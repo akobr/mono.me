@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.44.51111
+ * OpenAPI spec version: 0.9.45.54704
  */
 import * as zod from "zod";
 
@@ -29,6 +29,7 @@ export const GetAccountResponse = zod.object({
 export const CreateAccountBody = zod.object({
   Organization: zod.string().optional(),
   Project: zod.string().optional(),
+  ProjectDescription: zod.string().optional(),
 });
 
 export const CreateAccountResponse = zod.object({
@@ -91,12 +92,14 @@ export const GetAccessPointsResponseItem = zod.object({
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
+  Description: zod.string().optional(),
 });
 export const GetAccessPointsResponse = zod.array(GetAccessPointsResponseItem);
 
 export const CreateAccessPointBody = zod.object({
   Organization: zod.string().optional(),
   Project: zod.string().optional(),
+  ProjectDescription: zod.string().optional(),
   OwnerId: zod.string().optional(),
 });
 
@@ -141,6 +144,7 @@ export const CreateAccessPointResponse = zod.object({
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
+  Description: zod.string().optional(),
 });
 
 export const GetAccessPointParams = zod.object({
@@ -188,7 +192,84 @@ export const GetAccessPointResponse = zod.object({
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
+  Description: zod.string().optional(),
 });
+
+/**
+ * Sets the description of a project, trimmed; a blank one clears it. Needs a user with the Administrator role.
+ */
+export const UpdateAccessPointParams = zod.object({
+  key: zod.string().describe("The key of the project (organization.project)."),
+});
+
+export const UpdateAccessPointBody = zod.object({
+  Description: zod.string().optional(),
+});
+
+export const UpdateAccessPointResponse = zod.object({
+  Key: zod.string().optional(),
+  AccessMap: zod
+    .record(
+      zod.string(),
+      zod.enum([
+        "None",
+        "Reader",
+        "Contributor",
+        "ContributorWithSecrets",
+        "Administrator",
+        "Owner",
+      ]),
+    )
+    .optional(),
+  MachineAuthentication: zod
+    .object({
+      EnabledCredentialKinds: zod
+        .array(
+          zod.enum([
+            "ApiKey",
+            "Certificate",
+            "CertificateAndApiKey",
+            "ClientCredentials",
+            "Federated",
+          ]),
+        )
+        .optional(),
+      CredentialKind: zod
+        .union([
+          zod.literal("ApiKey"),
+          zod.literal("Certificate"),
+          zod.literal("CertificateAndApiKey"),
+          zod.literal("ClientCredentials"),
+          zod.literal("Federated"),
+          zod.literal(null),
+        ])
+        .nullish(),
+      CertificateLifetimeDays: zod.int().nullish(),
+    })
+    .optional(),
+  Description: zod.string().optional(),
+});
+
+/**
+ * Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
+ */
+export const getProjectsResponseRoleDefault = `None`;
+
+export const GetProjectsResponseItem = zod.object({
+  Key: zod.string().optional(),
+  Role: zod
+    .enum([
+      "None",
+      "Reader",
+      "Contributor",
+      "ContributorWithSecrets",
+      "Administrator",
+      "Owner",
+    ])
+    .default(getProjectsResponseRoleDefault),
+  Description: zod.string().optional(),
+});
+export const GetProjectsResponse = zod.array(GetProjectsResponseItem);
 
 /**
  * @deprecated
@@ -252,6 +333,7 @@ export const GrantUserAccessResponse = zod.object({
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
+  Description: zod.string().optional(),
 });
 
 /**
@@ -316,6 +398,7 @@ export const RevokeUserAccessResponse = zod.object({
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
+  Description: zod.string().optional(),
 });
 
 export const GetMachineAccessesParams = zod.object({

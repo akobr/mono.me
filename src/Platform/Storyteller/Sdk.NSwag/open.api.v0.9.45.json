@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.44.51111"
+    "version": "0.9.45.54704"
   },
   "servers": [
     {
@@ -89,7 +89,7 @@
         ],
         "operationId": "CreateAccount",
         "requestBody": {
-          "description": "Organization and project for the new account.",
+          "description": "Organization and project for the new account, and the description of the project.",
           "content": {
             "application/json": {
               "schema": {
@@ -120,7 +120,7 @@
             }
           },
           "400": {
-            "description": "The account already exists."
+            "description": "The account already exists, only one of the organization and the project is given, or a project description is given without them."
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
@@ -225,7 +225,7 @@
         ],
         "operationId": "CreateAccessPoint",
         "requestBody": {
-          "description": "An organization or project to create.",
+          "description": "An organization or project to create, and the description of the project.",
           "content": {
             "application/json": {
               "schema": {
@@ -313,6 +313,192 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AccessPoint"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///Annotation.Read",
+              "api:///Annotation.ReadWrite",
+              "api:///Configuration.Read",
+              "api:///Configuration.ReadWrite",
+              "api:///Configuration.Secrets",
+              "api:///Default.Read",
+              "api:///Default.ReadWrite",
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Sets the description of a project, trimmed; a blank one clears it. Needs a user with the Administrator role.",
+        "operationId": "UpdateAccessPoint",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the project (organization.project).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The new description; empty or no body clears it.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessPointUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessPoint"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The key is not organization.project, or the body is not a project update.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The project doesn't exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project changed concurrently twice in a row (Conflict); try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///Annotation.Read",
+              "api:///Annotation.ReadWrite",
+              "api:///Configuration.Read",
+              "api:///Configuration.ReadWrite",
+              "api:///Configuration.Secrets",
+              "api:///Default.Read",
+              "api:///Default.ReadWrite",
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/access/projects": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.",
+        "operationId": "GetProjects",
+        "responses": {
+          "200": {
+            "description": "The caller's projects.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSummary"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The account doesn't exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -15442,6 +15628,9 @@
           },
           "MachineAuthentication": {
             "$ref": "#/components/schemas/MachineAuthenticationPolicy"
+          },
+          "Description": {
+            "type": "string"
           }
         }
       },
@@ -15452,6 +15641,9 @@
             "type": "string"
           },
           "Project": {
+            "type": "string"
+          },
+          "ProjectDescription": {
             "type": "string"
           },
           "OwnerId": {
@@ -15485,6 +15677,14 @@
           }
         }
       },
+      "AccessPointUpdate": {
+        "type": "object",
+        "properties": {
+          "Description": {
+            "type": "string"
+          }
+        }
+      },
       "Account": {
         "type": "object",
         "properties": {
@@ -15512,6 +15712,9 @@
             "type": "string"
           },
           "Project": {
+            "type": "string"
+          },
+          "ProjectDescription": {
             "type": "string"
           }
         }
@@ -18038,6 +18241,29 @@
             ],
             "type": "string",
             "default": "None"
+          }
+        }
+      },
+      "ProjectSummary": {
+        "type": "object",
+        "properties": {
+          "Key": {
+            "type": "string"
+          },
+          "Role": {
+            "enum": [
+              "None",
+              "Reader",
+              "Contributor",
+              "ContributorWithSecrets",
+              "Administrator",
+              "Owner"
+            ],
+            "type": "string",
+            "default": "None"
+          },
+          "Description": {
+            "type": "string"
           }
         }
       },
