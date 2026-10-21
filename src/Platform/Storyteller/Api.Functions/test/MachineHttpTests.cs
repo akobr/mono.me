@@ -279,6 +279,30 @@ public class MachineHttpTests
         access.Created.ShouldBeNull();
     }
 
+    // JsonStringEnumConverter ORs names joined by commas, although MachineScope is no [Flags] enum: "AnnotationWrite,
+    // ConfigurationRead" would be ConfigurationWrite and "ConfigurationRead, SecretsRead" ConfigurationTransfer. A scope
+    // is one name, so such a value is not a machine scope, an escaped comma and a trailing one too. An Owner may give
+    // every scope, so only the body refuses them.
+    [Theory]
+    [InlineData("""["AnnotationWrite, ConfigurationRead"]""", "$.Scopes[0]")]
+    [InlineData("""["AnnotationWrite,ConfigurationRead"]""", "$.Scopes[0]")]
+    [InlineData("""["AnnotationRead", "ConfigurationRead, SecretsRead"]""", "$.Scopes[1]")]
+    [InlineData("""["AnnotationRead", "SecretsRead", "ConfigurationWrite,TemplateWrite"]""", "$.Scopes[2]")]
+    [InlineData("""["AnnotationRead,"]""", "$.Scopes[0]")]
+    public async Task PostMachines_ScopeNamesJoinedByCommas_AreBadRequestAndNoMachineIsCreated(string list, string path)
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.Owner };
+        var http = CreateHttp(access);
+        var body = $$"""{ "Organization": "", "Project": "", "Scopes": {{list}} }""";
+
+        var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<Models.ErrorResponse>();
+        error.Message.ShouldBe($"The request body is not a machine (at {path}).");
+        error.ErrorCode.ShouldBeNull();
+        access.Created.ShouldBeNull();
+    }
+
     [Fact]
     public async Task PostMachines_PropertyAndEnumNamesInAnyCase_AreRead()
     {
@@ -295,7 +319,8 @@ public class MachineHttpTests
 
     // The stored form, passed to the service and returned: the defined scopes, distinct, in enum order, completed once
     // with X.Read for every X.Write. Secrets imply no Configuration scope and management scopes imply nothing. The JSON
-    // reads integers as enum values too. An Owner may give every scope, so the role rule does not get in the way.
+    // reads a name in any case, trimmed, and integers as enum values too, also in a string. An Owner may give every
+    // scope, so the role rule does not get in the way.
     [Theory]
     [InlineData("""["AnnotationWrite"]""", new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite })]
     [InlineData("""["ConfigurationWrite"]""", new[] { MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite })]
@@ -306,6 +331,9 @@ public class MachineHttpTests
     [InlineData("""["KeyValueManage", "ConfigurationWrite", "AnnotationRead", "KeyValueManage", "ConfigurationWrite"]""", new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite, MachineScope.KeyValueManage })]
     [InlineData("""["annotationwrite", "CONFIGURATIONREAD", "annotationManage"]""", new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead, MachineScope.AnnotationManage })]
     [InlineData("""[1, "ConfigurationRead"]""", new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead })]
+    [InlineData("""[" ConfigurationRead ", "secretsWRITE"]""", new[] { MachineScope.ConfigurationRead, MachineScope.SecretsRead, MachineScope.SecretsWrite })]
+    [InlineData("""["3"]""", new[] { MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite })]
+    [InlineData("""[" 6 ", "+0", 2]""", new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer })]
     public async Task PostMachines_Scopes_ArePassedDistinctInEnumOrderWithTheImpliedReads(string list, MachineScope[] expected)
     {
         var access = new RecordingAccess(Machine()) { Role = AccountRole.Owner };
@@ -372,12 +400,14 @@ public class MachineHttpTests
         access.Roles.ShouldBe(RoleLookups("org1.proj1"));
     }
 
-    // The JSON reads integers as enum values, so an undefined one reaches the handler; it is named before the list is
-    // checked for a runtime scope.
+    // The JSON reads integers as enum values, also in a string, so an undefined one reaches the handler; it is named
+    // before the list is checked for a runtime scope.
     [Theory]
     [InlineData("[99]", "The machine scope 99 doesn't exist.")]
     [InlineData("""["SchemaWrite", 11]""", "The machine scope 11 doesn't exist.")]
     [InlineData("""["AnnotationRead", -1]""", "The machine scope -1 doesn't exist.")]
+    [InlineData("""["99"]""", "The machine scope 99 doesn't exist.")]
+    [InlineData("""["AnnotationRead", " -1 "]""", "The machine scope -1 doesn't exist.")]
     public async Task PostMachines_UndefinedScope_IsBadRequestAndNoMachineIsCreated(string list, string message)
     {
         var access = new RecordingAccess(Machine()) { Role = AccountRole.Administrator };

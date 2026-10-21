@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Api.Json;
 using _42.Platform.Storyteller.Json;
 
 using Microsoft.AspNetCore.Mvc;
@@ -84,6 +85,7 @@ internal static class FunctionTestDoubles
     {
         var options = new JsonOptions();
         options.JsonSerializerOptions.PropertyNamingPolicy = new NoChangeNamingPolicy();
+        options.JsonSerializerOptions.Converters.Add(new MachineScopeJsonConverter());
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new JObjectConverter());
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
