@@ -14,6 +14,7 @@ import type {
 } from '@42for.net/2splatform.sdk'
 import { accountActor, mockActor } from './audit'
 import type { MockDb } from './db'
+import { showcaseKeyValues } from './showcase/key-values'
 
 // The key/value pairs of the mock API (spec 29.8): a stateful store per scope with levels, versions with their
 // expiry, the deleted state, the project policy, recipients, the audit trail and deterministic usage.
@@ -84,7 +85,7 @@ export function placeholderJwe(place: string): string {
   })
 }
 
-function pair(
+export function pair(
   key: string,
   protection: KeyValueProtection,
   values: string[],
@@ -134,7 +135,7 @@ function seedPairs(scope: ScopeRef): StoredKeyValue[] {
   if (id === 'acme/billing/staging') {
     return [pair('db.host', 'Public', ['sql.staging']), pair('db.password', 'Standard', ['staging-secret'])]
   }
-  return []
+  return showcaseKeyValues(id)
 }
 
 export function storeOf(db: MockDb, scope: ScopeRef): KeyValueScopeStore {
