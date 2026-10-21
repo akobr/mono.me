@@ -277,7 +277,7 @@ A flat replay of the steps is not the same. Merging a finished document is not t
 
 ### Access and tags
 
-The read needs the scopes of the effective read and access to the whole project (`CheckAccessToProjectAsync`), as the templates do. The response shows ancestor documents in full, including values the annotation overrides, and the templates. A machine restricted to one annotation therefore gets `403 AnnotationRestricted`, also for its own annotation; it gets its effective configuration from the effective read. Bindings are not evaluated.
+Like the effective read, the read needs the Reader role, or the scope `Configuration.Read` for a machine. Like the templates, it needs access to the whole project (`CheckAccessToProjectAsync`). The response shows ancestor documents in full, including values the annotation overrides, and the templates. A machine restricted to one annotation therefore gets `403 AnnotationRestricted`, also for its own annotation; it gets its effective configuration from the effective read. Bindings are not evaluated.
 
 The read answers with a weak `ETag` of kind `c` (see "Conditional reads").
 
@@ -311,7 +311,7 @@ A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, ov
 - **The full key.** The same document under another key gets another tag, so nobody can make the server compute someone else's tag in their own configuration.
 - **The secret rights.** There are three values:
   - the caller may read secrets;
-  - secrets are withheld from a machine without mTLS, which also gets `X-2S-Secrets-Withheld`;
+  - secrets are withheld from a machine with `Secrets.Read` that has no mTLS, which also gets `X-2S-Secrets-Withheld`;
   - neither.
 
   Callers with different rights never share a resolved tag.

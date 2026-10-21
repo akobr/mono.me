@@ -95,15 +95,17 @@ The Standard and HSM keys carry a Key Vault rotation policy (`RotationInterval`,
 
 ## Secret delivery
 
-A secret value is delivered by a reveal, a secret version or diff, an export with secrets, or a resolved configuration with secret bindings. `request.GetSecretRightsAsync` decides once per request:
+A secret value is delivered by a reveal, a secret version or diff, an export with secrets, or a resolved configuration with secret bindings. A secret is written by a set or delete of a secret, a change to or from a secret level, a restore or protect of secrets, or an import with secrets. `request.GetSecretRightsAsync` decides both once per request, as `CanReadSecrets` and `CanWriteSecrets`:
 
-| Caller | Secrets are delivered when |
-| --- | --- |
-| User | The role is `ContributorWithSecrets` or higher on the project, or the token has the scope `Configuration.Secrets`. HTTPS with the bearer token |
-| Machine with an mTLS certificate (`PresentingCertificateThumbprint`) | The scope `Configuration.Secrets` |
-| Machine with an API key or a bearer token only: client credentials, or the Storyteller token of a [federated machine](authentication.md#machine-access-with-workload-identity-federation), which never presents a certificate | The scope, and the project policy has `RequireMtlsForSecretDelivery = false` |
+| Caller | Reads secrets (`CanReadSecrets`) when | Writes secrets (`CanWriteSecrets`) when |
+| --- | --- | --- |
+| User | The role is `ContributorWithSecrets` or higher on the project. No scope gives it. HTTPS with the bearer token | The same role |
+| Machine with an mTLS certificate (`PresentingCertificateThumbprint`) | The scope `Secrets.Read` | The scope `Secrets.Write` |
+| Machine with an API key or a bearer token only: client credentials, or the Storyteller token of a [federated machine](authentication.md#machine-access-with-workload-identity-federation), which never presents a certificate | `Secrets.Read`, and the project policy has `RequireMtlsForSecretDelivery = false` | `Secrets.Write`, and the same policy |
 
-Machines get the scope through the machine access scopes `SecretsRead` (`Configuration.Read` and `Configuration.Secrets`) and `SecretsReadWrite` (plus `Configuration.ReadWrite`); see [authentication.md](authentication.md#the-machineaccess-object). A withheld resolved configuration leaves the secrets unbound and carries the header `X-2S-Secrets-Withheld: mtls-required`. Explicit requests (a reveal, a secret version or diff, an export with secrets, a write of a secret) answer `403 MtlsRequired`. Responses with a secret value are `Cache-Control: no-store`. The result is also the request's ambient caller (`KeyValueCallerContext`), which the audit trail and the usage meters use for binding reads.
+A machine's scope counts when it is stored on the machine and carried by its credentials, in every build (see [Scopes of machines](authentication.md#scopes-of-machines)). Debug builds (`DEV_AUTH`) skip the role check of users, so there every user has both rights. Creating a machine with `Secrets.Write` adds `Secrets.Read`. Neither adds a `Configuration.*` scope, and a machine needs `Configuration.Read` or `Configuration.Write` to call the key/value routes at all (see [Who may do what](#who-may-do-what)). Only a user with `ContributorWithSecrets` gives a machine a `Secrets.*` scope.
+
+When the mTLS rule withholds the rights, each direction is reported only for a right the machine has, because only there would a certificate help. A resolved configuration of a machine with `Secrets.Read` leaves the secrets unbound and carries the header `X-2S-Secrets-Withheld: mtls-required`. Explicit reads (a reveal, a secret version or diff, an export with secrets) answer `403 MtlsRequired` when `Secrets.Read` is withheld, and writes of a secret when `Secrets.Write` is withheld. A machine without the scope gets no header, and `403 AccessDenied` for an explicit request. Responses with a secret value are `Cache-Control: no-store`. The result is also the request's ambient caller (`KeyValueCallerContext`), which the audit trail and the usage meters use for binding reads.
 
 Machine certificates are in Cosmos now (`CosmosClientCertificateStore`, partition `{project}.access`, id `mcert.{thumbprint}`, expiring 30 days after the certificate), so a certificate issued on one instance authenticates on every other one and survives a restart; hits are cached for 5 minutes and misses for 30 seconds, which bounds the revocation latency. `TransportSecurityMiddleware` refuses plain HTTP outside Development (`400 HttpsRequired`, with `X-Forwarded-Proto` honoured behind the platform's proxy) and sends `Strict-Transport-Security`.
 
@@ -224,7 +226,7 @@ The integration tests of `KeyValues.Azure.KeyVault/testint` start Lowkey Vault w
 
 ## Service
 
-`IKeyValueService` (`Backend.Core/src/KeyValues/`) is implemented by `CosmosKeyValueService`. Every call takes the organization, project and view, and the writes take a `KeyValueCaller`: the actor (an [`AuditActor`](audit-stamps.md#the-actor)), `CanReadSecrets`, `CanWriteSecrets`, the channel and the correlation id. The API decides the rights; the service enforces them, because only the service knows whether a key is a secret. The service also checks the project policy, validates references and client-encrypted values, writes the audit events and counts the usage.
+`IKeyValueService` (`Backend.Core/src/KeyValues/`) is implemented by `CosmosKeyValueService`. Every call takes the organization, project and view, and the writes take a `KeyValueCaller`: the actor (an [`AuditActor`](audit-stamps.md#the-actor)), `CanReadSecrets`, `CanWriteSecrets`, the channel and the correlation id. The two rights are separate: a machine gets `CanReadSecrets` from `Secrets.Read` and `CanWriteSecrets` from `Secrets.Write`, and a user gets both from `ContributorWithSecrets` (see [Secret delivery](#secret-delivery)). The API decides the rights; the service enforces them, because only the service knows whether a key is a secret. The service also checks the project policy, validates references and client-encrypted values, writes the audit events and counts the usage.
 
 | Method | Behaviour |
 | --- | --- |
@@ -269,39 +271,39 @@ Base `P` = `v1/{organization}/{project}/key-values`.
 
 | Method | Route | Body → response | Who |
 | --- | --- | --- | --- |
-| `GET` | `P/policy` | → `KeyValuePolicy` | Reader, machines with a read scope |
+| `GET` | `P/policy` | → `KeyValuePolicy` | Reader, machines with `Configuration.Read` |
 | `PUT` | `P/policy` | `KeyValuePolicyUpdate` (`AllowedProtections`, `DefaultSecretProtection`, `RequireMtlsForSecretDelivery`, `HsmRotationInterval`, `Byok.KeyUri`, `Byok.TenantId`, `ExpectedVersion`) → `KeyValuePolicy` | Administrator |
 | `GET` | `P/policy/byok/setup` | → `ByokSetupInfo` (`ClientId`, `ConsentUrl`, `RequiredRole`) | Administrator |
 | `POST` | `P/policy/byok/verify` | → `KeyValuePolicy` | Administrator |
 | `POST` | `P/policy/rotate` | `{ "Protection": "Standard" \| "Hsm" }` → `KeyValuePolicy` | Administrator |
-| `GET` | `P/recipients` | → `ClientEncryptionRecipient[]` | Reader, machines with a read scope |
+| `GET` | `P/recipients` | → `ClientEncryptionRecipient[]` | Reader, machines with `Configuration.Read` |
 | `POST` | `P/recipients` | `{ "Id"?, "Name", "PublicKey" }` (PEM or JWK) → `ClientEncryptionRecipient` | Administrator |
 | `PATCH` | `P/recipients/{id}` | `{ "Name"?, "IsEnabled"? }` → `ClientEncryptionRecipient` | Administrator |
 | `DELETE` | `P/recipients/{id}` | → `204` | Administrator |
 | `GET` | `P/audit` | query `view`, `key`, `operation`, `from`, `to`, `continuationToken` → `KeyValueAuditResponse`, newest first | Administrator |
 | `GET` | `v1/{organization}/{project}/usage/key-values` | query `from`, `to` (`yyyy-MM-dd`, the last 30 days by default, at most 400) → `KeyValueUsageReport` | Administrator |
 
-The Administrator operations are for users only; a machine gets `403` whatever its scopes and management scopes.
+The Administrator operations are for users only; a machine gets `403 AccessDenied` whatever its scopes ("Only a user with the Administrator role may call this operation; machines cannot.").
 
 ### Who may do what
 
-| Operation | User, project role | Machine, any of these scopes |
+| Operation | User, project role | Machine, all of these scopes |
 | --- | --- | --- |
-| List, get without reveal, versions, a public version or diff, policy, recipients | `Reader` | `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read`, `Default.ReadWrite` |
-| Export without secrets | `Reader` | a read scope and `Configuration.Transfer` |
-| Reveal, a secret version or diff | `ContributorWithSecrets` | a read scope and `Configuration.Secrets`, under the mTLS rule |
-| Export with secrets | `ContributorWithSecrets` | a read scope, `Configuration.Secrets` and `Configuration.Transfer`, under the mTLS rule |
-| Set or delete a public pair | `Contributor` | `Configuration.ReadWrite`, `Default.ReadWrite` |
-| Restore public pairs (`K/restore`) | `Contributor` | a write scope and `KeyValue.Manage` |
-| Import of public items | `Contributor` | a write scope and `Configuration.Transfer` |
-| Set or delete a secret; a change to or from a secret level | `ContributorWithSecrets` | a write scope and `Configuration.Secrets`, under the mTLS rule |
-| Restore or protect secrets (`K/restore`, `K/protect`) | `ContributorWithSecrets` | a write scope, `Configuration.Secrets` and `KeyValue.Manage`, under the mTLS rule |
-| Import with secrets | `ContributorWithSecrets` | a write scope, `Configuration.Secrets` and `Configuration.Transfer`, under the mTLS rule |
+| List, get without reveal, versions, a public version or diff, policy, recipients | `Reader` | `Configuration.Read` |
+| Export without secrets | `Reader` | `Configuration.Read` and `Configuration.Transfer` |
+| Reveal, a secret version or diff | `ContributorWithSecrets` | `Configuration.Read` and `Secrets.Read`, under the mTLS rule |
+| Export with secrets | `ContributorWithSecrets` | `Configuration.Read`, `Configuration.Transfer` and `Secrets.Read`, under the mTLS rule |
+| Set or delete a public pair | `Contributor` | `Configuration.Write` |
+| Restore public pairs (`K/restore`) | `Contributor` | `Configuration.Write` and `KeyValue.Manage` |
+| Import of public items | `Contributor` | `Configuration.Write` and `Configuration.Transfer` |
+| Set or delete a secret; a change to or from a secret level | `ContributorWithSecrets` | `Configuration.Write` and `Secrets.Write`, under the mTLS rule |
+| Restore or protect secrets (`K/restore`, `K/protect`) | `ContributorWithSecrets` | `Configuration.Write`, `KeyValue.Manage` and `Secrets.Write`, under the mTLS rule |
+| Import with secrets | `ContributorWithSecrets` | `Configuration.Write`, `Configuration.Transfer` and `Secrets.Write`, under the mTLS rule |
 | Permanent delete, purge, policy changes, BYOK setup and verify, rotation, recipients, audit, usage | `Administrator` | never |
 
-`Configuration.Transfer` and `KeyValue.Manage` are [management scopes](authentication.md#management-scopes-of-machines): no machine preset includes them, and an Administrator grants them to a machine explicitly. A machine without the management scope of an operation gets `403 AccessDenied` with a message that names it, for example "This operation needs the management scope KeyValue.Manage, which the machine was not created with.". The single-key writes stay runtime: a `PUT` with `Protection` and secret rights still changes the level of one key, a `PUT` to a deleted key re-creates it, and a `DELETE` soft-deletes one key, all without a management scope.
+A machine needs every scope of its row, each stored on the machine and carried by its credentials, in every build (see [Scopes of machines](authentication.md#scopes-of-machines)). Users need no scope, only the role. Reads need `Configuration.Read` and writes `Configuration.Write`; a bulk operation also needs its management scope: `Configuration.Transfer` for export and import, `KeyValue.Manage` for restore and protect. Only an Administrator gives a machine a management scope. A missing `Configuration.*` or management scope answers `403 AccessDenied` with a message that names it, for example "This operation needs the scope KeyValue.Manage, which the machine was not created with.". `Secrets.Read` and `Secrets.Write` are the secret rights of a machine (see [Secret delivery](#secret-delivery)): without them, a secret is refused as for a user without `ContributorWithSecrets`, with `403 AccessDenied`, and a restore reports such a key as `Forbidden`. The single-key writes stay runtime: a `PUT` with `Protection` and secret rights still changes the level of one key, a `PUT` to a deleted key re-creates it, and a `DELETE` soft-deletes one key, all without a management scope.
 
-A machine restricted to an annotation gets `403 AnnotationRestricted` for every operation of this table that machines may call, because key/values belong to the whole view (the Administrator operations refuse every machine with `403 AccessDenied`); it receives the values that the configuration of its annotation binds, through the resolved configuration (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)). The restriction is checked before the management scope. A caller without the rights to a secret gets `403 AccessDenied`; a machine whose only missing piece is the mTLS certificate gets `403 MtlsRequired`. Responses that carry a secret value are `Cache-Control: no-store`. A query parameter that does not parse is `400 InvalidQuery`.
+A machine restricted to an annotation gets `403 AnnotationRestricted` for every operation of this table that machines may call, because key/values belong to the whole view (the Administrator operations refuse every machine with `403 AccessDenied`); it receives the values that the configuration of its annotation binds, through the resolved configuration (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)). The restriction is checked before the scopes. A caller without the rights to a secret gets `403 AccessDenied`; a machine whose only missing piece is the mTLS certificate gets `403 MtlsRequired`. Responses that carry a secret value are `Cache-Control: no-store`. A query parameter that does not parse is `400 InvalidQuery`.
 
 ### Examples
 
@@ -347,7 +349,7 @@ The C# SDK (`Sdk.NSwag`, generated by NSwag) has `IKeyValuesApiClient` with one 
 
 ## CLI
 
-`sform story kv` (also `sform story key-values`) works in the context of the signed-in user: the organization, project and view of `sform` (`-p <organization>.<project>` and `-v <view>` override them). The project commands (`policy`, `recipients`, `audit`, `usage`) ignore the view. The API decides the rights, so a Reader lists and reads public pairs, a `ContributorWithSecrets` reveals and writes secrets, and an Administrator changes the policy. A machine sign-in also needs the management scope `Configuration.Transfer` for `export` and `import`, and `KeyValue.Manage` for `restore` and `protect` (see [Who may do what](#who-may-do-what)); a refusal prints the message and the error code of the API, and a `403 MtlsRequired` says that a machine needs its certificate.
+`sform story kv` (also `sform story key-values`) works in the context of the signed-in user: the organization, project and view of `sform` (`-p <organization>.<project>` and `-v <view>` override them). The project commands (`policy`, `recipients`, `audit`, `usage`) ignore the view. The API decides the rights, so a Reader lists and reads public pairs, a `ContributorWithSecrets` reveals and writes secrets, and an Administrator changes the policy. A machine sign-in needs the scopes of [Who may do what](#who-may-do-what) instead of a role: `Configuration.Read` to list and read, `Configuration.Write` to write, `Secrets.Read` and `Secrets.Write` for secrets, and on top `Configuration.Transfer` for `export` and `import` and `KeyValue.Manage` for `restore` and `protect`; a refusal prints the message and the error code of the API, and a `403 MtlsRequired` says that a machine needs its certificate.
 
 ```text
 sform story kv [--prefix <prefix>] [--protection <level>]... [--values] [--deleted|--all] [-k <token>]
@@ -434,9 +436,9 @@ An export lists the active keys, filtered by prefix and levels, ordered by key. 
 
 An import of up to 1,000 items first validates everything (keys, sizes, duplicates, allowed levels, and with `Replace` the prefix) and plans every item against the current state, deleted keys included. Any error returns `400 ImportInvalid` with the failing items, and nothing is written. The plan gives each item `Create`, `Update`, `Unchanged` or, in `Replace` mode, `Delete` for the active keys under the prefix that the document does not list. `DryRun` returns the plan. The writes go in atomic batches of 50 keys; a batch that another writer disturbed falls back to single writes. An import is idempotent: a second run of the same document changes nothing, and a run after a partial failure writes the rest. The keys a `Replace` deleted come back with one restore by prefix.
 
-A caller without secret rights can import public items only: a secret value in the document, a level change to or from a secret, or a `Replace` that would delete a secret answers `403`.
+A caller without the right to write secrets (`CanWriteSecrets`) can import public items only: a secret value in the document, a level change to or from a secret, or a `Replace` that would delete a secret answers `403`.
 
-A machine needs the management scope `Configuration.Transfer` for both, on top of a read scope for an export and a write scope for an import; without it, the export and the import answer `403 AccessDenied` before the body is read (see [Who may do what](#who-may-do-what)).
+A machine needs `Configuration.Read` and `Configuration.Transfer` for an export, and `Secrets.Read` for its secret values; `Configuration.Write` and `Configuration.Transfer` for an import, and `Secrets.Write` for its secret items. Without the `Configuration.*` scope or `Configuration.Transfer`, the export and the import answer `403 AccessDenied` before the body is read (see [Who may do what](#who-may-do-what)).
 
 ## Binding
 
@@ -453,7 +455,7 @@ The native store is the **default binding source** of resolved configurations, a
 ```
 
 - A configuration sees the pairs of its own organization, project and view. Keys are matched case-insensitively.
-- A public pair always binds. A secret binds only when the caller may receive secrets (`ContributorWithSecrets`, or the scope `Configuration.Secrets`); otherwise the string stays as stored, like any unresolved binding.
+- A public pair always binds. A secret binds only when the caller may read secrets (`ContributorWithSecrets`; a machine `Secrets.Read`, under the mTLS rule of [Secret delivery](#secret-delivery)); otherwise the string stays as stored, like any unresolved binding.
 - `public` declines secrets, and `secret` declines public pairs.
 - A missing or deleted key declines. At the top level the string stays as stored; inside an interpolation or a math expression the read fails with a binding error (`422`).
 - Each key is looked up once per resolved read, and a changed pair takes effect on the next read. Nothing is cached across reads. A conditional read (`If-None-Match`) of a document with bindings looks the keys up too: its 304 saves the transfer, not the lookups ([conditional reads](inheritance.md#conditional-reads)).

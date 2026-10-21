@@ -21,11 +21,11 @@ Views are implicit: the first write to a view creates it, and a write is never b
 
 | Method | Route | Needs | Result |
 | --- | --- | --- | --- |
-| GET | `v1/{organization}/{project}/views` | Reader; Administrator with `?discover=true` | `View[]`, `default` first |
+| GET | `v1/{organization}/{project}/views` | Reader, machines `Annotation.Read` or `Configuration.Read`; Administrator with `?discover=true` | `View[]`, `default` first |
 | POST | `v1/{organization}/{project}/views` | Administrator | `{ "Name", "Description" }` → `View`; `409 ViewExists` when registered, or for `default` |
 | PUT | `v1/{organization}/{project}/views/{view}` | Administrator | `{ "Description" }` → `View`; registers the view when needed, including `default` |
 
-Administrator operations (POST, PUT and `?discover=true`) need a user; machine credentials get `403`. PUT keeps the name as given: a legacy name that breaks the name rules (for example `Prod`) returns `400 InvalidName` instead of registering a different id. POST without a body (empty or `null`) returns `400`; PUT without one clears the description.
+Every machine of the project lists the views, also one restricted to an annotation; without either scope it gets `403 AccessDenied`, for example "This operation needs one of the scopes Annotation.Read or Configuration.Read, which the machine was not created with.". Administrator operations (POST, PUT and `?discover=true`) need a user; machine credentials get `403` ("Managing views needs a user with the Administrator role."). PUT keeps the name as given: a legacy name that breaks the name rules (for example `Prod`) returns `400 InvalidName` instead of registering a different id. POST without a body (empty or `null`) returns `400`; PUT without one clears the description.
 
 A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md) of its registration, null for a view that is not registered), `IsDefault`, and `IsRegistered`. `default` is always listed, also when it is not registered. Registrations live in the organization container, partition `{project}.meta`, id `view.{name}`.
 
@@ -58,6 +58,8 @@ The description is stored on the project's access point document (`apt.{organiza
 
 ## Roles
 
+Scopes describe machines, roles describe people. A user is authorized by the role on the access point only: the token must act for a user (the scope `User.Impersonation`, else `401` "The token does not act for a user: the scope User.Impersonation is missing."), and data scopes in a user token grant nothing. Debug builds (`DEV_AUTH`) skip these checks of users; the checks of machines run in every build. A machine has no role: its scopes decide, as described below the table.
+
 `None < Reader < Contributor < ContributorWithSecrets < Administrator < Owner`
 
 | Operation | Needs |
@@ -65,19 +67,29 @@ The description is stored on the project's access point document (`apt.{organiza
 | List members, set roles, remove members, manage invitations | `Administrator` on the access point |
 | Give, change, or remove the role `Owner` | `Owner` |
 | Leave an access point (remove yourself) | any membership |
-| Read deleted annotations and the history of an annotation | `Reader` on the project |
-| Delete, restore, and re-create annotations | `Contributor` on the project; machines with annotation write and the management scope `Annotation.Manage`. A machine re-creates a single key (`PUT …/annotations/{key}`) without it |
+| Read deleted annotations and the history of an annotation | `Reader` on the project; machines `Annotation.Read` |
+| Delete, restore, and re-create annotations | `Contributor` on the project; machines `Annotation.Write` and `Annotation.Manage`. A machine re-creates a single key (`PUT …/annotations/{key}`) with `Annotation.Write` alone |
 | Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
-| Export a view, import into a view, and read those jobs | `Administrator` on the project for users, and the scopes of every included kind. Machines have no role and need the scopes and the management scope `Configuration.Transfer`; a machine restricted to an annotation gets `403` `AnnotationRestricted` (see [export-import.md](export-import.md#access)) |
-| Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, or the scope `Configuration.Secrets` (see [key-values.md](key-values.md#secret-delivery)) |
-| Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project |
+| Export a view, import into a view, and read those jobs | `Administrator` on the project for users, without data scopes. Machines have no role and need `Configuration.Transfer` and the scope of every included kind: to export, `Annotation.Read` for annotations and `Configuration.Read` for the other kinds; to import, `Annotation.Write` and `Configuration.Write`; a machine restricted to an annotation gets `403` `AnnotationRestricted` (see [export-import.md](export-import.md#access)) |
+| Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, and no scope gives it to a user; machines `Secrets.Read`, under the mTLS rule of the project (see [key-values.md](key-values.md#secret-delivery)) |
+| Write key/value secrets: set, delete, restore, protect, import with secrets | `ContributorWithSecrets` on the project; machines `Secrets.Write`, under the mTLS rule of the project |
+| Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project, users only: machine credentials get `403` |
 | Set the [description of a project](#projects) | `Administrator` on the project, users only: machine credentials get `403` |
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 
 The API reads schemas, templates, deleted annotations and what the comparison of views needs (the views, the configurations and their diffs) with `Reader`. The admin UI locks its **Modeling** page, where they are, below `Contributor`; that lock is a choice of the admin UI. Its **Export & Import** tab is locked below `Administrator`, as the API requires (see [export-import.md](export-import.md#administration-ui)).
 
-Machines have no role; their scope and their [management scopes](authentication.md#management-scopes-of-machines) decide. The scope is a runtime preset of per-document reads and writes. Bulk and structural operations need a management scope on top of it: the export and import of a view or of key/values, schema and template writes, the bulk create, soft delete and restore of annotations, and the protect and bulk restore of key/values. Only an `Administrator` creates a machine with management scopes, resets it or replaces its federation rules. A machine created with an `AnnotationKey` reaches only that annotation and its descendants, and gets `403` `AnnotationRestricted` for other annotations and for operations of the whole project (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)).
+Machines have no role; their [scopes](authentication.md#scopes-of-machines) decide. A machine is exactly one flat list of scopes, `MachineAccess.Scopes`, in two groups:
+
+- **Runtime**: `Annotation.Read`, `Annotation.Write`, `Configuration.Read`, `Configuration.Write`, `Secrets.Read` and `Secrets.Write`, for the per-document reads and writes and for secret values.
+- **Management**: `Configuration.Transfer`, `Schema.Write`, `Template.Write`, `Annotation.Manage` and `KeyValue.Manage`, for the bulk and structural operations: the export and import of a view or of key/values, schema and template writes, the bulk create, soft delete and restore of annotations, and the protect and bulk restore of key/values.
+
+A read needs `X.Read`, a write `X.Write`, and a management operation its runtime scope and its management scope. Creating a machine with `Annotation.Write`, `Configuration.Write` or `Secrets.Write` adds the matching `X.Read`. A scope counts only when it is stored on the machine and carried by its credentials; otherwise the operation answers `403 AccessDenied` with a message that names the scope, in every build. Routes for users only refuse every machine with `403 AccessDenied`, whatever its credentials carry.
+
+The creator of a machine can use its credentials, so a user gives a machine no more than the user may do. Creating a machine, resetting it or replacing its federation rules needs `Contributor`, `ContributorWithSecrets` when the machine has a `Secrets.*` scope, and `Administrator` when it has a management scope. These are role checks of users, so Debug builds skip them.
+
+A machine created with an `AnnotationKey` reaches only that annotation and its descendants, and gets `403` `AnnotationRestricted` for other annotations and for operations of the whole project (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)).
 
 Every access point keeps at least one `Owner`. The last owner can't be demoted, removed, or leave (`409`, `LastOwner`).
 
@@ -133,7 +145,7 @@ A route that takes a JSON body does not require a `Content-Type`, and answers `4
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
 | `400` | `InvalidName` | A new organization, project, or view name breaks the [name rules](#names). |
-| `403` | `AccessDenied` | The caller's role on the access point is too low, or machine credentials call an operation of this page that is for users only: registering, describing or discovering views, a permanent delete, setting the description of a project or listing projects. |
+| `403` | `AccessDenied` | The caller's role on the access point is too low, a machine lacks a scope of the operation, or a machine calls an operation for users only (such as registering, describing or discovering views, a permanent delete, setting the description of a project or listing projects). |
 | `403` | `EmailMismatch`, `EmailNotVerified` | Accepting or declining with another or an unverified email. |
 | `404` | `NotFound` | The access point, account, or invitation does not exist. |
 | `404` | `MemberNotFound` | The account is not a member of the access point. |

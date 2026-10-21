@@ -82,28 +82,48 @@ volumes:
 
 `sform account` checks the variables without calling the account API, which is a good first step of a job. For client credentials and a federated machine it also gets a token; a federated machine needs `STORYTELLER_PROJECT` for that, as `sform account` has no `-p`. A wrong setting or a missing platform token file stops the job with exit code `2`, a token endpoint or GitHub request that fails with `3`, rejected credentials or a refused exchange with `44`.
 
-A machine reads, and with `-w` writes, single documents with its scope. Bulk and structural work needs a **management scope** on top of it, which only an Administrator gives, with `-m` when the machine is created. No scope includes one.
+A machine can do what its scopes allow, and it gets them when it is created. **Runtime scopes** read and write single documents. **Management scopes** add bulk and structural work, on top of the runtime scope of the operation. `sform account machine create` picks them:
 
-| Management scope | Needed by |
+| Option | Scopes |
 |---|---|
-| `configuration-transfer` | `sform story export` and `import`, `sform story kv export` and `import` |
-| `schema-write` | the writes and deletes of `sform story schema` |
-| `template-write` | `sform story template set`, `edit` and `delete` |
-| `annotation-manage` | `sform story delete` and `restore`, and `sform story set --restore-deleted` |
-| `keyvalue-manage` | `sform story kv protect` and `restore` |
+| `-r` | `Annotation.Read` and `Configuration.Read`. The default: `sform` adds them whenever no runtime scope is given. |
+| `-w` | The scopes of `-r`, and `Annotation.Write` and `Configuration.Write` |
+| `--scope` | Any scope of the table below |
+| `-m` | A management scope; a runtime scope is refused, with a hint to use `--scope` |
+
+`--scope` and `-m` take several values separated by commas, or repeat. A value is the kebab name, the scope string or the enum name, in any case (`secrets-read`, `Secrets.Read`, `SecretsRead`). An unknown value, or a runtime scope given to `-m`, prints the allowed names and stops with exit code `2` before any call. The API adds the read scope of every write scope, so `--scope configuration-write` gives `Configuration.Read` too.
+
+| `--scope` | Scope | Enum name | Group | Needed by |
+|---|---|---|---|---|
+| `annotation-read` | `Annotation.Read` | `AnnotationRead` | Runtime | `sform story` (the list), `get`, `deleted` and `history` |
+| `annotation-write` | `Annotation.Write` | `AnnotationWrite` | Runtime | `sform story set` |
+| `configuration-read` | `Configuration.Read` | `ConfigurationRead` | Runtime | the reads of `sform story config`, `schema`, `template` and `kv` |
+| `configuration-write` | `Configuration.Write` | `ConfigurationWrite` | Runtime | the writes of `sform story config` and `kv`; with `schema-write` or `template-write`, those of `schema` and `template` |
+| `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config get --resolved`, `sform story kv export --include-secrets` |
+| `secrets-write` | `Secrets.Write` | `SecretsWrite` | Runtime | `sform story kv set` of a secret, and `sform story kv protect` |
+| `configuration-transfer` | `Configuration.Transfer` | `ConfigurationTransfer` | Management | `sform story export` and `import`, `sform story kv export` and `import` |
+| `schema-write` | `Schema.Write` | `SchemaWrite` | Management | the writes and deletes of `sform story schema` |
+| `template-write` | `Template.Write` | `TemplateWrite` | Management | `sform story template set`, `edit` and `delete` |
+| `annotation-manage` | `Annotation.Manage` | `AnnotationManage` | Management | `sform story delete` and `restore`, and `sform story set --restore-deleted` |
+| `keyvalue-manage` | `KeyValue.Manage` | `KeyValueManage` | Management | `sform story kv protect` and `restore` |
 
 ``` powershell
-sform account machine create -w -m configuration-transfer   # a pipeline that keeps a view in a git repository
+sform account machine create                                    # Annotation.Read and Configuration.Read
+sform account machine create -r --scope secrets-read            # a service that also receives its secrets
+sform account machine create -w --scope configuration-transfer  # a pipeline that keeps a view in a git repository
+sform account machine create --scope configuration-write -m schema-write,template-write   # a pipeline that deploys schemas and templates
 ```
 
-`-m` takes several values separated by commas, or repeats. Without the management scope, the API answers `403` with a message that names the scope, and `sform` prints it. Machines created before management scopes existed have none, and a machine cannot be edited: create a new one for such a job.
+`--scope secrets-read` alone gives only `Secrets.Read`, because it is a runtime scope: add `-r` or `-w` for the documents themselves. Creating a machine needs the Contributor role, the `ContributorWithSecrets` role when it gets `Secrets.Read` or `Secrets.Write`, and the Administrator role when it gets a management scope; resetting it needs the same role. `sform account machine` lists the machines with the columns `Id`, `Scopes` (the runtime scopes), `Kind`, `Secret`, `RestrictionTo` and `Management` (the management scopes).
+
+Without a scope it needs, the API answers `403` with a message that names the scope, such as "This operation needs the scope Annotation.Manage, which the machine was not created with.", and `sform` prints it. Machines created before these scopes existed have none: their API keys and certificates get `401`, their client credentials `403`, and a federated machine gets no token. A machine cannot be edited: create a new one with the scopes the job needs.
 
 ::: warning
 Commands print what they read or write. A step that reads a resolved configuration with secrets puts those values into the job log, so prefer steps that write configuration, or keep such output out of the log.
 :::
 
 ::: tip
-The details, such as the token URL rules, the certificate header for a local API, how a federated machine gets and renews its token, and every exit code, are in [the technical documentation](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#machine-sign-in-for-pipelines).
+The details, such as the token URL rules, the certificate header for a local API, how a federated machine gets and renews its token, and every exit code, are in [the technical documentation](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#machine-sign-in-for-pipelines). [Scopes of machines](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#scopes-of-machines) lists the operations of every scope.
 :::
 
 ## Telemetry

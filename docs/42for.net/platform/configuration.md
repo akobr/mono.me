@@ -168,13 +168,13 @@ Expressions that the Storyteller API evaluates:
 }
 ```
 
-The customer keeps `currency` in the subject's `values`. The execution refers to it. The secret never has to be copied into the catalog; a resolved read with the secret scope materializes it for the service that is allowed to hold it, and everyone else still sees the expression.
+The customer keeps `currency` in the subject's `values`. The execution refers to it. The secret never has to be copied into the catalog; a resolved read by a caller with secret rights (a user with the `ContributorWithSecrets` role or higher, or a machine with the scope `Secrets.Read`) materializes it for the service that is allowed to hold it, and everyone else still sees the expression.
 
 The functions and sources depend on the deployment: each Azure Key Vault is a source under its own name. The administration UI lists the ones the server registered, with examples, and completes them as you type.
 
 ## Export and import
 
-The documents of a view can leave the platform as one zip and come back the same way: from the **Export & Import** page of the [Administration UI](admin-ui#export-and-import), or with `sform story export` and `sform story import`. An archive holds four kinds, all of them by default: the **annotations**, the **schemas**, the **templates** and the **configurations** of the view. `--include` (or the kind checkboxes of the page) narrows either side to some of them. Both need the Administrator role on the project, or Owner, on the page, in `sform` and in the API. A machine has no role and needs the scopes of the kinds it exports or imports, and the management scope `Configuration.Transfer`, instead. An Administrator gives it that scope when creating the machine.
+The documents of a view can leave the platform as one zip and come back the same way: from the **Export & Import** page of the [Administration UI](admin-ui#export-and-import), or with `sform story export` and `sform story import`. An archive holds four kinds, all of them by default: the **annotations**, the **schemas**, the **templates** and the **configurations** of the view. `--include` (or the kind checkboxes of the page) narrows either side to some of them. Both need the Administrator role on the project, or Owner, on the page, in `sform` and in the API. A machine has no role and needs the management scope `Configuration.Transfer` instead, with the read scope of each kind it exports or the write scope of each kind it imports: `Annotation.Read` or `Annotation.Write` for the annotations, `Configuration.Read` or `Configuration.Write` for the other three. An Administrator gives it `Configuration.Transfer` when creating the machine.
 
 The file name tells the kind of a document, so the folders don't matter to an import:
 

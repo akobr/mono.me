@@ -154,7 +154,7 @@ sform story history sbt.northwind         # who changed it, when, and what
 sform story delete sbt.northwind --permanent   # remove it now (Administrator or Owner)
 ```
 
-A machine deletes and restores only with the management scope `Annotation.Manage`, and never deletes permanently.
+A machine deletes and restores only with the scope `Annotation.Write` and the management scope `Annotation.Manage`, and never deletes permanently.
 
 Every change is recorded with the account or machine that made it: creates, updates (with the old and new values), deletes, restores, and configuration versions.
 
@@ -165,8 +165,8 @@ Writing a key that is deleted creates it again with an empty configuration. `sfo
 The annotations of a view travel in its [export](configuration#export-and-import), next to its schemas, templates and configurations. Each annotation is a file named by its key, such as `exe.northwind.invoicing.production.json`. The file holds what you can edit: title, description, documentation link, labels, values, the disabled flag, the validity window and the time zone, and for a [unit](#unit) its unit type and definition. An import replaces the content, so a field left out of the file is cleared; a unit without its type or definition gets the defaults of a new unit (`event`, `unknown`). The key gives the type and the parents, so they are not in the file. The audit and the deleted annotations stay with the platform.
 
 ```text
-sform story export --include annotations     # only the catalog (a user: Administrator or Owner; a machine: the annotation scopes and Configuration.Transfer)
-sform story import catalog.zip --dry-run     # what an import would change, without writing (a user: Administrator or Owner; a machine: the scopes of the included kinds and Configuration.Transfer)
+sform story export --include annotations     # only the catalog (a user: Administrator or Owner; a machine: Annotation.Read and Configuration.Transfer)
+sform story import catalog.zip --dry-run     # what an import would change, without writing (a user: Administrator or Owner; a machine: the write scopes of the included kinds and Configuration.Transfer)
 ```
 
 An import creates the missing annotations, ancestors before their descendants, and updates the ones that differ. With `--existing skip`, it keeps the ones the view has. A deleted annotation in the archive is created again, as any write of a deleted key does: its old configuration does not come back, only the one the archive holds. With `skip`, it stays deleted. Every write is recorded with the account or machine that ran the import. In the Administration UI, the **Export & Import** page of the view does the same.
