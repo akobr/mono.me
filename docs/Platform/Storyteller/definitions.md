@@ -159,8 +159,8 @@ Version routes, on each of the three stored kinds (the combined schema is comput
 
 PUT accepts a query parameter `force`. It defaults to false. See [Force](#force).
 
-- Reads require one of `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read`, `Default.ReadWrite`, plus access to the project.
-- Writes (`PUT` and `DELETE` of the three kinds) require `Configuration.ReadWrite` or `Default.ReadWrite` and the `Contributor` role on the project. A machine has no role; it needs the management scope `Schema.Write` on top of the write scope, stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Management scopes of machines](authentication.md#management-scopes-of-machines)).
+- Reads require the `Reader` role on the project. A machine needs the scope `Configuration.Read` instead.
+- Writes (`PUT` and `DELETE` of the three kinds) require the `Contributor` role on the project. A machine has no role; it needs `Configuration.Write` and the management scope `Schema.Write`, both stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Scopes of machines](authentication.md#scopes-of-machines)).
 - `400` means the body is not JSON or is not a schema NJsonSchema can parse, or the type code or annotation key is unknown. On the descendant-type `PUT` it also means that the type cannot descend from `{key}`; that response carries `ErrorCode` `InvalidKey`.
 - `404` means the requested schema, version, or (for a patch of configuration) the configuration is absent.
 - `413` with `ErrorCode` `BodyTooLarge` means the body of a schema, configuration or JSON Patch write is larger than 4 MiB; it is refused before it is parsed. A stored document is one Cosmos item of at most 2 MB.

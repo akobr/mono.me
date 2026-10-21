@@ -14,7 +14,7 @@ Every Storyteller record that names who changed it uses the same two types, in t
 
 `Kind` and `Id` are the reference. A client links an account to the members of the project and a machine to its page, and resolves the current name there when it needs one. `Name` is a snapshot: it is never looked up and goes stale after a rename, but it renders without an extra call and survives the account's removal from the project.
 
-The API names the caller with `HttpRequestDataExtensions.GetAuditActor()`. It never calls the profile resolver, so it adds no latency. Debug builds (`DEV_AUTH`) also serve requests without an identity; those are `System`. The platform's own writes (the calculation cache of configurations, the key/value maintenance and key rotation) are `System` too.
+The API names the caller with `HttpRequestDataExtensions.GetAuditActor()`. It never calls the profile resolver, so it adds no latency. Debug builds (`DEV_AUTH`) also serve requests without an identity; those are `System`. The export and import of a view are the exception: they answer such a request with `401`, as in every build. The platform's own writes (the calculation cache of configurations, the key/value maintenance and key rotation) are `System` too.
 
 ## The stamp
 

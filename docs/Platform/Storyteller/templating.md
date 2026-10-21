@@ -123,8 +123,8 @@ The routes include the view, like configuration routes:
 | GET | `…/template/{annotationType}/versions/{version}/diff` | `GetTemplateVersionDiff` |
 | GET | `…/template/{annotationType}/versions/{version}/diff/{versionFrom}` | `GetTemplateVersionDiffCustom` |
 
-- Reads require one of the scopes `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read`, `Default.ReadWrite`, plus access to the project.
-- Writes (`SetTemplate`, `PatchTemplate`, `DeleteTemplate`) require `Configuration.ReadWrite` or `Default.ReadWrite` and the `Contributor` role in the project. A machine has no role; it needs the management scope `Template.Write` on top of the write scope, stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Management scopes of machines](authentication.md#management-scopes-of-machines)).
+- Reads require the `Reader` role in the project. A machine needs the scope `Configuration.Read` instead.
+- Writes (`SetTemplate`, `PatchTemplate`, `DeleteTemplate`) require the `Contributor` role in the project. A machine has no role; it needs `Configuration.Write` and the management scope `Template.Write`, both stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Scopes of machines](authentication.md#scopes-of-machines)).
 - Write status codes: `400` for invalid input (JSON, `$patch`, JSON Patch; `ErrorCode` `PatchInvalid` for patch errors), `413` with `ErrorCode` `BodyTooLarge` for a body (a template or a JSON Patch) larger than 4 MiB, `404` for a patch of a missing template, `409` when the concurrency retries run out (`TemplateConcurrencyException`), `412` when a JSON Patch `test` operation does not match the stored template (`ErrorCode` `PatchTestFailed`), `500` for a storage or cache-invalidation failure. A client that puts `test` operations before its changes gets optimistic concurrency: a stale view of the template returns 412 instead of overwriting newer content.
 - Diff endpoints return a `DiffResult`, or unified diff text with `?format=unified`. An unknown version returns `404`.
 
@@ -297,7 +297,7 @@ sform story template diff <type> [to] [from]
 | `versions` | Lists the versions, newest first: version, author, creation time, and expiration time (`—` for the current version). |
 | `diff` | Shows the diff of the latest version against its previous one, of `to` against its previous one, or of `from → to`. |
 
-When the API refuses `set`, `edit` or `delete` with `403`, for example for a machine without the management scope `Template.Write`, the command prints the server's message ("This operation needs the management scope Template.Write, which the machine was not created with.") and `Error code: AccessDenied`, and exits with `44`.
+When the API refuses `set`, `edit` or `delete` with `403`, for example for a machine without the management scope `Template.Write`, the command prints the server's message ("This operation needs the scope Template.Write, which the machine was not created with.") and `Error code: AccessDenied`, and exits with `44`.
 
 Examples, for the `default` view of the current project:
 

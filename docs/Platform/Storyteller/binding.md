@@ -253,7 +253,7 @@ Clients such as the Administration UI offer completion and examples for the func
 }
 ```
 
-- The endpoint needs one of the scopes `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read`, `Default.ReadWrite` and the Reader role on the project. Machines may call it. The registrations are global today; the route is project-scoped so it can list project sources later.
+- The endpoint needs the Reader role on the project. A machine needs the scope `Configuration.Read` instead, and may call it also when it is restricted to an annotation. The registrations are global today; the route is project-scoped so it can list project sources later.
 - `BindingExecutor.GetCatalog()` sorts functions and sources by name (ordinal). It never resolves a value and never calls a source.
 - A binding that implements `IDescribedBinding` contributes its `BindingDescription`. `Describe` receives the registered name, so the examples use it (a Key Vault source does not know its key otherwise). Any other binding is listed by its name only, with an empty summary.
 - `IsDefault` is set for the source registered as `default`, which `@path.to.value` reads. `IsSecret` comes from the description.
