@@ -14,6 +14,9 @@ public static class Definitions
                 public const string AccessPoints = "v1/access/points";
                 public const string AccessPoint = $"v1/access/points/{{{Parameters.Key}}}";
 
+                // The caller's projects; "access" is a reserved organization name, so no organization route meets it.
+                public const string Projects = "v1/access/projects";
+
                 public const string Grant = "v1/access/grant";
                 public const string Revoke = "v1/access/revoke";
 
@@ -212,6 +215,8 @@ public static class Definitions
             public const string GetAccessPoints = nameof(GetAccessPoints);
             public const string GetAccessPoint = nameof(GetAccessPoint);
             public const string CreateAccessPoint = nameof(CreateAccessPoint);
+            public const string UpdateAccessPoint = nameof(UpdateAccessPoint);
+            public const string GetProjects = nameof(GetProjects);
 
             public const string GrantUserAccess = nameof(GrantUserAccess);
             public const string RevokeUserAccess = nameof(RevokeUserAccess);

@@ -140,6 +140,54 @@ public class MembersHttpTests
         access.Created.UserName.ShouldBe("ada@example.com");
     }
 
+    // The service trims the description and puts it on the project only; the handler passes it as sent.
+    [Fact]
+    public async Task PostAccount_WithAProjectDescription_PassesIt()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var body = FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { Organization = "acme", Project = "billing", ProjectDescription = " Billing of Acme. " });
+
+        var result = await http.PostAccount(UserRequest(body));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Created.ShouldNotBeNull();
+        access.Created.Organization.ShouldBe("acme");
+        access.Created.Project.ShouldBe("billing");
+        access.Created.ProjectDescription.ShouldBe(" Billing of Acme. ");
+    }
+
+    // The description belongs to the project the account creates; without one, it has nowhere to go.
+    [Fact]
+    public async Task PostAccount_ProjectDescriptionWithoutOrganizationAndProject_ReturnsBadRequest()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { ProjectDescription = "Billing of Acme." })));
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe("A project description needs an organization and a project.");
+        access.Calls.ShouldBe(["account:user-1"]);
+        access.Created.ShouldBeNull();
+    }
+
+    // A blank description is no description, so the bare account is created.
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public async Task PostAccount_BlankProjectDescriptionWithoutOrganizationAndProject_CreatesABareAccount(string description)
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { ProjectDescription = description })));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Created.ShouldNotBeNull();
+        access.Created.Project.ShouldBeNull();
+    }
+
     // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. An account without
     // memberships is created with {}, not without a body.
     [Theory]
