@@ -13,6 +13,7 @@ import {
   getKeyValuePolicy,
   getKeyValues,
   getMembers,
+  getProjects,
   getTemplates,
   getViewExport,
   getViewExportArchive,
@@ -22,6 +23,7 @@ import {
   startViewExport,
   startViewImport,
   StorytellerError,
+  updateAccessPoint,
 } from '../index'
 import * as mswEntry from '../msw'
 import { getGetMembersMockHandler, getStorytellerMock } from '../msw'
@@ -35,6 +37,7 @@ import {
   GetKeyValuePolicyResponse,
   GetKeyValuesResponse,
   GetMembersResponse,
+  GetProjectsResponse,
   GetTemplatesResponse,
   GetViewExportResponse,
   GetViewImportResponse,
@@ -42,6 +45,7 @@ import {
   SetMemberRoleBody,
   StartViewExportResponse,
   StartViewImportResponse,
+  UpdateAccessPointResponse,
 } from '../zod'
 
 // The generated MSW handlers answer every operation with Faker data, and the generated Zod schemas
@@ -60,6 +64,8 @@ describe('generated client against generated mocks', () => {
     ['getAccount', () => getAccount(), GetAccountResponse],
     ['getAuthConfiguration', () => getAuthConfiguration(), GetAuthConfigurationResponse],
     ['getMembers', () => getMembers('acme.billing'), GetMembersResponse],
+    ['getProjects', () => getProjects(), GetProjectsResponse],
+    ['updateAccessPoint', () => updateAccessPoint('acme.billing', { Description: 'Billing of Acme.' }), UpdateAccessPointResponse],
     ['getViews', () => getViews('acme', 'billing'), GetViewsResponse],
     ['getConfigurations', () => getConfigurations('acme', 'billing', 'default'), GetConfigurationsResponse],
     ['getConfigurationComposition', () => getConfigurationComposition('acme', 'billing', 'default', 'exe.a.b.c'), GetConfigurationCompositionResponse],

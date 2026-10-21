@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.44.51111
+ * OpenAPI spec version: 0.9.45.54704
  */
 import type { AccessPointAccessMap } from "./accessPointAccessMap";
 import type { MachineAuthenticationPolicy } from "./machineAuthenticationPolicy";
@@ -12,4 +12,5 @@ export interface AccessPoint {
   Key?: string;
   AccessMap?: AccessPointAccessMap;
   MachineAuthentication?: MachineAuthenticationPolicy;
+  Description?: string;
 }

@@ -3,12 +3,13 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.44.51111
+ * OpenAPI spec version: 0.9.45.54704
  */
 import type {
   AccessPoint,
   AccessPointCreate,
   AccessPointMember,
+  AccessPointUpdate,
   Account,
   AccountCreate,
   AuthConfiguration,
@@ -24,6 +25,7 @@ import type {
   MachineTokenResponse,
   MemberRoleUpdate,
   Permission,
+  ProjectSummary,
   SharedCertificate,
   SharedCertificateCreate,
 } from "../../model";
@@ -145,6 +147,66 @@ export const getAccessPoint = async (
   options?: Parameters<typeof storytellerFetch>[1],
 ): Promise<AccessPoint> => {
   return storytellerFetch<AccessPoint>(getGetAccessPointUrl(key), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getUpdateAccessPointUrl = (key: string) => {
+  return `/v1/access/points/${encodeURIComponent(String(key))}`;
+};
+
+/**
+ * Sets the description of a project, trimmed; a blank one clears it. Needs a user with the Administrator role.
+ */
+export const updateAccessPoint = async (
+  key: string,
+  accessPointUpdate?: AccessPointUpdate,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AccessPoint> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<AccessPoint>(getUpdateAccessPointUrl(key), {
+    ...options,
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(accessPointUpdate),
+  });
+};
+
+export const getGetProjectsUrl = () => {
+  return `/v1/access/projects`;
+};
+
+/**
+ * Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
+ */
+export const getProjects = async (
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<ProjectSummary[]> => {
+  return storytellerFetch<ProjectSummary[]>(getGetProjectsUrl(), {
     ...options,
     method: "GET",
   });

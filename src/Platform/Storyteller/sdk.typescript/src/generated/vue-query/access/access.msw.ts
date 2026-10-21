@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.44.51111
+ * OpenAPI spec version: 0.9.45.54704
  */
 import { faker } from "@faker-js/faker";
 
@@ -26,6 +26,7 @@ import type {
   MachineAccess,
   MachineAuthenticationPolicy,
   MachineTokenResponse,
+  ProjectSummary,
   SharedCertificate,
 } from "../../model";
 
@@ -121,6 +122,10 @@ export const getGetAccessPointsResponseMock = (): AccessPoint[] =>
       },
       undefined,
     ]),
+    Description: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
   }));
 
 export const getCreateAccessPointResponseMock = (
@@ -159,6 +164,10 @@ export const getCreateAccessPointResponseMock = (
         null,
       ]),
     },
+    undefined,
+  ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
   ...overrideResponse,
@@ -202,8 +211,80 @@ export const getGetAccessPointResponseMock = (
     },
     undefined,
   ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
   ...overrideResponse,
 });
+
+export const getUpdateAccessPointResponseMock = (
+  overrideResponse: Partial<Extract<AccessPoint, object>> = {},
+): AccessPoint => ({
+  Key: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  AccessMap: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: faker.helpers.arrayElement(
+        Object.values(AccountRole),
+      ),
+    },
+    undefined,
+  ]),
+  MachineAuthentication: faker.helpers.arrayElement([
+    {
+      EnabledCredentialKinds: faker.helpers.arrayElement([
+        faker.helpers.arrayElements(Object.values(MachineCredentialKind)),
+        undefined,
+      ]),
+      CredentialKind: faker.helpers.arrayElement([
+        faker.helpers.arrayElement([
+          "ApiKey",
+          "Certificate",
+          "CertificateAndApiKey",
+          "ClientCredentials",
+          "Federated",
+        ] as const),
+        null,
+      ]),
+      CertificateLifetimeDays: faker.helpers.arrayElement([
+        faker.number.int(),
+        null,
+      ]),
+    },
+    undefined,
+  ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getGetProjectsResponseMock = (): ProjectSummary[] =>
+  Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => ({
+    Key: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    Role: faker.helpers.arrayElement([
+      "None",
+      "Reader",
+      "Contributor",
+      "ContributorWithSecrets",
+      "Administrator",
+      "Owner",
+    ] as const),
+    Description: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+  }));
 
 export const getGrantUserAccessResponseMock = (
   overrideResponse: Partial<Extract<AccessPoint, object>> = {},
@@ -241,6 +322,10 @@ export const getGrantUserAccessResponseMock = (
         null,
       ]),
     },
+    undefined,
+  ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
   ...overrideResponse,
@@ -282,6 +367,10 @@ export const getRevokeUserAccessResponseMock = (
         null,
       ]),
     },
+    undefined,
+  ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
   ...overrideResponse,
@@ -1741,6 +1830,54 @@ export const getGetAccessPointMockHandler = (
   );
 };
 
+export const getUpdateAccessPointMockHandler = (
+  overrideResponse?:
+    | AccessPoint
+    | ((
+        info: Parameters<Parameters<typeof http.put>[1]>[0],
+      ) => Promise<AccessPoint> | AccessPoint),
+  options?: RequestHandlerOptions,
+) => {
+  return http.put(
+    "*/api/v1/access/points/:key",
+    async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getUpdateAccessPointResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getGetProjectsMockHandler = (
+  overrideResponse?:
+    | ProjectSummary[]
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<ProjectSummary[]> | ProjectSummary[]),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/access/projects",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetProjectsResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGrantUserAccessMockHandler = (
   overrideResponse?:
     | AccessPoint
@@ -2478,6 +2615,8 @@ export const getAccessMock = () => [
   getGetAccessPointsMockHandler(),
   getCreateAccessPointMockHandler(),
   getGetAccessPointMockHandler(),
+  getUpdateAccessPointMockHandler(),
+  getGetProjectsMockHandler(),
   getGrantUserAccessMockHandler(),
   getRevokeUserAccessMockHandler(),
   getGetMachineAccessesMockHandler(),
