@@ -52,7 +52,7 @@ function serveTokens(expiresIn = 900) {
           issued_token_type: 'urn:ietf:params:oauth:token-type:access_token',
           token_type: 'Bearer',
           expires_in: expiresIn,
-          scope: form.get('scope') ?? 'Default.Read Annotation.Read',
+          scope: form.get('scope') ?? 'Annotation.Read Configuration.Read',
         },
         { headers: { 'Cache-Control': 'no-store' } },
       )
@@ -104,7 +104,7 @@ describe('exchangeFederatedToken', () => {
     const token = await exchangeFederatedToken({ baseUrl, organization: 'acme', project: 'billing', machineId, subjectToken: 'gh-1' })
 
     expect(token.accessToken).toBe('st-gh-1')
-    expect(token.scope).toBe('Default.Read Annotation.Read')
+    expect(token.scope).toBe('Annotation.Read Configuration.Read')
     expect(token.expiresAt).toBeGreaterThanOrEqual(before + 900_000)
     expect(token.expiresAt).toBeLessThanOrEqual(Date.now() + 900_000)
     expect(requests).toHaveLength(1)
@@ -133,15 +133,15 @@ describe('exchangeFederatedToken', () => {
       machineId,
       subjectToken: 'mi-1',
       subjectTokenType: FederatedSubjectTokenType.AccessToken,
-      scope: 'Default.Read',
+      scope: 'Annotation.Read',
     })
 
-    expect(token.scope).toBe('Default.Read')
+    expect(token.scope).toBe('Annotation.Read')
     expect(requests[0]?.pathname).toBe('/api/v1/acme%20org/bill%2Fing/access/token')
     expect(requests[0]?.organization).toBe('acme org')
     expect(requests[0]?.project).toBe('bill/ing')
     expect(requests[0]?.form.subject_token_type).toEqual(['urn:ietf:params:oauth:token-type:access_token'])
-    expect(requests[0]?.form.scope).toEqual(['Default.Read'])
+    expect(requests[0]?.form.scope).toEqual(['Annotation.Read'])
   })
 
   it('turns an OAuth error body into a StorytellerError carrying the error code', async () => {
@@ -164,7 +164,7 @@ describe('exchangeFederatedToken', () => {
       .rejects.toMatchObject({ status: 503, errorCode: 'temporarily_unavailable' })
 
     server.use(oauthError(400, 'invalid_scope'))
-    await expect(exchangeFederatedToken({ baseUrl, organization: 'acme', project: 'billing', machineId, subjectToken: 't', scope: 'Secrets' }))
+    await expect(exchangeFederatedToken({ baseUrl, organization: 'acme', project: 'billing', machineId, subjectToken: 't', scope: 'Secrets.Read' }))
       .rejects.toMatchObject({ status: 400, errorCode: 'invalid_scope', message: 'Storyteller API returned 400 Bad Request.' })
   })
 
@@ -190,7 +190,7 @@ describe('exchangeFederatedToken', () => {
 
   // redirect: 'error' keeps the subject token from following a redirect to another host.
   it('uses the given fetch and refuses redirects', async () => {
-    const fetch = vi.fn(async () => HttpResponse.json({ access_token: 'st-x', token_type: 'Bearer', expires_in: 60, scope: 'Default.Read' }))
+    const fetch = vi.fn(async () => HttpResponse.json({ access_token: 'st-x', token_type: 'Bearer', expires_in: 60, scope: 'Annotation.Read' }))
 
     const token = await exchangeFederatedToken({
       baseUrl,

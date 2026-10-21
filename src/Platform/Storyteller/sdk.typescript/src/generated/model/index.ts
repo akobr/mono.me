@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.45.54704
+ * OpenAPI spec version: 0.9.46.25482
  */
 
 export * from "./accessPoint";
@@ -200,13 +200,11 @@ export * from "./keyValueWriteProtection";
 export * from "./machineAccess";
 export * from "./machineAccessCreate";
 export * from "./machineAccessCreateCredentialKind";
-export * from "./machineAccessCreateScope";
 export * from "./machineAccessCredentialKind";
-export * from "./machineAccessScope";
 export * from "./machineAuthenticationPolicy";
 export * from "./machineAuthenticationPolicyCredentialKind";
 export * from "./machineCredentialKind";
-export * from "./machineManagementScope";
+export * from "./machineScope";
 export * from "./machineTokenRequest";
 export * from "./machineTokenResponse";
 export * from "./memberRoleUpdate";

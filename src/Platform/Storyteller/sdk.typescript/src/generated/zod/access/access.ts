@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.45.54704
+ * OpenAPI spec version: 0.9.46.25482
  */
 import * as zod from "zod";
 
@@ -406,25 +406,29 @@ export const GetMachineAccessesParams = zod.object({
   project: zod.string().describe("Target project name."),
 });
 
-export const getMachineAccessesResponseScopeDefault = `AnnotationRead`;
 export const getMachineAccessesResponseCredentialKindDefault = `ApiKey`;
 
 export const GetMachineAccessesResponseItem = zod.object({
   Id: zod.string().optional(),
   ObjectId: zod.string().optional(),
   AccessKey: zod.string().optional(),
-  Scope: zod
-    .enum([
-      "AnnotationRead",
-      "ConfigurationRead",
-      "DefaultRead",
-      "AnnotationReadWrite",
-      "ConfigurationReadWrite",
-      "DefaultReadWrite",
-      "SecretsRead",
-      "SecretsReadWrite",
-    ])
-    .default(getMachineAccessesResponseScopeDefault),
+  Scopes: zod
+    .array(
+      zod.enum([
+        "AnnotationRead",
+        "AnnotationWrite",
+        "ConfigurationRead",
+        "ConfigurationWrite",
+        "SecretsRead",
+        "SecretsWrite",
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
+    )
+    .optional(),
   AnnotationKey: zod.string().optional(),
   CredentialKind: zod
     .enum([
@@ -454,17 +458,6 @@ export const GetMachineAccessesResponseItem = zod.object({
       }),
     )
     .optional(),
-  ManagementScopes: zod
-    .array(
-      zod.enum([
-        "ConfigurationTransfer",
-        "SchemaWrite",
-        "TemplateWrite",
-        "AnnotationManage",
-        "KeyValueManage",
-      ]),
-    )
-    .optional(),
 });
 export const GetMachineAccessesResponse = zod.array(
   GetMachineAccessesResponseItem,
@@ -475,23 +468,26 @@ export const CreateMachineAccessParams = zod.object({
   project: zod.string().describe("Target project name."),
 });
 
-export const createMachineAccessBodyScopeDefault = `AnnotationRead`;
-
 export const CreateMachineAccessBody = zod.object({
   Organization: zod.string().optional(),
   Project: zod.string().optional(),
-  Scope: zod
-    .enum([
-      "AnnotationRead",
-      "ConfigurationRead",
-      "DefaultRead",
-      "AnnotationReadWrite",
-      "ConfigurationReadWrite",
-      "DefaultReadWrite",
-      "SecretsRead",
-      "SecretsReadWrite",
-    ])
-    .default(createMachineAccessBodyScopeDefault),
+  Scopes: zod
+    .array(
+      zod.enum([
+        "AnnotationRead",
+        "AnnotationWrite",
+        "ConfigurationRead",
+        "ConfigurationWrite",
+        "SecretsRead",
+        "SecretsWrite",
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
+    )
+    .optional(),
   AnnotationKey: zod.string().optional(),
   CredentialKind: zod
     .union([
@@ -515,9 +511,23 @@ export const CreateMachineAccessBody = zod.object({
       }),
     )
     .optional(),
-  ManagementScopes: zod
+});
+
+export const createMachineAccessResponseCredentialKindDefault = `ApiKey`;
+
+export const CreateMachineAccessResponse = zod.object({
+  Id: zod.string().optional(),
+  ObjectId: zod.string().optional(),
+  AccessKey: zod.string().optional(),
+  Scopes: zod
     .array(
       zod.enum([
+        "AnnotationRead",
+        "AnnotationWrite",
+        "ConfigurationRead",
+        "ConfigurationWrite",
+        "SecretsRead",
+        "SecretsWrite",
         "ConfigurationTransfer",
         "SchemaWrite",
         "TemplateWrite",
@@ -526,27 +536,6 @@ export const CreateMachineAccessBody = zod.object({
       ]),
     )
     .optional(),
-});
-
-export const createMachineAccessResponseScopeDefault = `AnnotationRead`;
-export const createMachineAccessResponseCredentialKindDefault = `ApiKey`;
-
-export const CreateMachineAccessResponse = zod.object({
-  Id: zod.string().optional(),
-  ObjectId: zod.string().optional(),
-  AccessKey: zod.string().optional(),
-  Scope: zod
-    .enum([
-      "AnnotationRead",
-      "ConfigurationRead",
-      "DefaultRead",
-      "AnnotationReadWrite",
-      "ConfigurationReadWrite",
-      "DefaultReadWrite",
-      "SecretsRead",
-      "SecretsReadWrite",
-    ])
-    .default(createMachineAccessResponseScopeDefault),
   AnnotationKey: zod.string().optional(),
   CredentialKind: zod
     .enum([
@@ -576,17 +565,6 @@ export const CreateMachineAccessResponse = zod.object({
       }),
     )
     .optional(),
-  ManagementScopes: zod
-    .array(
-      zod.enum([
-        "ConfigurationTransfer",
-        "SchemaWrite",
-        "TemplateWrite",
-        "AnnotationManage",
-        "KeyValueManage",
-      ]),
-    )
-    .optional(),
 });
 
 export const GetMachineAccessParams = zod.object({
@@ -595,25 +573,29 @@ export const GetMachineAccessParams = zod.object({
   id: zod.string().describe("The id of the machine access."),
 });
 
-export const getMachineAccessResponseScopeDefault = `AnnotationRead`;
 export const getMachineAccessResponseCredentialKindDefault = `ApiKey`;
 
 export const GetMachineAccessResponse = zod.object({
   Id: zod.string().optional(),
   ObjectId: zod.string().optional(),
   AccessKey: zod.string().optional(),
-  Scope: zod
-    .enum([
-      "AnnotationRead",
-      "ConfigurationRead",
-      "DefaultRead",
-      "AnnotationReadWrite",
-      "ConfigurationReadWrite",
-      "DefaultReadWrite",
-      "SecretsRead",
-      "SecretsReadWrite",
-    ])
-    .default(getMachineAccessResponseScopeDefault),
+  Scopes: zod
+    .array(
+      zod.enum([
+        "AnnotationRead",
+        "AnnotationWrite",
+        "ConfigurationRead",
+        "ConfigurationWrite",
+        "SecretsRead",
+        "SecretsWrite",
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
+    )
+    .optional(),
   AnnotationKey: zod.string().optional(),
   CredentialKind: zod
     .enum([
@@ -643,17 +625,6 @@ export const GetMachineAccessResponse = zod.object({
       }),
     )
     .optional(),
-  ManagementScopes: zod
-    .array(
-      zod.enum([
-        "ConfigurationTransfer",
-        "SchemaWrite",
-        "TemplateWrite",
-        "AnnotationManage",
-        "KeyValueManage",
-      ]),
-    )
-    .optional(),
 });
 
 export const ResetMachineAccessParams = zod.object({
@@ -662,25 +633,29 @@ export const ResetMachineAccessParams = zod.object({
   id: zod.string().describe("The id of the machine access."),
 });
 
-export const resetMachineAccessResponseScopeDefault = `AnnotationRead`;
 export const resetMachineAccessResponseCredentialKindDefault = `ApiKey`;
 
 export const ResetMachineAccessResponse = zod.object({
   Id: zod.string().optional(),
   ObjectId: zod.string().optional(),
   AccessKey: zod.string().optional(),
-  Scope: zod
-    .enum([
-      "AnnotationRead",
-      "ConfigurationRead",
-      "DefaultRead",
-      "AnnotationReadWrite",
-      "ConfigurationReadWrite",
-      "DefaultReadWrite",
-      "SecretsRead",
-      "SecretsReadWrite",
-    ])
-    .default(resetMachineAccessResponseScopeDefault),
+  Scopes: zod
+    .array(
+      zod.enum([
+        "AnnotationRead",
+        "AnnotationWrite",
+        "ConfigurationRead",
+        "ConfigurationWrite",
+        "SecretsRead",
+        "SecretsWrite",
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
+    )
+    .optional(),
   AnnotationKey: zod.string().optional(),
   CredentialKind: zod
     .enum([
@@ -708,17 +683,6 @@ export const ResetMachineAccessResponse = zod.object({
         Subject: zod.string().optional(),
         Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
       }),
-    )
-    .optional(),
-  ManagementScopes: zod
-    .array(
-      zod.enum([
-        "ConfigurationTransfer",
-        "SchemaWrite",
-        "TemplateWrite",
-        "AnnotationManage",
-        "KeyValueManage",
-      ]),
     )
     .optional(),
 });
@@ -1014,7 +978,7 @@ export const DeleteFederatedIssuerParams = zod.object({
 export const DeleteFederatedIssuerResponse = zod.unknown();
 
 /**
- * Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; Administrator for a machine with management scopes.
+ * Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; ContributorWithSecrets for a machine with a Secrets scope, Administrator for one with a management scope.
  */
 export const SetMachineFederationRulesParams = zod.object({
   organization: zod.string().describe("Target organization name."),
@@ -1032,25 +996,29 @@ export const SetMachineFederationRulesBody = zod.array(
   SetMachineFederationRulesBodyItem,
 );
 
-export const setMachineFederationRulesResponseScopeDefault = `AnnotationRead`;
 export const setMachineFederationRulesResponseCredentialKindDefault = `ApiKey`;
 
 export const SetMachineFederationRulesResponse = zod.object({
   Id: zod.string().optional(),
   ObjectId: zod.string().optional(),
   AccessKey: zod.string().optional(),
-  Scope: zod
-    .enum([
-      "AnnotationRead",
-      "ConfigurationRead",
-      "DefaultRead",
-      "AnnotationReadWrite",
-      "ConfigurationReadWrite",
-      "DefaultReadWrite",
-      "SecretsRead",
-      "SecretsReadWrite",
-    ])
-    .default(setMachineFederationRulesResponseScopeDefault),
+  Scopes: zod
+    .array(
+      zod.enum([
+        "AnnotationRead",
+        "AnnotationWrite",
+        "ConfigurationRead",
+        "ConfigurationWrite",
+        "SecretsRead",
+        "SecretsWrite",
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
+    )
+    .optional(),
   AnnotationKey: zod.string().optional(),
   CredentialKind: zod
     .enum([
@@ -1078,17 +1046,6 @@ export const SetMachineFederationRulesResponse = zod.object({
         Subject: zod.string().optional(),
         Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
       }),
-    )
-    .optional(),
-  ManagementScopes: zod
-    .array(
-      zod.enum([
-        "ConfigurationTransfer",
-        "SchemaWrite",
-        "TemplateWrite",
-        "AnnotationManage",
-        "KeyValueManage",
-      ]),
     )
     .optional(),
 });

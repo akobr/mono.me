@@ -3,18 +3,14 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.45.54704
+ * OpenAPI spec version: 0.9.46.25482
  */
 import { faker } from "@faker-js/faker";
 
 import { HttpResponse, http } from "msw";
 import type { RequestHandlerOptions } from "msw";
 
-import {
-  AccountRole,
-  MachineCredentialKind,
-  MachineManagementScope,
-} from "../../model";
+import { AccountRole, MachineCredentialKind, MachineScope } from "../../model";
 import type {
   AccessPoint,
   AccessPointMember,
@@ -393,16 +389,10 @@ export const getGetMachineAccessesResponseMock = (): MachineAccess[] =>
       faker.string.alpha({ length: { min: 10, max: 20 } }),
       undefined,
     ]),
-    Scope: faker.helpers.arrayElement([
-      "AnnotationRead",
-      "ConfigurationRead",
-      "DefaultRead",
-      "AnnotationReadWrite",
-      "ConfigurationReadWrite",
-      "DefaultReadWrite",
-      "SecretsRead",
-      "SecretsReadWrite",
-    ] as const),
+    Scopes: faker.helpers.arrayElement([
+      faker.helpers.arrayElements(Object.values(MachineScope)),
+      undefined,
+    ]),
     AnnotationKey: faker.helpers.arrayElement([
       faker.string.alpha({ length: { min: 10, max: 20 } }),
       undefined,
@@ -479,10 +469,6 @@ export const getGetMachineAccessesResponseMock = (): MachineAccess[] =>
       })),
       undefined,
     ]),
-    ManagementScopes: faker.helpers.arrayElement([
-      faker.helpers.arrayElements(Object.values(MachineManagementScope)),
-      undefined,
-    ]),
   }));
 
 export const getCreateMachineAccessResponseMock = (
@@ -500,16 +486,10 @@ export const getCreateMachineAccessResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
-  Scope: faker.helpers.arrayElement([
-    "AnnotationRead",
-    "ConfigurationRead",
-    "DefaultRead",
-    "AnnotationReadWrite",
-    "ConfigurationReadWrite",
-    "DefaultReadWrite",
-    "SecretsRead",
-    "SecretsReadWrite",
-  ] as const),
+  Scopes: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineScope)),
+    undefined,
+  ]),
   AnnotationKey: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
@@ -584,10 +564,6 @@ export const getCreateMachineAccessResponseMock = (
         undefined,
       ]),
     })),
-    undefined,
-  ]),
-  ManagementScopes: faker.helpers.arrayElement([
-    faker.helpers.arrayElements(Object.values(MachineManagementScope)),
     undefined,
   ]),
   ...overrideResponse,
@@ -608,16 +584,10 @@ export const getGetMachineAccessResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
-  Scope: faker.helpers.arrayElement([
-    "AnnotationRead",
-    "ConfigurationRead",
-    "DefaultRead",
-    "AnnotationReadWrite",
-    "ConfigurationReadWrite",
-    "DefaultReadWrite",
-    "SecretsRead",
-    "SecretsReadWrite",
-  ] as const),
+  Scopes: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineScope)),
+    undefined,
+  ]),
   AnnotationKey: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
@@ -692,10 +662,6 @@ export const getGetMachineAccessResponseMock = (
         undefined,
       ]),
     })),
-    undefined,
-  ]),
-  ManagementScopes: faker.helpers.arrayElement([
-    faker.helpers.arrayElements(Object.values(MachineManagementScope)),
     undefined,
   ]),
   ...overrideResponse,
@@ -716,16 +682,10 @@ export const getResetMachineAccessResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
-  Scope: faker.helpers.arrayElement([
-    "AnnotationRead",
-    "ConfigurationRead",
-    "DefaultRead",
-    "AnnotationReadWrite",
-    "ConfigurationReadWrite",
-    "DefaultReadWrite",
-    "SecretsRead",
-    "SecretsReadWrite",
-  ] as const),
+  Scopes: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineScope)),
+    undefined,
+  ]),
   AnnotationKey: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
@@ -800,10 +760,6 @@ export const getResetMachineAccessResponseMock = (
         undefined,
       ]),
     })),
-    undefined,
-  ]),
-  ManagementScopes: faker.helpers.arrayElement([
-    faker.helpers.arrayElements(Object.values(MachineManagementScope)),
     undefined,
   ]),
   ...overrideResponse,
@@ -1135,16 +1091,10 @@ export const getSetMachineFederationRulesResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
-  Scope: faker.helpers.arrayElement([
-    "AnnotationRead",
-    "ConfigurationRead",
-    "DefaultRead",
-    "AnnotationReadWrite",
-    "ConfigurationReadWrite",
-    "DefaultReadWrite",
-    "SecretsRead",
-    "SecretsReadWrite",
-  ] as const),
+  Scopes: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineScope)),
+    undefined,
+  ]),
   AnnotationKey: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
@@ -1219,10 +1169,6 @@ export const getSetMachineFederationRulesResponseMock = (
         undefined,
       ]),
     })),
-    undefined,
-  ]),
-  ManagementScopes: faker.helpers.arrayElement([
-    faker.helpers.arrayElements(Object.values(MachineManagementScope)),
     undefined,
   ]),
   ...overrideResponse,

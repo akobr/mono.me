@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.45.54704
+ * OpenAPI spec version: 0.9.46.25482
  */
 import type {
   AccessPoint,
@@ -782,7 +782,7 @@ export const getSetMachineFederationRulesUrl = (
 };
 
 /**
- * Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; Administrator for a machine with management scopes.
+ * Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; ContributorWithSecrets for a machine with a Secrets scope, Administrator for one with a management scope.
  */
 export const setMachineFederationRules = async (
   organization: string,
