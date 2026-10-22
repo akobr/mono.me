@@ -44,6 +44,11 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
         reset.Scopes.ShouldBe(Granted);
         (await accessService.GetMachineAccessAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
         (await fixture.Services.GetRequiredService<IApiKeyHashStore>().GetAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
+
+        // The new key works with the stored scopes, and the old one is revoked.
+        var validator = fixture.Services.GetRequiredService<IApiKeyValidator>();
+        (await validator.ValidateAsync(reset.AccessKey))!.Scopes.ShouldBe(Granted);
+        (await validator.ValidateAsync(machine.AccessKey)).ShouldBeNull();
     }
 
     [Fact]
@@ -86,6 +91,11 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
         reset.Scopes.ShouldBe(Granted);
         (await accessService.GetMachineAccessAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
         (await fixture.Services.GetRequiredService<IApiKeyHashStore>().GetAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
+
+        // The new key works with the stored scopes, and the old one is revoked.
+        var validator = fixture.Services.GetRequiredService<IApiKeyValidator>();
+        (await validator.ValidateAsync(reset.AccessKey))!.Scopes.ShouldBe(Granted);
+        (await validator.ValidateAsync(machine.AccessKey)).ShouldBeNull();
         var record = await fixture.Services.GetRequiredService<IClientCertificateStore>().GetByMachineAccessIdAsync(Organization, Project, machine.Id);
         record!.Scopes.ShouldBe(Granted);
     }

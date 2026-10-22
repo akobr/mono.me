@@ -233,7 +233,7 @@ As planned, plus the two correction commits listed in the overview. Phase 1 is o
 
 ### 15. Out of scope
 
-Unchanged, as listed in the spec: editing the scopes of a machine, the 424-58 allow-list, the stale API key reset, the missing `mcert.` record on renewal, Debug decoding of Keycloak tokens, and `Api.Web`.
+Unchanged, as listed in the spec: editing the scopes of a machine, the 424-58 allow-list, the missing `mcert.` record on renewal, Debug decoding of Keycloak tokens, and `Api.Web`.
 
 Entra ID still has no compensation after a failed Graph call. Two failure cases now come before any write: a missing role and a missing API service principal.
 
@@ -300,3 +300,4 @@ Two rules changed after the review of the PR. Both deviate from earlier decision
 
 **Tests.** `ViewTransferHttpTests` covers the sets per kind, the rows where only the management scope of an import kind is missing (annotations, schemas, templates), the messages that name the full set, and machines with the extra scopes on every route. `MachineHttpTests` runs the delete over every stored-scope row and every user role (Release-gated, as the reset theory is), and the unknown machine. `OpenApiExportTests` pins the import 403 scopes and the delete 403. The admin UI has a unit test of the mock's delete rule, and the e2e test of a Contributor now expects no delete on such machines and deletes a runtime one. Counts after the follow-up: `Api.Functions/test` 2225 in Debug and in Release, `Cli/test` 793, Vitest 1427, Playwright 358 passed and 8 skipped, and the 64 visual screenshots unchanged.
 - The changed 403 texts of the import and of the delete were exported as `open.api.v0.9.48.json` (`info.version` `0.9.48.17600`), which replaces `0.9.46` in `sdk.typescript/`, and both SDKs were regenerated from it.
+- **The stale API key reset ([424-82](https://linear.app/424fun/issue/424-82)) is fixed after all**, from a CodeRabbit comment on the PR. `CosmosAccessService.ResetMachineAccessAsync` reads the machine document again after the reset wrote the new hash, and updates only `AccessKey` on that copy, so the new key validates and the old one is refused. `ScopesPersistenceTests` now checks both keys after the reset of an `ApiKey` and a `CertificateAndApiKey` machine; they failed before the fix and pass after it (`Access.Certificates/testint`: 44 passed against a container).
