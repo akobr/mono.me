@@ -601,7 +601,14 @@ public class CosmosAccessService : IAccessService
         var maskedKey = !string.IsNullOrEmpty(accessKey) && accessKey.Length >= 3
             ? $"{accessKey[..3]}***"
             : "***";
-        machineAccess = machineAccess with { AccessKey = maskedKey };
+
+        // The reset wrote the new hash onto this document (CosmosMergedApiKeyHashStore), so the copy read above is
+        // stale: writing it back would restore the old hash, keep the old key working and refuse the new one.
+        var current = await repository.Container.TryReadItemAsync(
+            appId,
+            partitionKey,
+            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
+        machineAccess = (current ?? machineAccess) with { AccessKey = maskedKey };
         await repository.Container.UpsertItemAsync(machineAccess, partitionKey);
 
         var result = machineAccess.ToMachineAccess();
