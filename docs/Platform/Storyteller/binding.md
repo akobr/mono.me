@@ -8,10 +8,10 @@ The data binding system lets configuration values, stored as JSON, reference ext
 
 Resolution runs on the resolved read (`GetResolvedConfigurationAsync` and the with-secrets / without-secrets variants). Writes, `GetRawConfigurationAsync`, the hierarchy view, and version content keep the stored JSON, including any object-binding envelope.
 
-The resolved read of the API asks `IConfigurationBindingResolver.ContainsBindings` first. A document without bindings is answered without the resolver. A document with bindings is resolved for every read, even when `If-None-Match` ends in a 304 ([conditional reads](inheritance.md#conditional-reads)).
+The resolved read of the API asks `IConfigurationBindingResolver.ContainsBindings` first. A document without bindings is answered without the resolver. A document with bindings records what its resolve reads (see "Dependency manifests"), so a later conditional read can answer 304 from the versions of those inputs without evaluating it again; JSON-e and Key Vault secrets make it evaluate on every read ([conditional reads](inheritance.md#conditional-reads)).
 
 The system is split into five binding projects, plus built-in functions contributed by `Backend.Core`:
-- **Binding.Abstractions**: Core interfaces and data structures (`IBindingExecutor`, `IConfigurationBindingResolver`, `IBindingRegistry`, `IBindingCatalog`, `IBindingSource`, `IBindingFunction`, `IDescribedBinding`, `BindingScope`).
+- **Binding.Abstractions**: Core interfaces and data structures (`IBindingExecutor`, `IConfigurationBindingResolver`, `IBindingRegistry`, `IBindingCatalog`, `IBindingSource`, `IBindingFunction`, `IDescribedBinding`, `IRecordingBinding`, `BindingScope`, `BindingDependencies`).
 - **Binding.Language**: The `@` string interpreter (tokenizer, parser, evaluator), the `IBindingExecutor` entry point, the `JsonQuery` structured-query helper, and the built-in `@config` function.
 - **Binding.Object**: The object-binding walker. An envelope whose `$binding` is `jlogic` or `jsone` is evaluated with JSON Logic or JSON-e.
 - **Binding.Core**: Dependency-injection registration and options for wiring up sources, functions, and the object-binding resolver, plus `KeyValueBindingSource`, the native key/value store as the `default`, `public` and `secret` sources.
@@ -140,9 +140,12 @@ Defines the fundamental building blocks:
 - `IBindingExecutor`: Executes the `@` string language on a `JProperty`/`JValue`.
 - `IConfigurationBindingResolver`: Walks a configuration `JObject` and resolves `@` strings and object-binding envelopes in place.
 - `IBindingRegistry`: Registers named `IBindingSource`s and `IBindingFunction`s.
-- `IBindingSource`: Resolves a `BindingRequest` (a path, `IncludeSecrets`, and the `Context` of the resolution pass, e.g. the configuration being resolved) to a `BindingValue`.
-- `IBindingFunction`: Resolves a `BindingFunctionRequest` (a function name plus already-evaluated `BindingValue` arguments) to a `BindingValue`.
+- `IBindingSource`: Resolves a `BindingRequest` (a path, `IncludeSecrets`, the `Context` of the resolution pass, e.g. the configuration being resolved, and its `Dependencies`) to a `BindingValue`.
+- `IBindingFunction`: Resolves a `BindingFunctionRequest` (a function name plus already-evaluated `BindingValue` arguments, and the `Document`, `Context` and `Dependencies` of the pass) to a `BindingValue`.
 - `IDescribedBinding`: Optional. A source or function describes itself (`BindingDescription`: summary, signature, parameters, examples, whether it holds secrets) for the catalog.
+- `BindingScope`: The ambient data of one resolution pass: the `Document` snapshot, an opaque `Context`, and the `Dependencies` collector.
+- `BindingDependencies` / `BindingDependency`: The dependency manifest of a resolve: what it read, each with a storage marker, or volatile (see "Dependency manifests").
+- `IRecordingBinding`: Optional. A source, function, executor or resolver that records what it reads into the `Dependencies`, or reads nothing; one without it makes the manifest volatile.
 - `IBindingCatalog`: Lists the registered functions and sources (`BindingCatalog` of `BindingFunctionDescriptor` and `BindingSourceDescriptor`) with their descriptions.
 - `BindingValue`: A thin wrapper around a `Newtonsoft.Json.Linq.JToken`.
 - `BindingException`: Base exception type for binding failures.
@@ -154,7 +157,7 @@ Defines the fundamental building blocks:
 Contains the interpreter pipeline:
 - `Tokenizer` / `Token` / `TokenType`: Lexes a binding string into tokens, tracking offsets for diagnostics.
 - `Parser` and the AST node types (`PathStatement`, `SourcedStatement`, `FunctionStatement`, `InterpolationExpression`, `MathExpression`, etc.): Build a `BindingNode` tree via recursive descent.
-- `BindingEvaluator`: Walks the AST, resolving statements against registered sources/functions and evaluating interpolation/math. Accepts an optional `BindingScope` (a `Document` and an opaque `Context`) which is forwarded onto every `BindingFunctionRequest` so functions can see ambient data beyond their own arguments.
+- `BindingEvaluator`: Walks the AST, resolving statements against registered sources/functions and evaluating interpolation/math. Accepts an optional `BindingScope` (a `Document`, an opaque `Context` and the `Dependencies`) which is forwarded onto every `BindingFunctionRequest` so functions can see ambient data beyond their own arguments; the `Context` and `Dependencies` also reach every `BindingRequest`. Calling a source or function that is not `IRecordingBinding` makes the `Dependencies` volatile; an unregistered name reads nothing and records nothing.
 - `BindingExecutor`: Implements `IBindingExecutor`, `IBindingRegistry` and `IBindingCatalog`; it guards on the leading `@`, then tokenizes, parses, evaluates, and assigns the result back onto the JSON token. `TryBinding` accepts an optional `BindingScope`.
 - `JsonQuery`: Resolves a JSONPath or JSON Pointer (RFC 6901) expression against a `JToken`, auto-detecting the dialect from the expression's leading character (`$` for JSONPath, `/` or empty for JSON Pointer).
 - `BindingFunctionArguments`: Shared helper that validates a function argument is a quoted string literal.
@@ -163,7 +166,7 @@ Contains the interpreter pipeline:
 
 ### Binding.Object
 
-Walks one configuration document. `ConfigurationBindingResolver` implements `IConfigurationBindingResolver`. Strings that start with `@` go to `IBindingExecutor`. Envelopes go to `ObjectBindingEngine`, which converts between `JToken` and `JsonNode` and calls JSON Logic or JSON-e. Numbers come back as `decimal`. ISO-8601 strings stay strings. One `EvaluationMeter` per read enforces `ObjectBindingLimits`; `JsonLogicMetering` wraps every built-in JSON Logic rule so it reports to that meter, and `ResultCheck` walks each result. The project references `JsonLogic` 6.1.0 and `Binding.JsonE`. It does not reference `Binding.Language`, `Binding.Core`, or `Backend.CosmosDb`.
+Walks one configuration document. `ConfigurationBindingResolver` implements `IConfigurationBindingResolver`. Strings that start with `@` go to `IBindingExecutor`. Envelopes go to `ObjectBindingEngine`, which converts between `JToken` and `JsonNode` and calls JSON Logic or JSON-e. Numbers come back as `decimal`. ISO-8601 strings stay strings. Every `@` string gets the same `BindingScope`, so its reads record into one manifest; a `jsone` envelope makes the manifest volatile because JSON-e can read the clock, and so does a string executor that is not `IRecordingBinding`. One `EvaluationMeter` per read enforces `ObjectBindingLimits`; `JsonLogicMetering` wraps every built-in JSON Logic rule so it reports to that meter, and `ResultCheck` walks each result. The project references `JsonLogic` 6.1.0 and `Binding.JsonE`. It does not reference `Binding.Language`, `Binding.Core`, or `Backend.CosmosDb`.
 
 ### Binding.JsonE
 
@@ -175,12 +178,12 @@ Contains dependency-injection registration:
 - `EntryPoint.AddConfigurationBindings`: Registers `BindingExecutor` as `IBindingExecutor`/`IBindingRegistry`/`IBindingCatalog`, registers `ConfigurationBindingResolver` as `IConfigurationBindingResolver` over that same executor, and applies `BindingsOptions`.
 - `BindingsOptions` / `BindingsOptionsExtensions`: Fluent API for registering sources (keyed, defaulting to `"default"`) and functions (by name) during startup. `BindingsOptions.ObjectBindingLimits` sets the object-binding evaluation limits (defaults in "Evaluation limits" above).
 
-`EntryPoint.AddKeyValueBindings` registers `KeyValueBindingSource` three times: as `default` (public pairs and secrets), `public` and `secret`. Call it after the other source registrations, so the native store owns those names. The source reads the organization, project and view from the `ConfigurationBindingContext` in `BindingRequest.Context` and declines outside a configuration read. Each key is looked up at most once per resolved read; the memo lives with the read's context, so a changed pair takes effect on the next read. A key-encryption key that is unavailable fails the read (`503`) instead of declining, because a silently unbound secret would look like a configuration error.
+`EntryPoint.AddKeyValueBindings` registers `KeyValueBindingSource` three times: as `default` (public pairs and secrets), `public` and `secret`. Call it after the other source registrations, so the native store owns those names. The source reads the organization, project and view from the `ConfigurationBindingContext` in `BindingRequest.Context` and declines outside a configuration read. Each key is looked up at most once per resolved read; the memo lives with the read's context, so a changed pair takes effect on the next read. Every read records the `_etag` of the pair's item, or `absent` without one (`IKeyValueService.LookupWithMarkerAsync`), also when the source declines the pair for its kind or the caller may not read the secret: a protection change still changes the manifest. A key-encryption key that is unavailable fails the read (`503`) instead of declining, because a silently unbound secret would look like a configuration error.
 
 ### Binding.Azure.KeyVault
 
 Provides integration with Azure Key Vault:
-- `KeyVaultBindingSource`: Implements `IBindingSource`. Declines (`null`) unless `IncludeSecrets` is set, and transforms configuration paths (using dots) to Key Vault secret names (using double dashes, e.g., `db.password` becomes `db--password`).
+- `KeyVaultBindingSource`: Implements `IBindingSource`. Declines (`null`) unless `IncludeSecrets` is set, and transforms configuration paths (using dots) to Key Vault secret names (using double dashes, e.g., `db.password` becomes `db--password`). A read records the secret's version and makes the manifest volatile: a vault has no version check cheaper than reading the secret. Without `IncludeSecrets` it reads and records nothing.
 - `EntryPoint`: Provides the `AddAzureKeyVaultBindings` extension method to configure multiple Key Vaults and register a `KeyVaultBindingSource` per vault. A vault entry named `default`, `public` or `secret` is a source of that name until `AddKeyValueBindings` is registered after it (as the API does), when the native store takes the name over; give such a vault another entry name to read it as `@(db.password, shared)` next to the store.
 
 ## Built-in Functions
@@ -214,7 +217,7 @@ Reads a value out of the freeform `Values` of an `Annotation`, using the same JS
 
 Both arguments must be quoted string literals (see the quoting note under "Function call" above); this applies even to the annotation type name, which might otherwise look like it should be a bare keyword.
 
-`@annotation` requires a `ConfigurationBindingContext` (carrying the `FullKey` of the configuration being resolved) supplied via `BindingScope.Context`; used outside of `CosmosConfigurationService`'s resolution pipeline, it throws a `BindingEvaluationException`.
+`@annotation` requires a `ConfigurationBindingContext` (carrying the `FullKey` of the configuration being resolved) supplied via `BindingScope.Context`; used outside of `CosmosConfigurationService`'s resolution pipeline, it throws a `BindingEvaluationException`. Each read records the `_etag` of the target annotation's item, or `absent` without one (`IAnnotationService.GetAnnotationWithMarkerAsync`).
 
 Both functions are registered explicitly in `Api.Functions/Program.cs`:
 
@@ -316,8 +319,26 @@ services.AddKeyValueBindings();
 
 ### Dependency Injection
 
-`AddConfigurationBindings` registers `IConfigurationBindingResolver`. `CosmosConfigurationService` takes that resolver. `GetResolvedConfigurationInternalAsync` builds a `BindingScope` (a deep clone of the calculated document, plus a `ConfigurationBindingContext` for the configuration key) and calls `ResolveAsync`. When no resolver is registered, the calculated document is returned unchanged. `IBindingExecutor` remains the string entry point used by the resolver.
+`AddConfigurationBindings` registers `IConfigurationBindingResolver`. `CosmosConfigurationService` takes that resolver. `ResolveConfigurationAsync` builds a `BindingScope` (a deep clone of the calculated document, a `ConfigurationBindingContext` for the configuration key, and the caller's `BindingDependencies` when it passes one) and calls `ResolveAsync`; a resolver that is not `IRecordingBinding` makes the collector volatile. When no resolver is registered, the calculated document is returned unchanged. `IBindingExecutor` remains the string entry point used by the resolver.
+
+## Dependency manifests
+
+A caller that wants to know what a resolve read passes a `BindingDependencies` to `IConfigurationService.ResolveConfigurationAsync`. The service puts it on the `BindingScope`, and every `IRecordingBinding` on the way records `(kind, source, key, marker)` for each external input it reads:
+
+| Input | Kind | Source | Key | Marker |
+| --- | --- | --- | --- | --- |
+| Key/value pair (`default`, `public`, `secret`) | `kv` | The view | The lower-cased key | `_etag` of the item, or `absent` |
+| `@annotation` | `annotation` | The view | The annotation key (the configured one or the ancestor) | `_etag` of the item, or `absent` |
+| Key Vault secret | `vault` | The registered vault name | The secret name | The secret version, or `absent`; volatile |
+
+`@config`, JSON Logic and an unregistered name read nothing outside the effective document and the registry, so they record nothing.
+
+The manifest is **volatile** when the resolved body can change while the recorded markers do not: JSON-e (`now`, `$fromNow`), a Key Vault read, a component that is not `IRecordingBinding`, a service that gives no marker (the default `LookupWithMarkerAsync` and `GetAnnotationWithMarkerAsync`), two markers of one input in one resolve, and a collector that no `BindingScope` carried. `BindingDependencies` fails closed: it is volatile until a scope carries it.
+
+`IConfigurationService.AreDependenciesUnchangedAsync` revalidates a manifest: one ReadMany of the items over the organization container, reading only their `_etag`. It never looks a value up, decrypts, meters or audits. An input of another kind counts as changed. The API keeps the manifests of its resolved reads and answers 304 from them ([conditional reads](inheritance.md#conditional-reads)).
 
 ## Extending the System
 
 `IBindingFunction` remains a general-purpose extension point beyond the two built-in functions documented above; register additional custom functions via `BindingsOptions.AddFunction` when further capabilities are needed. A function that needs ambient data beyond its own arguments (such as the document being resolved, or a caller-supplied context object) can read it from `BindingFunctionRequest.Document`/`BindingFunctionRequest.Context`, populated from the `BindingScope` passed into `IBindingExecutor.TryBinding`.
+
+A custom source or function makes every manifest it takes part in volatile, so documents that use it are evaluated on every conditional read. To take part in cheap 304s, it implements `IRecordingBinding` and records every external input it reads into `BindingRequest.Dependencies` or `BindingFunctionRequest.Dependencies` (or reads none). Its kind must also be one that `AreDependenciesUnchangedAsync` can revalidate; otherwise the manifest never revalidates and the read resolves again.
