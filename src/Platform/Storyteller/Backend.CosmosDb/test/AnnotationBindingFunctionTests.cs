@@ -113,6 +113,69 @@ public class AnnotationBindingFunctionTests
     }
 
     [Fact]
+    public async Task InvokeAsync_RecordsTheMarkerOfTheAnnotation()
+    {
+        var service = new FakeAnnotationService();
+        service.Set(ExecutionKey, new Dictionary<string, object> { ["title"] = "hello" }, marker: "\"7\"");
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
+        var dependencies = Recording();
+
+        await function.InvokeAsync(CreateRequest(ExecutionKey, "/title", dependencies: dependencies));
+
+        dependencies.IsVolatile.Should().BeFalse();
+        dependencies.ToList().Should().ContainSingle().Which.Should().Be(
+            new BindingDependency(BindingDependencyKinds.Annotation, "view", ExecutionKey.Annotation.ToString(), "\"7\""));
+    }
+
+    [Fact]
+    public async Task InvokeAsync_MissingAnnotation_RecordsAbsent()
+    {
+        var service = new FakeAnnotationService();
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
+        var dependencies = Recording();
+
+        var result = await function.InvokeAsync(CreateRequest(ExecutionKey, "/title", dependencies: dependencies));
+
+        result.Should().BeNull();
+        dependencies.ToList().Should().ContainSingle().Which.Marker.Should().Be(BindingDependency.Absent);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_Ancestor_RecordsItsOwnKey()
+    {
+        var service = new FakeAnnotationService();
+        var subjectKey = FullKey.Create(AnnotationKey.CreateSubject("mysubject"), ExecutionKey);
+        service.Set(subjectKey, new Dictionary<string, object> { ["owner"] = "team-b" }, marker: "\"3\"");
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
+        var dependencies = Recording();
+
+        await function.InvokeAsync(CreateRequest(ExecutionKey, "/owner", "Subject", dependencies));
+
+        dependencies.ToList().Should().ContainSingle().Which.Should().Be(
+            new BindingDependency(BindingDependencyKinds.Annotation, "view", subjectKey.Annotation.ToString(), "\"3\""));
+    }
+
+    [Fact]
+    public async Task InvokeAsync_AServiceWithoutMarkers_MakesItVolatile()
+    {
+        var service = new FakeAnnotationService { GivesMarkers = false };
+        service.Set(ExecutionKey, new Dictionary<string, object> { ["title"] = "hello" });
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
+        var dependencies = Recording();
+
+        var result = await function.InvokeAsync(CreateRequest(ExecutionKey, "/title", dependencies: dependencies));
+
+        result!.Token.Value<string>().Should().Be("hello");
+        dependencies.IsVolatile.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Function_Records()
+    {
+        new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => new FakeAnnotationService())).Should().BeAssignableTo<IRecordingBinding>();
+    }
+
+    [Fact]
     public async Task InvokeAsync_MissingContext_Throws()
     {
         var service = new FakeAnnotationService();
@@ -153,7 +216,12 @@ public class AnnotationBindingFunctionTests
         await act.Should().ThrowAsync<BindingEvaluationException>();
     }
 
-    private static BindingFunctionRequest CreateRequest(FullKey key, string expression, string? annotationType = null)
+    private static BindingDependencies Recording()
+    {
+        return new BindingScope { Dependencies = new BindingDependencies() }.Dependencies!;
+    }
+
+    private static BindingFunctionRequest CreateRequest(FullKey key, string expression, string? annotationType = null, BindingDependencies? dependencies = null)
     {
         var arguments = new List<BindingValue> { BindingValue.FromString(expression) };
         if (annotationType is not null)
@@ -167,15 +235,21 @@ public class AnnotationBindingFunctionTests
             Arguments = arguments,
             IncludeSecrets = true,
             Context = new ConfigurationBindingContext(key),
+            Dependencies = dependencies,
         };
     }
 
     private sealed class FakeAnnotationService : IAnnotationService
     {
         private readonly Dictionary<string, Annotation> _annotations = new();
+        private readonly Dictionary<string, string> _markers = new();
 
-        public void Set(FullKey key, IReadOnlyDictionary<string, object> values)
+        // false: the default member of the interface, which cannot tell the marker
+        public bool GivesMarkers { get; init; } = true;
+
+        public void Set(FullKey key, IReadOnlyDictionary<string, object> values, string marker = "\"1\"")
         {
+            _markers[key.ToString()] = marker;
             SetAnnotation(key, new Annotation
             {
                 ProjectName = key.ProjectName,
@@ -198,6 +272,13 @@ public class AnnotationBindingFunctionTests
         {
             _annotations.TryGetValue(fullKey.ToString(), out var annotation);
             return Task.FromResult(annotation);
+        }
+
+        public async Task<MarkedRead<Annotation>> GetAnnotationWithMarkerAsync(FullKey fullKey)
+        {
+            var annotation = await GetAnnotationAsync(fullKey);
+            var marker = _markers.TryGetValue(fullKey.ToString(), out var stored) ? stored : BindingDependency.Absent;
+            return new MarkedRead<Annotation>(annotation, GivesMarkers ? marker : null);
         }
 
         public Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request) => throw new NotSupportedException();

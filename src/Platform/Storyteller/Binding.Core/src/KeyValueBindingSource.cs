@@ -39,12 +39,13 @@ public static class KeyValueBindingSources
 /// The native key/value store as a binding source: <c>@db.host</c> (default), <c>@public(db.host)</c> and
 /// <c>@secret(db.password)</c>. The pairs come from the view of the configuration being resolved, so the
 /// source declines outside a configuration read. Each key is looked up at most once per resolved read.
+/// Every read records the storage marker of the pair, also when the kind declines it or the caller may not read it.
 /// </summary>
-public sealed class KeyValueBindingSource : IBindingSource
+public sealed class KeyValueBindingSource : IBindingSource, IRecordingBinding
 {
     // shared by the three kinds: one lookup per key and read, released with the read's context;
     // Lazy, because the properties of a document are resolved in parallel and GetOrAdd alone may run a factory twice
-    private static readonly ConditionalWeakTable<ConfigurationBindingContext, ConcurrentDictionary<string, Lazy<Task<KeyValueLookup?>>>> Memo = new();
+    private static readonly ConditionalWeakTable<ConfigurationBindingContext, ConcurrentDictionary<string, Lazy<Task<MarkedRead<KeyValueLookup>>>>> Memo = new();
 
     private readonly Lazy<IKeyValueService> _service;
     private readonly KeyValueSourceKind _kind;
@@ -65,8 +66,10 @@ public sealed class KeyValueBindingSource : IBindingSource
         }
 
         var includeSecrets = _kind != KeyValueSourceKind.Public && request.IncludeSecrets;
-        var lookup = await LookupAsync(context, request.PathString, includeSecrets);
+        var read = await LookupAsync(context, request.PathString, includeSecrets);
+        Record(request, context, read.Marker);
 
+        var lookup = read.Value;
         if (lookup is null)
         {
             return null;
@@ -85,13 +88,34 @@ public sealed class KeyValueBindingSource : IBindingSource
         return BindingValue.FromString(lookup.Value);
     }
 
-    private Task<KeyValueLookup?> LookupAsync(ConfigurationBindingContext context, string key, bool includeSecrets)
+    // a memo hit records again: the same marker changes nothing, and two lookups of a key in other versions make it volatile
+    private static void Record(BindingRequest request, ConfigurationBindingContext context, string? marker)
     {
-        var memo = Memo.GetValue(context, _ => new ConcurrentDictionary<string, Lazy<Task<KeyValueLookup?>>>(StringComparer.Ordinal));
+        if (request.Dependencies is not { } dependencies)
+        {
+            return;
+        }
+
+        if (marker is null)
+        {
+            dependencies.MarkVolatile("The key/value service gives no storage marker.");
+            return;
+        }
+
+        dependencies.Record(new BindingDependency(
+            BindingDependencyKinds.KeyValue,
+            context.ConfigurationKey.ViewName,
+            KeyValueRules.Normalize(request.PathString),
+            marker));
+    }
+
+    private Task<MarkedRead<KeyValueLookup>> LookupAsync(ConfigurationBindingContext context, string key, bool includeSecrets)
+    {
+        var memo = Memo.GetValue(context, _ => new ConcurrentDictionary<string, Lazy<Task<MarkedRead<KeyValueLookup>>>>(StringComparer.Ordinal));
         var memoKey = $"{(includeSecrets ? "s" : "p")}:{key.ToLowerInvariant()}";
         var configurationKey = context.ConfigurationKey;
 
-        return memo.GetOrAdd(memoKey, _ => new Lazy<Task<KeyValueLookup?>>(() => _service.Value.LookupAsync(
+        return memo.GetOrAdd(memoKey, _ => new Lazy<Task<MarkedRead<KeyValueLookup>>>(() => _service.Value.LookupWithMarkerAsync(
             configurationKey.OrganizationName,
             configurationKey.ProjectName,
             configurationKey.ViewName,

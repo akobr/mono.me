@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Annotations;
 using _42.Platform.Storyteller.Entities.Configurations;
@@ -59,8 +61,15 @@ public partial class CosmosAnnotationService : IAnnotationService
 
     public async Task<Annotation?> GetAnnotationAsync(FullKey fullKey)
     {
+        return (await GetAnnotationWithMarkerAsync(fullKey)).Value;
+    }
+
+    // The marker is the ETag of the annotation item in any state, and absent without an item.
+    public async Task<MarkedRead<Annotation>> GetAnnotationWithMarkerAsync(FullKey fullKey)
+    {
         var node = await Store(fullKey.OrganizationName).LoadAsync(fullKey, withConfiguration: false, withAudit: false);
-        return node.State == AnnotationItemState.Active ? node.Entity!.ToModel() : null;
+        var annotation = node.State == AnnotationItemState.Active ? node.Entity!.ToModel() : null;
+        return new MarkedRead<Annotation>(annotation, node.Entity is null ? BindingDependency.Absent : node.ETag);
     }
 
     public async Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request)

@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Configuring;
 using Azure;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Azure;
@@ -5,9 +6,13 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Binding;
 
+// A read records the version of the secret and makes the manifest volatile: a secret has no version check cheaper
+// than reading it. Without secrets the source reads nothing and records nothing.
 public class KeyVaultBindingSource(IAzureClientFactory<SecretClient> factory, string bindingKey)
-    : IBindingSource, IDescribedBinding
+    : IBindingSource, IDescribedBinding, IRecordingBinding
 {
+    private const string VolatileReason = "A Key Vault secret has no cheap version check.";
+
     private readonly SecretClient _client = factory.CreateClient(bindingKey);
 
     public BindingDescription Describe(string name)
@@ -46,6 +51,7 @@ public class KeyVaultBindingSource(IAzureClientFactory<SecretClient> factory, st
         }
 
         var secretName = string.Join("--", request.Path);
+        request.Dependencies?.MarkVolatile(VolatileReason);
 
         try
         {
@@ -53,14 +59,22 @@ public class KeyVaultBindingSource(IAzureClientFactory<SecretClient> factory, st
 
             if (!secretResponse.HasValue)
             {
+                Record(request, secretName, BindingDependency.Absent);
                 return null;
             }
 
+            Record(request, secretName, secretResponse.Value.Properties.Version ?? BindingDependency.Absent);
             return new BindingValue(new JValue(secretResponse.Value.Value));
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
+            Record(request, secretName, BindingDependency.Absent);
             return null;
         }
+    }
+
+    private void Record(BindingRequest request, string secretName, string marker)
+    {
+        request.Dependencies?.Record(new BindingDependency(BindingDependencyKinds.KeyVault, bindingKey, secretName, marker));
     }
 }

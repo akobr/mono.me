@@ -60,6 +60,85 @@ public class ConfigurationResolutionTests
     }
 
     [Fact]
+    public async Task ResolveConfigurationAsync_PutsTheCollectorOnTheScope()
+    {
+        var resolver = new RecordingAwareResolver(_ => { });
+        var service = CreateService(resolver);
+        var dependencies = new BindingDependencies();
+
+        await service.ResolveConfigurationAsync(Key, Effective(new JObject { ["host"] = "@db.host" }), dependencies: dependencies);
+
+        resolver.Calls.Should().ContainSingle().Which.Scope.Dependencies.Should().BeSameAs(dependencies);
+        dependencies.IsVolatile.Should().BeFalse("the scope attached it and the resolver records");
+    }
+
+    [Fact]
+    public async Task ResolveConfigurationAsync_AResolverThatDoesNotRecord_MakesItVolatile()
+    {
+        var resolver = new RecordingResolver(_ => { });
+        var service = CreateService(resolver);
+        var dependencies = new BindingDependencies();
+
+        await service.ResolveConfigurationAsync(Key, Effective(new JObject { ["host"] = "@db.host" }), dependencies: dependencies);
+
+        dependencies.IsVolatile.Should().BeTrue();
+        dependencies.VolatileReason.Should().Contain("resolver");
+    }
+
+    [Fact]
+    public async Task ResolveConfigurationAsync_WithoutAResolver_LeavesTheCollectorVolatile()
+    {
+        var service = CreateService(resolver: null);
+        var dependencies = new BindingDependencies();
+
+        await service.ResolveConfigurationAsync(Key, Effective(new JObject { ["host"] = "@db.host" }), dependencies: dependencies);
+
+        dependencies.IsVolatile.Should().BeTrue("no resolve recorded anything");
+    }
+
+    [Fact]
+    public async Task ResolveConfigurationAsync_WithoutACollector_PassesNone()
+    {
+        var resolver = new RecordingAwareResolver(_ => { });
+        var service = CreateService(resolver);
+
+        await service.ResolveConfigurationAsync(Key, Effective(new JObject { ["host"] = "@db.host" }));
+
+        resolver.Calls.Should().ContainSingle().Which.Scope.Dependencies.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AreDependenciesUnchangedAsync_WithoutDependencies_IsTrueWithoutARead()
+    {
+        // the service has no repositories: any read would fail
+        var service = CreateService(resolver: null);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [])).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AreDependenciesUnchangedAsync_AnInvalidKey_IsAbsentWithoutARead()
+    {
+        var service = CreateService(resolver: null);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [new BindingDependency(BindingDependencyKinds.KeyValue, "default", "not a key", BindingDependency.Absent)]))
+            .Should().BeTrue();
+        (await service.AreDependenciesUnchangedAsync(Key, [new BindingDependency(BindingDependencyKinds.KeyValue, "default", "not a key", "\"1\"")]))
+            .Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(BindingDependencyKinds.KeyVault, "primaryVault", "db--password")]
+    [InlineData("unknown", "default", "db.host")]
+    [InlineData(BindingDependencyKinds.Annotation, "default", "not an annotation key")]
+    public async Task AreDependenciesUnchangedAsync_AnInputItCannotCheck_IsFalseWithoutARead(string kind, string source, string key)
+    {
+        var service = CreateService(resolver: null);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [new BindingDependency(kind, source, key, "\"1\"")])).Should().BeFalse();
+    }
+
+    [Fact]
     public void HasBindings_AsksTheResolver()
     {
         var resolver = new RecordingResolver(_ => { }) { HasBindings = content => content.SelectToken("host") is not null };
@@ -89,7 +168,7 @@ public class ConfigurationResolutionTests
         };
     }
 
-    private sealed class RecordingResolver(Action<JObject> resolve) : IConfigurationBindingResolver
+    private class RecordingResolver(Action<JObject> resolve) : IConfigurationBindingResolver
     {
         public List<(bool IncludeSecrets, BindingScope Scope)> Calls { get; } = [];
 
@@ -103,5 +182,10 @@ public class ConfigurationResolutionTests
         }
 
         public bool ContainsBindings(JToken content) => HasBindings(content);
+    }
+
+    // An IRecordingBinding: the service trusts it to record what it reads.
+    private sealed class RecordingAwareResolver(Action<JObject> resolve) : RecordingResolver(resolve), IRecordingBinding
+    {
     }
 }
