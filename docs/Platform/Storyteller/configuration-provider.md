@@ -261,7 +261,7 @@ A rollback never undoes a newer document that another run swapped in meanwhile. 
 - Before the first `Load()` it throws `InvalidOperationException`; during the startup it waits for it. After the source stopped it throws `InvalidOperationException`.
 - A switch lasts for the process. A restart starts from the configured key.
 
-**Calls from change callbacks.** `TryRefreshAsync` and `SwitchKeyAsync`, called from a change callback that a notification of the same source runs (`IOptionsMonitor<T>.OnChange`, or `ChangeToken.OnChange` on the root), complete at their swap, not after the notification. The callback runs inside the current notification, and the new document is notified once that ends. Even `.GetAwaiter().GetResult()` in a callback does not deadlock. A switch from a callback whose document then does not bind does not throw: it is rolled back, and the rejection shows only in the status.
+**Calls from change callbacks.** `TryRefreshAsync` and `SwitchKeyAsync`, called from a change callback that a notification of the same source runs (`IOptionsMonitor<T>.OnChange`, or `ChangeToken.OnChange` on the root), complete at their swap, not after the notification. The callback runs inside the current notification, and the new document is notified once that ends. Even `.GetAwaiter().GetResult()` in a callback does not deadlock. A switch from a callback whose document then does not bind does not throw: it is rolled back, and the rejection shows only in the status. So a `true` from a nested `TryRefreshAsync`, or a nested `SwitchKeyAsync` that returns, means the document was read and swapped in, not that it bound; check `Status` after the notification when that matters.
 
 ### Status
 
