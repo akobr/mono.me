@@ -13,7 +13,15 @@ public sealed class ConditionalReadOptions
     // Keep it out of committed settings (an app setting or a Key Vault reference); without it each process draws its own key.
     public string? EntityTagKey { get; set; }
 
+    // How long a dependency manifest answers cheap 304s after the resolve that recorded it (absolute, not sliding).
+    public TimeSpan ManifestLifetime { get; set; } = TimeSpan.FromMinutes(5);
+
+    // The size of the manifest cache of a process: one per manifest plus one per recorded input.
+    public long ManifestCacheSizeLimit { get; set; } = 100_000;
+
     public bool IsValid => string.IsNullOrWhiteSpace(EntityTagKey) || TryDecode(EntityTagKey, out _);
+
+    public bool IsManifestCacheValid => ManifestLifetime > TimeSpan.Zero && ManifestCacheSizeLimit > 0;
 
     // The decoded key, or null when none is set.
     public byte[]? GetEntityTagKey()

@@ -31,14 +31,23 @@ public static class ConditionalRequestExtensions
     // Every If-None-Match line and list item counts. A header that is not a strict list of entity tags is ignored.
     public static bool MatchesIfNoneMatch(this HttpRequestData @this, EntityTagHeaderValue entityTag)
     {
-        if (!@this.Headers.TryGetValues(HeaderNames.IfNoneMatch, out var values)
-            || !EntityTagHeaderValue.TryParseStrictList(values.ToList(), out var listed))
-        {
-            return false;
-        }
-
         // Compare never matches * with a tag, so it is checked first
-        return listed.Any(tag => tag.Equals(EntityTagHeaderValue.Any) || tag.Compare(entityTag, useStrongComparison: false));
+        return @this.GetIfNoneMatch().Any(tag => tag.Equals(EntityTagHeaderValue.Any) || tag.Compare(entityTag, useStrongComparison: false));
+    }
+
+    // The tags listed in If-None-Match, in order; empty without the header or when it is not a strict list of entity tags.
+    public static IReadOnlyList<EntityTagHeaderValue> GetIfNoneMatch(this HttpRequestData @this)
+    {
+        return @this.Headers.TryGetValues(HeaderNames.IfNoneMatch, out var values)
+               && EntityTagHeaderValue.TryParseStrictList(values.ToList(), out var listed)
+            ? listed.ToList()
+            : [];
+    }
+
+    // The manifests of the resolved reads of this process, or null without them (nothing is cached then).
+    public static DependencyManifests? GetDependencyManifests(this HttpRequestData @this)
+    {
+        return @this.FunctionContext.InstanceServices.GetService<DependencyManifests>();
     }
 
     // Shared caches never store the response, and a browser revalidates its copy before each use.
