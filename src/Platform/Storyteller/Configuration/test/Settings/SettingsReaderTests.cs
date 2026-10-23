@@ -207,6 +207,68 @@ public class SettingsReaderTests
 
         ShouldFail().Message.ShouldContain("STORYTELLER_KEY");
         Read(requireKey: false).Key.ShouldBeNull();
+        SettingsReader.ReadForDocuments(Options()).Key.ShouldBeNull();
+    }
+
+    [Fact]
+    public void TheDocumentService_IgnoresTheOptionsOfTheProviderAlone()
+    {
+        _environment["STORYTELLER_REFRESH_INTERVAL"] = "often";
+        _environment["STORYTELLER_OPTIONAL"] = "maybe";
+        _environment["STORYTELLER_CACHE_DIR"] = "/var/cache/storyteller";
+        _environment["STORYTELLER_MODE"] = "effective";
+
+        var settings = SettingsReader.ReadForDocuments(Options(options =>
+        {
+            options.RefreshInterval = TimeSpan.FromMilliseconds(1);
+            options.Optional = true;
+            options.CacheDirectory = "/var/cache/other";
+            options.CacheProtector = new TestCacheProtector();
+            options.Placement = (SourcePlacement)7;
+            options.SecretRefreshInterval = TimeSpan.FromMinutes(5);
+        }));
+
+        settings.Key.ShouldNotBeNull().ToString().ShouldBe(TestDocuments.Key);
+        settings.Mode.ShouldBe(StorytellerReadMode.Effective);
+        settings.SecretRefreshInterval.ShouldBe(TimeSpan.FromMinutes(5));
+        settings.RefreshInterval.ShouldBe(TimeSpan.Zero);
+        settings.Optional.ShouldBeFalse();
+        settings.CacheDirectory.ShouldBeNull();
+        settings.CacheProtector.ShouldBeNull();
+        settings.Placement.ShouldBe(SourcePlacement.BeforeEnvironmentVariables);
+    }
+
+    [Fact]
+    public void TheDocumentService_ValidatesWhatItHonours()
+    {
+        _environment["STORYTELLER_KEY"] = "@acme.billing";
+        Should.Throw<StorytellerConfigurationException>(() => SettingsReader.ReadForDocuments(Options())).Message.ShouldContain("STORYTELLER_KEY");
+
+        _environment["STORYTELLER_KEY"] = TestDocuments.Key;
+        _environment["STORYTELLER_MODE"] = "both";
+        Should.Throw<StorytellerConfigurationException>(() => SettingsReader.ReadForDocuments(Options())).Message.ShouldContain("STORYTELLER_MODE");
+
+        _environment.Remove("STORYTELLER_MODE");
+        Should.Throw<StorytellerConfigurationException>(() => SettingsReader.ReadForDocuments(Options(options => options.ReadTimeout = TimeSpan.Zero)))
+            .Message.ShouldContain("ReadTimeout");
+    }
+
+    [Fact]
+    public void TheDocumentService_BindsTheCredentialToTheProjectOfItsKey_WhenItHasOne()
+    {
+        var scoped = TestCredential.ApiKey(ApiKey);
+        SettingsReader.ReadForDocuments(Options(options => options.Credential = scoped));
+        _environment.Remove("STORYTELLER_KEY");
+        var unscoped = TestCredential.ApiKey(ApiKey);
+        SettingsReader.ReadForDocuments(Options(options => options.Credential = unscoped));
+
+        var binding = scoped.Bindings.ShouldHaveSingleItem();
+        binding.Endpoint.ShouldBe(new Uri(TestDocuments.Endpoint));
+        binding.Organization.ShouldBe("acme");
+        binding.Project.ShouldBe("billing");
+        var without = unscoped.Bindings.ShouldHaveSingleItem();
+        without.Organization.ShouldBeNull();
+        without.Project.ShouldBeNull();
     }
 
     [Theory]

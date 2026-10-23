@@ -1,5 +1,4 @@
 using _42.Platform.Storyteller.Sdk.Configuring.Caching;
-using _42.Platform.Storyteller.Sdk.Configuring.Flattening;
 using _42.Platform.Storyteller.Sdk.Configuring.Logging;
 using _42.Platform.Storyteller.Sdk.Configuring.Reading;
 using _42.Platform.Storyteller.Sdk.Configuring.References;
@@ -127,7 +126,10 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                     LastErrorAt = _lastErrorAt,
                     ConsecutiveFailures = _consecutiveFailures,
                     TotalFailures = _totalFailures,
-                    IsDegraded = snapshot.Origin != StorytellerConfigurationOrigin.Platform || _consecutiveFailures > 0 || snapshot.Rejection is not null,
+                    IsDegraded = snapshot.Origin != StorytellerConfigurationOrigin.Platform
+                        || _consecutiveFailures > 0
+                        || snapshot.Rejection is not null
+                        || snapshot.RejectedData is not null,
                 };
             }
         }
@@ -328,7 +330,8 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     }
 
     // At the start of the host: the container's factory, for an engine that was given none. A degraded start happened
-    // before any logger existed, so it is reported now.
+    // before any logger existed, so it is reported now, and so are the warnings of the applied document: a document that
+    // does not change is applied once, at the startup.
     internal void UseLoggerFactory(ILoggerFactory loggerFactory)
     {
         if (_loggerFactory.IsGiven)
@@ -347,6 +350,18 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                 status.ConsecutiveFailures,
                 status.LastError?.Message ?? "No error was recorded.");
         }
+
+        ConfigurationSnapshot snapshot;
+        EngineLifetime? lifetime;
+
+        lock (_lock)
+        {
+            snapshot = _snapshot;
+            lifetime = _lifetime;
+        }
+
+        lifetime?.Reader.WarnUnboundBindings(snapshot.Identity, snapshot.Document?.Content as JToken);
+        _substitution.WarnUnresolved(_logger, snapshot.Identity.Key, snapshot.Substitution);
     }
 
     // After the host stopped: it disposes its logger factory before the configuration.
@@ -717,6 +732,7 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
 
         WriteCache(lifetime, started);
         lifetime.Reader.WarnUnboundBindings(identity, started.Document?.Content as JToken);
+        _substitution.WarnUnresolved(_logger, identity.Key, started.Substitution);
 
         switch (started.Origin)
         {
@@ -1057,21 +1073,29 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
         // that confirms a protected cache entry turns the origin to Platform.
         var origin = previous.Rejection is null ? StorytellerConfigurationOrigin.Platform : previous.Origin;
 
-        // The hook of secret rotation: references older than SecretRefreshInterval are resolved again, and the document
-        // is applied again only if a value changed. Nothing is resolved before Phase 3, so nothing is due.
+        // Secret rotation: references older than SecretRefreshInterval are resolved again, fresh ones are reused, and the
+        // document is applied again only if a value changed. A failure keeps the snapshot, and the next poll tries again.
         if (previous.Substitution is { } substitution && _substitution.IsRefreshDue(substitution))
         {
             var (data, refreshed) = await ApplyContentAsync(previous.Identity, previous.Document!, scope).ConfigureAwait(false);
-            var draft = previous with
-            {
-                ETag = notModified.ETag,
-                CacheControl = notModified.CacheControl,
-                Origin = origin,
-                Substitution = refreshed,
-                Data = HasSameData(data, previous.Data) ? previous.Data : data,
-            };
 
-            return new Draft(draft, true);
+            // The values that did not bind are still the ones resolved: nothing to apply. The snapshot keeps its old
+            // resolution time, so the next poll looks again, at the memory cache until those values expire, then at the
+            // resolver.
+            if (previous.RejectedData is not { } rejectedData || !HasSameData(data, rejectedData))
+            {
+                var draft = previous with
+                {
+                    ETag = notModified.ETag,
+                    CacheControl = notModified.CacheControl,
+                    Origin = origin,
+                    Substitution = refreshed,
+                    Data = HasSameData(data, previous.Data) ? previous.Data : data,
+                    RejectedData = null,
+                };
+
+                return new Draft(draft, true);
+            }
         }
 
         if (string.Equals(notModified.ETag, previous.ETag, StringComparison.Ordinal)
@@ -1133,59 +1157,13 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
         };
     }
 
-    // Step 3: flatten and validate the server's content, then resolve its references. The server's document itself is
-    // never changed: the cache keeps it as it came.
-    private async Task<(IReadOnlyDictionary<string, string> Data, SubstitutionResult? Substitution)> ApplyContentAsync(
+    // Step 3, shared with the document service.
+    private Task<(IReadOnlyDictionary<string, string> Data, SubstitutionResult? Substitution)> ApplyContentAsync(
         DocumentIdentity identity,
         Configuration document,
         RunScope scope)
     {
-        var content = document.Content switch
-        {
-            null => null,
-            JToken token => token,
-            var other => JToken.FromObject(other),
-        };
-
-        try
-        {
-            var data = DocumentFlattener.Flatten(content);
-
-            if (content is not JObject serverContent)
-            {
-                return (data, null);
-            }
-
-            var substitution = await _substitution.SubstituteAsync(serverContent, scope.Token).ConfigureAwait(false);
-
-            return ReferenceEquals(substitution.Content, serverContent)
-                ? (data, substitution)
-                : (DocumentFlattener.Flatten(substitution.Content), substitution);
-        }
-        catch (InvalidDocumentException exception)
-        {
-            throw new StorytellerConfigurationException(
-                $"The configuration {identity.Key} is not valid, so it is not applied: {exception.Message}",
-                identity.Key,
-                null,
-                null,
-                false,
-                exception);
-        }
-        catch (SecretResolutionException exception)
-        {
-            throw new StorytellerConfigurationException(
-                $"A secret reference in the configuration {identity.Key} could not be resolved: {exception.Message}",
-                identity.Key,
-                null,
-                null,
-                exception.IsTransient,
-                exception);
-        }
-        catch (OperationCanceledException) when (scope.IsTimedOut)
-        {
-            throw TimedOut(identity, _settings.ReadTimeout);
-        }
+        return ContentApplication.ApplyAsync(_substitution, identity, document, scope, _settings.ReadTimeout);
     }
 
     // Step 5, one pass on the lane: every provider publishes the snapshot and reloads, outside every lock of the engine.
@@ -1269,6 +1247,7 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
             if (!ReferenceEquals(snapshot.Document, before.Document))
             {
                 lifetime.Reader.WarnUnboundBindings(snapshot.Identity, snapshot.Document?.Content as JToken);
+                _substitution.WarnUnresolved(_logger, snapshot.Identity.Key, snapshot.Substitution);
             }
         }
     }
@@ -1276,21 +1255,14 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     // The document did not bind. The failure is recorded once, for this snapshot. While the current snapshot still carries
     // the rejected document (it, or a newer one that changed only its metadata), a new snapshot with the confirmed
     // content and identity goes in, and the next pass rebuilds the options from it. On the same identity it keeps the
-    // newest rejected tag, so polls answer 304 instead of applying and rolling back the document every interval.
+    // newest rejected tag, so polls answer 304 instead of applying and rolling back the document every interval. A
+    // rotation, the confirmed document with its secrets resolved again, keeps the rejected data instead, so a 304 that
+    // resolves the same values applies nothing.
     private void Reject(EngineLifetime lifetime, ConfigurationSnapshot rejected, Exception exception)
     {
         var key = rejected.Identity.Key;
         var types = DescribeTypes(exception);
-
-        // The types only, and not the exception: a binding exception may quote the value that did not convert, and this
-        // error goes to the status, to logs and to the caller of a switch.
-        var error = new StorytellerConfigurationException(
-            $"The configuration {key} did not bind: a reload callback threw {types}. The previous document is restored; the platform's document is tried again when it changes.",
-            key,
-            null,
-            null,
-            false);
-        var isRestored = false;
+        StorytellerConfigurationException? error = null;
 
         lock (_lock)
         {
@@ -1299,11 +1271,22 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                 return;
             }
 
-            // The restored document did not bind either: there is nothing older to go back to.
-            isRestored = ReferenceEquals(rejected.Data, _confirmed.Data) && rejected.Identity == _confirmed.Identity;
-
-            if (!isRestored)
+            // The restored document did not bind either, when the error stays null: there is nothing older to go back to.
+            if (!ReferenceEquals(rejected.Data, _confirmed.Data) || rejected.Identity != _confirmed.Identity)
             {
+                var isSameIdentity = rejected.Identity == _confirmed.Identity;
+                var isRotation = isSameIdentity && ReferenceEquals(rejected.Document, _confirmed.Document);
+
+                // The types only, and not the exception: a binding exception may quote the value that did not convert,
+                // and this error goes to the status, to logs and to the caller of a switch.
+                error = new StorytellerConfigurationException(
+                    isRotation
+                        ? $"The configuration {key} did not bind with its secret references resolved again: a reload callback threw {types}. The previous values are restored; the secrets are tried again when their values change."
+                        : $"The configuration {key} did not bind: a reload callback threw {types}. The previous document is restored; the platform's document is tried again when it changes.",
+                    key,
+                    null,
+                    null,
+                    false);
                 rejected.Notification.Rejection = error;
                 RecordFailure(error);
                 var current = _snapshot;
@@ -1312,14 +1295,16 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                 {
                     current.Notification.Rejection ??= error;
                     var target = _confirmed with { WritesCache = false };
-                    _snapshot = Stamp(rejected.Identity == target.Identity
-                        ? target with { ETag = current.ETag, CacheControl = current.CacheControl, Rejection = error }
-                        : target);
+                    _snapshot = Stamp(!isSameIdentity
+                        ? target
+                        : isRotation
+                            ? target with { ETag = current.ETag, CacheControl = current.CacheControl, RejectedData = rejected.Data }
+                            : target with { ETag = current.ETag, CacheControl = current.CacheControl, Rejection = error });
                 }
             }
         }
 
-        if (isRestored)
+        if (error is null)
         {
             _logger.LogError("The restored configuration {Key} did not bind either: a reload callback threw {Types}. It stays applied.", key, types);
         }
