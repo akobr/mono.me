@@ -14,6 +14,10 @@ internal sealed class DocumentReader
     // More paths than this are counted, not listed.
     private const int MaxListedPaths = 20;
 
+    // A proxy, a captive portal or an API that does not match the SDK. The SDK's message and the body are not quoted:
+    // the body of a resolved read may hold secrets.
+    private const string UnparsedAnswerFix = ": check that the endpoint is the Storyteller API base, /api included, and that nothing in between rewrites the response.";
+
     private readonly IConfigurationsApiClient _client;
     private readonly ILogger _logger;
 
@@ -95,14 +99,15 @@ internal sealed class DocumentReader
             listed);
     }
 
-    // 408, 424, 429 and 5xx other than 501 are worth another try; 501 and the other 4xx get the same answer again. A
-    // 2xx that did not parse came through something in between; a 3xx is a redirect, which is not followed.
+    // 408, 424, 429 and 5xx other than 501 and 505 are worth another try; 501, 505 and the other 4xx get the same answer
+    // again, as in the SDK's resilience pipeline. A 2xx that did not parse came through something in between; a 3xx is
+    // a redirect, which is not followed.
     internal static bool IsTransientStatus(int status)
     {
         return status switch
         {
             408 or 424 or 429 => true,
-            501 => false,
+            501 or 505 => false,
             >= 500 => true,
             >= 200 and < 300 => true,
             _ => false,
@@ -151,7 +156,7 @@ internal sealed class DocumentReader
         var status = exception.StatusCode;
         var error = (exception as ApiException<ErrorResponse>)?.Result ?? (status >= 400 ? TryReadError(exception.Response) : null);
         var errorCode = string.IsNullOrWhiteSpace(error?.ErrorCode) ? null : error.ErrorCode;
-        var message = $"{Describe(identity, status, errorCode)} ({status}{(errorCode is null ? string.Empty : $" {errorCode}")}){DescribeError(error)}";
+        var message = $"{Describe(identity, status, errorCode)} ({status}{(errorCode is null ? string.Empty : $" {errorCode}")}){(IsSuccessStatus(status) ? UnparsedAnswerFix : DescribeError(error))}";
 
         return IsTransientStatus(status)
             ? new ReadOutcome.Transient(status, errorCode, message, exception)
@@ -169,8 +174,14 @@ internal sealed class DocumentReader
             404 => $"The configuration {identity.Key} does not exist",
             422 => $"A binding in {identity.Key} cannot be evaluated",
             >= 300 and < 400 => $"Reading {identity.Key} was redirected, which is not followed; set the endpoint to the final URL",
+            _ when IsSuccessStatus(status) => $"The answer to the read of {identity.Key} did not parse as a configuration",
             _ => $"Reading {identity.Key} failed",
         };
+    }
+
+    private static bool IsSuccessStatus(int status)
+    {
+        return status is >= 200 and < 300;
     }
 
     // The statuses the OpenAPI document does not declare (424, 503, …) still carry an ErrorResponse; the generated

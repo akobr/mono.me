@@ -71,4 +71,39 @@ public class LocalUrlRuleTests
     {
         Should.Throw<StorytellerAuthenticationException>(() => LocalUrlRule.Require("/api", "STORYTELLER_ENDPOINT"));
     }
+
+    [Theory]
+    [InlineData("https://api.example.com/api?code=p4ssw0rd")]
+    [InlineData("https://api.example.com/api#p4ssw0rd")]
+    public void RequireEndpoint_RefusesAQueryOrAFragment_ThatPathsWouldFollow(string url)
+    {
+        LocalUrlRule.Require(url, "STORYTELLER_ENDPOINT").ShouldBe(new Uri(url));
+
+        var exception = Should.Throw<StorytellerAuthenticationException>(() => LocalUrlRule.RequireEndpoint(url, "STORYTELLER_ENDPOINT"));
+
+        exception.Reason.ShouldBe(StorytellerAuthenticationFailureReason.Configuration);
+        exception.Message.ShouldContain("STORYTELLER_ENDPOINT");
+        exception.Message.ShouldContain("query or a fragment");
+        exception.Message.ShouldNotContain("p4ssw0rd");
+    }
+
+    [Fact]
+    public void RequireEndpoint_AppliesTheLocalUrlRule()
+    {
+        LocalUrlRule.RequireEndpoint("http://localhost:7071/api/", "STORYTELLER_ENDPOINT").ShouldBe(new Uri("http://localhost:7071/api/"));
+        Should.Throw<StorytellerAuthenticationException>(() => LocalUrlRule.RequireEndpoint("http://loopback/api", "STORYTELLER_ENDPOINT"));
+    }
+
+    [Fact]
+    public void AnEndpointWithAQuery_FailsTheCredentialOptions()
+    {
+        var endpoint = new Uri("https://api.example.com/api?x=1");
+
+        Should.Throw<StorytellerAuthenticationException>(() => StorytellerCredential.FromFederatedTokenFile(
+                new FederatedTokenOptions { Endpoint = endpoint, ClientId = "machine", SubjectTokenPath = "/run/token" }))
+            .Message.ShouldContain("FederatedTokenOptions.Endpoint");
+        Should.Throw<StorytellerAuthenticationException>(() => StorytellerCredential.FromClientCredentials(
+                new ClientCredentialsOptions { Endpoint = endpoint, ClientId = "client_01", ClientSecret = "s3cr3t" }))
+            .Message.ShouldContain("ClientCredentialsOptions.Endpoint");
+    }
 }

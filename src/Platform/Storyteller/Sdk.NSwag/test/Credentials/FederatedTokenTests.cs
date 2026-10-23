@@ -236,6 +236,8 @@ public class FederatedTokenTests
     [InlineData("http://loopback/api")]
     [InlineData("http://api.example.com/api")]
     [InlineData("https://user:password@api.example.com/api")]
+    [InlineData("https://api.example.com/api?password=1")]
+    [InlineData("https://api.example.com/api#password")]
     public async Task AnEndpointThatBreaksTheLocalUrlRule_IsAConfigurationError(string endpoint)
     {
         var credential = Create().Bind(new StorytellerCredentialBinding(new Uri(endpoint)) { Organization = "acme", Project = "billing" }).WithPrimaryHandler(_http);

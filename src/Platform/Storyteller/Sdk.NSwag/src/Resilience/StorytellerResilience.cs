@@ -13,10 +13,19 @@ public static class StorytellerResilience
     // The circuit breaker sits outside the retries, so it counts one outcome per call: with the defaults, the attempts of
     // one failing call would open it on their own and block every other request of the client. The attempt timeout is
     // innermost, as in the standard handler. The pipeline keeps the state of its breaker, so one pipeline belongs to one
-    // client.
+    // client. Zero turns the retries or the attempt timeout off; a negative value is a mistake, not a way to say so.
     public static ResiliencePipeline<HttpResponseMessage> CreatePipeline(StorytellerResilienceOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentOutOfRangeException.ThrowIfNegative(options.MaxRetryAttempts, "options.MaxRetryAttempts");
+
+        if (options.AttemptTimeout < TimeSpan.Zero && options.AttemptTimeout != Timeout.InfiniteTimeSpan)
+        {
+            throw new ArgumentOutOfRangeException(
+                "options.AttemptTimeout",
+                options.AttemptTimeout,
+                "The attempt timeout must be positive, zero or Timeout.InfiniteTimeSpan; zero and infinite add none.");
+        }
 
         var builder = new ResiliencePipelineBuilder<HttpResponseMessage>();
 

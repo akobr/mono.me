@@ -6,13 +6,13 @@ namespace _42.Platform.Storyteller.Sdk.Resilience;
 // always honoured.
 public sealed class StorytellerResilienceOptions
 {
-    // Retries after the first attempt; 0 adds no retry.
+    // Retries after the first attempt; 0 adds no retry, and a negative value is an error.
     public int MaxRetryAttempts { get; set; } = 3;
 
     // The first delay of an exponential backoff with jitter.
     public TimeSpan BaseDelay { get; set; } = TimeSpan.FromMilliseconds(500);
 
-    // Zero or infinite adds no attempt timeout.
+    // Zero or infinite adds no attempt timeout; another negative value is an error.
     public TimeSpan AttemptTimeout { get; set; } = TimeSpan.FromSeconds(5);
 
     // false retries GET (and the other safe methods) only; the token client sets true, a token request has no side effect.
@@ -28,7 +28,8 @@ public sealed class StorytellerResilienceOptions
 
     public TimeSpan BreakDuration { get; set; } = TimeSpan.FromSeconds(30);
 
-    internal StorytellerResilienceOptions Clone()
+    // A copy for a client that must not see later changes of the caller's options.
+    public StorytellerResilienceOptions Clone()
     {
         return (StorytellerResilienceOptions)MemberwiseClone();
     }

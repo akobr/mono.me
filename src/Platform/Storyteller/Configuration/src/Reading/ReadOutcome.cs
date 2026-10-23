@@ -55,8 +55,8 @@ internal abstract record ReadOutcome
         public string Reason { get; }
     }
 
-    // 400, 401, 403, 404, 422, 501 and the other answers a retry would not change; a credential that is misconfigured
-    // or refused.
+    // 400, 401, 403, 404, 422, 501, 505 and the other answers a retry would not change; a credential that is
+    // misconfigured or refused.
     public sealed record Definitive : Failure
     {
         public Definitive(int? statusCode, string? errorCode, string message, Exception? exception)
@@ -65,7 +65,8 @@ internal abstract record ReadOutcome
         }
     }
 
-    // A network error, a timeout, an open circuit, 408, 424, 429 and 5xx other than 501; an unavailable token endpoint.
+    // A network error, a timeout, an open circuit, 408, 424, 429 and 5xx other than 501 and 505; an unavailable token
+    // endpoint.
     public sealed record Transient : Failure
     {
         public Transient(int? statusCode, string? errorCode, string message, Exception? exception)

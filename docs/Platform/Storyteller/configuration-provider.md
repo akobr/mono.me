@@ -173,8 +173,8 @@ The first `Load()` of a source runs the startup read. It blocks the caller, runs
 
 | Class | Failures |
 | --- | --- |
-| Transient | A network error, an attempt timeout, `ReadTimeout`, an open circuit; `408`, `424`, `429` and `5xx` except `501`; a `2xx` whose body does not parse; a `304` to a read that sent no tag the provider can apply; a credential that is `Unavailable`, or that throws anything but `StorytellerAuthenticationException`; a resolver failure marked transient |
-| Definitive | `400`, `401`, `403`, `404` (with or without a body, `AnnotationDeleted` included), `422`, `501`, a redirect (never followed), and any other `4xx`; a credential failure with the reason `Configuration` or `Rejected`; an invalid document; any other resolver failure |
+| Transient | A network error, an attempt timeout, `ReadTimeout`, an open circuit; `408`, `424`, `429` and `5xx` except `501` and `505`; a `2xx` whose body does not parse; a `304` to a read that sent no tag the provider can apply; a credential that is `Unavailable`, or that throws anything but `StorytellerAuthenticationException`; a resolver failure marked transient |
+| Definitive | `400`, `401`, `403`, `404` (with or without a body, `AnnotationDeleted` included), `422`, `501`, `505`, a redirect (never followed), and any other `4xx`; a credential failure with the reason `Configuration` or `Rejected`; an invalid document; any other resolver failure |
 | Withheld | `X-2S-Secrets-Withheld` on a resolved read, handled as definitive |
 
 Every failure is a `StorytellerConfigurationException` with `Key`, `StatusCode`, `ErrorCode` (from the platform's `ErrorResponse`), `IsTransient`, and the inner exception. Messages name the key, the status and the fix, never a secret.
@@ -286,7 +286,7 @@ A rollback never undoes a newer document that another run swapped in meanwhile. 
 ### Logging
 
 - **Category.** `_42.Platform.Storyteller.Sdk.Configuring.StorytellerConfigurationProvider`.
-- **Hand-over.** The provider starts before the container and its logger factory exist. `AddStorytellerConfiguration()` registers an `IHostedLifecycleService` that hands the container's `ILoggerFactory` to every source at `StartingAsync`, unless `options.LoggerFactory` is set. A source that started degraded logs its status then, so a start from the cache is reported although it happened before any logger existed. The warnings of the applied document (unbound bindings, unresolved references) are logged again then too, because a document that does not change is applied only once, at the startup. At `StoppedAsync` the factory is taken back, because the host disposes it before the configuration.
+- **Hand-over.** The provider starts before the container and its logger factory exist. `AddStorytellerConfiguration()` registers an `IHostedLifecycleService` that hands the container's `ILoggerFactory` to every source at `StartingAsync`, unless `options.LoggerFactory` is set. A source that started degraded logs its status then, so a start from the cache is reported although it happened before any logger existed. The warnings of the applied document (unbound bindings, unresolved references) are logged again then too, because a document that does not change is applied only once, at the startup, and so is the notice of a `no-store` answer that is not cached on disk. At `StoppedAsync` the factory is taken back, because the host disposes it before the configuration.
 - **Information:** a loaded or applied version, and once per configuration, a `no-store` answer that is not cached on disk.
 - **Warning:** a degraded start, a failed run, a document that did not bind, unbound bindings, unresolved references, and cache problems.
 - **Error:** a restored document that does not bind either, and an unexpected exception in a refresh.

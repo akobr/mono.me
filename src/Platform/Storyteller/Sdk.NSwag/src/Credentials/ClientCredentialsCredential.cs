@@ -49,7 +49,7 @@ internal sealed class ClientCredentialsCredential : CachedTokenCredential
 
         if (options.Endpoint is not null)
         {
-            LocalUrlRule.Require(options.Endpoint, "ClientCredentialsOptions.Endpoint");
+            LocalUrlRule.RequireEndpoint(options.Endpoint, "ClientCredentialsOptions.Endpoint");
         }
 
         return new ClientCredentialsCredential(options, null, getVariable, null);

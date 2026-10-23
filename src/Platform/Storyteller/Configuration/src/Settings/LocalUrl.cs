@@ -2,8 +2,9 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace _42.Platform.Storyteller.Sdk.Configuring.Settings;
 
-// The local URL rule of the SDK credentials (LocalUrlRule, internal there): an absolute https URL without user info, or
-// http to localhost or a loopback address literal, never to a name that DNS resolves.
+// A copy of the local URL rule of the SDK credentials (Sdk.NSwag/src/Credentials/LocalUrlRule.cs, internal there): an
+// absolute https URL without user info, or http to localhost or a loopback address literal, never to a name that DNS
+// resolves. A change there comes here too; SettingsReaderTests pins that both accept the same endpoints.
 internal static class LocalUrl
 {
     private static readonly char[] AuthorityEnd = ['/', '?', '#', '\\'];
