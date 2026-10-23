@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
 
@@ -29,8 +30,13 @@ public interface IConfigurationService
     bool HasBindings(Configuration effective);
 
     // Evaluates the bindings of a configuration from GetRawConfigurationAsync in place and returns it.
-    // Version, Modified and Hash stay the effective ones.
-    Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false);
+    // Version, Modified and Hash stay the effective ones. The bindings record what they read into dependencies, which
+    // an implementation puts on the BindingScope of the resolve; a collector it does not pass on stays volatile.
+    Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false, BindingDependencies? dependencies = null);
+
+    // Whether every input recorded by a resolve of the configuration still has its marker. It reads only the storage
+    // versions: nothing is looked up, decrypted, metered or audited. False for an input it cannot check.
+    Task<bool> AreDependenciesUnchangedAsync(FullKey key, IReadOnlyList<BindingDependency> dependencies);
 
     Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key);
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
@@ -204,5 +205,7 @@ internal sealed class FakeConfigurationService(ExportReads? reads = null, Import
 
     public bool HasBindings(Configuration effective) => throw new NotSupportedException();
 
-    public Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false) => throw new NotSupportedException();
+    public Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false, BindingDependencies? dependencies = null) => throw new NotSupportedException();
+
+    public Task<bool> AreDependenciesUnchangedAsync(FullKey key, IReadOnlyList<BindingDependency> dependencies) => throw new NotSupportedException();
 }

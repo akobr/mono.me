@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.KeyValues;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
@@ -65,5 +66,11 @@ internal sealed class CountingKeyValueService(CosmosKeyValueService inner) : IKe
     {
         _lookups.AddOrUpdate(key, 1, (_, count) => count + 1);
         return inner.LookupAsync(organization, project, view, key, includeSecrets);
+    }
+
+    public Task<MarkedRead<KeyValueLookup>> LookupWithMarkerAsync(string organization, string project, string view, string key, bool includeSecrets)
+    {
+        _lookups.AddOrUpdate(key, 1, (_, count) => count + 1);
+        return inner.LookupWithMarkerAsync(organization, project, view, key, includeSecrets);
     }
 }

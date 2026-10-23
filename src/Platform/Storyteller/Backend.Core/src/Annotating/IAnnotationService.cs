@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
 
@@ -10,6 +11,13 @@ public interface IAnnotationService
     Task<bool> ExistAnnotationAsync(FullKey fullKey);
 
     Task<Annotation?> GetAnnotationAsync(FullKey fullKey);
+
+    // GetAnnotationAsync with the storage marker of the annotation item, for the @annotation binding (see MarkedRead).
+    // The default cannot tell the marker.
+    async Task<MarkedRead<Annotation>> GetAnnotationWithMarkerAsync(FullKey fullKey)
+    {
+        return new MarkedRead<Annotation>(await GetAnnotationAsync(fullKey), Marker: null);
+    }
 
     // Deleted annotations only, with their Deletion.
     Task<Annotation?> GetDeletedAnnotationAsync(FullKey fullKey);

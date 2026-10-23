@@ -12,8 +12,9 @@ namespace _42.Platform.Storyteller.Binding;
 /// annotation. With one argument, the target is the annotation whose key equals the configuration currently being
 /// resolved (see <see cref="ConfigurationBindingContext"/>, supplied via <see cref="BindingScope.Context"/>). With a
 /// second argument, the target is instead the ancestor annotation of the given <see cref="AnnotationType"/>.
+/// The read records the storage marker of the target annotation (see <see cref="BindingScope.Dependencies"/>).
 /// </summary>
-public sealed class AnnotationBindingFunction : IBindingFunction, IDescribedBinding
+public sealed class AnnotationBindingFunction : IBindingFunction, IDescribedBinding, IRecordingBinding
 {
     private const string FunctionName = "annotation";
 
@@ -108,7 +109,10 @@ public sealed class AnnotationBindingFunction : IBindingFunction, IDescribedBind
             targetKey = FullKey.Create(ancestorKey, context.ConfigurationKey);
         }
 
-        var annotation = await _annotationService.Value.GetAnnotationAsync(targetKey);
+        var read = await _annotationService.Value.GetAnnotationWithMarkerAsync(targetKey);
+        Record(request, targetKey, read.Marker);
+
+        var annotation = read.Value;
         if (annotation is null || annotation.Values is null)
         {
             return null;
@@ -118,5 +122,25 @@ public sealed class AnnotationBindingFunction : IBindingFunction, IDescribedBind
         var result = JsonQuery.Resolve(document, expression);
 
         return result is null ? null : new BindingValue(result);
+    }
+
+    private static void Record(BindingFunctionRequest request, FullKey targetKey, string? marker)
+    {
+        if (request.Dependencies is not { } dependencies)
+        {
+            return;
+        }
+
+        if (marker is null)
+        {
+            dependencies.MarkVolatile("The annotation service gives no storage marker.");
+            return;
+        }
+
+        dependencies.Record(new BindingDependency(
+            BindingDependencyKinds.Annotation,
+            targetKey.ViewName,
+            targetKey.Annotation.ToString(),
+            marker));
     }
 }
