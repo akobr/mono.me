@@ -4,9 +4,9 @@ namespace _42.Platform.Storyteller.Binding.Language;
 /// Implements <c>@config("&lt;expr&gt;")</c>, resolving a JSONPath or JSON Pointer expression against the
 /// configuration document currently being resolved (see <see cref="BindingScope.Document"/>). The expression is
 /// always evaluated against a snapshot of the configuration taken before the binding pass started, so the result
-/// never depends on the order in which properties are processed.
+/// never depends on the order in which properties are processed. It reads no external input, so it records nothing.
 /// </summary>
-public sealed class ConfigBindingFunction : IBindingFunction, IDescribedBinding
+public sealed class ConfigBindingFunction : IBindingFunction, IDescribedBinding, IRecordingBinding
 {
     private const string FunctionName = "config";
 

@@ -10,6 +10,8 @@ namespace _42.Platform.Storyteller.Binding;
 /// </summary>
 public sealed class BindingScope
 {
+    private readonly BindingDependencies? _dependencies;
+
     /// <summary>
     /// The document a function may query in its entirety, e.g. a snapshot of the configuration currently being
     /// resolved. <c>null</c> when the caller has no such document to offer.
@@ -22,4 +24,18 @@ public sealed class BindingScope
     /// when the caller has no such context to offer.
     /// </summary>
     public object? Context { get; init; }
+
+    /// <summary>
+    /// The collector of the inputs this resolution pass reads, passed on to every source and function request.
+    /// <c>null</c> when the caller does not record. Setting it attaches the collector (see <see cref="BindingDependencies"/>).
+    /// </summary>
+    public BindingDependencies? Dependencies
+    {
+        get => _dependencies;
+        init
+        {
+            _dependencies = value;
+            value?.Attach();
+        }
+    }
 }

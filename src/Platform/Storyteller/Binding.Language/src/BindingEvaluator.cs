@@ -10,6 +10,8 @@ namespace _42.Platform.Storyteller.Binding.Language;
 /// resolve to <c>null</c> (the source/function declined or was not registered), in which case the
 /// caller should leave the original value untouched. Interpolation and math always produce a value or
 /// throw a <see cref="BindingEvaluationException"/> when an inner statement cannot be resolved.
+/// The <see cref="BindingScope.Dependencies"/> of the scope go to every source and function; one that is not an
+/// <see cref="IRecordingBinding"/> makes them volatile. An unregistered name reads nothing and records nothing.
 /// </summary>
 public sealed class BindingEvaluator
 {
@@ -125,7 +127,13 @@ public sealed class BindingEvaluator
             return null;
         }
 
-        var request = new BindingRequest { Path = path, IncludeSecrets = _includeSecrets, Context = _scope?.Context };
+        var dependencies = _scope?.Dependencies;
+        if (source is not IRecordingBinding)
+        {
+            dependencies?.MarkVolatile($"The source '{key}' does not record its reads.");
+        }
+
+        var request = new BindingRequest { Path = path, IncludeSecrets = _includeSecrets, Context = _scope?.Context, Dependencies = dependencies };
         var value = await source.ResolveAsync(request);
         return value?.Token;
     }
@@ -158,6 +166,12 @@ public sealed class BindingEvaluator
             arguments.Add(value);
         }
 
+        var dependencies = _scope?.Dependencies;
+        if (binding is not IRecordingBinding)
+        {
+            dependencies?.MarkVolatile($"The function '{function.Name}' does not record its reads.");
+        }
+
         var request = new BindingFunctionRequest
         {
             Name = function.Name,
@@ -165,6 +179,7 @@ public sealed class BindingEvaluator
             IncludeSecrets = _includeSecrets,
             Document = _scope?.Document,
             Context = _scope?.Context,
+            Dependencies = dependencies,
         };
 
         var result = await binding.InvokeAsync(request);
