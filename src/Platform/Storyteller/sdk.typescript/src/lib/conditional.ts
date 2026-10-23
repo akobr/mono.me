@@ -75,5 +75,14 @@ async function readConditional<T>(url: string, options: ConditionalReadOptions =
     throw StorytellerError.fromResponse(response.status, response.statusText, body)
   }
 
+  // A configuration is a JSON object; anything else is not the API's answer.
+  if (body === null || typeof body !== 'object' || Array.isArray(body) || body instanceof Blob) {
+    throw new StorytellerError({
+      status: response.status,
+      message: 'The Storyteller API answered without a configuration object.',
+      body,
+    })
+  }
+
   return { status: 200, notModified: false, value: body as T, ...read }
 }
