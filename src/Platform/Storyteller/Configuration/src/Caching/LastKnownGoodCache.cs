@@ -144,6 +144,23 @@ internal sealed partial class LastKnownGoodCache
         return _protector is null && !CacheControlDirectives.AllowsPlainEntry(identity.Document.Mode, cacheControl);
     }
 
+    // Once per identity, when a logger takes it: the first answer usually comes at the startup, before the container's
+    // logger factory is handed over, and the hand-over reports it then (StorytellerConfigurationEngine.UseLoggerFactory).
+    public void ReportNotCached(CacheIdentity identity, string? cacheControl)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+
+        if (ForbidsPlainEntry(identity, cacheControl)
+            && _logger.IsEnabled(LogLevel.Information)
+            && _skipsLogged.TryAdd(identity.Text, 0))
+        {
+            _logger.LogInformation(
+                "The configuration {Identity} is not cached on disk: the platform answered Cache-Control: {CacheControl}, and no cache protector is set.",
+                identity,
+                cacheControl ?? "(none)");
+        }
+    }
+
     // {file name}.{32 hex}.tmp: the temporary files of this cache, never anything else in the directory.
     [GeneratedRegex("^[0-9a-f]{32}\\.[0-9a-f]{32}\\.tmp$", RegexOptions.CultureInvariant)]
     private static partial Regex TemporaryFileName();
@@ -256,13 +273,7 @@ internal sealed partial class LastKnownGoodCache
 
     private void SkipPlainEntry(CacheIdentity identity, string? cacheControl)
     {
-        if (_skipsLogged.TryAdd(identity.Text, 0))
-        {
-            _logger.LogInformation(
-                "The configuration {Identity} is not cached on disk: the platform answered Cache-Control: {CacheControl}, and no cache protector is set.",
-                identity,
-                cacheControl ?? "(none)");
-        }
+        ReportNotCached(identity, cacheControl);
 
         var path = GetPath(identity);
 

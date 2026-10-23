@@ -11,7 +11,7 @@ internal static class UnboundTarget
         var variables = new EnvironmentVariables(getVariable);
         var endpoint = variables.ReadWithFallback(StorytellerVariables.ENDPOINT, StorytellerVariables.API_URL, out var source);
 
-        return endpoint is null ? null : LocalUrlRule.Require(endpoint, source);
+        return endpoint is null ? null : LocalUrlRule.RequireEndpoint(endpoint, source);
     }
 
     public static (string? Organization, string? Project) ReadProject(Func<string, string?> getVariable)

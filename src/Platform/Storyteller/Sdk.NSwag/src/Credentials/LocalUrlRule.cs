@@ -4,7 +4,8 @@ using System.Diagnostics.CodeAnalysis;
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
 // Credentials never cross a network in clear text: an absolute https URL without user info, or http to localhost or a
-// loopback address literal, never to a name that DNS resolves.
+// loopback address literal, never to a name that DNS resolves. The provider keeps a copy, LocalUrl in
+// Configuration/src/Settings, because this one is internal; a change here goes there too.
 internal static class LocalUrlRule
 {
     private static readonly char[] AuthorityEnd = ['/', '?', '#', '\\'];
@@ -36,6 +37,21 @@ internal static class LocalUrlRule
     public static Uri Require(Uri uri, string name)
     {
         return IsAllowed(uri) ? uri : throw Invalid(name);
+    }
+
+    // The API base: paths are appended to it, so it has no query or fragment either, as the provider requires.
+    public static Uri RequireEndpoint(string value, string name)
+    {
+        return RequireEndpoint(Require(value, name), name);
+    }
+
+    public static Uri RequireEndpoint(Uri uri, string name)
+    {
+        Require(uri, name);
+
+        return uri.Query.Length == 0 && uri.Fragment.Length == 0
+            ? uri
+            : throw StorytellerAuthenticationException.Configuration($"{name} must not have a query or a fragment; set the API base, /api included.");
     }
 
     // For messages and ToString(): scheme, host, port and path, never user info, a query or a fragment. A relative URL,

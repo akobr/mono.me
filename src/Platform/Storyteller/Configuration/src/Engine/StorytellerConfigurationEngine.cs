@@ -330,8 +330,8 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     }
 
     // At the start of the host: the container's factory, for an engine that was given none. A degraded start happened
-    // before any logger existed, so it is reported now, and so are the warnings of the applied document: a document that
-    // does not change is applied once, at the startup.
+    // before any logger existed, so it is reported now, and so are the warnings of the applied document and the notice of
+    // a no-store answer: a document that does not change is applied once, at the startup.
     internal void UseLoggerFactory(ILoggerFactory loggerFactory)
     {
         if (_loggerFactory.IsGiven)
@@ -362,6 +362,14 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
 
         lifetime?.Reader.WarnUnboundBindings(snapshot.Identity, snapshot.Document?.Content as JToken);
         _substitution.WarnUnresolved(_logger, snapshot.Identity.Key, snapshot.Substitution);
+
+        // A no-store answer at the startup came before any logger, and its notice comes once per configuration: now.
+        if (_cache is not null
+            && snapshot.Origin == StorytellerConfigurationOrigin.Platform
+            && Volatile.Read(ref _fingerprint) is { } fingerprint)
+        {
+            _cache.ReportNotCached(new CacheIdentity(snapshot.Identity, fingerprint), snapshot.CacheControl);
+        }
     }
 
     // After the host stopped: it disposes its logger factory before the configuration.

@@ -27,6 +27,46 @@ public class StorytellerResilienceTests
     }
 
     [Fact]
+    public void ZeroAndInfinite_TurnRetriesAndTheAttemptTimeoutOff()
+    {
+        Should.NotThrow(() => StorytellerResilience.CreatePipeline(new StorytellerResilienceOptions { MaxRetryAttempts = 0, AttemptTimeout = TimeSpan.Zero }));
+        Should.NotThrow(() => StorytellerResilience.CreatePipeline(new StorytellerResilienceOptions { AttemptTimeout = Timeout.InfiniteTimeSpan }));
+    }
+
+    [Fact]
+    public void NegativeValues_AreRejected_NotSkipped()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => StorytellerResilience.CreatePipeline(new StorytellerResilienceOptions { MaxRetryAttempts = -1 }))
+            .ParamName.ShouldBe("options.MaxRetryAttempts");
+        Should.Throw<ArgumentOutOfRangeException>(() => StorytellerResilience.CreatePipeline(new StorytellerResilienceOptions { AttemptTimeout = TimeSpan.FromSeconds(-5) }))
+            .ParamName.ShouldBe("options.AttemptTimeout");
+    }
+
+    [Fact]
+    public void Clone_CopiesEveryProperty()
+    {
+        var options = new StorytellerResilienceOptions
+        {
+            MaxRetryAttempts = 1,
+            BaseDelay = TimeSpan.FromSeconds(2),
+            AttemptTimeout = TimeSpan.FromSeconds(3),
+            RetryUnsafeMethods = true,
+            FailureRatio = 0.25,
+            MinimumThroughput = 4,
+            SamplingDuration = TimeSpan.FromSeconds(50),
+            BreakDuration = TimeSpan.FromSeconds(6),
+        };
+
+        var copy = options.Clone();
+
+        copy.ShouldNotBeSameAs(options);
+        foreach (var property in typeof(StorytellerResilienceOptions).GetProperties())
+        {
+            property.GetValue(copy).ShouldBe(property.GetValue(options), property.Name);
+        }
+    }
+
+    [Fact]
     public async Task A503ThenA200_IsRetried()
     {
         _api.Respond(HttpStatusCode.ServiceUnavailable);
