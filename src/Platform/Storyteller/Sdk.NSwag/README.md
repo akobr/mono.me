@@ -80,7 +80,7 @@ A `DelegatingHandler` wraps the primary handler, which follows redirects: a hand
 | `FromApiKey(apiKey)` | `Authorization: ApiKey <key>`; a leading `ApiKey ` and whitespace are removed. `.WithClientCertificate(certificate)` adds the machine's certificate, the only combination with a certificate. |
 | `FromCertificate(certificate)` | no `Authorization`; the certificate only. `StorytellerClientCertificate.Load(path, password)` loads a `.pfx` and refuses one without a private key. |
 | `FromClientCredentials(new ClientCredentialsOptions { … })` | `Bearer` from a `client_credentials` token request. Without `TokenUrl`, only an AuthKit client id (`client_…`) works: it reads the AuthKit domain from the endpoint's `v1/auth/configuration` and posts to `{domain}/oauth2/token`. |
-| `FromTokenFile(path)` | `Bearer` with the content of the file, read again before every request. |
+| `FromTokenFile(path)` | `Bearer` with the content of the file, read again before every request. It cannot renew, so a `401` is not retried: the rotated file is read by the next request. |
 | `FromFederatedTokenFile(new FederatedTokenOptions { … })` | `Bearer` from an RFC 8693 exchange at `{endpoint}/v1/{organization}/{project}/access/token`, with the platform token of the file, read again before every exchange. |
 | `FromEnvironment()` | the credential of the `STORYTELLER_*` variables below, or `null` when they describe none. |
 
