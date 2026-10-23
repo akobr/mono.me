@@ -7,8 +7,9 @@ namespace _42.Platform.Storyteller.Binding.Language;
 /// The JSON entry point for data binding. It guards on the leading '@', tokenizes, parses, and
 /// evaluates the expression, then assigns the result back onto the JSON token. Sources and functions
 /// are registered through <see cref="IBindingRegistry"/> and listed through <see cref="IBindingCatalog"/>.
+/// It records through the evaluator: the scope's <see cref="BindingScope.Dependencies"/> reach every source and function.
 /// </summary>
-public sealed class BindingExecutor : IBindingExecutor, IBindingRegistry, IBindingCatalog
+public sealed class BindingExecutor : IBindingExecutor, IBindingRegistry, IBindingCatalog, IRecordingBinding
 {
     public const string DefaultSourceKey = BindingEvaluator.DefaultSourceKey;
 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.KeyValues;
@@ -514,22 +515,28 @@ public class CosmosKeyValueService : IKeyValueService
 
     public async Task<KeyValueLookup?> LookupAsync(string organization, string project, string view, string key, bool includeSecrets)
     {
+        return (await LookupWithMarkerAsync(organization, project, view, key, includeSecrets)).Value;
+    }
+
+    // The marker is the ETag of the catalog item in any state, and absent without an item: an invalid key is never stored.
+    public async Task<MarkedRead<KeyValueLookup>> LookupWithMarkerAsync(string organization, string project, string view, string key, bool includeSecrets)
+    {
         if (!KeyValueRules.IsValidKey(key))
         {
-            return null;
+            return new MarkedRead<KeyValueLookup>(null, BindingDependency.Absent);
         }
 
         var place = GetPlace(organization, project, view);
-        var (entity, _) = await ReadAsync(place, key);
+        var (entity, etag) = await ReadAsync(place, key);
 
-        if (entity is null || entity.IsDeleted)
+        if (entity is null)
         {
-            return null;
+            return new MarkedRead<KeyValueLookup>(null, BindingDependency.Absent);
         }
 
-        if (entity.Content.Protection.IsSecret() && !includeSecrets)
+        if (entity.IsDeleted || (entity.Content.Protection.IsSecret() && !includeSecrets))
         {
-            return null;
+            return new MarkedRead<KeyValueLookup>(null, etag);
         }
 
         var value = await _protector.UnprotectAsync(place.Identity(entity), entity.Content);
@@ -542,7 +549,7 @@ public class CosmosKeyValueService : IKeyValueService
             _audit?.RecordBindingRead(place.Organization, place.Project, place.View, entity.Key, entity.Content.Protection, KeyValueCallerContext.Current ?? KeyValueCaller.System());
         }
 
-        return new KeyValueLookup(entity.Key, entity.Content.Protection, value, entity.Content.ContentType);
+        return new MarkedRead<KeyValueLookup>(new KeyValueLookup(entity.Key, entity.Content.Protection, value, entity.Content.ContentType), etag);
     }
 
     internal static string GetId(string normalizedKey)

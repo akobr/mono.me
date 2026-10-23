@@ -2,12 +2,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Json;
 using FluentAssertions;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
+using Moq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -18,6 +22,8 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 public class ConfigurationResolutionTests
 {
     private static readonly FullKey Key = FullKey.Create(AnnotationKey.CreateResponsibility("billing"), "acme", "main", "default");
+
+    private static readonly BindingDependency KeyValueInput = new(BindingDependencyKinds.KeyValue, "default", "db.host", "\"1\"");
 
     [Fact]
     public async Task ResolveConfigurationAsync_EvaluatesInPlaceAndKeepsTheEffectiveFields()
@@ -60,6 +66,112 @@ public class ConfigurationResolutionTests
     }
 
     [Fact]
+    public async Task ResolveConfigurationAsync_PutsTheCollectorOnTheScope()
+    {
+        var resolver = new RecordingAwareResolver(_ => { });
+        var service = CreateService(resolver);
+        var dependencies = new BindingDependencies();
+
+        await service.ResolveConfigurationAsync(Key, Effective(new JObject { ["host"] = "@db.host" }), dependencies: dependencies);
+
+        resolver.Calls.Should().ContainSingle().Which.Scope.Dependencies.Should().BeSameAs(dependencies);
+        dependencies.IsVolatile.Should().BeFalse("the scope attached it and the resolver records");
+    }
+
+    [Fact]
+    public async Task ResolveConfigurationAsync_AResolverThatDoesNotRecord_MakesItVolatile()
+    {
+        var resolver = new RecordingResolver(_ => { });
+        var service = CreateService(resolver);
+        var dependencies = new BindingDependencies();
+
+        await service.ResolveConfigurationAsync(Key, Effective(new JObject { ["host"] = "@db.host" }), dependencies: dependencies);
+
+        dependencies.IsVolatile.Should().BeTrue();
+        dependencies.VolatileReason.Should().Contain("resolver");
+    }
+
+    [Fact]
+    public async Task ResolveConfigurationAsync_WithoutAResolver_LeavesTheCollectorVolatile()
+    {
+        var service = CreateService(resolver: null);
+        var dependencies = new BindingDependencies();
+
+        await service.ResolveConfigurationAsync(Key, Effective(new JObject { ["host"] = "@db.host" }), dependencies: dependencies);
+
+        dependencies.IsVolatile.Should().BeTrue("no resolve recorded anything");
+    }
+
+    [Fact]
+    public async Task ResolveConfigurationAsync_WithoutACollector_PassesNone()
+    {
+        var resolver = new RecordingAwareResolver(_ => { });
+        var service = CreateService(resolver);
+
+        await service.ResolveConfigurationAsync(Key, Effective(new JObject { ["host"] = "@db.host" }));
+
+        resolver.Calls.Should().ContainSingle().Which.Scope.Dependencies.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AreDependenciesUnchangedAsync_WithoutDependencies_IsTrueWithoutARead()
+    {
+        // the service has no repositories: any read would fail
+        var service = CreateService(resolver: null);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [])).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AreDependenciesUnchangedAsync_AnInvalidKey_IsAbsentWithoutARead()
+    {
+        var service = CreateService(resolver: null);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [new BindingDependency(BindingDependencyKinds.KeyValue, "default", "not a key", BindingDependency.Absent)]))
+            .Should().BeTrue();
+        (await service.AreDependenciesUnchangedAsync(Key, [new BindingDependency(BindingDependencyKinds.KeyValue, "default", "not a key", "\"1\"")]))
+            .Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(BindingDependencyKinds.KeyVault, "primaryVault", "db--password")]
+    [InlineData("unknown", "default", "db.host")]
+    [InlineData(BindingDependencyKinds.Annotation, "default", "not an annotation key")]
+    public async Task AreDependenciesUnchangedAsync_AnInputItCannotCheck_IsFalseWithoutARead(string kind, string source, string key)
+    {
+        var service = CreateService(resolver: null);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [new BindingDependency(kind, source, key, "\"1\"")])).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AreDependenciesUnchangedAsync_AFailedRead_IsFalse()
+    {
+        var container = new Mock<Container>();
+        container.Setup(items => items.ReadManyItemsStreamAsync(It.IsAny<IReadOnlyList<(string, PartitionKey)>>(), It.IsAny<ReadManyRequestOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResponseMessage(HttpStatusCode.TooManyRequests));
+        var service = CreateService(resolver: null, container.Object);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [KeyValueInput])).Should().BeFalse("a failed check resolves again");
+    }
+
+    [Theory]
+    [InlineData(typeof(CosmosException))]
+    [InlineData(typeof(OperationCanceledException))]
+    public async Task AreDependenciesUnchangedAsync_AReadThatThrows_IsFalse(Type exceptionType)
+    {
+        Exception exception = exceptionType == typeof(CosmosException)
+            ? new CosmosException("unavailable", HttpStatusCode.ServiceUnavailable, 0, "activity", 0)
+            : new OperationCanceledException("timed out");
+        var container = new Mock<Container>();
+        container.Setup(items => items.ReadManyItemsStreamAsync(It.IsAny<IReadOnlyList<(string, PartitionKey)>>(), It.IsAny<ReadManyRequestOptions>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(exception);
+        var service = CreateService(resolver: null, container.Object);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [KeyValueInput])).Should().BeFalse();
+    }
+
+    [Fact]
     public void HasBindings_AsksTheResolver()
     {
         var resolver = new RecordingResolver(_ => { }) { HasBindings = content => content.SelectToken("host") is not null };
@@ -69,12 +181,20 @@ public class ConfigurationResolutionTests
         service.HasBindings(Effective(new JObject { ["plan"] = "enterprise" })).Should().BeFalse();
     }
 
-    private static CosmosConfigurationService CreateService(IConfigurationBindingResolver? resolver)
+    // container: the organization container of a revalidation; without it any read fails the test
+    private static CosmosConfigurationService CreateService(IConfigurationBindingResolver? resolver, Container? container = null)
     {
         var options = Options.Create(new JsonSerializerSettings());
+        var repositories = new Mock<IContainerRepositoryProvider>(MockBehavior.Strict);
+
+        if (container is not null)
+        {
+            repositories.Setup(provider => provider.GetOrganizationContainer(Key.OrganizationName))
+                .Returns(Mock.Of<IContainerRepository>(repository => repository.Container == container));
+        }
 
         // the resolve step never touches the repositories
-        return new CosmosConfigurationService(null!, new JsonSerializationSettingsService(options), options, resolver!);
+        return new CosmosConfigurationService(repositories.Object, new JsonSerializationSettingsService(options), options, resolver!);
     }
 
     private static Configuration Effective(JObject content)
@@ -89,7 +209,7 @@ public class ConfigurationResolutionTests
         };
     }
 
-    private sealed class RecordingResolver(Action<JObject> resolve) : IConfigurationBindingResolver
+    private class RecordingResolver(Action<JObject> resolve) : IConfigurationBindingResolver
     {
         public List<(bool IncludeSecrets, BindingScope Scope)> Calls { get; } = [];
 
@@ -103,5 +223,10 @@ public class ConfigurationResolutionTests
         }
 
         public bool ContainsBindings(JToken content) => HasBindings(content);
+    }
+
+    // An IRecordingBinding: the service trusts it to record what it reads.
+    private sealed class RecordingAwareResolver(Action<JObject> resolve) : RecordingResolver(resolve), IRecordingBinding
+    {
     }
 }

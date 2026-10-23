@@ -204,7 +204,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         return _bindingResolver?.ContainsBindings(effective.Content) ?? false;
     }
 
-    public async Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false)
+    public async Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false, BindingDependencies? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(effective);
 
@@ -213,14 +213,25 @@ public partial class CosmosConfigurationService : IConfigurationService
             return effective;
         }
 
+        if (_bindingResolver is not IRecordingBinding)
+        {
+            dependencies?.MarkVolatile("The binding resolver does not record its reads.");
+        }
+
         var scope = new BindingScope
         {
             Document = effective.Content.DeepClone(),
             Context = new ConfigurationBindingContext(key),
+            Dependencies = dependencies,
         };
 
         await _bindingResolver.ResolveAsync(effective.Content, includeSecrets, scope);
         return effective;
+    }
+
+    public Task<bool> AreDependenciesUnchangedAsync(FullKey key, IReadOnlyList<BindingDependency> dependencies)
+    {
+        return new BindingDependencyValidator(_repositoryProvider, _logger).AreUnchangedAsync(key, dependencies);
     }
 
     public async Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key)

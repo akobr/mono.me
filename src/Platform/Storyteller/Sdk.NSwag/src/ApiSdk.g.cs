@@ -10087,7 +10087,7 @@ namespace _42.Platform.Storyteller.Sdk
         System.Threading.Tasks.Task DeleteConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
 
         /// <remarks>
-        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.
+        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document without bindings is not evaluated. A document with bindings is revalidated from the versions of the key/value pairs and annotations it read, without evaluating it, when the serving instance recorded them for the sent ETag; otherwise it is evaluated and may still answer 304. JSON-e, and Key Vault secrets for a caller that may read secrets, are evaluated for every read.
         /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -10099,7 +10099,7 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.
+        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document without bindings is not evaluated. A document with bindings is revalidated from the versions of the key/value pairs and annotations it read, without evaluating it, when the serving instance recorded them for the sent ETag; otherwise it is evaluated and may still answer 304. JSON-e, and Key Vault secrets for a caller that may read secrets, are evaluated for every read.
         /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -11384,7 +11384,7 @@ namespace _42.Platform.Storyteller.Sdk
         }
 
         /// <remarks>
-        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.
+        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document without bindings is not evaluated. A document with bindings is revalidated from the versions of the key/value pairs and annotations it read, without evaluating it, when the serving instance recorded them for the sent ETag; otherwise it is evaluated and may still answer 304. JSON-e, and Key Vault secrets for a caller that may read secrets, are evaluated for every read.
         /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -11399,7 +11399,7 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.
+        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document without bindings is not evaluated. A document with bindings is revalidated from the versions of the key/value pairs and annotations it read, without evaluating it, when the serving instance recorded them for the sent ETag; otherwise it is evaluated and may still answer 304. JSON-e, and Key Vault secrets for a caller that may read secrets, are evaluated for every read.
         /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>

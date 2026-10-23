@@ -12,5 +12,11 @@ public sealed class BindingRequest
     /// </summary>
     public object? Context { get; init; }
 
+    /// <summary>
+    /// The <see cref="BindingScope.Dependencies"/> of this resolution pass: an <see cref="IRecordingBinding"/> source
+    /// records what it reads into it. <c>null</c> when the pass does not record.
+    /// </summary>
+    public BindingDependencies? Dependencies { get; init; }
+
     public string PathString => string.Join('.', Path);
 }

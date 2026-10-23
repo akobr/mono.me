@@ -1,3 +1,5 @@
+using _42.Platform.Storyteller.Configuring;
+
 namespace _42.Platform.Storyteller.KeyValues;
 
 public interface IKeyValueService
@@ -29,4 +31,11 @@ public interface IKeyValueService
 
     // For the binding sources: the current value, or null when missing, deleted, or a secret without includeSecrets.
     Task<KeyValueLookup?> LookupAsync(string organization, string project, string view, string key, bool includeSecrets);
+
+    // LookupAsync with the storage marker of the pair (see MarkedRead): the version of its item also when the value is
+    // null because the pair is deleted or a secret without includeSecrets. The default cannot tell the marker.
+    async Task<MarkedRead<KeyValueLookup>> LookupWithMarkerAsync(string organization, string project, string view, string key, bool includeSecrets)
+    {
+        return new MarkedRead<KeyValueLookup>(await LookupAsync(organization, project, view, key, includeSecrets), Marker: null);
+    }
 }

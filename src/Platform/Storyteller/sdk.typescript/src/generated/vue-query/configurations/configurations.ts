@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.48.17600
+ * OpenAPI spec version: 0.9.50.40497
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -1064,7 +1064,7 @@ export const getGetResolvedConfigurationUrl = (
 };
 
 /**
- * The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.
+ * The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document without bindings is not evaluated. A document with bindings is revalidated from the versions of the key/value pairs and annotations it read, without evaluating it, when the serving instance recorded them for the sent ETag; otherwise it is evaluated and may still answer 304. JSON-e, and Key Vault secrets for a caller that may read secrets, are evaluated for every read.
  */
 export const getResolvedConfiguration = async (
   organization: string,

@@ -21,4 +21,10 @@ public sealed class BindingFunctionRequest
     /// resolution pass, or <c>null</c> when none was supplied.
     /// </summary>
     public object? Context { get; init; }
+
+    /// <summary>
+    /// The <see cref="BindingScope.Dependencies"/> of this resolution pass: an <see cref="IRecordingBinding"/> function
+    /// records what it reads into it. <c>null</c> when the pass does not record.
+    /// </summary>
+    public BindingDependencies? Dependencies { get; init; }
 }

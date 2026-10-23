@@ -7,6 +7,7 @@ using _42.Platform.Storyteller.Api.ConditionalReads;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1;
 using _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.KeyValues;
 
@@ -247,36 +248,280 @@ public class ConfigurationConditionalReadTests
     }
 
     [Fact]
-    public async Task GetConfigurationResolved_WithBindings_TagsTheResolvedBody()
+    public async Task GetConfigurationResolved_RecordedInputs_TagTheReadByTheirMarkers()
     {
-        var value = "db-1";
-        var (http, configurations) = Create(() => Stored(), (configuration, _) =>
-        {
-            configuration.Content["host"] = value;
-            return configuration;
-        });
+        // without the manifests of the process every read resolves, and the tag still follows the inputs
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
         var first = Machine(mtls: true);
         await http.GetConfigurationResolved(first, Org, Project, View, Key);
         var tag = Headers(first).ETag.ToString();
 
         var unchanged = Machine(mtls: true, ifNoneMatch: tag);
         var unchangedResult = await http.GetConfigurationResolved(unchanged, Org, Project, View, Key);
-        value = "db-2";
+        configurations.Marker = "\"2\"";
         var changed = Machine(mtls: true, ifNoneMatch: tag);
+        var changedResult = await http.GetConfigurationResolved(changed, Org, Project, View, Key);
+
+        tag.ShouldStartWith("W/\"d.");
+        unchangedResult.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        changedResult.ShouldBeOfType<OkObjectResult>();
+        Headers(changed).ETag.ToString().ShouldNotBe(tag);
+        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(3);
+        configurations.Calls.ShouldNotContain(nameof(IConfigurationService.AreDependenciesUnchangedAsync));
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_VolatileInputs_TagTheResolvedBody()
+    {
+        var value = "db-1";
+        var (http, configurations) = Create(
+            () => Stored(),
+            (configuration, _) =>
+            {
+                configuration.Content["host"] = value;
+                return configuration;
+            },
+            Volatile);
+        using var provider = Manifests();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var tag = Headers(first).ETag.ToString();
+
+        var unchanged = Machine(mtls: true, ifNoneMatch: tag, provider: provider);
+        var unchangedResult = await http.GetConfigurationResolved(unchanged, Org, Project, View, Key);
+        value = "db-2";
+        var changed = Machine(mtls: true, ifNoneMatch: tag, provider: provider);
         var changedResult = await http.GetConfigurationResolved(changed, Org, Project, View, Key);
 
         tag.ShouldStartWith("W/\"b.");
         unchangedResult.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
         changedResult.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<Configuration>().Content["host"]!.Value<string>().ShouldBe("db-2");
         Headers(changed).ETag.ToString().ShouldNotBe(tag);
-        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(3, "a document with bindings is resolved for every read");
+        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(3, "a volatile document is resolved for every read");
+        configurations.Calls.ShouldNotContain(nameof(IConfigurationService.AreDependenciesUnchangedAsync));
         configurations.Calls.ShouldNotContain(nameof(IConfigurationService.GetResolvedConfigurationAsync));
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AServiceThatIgnoresTheCollector_TagsTheResolvedBody()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"), record: null);
+        using var provider = Manifests();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var tag = Headers(first).ETag.ToString();
+
+        await http.GetConfigurationResolved(Machine(mtls: true, ifNoneMatch: tag, provider: provider), Org, Project, View, Key);
+
+        tag.ShouldStartWith("W/\"b.", customMessage: "a collector that no scope carried is volatile");
+        configurations.Calls.ShouldNotContain(nameof(IConfigurationService.AreDependenciesUnchangedAsync));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetConfigurationResolved_TheTagOfAManifest_IsNotModifiedWithoutAResolve(bool strong)
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = Manifests();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var tag = Headers(first).ETag.ToString();
+        configurations.Calls.Clear();
+        var second = Machine(mtls: true, ifNoneMatch: strong ? tag.Replace("W/", string.Empty, StringComparison.Ordinal) : tag, provider: provider);
+
+        var result = await http.GetConfigurationResolved(second, Org, Project, View, Key);
+
+        result.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        Headers(second).ETag.ToString().ShouldBe(tag, "the 304 repeats the weak tag of the 200");
+        Headers(second).CacheControl.ToString().ShouldBe("no-store");
+        configurations.Calls.ShouldBe(
+        [
+            nameof(IConfigurationService.GetRawConfigurationAsync),
+            nameof(IConfigurationService.HasBindings),
+            nameof(IConfigurationService.AreDependenciesUnchangedAsync),
+        ]);
+        configurations.Revalidated.ShouldHaveSingleItem().ShouldHaveSingleItem().Marker.ShouldBe("\"1\"");
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_TheTagOfAManifest_RepeatsTheWithheldHeader()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = Manifests();
+        var first = Machine(mtls: false, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var second = Machine(mtls: false, ifNoneMatch: Headers(first).ETag.ToString(), provider: provider);
+
+        var result = await http.GetConfigurationResolved(second, Org, Project, View, Key);
+
+        result.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(1);
+        Headers(second)[SecretRights.WithheldHeader].ToString().ShouldBe(SecretRights.WithheldByMtls);
+        Headers(second).CacheControl.ToString().ShouldBe("private, no-cache");
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AChangedInput_ResolvesAndDropsTheManifest()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = Manifests();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var tag = Headers(first).ETag.ToString();
+
+        configurations.Marker = "\"2\"";
+        var changed = Machine(mtls: true, ifNoneMatch: tag, provider: provider);
+        var changedResult = await http.GetConfigurationResolved(changed, Org, Project, View, Key);
+        var again = Machine(mtls: true, ifNoneMatch: tag, provider: provider);
+        await http.GetConfigurationResolved(again, Org, Project, View, Key);
+
+        changedResult.ShouldBeOfType<OkObjectResult>();
+        Headers(changed).ETag.ToString().ShouldNotBe(tag);
+        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(3);
+        configurations.Revalidated.Count.ShouldBe(1, "the manifest that did not revalidate is gone");
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AManifestOfAnotherInstance_ResolvesAndStillAnswersNotModified()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var instance = Manifests();
+        using var otherInstance = Manifests();
+        var first = Machine(mtls: true, provider: instance);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var second = Machine(mtls: true, ifNoneMatch: Headers(first).ETag.ToString(), provider: otherInstance);
+
+        var result = await http.GetConfigurationResolved(second, Org, Project, View, Key);
+
+        result.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        Headers(second).ETag.ToString().ShouldBe(Headers(first).ETag.ToString(), "a d tag is the same on every instance");
+        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(2);
+        configurations.Revalidated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AManifestOfOtherRights_IsNotRevalidated()
+    {
+        // one machine on one channel whose rights changed: the secrets are withheld at first, then it may not read them
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = Manifests();
+        var withheld = Machine(mtls: false, provider: provider);
+        await http.GetConfigurationResolved(withheld, Org, Project, View, Key);
+        var neither = WithHttpContext(
+            KeyValueRequests.Machine(mtls: false, roles: [Scopes.Configuration.Read]),
+            Headers(withheld).ETag.ToString(),
+            provider);
+
+        var result = await http.GetConfigurationResolved(neither, Org, Project, View, Key);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        configurations.Revalidated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AManifestOfAnotherRegistry_IsNotRevalidated()
+    {
+        var executor = new BindingExecutor();
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = new ServiceCollection()
+            .AddSingleton<IBindingCatalog>(executor)
+            .AddConditionalReads(new ConfigurationBuilder().Build())
+            .BuildServiceProvider();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+
+        executor.RegisterSource("late", new PlainSource());
+        var second = Machine(mtls: true, ifNoneMatch: Headers(first).ETag.ToString(), provider: provider);
+        var result = await http.GetConfigurationResolved(second, Org, Project, View, Key);
+
+        result.ShouldBeOfType<OkObjectResult>("a source registered later can bind what the manifest recorded as stored");
+        configurations.Revalidated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AManifestOfAnotherCaller_IsNotRevalidated()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = Manifests();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var other = WithHttpContext(
+            TestRequests.MachineCarrying(KeyValueRequests.MachineRoles, machineId: "machine-2", mtls: true),
+            Headers(first).ETag.ToString(),
+            provider);
+
+        var result = await http.GetConfigurationResolved(other, Org, Project, View, Key);
+
+        result.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified, "the same inputs give the same tag");
+        configurations.Revalidated.ShouldBeEmpty("each caller is resolved, metered and audited for itself");
+        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AManifestOfAnotherDocumentOrKey_IsNotRevalidated()
+    {
+        var stored = Stored();
+        var (http, configurations) = Create(() => stored, Resolve("db-1"));
+        using var provider = Manifests();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var tag = Headers(first).ETag.ToString();
+
+        stored = Stored(version: 4);
+        var newer = await http.GetConfigurationResolved(Machine(mtls: true, ifNoneMatch: tag, provider: provider), Org, Project, View, Key);
+        stored = Stored();
+        var otherKey = await http.GetConfigurationResolved(Machine(mtls: true, ifNoneMatch: tag, provider: provider), Org, Project, View, "unt.invoicing.receiver");
+
+        newer.ShouldBeOfType<OkObjectResult>();
+        otherKey.ShouldBeOfType<OkObjectResult>();
+        configurations.Revalidated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AnOlderTagListedFirst_DoesNotHideTheCurrentOne()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = Manifests();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var older = Headers(first).ETag.ToString();
+        configurations.Marker = "\"2\"";
+        var second = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(second, Org, Project, View, Key);
+        var current = Headers(second).ETag.ToString();
+        configurations.Calls.Clear();
+        configurations.Revalidated.Clear();
+        var request = Machine(mtls: true, ifNoneMatch: string.Join(", ", Enumerable.Repeat(older, 50).Append(current)), provider: provider);
+
+        var result = await http.GetConfigurationResolved(request, Org, Project, View, Key);
+
+        result.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        Headers(request).ETag.ToString().ShouldBe(current);
+        configurations.Revalidated.Count.ShouldBe(2, "each distinct tag is revalidated once, the older one first");
+        configurations.Calls.ShouldNotContain(nameof(IConfigurationService.ResolveConfigurationAsync));
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AnyTag_Resolves()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = Manifests();
+        await http.GetConfigurationResolved(Machine(mtls: true, provider: provider), Org, Project, View, Key);
+        var request = Machine(mtls: true, ifNoneMatch: "*", provider: provider);
+
+        var result = await http.GetConfigurationResolved(request, Org, Project, View, Key);
+
+        result.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        Headers(request).ETag.ToString().ShouldStartWith("W/\"d.");
+        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(2);
+        configurations.Revalidated.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task GetConfigurationResolved_TagsOverBindings_FollowTheConfiguredKey()
     {
-        var (http, _) = Create(() => Stored(), Resolve("db-1"));
+        var (http, _) = Create(() => Stored(), Resolve("db-1"), Volatile);
         var key = Convert.ToBase64String(Enumerable.Range(1, 32).Select(index => (byte)index).ToArray());
         var otherKey = Convert.ToBase64String(Enumerable.Range(2, 32).Select(index => (byte)index).ToArray());
 
@@ -345,6 +590,119 @@ public class ConfigurationConditionalReadTests
         bound.ShouldAllBe(tag => tag.StartsWith("W/\"b.", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Tags_OfDependencies_FollowTheEffectiveTagTheRuntimeAndEveryInput()
+    {
+        var effective = ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), Rights(canReadSecrets: true, withheld: false));
+        IReadOnlyList<BindingDependency> inputs =
+        [
+            new(BindingDependencyKinds.Annotation, View, Key, "\"1\""),
+            new(BindingDependencyKinds.KeyValue, View, "db.host", "\"2\""),
+        ];
+        var tag = ConfigurationEntityTags.ForDependencies(effective, "runtime", inputs);
+
+        tag.ToString().ShouldMatch("^W/\"d\\.[A-Za-z0-9_-]{22}\"$");
+        ConfigurationEntityTags.IsDependencies(tag).ShouldBeTrue();
+        ConfigurationEntityTags.IsDependencies(effective).ShouldBeFalse();
+        ConfigurationEntityTags.ForDependencies(effective, "runtime", [.. inputs]).ShouldBe(tag);
+        ConfigurationEntityTags.ForDependencies(ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(version: 4), Rights(true, false)), "runtime", inputs).ShouldNotBe(tag);
+        ConfigurationEntityTags.ForDependencies(effective, "other runtime", inputs).ShouldNotBe(tag);
+        ConfigurationEntityTags.ForDependencies(effective, "runtime", [inputs[0]]).ShouldNotBe(tag);
+        ConfigurationEntityTags.ForDependencies(effective, "runtime", [inputs[0], inputs[1] with { Marker = "\"3\"" }]).ShouldNotBe(tag);
+        ConfigurationEntityTags.ForDependencies(effective, "runtime", [inputs[0], inputs[1] with { Key = "db.port" }]).ShouldNotBe(tag);
+        ConfigurationEntityTags.ForDependencies(effective, "runtime", [inputs[0], inputs[1] with { Source = "staging" }]).ShouldNotBe(tag);
+    }
+
+    [Fact]
+    public void DependencyManifests_KeepAManifestForItsLifetimeOnly()
+    {
+        var clock = new SteppingClock();
+        using var manifests = new DependencyManifests(
+            Options.Create(new ConditionalReadOptions { ManifestLifetime = TimeSpan.FromMinutes(5) }),
+            catalog: null,
+            clock);
+        var manifest = Manifest("\"1\"");
+        manifests.Set("caller", manifest);
+
+        clock.Now += TimeSpan.FromMinutes(3);
+        manifests.TryGet("caller", manifest.Tag, out var kept).ShouldBeTrue();
+        kept.ShouldBe(manifest);
+
+        clock.Now += TimeSpan.FromMinutes(3);
+        manifests.TryGet("caller", manifest.Tag, out _).ShouldBeFalse("the lifetime is absolute, so the read at minute 3 did not extend it");
+    }
+
+    [Fact]
+    public void DependencyManifests_AreKeptPerCallerAndFoundByTheStrongForm()
+    {
+        using var manifests = new DependencyManifests(Options.Create(new ConditionalReadOptions()));
+        var manifest = Manifest("\"1\"");
+        manifests.Set("caller", manifest);
+
+        manifests.TryGet("other caller", manifest.Tag, out _).ShouldBeFalse();
+        manifests.TryGet("caller", new EntityTagHeaderValue(manifest.Tag.Tag, isWeak: false), out _).ShouldBeTrue();
+
+        manifests.Remove("caller", manifest.Tag);
+        manifests.TryGet("caller", manifest.Tag, out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void DependencyManifests_KeepNoManifestLargerThanTheCache()
+    {
+        using var manifests = new DependencyManifests(Options.Create(new ConditionalReadOptions { ManifestCacheSizeLimit = 2 }));
+        var manifest = Manifest("\"1\"", "\"2\"");
+
+        manifests.Set("caller", manifest);
+
+        manifests.TryGet("caller", manifest.Tag, out _).ShouldBeFalse("a manifest counts one plus one per input");
+    }
+
+    [Fact]
+    public void RuntimeVersion_FollowsTheRegisteredBindingsAndTheCode()
+    {
+        var executor = new BindingExecutor();
+        using var manifests = new DependencyManifests(Options.Create(new ConditionalReadOptions()), executor);
+        var before = manifests.GetRuntimeVersion();
+
+        executor.RegisterSource("vault", new PlainSource());
+
+        manifests.GetRuntimeVersion().ShouldNotBe(before);
+        manifests.GetRuntimeVersion().ShouldContain("vault");
+        manifests.GetRuntimeVersion().ShouldStartWith(BindingRuntimeVersion.Of(catalog: null));
+        BindingRuntimeVersion.Of(catalog: null).ShouldContain(typeof(KeyValueBindingSource).Assembly.ManifestModule.ModuleVersionId.ToString("N"));
+    }
+
+    [Theory]
+    [InlineData("ManifestLifetime", "00:00:00")]
+    [InlineData("ManifestCacheSizeLimit", "0")]
+    public void AddConditionalReads_ValidatesTheManifestCache(string setting, string value)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"ConditionalReads:{setting}"] = value })
+            .Build();
+        using var services = new ServiceCollection().AddConditionalReads(configuration).BuildServiceProvider();
+
+        var exception = Should.Throw<OptionsValidationException>(() => services.GetRequiredService<IOptions<ConditionalReadOptions>>().Value);
+
+        exception.Message.ShouldContain($"ConditionalReads:{setting}");
+    }
+
+    [Fact]
+    public void AddConditionalReads_RegistersTheManifestsWithTheBindingCatalog()
+    {
+        var executor = new BindingExecutor();
+        executor.RegisterSource("vault", new PlainSource());
+        using var services = new ServiceCollection()
+            .AddSingleton<IBindingCatalog>(executor)
+            .AddConditionalReads(new ConfigurationBuilder().Build())
+            .BuildServiceProvider();
+
+        var manifests = services.GetRequiredService<DependencyManifests>();
+
+        manifests.ShouldBeSameAs(services.GetRequiredService<DependencyManifests>());
+        manifests.GetRuntimeVersion().ShouldContain("vault");
+    }
+
     [Theory]
     [InlineData(null, true)]
     [InlineData("", true)]
@@ -406,14 +764,25 @@ public class ConfigurationConditionalReadTests
         operation.GetProperty("description").GetString()!.ShouldContain("If-None-Match");
     }
 
+    // A resolve that records one input, db.host in the version of ConfigurationProxy.Marker.
     private static (ConfigurationHttp Http, ConfigurationProxy Configurations) Create(
         Func<Configuration?> stored,
         Func<Configuration, bool, Configuration>? resolve = null)
+    {
+        return Create(stored, resolve, (proxy, dependencies) => dependencies.Record(new BindingDependency(BindingDependencyKinds.KeyValue, View, "db.host", proxy.Marker)));
+    }
+
+    // record: what a resolve does with the collector it is given, after a scope carried it; null: it ignores the collector.
+    private static (ConfigurationHttp Http, ConfigurationProxy Configurations) Create(
+        Func<Configuration?> stored,
+        Func<Configuration, bool, Configuration>? resolve,
+        Action<ConfigurationProxy, BindingDependencies>? record)
     {
         var configurations = DispatchProxy.Create<IConfigurationService, ConfigurationProxy>();
         var proxy = (ConfigurationProxy)(object)configurations;
         proxy.Stored = stored;
         proxy.Resolve = resolve;
+        proxy.Record = record;
         var http = new ConfigurationHttp(
             configurations,
             DispatchProxy.Create<IAnnotationService, NoDeletedAnnotations>(),
@@ -421,6 +790,25 @@ public class ConfigurationConditionalReadTests
             new FixedKeyValuePolicies(requireMtls: true),
             NullLogger<ConfigurationHttp>.Instance);
         return (http, proxy);
+    }
+
+    // A resolve whose inputs are volatile, like one that runs JSON-e.
+    private static void Volatile(ConfigurationProxy proxy, BindingDependencies dependencies)
+    {
+        dependencies.MarkVolatile("JSON-e can read the clock.");
+    }
+
+    // The services of one process with its manifests.
+    private static ServiceProvider Manifests()
+    {
+        return new ServiceCollection().AddConditionalReads(new ConfigurationBuilder().Build()).BuildServiceProvider();
+    }
+
+    private static DependencyManifest Manifest(params string[] markers)
+    {
+        var effective = ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), Rights(canReadSecrets: true, withheld: false));
+        IReadOnlyList<BindingDependency> dependencies = markers.Select((marker, index) => new BindingDependency(BindingDependencyKinds.KeyValue, View, $"key{index}", marker)).ToList();
+        return new DependencyManifest(ConfigurationEntityTags.ForDependencies(effective, "runtime", dependencies), effective, "runtime", dependencies);
     }
 
     private static Func<Configuration, bool, Configuration> Resolve(string host)
@@ -463,14 +851,20 @@ public class ConfigurationConditionalReadTests
 
     // Secret rights come from machines, because a DEV_AUTH build skips the role check that gives users secret rights:
     // with a certificate the machine reads secrets, without one they are withheld (the project requires mTLS).
-    private static TestHttpRequestData Machine(bool mtls, string? ifNoneMatch = null)
+    private static TestHttpRequestData Machine(bool mtls, string? ifNoneMatch = null, IServiceProvider? provider = null)
     {
-        return WithHttpContext(KeyValueRequests.Machine(mtls), ifNoneMatch);
+        return WithHttpContext(KeyValueRequests.Machine(mtls), ifNoneMatch, provider);
     }
 
-    private static TestHttpRequestData WithHttpContext(TestHttpRequestData request, string? ifNoneMatch)
+    // provider: the services of the process, e.g. its manifests; the request keeps an empty provider without it.
+    private static TestHttpRequestData WithHttpContext(TestHttpRequestData request, string? ifNoneMatch, IServiceProvider? provider = null)
     {
         request.FunctionContext.Items[HttpContextItem] = new DefaultHttpContext();
+
+        if (provider is not null)
+        {
+            request.FunctionContext.InstanceServices = provider;
+        }
 
         if (ifNoneMatch is not null)
         {
@@ -515,6 +909,15 @@ public class ConfigurationConditionalReadTests
         // null: the document has no bindings
         public Func<Configuration, bool, Configuration>? Resolve { get; set; }
 
+        // what a resolve records into the collector, after a scope carried it; null: the collector is ignored
+        public Action<ConfigurationProxy, BindingDependencies>? Record { get; set; }
+
+        // the current version of the inputs: a revalidation is true when every recorded marker equals it
+        public string Marker { get; set; } = "\"1\"";
+
+        // the manifests of every revalidation
+        public List<IReadOnlyList<BindingDependency>> Revalidated { get; } = [];
+
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             var name = targetMethod?.Name ?? string.Empty;
@@ -524,23 +927,38 @@ public class ConfigurationConditionalReadTests
             {
                 nameof(IConfigurationService.GetRawConfigurationAsync) => Task.FromResult(Stored()),
                 nameof(IConfigurationService.HasBindings) => Resolve is not null,
-                nameof(IConfigurationService.ResolveConfigurationAsync) => ResolveAsync((Configuration)args![1]!, (bool)args[2]!),
+                nameof(IConfigurationService.ResolveConfigurationAsync) => ResolveAsync((Configuration)args![1]!, (bool)args[2]!, (BindingDependencies?)args[3]),
+                nameof(IConfigurationService.AreDependenciesUnchangedAsync) => Task.FromResult(Revalidate((IReadOnlyList<BindingDependency>)args![1]!)),
                 _ => throw new InvalidOperationException($"{name} must not be called."),
             };
         }
 
-        private Task<Configuration> ResolveAsync(Configuration effective, bool includeSecrets)
+        private Task<Configuration> ResolveAsync(Configuration effective, bool includeSecrets, BindingDependencies? dependencies)
         {
             IncludeSecrets.Add(includeSecrets);
 
             try
             {
-                return Task.FromResult(Resolve!(effective, includeSecrets));
+                var resolved = Resolve!(effective, includeSecrets);
+
+                if (dependencies is not null && Record is not null)
+                {
+                    _ = new BindingScope { Dependencies = dependencies };
+                    Record(this, dependencies);
+                }
+
+                return Task.FromResult(resolved);
             }
             catch (Exception exception)
             {
                 return Task.FromException<Configuration>(exception);
             }
+        }
+
+        private bool Revalidate(IReadOnlyList<BindingDependency> dependencies)
+        {
+            Revalidated.Add(dependencies);
+            return dependencies.All(dependency => dependency.Marker == Marker);
         }
     }
 
@@ -553,5 +971,19 @@ public class ConfigurationConditionalReadTests
                 ? Task.FromResult<Annotation?>(null)
                 : throw new InvalidOperationException($"{targetMethod?.Name} must not be called.");
         }
+    }
+
+    // A source that never binds, to add a name to the registry.
+    private sealed class PlainSource : IBindingSource
+    {
+        public ValueTask<BindingValue?> ResolveAsync(BindingRequest request) => new((BindingValue?)null);
+    }
+
+    // A clock that moves only when a test moves it.
+    private sealed class SteppingClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = DateTimeOffset.UnixEpoch;
+
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 }

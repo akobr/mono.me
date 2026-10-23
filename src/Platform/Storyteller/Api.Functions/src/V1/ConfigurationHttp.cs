@@ -7,8 +7,10 @@ using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.KeyValues.Policy;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -24,6 +26,9 @@ namespace _42.Platform.Storyteller.Api.V1;
 
 public partial class ConfigurationHttp
 {
+    // the d tags of one If-None-Match whose manifests a resolved read looks up
+    private const int MaxManifestCandidates = 4;
+
     private readonly IConfigurationService _configuration;
     private readonly IAnnotationService _annotations;
     private readonly IAccessService _access;
@@ -164,35 +169,44 @@ public partial class ConfigurationHttp
             return await NotFoundAsync(fullKey);
         }
 
-        EntityTagHeaderValue entityTag;
+        // the effective inputs, tagged before anything is evaluated: without bindings the effective document is the
+        // resolved one and is answered without evaluating; with bindings the tag is an input of the d tag
+        var effectiveTag = ConfigurationEntityTags.ForResolved(fullKey, configurationModel, rights);
+        var entityTag = effectiveTag;
 
         if (_configuration.HasBindings(configurationModel))
         {
-            // a 304 saves the transfer here, the bindings are evaluated for every read
-            configurationModel = await _configuration.ResolveConfigurationAsync(fullKey, configurationModel, rights.CanReadSecrets);
-            entityTag = ConfigurationEntityTags.ForResolvedBindings(fullKey, configurationModel, rights, request.GetEntityTagKey());
-        }
-        else
-        {
-            // nothing to bind: the effective document is the resolved one, and it is answered without evaluating
-            entityTag = ConfigurationEntityTags.ForResolved(fullKey, configurationModel, rights);
+            var manifests = request.GetDependencyManifests();
+            var caller = DependencyManifests.CallerOf(rights);
+            var runtime = manifests?.GetRuntimeVersion() ?? BindingRuntimeVersion.Of(catalog: null);
+            var unchanged = await FindUnchangedManifestAsync(request, fullKey, effectiveTag, runtime, caller, manifests);
+
+            if (unchanged is not null)
+            {
+                // nothing is evaluated, looked up, decrypted, metered or audited: the client holds the body already
+                SetResolvedHeaders(request, rights);
+                request.SetResponseHeader(HeaderNames.ETag, unchanged.ToString());
+                return new StatusCodeResult(StatusCodes.Status304NotModified);
+            }
+
+            var dependencies = new BindingDependencies();
+            configurationModel = await _configuration.ResolveConfigurationAsync(fullKey, configurationModel, rights.CanReadSecrets, dependencies);
+
+            if (dependencies.IsVolatile)
+            {
+                // the body can change while the inputs do not (the clock, a binding that does not record), so only its own digest names it
+                _logger.LogDebug("The resolved read of {Configuration} is tagged by its body: {Reason}", fullKey, dependencies.VolatileReason);
+                entityTag = ConfigurationEntityTags.ForResolvedBindings(fullKey, configurationModel, rights, request.GetEntityTagKey());
+            }
+            else
+            {
+                var recorded = dependencies.ToList();
+                entityTag = ConfigurationEntityTags.ForDependencies(effectiveTag, runtime, recorded);
+                manifests?.Set(caller, new DependencyManifest(entityTag, effectiveTag, runtime, recorded));
+            }
         }
 
-        // only the read right counts: mTLS would not let a machine with Secrets.Write alone read secrets
-        if (rights.IsReadWithheldByMtls)
-        {
-            request.SetResponseHeader(SecretRights.WithheldHeader, SecretRights.WithheldByMtls);
-        }
-
-        if (rights.CanReadSecrets)
-        {
-            request.MarkNoStore();
-        }
-        else
-        {
-            request.MarkNoCache();
-        }
-
+        SetResolvedHeaders(request, rights);
         return request.OkOrNotModified(configurationModel, entityTag);
     }
 
@@ -649,6 +663,67 @@ public partial class ConfigurationHttp
         {
             ErrorCode = ErrorCodes.AnnotationDeleted,
         });
+    }
+
+    // The d tag of If-None-Match whose manifest this caller recorded under the same effective document and runtime, when
+    // none of its inputs changed; null otherwise. The candidates are compared by their recorded inputs, in constant time,
+    // so a long header costs no hashing; at most MaxManifestCandidates distinct d tags are looked up and revalidated, in order,
+    // so an older tag listed first does not hide a newer one that is still current.
+    private async Task<EntityTagHeaderValue?> FindUnchangedManifestAsync(
+        HttpRequestData request,
+        FullKey key,
+        EntityTagHeaderValue effectiveTag,
+        string runtime,
+        string caller,
+        DependencyManifests? manifests)
+    {
+        if (manifests is null)
+        {
+            return null;
+        }
+
+        var candidates = request.GetIfNoneMatch()
+            .Where(ConfigurationEntityTags.IsDependencies)
+            .DistinctBy(tag => tag.Tag.ToString())
+            .Take(MaxManifestCandidates);
+
+        foreach (var tag in candidates)
+        {
+            if (!manifests.TryGet(caller, tag, out var manifest)
+                || !manifest.Effective.Equals(effectiveTag)
+                || !string.Equals(manifest.Runtime, runtime, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (await _configuration.AreDependenciesUnchangedAsync(key, manifest.Dependencies))
+            {
+                return manifest.Tag;
+            }
+
+            manifests.Remove(caller, manifest.Tag);
+        }
+
+        return null;
+    }
+
+    // The same on the 200 and the 304s. Only the read right counts: mTLS would not let a machine with Secrets.Write alone
+    // read secrets.
+    private static void SetResolvedHeaders(HttpRequestData request, SecretRights rights)
+    {
+        if (rights.IsReadWithheldByMtls)
+        {
+            request.SetResponseHeader(SecretRights.WithheldHeader, SecretRights.WithheldByMtls);
+        }
+
+        if (rights.CanReadSecrets)
+        {
+            request.MarkNoStore();
+        }
+        else
+        {
+            request.MarkNoCache();
+        }
     }
 
     private static bool IsForce(HttpRequestData request)
