@@ -1,0 +1,209 @@
+{
+  "description": "How the Content object of a Storyteller configuration becomes configuration keys. Each vector has a name, the document (the Content object) and either the keys it flattens to or the error that makes it invalid. Keys compare by their exact text; IConfiguration then compares them case-insensitively. Numbers are read as double-precision floats. Error paths: $ is the root, .name a property whose name is letters, digits, _ and - (starting with a letter or _), ['name'] any other property (with \\ and ' escaped), [0] an array item.",
+  "vectors": [
+    {
+      "name": "study example",
+      "document": {
+        "db": {
+          "host": "db.internal",
+          "port": 5432,
+          "hosts": [ "db-1", "db-2" ],
+          "ssl": true
+        },
+        "features": {
+          "beta": false,
+          "ratio": 0.5
+        },
+        "Logging": {
+          "LogLevel": {
+            "Default": "Information"
+          }
+        },
+        "name": "billing"
+      },
+      "keys": {
+        "db:host": "db.internal",
+        "db:port": "5432",
+        "db:hosts:0": "db-1",
+        "db:hosts:1": "db-2",
+        "db:ssl": "true",
+        "features:beta": "false",
+        "features:ratio": "0.5",
+        "Logging:LogLevel:Default": "Information",
+        "name": "billing"
+      }
+    },
+    {
+      "name": "an empty document has no keys",
+      "document": {},
+      "keys": {}
+    },
+    {
+      "name": "strings stay as written",
+      "document": {
+        "empty": "",
+        "padded": " padded ",
+        "date": "2026-10-20T12:00:00.1230000+02:00",
+        "binding": "@kv(\"db-password\")",
+        "booleanText": "True",
+        "numberText": "05432",
+        "unicode": "Žluťoučký kůň"
+      },
+      "keys": {
+        "empty": "",
+        "padded": " padded ",
+        "date": "2026-10-20T12:00:00.1230000+02:00",
+        "binding": "@kv(\"db-password\")",
+        "booleanText": "True",
+        "numberText": "05432",
+        "unicode": "Žluťoučký kůň"
+      }
+    },
+    {
+      "name": "numbers are their JSON text",
+      "document": {
+        "integer": 5432,
+        "negative": -7,
+        "zero": 0,
+        "fraction": 0.5,
+        "negativeFraction": -0.25,
+        "trailingZero": 1.50
+      },
+      "keys": {
+        "integer": "5432",
+        "negative": "-7",
+        "zero": "0",
+        "fraction": "0.5",
+        "negativeFraction": "-0.25",
+        "trailingZero": "1.5"
+      }
+    },
+    {
+      "name": "booleans are lower case",
+      "document": {
+        "on": true,
+        "off": false
+      },
+      "keys": {
+        "on": "true",
+        "off": "false"
+      }
+    },
+    {
+      "name": "null makes no key",
+      "document": {
+        "a": null,
+        "b": { "c": null },
+        "d": [ null ]
+      },
+      "keys": {}
+    },
+    {
+      "name": "empty objects and arrays make no key",
+      "document": {
+        "a": {},
+        "b": [],
+        "c": { "d": {}, "e": [ [] ] }
+      },
+      "keys": {}
+    },
+    {
+      "name": "array items keep their index, also after a null",
+      "document": {
+        "list": [ "x", null, "z", { "name": "w" }, [ "nested" ] ]
+      },
+      "keys": {
+        "list:0": "x",
+        "list:2": "z",
+        "list:3:name": "w",
+        "list:4:0": "nested"
+      }
+    },
+    {
+      "name": "names keep their casing and their dots, spaces and dashes",
+      "document": {
+        "Db": { "ConnectionString": "Server=db" },
+        "a.b": "1",
+        "c d": "2",
+        "e-f": "3"
+      },
+      "keys": {
+        "Db:ConnectionString": "Server=db",
+        "a.b": "1",
+        "c d": "2",
+        "e-f": "3"
+      }
+    },
+    {
+      "name": "sections whose names differ only in case merge",
+      "document": {
+        "Db": { "Host": "a" },
+        "db": { "port": 1 }
+      },
+      "keys": {
+        "Db:Host": "a",
+        "db:port": "1"
+      }
+    },
+    {
+      "name": "a value and a section may share a name",
+      "document": {
+        "a": "x",
+        "A": { "b": "y" }
+      },
+      "keys": {
+        "a": "x",
+        "A:b": "y"
+      }
+    },
+    {
+      "name": "a colon in a name is invalid",
+      "document": {
+        "db": { "a:b": "x" }
+      },
+      "error": { "rule": "colon-in-name", "path": "$.db['a:b']" }
+    },
+    {
+      "name": "a colon in the name of a null is invalid too",
+      "document": {
+        "a:b": null
+      },
+      "error": { "rule": "colon-in-name", "path": "$['a:b']" }
+    },
+    {
+      "name": "an empty name is invalid",
+      "document": {
+        "db": { "": "x" }
+      },
+      "error": { "rule": "empty-name", "path": "$.db['']" }
+    },
+    {
+      "name": "keys that differ only in case are invalid",
+      "document": {
+        "Db": { "Host": "a" },
+        "db": { "host": "b" }
+      },
+      "error": { "rule": "case-collision", "path": "$.db.host" }
+    },
+    {
+      "name": "an array item and a property that differ only in case are invalid",
+      "document": {
+        "list": [ "x" ],
+        "LIST": { "0": "y" }
+      },
+      "error": { "rule": "case-collision", "path": "$.LIST['0']" }
+    },
+    {
+      "name": "names with quotes are escaped in paths",
+      "document": {
+        "it's": { "a:b": 1 }
+      },
+      "error": { "rule": "colon-in-name", "path": "$['it\\'s']['a:b']" }
+    },
+    {
+      "name": "the document must be an object",
+      "document": [ "a", "b" ],
+      "error": { "rule": "not-an-object", "path": "$" }
+    }
+  ]
+}
