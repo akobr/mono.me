@@ -7,8 +7,10 @@ namespace _42.Platform.Storyteller.Binding.Object;
 /// Resolves <c>@</c> strings and <c>$binding</c> envelopes on a configuration object.
 /// <c>$context</c> is resolved before the engine runs. <c>$definition</c> is the program and is passed through.
 /// One <see cref="EvaluationMeter"/> bounds the work of all envelopes in one read (see <see cref="ObjectBindingLimits"/>).
+/// Every string binding gets the same scope, so its reads record into one <see cref="BindingScope.Dependencies"/>.
+/// JSON-e can read the clock, and a string executor that does not record hides its reads; both make the manifest volatile.
 /// </summary>
-public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
+public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver, IRecordingBinding
 {
     private const string BindingProperty = "$binding";
     private const string DefinitionProperty = "$definition";
@@ -165,6 +167,13 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
             }
 
             budget.Count++;
+
+            // JSON-e pushes the time of the evaluation as `now`
+            if (kind == ObjectBindingEngine.JsonEKind)
+            {
+                scope.Dependencies?.MarkVolatile("JSON-e can read the clock.");
+            }
+
             JToken result;
             try
             {
@@ -251,6 +260,11 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         if (!IsBindingString(value.Value<string>()))
         {
             return value;
+        }
+
+        if (_stringBindings is not IRecordingBinding)
+        {
+            scope.Dependencies?.MarkVolatile("The string bindings do not record their reads.");
         }
 
         var parent = value.Parent;
