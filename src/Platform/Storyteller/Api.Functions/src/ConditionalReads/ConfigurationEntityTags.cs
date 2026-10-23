@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.Binding;
 
 using Microsoft.Net.Http.Headers;
 
@@ -16,10 +17,14 @@ namespace _42.Platform.Storyteller.Api.ConditionalReads;
 // base64url. Every input is length-prefixed, so different inputs never hash alike. The full key ties a tag to its configuration.
 //   e  the effective read: full key, Version, Hash and Content.
 //   r  a resolved read of a document without bindings, which is the effective document: the same plus the secret rights.
-//   b  a resolved read with bindings: the same over the resolved Content, keyed (HMAC-SHA256), because it can carry secrets.
+//   b  a resolved read with bindings whose inputs are volatile: the same over the resolved Content, keyed (HMAC-SHA256),
+//      because it can carry secrets.
+//   d  a resolved read with bindings whose inputs were all recorded: the r tag of the effective read, the runtime version
+//      and the inputs with their storage markers (the dependency manifest), so it names the resolved body without hashing
+//      it. Not keyed: none of it is secret.
 //   c  the composition read: full key and the whole composition (every source with its version, presence and content, the
 //      nodes, steps and origins), so a change of any source changes the tag, even one that leaves Content as it was.
-// Modified is left out of e, r and b: past version 0 it changes only with Version, and a configuration without an item
+// Modified is left out of e, r, b and d: past version 0 it changes only with Version, and a configuration without an item
 // stamps every read. c keeps the stamps of the sources: a stored document's changes only with its version, and a Missing
 // source has none.
 public static class ConfigurationEntityTags
@@ -29,6 +34,8 @@ public static class ConfigurationEntityTags
     public const string ResolvedPrefix = "r";
 
     public const string BoundPrefix = "b";
+
+    public const string DependenciesPrefix = "d";
 
     public const string CompositionPrefix = "c";
 
@@ -50,6 +57,32 @@ public static class ConfigurationEntityTags
     {
         using var hash = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA256, secret);
         return Create(hash, BoundPrefix, key, rights, resolved);
+    }
+
+    // effective is the r tag of the read, taken before the resolve; dependencies come sorted from BindingDependencies.ToList.
+    public static EntityTagHeaderValue ForDependencies(EntityTagHeaderValue effective, string runtime, IReadOnlyList<BindingDependency> dependencies)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Append(hash, DependenciesPrefix);
+        Append(hash, effective.Tag.ToString());
+        Append(hash, runtime);
+        Append(hash, dependencies.Count.ToString(CultureInfo.InvariantCulture));
+
+        foreach (var dependency in dependencies)
+        {
+            Append(hash, dependency.Kind);
+            Append(hash, dependency.Source);
+            Append(hash, dependency.Key);
+            Append(hash, dependency.Marker);
+        }
+
+        return Finish(hash, DependenciesPrefix);
+    }
+
+    // Whether the tag names a dependency manifest; it says nothing about whose.
+    public static bool IsDependencies(EntityTagHeaderValue tag)
+    {
+        return tag.Tag.StartsWith($"\"{DependenciesPrefix}.", StringComparison.Ordinal);
     }
 
     public static EntityTagHeaderValue ForComposition(FullKey key, ConfigurationComposition composition)

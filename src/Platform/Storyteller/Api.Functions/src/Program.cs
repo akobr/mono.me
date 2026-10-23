@@ -87,7 +87,8 @@ var host = new HostBuilder()
         // Add persistant and logic layer
         services.AddCosmosDbAnnotations(context.Configuration, "cosmos");
 
-        // ETag and If-None-Match on the configuration reads; ConditionalReads:EntityTagKey shares the tags over resolved bindings between instances.
+        // ETag and If-None-Match on the configuration reads, and the dependency manifests that answer a resolved read with bindings without
+        // evaluating it; ConditionalReads:EntityTagKey shares the tags over volatile bindings between instances.
         services.AddConditionalReads(context.Configuration);
 
         // Key/value secrets: the Standard level wraps its data keys in the vault AzureKeyVaults:{KeyValues:Protection:Standard:VaultName};
