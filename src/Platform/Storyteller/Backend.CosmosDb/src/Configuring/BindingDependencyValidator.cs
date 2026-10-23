@@ -114,7 +114,7 @@ internal sealed class BindingDependencyValidator
 
             return markers;
         }
-        catch (CosmosException exception)
+        catch (Exception exception) when (exception is CosmosException or OperationCanceledException or JsonException)
         {
             _logger.LogWarning(exception, "The inputs of a resolved configuration could not be revalidated.");
             return null;

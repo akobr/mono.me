@@ -403,15 +403,39 @@ public class ConfigurationConditionalReadTests
     [Fact]
     public async Task GetConfigurationResolved_AManifestOfOtherRights_IsNotRevalidated()
     {
+        // one machine on one channel whose rights changed: the secrets are withheld at first, then it may not read them
         var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
         using var provider = Manifests();
-        var reading = Machine(mtls: true, provider: provider);
-        await http.GetConfigurationResolved(reading, Org, Project, View, Key);
-        var withheld = Machine(mtls: false, ifNoneMatch: Headers(reading).ETag.ToString(), provider: provider);
+        var withheld = Machine(mtls: false, provider: provider);
+        await http.GetConfigurationResolved(withheld, Org, Project, View, Key);
+        var neither = WithHttpContext(
+            KeyValueRequests.Machine(mtls: false, roles: [Scopes.Configuration.Read]),
+            Headers(withheld).ETag.ToString(),
+            provider);
 
-        var result = await http.GetConfigurationResolved(withheld, Org, Project, View, Key);
+        var result = await http.GetConfigurationResolved(neither, Org, Project, View, Key);
 
         result.ShouldBeOfType<OkObjectResult>();
+        configurations.Revalidated.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_AManifestOfAnotherRegistry_IsNotRevalidated()
+    {
+        var executor = new BindingExecutor();
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+        using var provider = new ServiceCollection()
+            .AddSingleton<IBindingCatalog>(executor)
+            .AddConditionalReads(new ConfigurationBuilder().Build())
+            .BuildServiceProvider();
+        var first = Machine(mtls: true, provider: provider);
+        await http.GetConfigurationResolved(first, Org, Project, View, Key);
+
+        executor.RegisterSource("late", new PlainSource());
+        var second = Machine(mtls: true, ifNoneMatch: Headers(first).ETag.ToString(), provider: provider);
+        var result = await http.GetConfigurationResolved(second, Org, Project, View, Key);
+
+        result.ShouldBeOfType<OkObjectResult>("a source registered later can bind what the manifest recorded as stored");
         configurations.Revalidated.ShouldBeEmpty();
     }
 
@@ -587,16 +611,22 @@ public class ConfigurationConditionalReadTests
     }
 
     [Fact]
-    public async Task DependencyManifests_KeepAManifestForItsLifetimeOnly()
+    public void DependencyManifests_KeepAManifestForItsLifetimeOnly()
     {
-        using var manifests = new DependencyManifests(Options.Create(new ConditionalReadOptions { ManifestLifetime = TimeSpan.FromMilliseconds(200) }));
+        var clock = new SteppingClock();
+        using var manifests = new DependencyManifests(
+            Options.Create(new ConditionalReadOptions { ManifestLifetime = TimeSpan.FromMinutes(5) }),
+            catalog: null,
+            clock);
         var manifest = Manifest("\"1\"");
         manifests.Set("caller", manifest);
 
+        clock.Now += TimeSpan.FromMinutes(3);
         manifests.TryGet("caller", manifest.Tag, out var kept).ShouldBeTrue();
         kept.ShouldBe(manifest);
-        await Task.Delay(TimeSpan.FromMilliseconds(400));
-        manifests.TryGet("caller", manifest.Tag, out _).ShouldBeFalse("the lifetime is absolute, so a read does not extend it");
+
+        clock.Now += TimeSpan.FromMinutes(3);
+        manifests.TryGet("caller", manifest.Tag, out _).ShouldBeFalse("the lifetime is absolute, so the read at minute 3 did not extend it");
     }
 
     [Fact]
@@ -631,7 +661,7 @@ public class ConfigurationConditionalReadTests
         using var manifests = new DependencyManifests(Options.Create(new ConditionalReadOptions()), executor);
         var before = manifests.GetRuntimeVersion();
 
-        executor.RegisterSource("vault", new ConfigSource());
+        executor.RegisterSource("vault", new PlainSource());
 
         manifests.GetRuntimeVersion().ShouldNotBe(before);
         manifests.GetRuntimeVersion().ShouldContain("vault");
@@ -658,7 +688,7 @@ public class ConfigurationConditionalReadTests
     public void AddConditionalReads_RegistersTheManifestsWithTheBindingCatalog()
     {
         var executor = new BindingExecutor();
-        executor.RegisterSource("vault", new ConfigSource());
+        executor.RegisterSource("vault", new PlainSource());
         using var services = new ServiceCollection()
             .AddSingleton<IBindingCatalog>(executor)
             .AddConditionalReads(new ConfigurationBuilder().Build())
@@ -929,11 +959,6 @@ public class ConfigurationConditionalReadTests
         }
     }
 
-    private sealed class ConfigSource : IBindingSource
-    {
-        public ValueTask<BindingValue?> ResolveAsync(BindingRequest request) => new((BindingValue?)null);
-    }
-
     // No annotation is deleted, so a missing configuration is a plain 404.
     public class NoDeletedAnnotations : DispatchProxy
     {
@@ -943,5 +968,19 @@ public class ConfigurationConditionalReadTests
                 ? Task.FromResult<Annotation?>(null)
                 : throw new InvalidOperationException($"{targetMethod?.Name} must not be called.");
         }
+    }
+
+    // A source that never binds, to add a name to the registry.
+    private sealed class PlainSource : IBindingSource
+    {
+        public ValueTask<BindingValue?> ResolveAsync(BindingRequest request) => new((BindingValue?)null);
+    }
+
+    // A clock that moves only when a test moves it.
+    private sealed class SteppingClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = DateTimeOffset.UnixEpoch;
+
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 }
