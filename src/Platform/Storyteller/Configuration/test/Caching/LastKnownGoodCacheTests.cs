@@ -3,6 +3,7 @@ using System.IO.Abstractions.TestingHelpers;
 using System.Text;
 using _42.Platform.Storyteller.Sdk.Configuring.Caching;
 using _42.Platform.Storyteller.Sdk.Configuring.Flattening;
+using _42.Platform.Storyteller.Sdk.Configuring.Logging;
 using _42.Platform.Storyteller.Sdk.Configuring.Reading;
 using _42.Testing.System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -98,6 +99,38 @@ public class LastKnownGoodCacheTests
 
         // Logged once per identity.
         _logs.Entries.ShouldHaveSingleItem().Level.ShouldBe(LogLevel.Information);
+    }
+
+    [Fact]
+    public void TheNoStoreNotice_WaitsForALogger_ThenComesOnce()
+    {
+        // As at the startup: the container's logger factory is handed over later.
+        var loggers = new SwitchableLoggerFactory(null);
+        var cache = new LastKnownGoodCache(CacheDirectory, _fileSystem, null, _time, loggers.CreateLogger("cache"));
+        var identity = Identity();
+
+        cache.Save(identity, TestDocuments.Document(), TestDocuments.WeakTag, "no-store");
+        loggers.Use(_logs);
+        _logs.Entries.ShouldBeEmpty();
+
+        cache.ReportNotCached(identity, "no-store");
+        cache.Revalidated(identity, "no-store");
+        cache.Save(identity, TestDocuments.Document(version: 4), TestDocuments.OtherTag, "no-store");
+
+        var notice = _logs.Entries.ShouldHaveSingleItem();
+        notice.Level.ShouldBe(LogLevel.Information);
+        notice.Message.ShouldContain("not cached on disk");
+    }
+
+    [Fact]
+    public void ReportNotCached_SaysNothing_ForAnAnswerThatMayBeStored()
+    {
+        var cache = Create();
+
+        cache.ReportNotCached(Identity(), PrivateNoCache);
+        Create(new TestCacheProtector()).ReportNotCached(Identity(), "no-store");
+
+        _logs.Entries.ShouldBeEmpty();
     }
 
     [Fact]

@@ -43,9 +43,11 @@ public class FullKey
         return TryParse(text, out key, out _);
     }
 
-    // Throws FormatException with the reason the text is not a full key.
+    // Throws FormatException with the reason the text is not a full key, and ArgumentNullException for null.
     public static FullKey Parse(string text)
     {
+        ArgumentNullException.ThrowIfNull(text);
+
         if (!TryParse(text, out var key, out var error))
         {
             throw new FormatException($"Invalid annotation full key '{text}': {error}");

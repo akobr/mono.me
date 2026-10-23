@@ -51,7 +51,7 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
 
         if (options.Endpoint is not null)
         {
-            LocalUrlRule.Require(options.Endpoint, "FederatedTokenOptions.Endpoint");
+            LocalUrlRule.RequireEndpoint(options.Endpoint, "FederatedTokenOptions.Endpoint");
         }
 
         return new FederatedTokenCredential(options, subjectTokenType, pathSource, null, getVariable, null);

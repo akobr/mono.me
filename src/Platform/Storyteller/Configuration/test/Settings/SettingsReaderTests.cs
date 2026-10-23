@@ -182,6 +182,47 @@ public class SettingsReaderTests
         exception.IsTransient.ShouldBeFalse();
     }
 
+    // LocalUrl copies the SDK's internal rule: an endpoint the provider accepts is one its credentials accept.
+    [Theory]
+    [InlineData("https://storyteller.example.com/api")]
+    [InlineData("https://storyteller.example.com:8443/api/")]
+    [InlineData("http://localhost:7071/api")]
+    [InlineData("http://LOCALHOST/api")]
+    [InlineData("http://127.0.0.1:7071/api")]
+    [InlineData("http://[::1]:7071/api")]
+    [InlineData("http://loopback/api")]
+    [InlineData("http://storyteller.example.com/api")]
+    [InlineData("http://10.0.0.5/api")]
+    [InlineData("https://user:p4ssw0rd@storyteller.example.com/api")]
+    [InlineData("http://user@localhost/api")]
+    [InlineData("ftp://storyteller.example.com/api")]
+    [InlineData("https://storyteller.example.com/api?code=p4ssw0rd")]
+    [InlineData("https://storyteller.example.com/api#p4ssw0rd")]
+    public void TheLocalUrlRule_IsTheOneOfTheSdkCredentials(string endpoint)
+    {
+        _environment["STORYTELLER_ENDPOINT"] = endpoint;
+        var uri = new Uri(endpoint, UriKind.Absolute);
+
+        var providerAccepts = TryRun(() => Read());
+        var credentialAccepts = TryRun(() => StorytellerCredential.FromFederatedTokenFile(
+            new FederatedTokenOptions { Endpoint = uri, ClientId = "machine", SubjectTokenPath = "/run/token" }));
+
+        credentialAccepts.ShouldBe(providerAccepts);
+
+        static bool TryRun(Action action)
+        {
+            try
+            {
+                action();
+                return true;
+            }
+            catch (Exception exception) when (exception is StorytellerConfigurationException or StorytellerAuthenticationException)
+            {
+                return false;
+            }
+        }
+    }
+
     [Fact]
     public void AnEndpointSetInCode_IsNamedAsAProperty()
     {
@@ -367,6 +408,10 @@ public class SettingsReaderTests
 
         ShouldFail(invalid => invalid.Resilience.AttemptTimeout = TimeSpan.FromMilliseconds(1)).Message.ShouldContain("Resilience");
         ShouldFail(invalid => invalid.Resilience = null!).Message.ShouldContain("Resilience");
+
+        // A typo that would turn retries or the attempt timeout off fails instead.
+        ShouldFail(invalid => invalid.Resilience.MaxRetryAttempts = -1).Message.ShouldContain("MaxRetryAttempts");
+        ShouldFail(invalid => invalid.Resilience.AttemptTimeout = TimeSpan.FromSeconds(-5)).Message.ShouldContain("AttemptTimeout");
     }
 
     [Fact]

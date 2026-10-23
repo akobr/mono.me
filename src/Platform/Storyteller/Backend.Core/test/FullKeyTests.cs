@@ -58,6 +58,13 @@ public class FullKeyTests
         exception.Message.ShouldContain(reason);
     }
 
+    [Fact]
+    public void Parse_Null_ThrowsArgumentNullException()
+    {
+        Should.Throw<ArgumentNullException>(() => FullKey.Parse(null!)).ParamName.ShouldBe("text");
+        FullKey.TryParse(null!, out _).ShouldBeFalse();
+    }
+
     [Theory]
     [InlineData("rst.invoicing")]
     [InlineData("sbt.northwind")]

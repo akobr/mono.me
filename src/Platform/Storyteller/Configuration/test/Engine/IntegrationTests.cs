@@ -134,6 +134,35 @@ public sealed class IntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task ANoStoreAnswerAtTheStartup_IsReportedOnceTheHostStarts_AndOnlyOnce()
+    {
+        var logs = new RecordingLoggerFactory();
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
+        _fixture.RespondDocument("one", EngineFixture.Tag(1), cacheControl: "no-store");
+        builder.Configuration.AddStoryteller(_fixture.Configure(options => options.CacheDirectory = EngineFixture.CacheDirectory, withLogs: false), out var refresher);
+        builder.Services.AddSingleton<ILoggerFactory>(logs);
+        builder.Services.AddStorytellerConfiguration();
+        using var host = builder.Build();
+
+        Ours(logs).ShouldBeEmpty();
+
+        await host.StartAsync();
+
+        var notice = Ours(logs).ShouldHaveSingleItem();
+        notice.Level.ShouldBe(LogLevel.Information);
+        notice.Message.ShouldContain("not cached on disk");
+        notice.Message.ShouldContain(TestDocuments.Key);
+
+        // Later no-store answers do not repeat it.
+        _fixture.RespondNotModified(EngineFixture.Tag(1), "no-store");
+        (await refresher.TryRefreshAsync()).ShouldBeTrue();
+        Ours(logs).Count(entry => entry.Message.Contains("not cached on disk")).ShouldBe(1);
+        _fixture.FileSystem.AllFiles.ShouldNotContain(path => path.StartsWith(EngineFixture.CacheDirectory, StringComparison.OrdinalIgnoreCase));
+
+        await host.StopAsync();
+    }
+
+    [Fact]
     public async Task AGivenLoggerFactory_IsKeptOverTheContainers()
     {
         var hostLogs = new RecordingLoggerFactory();

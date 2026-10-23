@@ -38,6 +38,7 @@ public sealed class DocumentReaderTests : IDisposable
             { 422, """{ "Message": "Cannot evaluate.", "ErrorCode": "binding.evaluation" }""", false, "binding.evaluation" },
             { 418, null, false, null },
             { 501, null, false, null },
+            { 505, null, false, null },
             { 302, null, false, null },
             { 408, null, true, null },
             { 424, """{ "Message": "The customer key is unavailable.", "ErrorCode": "CustomerKeyUnavailable" }""", true, "CustomerKeyUnavailable" },
@@ -230,7 +231,11 @@ public sealed class DocumentReaderTests : IDisposable
 
         var outcome = await CreateReader().ReadAsync(Identity(), null, CancellationToken.None);
 
-        outcome.ShouldBeOfType<ReadOutcome.Transient>().StatusCode.ShouldBe(200);
+        var transient = outcome.ShouldBeOfType<ReadOutcome.Transient>();
+        transient.StatusCode.ShouldBe(200);
+
+        // Names the cause and the fix, and quotes neither the body nor the SDK's message, which carries the body.
+        transient.Message.ShouldBe($"The answer to the read of {TestDocuments.Key} did not parse as a configuration (200): check that the endpoint is the Storyteller API base, /api included, and that nothing in between rewrites the response.");
     }
 
     [Fact]
@@ -337,7 +342,7 @@ public sealed class DocumentReaderTests : IDisposable
     [InlineData(500, true)]
     [InlineData(501, false)]
     [InlineData(503, true)]
-    [InlineData(505, true)]
+    [InlineData(505, false)]
     public void TransientStatuses(int status, bool isTransient)
     {
         DocumentReader.IsTransientStatus(status).ShouldBe(isTransient);

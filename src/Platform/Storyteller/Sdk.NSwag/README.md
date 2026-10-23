@@ -88,8 +88,8 @@ A `DelegatingHandler` wraps the primary handler, which follows redirects: a hand
 * **Renewal.** `GetAuthorizationAsync(rejected, cancellationToken)` takes the value the API refused. The cached token is dropped only when it is that value, so a burst of `401`s makes one token request.
 * **Token requests** use their own `HttpClient`: no redirects, no `Authorization` header, and the [resilience pipeline](#resilience) with retries of the `POST`. `ConfigureHandler` of the options (or of the binding) configures its `SocketsHttpHandler`, for a proxy; redirects stay off.
 * **Binding.** `credential.Bind(new StorytellerCredentialBinding(endpoint) { Organization = …, Project = … })` returns a copy that knows its endpoint and target project. Federation needs both; AuthKit discovery needs the endpoint. A value set in the options wins over the binding. An unbound credential falls back to `STORYTELLER_ENDPOINT` (or `STORYTELLER_API_URL`) and to the organization and project of `STORYTELLER_KEY` (`@{organization}.{project}.…`). Bind once and reuse the result, as a singleton: every copy of a client-credentials or federated credential has its own token cache and its own connection pool for token requests, so a `Bind` per request or per scope makes a token request each time.
-* **URLs** must be `https`, or `http` to `localhost` or a loopback address literal (`127.0.0.1`, `[::1]`), and carry no user info.
-* **Failures** throw `StorytellerAuthenticationException` with a `Reason`: `Configuration` (variables, files, a missing binding, a URL), `Rejected` (a `4xx` other than `408` and `429` from a token or discovery request, or a platform that does not sign in with AuthKit) or `Unavailable` (a network error, a timeout, an open circuit, or `408`, `429` or `5xx` after retries). Messages include the `error` and `error_description` of an OAuth answer; neither they nor `ToString()` contain a secret.
+* **URLs** must be `https`, or `http` to `localhost` or a loopback address literal (`127.0.0.1`, `[::1]`), and carry no user info. An endpoint, which paths are appended to, has no query or fragment either.
+* **Failures** throw `StorytellerAuthenticationException` with a `Reason`: `Configuration` (variables, files, a missing binding, a URL), `Rejected` (a `4xx` other than `408` and `429` from a token or discovery request, or a platform that does not sign in with AuthKit) or `Unavailable` (a network error, a timeout, an open circuit, or `408`, `429` or `5xx`; all but `501` and `505` after retries). Messages include the `error` and `error_description` of an OAuth answer; neither they nor `ToString()` contain a secret.
 
 `FromEnvironment` reads the names of the shared integration contract and accepts the `sform` names as fallbacks. A name and its fallback set to different values are an error that names both. Values are trimmed; an empty value is unset.
 
@@ -119,13 +119,13 @@ services.AddStorytellerSdk(
 
 ## Resilience
 
-`IHttpClientBuilder.AddStorytellerResilience(configure)` (namespace `_42.Platform.Storyteller.Sdk.Resilience`) adds a `ResilienceHandler` with retries, a circuit breaker and an attempt timeout. It is opt-in: `AddStorytellerSdk` adds none. `StorytellerResilience.CreatePipeline(options)` builds the same pipeline for a hand-built `HttpClient`; the pipeline keeps the state of its breaker, so use one per client.
+`IHttpClientBuilder.AddStorytellerResilience(configure)` (namespace `_42.Platform.Storyteller.Sdk.Resilience`) adds a `ResilienceHandler` with retries, a circuit breaker and an attempt timeout. It is opt-in: `AddStorytellerSdk` adds none. `StorytellerResilience.CreatePipeline(options)` builds the same pipeline for a hand-built `HttpClient`; the pipeline keeps the state of its breaker, so use one per client. `options.Clone()` copies the options, for a client that must not see later changes.
 
 | `StorytellerResilienceOptions` | Default |
 |---|---|
-| `MaxRetryAttempts` | 3; `0` adds no retry |
+| `MaxRetryAttempts` | 3; `0` adds no retry, a negative value throws `ArgumentOutOfRangeException` |
 | `BaseDelay` | 500 ms, exponential backoff with jitter |
-| `AttemptTimeout` | 5 s |
+| `AttemptTimeout` | 5 s; zero or `Timeout.InfiniteTimeSpan` adds none, another negative value throws `ArgumentOutOfRangeException` |
 | `RetryUnsafeMethods` | `false`: `GET` is retried; `POST`, `PUT`, `PATCH` and `DELETE` are not |
 | `FailureRatio`, `MinimumThroughput`, `SamplingDuration`, `BreakDuration` | 0.5, 3, 60 s, 30 s |
 

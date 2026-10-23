@@ -252,17 +252,8 @@ internal static class SettingsReader
             throw Invalid($"{OptionsName}.{nameof(StorytellerConfigurationOptions.Resilience)} is null.", key);
         }
 
-        var copy = new StorytellerResilienceOptions
-        {
-            MaxRetryAttempts = resilience.MaxRetryAttempts,
-            BaseDelay = resilience.BaseDelay,
-            AttemptTimeout = resilience.AttemptTimeout,
-            RetryUnsafeMethods = resilience.RetryUnsafeMethods,
-            FailureRatio = resilience.FailureRatio,
-            MinimumThroughput = resilience.MinimumThroughput,
-            SamplingDuration = resilience.SamplingDuration,
-            BreakDuration = resilience.BreakDuration,
-        };
+        // Every property, also one the SDK adds later.
+        var copy = resilience.Clone();
 
         try
         {
