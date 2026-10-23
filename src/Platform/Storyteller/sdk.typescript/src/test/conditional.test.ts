@@ -193,6 +193,21 @@ describe('conditional reads', () => {
     expect((error as StorytellerError).status).toBe(0)
   })
 
+  it('rejects a 200 whose body is not a configuration object', async () => {
+    const { fetch } = fakeFetch(
+      new Response(null, { status: 200 }),
+      new Response('not json', { status: 200, headers: { 'content-type': 'text/plain' } }),
+      json([1, 2]),
+    )
+    configure({ fetch })
+
+    for (let i = 0; i < 3; i++) {
+      const error = await readFailure(getConfigurationConditional)
+      expect(error).toBeInstanceOf(StorytellerError)
+      expect(error).toMatchObject({ status: 200, message: 'The Storyteller API answered without a configuration object.' })
+    }
+  })
+
   it('maps every other status to StorytellerError, as the fetcher does', async () => {
     const { fetch } = fakeFetch(
       json({ Message: 'No Configuration.Read.', Hint: 'Grant the scope.', ErrorCode: 'AccessDenied' }, 403),
