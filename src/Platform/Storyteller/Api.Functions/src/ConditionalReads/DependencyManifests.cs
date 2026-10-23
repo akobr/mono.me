@@ -4,6 +4,7 @@ using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Binding;
 
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 
@@ -21,10 +22,20 @@ public sealed class DependencyManifests : IDisposable
     private readonly IBindingCatalog? _catalog;
 
     public DependencyManifests(IOptions<ConditionalReadOptions> options, IBindingCatalog? catalog = null)
+        : this(options, catalog, timeProvider: null)
+    {
+    }
+
+    // timeProvider: the clock of the expirations, the system clock when null.
+    internal DependencyManifests(IOptions<ConditionalReadOptions> options, IBindingCatalog? catalog, TimeProvider? timeProvider)
     {
         _lifetime = options.Value.ManifestLifetime;
         _catalog = catalog;
-        _cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = Math.Max(1, options.Value.ManifestCacheSizeLimit) });
+        _cache = new MemoryCache(new MemoryCacheOptions
+        {
+            SizeLimit = Math.Max(1, options.Value.ManifestCacheSizeLimit),
+            Clock = timeProvider is null ? null : new TimeProviderClock(timeProvider),
+        });
     }
 
     // The actor and the channel of a read: the audit trail of the binding reads (BindingRead) tells callers apart by them.
@@ -66,5 +77,10 @@ public sealed class DependencyManifests : IDisposable
     private static string KeyOf(string caller, EntityTagHeaderValue tag)
     {
         return $"{caller}\n{tag.Tag}";
+    }
+
+    private sealed class TimeProviderClock(TimeProvider timeProvider) : ISystemClock
+    {
+        public DateTimeOffset UtcNow => timeProvider.GetUtcNow();
     }
 }

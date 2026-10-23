@@ -2,12 +2,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Json;
 using FluentAssertions;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
+using Moq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -18,6 +22,8 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 public class ConfigurationResolutionTests
 {
     private static readonly FullKey Key = FullKey.Create(AnnotationKey.CreateResponsibility("billing"), "acme", "main", "default");
+
+    private static readonly BindingDependency KeyValueInput = new(BindingDependencyKinds.KeyValue, "default", "db.host", "\"1\"");
 
     [Fact]
     public async Task ResolveConfigurationAsync_EvaluatesInPlaceAndKeepsTheEffectiveFields()
@@ -139,6 +145,33 @@ public class ConfigurationResolutionTests
     }
 
     [Fact]
+    public async Task AreDependenciesUnchangedAsync_AFailedRead_IsFalse()
+    {
+        var container = new Mock<Container>();
+        container.Setup(items => items.ReadManyItemsStreamAsync(It.IsAny<IReadOnlyList<(string, PartitionKey)>>(), It.IsAny<ReadManyRequestOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ResponseMessage(HttpStatusCode.TooManyRequests));
+        var service = CreateService(resolver: null, container.Object);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [KeyValueInput])).Should().BeFalse("a failed check resolves again");
+    }
+
+    [Theory]
+    [InlineData(typeof(CosmosException))]
+    [InlineData(typeof(OperationCanceledException))]
+    public async Task AreDependenciesUnchangedAsync_AReadThatThrows_IsFalse(Type exceptionType)
+    {
+        Exception exception = exceptionType == typeof(CosmosException)
+            ? new CosmosException("unavailable", HttpStatusCode.ServiceUnavailable, 0, "activity", 0)
+            : new OperationCanceledException("timed out");
+        var container = new Mock<Container>();
+        container.Setup(items => items.ReadManyItemsStreamAsync(It.IsAny<IReadOnlyList<(string, PartitionKey)>>(), It.IsAny<ReadManyRequestOptions>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(exception);
+        var service = CreateService(resolver: null, container.Object);
+
+        (await service.AreDependenciesUnchangedAsync(Key, [KeyValueInput])).Should().BeFalse();
+    }
+
+    [Fact]
     public void HasBindings_AsksTheResolver()
     {
         var resolver = new RecordingResolver(_ => { }) { HasBindings = content => content.SelectToken("host") is not null };
@@ -148,12 +181,20 @@ public class ConfigurationResolutionTests
         service.HasBindings(Effective(new JObject { ["plan"] = "enterprise" })).Should().BeFalse();
     }
 
-    private static CosmosConfigurationService CreateService(IConfigurationBindingResolver? resolver)
+    // container: the organization container of a revalidation; without it any read fails the test
+    private static CosmosConfigurationService CreateService(IConfigurationBindingResolver? resolver, Container? container = null)
     {
         var options = Options.Create(new JsonSerializerSettings());
+        var repositories = new Mock<IContainerRepositoryProvider>(MockBehavior.Strict);
+
+        if (container is not null)
+        {
+            repositories.Setup(provider => provider.GetOrganizationContainer(Key.OrganizationName))
+                .Returns(Mock.Of<IContainerRepository>(repository => repository.Container == container));
+        }
 
         // the resolve step never touches the repositories
-        return new CosmosConfigurationService(null!, new JsonSerializationSettingsService(options), options, resolver!);
+        return new CosmosConfigurationService(repositories.Object, new JsonSerializationSettingsService(options), options, resolver!);
     }
 
     private static Configuration Effective(JObject content)
