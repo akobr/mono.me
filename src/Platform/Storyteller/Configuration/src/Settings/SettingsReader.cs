@@ -20,6 +20,20 @@ internal static class SettingsReader
     // requireKey: the provider needs a key; the document service takes one as its default scope only.
     public static StorytellerSettings Read(StorytellerConfigurationOptions options, bool requireKey)
     {
+        return Read(options, requireKey, isProvider: true);
+    }
+
+    // The document service: Key is optional, and the options of the provider alone (RefreshInterval, Optional,
+    // CacheDirectory, CacheProtector and Placement) are ignored, from code and from the environment. A federated
+    // credential exchanges at the token endpoint of the project its own options name, or else of the project of Key, so
+    // one that names none fails its reads without Key and names the fix.
+    public static StorytellerSettings ReadForDocuments(StorytellerConfigurationOptions options)
+    {
+        return Read(options, requireKey: false, isProvider: false);
+    }
+
+    private static StorytellerSettings Read(StorytellerConfigurationOptions options, bool requireKey, bool isProvider)
+    {
         ArgumentNullException.ThrowIfNull(options);
 
         var variables = new VariableReader(options.GetEnvironmentVariable ?? Environment.GetEnvironmentVariable);
@@ -30,7 +44,7 @@ internal static class SettingsReader
         var resilience = CopyResilience(options.Resilience, keyText);
         var credential = ReadCredential(options, variables, fileSystem, timeProvider, keyText);
 
-        if (!Enum.IsDefined(options.Placement))
+        if (isProvider && !Enum.IsDefined(options.Placement))
         {
             throw Invalid($"{OptionsName}.{nameof(options.Placement)} is not a placement.", keyText);
         }
@@ -40,9 +54,9 @@ internal static class SettingsReader
             Endpoint = endpoint,
             Key = key,
             Mode = ReadMode(options, variables, keyText),
-            RefreshInterval = ReadRefreshInterval(options, variables, keyText),
-            Optional = ReadOptional(options, variables, keyText),
-            CacheDirectory = ReadCacheDirectory(options, variables, fileSystem, keyText),
+            RefreshInterval = isProvider ? ReadRefreshInterval(options, variables, keyText) : TimeSpan.Zero,
+            Optional = isProvider && ReadOptional(options, variables, keyText),
+            CacheDirectory = isProvider ? ReadCacheDirectory(options, variables, fileSystem, keyText) : null,
             Credential = credential?.Bind(new StorytellerCredentialBinding(endpoint)
             {
                 Organization = key?.OrganizationName,
@@ -55,8 +69,8 @@ internal static class SettingsReader
             SecretRefreshInterval = RequirePositive(options.SecretRefreshInterval, nameof(options.SecretRefreshInterval), keyText),
             ReadTimeout = RequirePositive(options.ReadTimeout, nameof(options.ReadTimeout), keyText),
             Resilience = resilience,
-            Placement = options.Placement,
-            CacheProtector = options.CacheProtector,
+            Placement = isProvider ? options.Placement : SourcePlacement.BeforeEnvironmentVariables,
+            CacheProtector = isProvider ? options.CacheProtector : null,
             LoggerFactory = options.LoggerFactory,
             TimeProvider = timeProvider,
             FileSystem = fileSystem,

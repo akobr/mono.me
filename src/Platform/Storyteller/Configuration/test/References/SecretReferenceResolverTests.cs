@@ -62,19 +62,6 @@ public class SecretReferenceResolverTests
         exception.IsTransient.ShouldBeFalse();
     }
 
-    [Fact]
-    public async Task TheSubstitutionStep_LeavesDocumentsAsTheyAre_UntilPhase3()
-    {
-        var substitution = new ReferenceSubstitution(new PrefixResolver("kv://", "secret"), StorytellerReadMode.Resolved, TimeSpan.FromHours(1), new FakeTimeProvider());
-        var content = JObject.Parse("""{ "password": "kv://vault/name" }""");
-
-        var result = await substitution.SubstituteAsync(content, CancellationToken.None);
-
-        result.Content.ShouldBeSameAs(content);
-        result.OldestResolution.ShouldBeNull();
-        substitution.IsRefreshDue(result).ShouldBeFalse();
-    }
-
     [Theory]
     [InlineData(120, true)]
     [InlineData(30, false)]

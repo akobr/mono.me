@@ -34,6 +34,11 @@ internal sealed record ConfigurationSnapshot
     // Set on a rollback of the same identity: the platform's current document did not bind.
     public StorytellerConfigurationException? Rejection { get; init; }
 
+    // Set on a rollback of a secret rotation: the data with the values resolved again, which did not bind. A 304 whose
+    // resolution gives the same data applies nothing, so an unchanged secret is not applied and rolled back every poll;
+    // a value rotated again is tried. Compared, never published or logged.
+    public IReadOnlyDictionary<string, string>? RejectedData { get; init; }
+
     // A 200 of the platform, whose cache entry is written once every provider took it. A rollback never writes: its
     // content is the confirmed one, under the rejected tag.
     public bool WritesCache { get; init; }
