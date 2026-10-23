@@ -667,7 +667,8 @@ public partial class ConfigurationHttp
 
     // The d tag of If-None-Match whose manifest this caller recorded under the same effective document and runtime, when
     // none of its inputs changed; null otherwise. The candidates are compared by their recorded inputs, in constant time,
-    // so a long header costs no hashing; at most MaxManifestCandidates distinct d tags are looked up, and one revalidated.
+    // so a long header costs no hashing; at most MaxManifestCandidates distinct d tags are looked up and revalidated, in order,
+    // so an older tag listed first does not hide a newer one that is still current.
     private async Task<EntityTagHeaderValue?> FindUnchangedManifestAsync(
         HttpRequestData request,
         FullKey key,
@@ -701,7 +702,6 @@ public partial class ConfigurationHttp
             }
 
             manifests.Remove(caller, manifest.Tag);
-            return null;
         }
 
         return null;

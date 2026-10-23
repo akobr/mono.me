@@ -479,24 +479,27 @@ public class ConfigurationConditionalReadTests
     }
 
     [Fact]
-    public async Task GetConfigurationResolved_ALongIfNoneMatch_RevalidatesOnce()
+    public async Task GetConfigurationResolved_AnOlderTagListedFirst_DoesNotHideTheCurrentOne()
     {
         var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
         using var provider = Manifests();
         var first = Machine(mtls: true, provider: provider);
         await http.GetConfigurationResolved(first, Org, Project, View, Key);
-        var tag = Headers(first).ETag.ToString();
+        var older = Headers(first).ETag.ToString();
         configurations.Marker = "\"2\"";
         var second = Machine(mtls: true, provider: provider);
         await http.GetConfigurationResolved(second, Org, Project, View, Key);
-        var listed = string.Join(", ", Enumerable.Repeat(tag, 50).Append(Headers(second).ETag.ToString()));
-        configurations.Marker = "\"3\"";
+        var current = Headers(second).ETag.ToString();
+        configurations.Calls.Clear();
         configurations.Revalidated.Clear();
+        var request = Machine(mtls: true, ifNoneMatch: string.Join(", ", Enumerable.Repeat(older, 50).Append(current)), provider: provider);
 
-        var result = await http.GetConfigurationResolved(Machine(mtls: true, ifNoneMatch: listed, provider: provider), Org, Project, View, Key);
+        var result = await http.GetConfigurationResolved(request, Org, Project, View, Key);
 
-        result.ShouldBeOfType<OkObjectResult>();
-        configurations.Revalidated.Count.ShouldBe(1);
+        result.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        Headers(request).ETag.ToString().ShouldBe(current);
+        configurations.Revalidated.Count.ShouldBe(2, "each distinct tag is revalidated once, the older one first");
+        configurations.Calls.ShouldNotContain(nameof(IConfigurationService.ResolveConfigurationAsync));
     }
 
     [Fact]
