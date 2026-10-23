@@ -104,6 +104,36 @@ public sealed class IntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task TheWarningsOfTheStartupDocument_AreLoggedOnceTheHostStarts()
+    {
+        var logs = new RecordingLoggerFactory();
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
+        _fixture.Http.Respond(
+            HttpStatusCode.OK,
+            TestDocuments.Json("""{ "Db": { "Password": "https://my-vault.vault.azure.net/secrets/db-password", "User": "@secret(db-user)" } }"""),
+            ("ETag", EngineFixture.Tag(1)),
+            ("Cache-Control", EngineFixture.PrivateNoCache));
+        builder.Configuration.AddStoryteller(_fixture.Configure(withLogs: false), out var refresher);
+        builder.Services.AddSingleton<ILoggerFactory>(logs);
+        builder.Services.AddStorytellerConfiguration();
+        using var host = builder.Build();
+
+        builder.Configuration["Db:Password"].ShouldBe("https://my-vault.vault.azure.net/secrets/db-password");
+        Ours(logs).ShouldBeEmpty();
+
+        await host.StartAsync();
+
+        var warnings = Ours(logs);
+        warnings.Count.ShouldBe(2);
+        warnings.ShouldAllBe(entry => entry.Level == LogLevel.Warning);
+        warnings.ShouldContain(entry => entry.Message.Contains("$.Db.User") && entry.Message.Contains("start with '@'"));
+        warnings.ShouldContain(entry => entry.Message.Contains("$.Db.Password") && entry.Message.Contains("no ReferenceResolver"));
+        refresher.Status.IsDegraded.ShouldBeFalse();
+
+        await host.StopAsync();
+    }
+
+    [Fact]
     public async Task AGivenLoggerFactory_IsKeptOverTheContainers()
     {
         var hostLogs = new RecordingLoggerFactory();
