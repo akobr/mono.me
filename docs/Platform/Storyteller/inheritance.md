@@ -291,13 +291,14 @@ The effective read (`GET .../configuration/{key}`), the resolved read (`.../reso
 
 ### The tags
 
-A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, over these inputs: the full key (organization, project, view, annotation key), `Version`, `Hash` and the JSON of `Content`. Each input is length-prefixed.
+A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, over length-prefixed inputs. For `e`, `r` and `b` the inputs are the full key (organization, project, view, annotation key), `Version`, `Hash` and the JSON of `Content`.
 
 | Kind | Read | Also hashed |
 | --- | --- | --- |
 | `e` | Effective | – |
 | `r` | Resolved, document without bindings | The secret rights |
-| `b` | Resolved, document with bindings | The secret rights; `Content` is the resolved one, and the digest is HMAC-SHA256 |
+| `b` | Resolved, document with volatile bindings | The secret rights; `Content` is the resolved one, and the digest is HMAC-SHA256 |
+| `d` | Resolved, document with recorded bindings | Instead of the fields: the `r` tag of the read, the runtime version and the inputs the resolve read, each with its storage marker (see "The dependency manifest") |
 | `c` | Composition | Instead of `Version`, `Hash` and `Content`: the whole composition as JSON, so a change of any merged document changes the tag, even one that leaves the effective document as it was |
 
 - **`Hash`.** `Hash` (`CalculatedContentHash`) is part of every tag, but it is not the tag:
@@ -307,7 +308,7 @@ A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, ov
   - it stays the same when an own write bumps `Version` without changing the merge.
 
   With `Version`, `Hash` and `Content` hashed together, the tag follows every field of the body that can change.
-- **`Modified`.** Not hashed in `e`, `r` and `b`. Past version 0 it changes only with `Version`. A configuration without an item gets `Modified` set to the time of the read, which would defeat every revalidation. The `c` tag hashes the stamps of the merged documents: a stored document's stamp changes only with its version, and a `Missing` one has none.
+- **`Modified`.** Not hashed in `e`, `r`, `b` and `d`. Past version 0 it changes only with `Version`. A configuration without an item gets `Modified` set to the time of the read, which would defeat every revalidation. The `c` tag hashes the stamps of the merged documents: a stored document's stamp changes only with its version, and a `Missing` one has none.
 - **The full key.** The same document under another key gets another tag, so nobody can make the server compute someone else's tag in their own configuration.
 - **The secret rights.** There are three values:
   - the caller may read secrets;
@@ -323,21 +324,34 @@ A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, ov
 | Document | What the read does | What a 304 saves |
 | --- | --- | --- |
 | No bindings | The effective document is the resolved one. It is tagged `r` and answered without calling the resolver. | Everything but the configuration point read and the access checks |
-| Bindings | `ResolveConfigurationAsync` evaluates it, and the resolved body is tagged `b`. | The transfer only |
+| Bindings whose inputs were recorded | The first read resolves and records the inputs (key/value pairs, annotations) with their storage markers. The body is tagged `d`, and the manifest is kept. A later read that sends the tag revalidates the markers in one ReadMany. | Everything but the configuration point read, the access checks and the ReadMany: no lookup, decryption, usage meter, audit entry or evaluation |
+| Volatile bindings | `ResolveConfigurationAsync` evaluates it on every read, and the resolved body is tagged `b`. | The transfer only |
 
-For a document with bindings, every conditional read still evaluates the bindings:
-- key/value lookups with their usage counters and audit entries;
-- Key Vault calls;
-- `@annotation` reads;
-- JSON-e.
+### The dependency manifest
 
-A document that reads the clock (JSON-e `now`, `$fromNow`) gets a new tag on every read.
+A resolve gets a `BindingDependencies` collector on its `BindingScope`. Every binding on the way records what it reads: `(kind, source, key, marker)`, see [binding.md](binding.md#dependency-manifests).
+
+- **Markers.** The marker of a key/value pair or an annotation is the `_etag` of its item in any state (active, soft-deleted, a secret hidden from the caller), or `absent` when there is no item. A write, a soft delete, a restore and a protection change change the `_etag`; a purge or the expiry of a deleted item makes it `absent`. A write that changes nothing keeps it. `Version` is not used: a delete and a restore keep it, and a pair created again after a purge starts at version 1.
+- **Volatile.** The manifest is volatile when the body can change while the markers do not:
+  - JSON-e, which can read the clock (`now`, `$fromNow`);
+  - a Key Vault secret read for a caller that may read secrets: a vault has no version check cheaper than reading the secret;
+  - a source, function, executor or resolver that does not implement `IRecordingBinding`;
+  - two different markers of one input in one resolve;
+  - a collector that no scope carried.
+
+  A volatile read is tagged `b` and nothing is kept. JSON Logic, `@config`, an unregistered binding and a Key Vault source without secret rights read nothing outside the effective document and the registry, so they are not volatile.
+- **The `d` tag** hashes the `r` tag of the read (the full key, the secret rights and the effective document), the runtime version and the recorded inputs. The runtime version is the module version ids of the assemblies that take part in a resolve, the informational version of the API and the names of the registered sources and functions. A new build of that code changes every `d` tag once.
+- **The cache.** `DependencyManifests` keeps a manifest per caller (actor and channel) and tag, in its own cache of `ConditionalReads:ManifestCacheSizeLimit` (100,000: one per manifest plus one per input), for `ConditionalReads:ManifestLifetime` (5 minutes) after the resolve that recorded it. The lifetime is absolute: a polled manifest is not kept longer.
+- **A conditional read** with bindings looks at the first four distinct `d` tags of `If-None-Match`. A tag is a candidate when the caller has a manifest under it that was recorded under the same `r` tag and runtime version. The first candidate is revalidated with `AreDependenciesUnchangedAsync`: one ReadMany of the items over the partitions of the organization container, reading only `id`, `PartitionKey` and `_etag`. When every marker is the same, the read answers 304 with the tag. Otherwise it drops the manifest and resolves.
+- **A cache miss** (another instance, an eviction, the lifetime) resolves. A `d` tag is the same on every instance, so the read still answers 304 when nothing changed, after evaluating. `If-None-Match: *` always resolves.
+- **The order rule.** The effective document is read before the resolve, and each marker comes from the read that produced the value. A write that races the read can only make the tag older than the data; the next poll's revalidation then answers 200.
+- **Billing and audit.** A 304 from a manifest is not a billed read: it records no `reads.binding` and no `reveals`, and writes no `BindingRead` count, because nothing is looked up or revealed. Only the RUs of the ReadMany are spent. Each caller is resolved at least once per lifetime on an instance, so the hourly `BindingRead` counts still name every machine that receives secrets, with lower counts.
 
 The `b` tags are keyed because a resolved body can carry secret values, and a plain hash in a header could be brute-forced for a weak secret. The key comes from `ConditionalReads:EntityTagKey`: base64 of at least 32 bytes, validated on start.
 - Set it as an app setting or a Key Vault reference, never in a committed settings file.
 - Without it, each process draws a random key. Tags stay correct but differ between instances, so a poller that lands on another instance gets a 200.
 
-The `e` and `r` tags are not keyed. They hash the stored document, which every reader of the project gets from the effective read anyway. Secrets belong in key/value pairs or Key Vault.
+The `e`, `r` and `d` tags are not keyed. `e` and `r` hash the stored document, which every reader of the project gets from the effective read anyway; `d` adds storage versions, never a value. Secrets belong in key/value pairs or Key Vault.
 
 ### Headers
 
@@ -345,7 +359,7 @@ The headers are the same on a 200 and a 304, and are never sent on a 400, 404 or
 
 | Header | Value |
 | --- | --- |
-| `ETag` | The tag |
+| `ETag` | The tag; a 304 from a manifest sends its weak tag also when the client sent the strong form |
 | `Cache-Control` | `no-store` when the caller may read secrets (resolved read). Otherwise `private, no-cache`: shared caches do not store the response, and a browser revalidates its copy before each use. |
 | `X-2S-Secrets-Withheld` | `mtls-required` when secrets were withheld |
 
@@ -354,6 +368,10 @@ The admin UI calls the API cross-origin. It cannot read the `ETag`, but the brow
 ### Limits
 
 - **Writes ignore `If-Match`.** The tags are weak, and `If-Match` needs a strong tag. A JSON Patch `test` operation guards a write instead.
-- **The `e`, `r` and `b` tags follow the effective cache.** A descendant whose `CalculatedContent` is stale (see "Cache and descendant freshness") keeps its tag until the cache is cleared. The `c` tag follows the stored documents, so it changes at once, and the composition's `Hash` can then differ from the effective `Hash` (see "Consistency").
+- **The `e`, `r`, `b` and `d` tags follow the effective cache.** A descendant whose `CalculatedContent` is stale (see "Cache and descendant freshness") keeps its tag until the cache is cleared. The `c` tag follows the stored documents, so it changes at once, and the composition's `Hash` can then differ from the effective `Hash` (see "Consistency").
+- **Manifests are kept per instance.** A poller that lands on another instance resolves once there.
+- **A revoked customer key.** The `_etag` of a pair does not change when its BYOK key is revoked, and a 304 from a manifest decrypts nothing. After a revocation a poller can get 304s for up to `KeyValues:Protection:Byok:CacheDuration` plus `ManifestLifetime` (10 minutes by default); the next full resolve fails with `424`. A 304 reveals nothing the client does not hold already.
+- **Write times of inputs the caller cannot read.** The markers of a secret hidden from the caller and of an ancestor annotation are part of the `d` tag, so such a caller gets a 200 with the same body when one of them is written. It learns that an input changed, never its value.
+- **Key Vault and JSON-e are always evaluated** for a caller that reads them (see "The dependency manifest").
 - **The SDKs do not send `If-None-Match` yet.** The TypeScript SDK returns only the body, so it cannot see the `ETag`, and it throws on a 304 that the script asked for itself. A polling client uses plain HTTP for now.
 - **Not covered:** `HEAD`, `If-Modified-Since` and the listings.
