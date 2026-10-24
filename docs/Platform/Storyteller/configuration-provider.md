@@ -500,7 +500,7 @@ options.ReferenceResolver = new KeyVaultReferenceResolver(new DefaultAzureCreden
 | `DefaultVaultSuffix` | `vault.azure.net` | The suffix a `kv://{vault}/…` shorthand expands to, `https://{vault}.{suffix}/`, as on the server. It is always allowed. |
 | `AllowedHostSuffixes` | `vault.azure.net` | The hosts a secret URI may name. Sovereign clouds are added here, and the host of a local emulator (see below). |
 | `AllowedVaults` | empty: any vault | Vault names. When set, every other vault is declined. The vault of a secret URI is the first label of its host, so `myvault` admits both `kv://myvault/x` and `https://myvault.vault.azure.net/secrets/x`. |
-| `SecretClientOptions` | – | Passed to every `SecretClient`. |
+| `SecretClientOptions` | – | Passed to every `SecretClient` that the resolver creates itself. Ignored when `SecretClientFactory` is set; the factory configures its own clients. |
 | `SecretClientFactory` | – | `Func<Uri, SecretClient>`, called once per vault with `https://{host}/`, in place of the default factory: for tests and custom clients. |
 
 - **Host match.** Case-insensitive on the IDN host: equal to a suffix, or ending with `.` and a suffix. `evilvault.azure.net` does not match `vault.azure.net`.
