@@ -331,6 +331,33 @@ public class AnnotationsHttpTests
     }
 
     [Fact]
+    public async Task SetMany_DuplicateType_UsesTheLastUnit()
+    {
+        var annotations = new RecordingAnnotations();
+        const string body = """
+            [{
+              "annotationType": "subject",
+              "annotationType": "unit",
+              "annotationKey": "unt.invoicing.export",
+              "name": "export",
+              "projectName": "x",
+              "viewName": "y",
+              "responsibilityKey": "rst.invoicing",
+              "responsibilityName": "invoicing",
+              "unitType": "time",
+              "unitDefinition": "*/15 * * * *"
+            }]
+            """;
+
+        var result = await Http(annotations).SetAnnotations(Request("POST", body), "acme", "billing", "staging");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        var created = annotations.LastCreated.ShouldNotBeNull().ShouldHaveSingleItem().ShouldBeOfType<Unit>();
+        created.UnitType.ShouldBe("time");
+        created.UnitDefinition.ShouldBe("*/15 * * * *");
+    }
+
+    [Fact]
     public async Task SetMany_UnitWithOnlyOneTriggerProperty_IsBadRequest()
     {
         var annotations = new RecordingAnnotations();

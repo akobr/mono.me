@@ -408,13 +408,32 @@ public partial class AnnotationsHttp
         string project,
         string view)
     {
-        // Elements stay JSON until the access check. A list of base Annotation would drop UnitType and
-        // UnitDefinition, and a body that is not JSON still names no key.
+        // Each element is read as the annotation that would be stored. A list of base Annotation would drop
+        // UnitType and UnitDefinition, and a body that is not JSON still names no key.
         var (elements, invalidBody) = await request.ReadJsonBodyAsync<List<JsonElement>>(_bodyJsonOptions, "a list of annotations", RequestBodyLimits.Annotations);
 
-        // The keys of the body are authorized before any 400 of the body, so a caller without access gets 403 first.
+        // The stored key is authorized before any 400 of the body, so a caller without access gets 403 first.
+        // Deserialization keeps the last duplicate member. When an element cannot be read, the same last
+        // AnnotationKey is taken from the raw element, so one broken element cannot hide a key outside the restriction.
         // A body that cannot be read names no key, which the restriction of a machine lets through to the 400.
-        var keys = (elements ?? []).Select(AnnotationKeyOf).Where(key => key is not null).Select(key => key!);
+        List<Annotation>? annotations = null;
+        JsonException? invalidElement = null;
+
+        if (elements is { } body && body.All(element => element.ValueKind != JsonValueKind.Null))
+        {
+            try
+            {
+                annotations = body.Select(DeserializeAnnotationElement).ToList();
+            }
+            catch (JsonException exception)
+            {
+                invalidElement = exception;
+            }
+        }
+
+        var keys = annotations is not null
+            ? annotations.Select(annotation => annotation.AnnotationKey)
+            : (elements ?? []).Select(AnnotationKeyOf).Where(key => key is not null).Select(key => key!);
         var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, keys, AccountRole.Contributor, MachineScope.AnnotationWrite, MachineScope.AnnotationManage);
 
         if (invalidBody is not null)
@@ -433,18 +452,12 @@ public partial class AnnotationsHttp
             return new BadRequestObjectResult(new ErrorResponse("The annotations must not contain null entries."));
         }
 
-        List<Annotation> annotations;
-
-        try
+        if (invalidElement is not null)
         {
-            annotations = elements.Select(DeserializeAnnotationElement).ToList();
-        }
-        catch (JsonException exception)
-        {
-            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation object in body: {exception.Message}"));
+            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation object in body: {invalidElement.Message}"));
         }
 
-        var annotationsToProcess = annotations
+        var annotationsToProcess = annotations!
             .Select(a => a is Unit unit
                 ? (Annotation)(unit with { ProjectName = project, ViewName = view })
                 : a with { ProjectName = project, ViewName = view })
@@ -1353,8 +1366,12 @@ public partial class AnnotationsHttp
             : null;
     }
 
+    // The last case-insensitive match wins, as deserialization does. The value stays valid for the document.
     private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
     {
+        var found = false;
+        value = default;
+
         if (element.ValueKind == JsonValueKind.Object)
         {
             foreach (var property in element.EnumerateObject())
@@ -1362,12 +1379,11 @@ public partial class AnnotationsHttp
                 if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                 {
                     value = property.Value;
-                    return true;
+                    found = true;
                 }
             }
         }
 
-        value = default;
-        return false;
+        return found;
     }
 }
