@@ -144,12 +144,7 @@ const references = computed(() => {
   const keys = ['ResponsibilityKey', 'SubjectKey', 'UnitKey', 'UsageKey', 'ContextKey', 'ExecutionKey']
     .map((field) => ({ field: field.replace('Key', ''), key: record[field] }))
     .filter((entry): entry is { field: string; key: string } => typeof entry.key === 'string' && !!entry.key)
-  const names = ['ResponsibilityNames', 'ContextNames', 'UnitNames']
-    .map((field) => ({ field: field.replace('Names', ''), names: record[field] }))
-    .filter(
-      (entry): entry is { field: string; names: string[] } => Array.isArray(entry.names) && entry.names.length > 0,
-    )
-  return { keys, names }
+  return { keys }
 })
 
 // Exact totals only when this view's catalog finished a live load. A snapshot or a failed page is partial.
@@ -351,12 +346,12 @@ const descendantCount = (total: number) => (authoritativeCatalog.value ? String(
       </UFormField>
 
       <div
-        v-if="references.keys.length || references.names.length || showDescendants"
+        v-if="references.keys.length || showDescendants"
         class="space-y-2 rounded-md border border-default p-3"
         data-testid="relations"
       >
         <h2 class="text-xs font-semibold text-muted uppercase">Relations</h2>
-        <template v-if="references.keys.length || references.names.length">
+        <template v-if="references.keys.length">
           <h3 class="text-xs font-medium text-muted">Ancestors</h3>
           <div v-for="entry in references.keys" :key="entry.field" class="flex flex-wrap items-center gap-2 text-sm">
             <span class="w-24 text-muted">{{ entry.field }}</span>
@@ -365,12 +360,6 @@ const descendantCount = (total: number) => (authoritativeCatalog.value ? String(
               class="max-w-full truncate font-mono text-xs text-primary hover:underline"
               >{{ entry.key }}</RouterLink
             >
-          </div>
-          <div v-for="entry in references.names" :key="entry.field" class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="w-24 text-muted">{{ entry.field }}s</span>
-            <span class="flex flex-wrap gap-1"
-              ><UBadge v-for="name in entry.names" :key="name" :label="name" color="neutral" variant="outline" size="sm"
-            /></span>
           </div>
         </template>
         <template v-if="showDescendants">

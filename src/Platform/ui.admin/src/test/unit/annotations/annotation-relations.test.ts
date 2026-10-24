@@ -69,8 +69,9 @@ describe('annotation relations', () => {
 
     expect(screen.host.text()).not.toContain('secret-name')
     expect(screen.host.text()).toContain('Ancestors')
-    expect(screen.host.text()).toContain('UnitType')
-    expect(screen.host.text()).toContain('event')
+    const relations = screen.host.get('[data-testid="relations"]').text()
+    expect(relations).not.toContain('UnitType')
+    expect(relations).not.toContain('event')
 
     const ancestor = screen.host.findAll('a').find((link) => link.text() === 'sbt.northwind')
     expect(decodeURIComponent(ancestor?.attributes('href') ?? '')).toContain(
