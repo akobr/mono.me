@@ -24,6 +24,9 @@ The value is case-insensitive. Settings are validated at startup, so a missing r
 | `Auth:TenantId` | yes | Tenant used for the OpenID metadata. |
 | `Auth:ClientId` | yes | API application ID. Tokens must have the audience `api://{ClientId}` or `{ClientId}`. |
 | `Auth:AppRoles:<MachineScope>` | no | The app role ID of each machine scope, for example `Auth:AppRoles:AnnotationRead`, used by Entra ID machine access. See [Entra ID app registrations](#entra-id-app-registrations). |
+| `Auth:DelegatedClients:*:ClientId`, `Auth:DelegatedClients:*:TenantId` | no | Client apps whose delegated tokens act for the signed-in user, each in one tenant (GUIDs), for example the [MCP server](#signing-in-through-the-mcp-server). Empty by default. See below. |
+
+A token whose `azp` (v1: `appid`) is not `Auth:ClientId` is a machine with that id. A listed client is the exception: its token is a user's when it is delegated (a non-blank `scp` and no `idtyp=app`) and its `tid` is the listed tenant. The same app's app-only tokens and its tokens from another tenant stay machines. A listed `ClientId` may not be `Auth:ClientId`, and the list is refused under AuthKit. The GUIDs may be written in any form (`{…}`, without dashes, any case); they are compared as GUIDs.
 
 ### AuthKit settings
 
@@ -348,6 +351,18 @@ spec:
               audience: https://api.example.com/api/v1/acme/billing/access/token
               expirationSeconds: 3600
 ```
+
+## Signing in through the MCP server
+
+The [MCP server](mcp.md) acts for the person signed in to an AI assistant. It validates the person's Entra ID token for its own app registration, then gets a token for the API on behalf of the person (the on-behalf-of flow) and calls the API with it. The inbound token is never forwarded.
+
+That token's `azp` is the MCP app, not `Auth:ClientId`, so the API treats it as a user only when `Auth:DelegatedClients` lists the MCP app and its tenant (see [Entra ID settings](#entra-id-settings)). From there it is a user token like any other: it needs `User.Impersonation`, the account is found by `sub`, the role decides, and the audit actor is the account.
+
+- The MCP app is single-tenant and a confidential client only, so the on-behalf-of tokens of the server are the only delegated tokens it can get.
+- Grant the MCP app the delegated `User.Impersonation` of the API (admin consent), or pre-authorize it on the API registration.
+- Add the optional claim `idtyp` to the API's access tokens, so app-only tokens are recognized beyond the missing `scp`.
+- `Account.Id` is the `sub`, and Entra documents `sub` as pairwise per application: check once per tenant that the on-behalf-of token carries the person's `sub`, as [Identity](mcp.md#identity) describes.
+- AuthKit issues no token for the API on behalf of a user, so the MCP server signs in with Entra ID only.
 
 ## Machine authentication policy
 
@@ -1240,6 +1255,7 @@ az functionapp cors add --name <function-app> --resource-group <group> --allowed
 ## Not available yet
 
 * User tokens issued by the AuthKit domain (Swagger UI sign-in) are not accepted alongside device-flow tokens. M2M tokens from the AuthKit domain are. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
+* The [MCP server](mcp.md) works with Entra ID only; AuthKit has no on-behalf-of or token exchange for the API.
 * A combination of an mTLS certificate and client credentials (`CertificateAndClientCredentials`) is not available.
 * The scopes of an existing machine cannot be edited. Create a new machine and delete the old one (see [Scopes of machines](#scopes-of-machines)).
 * The C# SDK has no helper that exchanges and caches the Storyteller token (the TypeScript SDK has `createFederatedTokenProvider`). Trusted issuers, federation rules and `Federated` machines are managed in the admin UI, with `sform` (see [Machine access with workload identity federation](#machine-access-with-workload-identity-federation)), the API or the SDKs.
