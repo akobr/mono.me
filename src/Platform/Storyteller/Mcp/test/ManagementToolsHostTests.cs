@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Net;
 
 using _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
 using ModelContextProtocol.Client;
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Mcp.UnitTests;
@@ -100,6 +102,56 @@ public sealed class ManagementToolsHostTests : IDisposable
     }
 
     [Fact]
+    public async Task SetAnnotation_TitleOnly_SendsTheStoredValuesAsTheyAreStored()
+    {
+        // date-like strings, nested ones too, with offsets and milliseconds a parsed DateTime would not keep
+        const string values = """{"d1":"2026-11-01T10:00:00.000+02:00","d2":"2026-11-01T10:00:00.000Z","o":{"x":"2026-11-01T10:00:00+05:00","list":["2026-01-01T00:00:00.5Z"]}}""";
+        _host.Api.Respond = _ => RecordingApiHandler.Json(
+            $$"""{"AnnotationType":"Subject","ProjectName":"main","ViewName":"default","AnnotationKey":"sbt.northwind","Name":"northwind","Title":"Old","ValidFrom":"2026-11-01T00:00:00+01:00","Values":{{values}}}""");
+        await using var client = await _host.ConnectAsync();
+
+        var result = await client.CallAsync("set_annotation", new { organization = "house", project = "main", key = "sbt.northwind", title = "Northwind" });
+
+        result.IsError.ShouldNotBe(true, result.Text());
+        var write = _host.Api.Requests.Last();
+        write.Method.ShouldBe(HttpMethod.Post);
+        var body = (JObject)AsText(write.Body!);
+        body.Value<string>("Title").ShouldBe("Northwind");
+        body["Values"]!.ToString(Formatting.None).ShouldBe(values);
+        DateTimeOffset.Parse(body.Value<string>("ValidFrom")!, CultureInfo.InvariantCulture).ShouldBe(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.FromHours(1)));
+    }
+
+    [Fact]
+    public async Task ReplaceTemplate_ChangedDate_IsTestedWithTheStoredText()
+    {
+        _host.Api.Respond = request => request.Method == HttpMethod.Get
+            ? RecordingApiHandler.Json("""{"AnnotationType":"exe","Version":2,"Content":{"since":"2026-10-24T10:00:00.000Z","n":1}}""")
+            : RecordingApiHandler.Json("""{"AnnotationType":"exe","Version":3,"Content":{"since":"2026-10-25T10:00:00.000Z","n":1}}""");
+        await using var client = await _host.ConnectAsync();
+
+        var result = await client.CallAsync("replace_template", new { organization = "house", project = "main", annotationType = "exe", content = new { since = "2026-10-25T10:00:00.000Z", n = 1 } });
+
+        result.IsError.ShouldNotBe(true, result.Text());
+        var patch = _host.Api.Requests.Last();
+        patch.Method.ShouldBe(HttpMethod.Patch);
+        AsText(patch.Body!).ToString(Formatting.None).ShouldBe(
+            """[{"op":"test","path":"/since","value":"2026-10-24T10:00:00.000Z"},{"op":"replace","path":"/since","value":"2026-10-25T10:00:00.000Z"}]""");
+    }
+
+    [Fact]
+    public async Task GetSchema_KeepsDateLikeStringsAsStored()
+    {
+        _host.Api.Respond = _ => RecordingApiHandler.Json(
+            """{"AnnotationType":"exe","Version":1,"Content":{"type":"object","properties":{"at":{"type":"string","default":"2026-10-24T10:00:00.000+02:00"}}}}""");
+        await using var client = await _host.ConnectAsync();
+
+        var result = await client.CallAsync("get_schema", new { organization = "house", project = "main", level = "type", annotationType = "exe" });
+
+        result.IsError.ShouldNotBe(true, result.Text());
+        result.Text().ShouldContain("\"default\":\"2026-10-24T10:00:00.000+02:00\"");
+    }
+
+    [Fact]
     public async Task CreateAnnotations_DeletedAncestor_IsAToolError_AndCreatesNothing()
     {
         _host.Api.Respond = _ => RecordingApiHandler.Json(
@@ -118,5 +170,12 @@ public sealed class ManagementToolsHostTests : IDisposable
     public void Dispose()
     {
         _host.Dispose();
+    }
+
+    // A request body as the API reads it: date-like strings stay text.
+    private static JToken AsText(string json)
+    {
+        using var reader = new JsonTextReader(new StringReader(json)) { DateParseHandling = DateParseHandling.None };
+        return JToken.ReadFrom(reader);
     }
 }

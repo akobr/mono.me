@@ -40,16 +40,17 @@ public class TemplateToolsTests
     }
 
     [Fact]
-    public async Task ReplaceTemplate_DateLikeStringsTheClientParsed_AreNotTested()
+    public async Task ReplaceTemplate_DateLikeStrings_AreTestedAsStored()
     {
-        // the SDK's template client parses date-like strings; "2026-10-24T10:00:00.000Z" comes back as a DateTime
-        using var reader = new JsonTextReader(new StringReader("""{"since":"2026-10-24T10:00:00.000Z","n":1}""")) { DateParseHandling = DateParseHandling.DateTime };
+        // the SDK's template client keeps date-like strings as text, so a changed date is guarded like any value
+        using var reader = new JsonTextReader(new StringReader("""{"since":"2026-10-24T10:00:00.000Z","n":1}""")) { DateParseHandling = DateParseHandling.None };
         _api.Setup(api => api.GetTemplateAsync(Organization, Project, ViewName, "exe", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.ConfigurationTemplate { AnnotationType = "exe", Version = 2, Content = JObject.Load(reader) });
 
-        await Tools.ReplaceTemplate(Organization, Project, "exe", Element("""{"since":"2026-10-24T10:00:00.000Z","n":2}"""));
+        await Tools.ReplaceTemplate(Organization, Project, "exe", Element("""{"since":"2026-10-25T10:00:00.000Z","n":1}"""));
 
-        _sentBody.ShouldBeOfType<JArray>().ToString(Formatting.None).ShouldBe("""[{"op":"test","path":"/n","value":1},{"op":"replace","path":"/n","value":2}]""");
+        _sentBody.ShouldBeOfType<JArray>().ToString(Formatting.None).ShouldBe(
+            """[{"op":"test","path":"/since","value":"2026-10-24T10:00:00.000Z"},{"op":"replace","path":"/since","value":"2026-10-25T10:00:00.000Z"}]""");
     }
 
     [Fact]
