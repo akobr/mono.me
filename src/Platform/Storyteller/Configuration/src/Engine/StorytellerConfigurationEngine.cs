@@ -75,6 +75,10 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     // Guarded by _lock: the sequence of the last snapshot a pass took, or that the providers loaded.
     private long _notifiedSequence;
 
+    // Rejected passes with the sequences they absorbed, so a switch whose snapshot a newer one replaced before its pass
+    // still learns that the pass rolled its key back. The newest few are enough: a run waits for the pass that covers it.
+    private readonly List<(long First, long Last, StorytellerConfigurationException Error)> _rejectedPasses = [];
+
     // Under the run gate: computed by the first run that needs the cache.
     private string? _fingerprint;
 
@@ -900,7 +904,7 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
 
             // Its own snapshot was notified and did not bind: the pass recorded and logged the rejection. A snapshot that
             // a newer one replaced before its pass succeeds.
-            if (swapped is not null && await NotifyAsync(isNested).ConfigureAwait(false) && GetRejection(swapped) is { } rejection)
+            if (swapped is not null && await NotifyAsync(isNested).ConfigureAwait(false) && GetRejection(swapped, target is not null) is { } rejection)
             {
                 return new RunResult(RunState.Failed, rejection);
             }
@@ -966,8 +970,9 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                 return null;
             }
 
+            var first = _notifiedSequence + 1;
             _notifiedSequence = _snapshot.Sequence;
-            return new Pass(lifetime, _snapshot, [.. _providers]);
+            return new Pass(lifetime, _snapshot, [.. _providers], first);
         }
     }
 
@@ -979,11 +984,30 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
         }
     }
 
-    private StorytellerConfigurationException? GetRejection(ConfigurationSnapshot snapshot)
+    // A switch also fails when a newer snapshot absorbed its own in a pass that was rejected and rolled the key back.
+    private StorytellerConfigurationException? GetRejection(ConfigurationSnapshot snapshot, bool isSwitch)
     {
         lock (_lock)
         {
-            return snapshot.Notification.Rejection;
+            if (snapshot.Notification.Rejection is { } own)
+            {
+                return own;
+            }
+
+            if (!isSwitch || _snapshot.Identity == snapshot.Identity)
+            {
+                return null;
+            }
+
+            foreach (var (first, last, error) in _rejectedPasses)
+            {
+                if (snapshot.Sequence >= first && snapshot.Sequence <= last)
+                {
+                    return error;
+                }
+            }
+
+            return null;
         }
     }
 
@@ -1215,11 +1239,11 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                 break;
 
             case [var single]:
-                Reject(pass.Lifetime, snapshot, single);
+                Reject(pass, single);
                 break;
 
             default:
-                Reject(pass.Lifetime, snapshot, new AggregateException(errors));
+                Reject(pass, new AggregateException(errors));
                 break;
         }
     }
@@ -1266,8 +1290,10 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     // newest rejected tag, so polls answer 304 instead of applying and rolling back the document every interval. A
     // rotation, the confirmed document with its secrets resolved again, keeps the rejected data instead, so a 304 that
     // resolves the same values applies nothing.
-    private void Reject(EngineLifetime lifetime, ConfigurationSnapshot rejected, Exception exception)
+    private void Reject(Pass pass, Exception exception)
     {
+        var lifetime = pass.Lifetime;
+        var rejected = pass.Snapshot;
         var key = rejected.Identity.Key;
         var types = DescribeTypes(exception);
         StorytellerConfigurationException? error = null;
@@ -1296,6 +1322,12 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                     null,
                     false);
                 rejected.Notification.Rejection = error;
+                _rejectedPasses.Add((pass.FirstSequence, rejected.Sequence, error));
+                if (_rejectedPasses.Count > 16)
+                {
+                    _rejectedPasses.RemoveAt(0);
+                }
+
                 RecordFailure(error);
                 var current = _snapshot;
 
@@ -1424,7 +1456,7 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     private sealed record Draft(ConfigurationSnapshot Snapshot, bool RequireCurrent);
 
     // One pass of the lane: the snapshot, and the providers attached when it started.
-    private sealed record Pass(EngineLifetime Lifetime, ConfigurationSnapshot Snapshot, StorytellerConfigurationProvider[] Providers);
+    private sealed record Pass(EngineLifetime Lifetime, ConfigurationSnapshot Snapshot, StorytellerConfigurationProvider[] Providers, long FirstSequence);
 
     // A TryRefreshAsync run that has not taken the gate yet; callers until then share it.
     private sealed class QueuedRefresh

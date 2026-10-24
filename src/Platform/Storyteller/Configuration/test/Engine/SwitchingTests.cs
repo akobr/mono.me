@@ -136,6 +136,50 @@ public sealed class SwitchingTests : IDisposable
         root["App:Name"].ShouldBe("contoso");
     }
 
+    // While a slow listener holds the notification of "two", the switch swaps in its document and waits. A refresh then
+    // swaps in a newer document of the new key that does not bind; one pass covers both and rolls back to the old key.
+    [Fact]
+    public async Task ASwitchWhoseSnapshotARejectedNewerOneReplaced_Throws_AndKeepsThePreviousKey()
+    {
+        _fixture.RespondDocument("one", EngineFixture.Tag(1));
+        var (root, engine) = _fixture.Build();
+        var services = new ServiceCollection();
+        services.AddOptions<RefreshTests.AppOptions>().Bind(root.GetSection("App")).ValidateDataAnnotations();
+        using var container = services.BuildServiceProvider();
+        var monitor = container.GetRequiredService<IOptionsMonitor<RefreshTests.AppOptions>>();
+        monitor.CurrentValue.Port.ShouldBe(80);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        using var listener = monitor.OnChange(options =>
+        {
+            if (options.Name == "two" && entered.TrySetResult())
+            {
+                release.Task.Wait(EngineFixture.Patience);
+            }
+        });
+
+        _fixture.RespondDocument("two", EngineFixture.Tag(2), version: 4, port: 81);
+        _fixture.RespondDocument("contoso", EngineFixture.Tag(3), version: 7, port: 82);
+        _fixture.RespondDocument("contoso-bad", EngineFixture.Tag(4), version: 8, port: 0);
+
+        var first = engine.TryRefreshAsync();
+        await entered.Task.WaitAsync(EngineFixture.Patience);
+        var switching = engine.SwitchKeyAsync(OtherKey);
+        SpinWait.SpinUntil(() => engine.Snapshot.ETag == EngineFixture.Tag(3), EngineFixture.Patience).ShouldBeTrue();
+        var second = engine.TryRefreshAsync();
+        SpinWait.SpinUntil(() => engine.Snapshot.ETag == EngineFixture.Tag(4), EngineFixture.Patience).ShouldBeTrue();
+        release.SetResult();
+
+        (await first.WaitAsync(EngineFixture.Patience)).ShouldBeTrue();
+        (await second.WaitAsync(EngineFixture.Patience)).ShouldBeFalse();
+        await Should.ThrowAsync<StorytellerConfigurationException>(() => switching.WaitAsync(EngineFixture.Patience));
+
+        engine.ActiveKey.ShouldNotBe(OtherKey);
+        root["App:Name"].ShouldBe("two");
+        monitor.CurrentValue.Port.ShouldBe(81);
+    }
+
     [Fact]
     public async Task SwitchingAndRefreshing_FromAnOptionsChangeCallback_DoNotDeadlock()
     {
