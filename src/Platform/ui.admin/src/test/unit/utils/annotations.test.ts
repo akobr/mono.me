@@ -6,11 +6,18 @@ import {
   canDescend,
   codeOfKey,
   deletedWith,
+  descendantFilterQuery,
+  descendantPreviewLimit,
   descendantTypeCodes,
+  getAllAncestors,
+  getAnnotationTypeInfo,
+  groupedDescendants,
   metaOf,
+  parseAnnotationKey,
   typeCodes,
   type AnnotationTypeCode,
 } from '@/utils/annotation-key'
+import { compileFilter, parseFilter } from '@/utils/filter-parser'
 import { withRelations } from '@/utils/annotation-relations'
 import { labelColor, normalizeLabels } from '@/utils/labels'
 
@@ -251,6 +258,134 @@ describe('descendant types', () => {
     expect(descendantTypeCodes('RST.invoicing')).toEqual(below.rst)
     for (const key of ['', 'rst', 'rst.', 'rst.a.b', 'exe.northwind.invoicing', 'xyz.a']) {
       expect(descendantTypeCodes(key), key).toEqual([])
+    }
+  })
+})
+
+describe('groupedDescendants', () => {
+  const ancestorsOf = (key: string) => getAllAncestors(key)
+  const typed = (key: string, extra: Partial<Annotation> = {}): Annotation => ({
+    ProjectName: 'p',
+    ViewName: 'default',
+    AnnotationKey: key,
+    Name: key.split('.').at(-1)!,
+    AnnotationType: getAnnotationTypeInfo(key.slice(0, key.indexOf('.')))?.type ?? 'Execution',
+    ...extra,
+  })
+
+  // One graph: diamonds, a disabled context, and a shipping execution that shares the exe.north prefix
+  // without descending from cnt.northwind.prod or rst.invoicing.
+  const rows = [
+    'rst.invoicing',
+    'rst.shipping',
+    'sbt.northwind',
+    'sbt.contoso',
+    'unt.invoicing.worker',
+    'unt.invoicing.pdf',
+    'cnt.northwind.prod',
+    'cnt.northwind.eu',
+    'usg.northwind.invoicing',
+    'usg.contoso.invoicing',
+    'exe.northwind.invoicing.prod',
+    'exe.northwind.invoicing.eu',
+    'exe.contoso.invoicing.prod',
+    'exe.northwind.shipping.stage',
+    'uxe.northwind.invoicing.prod.worker',
+    'uxe.northwind.invoicing.prod.pdf',
+    'EXE.Northwind.Invoicing.Prod',
+  ].map((key) => typed(key, key === 'cnt.northwind.eu' ? { IsDisabled: true } : {}))
+  const keys = [...rows.map((row) => row.AnnotationKey), ...rows.map((row) => row.AnnotationKey)]
+
+  const groupsOf = (root: string, limit?: number) => groupedDescendants(root, keys, ancestorsOf, limit)
+
+  const selected = (query: string) => {
+    const predicate = compileFilter(parseFilter(query), {
+      now: Date.parse('2026-10-24T00:00:00Z'),
+      configured: null,
+      ancestorsOf,
+      partsOf: parseAnnotationKey,
+    })
+    return rows
+      .filter(predicate)
+      .map((row) => row.AnnotationKey)
+      .toSorted((left, right) => left.localeCompare(right, 'en'))
+  }
+
+  it('quotes filter values the way setQualifier does', () => {
+    expect(descendantFilterQuery('rst.my invoicing')).toBe('ancestor:"rst.my invoicing"')
+    expect(descendantFilterQuery('rst.invoicing,eu', 'exe')).toBe('ancestor:"rst.invoicing,eu" type:exe')
+    expect(descendantFilterQuery('rst.invoicing')).toBe('ancestor:rst.invoicing')
+  })
+
+  it('groups every root type in typeCodes order and drops a unit of execution', () => {
+    expect(groupsOf('rst.invoicing').groups.map((group) => group.code)).toEqual(['unt', 'usg', 'exe', 'uxe'])
+    expect(groupsOf('sbt.northwind').groups.map((group) => group.code)).toEqual(['usg', 'cnt', 'exe', 'uxe'])
+    expect(groupsOf('usg.northwind.invoicing').groups.map((group) => group.code)).toEqual(['exe', 'uxe'])
+    expect(groupsOf('cnt.northwind.prod').groups.map((group) => group.code)).toEqual(['exe', 'uxe'])
+    expect(groupsOf('unt.invoicing.worker').groups.map((group) => group.code)).toEqual(['uxe'])
+    expect(groupsOf('exe.northwind.invoicing.prod').groups.map((group) => group.code)).toEqual(['uxe'])
+    expect(groupsOf('uxe.northwind.invoicing.prod.worker').groups).toEqual([])
+    expect(groupsOf('not-a-key').groups).toEqual([])
+  })
+
+  it('counts a diamond once, keeps a disabled key, and ignores a prefix neighbor', () => {
+    const subject = groupsOf('sbt.northwind')
+    const execution = subject.groups.find((group) => group.code === 'exe')
+    expect(execution?.preview.filter((key) => key.toLowerCase() === 'exe.northwind.invoicing.prod')).toEqual([
+      'exe.northwind.invoicing.prod',
+      'EXE.Northwind.Invoicing.Prod',
+    ])
+    expect(subject.groups.find((group) => group.code === 'cnt')?.preview).toContain('cnt.northwind.eu')
+
+    const responsibility = groupsOf('rst.invoicing')
+    expect(responsibility.groups.find((group) => group.code === 'uxe')?.preview).toEqual([
+      'uxe.northwind.invoicing.prod.pdf',
+      'uxe.northwind.invoicing.prod.worker',
+    ])
+    expect(responsibility.groups.find((group) => group.code === 'exe')?.preview).not.toContain(
+      'exe.northwind.shipping.stage',
+    )
+
+    const context = groupsOf('cnt.northwind.prod')
+    expect(context.groups.find((group) => group.code === 'exe')?.preview).toEqual([
+      'exe.northwind.invoicing.prod',
+      'EXE.Northwind.Invoicing.Prod',
+    ])
+    expect(context.total).toBe(4)
+    expect(groupsOf('unt.invoicing.worker').groups[0]?.preview).toEqual(['uxe.northwind.invoicing.prod.worker'])
+  })
+
+  it('sorts the preview and keeps the exact total past the limit', () => {
+    const many = ['sbt.northwind', ...'abcdef'.split('').map((name) => `cnt.northwind.${name}`)]
+    const grouped = groupedDescendants('sbt.northwind', many, ancestorsOf)
+
+    expect(descendantPreviewLimit).toBe(5)
+    expect(grouped.groups).toEqual([
+      {
+        code: 'cnt',
+        total: 6,
+        preview: ['cnt.northwind.a', 'cnt.northwind.b', 'cnt.northwind.c', 'cnt.northwind.d', 'cnt.northwind.e'],
+        query: 'ancestor:sbt.northwind type:cnt',
+      },
+    ])
+    expect(grouped.total).toBe(6)
+    expect(grouped.query).toBe('ancestor:sbt.northwind')
+  })
+
+  it('matches the ancestor filter for every group', () => {
+    for (const root of ['rst.invoicing', 'sbt.northwind', 'cnt.northwind.prod', 'unt.invoicing.worker', 'RST.Invoicing']) {
+      const grouped = groupsOf(root)
+      const combined = grouped.groups
+        .flatMap((group) => selected(group.query))
+        .toSorted((left, right) => left.localeCompare(right, 'en'))
+
+      expect(selected(grouped.query), root).toEqual(combined)
+      expect(combined.length, root).toBe(grouped.total)
+      for (const group of grouped.groups) {
+        const found = selected(group.query)
+        expect(found, `${root} ${group.code}`).toHaveLength(group.total)
+        expect(group.preview.every((key) => found.includes(key))).toBe(true)
+      }
     }
   })
 })
