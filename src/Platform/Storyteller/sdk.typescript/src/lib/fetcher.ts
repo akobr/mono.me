@@ -47,6 +47,23 @@ export function getStorytellerConfig(): StorytellerConfig {
  * - throws StorytellerError for non-2xx responses and network failures.
  */
 export async function storytellerFetch<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const response = await storytellerRequest(url, init)
+  const body = await readBody(response)
+
+  if (!response.ok) {
+    throw StorytellerError.fromResponse(response.status, response.statusText, body)
+  }
+
+  return body as T
+}
+
+/**
+ * The request part of storytellerFetch, for helpers that need the status and the headers (conditional reads).
+ * Returns the response of any status with its body unread; network failures and aborts become StorytellerError status 0.
+ * Other failures, such as a missing configuration or a failing getAccessToken, propagate as they are. Not exported from
+ * the package.
+ */
+export async function storytellerRequest(url: string, init: RequestInit = {}): Promise<Response> {
   const current = getStorytellerConfig()
   const target = /^https?:\/\//i.test(url) ? url : `${current.baseUrl}${url.startsWith('/') ? '' : '/'}${url}`
 
@@ -62,13 +79,7 @@ export async function storytellerFetch<T>(url: string, init: RequestInit = {}): 
     }
   }
 
-  const body = await readBody(response)
-
-  if (!response.ok) {
-    throw StorytellerError.fromResponse(response.status, response.statusText, body)
-  }
-
-  return body as T
+  return response
 }
 
 async function send(current: StorytellerConfig, target: string, init: RequestInit, forceRefresh: boolean): Promise<Response> {
@@ -101,7 +112,8 @@ async function send(current: StorytellerConfig, target: string, init: RequestIni
   }
 }
 
-async function readBody(response: Response): Promise<unknown> {
+/** Reads a response body the way storytellerFetch does. Not exported from the package. */
+export async function readBody(response: Response): Promise<unknown> {
   if (response.status === 204 || response.status === 205 || response.status === 304) {
     return undefined
   }

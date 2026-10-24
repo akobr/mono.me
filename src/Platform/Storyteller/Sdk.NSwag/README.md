@@ -29,6 +29,31 @@ dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTest
 
 Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (`npm run generate`), then add the new `{controller}ApiClient` to `src/ApiSdk.partial.cs` and `src/ServicesCollectionExtensions.cs`.
 
+`src/ApiSdk.Conditional.cs` is hand-written: it copies the route, the hooks and the exceptions of `GetConfigurationAsync` and `GetResolvedConfigurationAsync`. After a regeneration, compare it with the two generated methods, and keep the members it uses: `ConvertToString`, `ReadObjectResponseAsync`, `ReadAsStringAsync`, the `PrepareRequest` and `ProcessResponse` hooks, and the messages of the exceptions.
+
+## Conditional reads
+
+`IConfigurationsApiClient` has a conditional twin of each configuration read:
+
+```csharp
+var response = await configurations.GetResolvedConfigurationConditionalAsync("acme", "billing", "default", "sbt.northwind", etag);
+
+if (!response.IsNotModified)
+{
+    document = response.Result;   // the Configuration of a 200
+}
+
+etag = response.ETag;             // W/"r.…", sent back as it is
+```
+
+* `ifNoneMatch` is sent unchanged as `If-None-Match`; `null` or an empty string sends none.
+* A `304` returns with `IsNotModified` and no `Result`; it does not throw. Every other status throws what `GetConfigurationAsync` and `GetResolvedConfigurationAsync` throw for it, with the same messages: `ApiException<ErrorResponse>` for a `400`, `403`, `404` with a body, `422` (resolved only) or `500`, and a plain `ApiException` for a `401`, a `404` without a body (a missing configuration) and anything else.
+* `ConditionalResponse<T>` keeps the headers of a `200` and a `304`: `ETag` (raw, weak prefix included), `CacheControl` (raw), `IsNoStore`, `SecretsWithheld` (`X-2S-Secrets-Withheld`: `mtls-required` for a machine with `Secrets.Read` but no certificate), and all `Headers`, with case-insensitive names. `Cache-Control` and `X-2S-Secrets-Withheld` depend on the caller's rights, not on the document: a caller that may read secrets gets `no-store` on every resolved read.
+* Date-like strings of `Content` stay strings, as in the other reads of the client.
+* The client keeps no state of a read; one instance serves concurrent calls.
+
+The generated `GetConfigurationAsync` and `GetResolvedConfigurationAsync` still throw an `ApiException` with status `304` when they get one.
+
 ## Credentials
 
 `ISdkConfiguration` carries what every request needs:
@@ -45,6 +70,66 @@ services.AddStorytellerSdk(null, builder => builder.AddHttpMessageHandler(
 ```
 
 A `DelegatingHandler` wraps the primary handler, which follows redirects: a handler that sends a request again has to check that `RequestUri` and `Authorization` are still the ones it sent, as a redirect changes both on the same message. The overload with one parameter adds no handler.
+
+### Machine credentials
+
+`StorytellerCredential` (namespace `_42.Platform.Storyteller.Sdk.Credentials`) signs a machine in without `sform`:
+
+| Factory | Sends |
+|---|---|
+| `FromApiKey(apiKey)` | `Authorization: ApiKey <key>`; a leading `ApiKey ` and whitespace are removed. `.WithClientCertificate(certificate)` adds the machine's certificate, the only combination with a certificate. |
+| `FromCertificate(certificate)` | no `Authorization`; the certificate only. `StorytellerClientCertificate.Load(path, password)` loads a `.pfx` and refuses one without a private key. |
+| `FromClientCredentials(new ClientCredentialsOptions { … })` | `Bearer` from a `client_credentials` token request. Without `TokenUrl`, only an AuthKit client id (`client_…`) works: it reads the AuthKit domain from the endpoint's `v1/auth/configuration` and posts to `{domain}/oauth2/token`. |
+| `FromTokenFile(path)` | `Bearer` with the content of the file, read again before every request. It cannot renew, so a `401` is not retried: the rotated file is read by the next request. |
+| `FromFederatedTokenFile(new FederatedTokenOptions { … })` | `Bearer` from an RFC 8693 exchange at `{endpoint}/v1/{organization}/{project}/access/token`, with the platform token of the file, read again before every exchange. |
+| `FromEnvironment()` | the credential of the `STORYTELLER_*` variables below, or `null` when they describe none. |
+
+* **Token cache.** Client credentials and federation keep their token in memory. Concurrent callers share one token request, and its failure. The token is renewed 60 seconds before it expires, or halfway through a token that lives less than two minutes: `expires_in` capped at a day, else the JWT `exp`, else five minutes. A renewal that fails before the token expires keeps the token until then.
+* **Renewal.** `GetAuthorizationAsync(rejected, cancellationToken)` takes the value the API refused. The cached token is dropped only when it is that value, so a burst of `401`s makes one token request.
+* **Token requests** use their own `HttpClient`: no redirects, no `Authorization` header, and the [resilience pipeline](#resilience) with retries of the `POST`. `ConfigureHandler` of the options (or of the binding) configures its `SocketsHttpHandler`, for a proxy; redirects stay off.
+* **Binding.** `credential.Bind(new StorytellerCredentialBinding(endpoint) { Organization = …, Project = … })` returns a copy that knows its endpoint and target project. Federation needs both; AuthKit discovery needs the endpoint. A value set in the options wins over the binding. An unbound credential falls back to `STORYTELLER_ENDPOINT` (or `STORYTELLER_API_URL`) and to the organization and project of `STORYTELLER_KEY` (`@{organization}.{project}.…`). Bind once and reuse the result, as a singleton: every copy of a client-credentials or federated credential has its own token cache and its own connection pool for token requests, so a `Bind` per request or per scope makes a token request each time.
+* **URLs** must be `https`, or `http` to `localhost` or a loopback address literal (`127.0.0.1`, `[::1]`), and carry no user info. An endpoint, which paths are appended to, has no query or fragment either.
+* **Failures** throw `StorytellerAuthenticationException` with a `Reason`: `Configuration` (variables, files, a missing binding, a URL), `Rejected` (a `4xx` other than `408` and `429` from a token or discovery request, or a platform that does not sign in with AuthKit) or `Unavailable` (a network error, a timeout, an open circuit, or `408`, `429` or `5xx`; all but `501` and `505` after retries). Messages include the `error` and `error_description` of an OAuth answer; neither they nor `ToString()` contain a secret.
+
+`FromEnvironment` reads the names of the shared integration contract and accepts the `sform` names as fallbacks. A name and its fallback set to different values are an error that names both. Values are trimmed; an empty value is unset.
+
+| Kind | Variables |
+|---|---|
+| API key | `STORYTELLER_API_KEY` |
+| Certificate | `STORYTELLER_CLIENT_CERTIFICATE` (fallback `STORYTELLER_CERTIFICATE_FILE`) and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD` (fallback `STORYTELLER_CERTIFICATE_PASSWORD`); alone or with an API key |
+| Client credentials | `STORYTELLER_CLIENT_ID`, `STORYTELLER_CLIENT_SECRET`, `STORYTELLER_TOKEN_URL` (recommended; `sform account machine create` prints it), `STORYTELLER_TOKEN_SCOPE` |
+| Federation | `STORYTELLER_CLIENT_ID` (the machine id) with `STORYTELLER_TOKEN_FILE` (fallback `STORYTELLER_SUBJECT_TOKEN_FILE`) and no client secret; optional `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE` |
+| Token file | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID` |
+
+Variables of two kinds at once, and `STORYTELLER_CLIENT_ID` alone, are errors. The GitHub Actions token source of `sform` is not supported here.
+
+`IHttpClientBuilder.AddStorytellerCredential(credential)` adds a `StorytellerCredentialHandler`. It sets `Authorization` on every request. After a `401` it asks the credential once more and sends the request again, when the credential `CanRenew`, the body is empty or a `ByteArrayContent`, and no redirect changed the request. On that path:
+
+* leave `AccessTokenFactory` null, otherwise `PrepareRequest` sets `Authorization` too;
+* the certificate still goes to `SdkConfiguration.ClientCertificate`, which puts it on the primary handler.
+
+```csharp
+var credential = StorytellerCredential.FromEnvironment()!
+    .Bind(new StorytellerCredentialBinding(new Uri(apiUrl)) { Organization = "acme", Project = "billing" });
+
+services.AddStorytellerSdk(
+    () => new SdkConfiguration { BaseUrl = apiUrl, ClientCertificate = credential.ClientCertificate },
+    builder => builder.AddStorytellerCredential(credential).AddStorytellerResilience());
+```
+
+## Resilience
+
+`IHttpClientBuilder.AddStorytellerResilience(configure)` (namespace `_42.Platform.Storyteller.Sdk.Resilience`) adds a `ResilienceHandler` with retries, a circuit breaker and an attempt timeout. It is opt-in: `AddStorytellerSdk` adds none. `StorytellerResilience.CreatePipeline(options)` builds the same pipeline for a hand-built `HttpClient`; the pipeline keeps the state of its breaker, so use one per client. `options.Clone()` copies the options, for a client that must not see later changes.
+
+| `StorytellerResilienceOptions` | Default |
+|---|---|
+| `MaxRetryAttempts` | 3; `0` adds no retry, a negative value throws `ArgumentOutOfRangeException` |
+| `BaseDelay` | 500 ms, exponential backoff with jitter |
+| `AttemptTimeout` | 5 s; zero or `Timeout.InfiniteTimeSpan` adds none, another negative value throws `ArgumentOutOfRangeException` |
+| `RetryUnsafeMethods` | `false`: `GET` is retried; `POST`, `PUT`, `PATCH` and `DELETE` are not |
+| `FailureRatio`, `MinimumThroughput`, `SamplingDuration`, `BreakDuration` | 0.5, 3, 60 s, 30 s |
+
+The circuit breaker sits outside the retries, so it counts calls, not attempts: the retries of one failing call do not open it, three failing calls in a minute do. While it is open, calls throw `BrokenCircuitException` without reaching the server. `408`, `429`, `5xx` except `501` and `505`, network errors and attempt timeouts are retried and counted; `501` and `505` are definitive. `Retry-After` is always honoured. An application that gets `AddStandardResilienceHandler` from Aspire's service defaults (`ConfigureHttpClientDefaults`) should not add this one as well: the two pipelines would retry each other's retries.
 
 ## Workload identity federation
 
@@ -66,7 +151,7 @@ var token = await access.ExchangeMachineTokenAsync("acme", "billing", new Machin
 // token.Access_token for Authorization: Bearer, valid for token.Expires_in seconds
 ```
 
-The SDK has no exchange helper that caches the token for `AccessTokenFactory`; the TypeScript SDK has one (`createFederatedTokenProvider`).
+`StorytellerCredential.FromFederatedTokenFile` (see [Machine credentials](#machine-credentials)) makes the exchange and caches its token, like `createFederatedTokenProvider` of the TypeScript SDK.
 
 ## Client-side encryption
 
