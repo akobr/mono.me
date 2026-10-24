@@ -1,6 +1,6 @@
 # Configuration Provider for .NET
 
-The package `42.Platform.Storyteller.Configuration` loads one Storyteller configuration into the `IConfiguration` of a .NET application. It reads the configuration by its full key, polls it with `If-None-Match`, keeps a last-known-good copy on disk, switches the active key at runtime, and resolves secret references locally, with the application's own identity. The same package gives jobs a service that reads any configuration on demand. `42.Platform.Storyteller.Configuration.KeyVault` adds a resolver for Azure Key Vault.
+The package `42.Platform.Storyteller.Configuration` loads one Storyteller configuration into the `IConfiguration` of a .NET application. It reads the configuration by its full key, polls it with `If-None-Match`, keeps the applied snapshot in memory and, when `CacheDirectory` is set, a last-known-good copy on disk, switches the active key at runtime, and, in `Resolved` mode with a `ReferenceResolver` configured, resolves secret references locally, with the application's own identity. The same package gives jobs a service that reads any configuration on demand. `42.Platform.Storyteller.Configuration.KeyVault` adds a resolver for Azure Key Vault.
 
 The code is in:
 
@@ -504,7 +504,7 @@ options.ReferenceResolver = new KeyVaultReferenceResolver(new DefaultAzureCreden
 | `SecretClientFactory` | – | `Func<Uri, SecretClient>`, called once per vault with `https://{host}/`, in place of the default factory: for tests and custom clients. |
 
 - **Host match.** Case-insensitive on the IDN host: equal to a suffix, or ending with `.` and a suffix. `evilvault.azure.net` does not match `vault.azure.net`.
-- **Options.** They are copied when the resolver is created. Suffixes are trimmed, a leading dot is removed, and an IDN suffix becomes punycode. An invalid suffix or an empty vault name throws `ArgumentException`. Vault names compare without case, as Key Vault does.
+- **Options.** The suffixes and vault names are copied when the resolver is created. `SecretClientOptions` is kept by reference and passed to each `SecretClient` it creates, so a later change to it affects clients created afterwards. Suffixes are trimmed, a leading dot is removed, and an IDN suffix becomes punycode. An invalid suffix or an empty vault name throws `ArgumentException`. Vault names compare without case, as Key Vault does.
 - **Declined values** go to the next resolver of a `FirstOf`. A `kv://` shorthand that no resolver accepts, for example one of a vault outside `AllowedVaults`, fails the apply (see [Substitution](#substitution)).
 - **Clients.** One `SecretClient` per vault origin.
 - **Read.** `GetSecretAsync(name, version)`; the latest version when the reference names none.
