@@ -353,9 +353,12 @@ export const useCatalogStore = defineStore('catalog', () => {
     controller?.abort()
     scope.value = null
     status.value = 'idle'
+    error.value = undefined
     byKey.value = new Map()
     configurations.value = null
     loadedCount.value = 0
+    loadedAt.value = undefined
+    fromSnapshot.value = false
     publish()
   }
 
