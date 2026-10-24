@@ -163,8 +163,49 @@ public class MachineToolsTests
     }
 
     [Fact]
+    public async Task CreateMachine_EmptyFederationRules_AreNoRulesAndKeepTheProjectDefault()
+    {
+        Sdk.MachineAccessCreate? sent = null;
+        _access.Setup(api => api.CreateMachineAccessAsync("house", "main", It.IsAny<Sdk.MachineAccessCreate>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, Sdk.MachineAccessCreate, CancellationToken>((_, _, body, _) => sent = body)
+            .ReturnsAsync(new Sdk.MachineAccess { Id = "m", CredentialKind = Sdk.MachineAccessCredentialKind.ApiKey, AccessKey = "2s.key" });
+
+        await Tools().CreateMachine("house", "main", ["AnnotationRead"], federationRules: Json("[]"));
+
+        sent.ShouldNotBeNull();
+        sent.CredentialKind.ShouldBeNull();
+        sent.FederationRules.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ResetMachine_CertificateMachine_IsRefusedWithoutAReset()
+    {
+        _access.Setup(api => api.GetMachineAccessAsync("house", "main", "m-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.MachineAccess { Id = "m-1", CredentialKind = Sdk.MachineAccessCredentialKind.Certificate, AccessKey = string.Empty });
+
+        var exception = await Should.ThrowAsync<ToolInputException>(() => Tools().ResetMachine("house", "main", "m-1", CancellationToken.None));
+
+        exception.Message.ShouldBe(MachineText.CertificateReset);
+        _access.Verify(api => api.ResetMachineAccessAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public void ResetMachine_DescriptionSaysACertificateMachineCannotBeReset()
+    {
+        var description = typeof(MachineTools).GetMethod(nameof(MachineTools.ResetMachine))!
+            .GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false)
+            .Cast<System.ComponentModel.DescriptionAttribute>()
+            .Single()
+            .Description;
+
+        description.ShouldContain(MachineText.CertificateReset);
+    }
+
+    [Fact]
     public async Task ResetMachine_NamesTheNewSecret()
     {
+        _access.Setup(api => api.GetMachineAccessAsync("house", "main", "m-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.MachineAccess { Id = "m-1", CredentialKind = Sdk.MachineAccessCredentialKind.ClientCredentials, AccessKey = "new***" });
         _access.Setup(api => api.ResetMachineAccessAsync("house", "main", "m-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.MachineAccess { Id = "m-1", CredentialKind = Sdk.MachineAccessCredentialKind.ClientCredentials, AccessKey = "new-secret" });
 

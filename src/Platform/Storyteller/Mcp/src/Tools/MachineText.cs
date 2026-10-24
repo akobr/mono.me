@@ -10,6 +10,10 @@ public static class MachineText
         "Needs Contributor on the project; ContributorWithSecrets when the machine has SecretsRead or SecretsWrite; "
         + "Administrator when it has a management scope.";
 
+    public const string CertificateReset =
+        "A Certificate machine has no API key and cannot be reset: the machine renews its certificate itself over mTLS, "
+        + "and to revoke the certificate, delete the machine and create a new one.";
+
     public const string FederationRules =
         "Federation rules, 1 to 10, as a JSON array " + FederationRuleArguments.Shape + ". Issuer names a trusted issuer of the "
         + "project; Audience is the token's aud (usually the machine's TokenEndpoint); Subject is the token's sub exactly, or "

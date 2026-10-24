@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using _42.Platform.Storyteller.Mcp.Tools;
+using _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
 using Newtonsoft.Json.Linq;
 
@@ -43,6 +44,24 @@ public class ToolHelpersTests
 
         result.IsError.ShouldBe(true);
         result.StructuredContent!.Value.GetProperty("Message").GetString().ShouldBe("Nope.");
+    }
+
+    [Fact]
+    public void Error_DetailsWithoutAMessage_GetTheText()
+    {
+        var result = ToolResults.Error("Nope.", new { Status = 404 });
+
+        result.StructuredContent!.Value.GetProperty("Message").GetString().ShouldBe("Nope.");
+        result.StructuredContent.Value.GetProperty("Status").GetInt32().ShouldBe(404);
+    }
+
+    [Fact]
+    public void Error_DetailsWithTheirOwnMessage_KeepIt_AndTheTextStaysComposed()
+    {
+        var result = ToolResults.Error("Storyteller API answered 412: Changed. Hint: Read it again.", new JObject { ["Status"] = 412, ["Message"] = "Changed." });
+
+        result.StructuredContent!.Value.GetProperty("Message").GetString().ShouldBe("Changed.");
+        result.Text().ShouldBe("Storyteller API answered 412: Changed. Hint: Read it again.");
     }
 
     [Fact]

@@ -39,6 +39,37 @@ public sealed class KeyValueRequestTests : IDisposable
     }
 
     [Fact]
+    public async Task RevealKeyValue_ByTheCurrentVersion_RevealsThroughThePair()
+    {
+        _host.Api.Respond = _ => RecordingApiHandler.Json(Pair);
+        await using var client = await _host.ConnectAsync();
+
+        await client.CallAsync("reveal_key_value", new { organization = "house", project = "main", key = "db.password", version = 2 });
+        await client.CallAsync("reveal_key_value", new { organization = "house", project = "main", key = "db.password", version = 1 });
+
+        _host.Api.Requests.Select(request => request.Uri.PathAndQuery).ShouldBe(
+        [
+            "/api/v1/house/main/default/key-values/db.password?reveal=false&includeDeleted=true",
+            "/api/v1/house/main/default/key-values/db.password?reveal=true",
+            "/api/v1/house/main/default/key-values/db.password?reveal=false&includeDeleted=true",
+            "/api/v1/house/main/default/key-values/db.password/versions/1?reveal=true",
+        ]);
+    }
+
+    [Fact]
+    public async Task SetKeyValue_OfAHyokPairWithoutProtection_ReadsAndNeverWrites()
+    {
+        _host.Api.Respond = _ => RecordingApiHandler.Json("""{"Key":"api.token","Protection":"Hyok","IsSecret":true,"Version":4}""");
+        await using var client = await _host.ConnectAsync();
+
+        var result = await client.CallAsync("set_key_value", new { organization = "house", project = "main", key = "api.token", value = "plaintext" });
+
+        result.IsError.ShouldBe(true);
+        result.Text().ShouldContain("client-encrypted value");
+        _host.Api.Requests.ShouldHaveSingleItem().Method.ShouldBe(HttpMethod.Get);
+    }
+
+    [Fact]
     public async Task DiffKeyValue_OfASecret_NeverReachesTheDiffRoute()
     {
         _host.Api.Respond = _ => RecordingApiHandler.Json("""[{"Version":1,"Protection":"Public","IsCurrent":false},{"Version":2,"Protection":"Standard","IsCurrent":true}]""");
