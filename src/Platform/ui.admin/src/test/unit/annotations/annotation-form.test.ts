@@ -6,9 +6,11 @@ import {
   readOnlyIssues,
   toAnnotationBody,
   toAnnotationDraft,
+  type AnnotationForm as AnnotationDraft,
 } from '@/forms/annotation.schema'
 import { chunk, runLimited } from '@/composables/useAnnotationActions'
 import AnnotationForm from '@/components/annotations/AnnotationForm.vue'
+import { parseDocument, toJson, toYaml } from '@/utils/json-yaml'
 import { mountScreen, settle } from '../../helpers'
 
 const annotation: Annotation = {
@@ -22,6 +24,17 @@ const annotation: Annotation = {
   Values: { retries: 3 },
   ...({ SubjectKey: 'sbt.northwind' } as object),
 }
+
+const unit = {
+  ...annotation,
+  AnnotationKey: 'unt.invoicing.export',
+  Name: 'export',
+  AnnotationType: 'Unit',
+  UnitType: 'event',
+  UnitDefinition: 'unknown',
+  ResponsibilityKey: 'rst.invoicing',
+  ResponsibilityName: 'invoicing',
+} as Annotation
 
 const issues = (value: unknown) =>
   annotationFormSchema.safeParse(value).error?.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`) ?? []
@@ -115,6 +128,49 @@ describe('annotation form schema', () => {
     expect(body.SubjectKey).toBe('sbt.northwind')
     expect(body.UsageKey).toBe('usg.northwind.invoicing')
     expect(body.ContextName).toBe('prod')
+  })
+
+  it('carries the trigger only on a unit draft', () => {
+    expect(toAnnotationDraft(unit)).toMatchObject({ UnitType: 'event', UnitDefinition: 'unknown' })
+    expect(toAnnotationDraft(annotation)).not.toHaveProperty('UnitType')
+    expect(toAnnotationDraft(annotation)).not.toHaveProperty('UnitDefinition')
+  })
+
+  it('keeps a custom trigger and rejects a blank one', () => {
+    expect(issues({ ...toAnnotationDraft(unit), UnitType: 'queue', UnitDefinition: 'orders.>' })).toEqual([])
+    expect(issues({ ...toAnnotationDraft(unit), UnitType: '  ', UnitDefinition: '' })).toEqual([
+      'UnitType: Enter a unit type.',
+      'UnitDefinition: Enter a unit definition.',
+    ])
+    expect(issues({ ...toAnnotationDraft(annotation), UnitType: '', UnitDefinition: '' })).toEqual([])
+  })
+
+  it('writes the edited trigger over the loaded unit', () => {
+    const body = toAnnotationBody(
+      { ...toAnnotationDraft(unit), UnitType: ' volume ', UnitDefinition: ' incoming/*.csv ' },
+      unit,
+    ) as Annotation & { UnitType?: string; UnitDefinition?: string; ResponsibilityKey?: string }
+
+    expect(body.UnitType).toBe('volume')
+    expect(body.UnitDefinition).toBe('incoming/*.csv')
+    expect(body.ResponsibilityKey).toBe('rst.invoicing')
+  })
+
+  it('reads an edited trigger from JSON and YAML', () => {
+    const edited = { ...toAnnotationDraft(unit), UnitType: 'queue', UnitDefinition: 'orders.>' }
+    for (const text of [toJson(edited), toYaml(edited)]) {
+      const parsed = parseDocument(text, text.trimStart().startsWith('{') ? 'json' : 'yaml')
+      expect(parsed.ok).toBe(true)
+      if (!parsed.ok) {
+        continue
+      }
+      const body = toAnnotationBody(annotationFormSchema.parse(parsed.value) as AnnotationDraft, unit) as Annotation & {
+        UnitType?: string
+        UnitDefinition?: string
+      }
+      expect(body.UnitType).toBe('queue')
+      expect(body.UnitDefinition).toBe('orders.>')
+    }
   })
 
   it('blocks changes of key fields in the text modes', () => {

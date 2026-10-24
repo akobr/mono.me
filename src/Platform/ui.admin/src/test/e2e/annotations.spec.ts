@@ -15,6 +15,8 @@ test('filters the grid, edits an annotation in the detail and saves it', async (
   await expect(identity.getByRole('img', { name: 'Subject' })).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
 
+  await expect(page.getByTestId('unit-fields')).toHaveCount(0)
+
   await page.getByRole('textbox', { name: 'Title' }).fill('Northwind Traders')
 
   // The description is Markdown: the Preview tab renders headings, lists and tables.
@@ -303,4 +305,31 @@ test('keeps the scroll position of the list behind a covering detail', async ({ 
   await expect(page).toHaveURL(/\/configurations$/)
   await navigate('Annotations')
   await expect.poll(scrollTop).toBeCloseTo(left, -1)
+})
+
+test('edits a unit type and definition in the form, then shows them in JSON and YAML', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/annotations/unt.invoicing.pdf')
+  await expect(page.getByTestId('unit-fields')).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Unit type' })).toHaveValue('event')
+  await expect(page.getByRole('textbox', { name: 'Unit definition' })).toHaveValue('unknown')
+
+  const type = page.getByRole('combobox', { name: 'Unit type' })
+  await type.fill('queue')
+  await page.getByRole('option', { name: /queue/i }).click()
+  await page.getByRole('textbox', { name: 'Unit definition' }).fill('orders.>')
+  await page.getByRole('button', { name: /^Save/ }).click()
+  await expect(page.getByText('Annotation saved', { exact: true })).toBeVisible()
+
+  await page.getByRole('radio', { name: 'JSON' }).click()
+  const document = page.locator('.cm-content')
+  await expect(document).toContainText('"UnitType": "queue"')
+  await expect(document).toContainText('"UnitDefinition": "orders.>"')
+
+  await page.getByRole('radio', { name: 'YAML' }).click()
+  await expect(document).toContainText('UnitType: queue')
+  await expect(document).toContainText('UnitDefinition:')
+
+  await goto(page, '/acme/billing/default/annotations/unt.invoicing.pdf')
+  await expect(page.getByRole('combobox', { name: 'Unit type' })).toHaveValue('queue')
+  await expect(page.getByRole('textbox', { name: 'Unit definition' })).toHaveValue('orders.>')
 })

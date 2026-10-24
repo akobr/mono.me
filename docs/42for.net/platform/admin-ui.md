@@ -82,7 +82,7 @@ On a phone, the **Filters** button opens the same filters as toggles in a bottom
 
 The **detail** of an annotation has two tabs:
 
-- **Annotation:** the fields as a form, or as JSON or YAML. The form starts with the type icon and the key, with the name in bold: they are part of the key and cannot be edited. Title, description and documentation link have the same limits as the API (200, 10,000 and 2048 characters). The description is Markdown, and its **Preview** tab renders it. You can use headings, lists, block quotes, code blocks, tables, links and images. Raw HTML is shown as text, and only `http(s)`, `mailto` and relative links work.
+- **Annotation:** the fields as a form, or as JSON or YAML. The form starts with the type icon and the key, with the name in bold: they are part of the key and cannot be edited. Title, description and documentation link have the same limits as the API (200, 10,000 and 2048 characters). The description is Markdown, and its **Preview** tab renders it. You can use headings, lists, block quotes, code blocks, tables, links and images. Raw HTML is shown as text, and only `http(s)`, `mailto` and relative links work. For a unit, the form, JSON, and YAML also edit the unit type and the unit definition. The type menu suggests Time, Message, and Volume, and any other text is saved. A Time definition that does not have 5 or 6 fields shows a hint and can still be saved.
 - **History:** who changed it and when, newest first. An update lists every field with its old and new value; the description only shows that it changed. Deletes, restores and configuration saves are entries too, and a re-created annotation starts a new lifetime.
 
 The header links to the configuration, drawn by where the configuration comes from:

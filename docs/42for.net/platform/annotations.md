@@ -79,8 +79,8 @@ The responsibility holds the defaults of the capability itself: the behavior you
 
 A unit goes one step below a responsibility. It names a job, a workflow step, a file arrival, or a message the capability handles. Two fields describe it:
 
-- `unitType` — what kind of trigger it is, such as `time`, `message`, `file`, or `event`
-- `unitDefinition` — the concrete trigger, such as a CRON expression, a message template, or a file pattern
+- `unitType` — any text. Common kinds are `time` (a schedule), `message` (a message arrives), and `volume` (a file or another source changes). `file` and `event` are used as well.
+- `unitDefinition` — any text: a Cron expression, a message name rule, template, or source name, or a volume source or path filter
 
 The scheduler actor that fires units is further along the [road map](road-map). The annotation is already part of the model, so a job can be named, documented, and configured per customer today.
 
