@@ -9,6 +9,9 @@ namespace _42.Platform.Storyteller.Access.AzureAd.UnitTests;
 
 public class UserAuthenticationOptionsTests
 {
+    private const string McpClientId = "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11";
+    private const string McpTenantId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d";
+
     private readonly UserAuthenticationOptionsValidator _validator = new();
 
     [Fact]
@@ -118,6 +121,116 @@ public class UserAuthenticationOptionsTests
         });
 
         result.Failed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Bind_DelegatedClients_MapOntoOptions()
+    {
+        var options = Bind(new Dictionary<string, string?>
+        {
+            ["Auth:TenantId"] = "tenant",
+            ["Auth:ClientId"] = "client",
+            ["Auth:DelegatedClients:0:ClientId"] = McpClientId,
+            ["Auth:DelegatedClients:0:TenantId"] = McpTenantId,
+        });
+
+        options.DelegatedClients.Count.ShouldBe(1);
+        options.DelegatedClients[0].ClientId.ShouldBe(McpClientId);
+        options.DelegatedClients[0].TenantId.ShouldBe(McpTenantId);
+    }
+
+    [Fact]
+    public void Bind_NoDelegatedClients_IsEmpty()
+    {
+        var options = Bind(new Dictionary<string, string?>
+        {
+            ["Auth:TenantId"] = "tenant",
+            ["Auth:ClientId"] = "client",
+        });
+
+        options.DelegatedClients.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Validate_EntraWithDelegatedClient_Succeeds()
+    {
+        var options = EntraOptions("tenant", "client");
+        options.DelegatedClients.Add(new DelegatedClientOptions { ClientId = McpClientId, TenantId = McpTenantId });
+
+        _validator.Validate(null, options).Succeeded.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("", McpTenantId)]
+    [InlineData("mcp-app", McpTenantId)]
+    [InlineData(McpClientId, "")]
+    [InlineData(McpClientId, "common")]
+    public void Validate_DelegatedClientWithoutGuids_Fails(string clientId, string tenantId)
+    {
+        var options = EntraOptions("tenant", "client");
+        options.DelegatedClients.Add(new DelegatedClientOptions { ClientId = clientId, TenantId = tenantId });
+
+        var result = _validator.Validate(null, options);
+
+        result.Failed.ShouldBeTrue();
+        result.FailureMessage.ShouldNotBeNull();
+        result.FailureMessage.ShouldContain("Auth:DelegatedClients");
+    }
+
+    [Fact]
+    public void Validate_DelegatedClientEqualToTheApiClient_Fails()
+    {
+        var options = EntraOptions("tenant", McpClientId.ToUpperInvariant());
+        options.DelegatedClients.Add(new DelegatedClientOptions { ClientId = McpClientId, TenantId = McpTenantId });
+
+        var result = _validator.Validate(null, options);
+
+        result.Failed.ShouldBeTrue();
+        result.FailureMessage.ShouldNotBeNull();
+        result.FailureMessage.ShouldContain("other than Auth:ClientId");
+    }
+
+    [Theory]
+    [InlineData("{6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11}", McpClientId)]
+    [InlineData("6c0f1a2e1f434b0e9a4d2f5e8f0c9b11", McpClientId)]
+    [InlineData(McpClientId, "{6C0F1A2E-1F43-4B0E-9A4D-2F5E8F0C9B11}")]
+    [InlineData(McpClientId, "6c0f1a2e1f434b0e9a4d2f5e8f0c9b11")]
+    public void Validate_DelegatedClientEqualToTheApiClientInAnotherGuidForm_Fails(string apiClientId, string delegatedClientId)
+    {
+        var options = EntraOptions("tenant", apiClientId);
+        options.DelegatedClients.Add(new DelegatedClientOptions { ClientId = delegatedClientId, TenantId = McpTenantId });
+
+        var result = _validator.Validate(null, options);
+
+        result.Failed.ShouldBeTrue();
+        result.FailureMessage.ShouldNotBeNull();
+        result.FailureMessage.ShouldContain("other than Auth:ClientId");
+    }
+
+    [Theory]
+    [InlineData("{6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11}", "{8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d}")]
+    [InlineData("6c0f1a2e1f434b0e9a4d2f5e8f0c9b11", "8a7b6c5d4e3f4a1b8c9d0e1f2a3b4c5d")]
+    public void Validate_DelegatedClientInAnotherGuidForm_Succeeds(string clientId, string tenantId)
+    {
+        var options = EntraOptions("tenant", "client");
+        options.DelegatedClients.Add(new DelegatedClientOptions { ClientId = clientId, TenantId = tenantId });
+
+        _validator.Validate(null, options).Succeeded.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_DelegatedClientsUnderAuthKit_Fail()
+    {
+        var result = _validator.Validate(null, new UserAuthenticationOptions
+        {
+            Provider = IdentityProviderKind.AuthKit,
+            AuthKit = new AuthKitOptions { ClientId = "client_123" },
+            DelegatedClients = [new DelegatedClientOptions { ClientId = McpClientId, TenantId = McpTenantId }],
+        });
+
+        result.Failed.ShouldBeTrue();
+        result.FailureMessage.ShouldNotBeNull();
+        result.FailureMessage.ShouldContain("Entra ID only");
     }
 
     [Fact]

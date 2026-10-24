@@ -15,6 +15,9 @@ namespace _42.Platform.Storyteller.Access.AzureAd.UnitTests;
 
 public class EntraIdBearerTokenValidatorTests
 {
+    private const string McpClientId = "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11";
+    private const string McpTenantId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d";
+
     [Fact]
     public async Task Validate_UserToken_ReturnsClaimsAndIsNotAMachine()
     {
@@ -128,6 +131,161 @@ public class EntraIdBearerTokenValidatorTests
         result.ShouldNotBeNull();
         result.IsMachine.ShouldBeFalse();
         result.MachineId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Validate_DelegatedTokenOfListedClient_IsAUser()
+    {
+        using var fixture = DelegatedFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeFalse();
+        result.MachineId.ShouldBeNull();
+        FindClaim(result, "sub", ClaimTypes.NameIdentifier).ShouldBe("user-1");
+    }
+
+    [Fact]
+    public async Task Validate_DelegatedTokenOfListedClient_MatchesIgnoringCase()
+    {
+        using var fixture = DelegatedFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId.ToUpperInvariant()), new Claim("tid", McpTenantId.ToUpperInvariant()), new Claim("scp", "User.Impersonation")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("{6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11}", "{8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d}")]
+    [InlineData("6C0F1A2E1F434B0E9A4D2F5E8F0C9B11", "8a7b6c5d4e3f4a1b8c9d0e1f2a3b4c5d")]
+    public async Task Validate_DelegatedTokenOfAClientListedInAnotherGuidForm_IsAUser(string clientId, string tenantId)
+    {
+        using var fixture = new TokenFixture(delegatedClients: [new DelegatedClientOptions { ClientId = clientId, TenantId = tenantId }]);
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeFalse();
+        result.MachineId.ShouldBeNull();
+    }
+
+    [Fact]
+    public void NormalizeDelegatedClients_WritesTheDashedForm()
+    {
+        var normalized = EntraIdBearerTokenValidator.NormalizeDelegatedClients(
+            [new DelegatedClientOptions { ClientId = "{6C0F1A2E-1F43-4B0E-9A4D-2F5E8F0C9B11}", TenantId = "8a7b6c5d4e3f4a1b8c9d0e1f2a3b4c5d" }]);
+
+        var client = normalized.ShouldHaveSingleItem();
+        client.ClientId.ShouldBe(McpClientId);
+        client.TenantId.ShouldBe(McpTenantId);
+    }
+
+    [Fact]
+    public async Task Validate_V1DelegatedTokenOfListedClient_IsAUser()
+    {
+        using var fixture = DelegatedFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V1Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("appid", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Validate_DelegatedTokenOfListedClientFromAnotherTenant_IsAMachine()
+    {
+        using var fixture = DelegatedFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", "11111111-2222-4333-8444-555555555555"), new Claim("scp", "User.Impersonation")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeTrue();
+        result.MachineId.ShouldBe(McpClientId);
+    }
+
+    [Fact]
+    public async Task Validate_AppOnlyTokenOfListedClient_IsAMachine()
+    {
+        using var fixture = DelegatedFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", McpClientId), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("roles", "Configuration.Read")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeTrue();
+        result.MachineId.ShouldBe(McpClientId);
+    }
+
+    [Fact]
+    public async Task Validate_ListedClientWithIdtypApp_IsAMachine()
+    {
+        using var fixture = DelegatedFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation"), new Claim("idtyp", "app")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Validate_DelegatedTokenOfUnlistedClient_IsAMachine()
+    {
+        using var fixture = DelegatedFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("azp", "other-app"), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeTrue();
+        result.MachineId.ShouldBe("other-app");
+    }
+
+    [Fact]
+    public async Task Validate_DelegatedTokenWithoutListedClients_IsAMachine()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeTrue();
+        result.MachineId.ShouldBe(McpClientId);
     }
 
     [Theory]
@@ -327,6 +485,11 @@ public class EntraIdBearerTokenValidatorTests
         await Should.ThrowAsync<InvalidOperationException>(() => validator.ValidateAsync("token"));
     }
 
+    private static TokenFixture DelegatedFixture()
+    {
+        return new TokenFixture(delegatedClients: [new DelegatedClientOptions { ClientId = McpClientId, TenantId = McpTenantId }]);
+    }
+
     private static string? FindClaim(BearerValidationResult result, params string[] types)
     {
         foreach (var type in types)
@@ -343,7 +506,11 @@ public class EntraIdBearerTokenValidatorTests
 
     private sealed class TokenFixture : IDisposable
     {
-        public TokenFixture(string clientId = "client-id", string tenantId = "tenant-id", Exception? failure = null)
+        public TokenFixture(
+            string clientId = "client-id",
+            string tenantId = "tenant-id",
+            Exception? failure = null,
+            List<DelegatedClientOptions>? delegatedClients = null)
         {
             Rsa = RSA.Create(2048);
             Key = new RsaSecurityKey(Rsa) { KeyId = "test-key" };
@@ -361,6 +528,7 @@ public class EntraIdBearerTokenValidatorTests
                     Provider = IdentityProviderKind.EntraId,
                     ClientId = clientId,
                     TenantId = tenantId,
+                    DelegatedClients = delegatedClients ?? [],
                 }),
                 new TestHostEnvironment(),
                 Manager);

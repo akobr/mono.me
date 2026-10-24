@@ -19,7 +19,29 @@ public sealed class UserAuthenticationOptionsValidator : IValidateOptions<UserAu
 
         if (options.Provider == IdentityProviderKind.AuthKit)
         {
-            return ValidateAuthKit(options.AuthKit);
+            return options.DelegatedClients.Count > 0
+                ? ValidateOptionsResult.Fail("Auth:DelegatedClients applies to Entra ID only.")
+                : ValidateAuthKit(options.AuthKit);
+        }
+
+        return ValidateDelegatedClients(options);
+    }
+
+    private static ValidateOptionsResult ValidateDelegatedClients(UserAuthenticationOptions options)
+    {
+        foreach (var client in options.DelegatedClients)
+        {
+            if (!Guid.TryParse(client.ClientId, out var clientId) || !Guid.TryParse(client.TenantId, out _))
+            {
+                return ValidateOptionsResult.Fail("Auth:DelegatedClients entries need a ClientId and a TenantId, both GUIDs.");
+            }
+
+            // Compared as GUIDs: the same app may be written {...} or without dashes on one side. An Auth:ClientId that is
+            // not a GUID cannot name a listed app.
+            if (Guid.TryParse(options.ClientId, out var apiClientId) && clientId == apiClientId)
+            {
+                return ValidateOptionsResult.Fail("Auth:DelegatedClients lists client apps other than Auth:ClientId.");
+            }
         }
 
         return ValidateOptionsResult.Success;
