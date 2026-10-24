@@ -5,7 +5,9 @@ public static class ManagementText
 {
     public const string Paged =
         "Returns {Items, ContinuationToken, Count}; pass ContinuationToken back for the next page. A page can be empty "
-        + "and still carry a ContinuationToken, because the API filters its pages: follow it until it is absent.";
+        + "and still carry a ContinuationToken, because the list is filtered page by page: follow it until it is absent. "
+        + "Deleting, restoring or changing listed items between pages can skip items, so after acting on them start "
+        + "again from the first page.";
 
     public const string CompactItems =
         "Items are compact: AnnotationKey, AnnotationType, Name, Title, Status (Active, Disabled, Scheduled or Expired), "

@@ -10,15 +10,30 @@ public static class AnnotationGuards
     // FindDeletedAnnotationsAsync takes at most this many keys per call.
     public const int MaxKeysPerLookup = 100;
 
-    // The names of a new key follow the sform rule; existing keys are addressed as they are.
-    public static void EnsureNewNames(AnnotationKey key)
+    // A new name follows the sform rule; existing names are addressed as they are. Every name of a key is the name of a
+    // responsibility, a subject, a context or a unit (rst.R, sbt.S, cnt.S.C, unt.R.U among the key and its ancestors),
+    // and it is new only when that annotation does not exist yet, deleted ones included. Only a name outside the rule
+    // is looked up, so a write with ordinary names makes no extra call.
+    public static async Task EnsureNewNamesAsync(
+        Sdk.IAnnotationsApiClient annotations,
+        string organization,
+        string project,
+        string view,
+        IEnumerable<AnnotationKey> keys,
+        CancellationToken cancellationToken)
     {
-        foreach (var name in key.ToString().Split(Constants.KeySeparators, StringSplitOptions.RemoveEmptyEntries).Skip(1))
+        var naming = keys
+            .SelectMany(key => key.GetAllAncestorKeys().Append(key))
+            .Where(key => key.Type is AnnotationType.Responsibility or AnnotationType.Subject or AnnotationType.Context or AnnotationType.Unit)
+            .DistinctBy(key => key.ToString(), StringComparer.Ordinal)
+            .Where(key => !AnnotationNames.IsValid(key.Name));
+
+        foreach (var key in naming)
         {
-            if (!AnnotationNames.IsValid(name))
+            if (!await ExistsAsync(annotations, organization, project, view, key.ToString(), cancellationToken))
             {
                 throw new ToolInputException(
-                    $"The name '{name}' of the new key '{key}' is not allowed: a name has 1 to {AnnotationNames.MaxLength} "
+                    $"The name '{key.Name}' of the new key '{key}' is not allowed: a new name has 1 to {AnnotationNames.MaxLength} "
                     + "letters, numbers, dashes or underscores.");
             }
         }
@@ -95,6 +110,25 @@ public static class AnnotationGuards
             throw new ToolInputException(
                 $"The annotation '{key}' is deleted ({Describe(annotation)}). Restore it with restore_annotations before "
                 + "changing its configuration.");
+        }
+    }
+
+    private static async Task<bool> ExistsAsync(
+        Sdk.IAnnotationsApiClient annotations,
+        string organization,
+        string project,
+        string view,
+        string key,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await annotations.GetAnnotationAsync(organization, project, view, key, true, true, cancellationToken);
+            return true;
+        }
+        catch (Sdk.ApiException exception) when (exception.StatusCode == 404)
+        {
+            return false;
         }
     }
 

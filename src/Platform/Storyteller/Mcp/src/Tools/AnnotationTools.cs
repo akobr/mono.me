@@ -15,7 +15,9 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
 {
     public const int MaxKeys = 100;
 
-    private const string NameRule = "New names have 1 to 50 letters, numbers, dashes or underscores.";
+    private const string NameRule =
+        "A new name (of a responsibility, subject, context or unit that does not exist yet) has 1 to 50 letters, "
+        + "numbers, dashes or underscores; existing names are used as they are.";
 
     private const string DeletedRule =
         "Before a create, the keys and their ancestors are looked up among the deleted annotations; when one is deleted "
@@ -37,6 +39,9 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
 
     private static readonly string[] ClearableFields =
         ["title", "description", "documentationLink", "labels", "values", "isDisabled", "validFrom", "expiresAt", "timeZone"];
+
+    // How long one name may take to match a find_annotations pattern.
+    private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(100);
 
     [McpServerTool(Name = "list_annotations", Title = "List annotations", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(
@@ -86,9 +91,11 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
     [Description(
         "Finds annotations of one type by the names in their keys. The filters each type takes: rst responsibility; "
         + "sbt subject; unt responsibility; usg subject and responsibility; cnt subject and context; exe subject, "
-        + "responsibility and context; uxe subject, responsibility, context and unit. A filter is an exact name, or a "
-        + "regular expression when it starts with ^ or ends with $ (evaluated by the server). Without filters it lists "
-        + "every annotation of the type. Only active ones unless includeInactive or includeDeleted adds the others. "
+        + "responsibility and context; uxe subject, responsibility, context and unit. A filter is an exact name, "
+        + "compared ignoring case, or a .NET regular expression when it starts with ^ or ends with $ (case-sensitive; "
+        + "(?i) ignores case); a pattern that takes too long to match is refused. Every annotation of the type is read "
+        + "and its key's names matched page by page, so matches can follow empty pages. Without filters it lists every "
+        + "annotation of the type. Only active ones unless includeInactive or includeDeleted adds the others. "
         + ManagementText.CompactItems + " " + ManagementText.Paged + " Needs the Reader role.")]
     public async Task<CallToolResult> FindAnnotations(
         [Description(ToolText.Organization)] string organization,
@@ -106,7 +113,7 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         CancellationToken cancellationToken = default)
     {
         var type = TypeCodes.Parse(annotationType);
-        var filters = new Dictionary<string, string?>(StringComparer.Ordinal)
+        var filters = new Dictionary<string, Func<string, bool>?>(StringComparer.Ordinal)
         {
             ["responsibility"] = Filter(responsibility, nameof(responsibility)),
             ["subject"] = Filter(subject, nameof(subject)),
@@ -123,49 +130,59 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
                 $"annotationType {type} takes the filters {string.Join(" and ", allowed)}, not {string.Join(" and ", refused)}.");
         }
 
-        var (r, s, c, u) = (filters["responsibility"], filters["subject"], filters["context"], filters["unit"]);
+        var given = filters.Where(filter => filter.Value is not null).Select(filter => (Name: filter.Key, Match: filter.Value!)).ToList();
         var (inactive, deleted) = (Flag(includeInactive), Flag(includeDeleted));
 
+        // The typed routes take name queries but drop them for most types and fail on responsibilities, so the names
+        // are matched here. A page is filtered before the host page takes its offset: a re-read of the same API page
+        // gives the same matches, so the host cursor stays in place.
         Func<string?, Task<(IReadOnlyList<Sdk.Annotation> Items, string? Next)>> read = type switch
         {
             AnnotationTypeCodes.Responsibility => async token =>
             {
-                var response = await annotations.GetResponsibilitiesAsync(organization, project, view, r, token, inactive, deleted, cancellationToken);
+                var response = await annotations.GetResponsibilitiesAsync(organization, project, view, null, token, inactive, deleted, cancellationToken);
                 return (Items(response.Annotations), response.ContinuationToken);
             },
             AnnotationTypeCodes.Subject => async token =>
             {
-                var response = await annotations.GetSubjectsAsync(organization, project, view, s, token, inactive, deleted, cancellationToken);
+                var response = await annotations.GetSubjectsAsync(organization, project, view, null, token, inactive, deleted, cancellationToken);
                 return (Items(response.Annotations), response.ContinuationToken);
             },
             AnnotationTypeCodes.Unit => async token =>
             {
-                var response = await annotations.GetUnitsAsync(organization, project, view, r, token, inactive, deleted, cancellationToken);
+                var response = await annotations.GetUnitsAsync(organization, project, view, null, token, inactive, deleted, cancellationToken);
                 return (Items(response.Annotations), response.ContinuationToken);
             },
             AnnotationTypeCodes.Usage => async token =>
             {
-                var response = await annotations.GetUsagesAsync(organization, project, view, r, s, token, inactive, deleted, cancellationToken);
+                var response = await annotations.GetUsagesAsync(organization, project, view, null, null, token, inactive, deleted, cancellationToken);
                 return (Items(response.Annotations), response.ContinuationToken);
             },
             AnnotationTypeCodes.Context => async token =>
             {
-                var response = await annotations.GetContextsAsync(organization, project, view, s, c, token, inactive, deleted, cancellationToken);
+                var response = await annotations.GetContextsAsync(organization, project, view, null, null, token, inactive, deleted, cancellationToken);
                 return (Items(response.Annotations), response.ContinuationToken);
             },
             AnnotationTypeCodes.Execution => async token =>
             {
-                var response = await annotations.GetExecutionsAsync(organization, project, view, r, s, c, token, inactive, deleted, cancellationToken);
+                var response = await annotations.GetExecutionsAsync(organization, project, view, null, null, null, token, inactive, deleted, cancellationToken);
                 return (Items(response.Annotations), response.ContinuationToken);
             },
             _ => async token =>
             {
-                var response = await annotations.GetUnitsOfExecutionAsync(organization, project, view, r, u, s, c, token, inactive, deleted, cancellationToken);
+                var response = await annotations.GetUnitsOfExecutionAsync(organization, project, view, null, null, null, null, token, inactive, deleted, cancellationToken);
                 return (Items(response.Annotations), response.ContinuationToken);
             },
         };
 
-        return Summaries(await ApiPageReader.ReadAsync(continuationToken, limit, read));
+        var page = await ApiPageReader.ReadAsync(continuationToken, limit, given.Count == 0 ? read : async token =>
+        {
+            var (items, next) = await read(token);
+            IReadOnlyList<Sdk.Annotation> matches = items.Where(item => Matches(item, given)).ToList();
+            return (matches, next);
+        });
+
+        return Summaries(page);
     }
 
     [McpServerTool(Name = "list_descendants", Title = "List descendants of an annotation", ReadOnly = true, Idempotent = true, OpenWorld = false)]
@@ -267,12 +284,12 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         }
         else
         {
-            AnnotationGuards.EnsureNewNames(annotationKey);
-
             if (isUnit && (string.IsNullOrWhiteSpace(unitType) || string.IsNullOrWhiteSpace(unitDefinition)))
             {
                 throw new ToolInputException($"The new unit '{keyText}' needs unitType and unitDefinition.");
             }
+
+            await AnnotationGuards.EnsureNewNamesAsync(annotations, organization, project, view, [annotationKey], cancellationToken);
 
             if (!recreateDeleted)
             {
@@ -333,10 +350,8 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
             throw new ToolInputException($"'lines' takes 1 to {MaxKeys} keys or compact lines.");
         }
 
-        foreach (var key in keys)
-        {
-            AnnotationGuards.EnsureNewNames(key);
-        }
+        // a key that exists is skipped by the API, so its names are not new
+        await AnnotationGuards.EnsureNewNamesAsync(annotations, organization, project, view, keys, cancellationToken);
 
         if (!recreateDeleted)
         {
@@ -377,23 +392,27 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
     [Description(
         "Lists deleted annotations, newest deletion first, each with its Deletion: DeletionId, RootKey, DeletedAt, "
         + "DeletedBy, IsRoot, DescendantCount on a root, and PurgeAt (when it is purged automatically). By default only "
-        + "the roots of deletions (the keys a delete was asked for); roots false lists every deleted annotation, "
-        + "deletionId what one delete removed. " + ManagementText.CompactItems + " " + ManagementText.Paged
-        + " Needs the Reader role.")]
+        + "the roots of deletions (the keys a delete was asked for); roots false lists every deleted annotation. With "
+        + "deletionId it lists every annotation that one delete removed, unless roots is true. "
+        + ManagementText.CompactItems + " " + ManagementText.Paged + " Needs the Reader role.")]
     public async Task<CallToolResult> ListDeletedAnnotations(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
         [Description(ToolText.View)] string view = ToolText.DefaultView,
-        [Description("Only the roots of deletions (default true); false lists every deleted annotation.")] bool roots = true,
+        [Description("Only the roots of deletions: default true, or false with deletionId; false lists every deleted annotation.")] bool? roots = null,
         [Description("Only what one delete removed: the DeletionId of a Deletion.")] string? deletionId = null,
         [Description(ToolText.Limit)] int? limit = null,
         [Description(ToolText.ContinuationToken)] string? continuationToken = null,
         CancellationToken cancellationToken = default)
     {
         var deletion = string.IsNullOrWhiteSpace(deletionId) ? null : deletionId.Trim();
+
+        // The API's default (roots only) applies next to a deletionId too and would leave out what that delete removed
+        // below its root, so a deletionId alone lists every annotation of the deletion.
+        var rootsOnly = roots ?? deletion is null;
         var page = await ApiPageReader.ReadAsync(continuationToken, limit, async token =>
         {
-            var response = await annotations.GetDeletedAnnotationsAsync(organization, project, view, roots ? null : false, deletion, token, cancellationToken);
+            var response = await annotations.GetDeletedAnnotationsAsync(organization, project, view, rootsOnly ? null : false, deletion, token, cancellationToken);
             return (Items(response.Annotations), response.ContinuationToken);
         });
 
@@ -482,9 +501,10 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         return ToolResults.Json(new HostPage.Page<AnnotationSummary>(AnnotationSummary.From(page.Items, DateTimeOffset.UtcNow), page.ContinuationToken));
     }
 
-    // An exact name or a regular expression (^... or ...$), as the API reads it. A pattern the server could not compile
-    // is refused here; % patterns are refused because the API compares them literally, % included.
-    private static string? Filter(string? value, string parameter)
+    // An exact name, compared ignoring case, or a regular expression (^... or ...$) with a match timeout: a pattern that
+    // backtracks without end fails the call instead of holding the host. % patterns are refused rather than compared
+    // literally, because they read like SQL LIKE.
+    private static Func<string, bool>? Filter(string? value, string parameter)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -498,19 +518,46 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
             throw new ToolInputException($"'{parameter}' is an exact name or a regular expression that starts with ^ or ends with $; % patterns are not supported.");
         }
 
-        if (text.StartsWith('^') || text.EndsWith('$'))
+        if (!text.StartsWith('^') && !text.EndsWith('$'))
+        {
+            return name => string.Equals(name, text, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Regex pattern;
+
+        try
+        {
+            pattern = new Regex(text, RegexOptions.None, PatternTimeout);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new ToolInputException($"'{parameter}' is not a valid regular expression: {exception.Message}");
+        }
+
+        return name =>
         {
             try
             {
-                _ = new Regex(text, RegexOptions.None, TimeSpan.FromSeconds(1));
+                return pattern.IsMatch(name);
             }
-            catch (ArgumentException exception)
+            catch (RegexMatchTimeoutException)
             {
-                throw new ToolInputException($"'{parameter}' is not a valid regular expression: {exception.Message}");
+                throw new ToolInputException(
+                    $"'{parameter}' took too long to match the name '{name}'; simplify the pattern (nested repetitions such as (a+)+ backtrack without end).");
             }
-        }
+        };
+    }
 
-        return text;
+    private static bool Matches(Sdk.Annotation annotation, IReadOnlyList<(string Name, Func<string, bool> Match)> filters)
+    {
+        return AnnotationKey.TryParse(annotation.AnnotationKey ?? string.Empty, out var key)
+            && filters.All(filter => filter.Match(filter.Name switch
+            {
+                "responsibility" => key.ResponsibilityName,
+                "subject" => key.SubjectName,
+                "context" => key.ContextName,
+                _ => key.UnitName,
+            }));
     }
 
     private static bool IsGiven(JsonElement? element)
