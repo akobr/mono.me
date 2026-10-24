@@ -1,3 +1,5 @@
+// The hand-written halves of the generated clients stay together, as ApiSdk.g.cs keeps their generated halves.
+#pragma warning disable SA1402 // File may only contain a single type
 using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -33,6 +35,10 @@ public partial class AnnotationsApiClient
         _configuration = configuration;
         BaseUrl = configuration.BaseUrl;
     }
+
+    // Annotation values keep their date-like strings as stored; typed dates (ValidFrom, stamps) still parse.
+    static partial void UpdateJsonSerializerSettings(JsonSerializerSettings settings)
+        => settings.DateParseHandling = DateParseHandling.None;
 
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);
@@ -70,6 +76,10 @@ public partial class SchemasApiClient
         BaseUrl = configuration.BaseUrl;
     }
 
+    // Schema documents keep their date-like strings as stored; typed dates (the stamps) still parse.
+    static partial void UpdateJsonSerializerSettings(JsonSerializerSettings settings)
+        => settings.DateParseHandling = DateParseHandling.None;
+
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);
 }
@@ -85,6 +95,10 @@ public partial class TemplatesApiClient
         _configuration = configuration;
         BaseUrl = configuration.BaseUrl;
     }
+
+    // Template documents keep their date-like strings as stored; typed dates (the stamps) still parse.
+    static partial void UpdateJsonSerializerSettings(JsonSerializerSettings settings)
+        => settings.DateParseHandling = DateParseHandling.None;
 
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);
@@ -117,6 +131,10 @@ public partial class TransfersApiClient
         _configuration = configuration;
         BaseUrl = configuration.BaseUrl;
     }
+
+    // Transferred documents and values keep their date-like strings as stored; typed dates still parse.
+    static partial void UpdateJsonSerializerSettings(JsonSerializerSettings settings)
+        => settings.DateParseHandling = DateParseHandling.None;
 
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);

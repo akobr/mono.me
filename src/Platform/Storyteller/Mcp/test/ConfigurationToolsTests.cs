@@ -145,9 +145,27 @@ public class ConfigurationToolsTests
     [Fact]
     public async Task PatchConfiguration_SendsTheOperations()
     {
+        Own(7, """{"a":1}""");
+
         await Tools.PatchConfiguration(Organization, Project, Key, Element("""[{"op":"test","path":"/a","value":1},{"op":"remove","path":"/a"}]"""));
 
         _sentBody.ShouldBeOfType<JArray>().Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task PatchConfiguration_NothingStored_IsRefused_NamingTheFirstWrites()
+    {
+        // an effective read caches an item with Version 0 and the inherited values; the API would patch it as stored
+        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Version = 0, Content = JObject.Parse("""{"inherited":1}""") });
+
+        var exception = await Should.ThrowAsync<ToolInputException>(
+            () => Tools.PatchConfiguration(Organization, Project, Key, Element("""[{"op":"add","path":"/x","value":1}]""")));
+
+        exception.Message.ShouldContain("no stored configuration");
+        exception.Message.ShouldContain("set_configuration");
+        exception.Message.ShouldContain("replace_configuration");
+        _sentBody.ShouldBeNull();
     }
 
     [Theory]

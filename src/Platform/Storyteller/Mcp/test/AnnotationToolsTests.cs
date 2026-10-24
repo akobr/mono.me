@@ -124,9 +124,38 @@ public class AnnotationToolsTests
     public async Task SetAnnotation_NewNameOutsideTheRule_IsRefused()
     {
         Missing("sbt.north wind");
+        Absent("sbt.north wind");
 
         (await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.north wind")))
             .Message.ShouldContain("'north wind'");
+        _sent.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task SetAnnotation_MissingAncestorWithANameOutsideTheRule_IsRefused()
+    {
+        Missing("exe.north wind.billing.prod");
+        Absent("sbt.north wind");
+
+        var exception = await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "exe.north wind.billing.prod"));
+
+        exception.Message.ShouldContain("'north wind' of the new key 'sbt.north wind'");
+        _sent.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("usg.Žluťoučký kůň.billing", "sbt.Žluťoučký kůň")]
+    [InlineData("usg.northwind.Fakturace účtů", "rst.Fakturace účtů")]
+    [InlineData("uxe.northwind.billing.prod.Noční běh", "unt.billing.Noční běh")]
+    public async Task SetAnnotation_NewKeyUnderAnExistingNameOutsideTheRule_IsCreated(string key, string existing)
+    {
+        // only the names that do not exist yet follow the rule; the valid ones are not even looked up
+        Missing(key);
+        Present(existing);
+
+        await Tools.SetAnnotation(Organization, Project, key);
+
+        _sent.ShouldNotBeNull().AnnotationKey.ShouldBe(key);
     }
 
     [Fact]
@@ -219,6 +248,29 @@ public class AnnotationToolsTests
     }
 
     [Fact]
+    public async Task CreateAnnotations_ExistingKeysOutsideTheNameRule_AreSkipped_NotRefused()
+    {
+        Present("sbt.Žluťoučký kůň");
+        _api.Setup(api => api.SetAnnotationsSimpleAsync(Organization, Project, ViewName, It.IsAny<IEnumerable<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Sdk.Annotation> { new Sdk.Usage { AnnotationKey = "usg.Žluťoučký kůň.billing", Name = "billing" } });
+
+        var result = (await Tools.CreateAnnotations(Organization, Project, ["sbt.Žluťoučký kůň", "Žluťoučký kůň.billing"])).Structured();
+
+        result["Created"]!.Select(item => item.Value<string>("AnnotationKey")).ShouldBe(new[] { "usg.Žluťoučký kůň.billing" });
+        result["Skipped"]!.Values<string>().ShouldBe(new[] { "sbt.Žluťoučký kůň" });
+    }
+
+    [Fact]
+    public async Task CreateAnnotations_NewNameOutsideTheRule_IsRefused_AndCreatesNothing()
+    {
+        Absent("sbt.north wind");
+
+        (await Should.ThrowAsync<ToolInputException>(() => Tools.CreateAnnotations(Organization, Project, ["northwind", "north wind.billing"])))
+            .Message.ShouldContain("'north wind'");
+        _lookups.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task CreateAnnotations_MoreThan100Lines_IsRefused()
     {
         var lines = Enumerable.Range(0, 101).Select(index => $"s{index}").ToArray();
@@ -269,14 +321,57 @@ public class AnnotationToolsTests
     }
 
     [Fact]
-    public async Task FindAnnotations_SendsTheFiltersOfTheType()
+    public async Task FindAnnotations_MatchesTheNamesInTheHost_NotThroughTheApiQueries()
     {
-        _api.Setup(api => api.GetContextsAsync(Organization, Project, ViewName, "northwind", "^prod", null, null, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Sdk.AnnotationsResponse_Context { Annotations = [new Sdk.Context { AnnotationKey = "cnt.northwind.prod", Name = "prod" }] });
+        // the API's typed routes drop their name queries, so none is sent and every context comes back
+        _api.Setup(api => api.GetContextsAsync(Organization, Project, ViewName, null, null, null, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.AnnotationsResponse_Context
+            {
+                Annotations =
+                [
+                    new Sdk.Context { AnnotationKey = "cnt.northwind.prod", Name = "prod" },
+                    new Sdk.Context { AnnotationKey = "cnt.northwind.preprod", Name = "preprod" },
+                    new Sdk.Context { AnnotationKey = "cnt.contoso.prod", Name = "prod" },
+                    new Sdk.Context { AnnotationKey = "cnt.NorthWind.production", Name = "production" },
+                    new Sdk.Context { AnnotationKey = "cnt.northwind.Prod", Name = "Prod" },
+                ],
+            });
 
         var page = (await Tools.FindAnnotations(Organization, Project, "CNT", subject: "northwind", context: " ^prod ")).Structured();
 
-        Keys(page).ShouldBe(new[] { "cnt.northwind.prod" });
+        // the exact name ignores case, the pattern does not
+        Keys(page).ShouldBe(new[] { "cnt.northwind.prod", "cnt.NorthWind.production" });
+    }
+
+    [Fact]
+    public async Task FindAnnotations_PagesTheMatches_AcrossApiPages()
+    {
+        var tokens = new List<string?>();
+        _api.Setup(api => api.GetSubjectsAsync(Organization, Project, ViewName, null, It.IsAny<string>(), null, null, It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, string, string, bool?, bool?, CancellationToken>((_, _, _, _, token, _, _, _) => tokens.Add(token))
+            .ReturnsAsync((string _, string _, string _, string _, string token, bool? _, bool? _, CancellationToken _) => token is null
+                ? Subjects("api-2", "a1", "b1", "a2", "b2", "a3")
+                : Subjects(null, "b3", "a4"));
+
+        var first = (await Tools.FindAnnotations(Organization, Project, "sbt", subject: "^a", limit: 2)).Structured();
+        var second = (await Tools.FindAnnotations(Organization, Project, "sbt", subject: "^a", limit: 2, continuationToken: first.Value<string>("ContinuationToken"))).Structured();
+        var third = (await Tools.FindAnnotations(Organization, Project, "sbt", subject: "^a", limit: 2, continuationToken: second.Value<string>("ContinuationToken"))).Structured();
+
+        Keys(first).ShouldBe(new[] { "sbt.a1", "sbt.a2" });
+        Keys(second).ShouldBe(new[] { "sbt.a3" });
+        Keys(third).ShouldBe(new[] { "sbt.a4" });
+        third["ContinuationToken"].ShouldBeNull();
+        tokens.ShouldBe(new[] { null, null, "api-2" });
+    }
+
+    [Fact]
+    public async Task FindAnnotations_PatternThatTakesTooLong_IsAnInputError()
+    {
+        _api.Setup(api => api.GetSubjectsAsync(Organization, Project, ViewName, null, null, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Subjects(null, new string('a', 40) + "!"));
+
+        (await Should.ThrowAsync<ToolInputException>(() => Tools.FindAnnotations(Organization, Project, "sbt", subject: "^(a+)+$")))
+            .Message.ShouldContain("took too long");
     }
 
     [Theory]
@@ -291,9 +386,26 @@ public class AnnotationToolsTests
     [Theory]
     [InlineData("^(prod")]
     [InlineData("%prod")]
-    public async Task FindAnnotations_PatternTheServerCannotUse_IsRefused(string pattern)
+    public async Task FindAnnotations_InvalidPattern_IsRefused(string pattern)
     {
         await Should.ThrowAsync<ToolInputException>(() => Tools.FindAnnotations(Organization, Project, "sbt", subject: pattern));
+    }
+
+    [Theory]
+    [InlineData(null, null, null)]
+    [InlineData(null, " del-1 ", false)]
+    [InlineData(true, "del-1", null)]
+    [InlineData(false, null, false)]
+    public async Task ListDeletedAnnotations_WithADeletionId_ListsEverythingItRemoved_UnlessRootsIsTrue(bool? roots, string? deletionId, bool? sentRoots)
+    {
+        var sent = new List<(bool? Roots, string? DeletionId)>();
+        _api.Setup(api => api.GetDeletedAnnotationsAsync(Organization, Project, ViewName, It.IsAny<bool?>(), It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, bool?, string, string, CancellationToken>((_, _, _, rootsQuery, deletion, _, _) => sent.Add((rootsQuery, deletion)))
+            .ReturnsAsync(Page(null));
+
+        await Tools.ListDeletedAnnotations(Organization, Project, roots: roots, deletionId: deletionId);
+
+        sent.ShouldHaveSingleItem().ShouldBe((sentRoots, deletionId?.Trim()));
     }
 
     [Fact]
@@ -342,6 +454,16 @@ public class AnnotationToolsTests
         };
     }
 
+    private static Sdk.AnnotationsResponse_Subject Subjects(string? next, params string[] names)
+    {
+        return new Sdk.AnnotationsResponse_Subject
+        {
+            Annotations = names.Select(name => new Sdk.Subject { AnnotationKey = $"sbt.{name}", Name = name }).ToList(),
+            ContinuationToken = next,
+            Count = names.Length,
+        };
+    }
+
     private static IEnumerable<string?> Keys(JObject page)
     {
         return page["Items"]!.Select(item => item.Value<string>("AnnotationKey"));
@@ -356,6 +478,19 @@ public class AnnotationToolsTests
     private void Missing(string key)
     {
         _api.Setup(api => api.GetAnnotationAsync(Organization, Project, ViewName, key, true, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(NotFound());
+    }
+
+    // The lookups of the name rule, which count deleted annotations as existing.
+    private void Present(string key)
+    {
+        _api.Setup(api => api.GetAnnotationAsync(Organization, Project, ViewName, key, true, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.Subject { AnnotationKey = key, Name = key.Split('.')[^1] });
+    }
+
+    private void Absent(string key)
+    {
+        _api.Setup(api => api.GetAnnotationAsync(Organization, Project, ViewName, key, true, true, It.IsAny<CancellationToken>()))
             .ThrowsAsync(NotFound());
     }
 

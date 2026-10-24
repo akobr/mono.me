@@ -170,9 +170,10 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
     [Description(
         "Applies RFC 6902 operations to the annotation's own stored document (read it with get_configuration form "
         + "\"own\"; the paths address it). A test operation is the only guard against a concurrent change: there is no "
-        + "version check, and a failed test answers 412 PatchTestFailed. Without a stored configuration it answers 404; "
-        + "set_configuration writes a first document. " + NeedsAnnotation + " The result is checked against the combined schema "
-        + "unless force is true. Needs the Contributor role. Returns the stored own document and its Version.")]
+        + "version check, and a failed test answers 412 PatchTestFailed. Without a stored own document (form \"own\" "
+        + "says IsStored false) the call is refused; set_configuration or replace_configuration writes a first document. "
+        + NeedsAnnotation + " The result is checked against the combined schema unless force is true. Needs the "
+        + "Contributor role. Returns the stored own document and its Version.")]
     public async Task<CallToolResult> PatchConfiguration(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
@@ -185,6 +186,16 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
         var annotationKey = AnnotationKeys.Parse(key).ToString();
         var patch = DocumentWrites.ReadPatch(operations);
         await AnnotationGuards.EnsureAnnotationExistsAsync(annotations, organization, project, view, annotationKey, cancellationToken);
+
+        // The API patches an item an effective read cached (Version 0, empty content) as if it were stored, and its
+        // version 1 then collides with the versions a delete_configuration kept; only a stored document is patched.
+        var stored = await StoredConfigurations.GetOwnAsync(configurations, organization, project, view, annotationKey, cancellationToken);
+
+        if (stored.Content is null)
+        {
+            throw new ToolInputException(
+                $"'{annotationKey}' has no stored configuration to patch; set_configuration or replace_configuration writes a first document.");
+        }
 
         return ToolResults.Json(await configurations.PatchConfigurationAsync(organization, project, view, annotationKey, Force(force), patch, cancellationToken));
     }

@@ -50,6 +50,34 @@ public class SchemaToolsTests
         result.Value<long>("Version").ShouldBe(2);
     }
 
+    [Theory]
+    [InlineData("http://10.0.0.5:8080/admin/reset")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("other.json#/definitions/a")]
+    public async Task SetSchema_ExternalReference_IsRefused_AndNothingIsSent(string reference)
+    {
+        var schema = Element("""{"type":"object","properties":{"a":{"items":[{"$ref":"REFERENCE"}]}}}""".Replace("REFERENCE", reference, StringComparison.Ordinal));
+
+        var exception = await Should.ThrowAsync<ToolInputException>(() => Tools.SetSchema(Organization, Project, "type", schema, annotationType: "exe"));
+
+        exception.Message.ShouldContain(reference);
+        exception.Message.ShouldContain("fetch");
+    }
+
+    [Fact]
+    public async Task SetSchema_LocalReferencesAndAPropertyNamedRef_AreSent()
+    {
+        object? sent = null;
+        _api.Setup(api => api.SetConfigurationSchemaAsync(Organization, Project, ViewName, "exe", null, It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, string, bool?, object, CancellationToken>((_, _, _, _, _, body, _) => sent = body)
+            .ReturnsAsync(new Sdk.ConfigurationSchema { AnnotationType = "exe", Version = 1 });
+        const string json = """{"definitions":{"n":{"type":"integer"}},"properties":{"a":{"$ref":"#/definitions/n"},"$ref":{"type":"string"}}}""";
+
+        await Tools.SetSchema(Organization, Project, "type", Element(json), annotationType: "exe");
+
+        sent.ShouldBeOfType<JObject>().ToString(Formatting.None).ShouldBe(json);
+    }
+
     [Fact]
     public async Task GetSchema_WithVersion_ReadsTheVersion()
     {

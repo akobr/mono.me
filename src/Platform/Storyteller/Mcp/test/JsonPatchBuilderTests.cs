@@ -63,22 +63,22 @@ public class JsonPatchBuilderTests
     }
 
     [Fact]
-    public void ParsedDates_AreComparedAsParsed_AndNeverTested()
+    public void DateStrings_AreComparedAndTestedAsTheirText()
     {
-        // the SDK's template client parses date-like strings, so the stored text is unknown
-        var stored = ReadWithDates("""{"at":"2026-10-24T10:00:00.000Z","list":["2026-01-01T00:00:00Z"],"n":1}""");
-        var desired = JObject.Parse("""{"at":"2026-10-24T10:00:00.000Z","list":["2026-02-01T00:00:00Z"],"n":2}""");
+        // the SDK's document clients and the tool arguments keep date-like strings as text
+        var stored = ReadAsText("""{"at":"2026-10-24T10:00:00.000Z","list":["2026-01-01T00:00:00Z"],"since":"2026-10-24T10:00:00+02:00"}""");
+        var desired = ReadAsText("""{"at":"2026-10-24T10:00:00.000Z","list":["2026-02-01T00:00:00Z"],"since":"2026-10-24T08:00:00Z"}""");
 
         var patch = JsonPatchBuilder.Create(stored, desired);
 
         patch.ToString(Formatting.None).ShouldBe(
-            """[{"op":"replace","path":"/list","value":["2026-02-01T00:00:00Z"]},"""
-            + """{"op":"test","path":"/n","value":1},{"op":"replace","path":"/n","value":2}]""");
+            """[{"op":"test","path":"/list","value":["2026-01-01T00:00:00Z"]},{"op":"replace","path":"/list","value":["2026-02-01T00:00:00Z"]},"""
+            + """{"op":"test","path":"/since","value":"2026-10-24T10:00:00+02:00"},{"op":"replace","path":"/since","value":"2026-10-24T08:00:00Z"}]""");
     }
 
-    private static JObject ReadWithDates(string json)
+    private static JObject ReadAsText(string json)
     {
-        using var reader = new JsonTextReader(new StringReader(json)) { DateParseHandling = DateParseHandling.DateTime };
+        using var reader = new JsonTextReader(new StringReader(json)) { DateParseHandling = DateParseHandling.None };
         return JObject.Load(reader);
     }
 

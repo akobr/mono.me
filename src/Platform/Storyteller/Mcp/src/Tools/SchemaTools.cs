@@ -4,6 +4,8 @@ using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
+using Newtonsoft.Json.Linq;
+
 namespace _42.Platform.Storyteller.Mcp.Tools;
 
 [McpServerToolType]
@@ -65,7 +67,8 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
         + "view it applies to is checked against the combined schema as it will be: a violation answers 409 with the "
         + "failing annotations and their messages, unless force is true, which stores the schema and leaves those "
         + "configurations as they are (their next write must comply). A descendant-type schema only for a type that can "
-        + "descend from key. " + Layers + " Needs the Contributor role.")]
+        + "descend from key. A $ref must point inside the document (#/...); a reference to a URL or a file is refused, "
+        + "because the API would fetch it. " + Layers + " Needs the Contributor role.")]
     public async Task<CallToolResult> SetSchema(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
@@ -79,6 +82,7 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
     {
         var target = SchemaTarget.Parse(level, annotationType, key);
         var document = ToolArguments.ToObject(schema, nameof(schema));
+        EnsureLocalReferences(document);
         var (type, annotationKey) = (target.AnnotationType!, target.Key!);
         bool? forced = force ? true : null;
 
@@ -199,5 +203,24 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
         };
 
         return ToolResults.Json(diff);
+    }
+
+    // The API resolves every $ref of a schema it parses, on a write of the schema and of each configuration it checks:
+    // a reference to a URL would make it fetch the URL from its own network, one to a file read the file. Only
+    // references inside the document are sent. A "$ref" whose value is not a string is a property named "$ref".
+    private static void EnsureLocalReferences(JObject schema)
+    {
+        var external = schema.Descendants()
+            .OfType<JProperty>()
+            .FirstOrDefault(property => property.Name == "$ref"
+                && property.Value is JValue { Type: JTokenType.String } value
+                && !((string?)value ?? string.Empty).StartsWith('#'));
+
+        if (external is not null)
+        {
+            throw new ToolInputException(
+                $"The schema refers to '{(string?)external.Value}' at {external.Path}: only references inside the document "
+                + "(\"$ref\": \"#/...\") are accepted, because the API would fetch an external reference from its own network.");
+        }
     }
 }
