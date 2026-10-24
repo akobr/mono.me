@@ -210,4 +210,21 @@ describe('catalog store', () => {
 
     expect(catalog.status).toBe('error')
   })
+
+  it('clears the load metadata on reset', async () => {
+    server.use(...typeHandlers(), configurations)
+    const catalog = useCatalogStore()
+    await catalog.load(scope)
+    catalog.error = new Error('stale')
+    catalog.fromSnapshot = true
+
+    catalog.reset()
+
+    expect(catalog.status).toBe('idle')
+    expect(catalog.scope).toBeNull()
+    expect(catalog.error).toBeUndefined()
+    expect(catalog.loadedAt).toBeUndefined()
+    expect(catalog.fromSnapshot).toBe(false)
+    expect(catalog.byKey.size).toBe(0)
+  })
 })

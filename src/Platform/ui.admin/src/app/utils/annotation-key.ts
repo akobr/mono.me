@@ -4,6 +4,7 @@ import {
   getAllAncestors,
   getAnnotationTypeInfo,
   isValidAnnotationKey,
+  parseAnnotationKey,
   type AnnotationType,
   type AnnotationTypeCode,
 } from '@42for.net/2splatform.sdk'
@@ -182,6 +183,97 @@ export function canDescend(ancestorKey: string, descendantType: string): boolean
 /** The type codes that can descend from the key, in `typeCodes` order; none for an invalid key or a uxe key. */
 export function descendantTypeCodes(ancestorKey: string): AnnotationTypeCode[] {
   return isValidAnnotationKey(ancestorKey) ? typeCodes.filter((code) => canDescend(ancestorKey, code)) : []
+}
+
+/** How many descendant keys a Relations row shows before "Show all". */
+export const descendantPreviewLimit = 5
+
+export interface DescendantGroup {
+  code: AnnotationTypeCode
+  total: number
+  preview: string[]
+  /** `ancestor:<root> type:<code>`, quoted like `setQualifier`. */
+  query: string
+}
+
+export interface GroupedDescendants {
+  groups: DescendantGroup[]
+  /** Every descendant, across groups. */
+  total: number
+  /** `ancestor:<root>` for the whole set. */
+  query: string
+}
+
+/** Quotes a filter value that contains a space or a comma, the same rule as `setQualifier`. */
+function quoteFilterValue(value: string): string {
+  return /[\s,]/.test(value) ? `"${value}"` : value
+}
+
+/**
+ * The Annotations-view filter for the descendants of `rootKey`, optionally one type.
+ * Kept here so `annotation-key` does not import `filter-parser` (that module already imports this one).
+ */
+export function descendantFilterQuery(rootKey: string, code?: AnnotationTypeCode): string {
+  const ancestor = `ancestor:${quoteFilterValue(rootKey)}`
+  return code ? `${ancestor} type:${quoteFilterValue(code)}` : ancestor
+}
+
+/**
+ * Transitive descendants of `rootKey` grouped by type, from catalog keys and the same ancestry test as `ancestor:`.
+ * A key is counted once. Groups follow `descendantTypeCodes`. An invalid root or a unit of execution has none.
+ */
+export function groupedDescendants(
+  rootKey: string,
+  keys: Iterable<string>,
+  ancestorsOf: (key: string) => readonly string[],
+  limit = descendantPreviewLimit,
+): GroupedDescendants {
+  const query = descendantFilterQuery(rootKey)
+  const applicable = descendantTypeCodes(rootKey)
+  if (applicable.length === 0) {
+    return { groups: [], total: 0, query }
+  }
+
+  const wanted = new Set(applicable)
+  const needle = rootKey.toLowerCase()
+  const members = new Map<AnnotationTypeCode, string[]>(applicable.map((code) => [code, []]))
+  const seen = new Set<string>()
+
+  for (const key of keys) {
+    if (seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+
+    const code = parseAnnotationKey(key)?.code
+    const bucket = code ? members.get(code) : undefined
+    if (!code || !wanted.has(code) || !bucket) {
+      continue
+    }
+    if (!ancestorsOf(key).some((ancestor) => ancestor.toLowerCase() === needle)) {
+      continue
+    }
+    bucket.push(key)
+  }
+
+  const groups: DescendantGroup[] = []
+  let total = 0
+  for (const code of applicable) {
+    const found = members.get(code) ?? []
+    if (found.length === 0) {
+      continue
+    }
+    found.sort((left, right) => left.localeCompare(right, 'en'))
+    total += found.length
+    groups.push({
+      code,
+      total: found.length,
+      preview: found.slice(0, Math.max(0, limit)),
+      query: descendantFilterQuery(rootKey, code),
+    })
+  }
+
+  return { groups, total, query }
 }
 
 /** The API's message for a pair that cannot descend (DescendantTypeRules.GetCannotDescendMessage). */
