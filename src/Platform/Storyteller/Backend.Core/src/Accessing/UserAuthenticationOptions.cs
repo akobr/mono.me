@@ -13,5 +13,8 @@ public class UserAuthenticationOptions
 
     public Dictionary<string, string> AppRoles { get; set; } = new();
 
+    // Entra ID only. Empty: every token whose azp differs from ClientId is a machine, as before.
+    public List<DelegatedClientOptions> DelegatedClients { get; set; } = [];
+
     public AuthKitOptions AuthKit { get; set; } = new();
 }
