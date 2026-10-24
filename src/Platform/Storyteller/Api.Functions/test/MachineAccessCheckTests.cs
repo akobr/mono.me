@@ -583,6 +583,29 @@ public class MachineAccessCheckTests
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
     }
 
+    // A delegated token of a listed client app (424-84, the MCP server's on-behalf-of token) is classified as a user
+    // by the Entra validator: no machine identity, its own azp and tid. It goes through the same role check.
+    [Theory]
+    [MemberData(nameof(EveryReach))]
+    public async Task UserOfADelegatedClient_WithTheRole_Passes(Reach reach)
+    {
+        await Check(reach, DelegatedUser(), new RoleAccess(AccountRole.Contributor), AccountRole.Contributor, MachineScope.AnnotationWrite);
+    }
+
+    [Theory]
+    [MemberData(nameof(EveryReach))]
+    public async Task UserOfADelegatedClient_BelowTheRole_IsDenied(Reach reach)
+    {
+        if (DevAuth)
+        {
+            return;
+        }
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Check(reach, DelegatedUser(), new RoleAccess(AccountRole.Reader), AccountRole.Contributor));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+    }
+
     // The token carries only User.Impersonation: a user needs no data scope, the role decides.
     [Theory]
     [MemberData(nameof(UserWithTheMinimalRole))]
@@ -713,6 +736,17 @@ public class MachineAccessCheckTests
     }
 
     private static RoleAccess Restricted() => new(AccountRole.Reader, Restriction);
+
+    // The claims of an on-behalf-of token of a listed client app, as the Entra validator leaves a user: no machine
+    // identity, the azp and tid of the client next to sub and User.Impersonation.
+    private static TestHttpRequestData DelegatedUser()
+    {
+        var request = TestRequests.User();
+        var claims = (List<System.Security.Claims.Claim>)request.FunctionContext.Items[FunctionContextItemKeys.CachedClaims];
+        claims.Add(new System.Security.Claims.Claim("azp", "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11"));
+        claims.Add(new System.Security.Claims.Claim("tid", "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d"));
+        return request;
+    }
 
     // The credentials carry the runtime scope Configuration.Read and the given management scopes as roles.
     private static TestHttpRequestData MachineRequest(
