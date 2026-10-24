@@ -14,6 +14,7 @@ dotnet run --project src/Platform/Aspire.Host/src
 | `keyvault` | Lowkey Vault, the Key Vault emulator of key/value protection |
 | `api-functions` | The Storyteller Azure Functions API |
 | `ui-admin` | The Vite dev server of the admin UI on port 5173 |
+| `mcp` | The [MCP server](../Storyteller/mcp.md) for AI assistants; explicit start, it needs an Entra ID app registration in its user secrets (`Mcp:*`, `Storyteller:Scopes`) |
 
 ## Cosmos DB modes
 
