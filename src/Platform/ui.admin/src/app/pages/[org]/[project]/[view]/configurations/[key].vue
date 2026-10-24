@@ -44,12 +44,17 @@ function close() {
           />
           <AnnotationTypeBadge :type="key.slice(0, 3)" variant="label" class="mt-0.5" />
           <div class="min-w-0 flex-1">
-            <RouterLink
-              :to="`/${context.org}/${context.project}/${context.view}/annotations/${key}`"
-              class="flex items-center gap-1 text-xs text-muted hover:text-highlighted hover:underline"
-            >
-              Annotation <UIcon name="i-lucide-chevron-right" class="size-3" />
-            </RouterLink>
+            <UTooltip text="Open the annotation">
+              <UButton
+                :to="`/${context.org}/${context.project}/${context.view}/annotations/${key}`"
+                size="xs"
+                variant="outline"
+                color="neutral"
+                icon="i-lucide-tags"
+                label="Annotation"
+                class="w-fit"
+              />
+            </UTooltip>
             <h2 class="truncate text-base font-semibold text-highlighted">
               {{ annotation?.Name ?? key.split('.').at(-1) }}
             </h2>
