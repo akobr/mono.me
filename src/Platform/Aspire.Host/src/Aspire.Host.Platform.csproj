@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Storyteller\Api.Functions\src\Api.Functions.csproj" />
     <ProjectReference Include="..\..\Storyteller\DbCreator\src\DbCreator.csproj" />
+    <ProjectReference Include="..\..\Storyteller\Mcp\src\Mcp.csproj" />
   </ItemGroup>
 
 </Project>
