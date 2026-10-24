@@ -6,6 +6,7 @@ import {
   setAnnotationBodyTitleMax,
 } from '@42for.net/2splatform.sdk/zod'
 import type { Annotation } from '@42for.net/2splatform.sdk'
+import { isUnitAnnotation } from '@/utils/unit-types'
 
 export function isValidTimeZone(timeZone: string): boolean {
   try {
@@ -63,9 +64,20 @@ export const annotationFormSchema = SetAnnotationBody.extend({
     .record(z.string(), z.unknown())
     .refine((values) => Object.keys(values).every((key) => key.trim().length > 0), 'Value keys cannot be empty.')
     .optional(),
+  UnitType: z.string().optional(),
+  UnitDefinition: z.string().optional(),
 }).superRefine((value, context) => {
   if (value.ValidFrom && value.ExpiresAt && Date.parse(value.ValidFrom) >= Date.parse(value.ExpiresAt)) {
     context.addIssue({ code: 'custom', path: ['ExpiresAt'], message: 'Expires must be after Valid from.' })
+  }
+  if (!isUnitAnnotation(value)) {
+    return
+  }
+  if (!value.UnitType?.trim()) {
+    context.addIssue({ code: 'custom', path: ['UnitType'], message: 'Enter a unit type.' })
+  }
+  if (!value.UnitDefinition?.trim()) {
+    context.addIssue({ code: 'custom', path: ['UnitDefinition'], message: 'Enter a unit definition.' })
   }
 })
 
@@ -74,9 +86,9 @@ export type AnnotationForm = z.input<typeof annotationFormSchema>
 /** Fields that are part of the key and cannot change through the editor. */
 export const readOnlyAnnotationFields = ['AnnotationKey', 'Name', 'AnnotationType', 'ProjectName', 'ViewName'] as const
 
-/** The editable document of an annotation: the base fields only; the type-specific members stay on the loaded annotation. */
+/** The editable document of an annotation. A unit also carries its trigger; other type-specific members stay on the loaded annotation. */
 export function toAnnotationDraft(annotation: Annotation): AnnotationForm {
-  return {
+  const draft: AnnotationForm = {
     ProjectName: annotation.ProjectName,
     ViewName: annotation.ViewName,
     AnnotationKey: annotation.AnnotationKey,
@@ -92,16 +104,23 @@ export function toAnnotationDraft(annotation: Annotation): AnnotationForm {
     Labels: annotation.Labels ?? [],
     Values: annotation.Values ?? {},
   }
+
+  if (!isUnitAnnotation(annotation)) {
+    return draft
+  }
+
+  const unit = annotation as Annotation & { UnitType?: string; UnitDefinition?: string }
+  return { ...draft, UnitType: unit.UnitType ?? '', UnitDefinition: unit.UnitDefinition ?? '' }
 }
 
 /**
  * The body for SetAnnotation: empty strings and collections become absent. SetAnnotation replaces the whole
- * document and requires the type-specific members (SubjectKey, UnitType, ContextNames, …), which the form never
- * edits, so they are taken from the loaded `original`.
+ * document and requires the type-specific members (SubjectKey, ContextNames, …), which the form does not edit,
+ * so they are taken from the loaded `original`. A unit's trigger is edited, and the trimmed draft replaces it.
  */
 export function toAnnotationBody(draft: AnnotationForm, original?: Annotation): Annotation {
   const blank = (value: string | undefined) => (value && value.trim() ? value.trim() : undefined)
-  return {
+  const body: Annotation & { UnitType?: string; UnitDefinition?: string } = {
     ...original,
     ProjectName: draft.ProjectName,
     ViewName: draft.ViewName,
@@ -118,6 +137,13 @@ export function toAnnotationBody(draft: AnnotationForm, original?: Annotation): 
     Labels: draft.Labels?.length ? draft.Labels : undefined,
     Values: draft.Values && Object.keys(draft.Values).length ? draft.Values : undefined,
   }
+
+  if (isUnitAnnotation(draft)) {
+    body.UnitType = draft.UnitType?.trim() ?? ''
+    body.UnitDefinition = draft.UnitDefinition?.trim() ?? ''
+  }
+
+  return body
 }
 
 /** Issues of a document edited as JSON/YAML that the schema cannot express: changed key fields. */

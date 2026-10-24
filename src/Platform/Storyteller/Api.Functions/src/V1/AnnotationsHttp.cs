@@ -26,6 +26,7 @@ public partial class AnnotationsHttp
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNameCaseInsensitive = true,
+        AllowTrailingCommas = true,
         Converters = { new JsonStringEnumConverter() },
     };
 
@@ -407,11 +408,13 @@ public partial class AnnotationsHttp
         string project,
         string view)
     {
-        var (annotations, invalidBody) = await request.ReadJsonBodyAsync<List<Annotation>>(_bodyJsonOptions, "a list of annotations", RequestBodyLimits.Annotations);
+        // Elements stay JSON until the access check. A list of base Annotation would drop UnitType and
+        // UnitDefinition, and a body that is not JSON still names no key.
+        var (elements, invalidBody) = await request.ReadJsonBodyAsync<List<JsonElement>>(_bodyJsonOptions, "a list of annotations", RequestBodyLimits.Annotations);
 
         // The keys of the body are authorized before any 400 of the body, so a caller without access gets 403 first.
         // A body that cannot be read names no key, which the restriction of a machine lets through to the 400.
-        var keys = (annotations ?? []).Where(a => a is not null).Select(a => a.AnnotationKey);
+        var keys = (elements ?? []).Select(AnnotationKeyOf).Where(key => key is not null).Select(key => key!);
         var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, keys, AccountRole.Contributor, MachineScope.AnnotationWrite, MachineScope.AnnotationManage);
 
         if (invalidBody is not null)
@@ -419,19 +422,32 @@ public partial class AnnotationsHttp
             return invalidBody;
         }
 
-        if (annotations is null)
+        if (elements is null)
         {
             return new BadRequestObjectResult(new ErrorResponse("The annotations are missing."));
         }
 
         // The projection below would dereference a null entry.
-        if (annotations.Any(a => a is null))
+        if (elements.Any(element => element.ValueKind == JsonValueKind.Null))
         {
             return new BadRequestObjectResult(new ErrorResponse("The annotations must not contain null entries."));
         }
 
+        List<Annotation> annotations;
+
+        try
+        {
+            annotations = elements.Select(DeserializeAnnotationElement).ToList();
+        }
+        catch (JsonException exception)
+        {
+            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation object in body: {exception.Message}"));
+        }
+
         var annotationsToProcess = annotations
-            .Select(a => a with { ProjectName = project, ViewName = view })
+            .Select(a => a is Unit unit
+                ? (Annotation)(unit with { ProjectName = project, ViewName = view })
+                : a with { ProjectName = project, ViewName = view })
             .ToList();
 
         if (annotationsToProcess.Count > ApiConstants.MaxInputItems)
@@ -1296,5 +1312,62 @@ public partial class AnnotationsHttp
     private static AnnotationDeletedFilter DeletedFilter(bool includeDeleted)
     {
         return includeDeleted ? AnnotationDeletedFilter.Include : AnnotationDeletedFilter.Exclude;
+    }
+
+    // A unit element that carries a trigger is the concrete Unit, so the values reach normalization.
+    // Every other element stays a base Annotation and keeps today's defaults.
+    private static Annotation DeserializeAnnotationElement(JsonElement element)
+    {
+        var runtimeType = IsUnitElement(element) && HasUnitMember(element) ? typeof(Unit) : typeof(Annotation);
+        var deserialized = element.Deserialize(runtimeType, AnnotationBodyOptions);
+
+        if (deserialized is not Annotation annotation)
+        {
+            throw new JsonException("No annotation object in body.");
+        }
+
+        return annotation;
+    }
+
+    private static bool IsUnitElement(JsonElement element)
+    {
+        if (!TryGetProperty(element, nameof(Annotation.AnnotationType), out var type) || type.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        return Enum.TryParse(type.GetString(), ignoreCase: true, out AnnotationType annotationType)
+            && annotationType == AnnotationType.Unit;
+    }
+
+    private static bool HasUnitMember(JsonElement element)
+    {
+        return TryGetProperty(element, nameof(Unit.UnitType), out _)
+            || TryGetProperty(element, nameof(Unit.UnitDefinition), out _);
+    }
+
+    private static string? AnnotationKeyOf(JsonElement element)
+    {
+        return TryGetProperty(element, nameof(Annotation.AnnotationKey), out var key) && key.ValueKind == JsonValueKind.String
+            ? key.GetString()
+            : null;
+    }
+
+    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
     }
 }

@@ -42,7 +42,7 @@ public static class AnnotationFactory
             Values = input.Values,
         };
 
-        return annotation is Unit unit && input is Unit inputUnit
+        return annotation is Unit unit && input is IUnit inputUnit
             ? unit with { UnitType = inputUnit.UnitType, UnitDefinition = inputUnit.UnitDefinition }
             : annotation;
     }
