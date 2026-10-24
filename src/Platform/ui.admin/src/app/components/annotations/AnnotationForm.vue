@@ -13,8 +13,10 @@ import {
   type AnnotationForm,
 } from '@/forms/annotation.schema'
 import { toTypedSchema } from '@/forms/typed-schema'
+import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore, type EditorMode } from '@/stores/preferences'
+import { groupedDescendants, metaOf } from '@/utils/annotation-key'
 import { errorMessage } from '@/utils/errors'
 
 /**
@@ -26,6 +28,7 @@ const props = defineProps<{ annotation: Annotation; fresh: boolean }>()
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
+const catalog = useCatalogStore()
 const preferences = usePreferencesStore()
 const actions = useAnnotationActions()
 const canEdit = useCan('edit')
@@ -120,21 +123,50 @@ const references = computed(() => {
   const keys = ['ResponsibilityKey', 'SubjectKey', 'UnitKey', 'UsageKey', 'ContextKey', 'ExecutionKey']
     .map((field) => ({ field: field.replace('Key', ''), key: record[field] }))
     .filter((entry): entry is { field: string; key: string } => typeof entry.key === 'string' && !!entry.key)
-  const names = ['ResponsibilityNames', 'ContextNames', 'UnitNames']
-    .map((field) => ({ field: field.replace('Names', ''), names: record[field] }))
-    .filter(
-      (entry): entry is { field: string; names: string[] } => Array.isArray(entry.names) && entry.names.length > 0,
-    )
   const unit = ['UnitType', 'UnitDefinition']
     .map((field) => ({ field, value: record[field] }))
     .filter((entry): entry is { field: string; value: string } => typeof entry.value === 'string' && !!entry.value)
-  return { keys, names, unit }
+  return { keys, unit }
 })
+
+// Exact totals only when this view's catalog finished a live load. A snapshot or a failed page is partial.
+const scopeMatches = computed(() => {
+  const current = context.scope
+  const loaded = catalog.scope
+  return (
+    !!current &&
+    !!loaded &&
+    current.org === loaded.org &&
+    current.project === loaded.project &&
+    current.view === loaded.view
+  )
+})
+const countingDescendants = computed(
+  () => !scopeMatches.value || catalog.status === 'idle' || catalog.status === 'loading',
+)
+const authoritativeCatalog = computed(
+  () => scopeMatches.value && catalog.status === 'ready' && !catalog.error && !catalog.fromSnapshot,
+)
+const descendants = computed(() => {
+  // In-place catalog edits publish through revision; byKey itself is a shallow map.
+  void catalog.revision
+  return groupedDescendants(props.annotation.AnnotationKey, catalog.byKey.keys(), catalog.ancestorsOf)
+})
+const showDescendants = computed(
+  () => countingDescendants.value || !authoritativeCatalog.value || descendants.value.groups.length > 0,
+)
 
 const link = (key: string) => ({
   path: `/${context.org}/${context.project}/${context.view}/annotations/${key}`,
   query: route.query,
 })
+
+const filteredList = (query: string) => ({
+  path: `/${context.org}/${context.project}/${context.view}/annotations`,
+  query: { q: query },
+})
+
+const descendantCount = (total: number) => (authoritativeCatalog.value ? String(total) : `at least ${total}`)
 </script>
 
 <template>
@@ -257,26 +289,74 @@ const link = (key: string) => ({
       </UFormField>
 
       <div
-        v-if="references.keys.length || references.names.length || references.unit.length"
+        v-if="references.keys.length || references.unit.length || showDescendants"
         class="space-y-2 rounded-md border border-default p-3"
+        data-testid="relations"
       >
-        <p class="text-xs font-semibold text-muted uppercase">Relations</p>
-        <div v-for="entry in references.keys" :key="entry.field" class="flex items-center gap-2 text-sm">
-          <span class="w-24 text-muted">{{ entry.field }}</span>
-          <RouterLink :to="link(entry.key)" class="font-mono text-xs text-primary hover:underline">{{
-            entry.key
-          }}</RouterLink>
-        </div>
-        <div v-for="entry in references.names" :key="entry.field" class="flex items-center gap-2 text-sm">
-          <span class="w-24 text-muted">{{ entry.field }}s</span>
-          <span class="flex flex-wrap gap-1"
-            ><UBadge v-for="name in entry.names" :key="name" :label="name" color="neutral" variant="outline" size="sm"
-          /></span>
-        </div>
-        <div v-for="entry in references.unit" :key="entry.field" class="flex items-center gap-2 text-sm">
-          <span class="w-24 text-muted">{{ entry.field }}</span>
-          <span class="font-mono text-xs">{{ entry.value }}</span>
-        </div>
+        <h2 class="text-xs font-semibold text-muted uppercase">Relations</h2>
+        <template v-if="references.keys.length || references.unit.length">
+          <h3 class="text-xs font-medium text-muted">Ancestors</h3>
+          <div v-for="entry in references.keys" :key="entry.field" class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="w-24 text-muted">{{ entry.field }}</span>
+            <RouterLink
+              :to="link(entry.key)"
+              class="max-w-full truncate font-mono text-xs text-primary hover:underline"
+              >{{ entry.key }}</RouterLink
+            >
+          </div>
+          <div v-for="entry in references.unit" :key="entry.field" class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="w-24 text-muted">{{ entry.field }}</span>
+            <span class="max-w-full truncate font-mono text-xs">{{ entry.value }}</span>
+          </div>
+        </template>
+        <template v-if="showDescendants">
+          <h3 class="text-xs font-medium text-muted">Descendants</h3>
+          <p
+            v-if="countingDescendants"
+            role="status"
+            aria-live="polite"
+            class="text-xs text-muted"
+            data-testid="descendants-status"
+          >
+            Counting descendants…
+          </p>
+          <template v-else>
+            <p v-if="!authoritativeCatalog" class="text-xs text-muted" data-testid="descendants-status">
+              The catalog is incomplete, so these counts are partial.
+            </p>
+            <div
+              v-for="group in descendants.groups"
+              :key="group.code"
+              class="flex flex-wrap items-center gap-2 text-sm"
+              data-testid="descendant-group"
+            >
+              <span class="flex w-24 min-w-0 items-center gap-1 text-muted">
+                <AnnotationTypeBadge :type="group.code" variant="icon" />
+                <span class="truncate" :title="metaOf(group.code)?.label">{{ metaOf(group.code)?.label }}</span>
+              </span>
+              <UBadge :label="descendantCount(group.total)" color="neutral" variant="outline" size="sm" />
+              <RouterLink
+                v-for="key in group.preview"
+                :key="key"
+                :to="link(key)"
+                class="max-w-full truncate font-mono text-xs text-primary hover:underline"
+                >{{ key }}</RouterLink
+              >
+              <RouterLink
+                v-if="group.total > group.preview.length"
+                :to="filteredList(group.query)"
+                class="text-xs text-primary hover:underline"
+                >Show all {{ group.total }}</RouterLink
+              >
+            </div>
+            <RouterLink
+              v-if="descendants.groups.length > 1"
+              :to="filteredList(descendants.query)"
+              class="text-xs text-primary hover:underline"
+              >All descendants ({{ descendantCount(descendants.total) }})</RouterLink
+            >
+          </template>
+        </template>
       </div>
     </form>
 
