@@ -20,6 +20,12 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
+  <!-- The host's shared framework: restore then prunes its packages, which Microsoft.Identity.Web.TokenCache brings
+       in at vulnerable versions (Microsoft.AspNetCore.DataProtection, System.Security.Cryptography.Xml 10.0.0). -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\src\Mcp.csproj" />
   </ItemGroup>

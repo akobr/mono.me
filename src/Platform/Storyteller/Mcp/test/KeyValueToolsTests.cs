@@ -70,6 +70,58 @@ public class KeyValueToolsTests
     }
 
     [Fact]
+    public async Task SetKeyValue_ExistingHyokPairWithoutProtection_IsRefusedBeforeTheWrite()
+    {
+        _keyValues.Setup(api => api.GetKeyValueAsync("house", "main", "default", "api.token", false, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.KeyValue { Key = "api.token", Protection = Sdk.KeyValueProtection.Hyok, IsSecret = true, Version = 2 });
+
+        var exception = await Should.ThrowAsync<ToolInputException>(() => Tools().SetKeyValue("house", "main", "api.token", "new-plaintext-secret"));
+
+        exception.Message.ShouldBe(KeyValueProtections.HyokRefusal);
+        _keyValues.Verify(api => api.SetKeyValueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Sdk.KeyValueWrite>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SetKeyValue_WithoutProtection_WritesANewKeyOrAPairThatIsNotHyok(bool exists)
+    {
+        var read = _keyValues.Setup(api => api.GetKeyValueAsync("house", "main", "default", "db.host", false, true, It.IsAny<CancellationToken>()));
+
+        if (exists)
+        {
+            read.ReturnsAsync(new Sdk.KeyValue { Key = "db.host", Protection = Sdk.KeyValueProtection.Standard, IsSecret = true, Version = 2 });
+        }
+        else
+        {
+            read.ThrowsAsync(ToolFixtures.NotFound());
+        }
+
+        Sdk.KeyValueWrite? sent = null;
+        _keyValues.Setup(api => api.SetKeyValueAsync("house", "main", "default", "db.host", It.IsAny<Sdk.KeyValueWrite>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, string, Sdk.KeyValueWrite, CancellationToken>((_, _, _, _, body, _) => sent = body)
+            .ReturnsAsync(new Sdk.KeyValue { Key = "db.host", Version = 3 });
+
+        await Tools().SetKeyValue("house", "main", "db.host", "sql.internal");
+
+        sent.ShouldNotBeNull();
+        sent.Protection.ShouldBeNull();
+        sent.Value.ShouldBe("sql.internal");
+    }
+
+    [Fact]
+    public void SetKeyValue_ContentTypeDescription_SaysAnUpdateWithoutItClearsTheType()
+    {
+        var parameter = typeof(KeyValueTools).GetMethod(nameof(KeyValueTools.SetKeyValue))!.GetParameters().Single(item => item.Name == "contentType");
+        var description = parameter.GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false)
+            .Cast<System.ComponentModel.DescriptionAttribute>()
+            .Single()
+            .Description;
+
+        description.ShouldContain("an update without it clears the stored type");
+    }
+
+    [Fact]
     public async Task SetKeyValue_UnknownProtection_IsAnInputError()
     {
         var exception = await Should.ThrowAsync<ToolInputException>(() => Tools().SetKeyValue("house", "main", "db.host", "x", protection: "Secret"));
@@ -263,6 +315,46 @@ public class KeyValueToolsTests
         sent.RequireMtlsForSecretDelivery.ShouldBeNull();
         sent.Byok.ShouldBeNull();
         sent.ExpectedVersion.ShouldBe(7);
+    }
+
+    [Fact]
+    public async Task SetKeyValuePolicy_ListWithoutPublic_GetsPublicAdded()
+    {
+        Sdk.KeyValuePolicyUpdate? sent = null;
+        _keyValues.Setup(api => api.SetKeyValuePolicyAsync("house", "main", It.IsAny<Sdk.KeyValuePolicyUpdate>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, Sdk.KeyValuePolicyUpdate, CancellationToken>((_, _, body, _) => sent = body)
+            .ReturnsAsync(new Sdk.KeyValuePolicy { Version = 8 });
+
+        await Tools().SetKeyValuePolicy("house", "main", allowedProtections: ["Standard", "Hsm"]);
+
+        sent.ShouldNotBeNull();
+        sent.AllowedProtections.ShouldBe([Sdk.AllowedProtections2.Standard, Sdk.AllowedProtections2.Hsm, Sdk.AllowedProtections2.Public]);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3651)]
+    [InlineData(int.MaxValue)]
+    public async Task SetKeyValuePolicy_HsmRotationOutsideTheApiBounds_IsAnInputError(int days)
+    {
+        var exception = await Should.ThrowAsync<ToolInputException>(() => Tools().SetKeyValuePolicy("house", "main", hsmRotationDays: days));
+
+        exception.Message.ShouldBe("'hsmRotationDays' is 1 to 3,650.");
+        _keyValues.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task SetKeyValuePolicy_HsmRotationOfTenYears_IsSent()
+    {
+        Sdk.KeyValuePolicyUpdate? sent = null;
+        _keyValues.Setup(api => api.SetKeyValuePolicyAsync("house", "main", It.IsAny<Sdk.KeyValuePolicyUpdate>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, Sdk.KeyValuePolicyUpdate, CancellationToken>((_, _, body, _) => sent = body)
+            .ReturnsAsync(new Sdk.KeyValuePolicy { Version = 8 });
+
+        await Tools().SetKeyValuePolicy("house", "main", hsmRotationDays: 3650);
+
+        sent.ShouldNotBeNull();
+        sent.HsmRotationInterval.ShouldBe("3650.00:00:00");
     }
 
     [Fact]

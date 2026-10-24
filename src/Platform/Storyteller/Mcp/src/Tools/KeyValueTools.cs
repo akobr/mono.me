@@ -74,13 +74,14 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
     [McpServerTool(Name = "set_key_value", Title = "Set a key/value pair", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
         "Creates or updates a pair as a new version; the older versions are kept. protection is required when the key is new "
-        + "and kept when it is omitted on an update. Read Version first (get_key_value) and pass it as expectedVersion, or 0 to "
-        + "create only when the key does not exist; a mismatch is 412 KeyValueVersionMismatch. Public pairs need Contributor; "
-        + "a secret level (Standard, Hsm, Byok), or a change to or from one, needs ContributorWithSecrets; a level the project "
-        + "policy does not allow is 409 ProtectionNotAllowed. Hyok is refused, because a client-encrypted value is encrypted "
-        + "on the person's machine by sform or the admin UI. A secret value given here is part of the conversation; to keep "
-        + "it out, the person sets it with sform (sform story kv set <key> --secret, hidden input) or the admin UI. The "
-        + "result never carries a secret value.")]
+        + "and kept when it is omitted on an update; contentType is not kept (see contentType). Read Version first "
+        + "(get_key_value) and pass it as expectedVersion, or 0 to create only when the key does not exist; a mismatch is 412 "
+        + "KeyValueVersionMismatch. Public pairs need Contributor; a secret level (Standard, Hsm, Byok), or a change to or "
+        + "from one, needs ContributorWithSecrets; a level the project policy does not allow is 409 ProtectionNotAllowed. "
+        + "Hyok is refused, and so is an update of an existing Hyok pair with protection omitted, because a client-encrypted "
+        + "value is encrypted on the person's machine by sform or the admin UI. A secret value given here is part of the "
+        + "conversation; to keep it out, the person sets it with sform (sform story kv set <key> --secret, hidden input) or "
+        + "the admin UI. The result never carries a secret value.")]
     public async Task<CallToolResult> SetKeyValue(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
@@ -89,9 +90,10 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
         [Description(ToolText.View)] string view = ToolText.DefaultView,
         [Description("Public, Standard, Hsm or Byok. Required for a new key; omit it to keep the level of an existing key.")] string? protection = null,
         [Description(
-            "An optional content type of up to 255 characters, such as text/plain or application/json. "
-            + "application/vnd.2s.secret-reference marks a public reference to a secret in the customer's own Key Vault "
-            + "(kv://{vault}/{name}), which the platform never resolves.")]
+            "An optional content type of up to 255 characters, such as text/plain or application/json. It replaces the "
+            + "stored content type: an update without it clears the stored type, so pass the ContentType from get_key_value "
+            + "to keep it. application/vnd.2s.secret-reference marks a public reference to a secret in the customer's own Key "
+            + "Vault (kv://{vault}/{name}), which the platform never resolves; a reference needs it on every update.")]
         string? contentType = null,
         [Description("Write only when the key is at this version; 0 writes only when the key does not exist or is deleted.")] long? expectedVersion = null,
         CancellationToken cancellationToken = default)
@@ -111,7 +113,17 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
             ExpectedVersion = expectedVersion,
         };
 
-        var pair = await keyValues.SetKeyValueAsync(organization, project, view, ToolArguments.Required(key, nameof(key)), body, cancellationToken);
+        var name = ToolArguments.Required(key, nameof(key));
+
+        // Without protection the API keeps the stored level, and a Hyok level would take the value as a client-encrypted
+        // document; the stored level is read first.
+        if (level is null
+            && await KeyValueProtections.FindAsync(keyValues, organization, project, view, name, cancellationToken) is { Protection: Sdk.KeyValueProtection.Hyok })
+        {
+            throw new ToolInputException(KeyValueProtections.HyokRefusal);
+        }
+
+        var pair = await keyValues.SetKeyValueAsync(organization, project, view, name, body, cancellationToken);
         return ToolResults.Json(KeyValueProtections.Describe(pair));
     }
 
@@ -278,10 +290,10 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
     public async Task<CallToolResult> SetKeyValuePolicy(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
-        [Description("Every level writes may use: " + KeyValueText.Levels + ". Public is always allowed.")] string[]? allowedProtections = null,
+        [Description("Every level writes may use: " + KeyValueText.Levels + ". Public is always allowed and added when it is missing.")] string[]? allowedProtections = null,
         [Description("The secret level clients offer as default: Standard, Hsm, Byok or Hyok; it must be allowed.")] string? defaultSecretProtection = null,
         [Description("true: machines receive and write secret values only with an mTLS certificate.")] bool? requireMtlsForSecretDelivery = null,
-        [Description("How often the platform rotates the project's HSM key, in days.")] int? hsmRotationDays = null,
+        [Description("How often the platform rotates the project's HSM key, in days: 1 to 3,650.")] int? hsmRotationDays = null,
         [Description("Change only when the policy is at this Version (get_key_value_policy).")] long? expectedVersion = null,
         CancellationToken cancellationToken = default)
     {
@@ -290,15 +302,18 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
             throw new ToolInputException("'allowedProtections' lists every allowed level; pass [\"Public\"] to allow public pairs only, or omit it to keep the list.");
         }
 
-        if (hsmRotationDays < 1)
+        // The API's bounds: 1 day to 10 years.
+        if (hsmRotationDays is < 1 or > 3650)
         {
-            throw new ToolInputException("'hsmRotationDays' is 1 or higher.");
+            throw new ToolInputException("'hsmRotationDays' is 1 to 3,650.");
         }
 
         var body = new Sdk.KeyValuePolicyUpdate
         {
+            // The API refuses a list without Public, which always stays allowed.
             AllowedProtections = allowedProtections?
                 .Select(level => EnumNames.Parse<Sdk.AllowedProtections2>(level, nameof(allowedProtections)))
+                .Append(Sdk.AllowedProtections2.Public)
                 .Distinct()
                 .ToList(),
             DefaultSecretProtection = EnumNames.ParseOptional<Sdk.KeyValuePolicyUpdateDefaultSecretProtection>(defaultSecretProtection, nameof(defaultSecretProtection)),

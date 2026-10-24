@@ -37,7 +37,7 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
 
         var configured = options.Value;
         _clientId = configured.ClientId ?? string.Empty;
-        _delegatedClients = configured.DelegatedClients.ToArray();
+        _delegatedClients = NormalizeDelegatedClients(configured.DelegatedClients);
         _configurationManager = configurationManager;
 
         if (environment.IsDevelopment())
@@ -75,6 +75,16 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
         }
 
         return appId;
+    }
+
+    // The settings accept any GUID form ({...}, 32 digits); tokens carry azp and tid in the dashed form (D).
+    public static IReadOnlyList<DelegatedClientOptions> NormalizeDelegatedClients(IEnumerable<DelegatedClientOptions> delegatedClients)
+    {
+        ArgumentNullException.ThrowIfNull(delegatedClients);
+
+        return delegatedClients
+            .Select(client => new DelegatedClientOptions { ClientId = NormalizeGuid(client.ClientId), TenantId = NormalizeGuid(client.TenantId) })
+            .ToArray();
     }
 
     public async Task<BearerValidationResult?> ValidateAsync(string rawToken, CancellationToken cancellationToken = default)
@@ -180,6 +190,12 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
         }
 
         return claims.Any(claim => claim.Type is ("scp" or ScopeClaimType) && !string.IsNullOrWhiteSpace(claim.Value));
+    }
+
+    // A value that is not a GUID stays as it is; the options validator refuses it.
+    private static string NormalizeGuid(string? value)
+    {
+        return Guid.TryParse(value, out var id) ? id.ToString("D") : value ?? string.Empty;
     }
 
     private static string? FirstClaim(IReadOnlyList<Claim> claims, string type)

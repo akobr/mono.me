@@ -45,6 +45,9 @@ public static class ApiErrors
             details["ErrorCode"] = errorCode;
         }
 
+        // Structured Message is the API's (or the fixed) message alone; the text below composes it with status and hint.
+        details["Message"] = message;
+
         if (!string.IsNullOrEmpty(hint))
         {
             details["Hint"] = hint;

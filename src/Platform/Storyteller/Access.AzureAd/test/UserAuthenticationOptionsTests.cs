@@ -190,6 +190,34 @@ public class UserAuthenticationOptionsTests
         result.FailureMessage.ShouldContain("other than Auth:ClientId");
     }
 
+    [Theory]
+    [InlineData("{6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11}", McpClientId)]
+    [InlineData("6c0f1a2e1f434b0e9a4d2f5e8f0c9b11", McpClientId)]
+    [InlineData(McpClientId, "{6C0F1A2E-1F43-4B0E-9A4D-2F5E8F0C9B11}")]
+    [InlineData(McpClientId, "6c0f1a2e1f434b0e9a4d2f5e8f0c9b11")]
+    public void Validate_DelegatedClientEqualToTheApiClientInAnotherGuidForm_Fails(string apiClientId, string delegatedClientId)
+    {
+        var options = EntraOptions("tenant", apiClientId);
+        options.DelegatedClients.Add(new DelegatedClientOptions { ClientId = delegatedClientId, TenantId = McpTenantId });
+
+        var result = _validator.Validate(null, options);
+
+        result.Failed.ShouldBeTrue();
+        result.FailureMessage.ShouldNotBeNull();
+        result.FailureMessage.ShouldContain("other than Auth:ClientId");
+    }
+
+    [Theory]
+    [InlineData("{6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11}", "{8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d}")]
+    [InlineData("6c0f1a2e1f434b0e9a4d2f5e8f0c9b11", "8a7b6c5d4e3f4a1b8c9d0e1f2a3b4c5d")]
+    public void Validate_DelegatedClientInAnotherGuidForm_Succeeds(string clientId, string tenantId)
+    {
+        var options = EntraOptions("tenant", "client");
+        options.DelegatedClients.Add(new DelegatedClientOptions { ClientId = clientId, TenantId = tenantId });
+
+        _validator.Validate(null, options).Succeeded.ShouldBeTrue();
+    }
+
     [Fact]
     public void Validate_DelegatedClientsUnderAuthKit_Fail()
     {

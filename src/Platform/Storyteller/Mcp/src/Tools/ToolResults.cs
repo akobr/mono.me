@@ -25,10 +25,11 @@ public static class ToolResults
     }
 
     // The text is the message as it is, for the model; the structured content adds the details (status, error code).
+    // Details that carry their own Message (the API's, without the status and hint the text adds) keep it.
     public static CallToolResult Error(string message, object? details = null)
     {
         var content = details is null ? new JObject() : ToObject(details);
-        content["Message"] = message;
+        content["Message"] ??= message;
 
         using var document = JsonDocument.Parse(content.ToString(Formatting.None));
 

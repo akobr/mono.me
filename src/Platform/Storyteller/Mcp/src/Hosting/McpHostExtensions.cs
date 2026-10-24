@@ -14,6 +14,8 @@ public static class McpHostExtensions
 {
     public const string McpPath = "/mcp";
 
+    public static readonly TimeSpan ApiCallTimeout = TimeSpan.FromMinutes(5);
+
     public static WebApplicationBuilder AddStorytellerMcp(this WebApplicationBuilder builder)
     {
         builder.AddServiceDefaults();
@@ -81,6 +83,10 @@ public static class McpHostExtensions
 
     // The scoped ISdkConfiguration wins over the SDK's own singleton (TryAdd): every request's clients send the token of
     // that request. Unsafe methods are never retried: a retried machine creation would create a second machine.
+    //
+    // A call may take as long as ApiCallTimeout. The standard handler's 10-second attempt (and HttpClient's 100-second)
+    // timeout would drop the answer of a write the API still completes, the one-time credentials of a new machine
+    // among them. The circuit breaker samples at least two attempts, which its options validator requires.
     public static IServiceCollection AddStorytellerClients(this IServiceCollection services)
     {
         services.AddScoped<StorytellerAccessToken>();
@@ -99,7 +105,14 @@ public static class McpHostExtensions
 #pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it drops the defaults' handler that retries writes.
             client.RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
-            client.AddStandardResilienceHandler(options => options.Retry.DisableForUnsafeHttpMethods());
+            client.ConfigureHttpClient(http => http.Timeout = Timeout.InfiniteTimeSpan);
+            client.AddStandardResilienceHandler(options =>
+            {
+                options.Retry.DisableForUnsafeHttpMethods();
+                options.AttemptTimeout.Timeout = ApiCallTimeout;
+                options.TotalRequestTimeout.Timeout = ApiCallTimeout;
+                options.CircuitBreaker.SamplingDuration = 2 * ApiCallTimeout;
+            });
         });
 
         return services;
