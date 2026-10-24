@@ -72,6 +72,41 @@ public class AnnotationModelTests
     }
 
     [Fact]
+    public void Normalize_CopiesTheTriggerFromIUnit()
+    {
+        var key = AnnotationKey.CreateUnit("invoicing", "export");
+        var input = new TriggerOnlyUnit
+        {
+            ProjectName = "billing",
+            ViewName = "default",
+            AnnotationKey = key.ToString(),
+            Name = "export",
+            AnnotationType = AnnotationType.Unit,
+            ResponsibilityKey = "rst.invoicing",
+            ResponsibilityName = "invoicing",
+            UnitType = "volume",
+            UnitDefinition = "incoming/*.csv",
+        };
+
+        var unit = AnnotationFactory.Normalize(input, key).ShouldBeOfType<Unit>();
+
+        unit.UnitType.ShouldBe("volume");
+        unit.UnitDefinition.ShouldBe("incoming/*.csv");
+    }
+
+    // An IUnit that is not the concrete Unit, so the copy cannot depend on that record.
+    private sealed record TriggerOnlyUnit : Annotation, IUnit
+    {
+        public required string ResponsibilityKey { get; init; }
+
+        public required string ResponsibilityName { get; init; }
+
+        public required string UnitType { get; init; }
+
+        public required string UnitDefinition { get; init; }
+    }
+
+    [Fact]
     public void CreateDefault_CopiesTheMembersOfAnAutomaticAncestor()
     {
         var from = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
