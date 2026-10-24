@@ -53,6 +53,43 @@ test('the breadcrumb opens the configuration of a parent and keeps Lineage at th
   await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('Context prod')
 })
 
+test('Annotation opens the annotation and drops the filter', async ({ page }) => {
+  await openApp(page, `${path}?q=northwind`)
+  await page.getByRole('link', { name: 'Annotation', exact: true }).click()
+
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`/acme/billing/default/annotations/${key}`)
+  expect(new URL(page.url()).searchParams.has('q')).toBe(false)
+  await expect(page.getByRole('link', { name: 'Inherited configuration', exact: true })).toBeVisible()
+})
+
+test('a reader sees Annotation on a configuration', async ({ page }) => {
+  await openApp(page, `/northwind/portal/default/configurations/${key}`)
+  await expect(page.getByRole('link', { name: 'Annotation', exact: true })).toBeVisible()
+})
+
+test('a dirty configuration asks before Annotation opens', async ({ page }) => {
+  await openFromTemplate(page)
+  await editJson(page, (content) => {
+    content.retries = 9
+  })
+
+  const confirm = page.getByRole('dialog', { name: 'Discard changes?' })
+  const annotation = page.getByRole('link', { name: 'Annotation', exact: true })
+  await annotation.click()
+  await expect(confirm).toBeVisible()
+  await expect.poll(() => new URL(page.url()).pathname).toBe(path)
+
+  await confirm.getByRole('button', { name: 'Keep editing' }).click()
+  await expect(confirm).toBeHidden()
+  await expect.poll(() => new URL(page.url()).pathname).toBe(path)
+  await expect(page.locator('.cm-content').first()).toContainText('"retries": 9')
+
+  await annotation.click()
+  await confirm.getByRole('button', { name: 'Discard', exact: true }).click()
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`/acme/billing/default/annotations/${key}`)
+  expect(new URL(page.url()).searchParams.has('q')).toBe(false)
+})
+
 /** Opens the drop-down of the New dialog on Configurations and searches it; the options are teleported to the body. */
 async function searchNewConfiguration(page: Page, term: string) {
   // The one of the top bar: with a filter, the empty state (and its button) shows until the catalog has loaded.
