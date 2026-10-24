@@ -40,3 +40,4 @@ In the mock admin UI, `sbt.northwind` shows Usage 5, Instance 3, AppRun 15 with 
 
 - The branch `feat/424-89` is based on local `main` at `981684a3`, which is behind `origin/main`. The three-dot diff against `origin/main` is these commits.
 - No end-to-end spec was added. The relations behavior is covered by the component test and a pass through the mock UI.
+- Descendants stays hidden when `descendantTypeCodes` is empty, including while the catalog is loading or has failed. A unit of execution does not flash "Counting descendants…" or keep the incomplete note. Settled partial catalogs still badge known counts as "at least N", as the spec asks.

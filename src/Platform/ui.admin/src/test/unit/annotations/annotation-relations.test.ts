@@ -132,19 +132,25 @@ describe('annotation relations', () => {
     screen.host.unmount()
   })
 
-  it('omits descendants when the catalog is complete and the annotation has none', async () => {
+  it('omits descendants when the annotation cannot have any', async () => {
     const leaf: Annotation = {
       ...context,
       AnnotationKey: 'uxe.northwind.alpha.prod.worker',
       Name: 'worker',
       AnnotationType: 'UnitOfExecution',
     }
-    fillCatalog(['uxe.northwind.alpha.prod.worker'])
-    const screen = await mountScreen(AnnotationForm, { annotation: leaf, fresh: true }, { scope })
-    await settle()
+    const open = async (state: Parameters<typeof fillCatalog>[1] = {}) => {
+      fillCatalog(['uxe.northwind.alpha.prod.worker'], state)
+      const screen = await mountScreen(AnnotationForm, { annotation: leaf, fresh: true }, { scope })
+      await settle()
+      expect(screen.host.text()).toContain('Ancestors')
+      expect(screen.host.text()).not.toContain('Descendants')
+      expect(screen.host.text()).not.toContain('Counting descendants')
+      screen.host.unmount()
+    }
 
-    expect(screen.host.text()).toContain('Ancestors')
-    expect(screen.host.text()).not.toContain('Descendants')
-    screen.host.unmount()
+    await open()
+    await open({ status: 'loading' })
+    await open({ status: 'error', error: new Error('page failed') })
   })
 })

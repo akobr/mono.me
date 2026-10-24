@@ -16,7 +16,7 @@ import { toTypedSchema } from '@/forms/typed-schema'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore, type EditorMode } from '@/stores/preferences'
-import { groupedDescendants, metaOf } from '@/utils/annotation-key'
+import { descendantTypeCodes, groupedDescendants, metaOf } from '@/utils/annotation-key'
 import { errorMessage } from '@/utils/errors'
 
 /**
@@ -152,8 +152,12 @@ const descendants = computed(() => {
   void catalog.revision
   return groupedDescendants(props.annotation.AnnotationKey, catalog.byKey.keys(), catalog.ancestorsOf)
 })
+// A unit of execution, or any key with no descendant types, never grows a Descendants block.
+const canHaveDescendants = computed(() => descendantTypeCodes(props.annotation.AnnotationKey).length > 0)
 const showDescendants = computed(
-  () => countingDescendants.value || !authoritativeCatalog.value || descendants.value.groups.length > 0,
+  () =>
+    canHaveDescendants.value &&
+    (countingDescendants.value || !authoritativeCatalog.value || descendants.value.groups.length > 0),
 )
 
 const link = (key: string) => ({
