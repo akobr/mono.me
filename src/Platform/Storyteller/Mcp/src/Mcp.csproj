@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.Mcp</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.Mcp</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UserSecretsId>5d1f6b0e-8c3a-4f7e-9b52-2a6c4d8e1f30</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="42.Platform.Storyteller.Mcp.UnitTests" />
+    <InternalsVisibleTo Include="42.Platform.Storyteller.Mcp.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.Identity.Client" />
+    <PackageReference Include="Microsoft.Identity.Web.TokenCache" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <PackageReference Include="NJsonSchema" />
+    <!-- Microsoft.Identity.Web.TokenCache 4.5.0 brings 10.0.0, which has known vulnerabilities. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Aspire.ServiceDefaults\src\Aspire.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
+    <ProjectReference Include="..\..\Sdk.NSwag\src\Sdk.NSwag.csproj" />
+  </ItemGroup>
+
+</Project>
