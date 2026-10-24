@@ -81,11 +81,27 @@ public class ConfigurationSearchTests
     [Fact]
     public void BindsKey_MatchesTheValuesStoreReferences_AsStored()
     {
-        var matches = new ConfigurationSearch(bindsKey: "DB.Password").FindMatches("sbt.a", 1, Document).ToList();
+        var matches = new ConfigurationSearch(bindsKey: "DB.Password").FindMatches("sbt.a", 1, Document).ToDictionary(match => match.Pointer!);
 
-        // not the Key Vault source, not the program of an object binding, not a different key that starts alike
-        matches.Select(match => match.Pointer).ShouldBe(["/database/password", "/url", "/public", "/rule/$context/p"]);
-        matches[0].Value!.Value<string>().ShouldBe("@secret(db.password)");
+        // not the Key Vault source, not a different key that starts alike
+        matches.Keys.ShouldBe(["/database/password", "/url", "/public", "/rule/$definition/v", "/rule/$context/p"]);
+        matches["/database/password"].Value!.Value<string>().ShouldBe("@secret(db.password)");
+        matches["/database/password"].Note.ShouldBeNull();
+        matches["/rule/$context/p"].Note.ShouldBeNull();
+
+        // the resolver binds the program's result again: a string of the program is read when the program emits it
+        matches["/rule/$definition/v"].Note.ShouldBe(ConfigurationSearch.PossibleReadNote);
+    }
+
+    [Fact]
+    public void BindsKey_InTheProgramOfAnObjectBinding_IsAPossibleRead()
+    {
+        var document = JObject.Parse("""{"conn": {"$binding": "jsone", "$definition": {"password": "@db.password"}}}""");
+
+        var match = new ConfigurationSearch(bindsKey: "db.password").FindMatches("sbt.a", 1, document).ShouldHaveSingleItem();
+
+        match.Pointer.ShouldBe("/conn/$definition/password");
+        match.Note.ShouldBe(ConfigurationSearch.PossibleReadNote);
     }
 
     [Fact]

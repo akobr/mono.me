@@ -28,7 +28,7 @@ public class BindingCheckToolsTests
               "host": "@db.host",
               "plain": "x",
               "list": ["@public(region)"],
-              "rule": { "$binding": "jlogic", "$definition": { "var": "tier" }, "$context": { "tier": "@plan.tier" } }
+              "rule": { "$binding": "jlogic", "$definition": { "if": [{ "var": "tier" }, { "var": "tier" }, "@plan.fallback"] }, "$context": { "tier": "@plan.tier" } }
             }
             """);
         _configurations
@@ -43,6 +43,8 @@ public class BindingCheckToolsTests
         result.Text().ShouldNotContain(Secret);
         result.StructuredContent!.Value.GetRawText().ShouldNotContain(Secret);
         var bindings = Bindings(result);
+
+        // the strings in $context and $definition are replaced together with their object binding
         bindings.Keys.ShouldBe(["/password", "/host", "/list/0", "/rule"]);
         bindings["/password"].ShouldBe(true);
         bindings["/host"].ShouldBe(false);
