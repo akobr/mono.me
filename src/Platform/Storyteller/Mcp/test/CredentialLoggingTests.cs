@@ -47,7 +47,7 @@ public sealed class CredentialLoggingTests : IDisposable
         var result = await client.CallAsync("reset_machine", new { organization = "house", project = "main", id = "m-1" });
 
         result.Text().ShouldContain(AccessKey);
-        _host.Api.Requests.ShouldHaveSingleItem().Method.ShouldBe(HttpMethod.Put);
+        _host.Api.Requests.Select(request => request.Method).ShouldBe([HttpMethod.Get, HttpMethod.Put]);
         ShouldNotBeLogged();
     }
 

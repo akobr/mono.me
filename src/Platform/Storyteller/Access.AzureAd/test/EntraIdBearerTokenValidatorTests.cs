@@ -165,6 +165,35 @@ public class EntraIdBearerTokenValidatorTests
         result.IsMachine.ShouldBeFalse();
     }
 
+    [Theory]
+    [InlineData("{6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11}", "{8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d}")]
+    [InlineData("6C0F1A2E1F434B0E9A4D2F5E8F0C9B11", "8a7b6c5d4e3f4a1b8c9d0e1f2a3b4c5d")]
+    public async Task Validate_DelegatedTokenOfAClientListedInAnotherGuidForm_IsAUser(string clientId, string tenantId)
+    {
+        using var fixture = new TokenFixture(delegatedClients: [new DelegatedClientOptions { ClientId = clientId, TenantId = tenantId }]);
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeFalse();
+        result.MachineId.ShouldBeNull();
+    }
+
+    [Fact]
+    public void NormalizeDelegatedClients_WritesTheDashedForm()
+    {
+        var normalized = EntraIdBearerTokenValidator.NormalizeDelegatedClients(
+            [new DelegatedClientOptions { ClientId = "{6C0F1A2E-1F43-4B0E-9A4D-2F5E8F0C9B11}", TenantId = "8a7b6c5d4e3f4a1b8c9d0e1f2a3b4c5d" }]);
+
+        var client = normalized.ShouldHaveSingleItem();
+        client.ClientId.ShouldBe(McpClientId);
+        client.TenantId.ShouldBe(McpTenantId);
+    }
+
     [Fact]
     public async Task Validate_V1DelegatedTokenOfListedClient_IsAUser()
     {

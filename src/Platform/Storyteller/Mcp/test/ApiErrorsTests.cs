@@ -65,6 +65,29 @@ public class ApiErrorsTests
     }
 
     [Fact]
+    public void StructuredMessage_IsTheApiMessageAlone()
+    {
+        var result = ApiErrors.ToResult(Error(412, new Sdk.ErrorResponse { Message = "The key changed since it was read.", Hint = "Read the key again.", ErrorCode = "KeyValueVersionMismatch" }));
+
+        var content = result.StructuredContent!.Value;
+        content.GetProperty("Message").GetString().ShouldBe("The key changed since it was read.");
+        content.GetProperty("Hint").GetString().ShouldBe("Read the key again.");
+        content.GetProperty("ErrorCode").GetString().ShouldBe("KeyValueVersionMismatch");
+        content.EnumerateObject().Select(property => property.Name).ShouldBe(["Status", "ErrorCode", "Message", "Hint"]);
+        result.Text().ShouldBe("Storyteller API answered 412 KeyValueVersionMismatch: The key changed since it was read. Hint: Read the key again.");
+    }
+
+    [Theory]
+    [InlineData(404, "It does not exist, or it is not visible to the signed-in person.")]
+    [InlineData(500, ApiErrors.ServerMessage)]
+    public void StructuredMessage_OfAnAnswerWithoutABody_IsTheFixedMessage(int status, string message)
+    {
+        var result = ApiErrors.ToResult(new Sdk.ApiException("The HTTP status code of the response was not expected.", status, Marker, NoHeaders, null));
+
+        result.StructuredContent!.Value.GetProperty("Message").GetString().ShouldBe(message);
+    }
+
+    [Fact]
     public void Unauthorized_NamesTheDelegatedClientSetting()
     {
         var result = ApiErrors.ToResult(new Sdk.ApiException("Unauthorized", 401, "Scope(s): User.Impersonation", NoHeaders, null));

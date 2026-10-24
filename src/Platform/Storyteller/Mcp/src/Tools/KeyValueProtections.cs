@@ -27,6 +27,25 @@ public static class KeyValueProtections
         return content;
     }
 
+    // The pair without its value, a deleted pair included; null when the key does not exist.
+    public static async Task<Sdk.KeyValue?> FindAsync(
+        Sdk.IKeyValuesApiClient keyValues,
+        string organization,
+        string project,
+        string view,
+        string key,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await keyValues.GetKeyValueAsync(organization, project, view, key, false, true, cancellationToken);
+        }
+        catch (Sdk.ApiException exception) when (exception.StatusCode == 404)
+        {
+            return null;
+        }
+    }
+
     // A listing filter: validated names, comma-separated as the API takes them.
     public static string? ToFilter(IReadOnlyCollection<string>? protections, string parameter)
     {

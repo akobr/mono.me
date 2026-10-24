@@ -50,6 +50,26 @@ public class EntraIdClaimNormalizerTests
         result.MachineId.ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData("{6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11}", "{8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d}")]
+    [InlineData("6c0f1a2e1f434b0e9a4d2f5e8f0c9b11", "8A7B6C5D4E3F4A1B8C9D0E1F2A3B4C5D")]
+    public void Normalize_DelegatedTokenOfAClientListedInAnotherGuidForm_IsAUser(string clientId, string tenantId)
+    {
+        var normalizer = new EntraIdClaimNormalizer(Options.Create(new UserAuthenticationOptions
+        {
+            Provider = IdentityProviderKind.EntraId,
+            TenantId = "tenant-id",
+            ClientId = "client-id",
+            DelegatedClients = [new DelegatedClientOptions { ClientId = clientId, TenantId = tenantId }],
+        }));
+
+        var result = normalizer.Normalize(
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+
+        result.IsMachine.ShouldBeFalse();
+        result.MachineId.ShouldBeNull();
+    }
+
     [Fact]
     public void Normalize_AppOnlyTokenOfListedClient_IsAMachine()
     {

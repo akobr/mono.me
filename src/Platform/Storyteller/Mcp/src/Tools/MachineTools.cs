@@ -78,7 +78,12 @@ public sealed class MachineTools(Sdk.IAccessApiClient access)
             ? FederationRuleArguments.Parse(element, nameof(federationRules))
             : null;
 
-        // As in sform, rules imply the Federated kind.
+        // As in sform, rules imply the Federated kind. An empty list is no rules, as the API takes it.
+        if (rules is { Count: 0 })
+        {
+            rules = null;
+        }
+
         var kind = EnumNames.ParseOptional<Sdk.MachineAccessCreateCredentialKind>(credentialKind, nameof(credentialKind))
             ?? (rules is null ? null : Sdk.MachineAccessCreateCredentialKind.Federated);
 
@@ -102,15 +107,26 @@ public sealed class MachineTools(Sdk.IAccessApiClient access)
     [Description(
         "Replaces the secret of a machine (its API key, or its client secret for ClientCredentials) and returns the new one "
         + "once in AccessKey; the old secret stops working. The API keeps no copy; CredentialNotice names what the result "
-        + "holds, and the secret enters the conversation. A Federated machine has no secret and cannot be reset (400); the "
-        + "reset returns no certificate. " + MachineText.Roles)]
+        + "holds, and the secret enters the conversation. A Federated machine has no secret and cannot be reset (400). "
+        + MachineText.CertificateReset + " A CertificateAndApiKey machine gets a new API key; the reset returns no "
+        + "certificate. " + MachineText.Roles)]
     public async Task<CallToolResult> ResetMachine(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
         [Description(MachineText.Id)] string id,
         CancellationToken cancellationToken)
     {
-        var machine = await access.ResetMachineAccessAsync(organization, project, ToolArguments.Required(id, nameof(id)), cancellationToken);
+        var machineId = ToolArguments.Required(id, nameof(id));
+
+        // The API has nothing to reset on a Certificate machine and answers 500, which no retry fixes.
+        var existing = await access.GetMachineAccessAsync(organization, project, machineId, cancellationToken);
+
+        if (existing.CredentialKind == Sdk.MachineAccessCredentialKind.Certificate)
+        {
+            throw new ToolInputException(MachineText.CertificateReset);
+        }
+
+        var machine = await access.ResetMachineAccessAsync(organization, project, machineId, cancellationToken);
         return MachineCredentialNotice.Result(machine, MachineCredentialNotice.ForReset(machine));
     }
 

@@ -14,7 +14,7 @@ public sealed class EntraIdClaimNormalizer : IBearerClaimsNormalizer
     public EntraIdClaimNormalizer(IOptions<UserAuthenticationOptions> options)
     {
         _clientId = options.Value.ClientId;
-        _delegatedClients = options.Value.DelegatedClients.ToArray();
+        _delegatedClients = EntraIdBearerTokenValidator.NormalizeDelegatedClients(options.Value.DelegatedClients);
     }
 
     // Entra claims already have the shape the API reads. Only the machine rule applies, with the same delegated
