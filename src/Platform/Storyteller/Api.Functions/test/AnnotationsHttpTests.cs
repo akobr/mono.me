@@ -280,6 +280,81 @@ public class AnnotationsHttpTests
     }
 
     [Fact]
+    public async Task SetMany_UnitWithATrigger_PassesTheConcreteUnit()
+    {
+        var annotations = new RecordingAnnotations();
+        const string body = """
+            [{
+              "annotationKey": "unt.invoicing.export",
+              "name": "export",
+              "annotationType": "unit",
+              "projectName": "x",
+              "viewName": "y",
+              "responsibilityKey": "rst.invoicing",
+              "responsibilityName": "invoicing",
+              "unitType": "time",
+              "unitDefinition": "*/15 * * * *"
+            }]
+            """;
+
+        var result = await Http(annotations).SetAnnotations(Request("POST", body), "acme", "billing", "staging");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        var created = annotations.LastCreated.ShouldNotBeNull().ShouldHaveSingleItem().ShouldBeOfType<Unit>();
+        created.ProjectName.ShouldBe("billing");
+        created.ViewName.ShouldBe("staging");
+        created.UnitType.ShouldBe("time");
+        created.UnitDefinition.ShouldBe("*/15 * * * *");
+    }
+
+    [Fact]
+    public async Task SetMany_UnitWithoutATrigger_StaysABaseAnnotation()
+    {
+        var annotations = new RecordingAnnotations();
+        const string body = """
+            [{
+              "annotationKey": "unt.invoicing.export",
+              "name": "export",
+              "annotationType": "Unit",
+              "projectName": "x",
+              "viewName": "y"
+            }]
+            """;
+
+        var result = await Http(annotations).SetAnnotations(Request("POST", body), "acme", "billing", "staging");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        var created = annotations.LastCreated.ShouldNotBeNull().ShouldHaveSingleItem();
+        created.ShouldBeOfType<Annotation>();
+        created.ShouldNotBeOfType<Unit>();
+        created.AnnotationType.ShouldBe(AnnotationType.Unit);
+    }
+
+    [Fact]
+    public async Task SetMany_UnitWithOnlyOneTriggerProperty_IsBadRequest()
+    {
+        var annotations = new RecordingAnnotations();
+        const string body = """
+            [{
+              "annotationKey": "unt.invoicing.export",
+              "name": "export",
+              "annotationType": "Unit",
+              "projectName": "x",
+              "viewName": "y",
+              "responsibilityKey": "rst.invoicing",
+              "responsibilityName": "invoicing",
+              "unitType": "message"
+            }]
+            """;
+
+        var result = await Http(annotations).SetAnnotations(Request("POST", body), "acme", "billing", "staging");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldStartWith("Invalid annotation object in body:");
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Delete_ReturnsTheDeletion()
     {
         var annotations = new RecordingAnnotations();
