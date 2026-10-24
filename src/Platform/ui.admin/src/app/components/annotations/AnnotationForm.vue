@@ -18,6 +18,14 @@ import { useContextStore } from '@/stores/context'
 import { usePreferencesStore, type EditorMode } from '@/stores/preferences'
 import { descendantTypeCodes, groupedDescendants, metaOf } from '@/utils/annotation-key'
 import { errorMessage } from '@/utils/errors'
+import {
+  cronFieldHint,
+  genericUnitDefinitionHelp,
+  genericUnitDefinitionPlaceholder,
+  isUnitAnnotation,
+  unitTypeInfo,
+  unitTypeMenuItems,
+} from '@/utils/unit-types'
 
 /**
  * The Annotation tab (spec section 11.1): Form | JSON | YAML over one VeeValidate form with one Zod schema.
@@ -49,6 +57,8 @@ const [expiresAt] = defineField('ExpiresAt')
 const [timeZone] = defineField('TimeZone')
 const [labels] = defineField('Labels')
 const [valuesField] = defineField('Values')
+const [unitType] = defineField('UnitType')
+const [unitDefinition] = defineField('UnitDefinition')
 
 const readonly = computed(() => !canEdit.value)
 const descriptionTab = ref<'write' | 'preview'>('write')
@@ -118,15 +128,28 @@ defineShortcuts({
 
 const errorList = computed(() => Object.entries(errors.value).filter(([, message]) => !!message))
 
+const isUnit = computed(() => isUnitAnnotation(props.annotation))
+const typeItems = computed(() => unitTypeMenuItems(unitType.value))
+const typeInfo = computed(() => unitTypeInfo(unitType.value))
+const definitionHelp = computed(() => typeInfo.value?.definitionHelp ?? genericUnitDefinitionHelp)
+const definitionPlaceholder = computed(() => typeInfo.value?.definitionPlaceholder ?? genericUnitDefinitionPlaceholder)
+const cronHint = computed(() => (typeInfo.value?.value === 'time' ? cronFieldHint(unitDefinition.value) : undefined))
+
+function createUnitType(value: string) {
+  unitType.value = value.trim()
+}
+
 const references = computed(() => {
   const record = props.annotation as unknown as Record<string, unknown>
   const keys = ['ResponsibilityKey', 'SubjectKey', 'UnitKey', 'UsageKey', 'ContextKey', 'ExecutionKey']
     .map((field) => ({ field: field.replace('Key', ''), key: record[field] }))
     .filter((entry): entry is { field: string; key: string } => typeof entry.key === 'string' && !!entry.key)
-  const unit = ['UnitType', 'UnitDefinition']
-    .map((field) => ({ field, value: record[field] }))
-    .filter((entry): entry is { field: string; value: string } => typeof entry.value === 'string' && !!entry.value)
-  return { keys, unit }
+  const names = ['ResponsibilityNames', 'ContextNames', 'UnitNames']
+    .map((field) => ({ field: field.replace('Names', ''), names: record[field] }))
+    .filter(
+      (entry): entry is { field: string; names: string[] } => Array.isArray(entry.names) && entry.names.length > 0,
+    )
+  return { keys, names }
 })
 
 // Exact totals only when this view's catalog finished a live load. A snapshot or a failed page is partial.
@@ -284,6 +307,41 @@ const descendantCount = (total: number) => (authoritativeCatalog.value ? String(
         <TimeZoneSelect v-model="timeZone" :disabled="readonly" />
       </UFormField>
 
+      <div v-if="isUnit" class="space-y-4" data-testid="unit-fields">
+        <p class="text-xs font-semibold text-muted uppercase">Unit</p>
+        <UFormField label="Unit type" name="UnitType" :error="errors.UnitType" :help="typeInfo?.description">
+          <UInputMenu
+            v-model="unitType"
+            :items="typeItems"
+            value-key="value"
+            create-item
+            :disabled="readonly"
+            class="w-full"
+            aria-label="Unit type"
+            data-testid="unit-type"
+            @create="createUnitType"
+          />
+        </UFormField>
+        <UFormField
+          label="Unit definition"
+          name="UnitDefinition"
+          :error="errors.UnitDefinition"
+          :help="definitionHelp"
+        >
+          <UTextarea
+            v-model="unitDefinition"
+            autoresize
+            :rows="2"
+            :disabled="readonly"
+            class="w-full"
+            :placeholder="definitionPlaceholder"
+            aria-label="Unit definition"
+            data-testid="unit-definition"
+          />
+          <p v-if="cronHint" class="mt-1 text-xs text-muted" data-testid="unit-cron-hint">{{ cronHint }}</p>
+        </UFormField>
+      </div>
+
       <UFormField label="Labels" name="Labels" :error="errors.Labels">
         <LabelsInput v-model="labels" :disabled="readonly" />
       </UFormField>
@@ -293,12 +351,12 @@ const descendantCount = (total: number) => (authoritativeCatalog.value ? String(
       </UFormField>
 
       <div
-        v-if="references.keys.length || references.unit.length || showDescendants"
+        v-if="references.keys.length || references.names.length || showDescendants"
         class="space-y-2 rounded-md border border-default p-3"
         data-testid="relations"
       >
         <h2 class="text-xs font-semibold text-muted uppercase">Relations</h2>
-        <template v-if="references.keys.length || references.unit.length">
+        <template v-if="references.keys.length || references.names.length">
           <h3 class="text-xs font-medium text-muted">Ancestors</h3>
           <div v-for="entry in references.keys" :key="entry.field" class="flex flex-wrap items-center gap-2 text-sm">
             <span class="w-24 text-muted">{{ entry.field }}</span>
@@ -308,9 +366,11 @@ const descendantCount = (total: number) => (authoritativeCatalog.value ? String(
               >{{ entry.key }}</RouterLink
             >
           </div>
-          <div v-for="entry in references.unit" :key="entry.field" class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="w-24 text-muted">{{ entry.field }}</span>
-            <span class="max-w-full truncate font-mono text-xs">{{ entry.value }}</span>
+          <div v-for="entry in references.names" :key="entry.field" class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="w-24 text-muted">{{ entry.field }}s</span>
+            <span class="flex flex-wrap gap-1"
+              ><UBadge v-for="name in entry.names" :key="name" :label="name" color="neutral" variant="outline" size="sm"
+            /></span>
           </div>
         </template>
         <template v-if="showDescendants">
