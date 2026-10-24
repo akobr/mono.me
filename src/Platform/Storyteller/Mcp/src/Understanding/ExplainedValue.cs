@@ -20,7 +20,8 @@ public sealed record ExplainedValue
 
     public required IReadOnlyList<string> Via { get; init; }
 
-    // The other steps whose document holds a value at the same path; only for members of objects.
+    // The other steps whose document holds a value at the same path; only for scalar members of objects. An object or
+    // array merges with the ones before it, so it has none: its members and items carry their own steps.
     public IReadOnlyList<Setter>? AlsoSetBy { get; init; }
 
     public sealed record ValueNode(string AnnotationKey, int Depth);

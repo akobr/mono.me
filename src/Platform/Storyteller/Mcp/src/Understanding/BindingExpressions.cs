@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace _42.Platform.Storyteller.Mcp.Understanding;
 
 // Reads what an @ expression refers to, following the grammar of Binding.Language (Tokenizer and Parser) without
@@ -6,9 +8,18 @@ namespace _42.Platform.Storyteller.Mcp.Understanding;
 // A call with exactly one bare path argument is a source call when the name is a registered source; this reader does not
 // know the registrations, so it takes such a call as a source call (as @public, @secret and a Key Vault source are
 // written). Bare path arguments of other calls are read through the default source, as the evaluator does.
+//
+// The reader recurses once per nested statement or parenthesis, and any stored string reaches it, so an expression
+// longer than MaxLength or nested deeper than MaxDepth is not read: it counts as not valid, with ExceedsLimits.
 public static class BindingExpressions
 {
+    public const int MaxLength = 8 * 1024;
+    public const int MaxDepth = 64;
+
     public static readonly IReadOnlySet<string> ValuesStoreSources = new HashSet<string>(StringComparer.Ordinal) { "default", "public", "secret" };
+
+    private static readonly ParsedBinding Invalid = new(BindingForm.Invalid, null, [], false, false);
+    private static readonly ParsedBinding BeyondLimits = Invalid with { ExceedsLimits = true };
 
     // The resolver binds every string that starts with '@' (Binding.Object ConfigurationBindingResolver).
     public static bool IsBinding(string? value)
@@ -18,13 +29,20 @@ public static class BindingExpressions
 
     public static ParsedBinding Parse(string expression)
     {
+        if (expression.Length > MaxLength)
+        {
+            return BeyondLimits;
+        }
+
+        var reader = new Reader(expression);
+
         try
         {
-            return new Reader(expression).Read();
+            return reader.Read();
         }
         catch (FormatException)
         {
-            return new ParsedBinding(BindingForm.Invalid, null, [], false, false);
+            return reader.ExceededLimits ? BeyondLimits : Invalid;
         }
     }
 
@@ -32,8 +50,11 @@ public static class BindingExpressions
     {
         private readonly List<BindingReference> _references = [];
         private int _position;
+        private int _depth;
         private bool _readsDocument;
         private bool _readsAnnotations;
+
+        public bool ExceededLimits { get; private set; }
 
         private bool IsAtEnd => _position >= text.Length;
 
@@ -53,7 +74,8 @@ public static class BindingExpressions
             else if (StartsWith("@{"))
             {
                 _position = 2;
-                ReadMath();
+                ReadExpression();
+                Expect('}');
                 form = BindingForm.Math;
             }
             else if (StartsWith("@"))
@@ -89,37 +111,46 @@ public static class BindingExpressions
         // After '@'. Inside parentheses the tokenizer skips whitespace between tokens; elsewhere a statement is compact.
         private (BindingForm Form, string? Name) ReadStatement(bool inParentheses)
         {
-            SkipWhitespaceIf(inParentheses);
+            Enter();
 
-            if (IsAtEnd)
+            try
             {
-                throw new FormatException();
-            }
+                SkipWhitespaceIf(inParentheses);
 
-            if (Current == '(')
+                if (IsAtEnd)
+                {
+                    throw new FormatException();
+                }
+
+                if (Current == '(')
+                {
+                    _position++;
+                    SkipWhitespace();
+                    var path = ReadPath(inParentheses: true);
+                    Expect(',');
+                    SkipWhitespace();
+                    var source = ReadIdentifier();
+                    Expect(')');
+                    _references.Add(new BindingReference(path, source));
+                    return (BindingForm.Sourced, source);
+                }
+
+                var name = ReadIdentifier();
+                SkipWhitespaceIf(inParentheses);
+
+                if (!IsAtEnd && Current == '(')
+                {
+                    _position++;
+                    return ReadCall(name);
+                }
+
+                _references.Add(new BindingReference(name + ReadPathRest(inParentheses), "default"));
+                return (BindingForm.Path, null);
+            }
+            finally
             {
-                _position++;
-                SkipWhitespace();
-                var path = ReadPath(inParentheses: true);
-                Expect(',');
-                SkipWhitespace();
-                var source = ReadIdentifier();
-                Expect(')');
-                _references.Add(new BindingReference(path, source));
-                return (BindingForm.Sourced, source);
+                _depth--;
             }
-
-            var name = ReadIdentifier();
-            SkipWhitespaceIf(inParentheses);
-
-            if (!IsAtEnd && Current == '(')
-            {
-                _position++;
-                return ReadCall(name);
-            }
-
-            _references.Add(new BindingReference(name + ReadPathRest(inParentheses), "default"));
-            return (BindingForm.Path, null);
         }
 
         // After '('.
@@ -236,38 +267,79 @@ public static class BindingExpressions
             }
         }
 
-        private void ReadMath()
+        // The math grammar of Parser: expression := term (('+' | '-') term)*.
+        private void ReadExpression()
         {
-            while (true)
+            ReadTerm();
+
+            while (TryConsumeOperator("+-"))
             {
-                SkipWhitespace();
+                ReadTerm();
+            }
+        }
 
-                if (IsAtEnd)
+        // term := factor (('*' | '/' | '%') factor)*
+        private void ReadTerm()
+        {
+            ReadFactor();
+
+            while (TryConsumeOperator("*/%"))
+            {
+                ReadFactor();
+            }
+        }
+
+        // factor := number | '@' statement | '(' expression ')'. A sign is no factor, so @{-1} does not parse either.
+        private void ReadFactor()
+        {
+            SkipWhitespace();
+
+            if (IsAtEnd)
+            {
+                throw new FormatException();
+            }
+
+            if (char.IsAsciiDigit(Current))
+            {
+                ReadNumber();
+            }
+            else if (TryConsume('@'))
+            {
+                ReadStatement(inParentheses: false);
+            }
+            else if (TryConsume('('))
+            {
+                Enter();
+
+                try
+                {
+                    ReadExpression();
+                    Expect(')');
+                }
+                finally
+                {
+                    _depth--;
+                }
+            }
+            else
+            {
+                throw new FormatException();
+            }
+        }
+
+        // Digits with an optional fraction of at least one digit, as the tokenizer reads a number.
+        private void ReadNumber()
+        {
+            SkipDigits();
+
+            if (TryConsume('.'))
+            {
+                if (IsAtEnd || !char.IsAsciiDigit(Current))
                 {
                     throw new FormatException();
                 }
 
-                var c = Current;
-
-                if (c == '}')
-                {
-                    _position++;
-                    return;
-                }
-
-                if (c == '@')
-                {
-                    _position++;
-                    ReadStatement(inParentheses: false);
-                }
-                else if (char.IsAsciiDigit(c) || c is '.' or '(' or ')' or '+' or '-' or '*' or '/' or '%')
-                {
-                    _position++;
-                }
-                else
-                {
-                    throw new FormatException();
-                }
+                SkipDigits();
             }
         }
 
@@ -366,6 +438,31 @@ public static class BindingExpressions
             return true;
         }
 
+        private bool TryConsumeOperator(string operators)
+        {
+            SkipWhitespace();
+
+            if (IsAtEnd || !operators.Contains(Current, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            _position++;
+            return true;
+        }
+
+        // A nested statement or parenthesis: beyond MaxDepth, or close to the end of the thread's stack, nothing is read.
+        private void Enter()
+        {
+            _depth++;
+
+            if (_depth > MaxDepth || !RuntimeHelpers.TryEnsureSufficientExecutionStack())
+            {
+                ExceededLimits = true;
+                throw new FormatException();
+            }
+        }
+
         private void SkipWhitespaceIf(bool condition)
         {
             if (condition)
@@ -377,6 +474,14 @@ public static class BindingExpressions
         private void SkipWhitespace()
         {
             while (!IsAtEnd && char.IsWhiteSpace(Current))
+            {
+                _position++;
+            }
+        }
+
+        private void SkipDigits()
+        {
+            while (!IsAtEnd && char.IsAsciiDigit(Current))
             {
                 _position++;
             }

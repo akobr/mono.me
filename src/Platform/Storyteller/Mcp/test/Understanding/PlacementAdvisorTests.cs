@@ -78,6 +78,41 @@ public class PlacementAdvisorTests
     }
 
     [Fact]
+    public void APointerThroughAnArray_IsNotAssessed()
+    {
+        // a merge write cannot reach /servers/0: arrays merge by union, so {"servers": [{"host": "b"}]} appends an item
+        var composition = Compositions.Execution();
+        composition.SourceContent(Compositions.Responsibility)["servers"] = new JArray(new JObject { ["host"] = "a" });
+        composition.Content()["servers"] = new JArray(new JObject { ["host"] = "a" });
+        composition.AddOrigin("/servers", 1);
+
+        var effects = EffectsByCandidate(composition, PlacementTargets.FromPointers(["/servers/0/host"]));
+
+        effects.Values.ShouldAllBe(effect => effect.Effective == null && effect.Note == PlacementTargets.ThroughArrayNote);
+    }
+
+    [Fact]
+    public void APointerAtAnObject_IsNotAssessed()
+    {
+        // the responsibility's database object merges with the execution's: a scalar replay would call it overridden
+        var composition = Compositions.Execution();
+        composition.SourceContent(Compositions.Responsibility)["database"] = new JObject { ["host"] = "a" };
+        composition.SourceContent(Compositions.Own)["database"] = new JObject { ["port"] = 5 };
+        composition.Content()["database"] = new JObject { ["host"] = "a", ["port"] = 5 };
+
+        var effects = AllEffectsByCandidate(composition, PlacementTargets.FromPointers(["/database", "/currency"]));
+
+        effects["rst.invoicing"][0].ShouldSatisfyAllConditions(
+            effect => effect.Effective.ShouldBeNull(),
+            effect => effect.Note.ShouldBe(PlacementTargets.ContainerNote));
+        effects["rst.invoicing"][1].Effective.ShouldBe(false);
+
+        // a fragment places the object as given
+        var fragment = EffectsByCandidate(composition, PlacementTargets.FromFragment(JObject.Parse("""{"database": {"user": "u"}}""")));
+        fragment["rst.invoicing"].Effective.ShouldBe(true);
+    }
+
+    [Fact]
     public void Template_WinsOverAncestors_AndIsAddedWhenTheViewHasNone()
     {
         var targets = PlacementTargets.FromPointers(["/plan"]);
@@ -181,11 +216,16 @@ public class PlacementAdvisorTests
 
     private static Dictionary<string, PlacementEffect> EffectsByCandidate(Sdk.ConfigurationComposition composition, PlacementTargets targets)
     {
+        return AllEffectsByCandidate(composition, targets).ToDictionary(pair => pair.Key, pair => pair.Value.ShouldHaveSingleItem());
+    }
+
+    private static Dictionary<string, IReadOnlyList<PlacementEffect>> AllEffectsByCandidate(Sdk.ConfigurationComposition composition, PlacementTargets targets)
+    {
         var (candidates, _) = PlacementCandidates.For([AnnotationKey.Parse(Compositions.ExecutionKey)], typeDefault: false);
         var systems = new[] { new PlacementAdvisor.SystemComposition(Compositions.ExecutionKey, composition) };
 
         return candidates.ToDictionary(
             candidate => candidate.AnnotationKey!,
-            candidate => PlacementAdvisor.Assess(candidate, systems, targets).Effects!.ShouldHaveSingleItem());
+            candidate => PlacementAdvisor.Assess(candidate, systems, targets).Effects!);
     }
 }

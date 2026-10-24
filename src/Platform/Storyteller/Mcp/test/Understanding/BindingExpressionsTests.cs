@@ -64,6 +64,75 @@ public class BindingExpressionsTests
 
         parsed.Form.ShouldBe(BindingForm.Invalid);
         parsed.References.ShouldBeEmpty();
+        parsed.ExceedsLimits.ShouldBeFalse();
+    }
+
+    // Parser.ParseMath: expression := term (('+' | '-') term)*, term := factor (('*' | '/' | '%') factor)*,
+    // factor := number | statement | '(' expression ')'
+    [Theory]
+    [InlineData("@{}")]
+    [InlineData("@{1 +}")]
+    [InlineData("@{-1}")]
+    [InlineData("@{* 2}")]
+    [InlineData("@{(1}")]
+    [InlineData("@{1)}")]
+    [InlineData("@{1 2}")]
+    [InlineData("@{()}")]
+    [InlineData("@{.5}")]
+    [InlineData("@{1.}")]
+    [InlineData("@{1 + @a.b @c}")]
+    [InlineData("@{1 + 2")]
+    public void Parse_BrokenMath_IsInvalid(string expression)
+    {
+        BindingExpressions.Parse(expression).Form.ShouldBe(BindingForm.Invalid);
+    }
+
+    [Theory]
+    [InlineData("@{1}")]
+    [InlineData("@{ 1.5 / @rate.value }")]
+    [InlineData("@{2 * (3 + @a.b) % 4 - 1}")]
+    [InlineData("@{((@a.b))}")]
+    [InlineData("@{@f(@a.b, \"x\") + 1}")]
+    public void Parse_Math_FollowsTheGrammar(string expression)
+    {
+        BindingExpressions.Parse(expression).Form.ShouldBe(BindingForm.Math);
+    }
+
+    [Fact]
+    public void Parse_TenThousandNestedCalls_IsInvalid_WithoutExhaustingTheStack()
+    {
+        // about 40 KB, far under the API's document limit; read recursively, it would overflow the host's stack
+        var parsed = BindingExpressions.Parse(NestedCalls(10_000));
+
+        parsed.Form.ShouldBe(BindingForm.Invalid);
+        parsed.ExceedsLimits.ShouldBeTrue();
+        parsed.References.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Parse_NestingDeeperThanTheLimit_IsInvalid()
+    {
+        var deepest = BindingExpressions.Parse(NestedCalls(BindingExpressions.MaxDepth));
+        var deeper = BindingExpressions.Parse(NestedCalls(BindingExpressions.MaxDepth + 1));
+        var parentheses = BindingExpressions.Parse($"@{{{new string('(', BindingExpressions.MaxDepth + 1)}1{new string(')', BindingExpressions.MaxDepth + 1)}}}");
+
+        deepest.Form.ShouldBe(BindingForm.Function);
+        deepest.References.ShouldHaveSingleItem().Key.ShouldBe("x");
+        deeper.Form.ShouldBe(BindingForm.Invalid);
+        deeper.ExceedsLimits.ShouldBeTrue();
+        parentheses.Form.ShouldBe(BindingForm.Invalid);
+        parentheses.ExceedsLimits.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Parse_LongerThanTheLimit_IsInvalid()
+    {
+        var longest = "@" + new string('a', BindingExpressions.MaxLength - 1);
+
+        BindingExpressions.Parse(longest).Form.ShouldBe(BindingForm.Path);
+        BindingExpressions.Parse(longest + "b").ShouldSatisfyAllConditions(
+            parsed => parsed.Form.ShouldBe(BindingForm.Invalid),
+            parsed => parsed.ExceedsLimits.ShouldBeTrue());
     }
 
     [Theory]
@@ -94,11 +163,49 @@ public class BindingExpressionsTests
 
         var found = BindingScanner.Scan(document).ToDictionary(binding => binding.Pointer);
 
-        found.Keys.ShouldBe(["/a", "/list/1", "/manual/note", "/typo", "/rule", "/rule/$context/p", "/extra"]);
+        found.Keys.ShouldBe(["/a", "/list/1", "/manual/note", "/typo", "/rule", "/rule/$definition/v", "/rule/$context/p", "/extra"]);
         found["/typo"].IsValid.ShouldBeFalse();
         found["/rule"].IsValid.ShouldBeTrue();
         found["/extra"].IsValid.ShouldBeFalse();
         found["/rule/$context/p"].EnvelopePointer.ShouldBe("/rule");
+        found["/rule/$context/p"].InDefinition.ShouldBeFalse();
         found["/a"].EnvelopePointer.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Scanner_AnAtStringOfTheProgram_IsAPossibleRead()
+    {
+        // the resolver binds the program's result again, and JSON-e passes a plain string through
+        var document = JObject.Parse("""{"conn": {"$binding": "jsone", "$definition": {"password": "@db.password"}}}""");
+
+        var found = BindingScanner.Scan(document).ToDictionary(binding => binding.Pointer);
+
+        var password = found["/conn/$definition/password"];
+        password.InDefinition.ShouldBeTrue();
+        password.IsValid.ShouldBeTrue();
+        password.EnvelopePointer.ShouldBe("/conn");
+        password.Parsed.References.ShouldHaveSingleItem().ShouldBe(new BindingReference("db.password", "default"));
+        found["/conn"].InDefinition.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("""{"tier": "@plan.tier"}""", true)]
+    [InlineData("\"@plan.context\"", true)]
+    [InlineData("5", false)]
+    [InlineData("true", false)]
+    [InlineData("null", false)]
+    [InlineData("[]", false)]
+    [InlineData("\"plain\"", false)]
+    public void Scanner_AContextThatCannotResolveToAnObject_IsNotValid(string context, bool isValid)
+    {
+        var document = JObject.Parse("""{"rule": {"$binding": "jlogic", "$definition": 1, "$context": """ + context + "}}");
+
+        BindingScanner.Scan(document).First(binding => binding.Pointer == "/rule").IsValid.ShouldBe(isValid);
+    }
+
+    // @f(@f(...@x...)): statements nested that deep, the innermost a path
+    private static string NestedCalls(int statements)
+    {
+        return "@" + string.Concat(Enumerable.Repeat("f(@", statements - 1)) + "x" + new string(')', statements - 1);
     }
 }

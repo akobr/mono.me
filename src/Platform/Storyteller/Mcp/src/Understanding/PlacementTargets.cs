@@ -7,10 +7,16 @@ namespace _42.Platform.Storyteller.Mcp.Understanding;
 // The values to place: the pointers, and the content a candidate gets in a replay. Every scalar is replaced by a marker
 // that no stored document holds, so a replay tells a placed value from an equal value set elsewhere: the value is
 // effective only where its marker survives. Arrays keep their items, because arrays merge by union: they are effective
-// when every item arrives.
+// when every item arrives. A pointer without a fragment stands for one scalar value.
 public sealed class PlacementTargets
 {
     public const int MaxTargets = 20;
+
+    public const string ThroughArrayNote =
+        "An array lies on the way to this pointer. Arrays merge by union, so a write cannot place a value at one of its items: place the whole array with a fragment.";
+
+    public const string ContainerNote =
+        "The value at this pointer is an object or an array, and a pointer stands for one scalar value: give the object or array as a fragment instead.";
 
     private const string MarkerPrefix = "\u0000placement-marker:";
 
@@ -150,6 +156,26 @@ public sealed class PlacementTargets
     public JToken? ValueAt(int target)
     {
         return Fragment is null ? null : JsonPointer.Find(Fragment, Pointers[target]);
+    }
+
+    // Why a pointer cannot be replayed as one scalar value in a system: an array on the way in its effective document or
+    // in the candidate's stored one, or an object or array at the pointer. Null when it can, and always for a fragment,
+    // whose leaves are placed as given.
+    public string? Unplaceable(int target, JToken? effective, JToken? candidate)
+    {
+        if (Fragment is not null)
+        {
+            return null;
+        }
+
+        var pointer = Pointers[target];
+
+        if ((effective is not null && JsonPointer.IsInArray(effective, pointer)) || (candidate is not null && JsonPointer.IsInArray(candidate, pointer)))
+        {
+            return ThroughArrayNote;
+        }
+
+        return JsonPointer.Find(effective, pointer) is JContainer ? ContainerNote : null;
     }
 
     // Whether the replayed value at the target's pointer is the placed one.

@@ -20,7 +20,7 @@ public static class ConfigurationExplainer
     private static readonly string[] FixedNotes =
     [
         "Bindings are not evaluated in this read: an Expression is the binding as stored. check_configuration_bindings evaluates them, when the server enables the secret tools.",
-        "A template is merged at every node of its type, after the node's ancestors and before the node's own content: it overrides every ancestor and loses only to that node's own content.",
+        "A template is merged at every node of its type, after that node's ancestors and before the node's own content. In this document it can still lose to the content and templates of deeper nodes, and to an ancestor brought back by a later branch (see Via and AlsoSetBy).",
         "A shared ancestor is merged once per branch, so a later branch can bring its value back over what an earlier branch set (see Via and AlsoSetBy).",
         "Views never inherit from each other.",
     ];
@@ -33,10 +33,12 @@ public static class ConfigurationExplainer
             .ToList();
     }
 
-    // The Values store keys the bindings read, each once (the store compares keys without case), in document order.
+    // The Values store keys the bindings read, each once (the store compares keys without case), in document order; the
+    // keys only a $definition holds come last, so the lookup budget goes to the certain reads first.
     public static IReadOnlyList<string> ValuesStoreKeys(IEnumerable<BindingOccurrence> bindings)
     {
         return bindings
+            .OrderBy(binding => binding.InDefinition)
             .SelectMany(binding => binding.Parsed.References)
             .Where(reference => reference.IsValuesStore)
             .Select(reference => reference.Key)
@@ -44,11 +46,14 @@ public static class ConfigurationExplainer
             .ToList();
     }
 
-    // The machines whose scopes allow configuration reads, grouped by how their annotation restriction reaches the key.
+    // The machines whose scopes allow configuration reads, grouped by how their annotation restriction reaches the key. A
+    // machine is allowed on its restriction and every descendant of it (MachineAnnotationRestriction), and the effective
+    // document of a descendant of the key holds the key's values.
     public static ConfigurationConsumers Consumers(AnnotationKey key, IEnumerable<Sdk.MachineAccess> machines)
     {
         var direct = new List<ConfigurationConsumers.Machine>();
         var throughDescendants = new List<ConfigurationConsumers.Machine>();
+        var throughSharedDescendants = new List<ConfigurationConsumers.Machine>();
         var keyText = key.ToString();
 
         foreach (var machine in machines)
@@ -77,10 +82,17 @@ public static class ConfigurationExplainer
                 {
                     throughDescendants.Add(entry);
                 }
+                else if (SharesDescendants(key, restrictionKey))
+                {
+                    throughSharedDescendants.Add(entry);
+                }
             }
         }
 
-        return new ConfigurationConsumers { Machines = new ConfigurationConsumers.MachineGroups(direct, throughDescendants) };
+        return new ConfigurationConsumers
+        {
+            Machines = new ConfigurationConsumers.MachineGroups(direct, throughDescendants, throughSharedDescendants),
+        };
     }
 
     public static ConfigurationConsumers ConsumersUnavailable(string reason)
@@ -146,6 +158,21 @@ public static class ConfigurationExplainer
         return ToolResults.ToToken(composition.Content) as JObject ?? new JObject();
     }
 
+    // Two keys share descendants when every name both of them have is the same: the unit of execution with the names of
+    // both descends from each (rst.billing and sbt.northwind share usg.northwind.billing). A name a type lacks is "".
+    private static bool SharesDescendants(AnnotationKey first, AnnotationKey second)
+    {
+        return Agree(first.SubjectName, second.SubjectName)
+            && Agree(first.ResponsibilityName, second.ResponsibilityName)
+            && Agree(first.ContextName, second.ContextName)
+            && Agree(first.UnitName, second.UnitName);
+
+        static bool Agree(string name, string other)
+        {
+            return name.Length == 0 || other.Length == 0 || string.Equals(name, other, StringComparison.Ordinal);
+        }
+    }
+
     private static ExplainedValue ExplainValue(
         Sdk.ConfigurationCompositionOrigin origin,
         JObject content,
@@ -154,7 +181,8 @@ public static class ConfigurationExplainer
         Dictionary<int, Sdk.ConfigurationCompositionStep> stepsByOrder,
         Dictionary<string, Sdk.ConfigurationCompositionSource> sources)
     {
-        var (value, kind) = Describe(JsonPointer.Find(content, origin.Path));
+        var token = JsonPointer.Find(content, origin.Path);
+        var (value, kind) = Describe(token);
 
         if (!stepsByOrder.TryGetValue(origin.Step, out var step))
         {
@@ -164,8 +192,10 @@ public static class ConfigurationExplainer
         var source = sources.GetValueOrDefault(step.SourceId);
         var node = nodes.FirstOrDefault(item => item.Index == step.Node);
 
-        // arrays merge by union and positions shift, so their items are attributed by their origins only
-        var setters = JsonPointer.IsInArray(content, origin.Path)
+        // only a scalar lists the other documents: an object or array merges with an earlier one of its kind and keeps the
+        // first step, so a later document holding one there was merged in, not left out, and its members and items carry
+        // their own steps. Arrays merge by union and positions shift, so their items are attributed by their origins only.
+        var setters = token is JContainer || JsonPointer.IsInArray(content, origin.Path)
             ? null
             : steps.Where(other => other.Order != step.Order)
                 .Select(other => Setter(other, step, origin.Path, nodes, sources))
@@ -242,9 +272,20 @@ public static class ConfigurationExplainer
 
         if (!binding.IsValid)
         {
-            note = binding.Parsed.Form == BindingForm.Object
-                ? "A malformed object binding: the resolved read fails on it."
-                : "Not a valid binding expression: the resolved read fails on it.";
+            var emitted = binding.InDefinition ? " if the program of its object binding emits it" : string.Empty;
+
+            note = binding.Parsed switch
+            {
+                { Form: BindingForm.Object } =>
+                    $"A malformed object binding (an unknown kind, no $definition, another property, or a $context that cannot resolve to an object): the resolved read fails on it{emitted}.",
+                { ExceedsLimits: true } =>
+                    $"Not read here: longer than {BindingExpressions.MaxLength} characters or nested more than {BindingExpressions.MaxDepth} levels deep, so what it reads is not known.",
+                _ => $"Not a valid binding expression: the resolved read fails on it{emitted}.",
+            };
+        }
+        else if (binding.InDefinition)
+        {
+            note = "In the $definition of an object binding: read only if the program emits this string, because the resolver binds the program's result again.";
         }
         else if (binding.EnvelopePointer is not null)
         {
@@ -259,6 +300,7 @@ public static class ConfigurationExplainer
             Name = binding.Parsed.Name,
             IsValid = binding.IsValid,
             EnvelopePointer = binding.EnvelopePointer,
+            InDefinition = binding.InDefinition ? true : null,
             References = binding.Parsed.References.Select(reference => ExplainReference(reference, keyValues)).ToList(),
             Reads = reads.Count > 0 ? reads : null,
             Note = note,
