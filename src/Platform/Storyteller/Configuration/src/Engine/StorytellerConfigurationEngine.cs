@@ -53,6 +53,10 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     // answer that a later 304 said not to store.
     private readonly Dictionary<string, long> _cacheDecisions = new(StringComparer.Ordinal);
 
+    // Guarded by _lock: rejected passes with the sequences they absorbed, so a switch whose snapshot a newer one replaced before its pass
+    // still learns that the pass rolled its key back. The newest few are enough: a run waits for the pass that covers it.
+    private readonly List<(long First, long Last, StorytellerConfigurationException Error)> _rejectedPasses = [];
+
     // Guarded by _lock; _snapshot is also read without it.
     private ConfigurationSnapshot _snapshot;
     private long _sequence;
@@ -74,10 +78,6 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
 
     // Guarded by _lock: the sequence of the last snapshot a pass took, or that the providers loaded.
     private long _notifiedSequence;
-
-    // Rejected passes with the sequences they absorbed, so a switch whose snapshot a newer one replaced before its pass
-    // still learns that the pass rolled its key back. The newest few are enough: a run waits for the pass that covers it.
-    private readonly List<(long First, long Last, StorytellerConfigurationException Error)> _rejectedPasses = [];
 
     // Under the run gate: computed by the first run that needs the cache.
     private string? _fingerprint;
