@@ -220,6 +220,32 @@ public partial class MachineRestrictionHttpTests
         created.Select(annotation => annotation.AnnotationKey).ShouldBe([Ancestor, Parent, Restriction, Descendant]);
     }
 
+    // Deserialization keeps the last AnnotationKey. An allowed key written first must not authorize the one that is stored.
+    [Theory]
+    [InlineData("""[{"AnnotationKey":"exe.northwind.invoicing.prod","annotationKey":"sbt.northwind","Name":"northwind","AnnotationType":"Subject","ProjectName":"x","ViewName":"y"}]""")]
+    [InlineData("""[{"AnnotationKey":"exe.northwind.invoicing.prod","AnnotationKey":"sbt.northwind","Name":"northwind","AnnotationType":"Subject","ProjectName":"x","ViewName":"y"}]""")]
+    public async Task SetAnnotations_WithADuplicateKeyOutsideTheRestriction_IsRefusedBeforeTheService(string body)
+    {
+        var http = CreateAnnotationsHttp(Untouched<IAnnotationService>());
+
+        await ShouldBeRestrictedAsync(() => http.SetAnnotations(MachineRequest("POST", body), Org, Project, DefaultView));
+    }
+
+    [Fact]
+    public async Task SetAnnotations_WithADuplicateKeyInsideTheRestriction_StoresTheLastKey()
+    {
+        var (annotations, recorder) = Recording<IAnnotationService>();
+        recorder.Returns(nameof(IAnnotationService.CreateAnnotationsAsync), (IEnumerable<Annotation>)[StoredAnnotation(Restriction)]);
+        const string body = """[{"AnnotationKey":"sbt.northwind","annotationKey":"exe.northwind.invoicing.prod","Name":"prod","AnnotationType":"Execution","ProjectName":"x","ViewName":"y"}]""";
+
+        var result = await CreateAnnotationsHttp(annotations).SetAnnotations(MachineRequest("POST", body), Org, Project, DefaultView);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        var call = recorder.Calls.ShouldHaveSingleItem();
+        call.Method.ShouldBe(nameof(IAnnotationService.CreateAnnotationsAsync));
+        call.Arg<IEnumerable<Annotation>>(1).Select(annotation => annotation.AnnotationKey).ShouldBe([Restriction]);
+    }
+
     // The keys of the body are checked before its 400s, so a null entry does not hide a key outside the restriction.
     [Fact]
     public async Task SetAnnotations_WithAKeyOutsideTheRestrictionAndANullEntry_IsRefusedBeforeTheService()
