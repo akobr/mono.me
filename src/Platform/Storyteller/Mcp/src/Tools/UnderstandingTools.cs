@@ -29,20 +29,26 @@ public sealed class UnderstandingTools(
         + "unit or keyText, each a case-insensitive part of a name in the key) need no document reads. Content filters (property, valueText, bindsKey) "
         + "search the stored own document of each configuration, not the effective one: a value inherited from an ancestor is found on the ancestor, not "
         + "on its descendants. Every given filter must match. Binding expressions are matched and reported as stored; nothing is evaluated and no secret "
-        + "is read. Budgets: at most 5 API pages (5,000 configurations) and 200 document reads, at most maxResults matches; IsTruncated and TruncatedBy "
-        + "say when a budget stopped the search. Needs the Reader role on the project.";
+        + "is read; a bindsKey match in the $definition of an object binding is only a possible read (Note). Budgets: at most 5 API pages (5,000 "
+        + "configurations) and 200 document reads, at most maxResults matches; IsTruncated and TruncatedBy say when a budget stopped the search. Needs "
+        + "the Reader role on the project.";
 
     private const string ExplainDescription =
         "Explains where the values of an annotation's effective configuration come from and who can read them. Values: for every value (or those at and "
         + "under pointer) the merge step that set it, its source (an annotation's configuration or a view template), the node it was merged at and Via, "
-        + "the branch it arrived through; for members of objects AlsoSetBy lists the other steps whose document holds a value there (BeforeWinner true: "
-        + "merged before the winner, so overridden; false: merged after it inside a branch that was merged again, so not applied). Array items are "
-        + "attributed by their step only. At most 200 values (IsTruncated). Sources: every merged document with the number of values it supplies, Missing "
-        + "and Empty ones included. Bindings: the @ expressions and object bindings as stored, with the key/value pairs they read and those pairs' "
-        + "metadata (exists, deleted, protection, version; never a value; at most 50 lookups). Consumers: the platform does not record runtime reads; with "
-        + "includeConsumers the machines whose scopes and annotation restriction reach the values (listing machines needs Contributor; otherwise Machines "
-        + "is null with the reason). IsStale is true when the effective read differs from the composition. Bindings are not evaluated. Needs the Reader "
-        + "role on the project (the composition shows every ancestor's document).";
+        + "the branch it arrived through; for scalar members of objects AlsoSetBy lists the other steps whose document holds a value there (BeforeWinner "
+        + "true: merged before the winner, so overridden; false: merged after it inside a branch that was merged again, so not applied). Objects and "
+        + "arrays merge, so they have no AlsoSetBy: their members and items carry their own steps. Array items are attributed by their step only. At "
+        + "most 200 values (IsTruncated). Sources: every merged document with the number of values it supplies, Missing and Empty ones included. "
+        + "Bindings: the @ expressions and object bindings as stored, with the key/value pairs they read and those pairs' metadata (exists, deleted, "
+        + "protection, version; never a value; at most 50 lookups); an @ string in the $definition of an object binding is marked InDefinition, read "
+        + "only if the program emits it. Consumers: the platform does not record runtime reads; with includeConsumers the machines whose scopes allow "
+        + "configuration reads, by how their annotation restriction reaches the values: ReadsThisDocument (unrestricted, or restricted to the key or an "
+        + "ancestor), ReadsThroughDescendants (restricted to a descendant) and ReadsThroughSharedDescendants (restricted to an annotation that shares "
+        + "descendants with the key, as rst.billing shares usg.northwind.billing with sbt.northwind); the last two read the values only through such a "
+        + "descendant when it exists, where it may override them. Listing machines needs Contributor; otherwise Machines is null with the reason. "
+        + "IsStale is true when the effective read differs from the composition. Bindings are not evaluated. Needs the Reader role on the project (the "
+        + "composition shows every ancestor's document).";
 
     private const string PlacementDescription =
         "Suggests where to write a configuration value that belongs to one or more systems, and checks whether it would take effect; writes nothing. "
@@ -51,9 +57,11 @@ public sealed class UnderstandingTools(
         + "one responsibility: rst). Candidates: with typeDefault first the view template of the systems' type; for one system its own annotation, then "
         + "its ancestors from the most specific; for several systems the most specific annotations they all share, then the other shared ones. For each "
         + "candidate the tool replays every existing system's composition with the value placed there and reports per system and pointer whether it wins "
-        + "(Effective) or which step overrides it; candidates effective for every system come first. For the first three candidates it reports whether the "
-        + "annotation exists, is deleted (restore it first) or is missing (create it first), and how many annotations it reaches. With a fragment it "
-        + "previews the schema check of the write on the first existing candidate (the API decides at write time). Needs the Reader role on the project.";
+        + "(Effective) or which step overrides it; candidates effective for every system come first. A pointer stands for one scalar value: through an "
+        + "array or at an object or array it is not assessed (Effective null with a Note; give a fragment). For the first three candidates it reports "
+        + "whether the annotation exists, is deleted (restore it first) or is missing (create it first), and how many annotations it reaches. With a "
+        + "fragment it previews the schema check of the write on the first existing candidate (the API decides at write time; Reason says why a "
+        + "preview was skipped, for example a pattern that took too long to check). Needs the Reader role on the project.";
 
     [McpServerTool(Name = "search_configurations", Title = "Search configurations", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(SearchDescription)]
@@ -70,7 +78,7 @@ public sealed class UnderstandingTools(
         [Description("A case-insensitive part of any name in the key.")] string? keyText = null,
         [Description("A property name such as host, or a pointer suffix that starts with '/' such as /database/host: matches the values at such paths of the stored documents (case-insensitive).")] string? property = null,
         [Description("A case-insensitive part of a scalar value (string, number or boolean) of the stored documents.")] string? valueText = null,
-        [Description("A Values store key such as db.password: matches the bindings that read it, as @db.password, @secret(db.password), @(db.password, public) or inside an interpolation.")] string? bindsKey = null,
+        [Description("A Values store key such as db.password: matches the bindings that read it, as @db.password, @secret(db.password), @(db.password, public) or inside an interpolation; a match in the $definition of an object binding is a possible read, marked with a Note.")] string? bindsKey = null,
         [Description("The most matches to return, 1 to 200; default 50.")] int? maxResults = null,
         CancellationToken cancellationToken = default)
     {
@@ -140,7 +148,7 @@ public sealed class UnderstandingTools(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
         [Description("The systems the value belongs to, 1 to 20, each named by subject, responsibility, context and unit (names: letters, digits, '-' and '_', at most 50 characters).")] PlacementSystem[] systems,
-        [Description("The JSON pointers of the values to place, for example [\"/database/host\"]; give pointers or fragment, at most 20 values.")] string[]? pointers = null,
+        [Description("The JSON pointers of the values to place, for example [\"/database/host\"]; each pointer is one scalar value outside any array (to place an object or a whole array, give a fragment). Give pointers or fragment, at most 20 values.")] string[]? pointers = null,
         [Description("The values to place as a JSON object, for example {\"database\": {\"host\": \"db.example\"}}; its scalars and arrays are the values (at most 20). Give fragment or pointers; a fragment also previews the schema check.")] JsonElement? fragment = null,
         [Description("Also suggest the view template of the systems' type, a value for every annotation of that type; default false. The systems must be of one type.")] bool typeDefault = false,
         [Description(ToolText.View)] string view = ToolText.DefaultView,

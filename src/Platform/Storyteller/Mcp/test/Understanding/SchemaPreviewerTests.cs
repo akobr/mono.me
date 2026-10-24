@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using _42.Platform.Storyteller.Mcp.Understanding;
 
 using Newtonsoft.Json.Linq;
@@ -52,6 +54,47 @@ public class SchemaPreviewerTests
 
         preview.IsPreviewed.ShouldBeFalse();
         preview.Reason.ShouldBe(SchemaPreviewer.ExternalReferencesReason);
+        preview.IsValid.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ACancelledCall_DoesNotStartTheValidation()
+    {
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+        var validated = false;
+
+        await Should.ThrowAsync<OperationCanceledException>(() => SchemaPreviewer.PreviewAsync(
+            "sbt.northwind",
+            new JObject { ["port"] = 1 },
+            PortSchema,
+            (parsed, json) =>
+            {
+                validated = true;
+                return parsed.Validate(json);
+            },
+            cancelled.Token));
+
+        validated.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task APatternThatRunsOutOfTheMatchTimeout_IsNotPreviewed()
+    {
+        // NJsonSchema matches a pattern with the default match timeout, which the host sets; ^(a+)+$ backtracks on this
+        // value for hours, so the check stands in for the timeout (the default is read once per process)
+        var schema = JObject.Parse("""{"type": "object", "properties": {"a": {"type": "string", "pattern": "^(a+)+$"}}}""");
+        var document = new JObject { ["a"] = new string('a', 40) + "!" };
+
+        var preview = await SchemaPreviewer.PreviewAsync(
+            "sbt.northwind",
+            document,
+            schema,
+            (_, json) => throw new RegexMatchTimeoutException(json, "^(a+)+$", TimeSpan.FromMilliseconds(200)),
+            CancellationToken.None);
+
+        preview.IsPreviewed.ShouldBeFalse();
+        preview.Reason.ShouldBe(SchemaPreviewer.PatternTimeoutReason);
         preview.IsValid.ShouldBeNull();
     }
 }

@@ -1,7 +1,8 @@
 namespace _42.Platform.Storyteller.Mcp.Understanding;
 
 // A binding of the effective document as stored, with what it reads. EnvelopePointer names the object binding whose
-// $context holds it.
+// $context or $definition holds it. InDefinition is true for a string of a $definition, which is read only if the
+// program emits it; it is left out otherwise.
 public sealed record ExplainedBinding
 {
     public required string Pointer { get; init; }
@@ -15,6 +16,8 @@ public sealed record ExplainedBinding
     public bool IsValid { get; init; }
 
     public string? EnvelopePointer { get; init; }
+
+    public bool? InDefinition { get; init; }
 
     public required IReadOnlyList<Reference> References { get; init; }
 

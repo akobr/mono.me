@@ -171,11 +171,22 @@ public static class PlacementAdvisor
         }
 
         var result = CompositionReplay.Run(nodes, steps);
+        var effective = ToolResults.ToToken(composition.Content);
+        var sourceId = SourceIdOf(candidate);
+        var stored = CompositionReplay.ContentOf((composition.Sources ?? []).FirstOrDefault(source => string.Equals(source.Id, sourceId, StringComparison.Ordinal)));
         var effects = new List<PlacementEffect>();
 
         for (var index = 0; index < targets.Pointers.Count; index++)
         {
             var pointer = targets.Pointers[index];
+
+            // a replay of a scalar there would describe a write nobody makes
+            if (targets.Unplaceable(index, effective, stored) is { } unplaceable)
+            {
+                effects.Add(new PlacementEffect(system.AnnotationKey, pointer, null) { Note = unplaceable });
+                continue;
+            }
+
             var token = JsonPointer.Find(result.Content, pointer);
 
             if (targets.IsEffective(index, token))
@@ -197,6 +208,14 @@ public static class PlacementAdvisor
         }
 
         return effects;
+    }
+
+    // The composition source the candidate writes: an annotation's configuration or a view template.
+    private static string SourceIdOf(PlacementCandidate candidate)
+    {
+        return candidate.Kind == PlacementCandidate.TemplateKind
+            ? $"template:{candidate.TemplateTypeCode}"
+            : $"configuration:{candidate.AnnotationKey}";
     }
 
     private static bool PlaceAnnotation(List<ReplayStep> steps, string annotationKey, PlacementTargets targets)

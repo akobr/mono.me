@@ -119,13 +119,38 @@ public class ConfigurationExplainerTests
 
         var explanation = Explain(composition, pointer: "/features");
 
+        // the usage's array was merged in, not overridden: its item is there, from step 3
         var features = explanation.Values[0];
         features.ValueKind.ShouldBe("array");
-        features.AlsoSetBy!.Select(setter => (setter.Step, setter.ValueKind, setter.BeforeWinner)).ShouldBe([(3, "array", false), (4, "array", false)]);
+        features.AlsoSetBy.ShouldBeNull();
         explanation.Values[1].Value!.Value<string>().ShouldBe("vat");
         explanation.Values[1].AlsoSetBy.ShouldBeNull();
         explanation.Values[2].Step.ShouldBe(3);
         explanation.Values[2].AlsoSetBy.ShouldBeNull();
+    }
+
+    [Fact]
+    public void NestedObjects_AtTwoLevels_AreMerged_NotOverridden()
+    {
+        // the responsibility sets the database host, the execution adds the port: both are applied
+        var composition = Compositions.Execution();
+        composition.SourceContent(Compositions.Responsibility)["database"] = new JObject { ["host"] = "a" };
+        composition.SourceContent(Compositions.Own)["database"] = new JObject { ["port"] = 5 };
+        composition.Content()["database"] = new JObject { ["host"] = "a", ["port"] = 5 };
+        composition.AddOrigin("/database", 1);
+        composition.AddOrigin("/database/host", 1);
+        composition.AddOrigin("/database/port", 7);
+
+        var explanation = Explain(composition, pointer: "/database");
+
+        var values = explanation.Values.ToDictionary(value => value.Pointer);
+        values["/database"].ShouldSatisfyAllConditions(
+            database => database.Step.ShouldBe(1),
+            database => database.ValueKind.ShouldBe("object"),
+            database => database.AlsoSetBy.ShouldBeNull());
+        values["/database/port"].Step.ShouldBe(7);
+        values["/database/port"].AlsoSetBy.ShouldBeNull();
+        values["/database/host"].AlsoSetBy.ShouldBeNull();
     }
 
     [Fact]
@@ -166,23 +191,46 @@ public class ConfigurationExplainerTests
         var reference = password.References.ShouldHaveSingleItem();
         (reference.Key, reference.Source, reference.IsValuesStore).ShouldBe(("db.password", "secret", true));
         reference.KeyValue!.Version.ShouldBe(3);
-        reference.Note.ShouldContain("may read secrets");
+        reference.Note.ShouldNotBeNull().ShouldContain("may read secrets");
 
-        bindings["/host"].References.ShouldHaveSingleItem().Note.ShouldContain("No such pair");
-        bindings["/declined"].References.ShouldHaveSingleItem().Note.ShouldContain("public source declines a secret");
+        bindings["/host"].References.ShouldHaveSingleItem().Note.ShouldNotBeNull().ShouldContain("No such pair");
+        bindings["/declined"].References.ShouldHaveSingleItem().Note.ShouldNotBeNull().ShouldContain("public source declines a secret");
         bindings["/vault"].References.ShouldHaveSingleItem().IsValuesStore.ShouldBeFalse();
         bindings["/url"].Form.ShouldBe(BindingForm.Interpolation);
-        bindings["/url"].References.ShouldHaveSingleItem().Note.ShouldContain("Not looked up");
+        bindings["/url"].References.ShouldHaveSingleItem().Note.ShouldNotBeNull().ShouldContain("Not looked up");
 
         var rule = bindings["/rule"];
         rule.Form.ShouldBe(BindingForm.Object);
         rule.Name.ShouldBe("jlogic");
         rule.IsValid.ShouldBeTrue();
+        rule.InDefinition.ShouldBeNull();
         var context = bindings["/rule/$context/tier"];
         context.EnvelopePointer.ShouldBe("/rule");
         context.Reads.ShouldBe(["this document (@config)"]);
-        // the program of an object binding is not bound
-        bindings.Keys.ShouldNotContain(pointer => pointer.StartsWith("/rule/$definition", StringComparison.Ordinal));
+        context.Note.ShouldNotBeNull().ShouldContain("$context");
+
+        // the resolver binds the program's result again, so a string the program can emit is a possible read
+        var program = bindings["/rule/$definition/if/0"];
+        program.InDefinition.ShouldBe(true);
+        program.EnvelopePointer.ShouldBe("/rule");
+        program.Note.ShouldNotBeNull().ShouldContain("only if the program emits");
+        program.References.ShouldHaveSingleItem().Key.ShouldBe("not.a.binding");
+    }
+
+    [Fact]
+    public void Bindings_BeyondTheReadersLimits_AreNotValid_WithTheReason()
+    {
+        var composition = Compositions.Execution();
+        var deep = "@" + string.Concat(Enumerable.Repeat("f(@", 99)) + "x" + new string(')', 99);
+        composition.SourceContent(Compositions.Context)["deep"] = deep;
+        composition.Content()["deep"] = deep;
+        composition.AddOrigin("/deep", 5);
+
+        var binding = Explain(composition).Bindings.ShouldHaveSingleItem();
+
+        binding.IsValid.ShouldBeFalse();
+        binding.Form.ShouldBe(BindingForm.Invalid);
+        binding.Note.ShouldNotBeNull().ShouldContain("Not read here");
     }
 
     [Fact]
@@ -190,10 +238,12 @@ public class ConfigurationExplainerTests
     {
         var composition = WithBindings(Compositions.Execution());
         composition.Content()["again"] = "@DB.Password";
+        composition.Content()["later"] = "@later.key";
 
         var keys = ConfigurationExplainer.ValuesStoreKeys(ConfigurationExplainer.BindingsOf(composition, string.Empty));
 
-        keys.ShouldBe(["db.password", "db.host", "public.only", "host.value"]);
+        // the key only the program of the object binding holds is a possible read, so it comes last
+        keys.ShouldBe(["db.password", "db.host", "public.only", "host.value", "later.key", "not.a.binding"]);
     }
 
     [Fact]
@@ -207,6 +257,8 @@ public class ConfigurationExplainerTests
             Machine("unit-job", "uxe.northwind.invoicing.prod.export", Sdk.MachineScope.ConfigurationRead),
             Machine("annotations-only", null, Sdk.MachineScope.AnnotationRead),
             Machine("other-customer", "sbt.contoso", Sdk.MachineScope.ConfigurationRead),
+            Machine("export-unit", "unt.invoicing.export", Sdk.MachineScope.ConfigurationRead),
+            Machine("billing", "rst.billing", Sdk.MachineScope.ConfigurationRead),
         };
 
         var consumers = ConfigurationExplainer.Consumers(AnnotationKey.Parse(Compositions.ExecutionKey), machines);
@@ -216,6 +268,40 @@ public class ConfigurationExplainerTests
         consumers.Machines.ReadsThisDocument[1].SecretsRead.ShouldBeTrue();
         consumers.Machines.ReadsThisDocument[0].SecretsRead.ShouldBeFalse();
         consumers.Machines.ReadsThroughDescendants.ShouldHaveSingleItem().Id.ShouldBe("unit-job");
+
+        // the unit reads the execution through uxe.northwind.invoicing.prod.export; another responsibility shares nothing
+        consumers.Machines.ReadsThroughSharedDescendants.ShouldHaveSingleItem().Id.ShouldBe("export-unit");
+    }
+
+    // A machine is allowed on its restriction and every descendant of it, and a descendant of the key merges the key's
+    // values, so a restriction that shares a descendant with the key reaches them.
+    [Theory]
+    [InlineData("sbt.northwind", "rst.billing", true)]
+    [InlineData("sbt.northwind", "unt.invoicing.export", true)]
+    [InlineData("usg.northwind.invoicing", "cnt.northwind.prod", true)]
+    [InlineData("cnt.northwind.prod", "unt.invoicing.export", true)]
+    [InlineData("rst.invoicing", "rst.billing", false)]
+    [InlineData("sbt.northwind", "cnt.contoso.prod", false)]
+    [InlineData("cnt.northwind.prod", "cnt.northwind.test", false)]
+    [InlineData("usg.northwind.invoicing", "unt.billing.export", false)]
+    public void Consumers_ARestrictionThatSharesDescendants_ReadsThroughThem(string key, string restriction, bool shares)
+    {
+        var machines = new[] { Machine("machine", restriction, Sdk.MachineScope.ConfigurationRead, Sdk.MachineScope.SecretsRead) };
+
+        var groups = ConfigurationExplainer.Consumers(AnnotationKey.Parse(key), machines).Machines!;
+
+        groups.ReadsThisDocument.ShouldBeEmpty();
+        groups.ReadsThroughDescendants.ShouldBeEmpty();
+        groups.ReadsThroughSharedDescendants.Count.ShouldBe(shares ? 1 : 0);
+    }
+
+    [Fact]
+    public void Notes_SayATemplateCanStillLose_InThisDocument()
+    {
+        var explanation = Explain(Compositions.Execution());
+
+        explanation.Notes.ShouldNotContain(note => note.Contains("overrides every ancestor", StringComparison.Ordinal));
+        explanation.Notes.ShouldContain(note => note.Contains("deeper nodes", StringComparison.Ordinal) && note.Contains("later branch", StringComparison.Ordinal));
     }
 
     [Theory]

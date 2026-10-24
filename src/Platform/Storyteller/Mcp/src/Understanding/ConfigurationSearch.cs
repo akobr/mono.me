@@ -18,6 +18,9 @@ public sealed class ConfigurationSearch
     public const string ByDocumentReads = "DocumentReads";
     public const string ByMaxResults = "MaxResults";
 
+    public const string PossibleReadNote =
+        "In the $definition of an object binding: a possible read, made only if the program emits this string, because the resolver binds the program's result again.";
+
     // A larger object or array is reported by its kind only, so one match cannot fill the result.
     private const int MaxInlineValueLength = 1000;
 
@@ -96,12 +99,13 @@ public sealed class ConfigurationSearch
                 continue;
             }
 
-            if (_bindsKey is not null && (inDefinition || !Binds(token, _bindsKey)))
+            if (_bindsKey is not null && !Binds(token, _bindsKey))
             {
                 continue;
             }
 
-            yield return Describe(annotationKey, version, pointer, token);
+            var match = Describe(annotationKey, version, pointer, token);
+            yield return _bindsKey is not null && inDefinition ? match with { Note = PossibleReadNote } : match;
         }
     }
 
@@ -187,7 +191,8 @@ public sealed class ConfigurationSearch
         return new SearchMatch(annotationKey, version) { Pointer = pointer, ValueKind = token.Type == JTokenType.Array ? "array" : "object" };
     }
 
-    // Every value with its pointer; inDefinition marks the program of an object binding, which is never bound.
+    // Every value with its pointer; inDefinition marks the program of an object binding, whose strings are bound only
+    // when the program emits them (the resolver binds the program's result again).
     private static IEnumerable<(string Pointer, JToken Token, bool InDefinition)> Walk(JToken token, string pointer, bool inDefinition)
     {
         switch (token)

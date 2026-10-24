@@ -1,6 +1,6 @@
 using _42.Platform.Storyteller.Mcp.Tools;
-using _42.Platform.Storyteller.Mcp.UnitTests.Support;
 using _42.Platform.Storyteller.Mcp.Understanding;
+using _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
 using ModelContextProtocol.Protocol;
 
@@ -73,7 +73,11 @@ public class UnderstandingToolsTests
             .ThrowsAsync(new Sdk.ApiException("Not found", 404, string.Empty, NoHeaders, null));
         _access
             .Setup(client => client.GetMachineAccessesAsync(Org, Project, It.IsAny<CancellationToken>()))
-            .ReturnsAsync([new Sdk.MachineAccess { Id = "m1", Scopes = [Sdk.MachineScope.ConfigurationRead], AccessKey = Marker }]);
+            .ReturnsAsync(
+            [
+                new Sdk.MachineAccess { Id = "m1", Scopes = [Sdk.MachineScope.ConfigurationRead], AccessKey = Marker },
+                new Sdk.MachineAccess { Id = "export", AnnotationKey = "unt.invoicing.export", Scopes = [Sdk.MachineScope.ConfigurationRead], AccessKey = Marker },
+            ]);
 
         var result = await Tools.ExplainConfiguration(Org, Project, Compositions.ExecutionKey);
 
@@ -84,6 +88,7 @@ public class UnderstandingToolsTests
         bindings[0]!["References"]![0]!["KeyValue"]!["Version"]!.Value<long>().ShouldBe(4);
         bindings[1]!["References"]![0]!["KeyValue"]!["Exists"]!.Value<bool>().ShouldBeFalse();
         content["Consumers"]!["Machines"]!["ReadsThisDocument"]![0]!["Id"]!.Value<string>().ShouldBe("m1");
+        content["Consumers"]!["Machines"]!["ReadsThroughSharedDescendants"]![0]!["Id"]!.Value<string>().ShouldBe("export");
         _keyValues.Verify(client => client.GetKeyValueAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.Is<bool?>(reveal => reveal != false), It.IsAny<bool?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -102,7 +107,7 @@ public class UnderstandingToolsTests
         content["KeyValueLookupsTruncated"]!.Value<bool>().ShouldBeTrue();
         content["IsStale"]!.Value<bool>().ShouldBeTrue();
         content["Consumers"]!["Machines"].ShouldBeNull();
-        content["Consumers"]!["Reason"]!.Value<string>().ShouldContain("includeConsumers");
+        content["Consumers"]!["Reason"]!.Value<string>().ShouldNotBeNull().ShouldContain("includeConsumers");
     }
 
     [Theory]
@@ -120,7 +125,7 @@ public class UnderstandingToolsTests
         result.IsError.ShouldNotBe(true);
         var content = Structured(result);
         content["Consumers"]!["Machines"].ShouldBeNull();
-        content["Consumers"]!["Reason"]!.Value<string>().ShouldContain("Contributor");
+        content["Consumers"]!["Reason"]!.Value<string>().ShouldNotBeNull().ShouldContain("Contributor");
         ((JArray)content["Values"]!).ShouldHaveSingleItem()["Pointer"]!.Value<string>().ShouldBe("/currency");
     }
 
@@ -158,9 +163,9 @@ public class UnderstandingToolsTests
             ["exe.northwind.invoicing.prod", "cnt.northwind.prod", "sbt.northwind", "usg.northwind.invoicing", "rst.invoicing"]);
         candidates[0]!["Evidence"]!["State"]!.Value<string>().ShouldBe(PlacementEvidence.Exists);
         candidates[0]!["Evidence"]!["Descendants"]!.Value<int>().ShouldBe(2);
-        candidates[0]!["Evidence"]!["Reach"]!.Value<string>().ShouldContain("at least 2");
+        candidates[0]!["Evidence"]!["Reach"]!.Value<string>().ShouldNotBeNull().ShouldContain("at least 2");
         candidates[1]!["Evidence"]!["State"]!.Value<string>().ShouldBe(PlacementEvidence.Deleted);
-        candidates[1]!["Evidence"]!["Next"]!.Value<string>().ShouldContain("restore_annotations");
+        candidates[1]!["Evidence"]!["Next"]!.Value<string>().ShouldNotBeNull().ShouldContain("restore_annotations");
         candidates[2]!["Evidence"]!["State"]!.Value<string>().ShouldBe(PlacementEvidence.Missing);
         candidates[3]!["Evidence"].ShouldBeNull();
         candidates[3]!["Effects"]![0]!["Effective"]!.Value<bool>().ShouldBeFalse();
