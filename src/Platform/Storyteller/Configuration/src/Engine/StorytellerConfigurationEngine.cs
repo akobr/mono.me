@@ -57,6 +57,9 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     // still learns that the pass rolled its key back. The newest few are enough: a run waits for the pass that covers it.
     private readonly List<(long First, long Last, StorytellerConfigurationException Error)> _rejectedPasses = [];
 
+    // Guarded by _lock: the snapshots of switches that wait for their outcome; a range that covers one is kept.
+    private readonly HashSet<long> _pendingSwitches = [];
+
     // Guarded by _lock; _snapshot is also read without it.
     private ConfigurationSnapshot _snapshot;
     private long _sequence;
@@ -790,6 +793,8 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
     // a change callback (isNested) never waits for the lane.
     private async Task<RunResult> RunAsync(EngineLifetime lifetime, SwitchTarget? target, CancellationToken cancellationToken, QueuedRefresh? queued, bool isNested)
     {
+        ConfigurationSnapshot? swapped = null;
+
         try
         {
             using (var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Stopping))
@@ -804,7 +809,6 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                 }
             }
 
-            ConfigurationSnapshot? swapped = null;
             StorytellerConfigurationException? error = null;
             DocumentIdentity identity;
 
@@ -875,6 +879,11 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                         {
                             swapped = Stamp(draft.Snapshot);
                             _snapshot = swapped;
+
+                            if (target is not null && !isNested)
+                            {
+                                _pendingSwitches.Add(swapped.Sequence);
+                            }
                         }
                     }
                 }
@@ -914,6 +923,15 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
         }
         finally
         {
+            if (swapped is not null && target is not null && !isNested)
+            {
+                lock (_lock)
+                {
+                    _pendingSwitches.Remove(swapped.Sequence);
+                    TrimRejectedPasses();
+                }
+            }
+
             ArmTimer(lifetime);
         }
     }
@@ -981,6 +999,23 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
         lock (_lock)
         {
             return _lifetime is not null && _snapshot.Sequence > _notifiedSequence;
+        }
+    }
+
+    // Under _lock: keeps the newest few ranges, and every range that covers a switch still waiting for its outcome.
+    private void TrimRejectedPasses()
+    {
+        for (var i = 0; _rejectedPasses.Count > 16 && i < _rejectedPasses.Count;)
+        {
+            var (first, last, _) = _rejectedPasses[i];
+            if (_pendingSwitches.Any(sequence => sequence >= first && sequence <= last))
+            {
+                i++;
+            }
+            else
+            {
+                _rejectedPasses.RemoveAt(i);
+            }
         }
     }
 
@@ -1323,10 +1358,7 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                     false);
                 rejected.Notification.Rejection = error;
                 _rejectedPasses.Add((pass.FirstSequence, rejected.Sequence, error));
-                if (_rejectedPasses.Count > 16)
-                {
-                    _rejectedPasses.RemoveAt(0);
-                }
+                TrimRejectedPasses();
 
                 RecordFailure(error);
                 var current = _snapshot;
