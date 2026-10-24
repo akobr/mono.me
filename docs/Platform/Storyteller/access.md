@@ -78,6 +78,8 @@ Scopes describe machines, roles describe people. A user is authorized by the rol
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 
+The [MCP server](mcp.md) acts with the role of the signed-in person: its calls carry a delegated token of that person, so an assistant never does more than the person may do, and the audit names the person. The server offers a part of the API only (see [its limits](mcp.md#limits)).
+
 The API reads schemas, templates, deleted annotations and what the comparison of views needs (the views, the configurations and their diffs) with `Reader`. The admin UI locks its **Modeling** page, where they are, below `Contributor`; that lock is a choice of the admin UI. Its **Export & Import** tab is locked below `Administrator`, as the API requires (see [export-import.md](export-import.md#administration-ui)).
 
 Machines have no role; their [scopes](authentication.md#scopes-of-machines) decide. A machine is exactly one flat list of scopes, `MachineAccess.Scopes`, in two groups:

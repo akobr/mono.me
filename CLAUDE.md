@@ -74,6 +74,7 @@ The flagship **2S Platform** — a serverless annotation/metadata platform.
 - `Api.Functions/` — Azure Functions HTTP API (isolated worker model)
 - `Api.Web/` — ASP.NET Core Web API
 - `DbCreator/` — CosmosDB schema creation tool
+- `Mcp/` — MCP server over the API for AI assistants (Streamable HTTP, Entra ID on-behalf-of; docs in `docs/Platform/Storyteller/mcp.md`)
 
 When you make changes in Storyteller, keep the documentation in `docs/Platform/Storyteller/` up to date. Treat existing files in `docs/Platform/Storyteller/specs/` as historical reference documents, but create new specs and reviews there when the Documentation Workflow requires them.
 
