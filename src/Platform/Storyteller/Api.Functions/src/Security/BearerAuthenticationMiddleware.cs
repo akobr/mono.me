@@ -9,6 +9,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Security;
@@ -17,6 +18,9 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
 {
     private const string BearerPrefix = "Bearer ";
     private const string RetryAfterSeconds = "5";
+    private const string SubjectClaimType = "sub";
+    private const string NameClaimType = "name";
+    private const string UserNameClaimType = "preferred_username";
 
     private readonly ILogger<BearerAuthenticationMiddleware> _logger;
 
@@ -48,25 +52,35 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         }
 
         var machineValidators = context.InstanceServices.GetServices<IMachineTokenValidator>().ToList();
-        var issuer = machineValidators.Count > 0 ? TryReadIssuer(rawToken) : null;
+        var exchangeOptions = context.InstanceServices.GetService<IOptions<TokenExchangeOptions>>()?.Value;
+
+        // Read without validation: the issuer picks the validators, and the audiences count once a validator accepted the
+        // token (or DEV_AUTH decoded it).
+        var token = TryReadToken(rawToken);
+        var issuer = machineValidators.Count > 0 ? token?.Issuer : null;
 
         // A validator that owns the issuer runs alone (Storyteller tokens never pay a user provider attempt),
-        // also under DEV_AUTH, so Federated machines behave locally as in production.
+        // also under DEV_AUTH, so Federated machines and Storyteller user tokens behave locally as in production.
         var owner = issuer is null ? null : machineValidators.FirstOrDefault(candidate => candidate.OwnsIssuer(issuer));
 
         if (owner is null && BearerValidationMode.DecodeWithoutValidation)
         {
-            var claims = TryReadUnvalidatedClaims(rawToken);
-
-            if (claims is null)
+            if (token is null)
             {
                 await next(context);
                 return;
             }
 
+            if (IsIssuedToAnActor(exchangeOptions, token))
+            {
+                RefuseTokenOfAnActor(context, httpReqData);
+                return;
+            }
+
             // The active provider's normalizer still runs, so decoded AuthKit tokens get name, preferred_username and scp.
-            var normalized = context.InstanceServices.GetRequiredService<IBearerClaimsNormalizer>().Normalize(claims);
-            StoreIdentity(context, normalized);
+            // Decoded claims never give a delegation: anyone can write act or restrictions into an unsigned token.
+            var normalized = context.InstanceServices.GetRequiredService<IBearerClaimsNormalizer>().Normalize(token.Claims.ToList());
+            StoreIdentity(context, normalized, delegation: null);
             await next(context);
             return;
         }
@@ -77,7 +91,7 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         {
             if (owner is not null)
             {
-                result = AsMachine(await owner.ValidateAsync(rawToken, context.CancellationToken));
+                result = FromOwner(owner, await owner.ValidateAsync(rawToken, context.CancellationToken));
             }
             else
             {
@@ -104,7 +118,28 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
             return;
         }
 
-        StoreIdentity(context, result);
+        if (owner is null && IsIssuedToAnActor(exchangeOptions, token))
+        {
+            RefuseTokenOfAnActor(context, httpReqData);
+            return;
+        }
+
+        // A Storyteller user token: the account it names must still exist, and gives the names the token does not carry.
+        var delegation = owner is not null && !result.IsMachine ? result.Delegation : null;
+
+        if (delegation is not null)
+        {
+            result = await WithAccountNamesAsync(context, result);
+
+            if (result is null)
+            {
+                _logger.LogWarning("A Storyteller user token of no account is presented for {Url}", httpReqData.Url.AbsolutePath);
+                RespondUnauthorized(context, httpReqData);
+                return;
+            }
+        }
+
+        StoreIdentity(context, result, delegation);
         await next(context);
     }
 
@@ -163,21 +198,57 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         return result is { IsMachine: true, MachineId.Length: > 0 } ? result : null;
     }
 
-    private static string? TryReadIssuer(string rawToken)
+    // An owner's results are machines. Only an IUserTokenIssuerValidator (Storyteller) also gives users, and only with the
+    // actor that acts for them; a user result of any other owner, or one without a delegation, is refused (401).
+    private static BearerValidationResult? FromOwner(IMachineTokenValidator owner, BearerValidationResult? result)
     {
-        var handler = new JwtSecurityTokenHandler();
+        return owner is IUserTokenIssuerValidator && result is { IsMachine: false, Delegation: not null }
+            ? result
+            : AsMachine(result);
+    }
 
-        try
-        {
-            return handler.CanReadToken(rawToken) ? handler.ReadJwtToken(rawToken).Issuer : null;
-        }
-        catch (Exception exception) when (exception is ArgumentException or SecurityTokenException)
+    // A token whose aud names an actor of the token exchange (one of its SubjectAudiences) was issued to the actor, for the
+    // exchange only. Accepting it on API routes would be the token passthrough the MCP specification forbids, so it is
+    // refused even when its provider accepts it.
+    private static bool IsIssuedToAnActor(TokenExchangeOptions? options, JwtSecurityToken? token)
+    {
+        return options is not null && token is not null && options.IsIssuedToAnActor(token.Audiences);
+    }
+
+    // A Storyteller user token carries no name: one point read of its account adds name and preferred_username, the claims
+    // a provider's token has, so audit stamps read "Ada via mcp". Null when the account no longer exists.
+    private static async Task<BearerValidationResult?> WithAccountNamesAsync(FunctionContext context, BearerValidationResult result)
+    {
+        var accountId = result.Claims.FirstOrDefault(claim => claim.Type == SubjectClaimType)?.Value;
+
+        if (string.IsNullOrWhiteSpace(accountId))
         {
             return null;
         }
+
+        var account = await context.InstanceServices.GetRequiredService<IAccessService>().GetAccountAsync(accountId);
+
+        if (account is null)
+        {
+            return null;
+        }
+
+        var claims = result.Claims.Where(claim => claim.Type is not (NameClaimType or UserNameClaimType)).ToList();
+
+        if (!string.IsNullOrWhiteSpace(account.Name))
+        {
+            claims.Add(new Claim(NameClaimType, account.Name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(account.UserName))
+        {
+            claims.Add(new Claim(UserNameClaimType, account.UserName));
+        }
+
+        return result with { Claims = claims };
     }
 
-    private static List<Claim>? TryReadUnvalidatedClaims(string rawToken)
+    private static JwtSecurityToken? TryReadToken(string rawToken)
     {
         if (string.IsNullOrWhiteSpace(rawToken))
         {
@@ -186,28 +257,27 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
 
         var handler = new JwtSecurityTokenHandler();
 
-        if (!handler.CanReadToken(rawToken))
-        {
-            return null;
-        }
-
         try
         {
-            return handler.ReadJwtToken(rawToken).Claims.ToList();
+            return handler.CanReadToken(rawToken) ? handler.ReadJwtToken(rawToken) : null;
         }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-        catch (SecurityTokenException)
+        catch (Exception exception) when (exception is ArgumentException or SecurityTokenException)
         {
             return null;
         }
     }
 
-    private static void StoreIdentity(FunctionContext context, BearerValidationResult result)
+    // The delegation comes from the result of the Storyteller token validator only, never from claims: the user acts
+    // through that actor, so the audit actor gets Via and the actor's restrictions apply.
+    private static void StoreIdentity(FunctionContext context, BearerValidationResult result, BearerDelegation? delegation)
     {
         context.Items[FunctionContextItemKeys.CachedClaims] = result.Claims as List<Claim> ?? result.Claims.ToList();
+
+        if (!result.IsMachine && delegation is not null)
+        {
+            context.Items[FunctionContextItemKeys.DelegatedActor] = delegation.ActorId;
+            context.Items[FunctionContextItemKeys.DelegatedRestrictions] = delegation.Restrictions;
+        }
 
         if (result.IsMachine && !string.IsNullOrEmpty(result.MachineId))
         {
@@ -232,6 +302,12 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
     private void RespondUnauthorized(FunctionContext context, HttpRequestData request)
     {
         AssignResponse(context, request.CreateResponse(HttpStatusCode.Unauthorized));
+    }
+
+    private void RefuseTokenOfAnActor(FunctionContext context, HttpRequestData request)
+    {
+        _logger.LogWarning("A bearer token issued to an actor of the token exchange is presented for {Url}", request.Url.AbsolutePath);
+        RespondUnauthorized(context, request);
     }
 
     private void RespondUnavailable(FunctionContext context, HttpRequestData request)

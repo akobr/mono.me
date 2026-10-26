@@ -111,6 +111,29 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         _access.Verify(service => service.CreateAccountAsync(It.IsAny<Accessing.Model.AccountCreate>()), Times.Never);
     }
 
+    // End to end: the API's validator accepts the issued token as the user of the account, acting through the actor.
+    [Fact]
+    public async Task ExchangedToken_IsAcceptedByTheValidator_AsTheUserThroughTheActor()
+    {
+        var result = await _exchange.ExchangeAsync(Request());
+        var validator = new StorytellerTokenValidator(
+            _keyProvider,
+            Options.Create(_options),
+            Options.Create(_exchangeOptions),
+            _time,
+            NullLogger<StorytellerTokenValidator>.Instance);
+
+        var validated = await validator.ValidateAsync(result.AccessToken!);
+
+        validated.ShouldNotBeNull();
+        validated.IsMachine.ShouldBeFalse();
+        validated.MachineId.ShouldBeNull();
+        validated.Claims.Select(claim => (claim.Type, claim.Value)).ShouldBe([("sub", AccountId), ("scp", UserScopes.Impersonation)]);
+        var delegation = validated.Delegation.ShouldNotBeNull();
+        delegation.ActorId.ShouldBe(ActorId);
+        delegation.Restrictions.ShouldBe([ActorRestrictions.NoSecretReveal]);
+    }
+
     [Fact]
     public async Task SubjectToken_IsValidatedForTheActorsAudiencesAndClients()
     {

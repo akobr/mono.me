@@ -4,17 +4,13 @@ namespace _42.Platform.Storyteller.Accessing;
 
 public sealed class UserAuthenticationOptionsValidator : IValidateOptions<UserAuthenticationOptions>
 {
-    private const string DelegatedClientsEntraIdOnly = "Auth:DelegatedClients applies to Entra ID only.";
-
     public ValidateOptionsResult Validate(string? name, UserAuthenticationOptions options)
     {
-        // Each provider has its own rules; the Entra ID ones (and Auth:DelegatedClients) apply to Entra ID only.
+        // Each provider has its own rules; the Entra ID ones apply to Entra ID only.
         return options.Provider switch
         {
             IdentityProviderKind.EntraId => ValidateEntraId(options),
-            IdentityProviderKind.AuthKit => options.DelegatedClients.Count > 0
-                ? ValidateOptionsResult.Fail(DelegatedClientsEntraIdOnly)
-                : ValidateAuthKit(options.AuthKit),
+            IdentityProviderKind.AuthKit => ValidateAuthKit(options.AuthKit),
             IdentityProviderKind.Keycloak => ValidateKeycloak(options),
             _ => ValidateOptionsResult.Fail($"Auth:Provider '{options.Provider}' is not a known identity provider."),
         };
@@ -25,26 +21,6 @@ public sealed class UserAuthenticationOptionsValidator : IValidateOptions<UserAu
         if (string.IsNullOrWhiteSpace(options.ClientId) || string.IsNullOrWhiteSpace(options.TenantId))
         {
             return ValidateOptionsResult.Fail("Auth:ClientId and Auth:TenantId are required when Auth:Provider is EntraId.");
-        }
-
-        return ValidateDelegatedClients(options);
-    }
-
-    private static ValidateOptionsResult ValidateDelegatedClients(UserAuthenticationOptions options)
-    {
-        foreach (var client in options.DelegatedClients)
-        {
-            if (!Guid.TryParse(client.ClientId, out var clientId) || !Guid.TryParse(client.TenantId, out _))
-            {
-                return ValidateOptionsResult.Fail("Auth:DelegatedClients entries need a ClientId and a TenantId, both GUIDs.");
-            }
-
-            // Compared as GUIDs: the same app may be written {...} or without dashes on one side. An Auth:ClientId that is
-            // not a GUID cannot name a listed app.
-            if (Guid.TryParse(options.ClientId, out var apiClientId) && clientId == apiClientId)
-            {
-                return ValidateOptionsResult.Fail("Auth:DelegatedClients lists client apps other than Auth:ClientId.");
-            }
         }
 
         return ValidateOptionsResult.Success;
@@ -107,11 +83,6 @@ public sealed class UserAuthenticationOptionsValidator : IValidateOptions<UserAu
         {
             // The advertised sign-in client would get tokens the API refuses.
             failures.Add("Auth:Keycloak:ClientId must be one of Auth:Keycloak:AllowedClientIds.");
-        }
-
-        if (options.DelegatedClients.Count > 0)
-        {
-            failures.Add(DelegatedClientsEntraIdOnly);
         }
 
         return failures.Count > 0

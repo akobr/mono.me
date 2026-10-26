@@ -72,7 +72,7 @@ public sealed class FederatedTokenExchangeServiceTests : IDisposable
         token.GetPayloadValue<string>("federation_subject").ShouldBe("repo:acme/app:ref:refs/heads/main");
         token.GetPayloadValue<string>("annotation_key").ShouldBe("unit.service");
 
-        var validated = await new StorytellerTokenValidator(_keyProvider, Options.Create(_options), _time, NullLogger<StorytellerTokenValidator>.Instance)
+        var validated = await new StorytellerTokenValidator(_keyProvider, Options.Create(_options), Options.Create(new TokenExchangeOptions()), _time, NullLogger<StorytellerTokenValidator>.Instance)
             .ValidateAsync(result.AccessToken!);
         validated.ShouldNotBeNull();
         validated.CredentialKind.ShouldBe(MachineCredentialKind.Federated);

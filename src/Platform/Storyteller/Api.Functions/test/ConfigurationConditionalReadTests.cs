@@ -247,6 +247,73 @@ public class ConfigurationConditionalReadTests
         Headers(withheld).ETag.ToString().ShouldNotBe(Headers(writing).ETag.ToString());
     }
 
+    // A user acting through an actor under NoSecretReveal is read as a user without secret rights, in every build, and
+    // learns why: the header names the actor, on the 200 and on the 304.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetConfigurationResolved_ThroughARestrictedActor_IsEvaluatedWithoutSecretsAndSaysWhy(bool bound)
+    {
+        var (http, configurations) = Create(() => Stored(), bound ? Resolve("db-1") : null, role: AccountRole.ContributorWithSecrets);
+        using var provider = Manifests();
+        var first = Delegated(provider: provider);
+        var result = await http.GetConfigurationResolved(first, Org, Project, View, Key);
+        var second = Delegated(ifNoneMatch: Headers(first).ETag.ToString(), provider: provider);
+
+        var notModified = await http.GetConfigurationResolved(second, Org, Project, View, Key);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        notModified.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified);
+        configurations.IncludeSecrets.Count.ShouldBe(bound ? 1 : 0);
+        configurations.IncludeSecrets.ShouldAllBe(includeSecrets => !includeSecrets);
+
+        foreach (var request in new[] { first, second })
+        {
+            Headers(request)[SecretRights.WithheldHeader].ToString().ShouldBe(SecretRights.WithheldByActor);
+            Headers(request).CacheControl.ToString().ShouldBe("private, no-cache");
+        }
+    }
+
+    // The actor's variant has the body of a read without secret rights but its own header value, so it shares a tag with
+    // none of the others: the same user reading directly, a machine withheld by the mTLS rule, a caller without rights.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GetConfigurationResolved_ThroughARestrictedActor_NeverSharesATag(bool bound)
+    {
+        var (http, _) = Create(() => Stored(), bound ? Resolve("db-1") : null, role: AccountRole.ContributorWithSecrets);
+        var restricted = Delegated();
+        var direct = WithHttpContext(KeyValueRequests.User(), ifNoneMatch: null);
+        var withheldByMtls = Machine(mtls: false);
+        var neither = WithHttpContext(KeyValueRequests.Machine(mtls: false, roles: [Scopes.Configuration.Read]), ifNoneMatch: null);
+
+        await http.GetConfigurationResolved(restricted, Org, Project, View, Key);
+        await http.GetConfigurationResolved(direct, Org, Project, View, Key);
+        await http.GetConfigurationResolved(withheldByMtls, Org, Project, View, Key);
+        await http.GetConfigurationResolved(neither, Org, Project, View, Key);
+        var replayed = await http.GetConfigurationResolved(Delegated(ifNoneMatch: Headers(direct).ETag.ToString()), Org, Project, View, Key);
+
+        new[] { restricted, direct, withheldByMtls, neither }.Select(request => Headers(request).ETag.ToString()).Distinct().Count().ShouldBe(4);
+        replayed.ShouldBeOfType<OkObjectResult>("the tag of the direct read names the variant with secrets");
+        Headers(direct).ContainsKey(SecretRights.WithheldHeader).ShouldBeFalse();
+        Headers(withheldByMtls)[SecretRights.WithheldHeader].ToString().ShouldBe(SecretRights.WithheldByMtls);
+        Headers(restricted)[SecretRights.WithheldHeader].ToString().ShouldBe(SecretRights.WithheldByActor);
+    }
+
+    // An actor that allows secrets leaves the user the read right: the read is the one with secrets, without the header.
+    [Fact]
+    public async Task GetConfigurationResolved_ThroughAnActorThatAllowsSecrets_ReadsTheSecrets()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"), role: AccountRole.ContributorWithSecrets);
+        var request = Delegated(restrictions: []);
+
+        await http.GetConfigurationResolved(request, Org, Project, View, Key);
+
+        configurations.IncludeSecrets.ShouldBe([true]);
+        Headers(request).ContainsKey(SecretRights.WithheldHeader).ShouldBeFalse();
+        Headers(request).CacheControl.ToString().ShouldBe("no-store");
+    }
+
     [Fact]
     public async Task GetConfigurationResolved_RecordedInputs_TagTheReadByTheirMarkers()
     {
@@ -458,6 +525,24 @@ public class ConfigurationConditionalReadTests
         configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(2);
     }
 
+    // The same user through an actor is another caller, even when the actor allows secrets and the tags are equal: its
+    // binding reads are audited with Via, so a manifest the user recorded directly never answers it.
+    [Fact]
+    public async Task GetConfigurationResolved_AManifestOfTheSameUserCallingDirectly_IsNotRevalidated()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"), role: AccountRole.ContributorWithSecrets);
+        using var provider = Manifests();
+        var direct = WithHttpContext(KeyValueRequests.User(), ifNoneMatch: null, provider);
+        await http.GetConfigurationResolved(direct, Org, Project, View, Key);
+        var throughTheActor = Delegated(ifNoneMatch: Headers(direct).ETag.ToString(), provider: provider, restrictions: []);
+
+        var result = await http.GetConfigurationResolved(throughTheActor, Org, Project, View, Key);
+
+        result.ShouldBeOfType<StatusCodeResult>().StatusCode.ShouldBe(StatusCodes.Status304NotModified, "the same inputs give the same tag");
+        configurations.Revalidated.ShouldBeEmpty("each caller is resolved, metered and audited for itself");
+        configurations.Calls.Count(call => call == nameof(IConfigurationService.ResolveConfigurationAsync)).ShouldBe(2);
+    }
+
     [Fact]
     public async Task GetConfigurationResolved_AManifestOfAnotherDocumentOrKey_IsNotRevalidated()
     {
@@ -565,28 +650,32 @@ public class ConfigurationConditionalReadTests
         ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), rights).ToString().ShouldNotBe(tag);
     }
 
+    // Reading, withheld by the mTLS rule, withheld by the actor, and neither: each its own variant of the read.
     [Fact]
-    public void Tags_SplitTheThreeSecretRights()
+    public void Tags_SplitTheFourSecretRights()
     {
         var secret = new byte[32];
         var reading = Rights(canReadSecrets: true, withheld: false);
         var withheld = Rights(canReadSecrets: false, withheld: true);
+        var withheldByActor = Rights(canReadSecrets: false, withheld: false, withheldByActor: true);
         var neither = Rights(canReadSecrets: false, withheld: false);
 
         string[] resolved =
         [
             ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), reading).ToString(),
             ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), withheld).ToString(),
+            ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), withheldByActor).ToString(),
             ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), neither).ToString(),
         ];
         string[] bound =
         [
             ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), reading, secret).ToString(),
             ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), withheld, secret).ToString(),
+            ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), withheldByActor, secret).ToString(),
             ConfigurationEntityTags.ForResolvedBindings(FullKeyOfTheRead, Stored(), neither, secret).ToString(),
         ];
 
-        resolved.Concat(bound).Distinct().Count().ShouldBe(6);
+        resolved.Concat(bound).Distinct().Count().ShouldBe(8);
         bound.ShouldAllBe(tag => tag.StartsWith("W/\"b.", StringComparison.Ordinal));
     }
 
@@ -644,6 +733,17 @@ public class ConfigurationConditionalReadTests
 
         manifests.Remove("caller", manifest.Tag);
         manifests.TryGet("caller", manifest.Tag, out _).ShouldBeFalse();
+    }
+
+    // Via goes with the kind, so the account, the channel and the actor stay apart in the key.
+    [Fact]
+    public void DependencyManifests_TellACallerThroughAnActorFromTheSameCallerDirectly()
+    {
+        var direct = new SecretRights(new KeyValueCaller(AuditActor.Account("tid:oid"), true, true), IsReadWithheldByMtls: false, IsWriteWithheldByMtls: false);
+        var throughTheActor = direct with { Caller = direct.Caller with { Actor = direct.Caller.Actor with { Via = "mcp" } } };
+
+        DependencyManifests.CallerOf(direct).ShouldBe("Account:tid:oid:User");
+        DependencyManifests.CallerOf(throughTheActor).ShouldBe("Account.mcp:tid:oid:User");
     }
 
     [Fact]
@@ -764,19 +864,21 @@ public class ConfigurationConditionalReadTests
         operation.GetProperty("description").GetString()!.ShouldContain("If-None-Match");
     }
 
-    // A resolve that records one input, db.host in the version of ConfigurationProxy.Marker.
+    // A resolve that records one input, db.host in the version of ConfigurationProxy.Marker. role: the role of every user.
     private static (ConfigurationHttp Http, ConfigurationProxy Configurations) Create(
         Func<Configuration?> stored,
-        Func<Configuration, bool, Configuration>? resolve = null)
+        Func<Configuration, bool, Configuration>? resolve = null,
+        AccountRole role = AccountRole.Reader)
     {
-        return Create(stored, resolve, (proxy, dependencies) => dependencies.Record(new BindingDependency(BindingDependencyKinds.KeyValue, View, "db.host", proxy.Marker)));
+        return Create(stored, resolve, (proxy, dependencies) => dependencies.Record(new BindingDependency(BindingDependencyKinds.KeyValue, View, "db.host", proxy.Marker)), role);
     }
 
     // record: what a resolve does with the collector it is given, after a scope carried it; null: it ignores the collector.
     private static (ConfigurationHttp Http, ConfigurationProxy Configurations) Create(
         Func<Configuration?> stored,
         Func<Configuration, bool, Configuration>? resolve,
-        Action<ConfigurationProxy, BindingDependencies>? record)
+        Action<ConfigurationProxy, BindingDependencies>? record,
+        AccountRole role = AccountRole.Reader)
     {
         var configurations = DispatchProxy.Create<IConfigurationService, ConfigurationProxy>();
         var proxy = (ConfigurationProxy)(object)configurations;
@@ -786,7 +888,7 @@ public class ConfigurationConditionalReadTests
         var http = new ConfigurationHttp(
             configurations,
             DispatchProxy.Create<IAnnotationService, NoDeletedAnnotations>(),
-            new RoleAccess(AccountRole.Reader),
+            new RoleAccess(role),
             new FixedKeyValuePolicies(requireMtls: true),
             NullLogger<ConfigurationHttp>.Instance);
         return (http, proxy);
@@ -856,6 +958,13 @@ public class ConfigurationConditionalReadTests
         return WithHttpContext(KeyValueRequests.Machine(mtls), ifNoneMatch, provider);
     }
 
+    // A user acting through the actor of TestRequests.DelegatedUser, NoSecretReveal unless restrictions are given. The
+    // restriction holds in every build, so the actor withholds the secrets from a Debug (DEV_AUTH) user too.
+    private static TestHttpRequestData Delegated(string? ifNoneMatch = null, IServiceProvider? provider = null, IReadOnlyList<string>? restrictions = null)
+    {
+        return WithHttpContext(TestRequests.DelegatedUser(restrictions), ifNoneMatch, provider);
+    }
+
     // provider: the services of the process, e.g. its manifests; the request keeps an empty provider without it.
     private static TestHttpRequestData WithHttpContext(TestHttpRequestData request, string? ifNoneMatch, IServiceProvider? provider = null)
     {
@@ -879,9 +988,11 @@ public class ConfigurationConditionalReadTests
         return ((HttpContext)request.FunctionContext.Items[HttpContextItem]).Response.Headers;
     }
 
-    private static SecretRights Rights(bool canReadSecrets, bool withheld)
+    // withheld: by the mTLS rule; withheldByActor: by an actor under NoSecretReveal, which leaves the write right.
+    private static SecretRights Rights(bool canReadSecrets, bool withheld, bool withheldByActor = false)
     {
-        return new SecretRights(new KeyValueCaller(AuditActor.System, canReadSecrets, canReadSecrets), IsReadWithheldByMtls: withheld, IsWriteWithheldByMtls: withheld);
+        var caller = new KeyValueCaller(AuditActor.System, canReadSecrets, canReadSecrets || withheldByActor);
+        return new SecretRights(caller, IsReadWithheldByMtls: withheld, IsWriteWithheldByMtls: withheld) { IsReadWithheldByActor = withheldByActor };
     }
 
     private static Configuration Stored(ulong version = 3, string? hash = "0badc0de", string sender = "billing@example.com", DateTimeOffset? modified = null)

@@ -193,6 +193,53 @@ public class InvitationsHttpTests
         service.Calls.ShouldBeEmpty();
     }
 
+    // A call through an actor carries the user name stored on the account as preferred_username, for audit, not what the
+    // identity provider asserts now: it is never a verified email, also where a direct token without email_verified is
+    // (Entra ID, and AuthKit with RequireVerifiedEmail off). Invitations are answered through the provider's own sign-in.
+    [Theory]
+    [InlineData(IdentityProviderKind.EntraId)]
+    [InlineData(IdentityProviderKind.AuthKit)]
+    public void IsEmailVerified_ThroughAnActor_IsFalse(IdentityProviderKind provider)
+    {
+        var options = TrustingOptions(provider);
+
+        InvitationsHttp.IsEmailVerified(Request(DelegatedClaims(provider)), options).ShouldBeTrue();
+        InvitationsHttp.IsEmailVerified(Request(DelegatedClaims(provider), delegatedActor: true), options).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(IdentityProviderKind.EntraId)]
+    [InlineData(IdentityProviderKind.AuthKit)]
+    public async Task Mine_ThroughAnActor_ReturnsEmptyWithoutQuerying(IdentityProviderKind provider)
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service, TrustingOptions(provider));
+
+        var result = await http.GetMyInvitations(Request(DelegatedClaims(provider), delegatedActor: true));
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IReadOnlyList<Invitation>>()!.ShouldBeEmpty();
+        service.Calls.ShouldBeEmpty();
+    }
+
+    // Accepting and declining through an actor reach the service unverified, so it refuses them (403 EmailMismatch or
+    // EmailNotVerified).
+    [Theory]
+    [InlineData(IdentityProviderKind.EntraId)]
+    [InlineData(IdentityProviderKind.AuthKit)]
+    public async Task AcceptAndDecline_ThroughAnActor_AreNotVerified(IdentityProviderKind provider)
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service, TrustingOptions(provider));
+
+        await http.AcceptInvitation(Request(DelegatedClaims(provider), delegatedActor: true), "inv-1");
+        service.LastInvitee.ShouldNotBeNull().IsEmailVerified.ShouldBeFalse();
+
+        await http.DeclineInvitation(Request(DelegatedClaims(provider), delegatedActor: true), "inv-1");
+        service.LastInvitee.ShouldNotBeNull().IsEmailVerified.ShouldBeFalse();
+
+        service.Calls.ShouldBe(["accept:inv-1", "decline:inv-1"]);
+    }
+
     [Fact]
     public async Task Create_ServiceRejectsInput_ReturnsBadRequest()
     {
@@ -290,18 +337,54 @@ public class InvitationsHttpTests
 
     private static InvitationsHttp CreateHttp(RecordingInvitations service, IdentityProviderKind provider = IdentityProviderKind.EntraId)
     {
-        return new InvitationsHttp(service, Options.Create(new UserAuthenticationOptions { Provider = provider }), FunctionTestDoubles.ApiJsonOptions);
+        return CreateHttp(service, new UserAuthenticationOptions { Provider = provider });
     }
 
-    // A request with the claims; a body goes as JSON, with its content type unless contentType is false.
-    private static TestHttpRequestData Request(List<Claim> claims, string? body = null, bool contentType = true)
+    private static InvitationsHttp CreateHttp(RecordingInvitations service, UserAuthenticationOptions options)
+    {
+        return new InvitationsHttp(service, Options.Create(options), FunctionTestDoubles.ApiJsonOptions);
+    }
+
+    // Options under which a direct token without email_verified counts as verified.
+    private static UserAuthenticationOptions TrustingOptions(IdentityProviderKind provider)
+    {
+        return new UserAuthenticationOptions
+        {
+            Provider = provider,
+            AuthKit = new AuthKitOptions { RequireVerifiedEmail = false },
+        };
+    }
+
+    // A request with the claims; a body goes as JSON, with its content type unless contentType is false. A delegated
+    // actor makes it a call through the actor mcp under NoSecretReveal, as the bearer middleware leaves a Storyteller
+    // user token.
+    private static TestHttpRequestData Request(List<Claim> claims, string? body = null, bool contentType = true, bool delegatedActor = false)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
         var headers = body is not null && contentType ? FunctionTestDoubles.JsonContentType() : null;
         var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, body: body);
         claims.Add(new Claim("scp", Scopes.User.Impersonation));
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
+
+        if (delegatedActor)
+        {
+            context.Items[FunctionContextItemKeys.DelegatedActor] = "mcp";
+            context.Items[FunctionContextItemKeys.DelegatedRestrictions] = new[] { ActorRestrictions.NoSecretReveal };
+        }
+
         return request;
+    }
+
+    // The claims of a Storyteller user token after the bearer middleware: the account id, and the name and user name
+    // stored on the account; no email_verified.
+    private static List<Claim> DelegatedClaims(IdentityProviderKind provider)
+    {
+        return
+        [
+            new("sub", provider == IdentityProviderKind.EntraId ? EntraAccountId : "user_01"),
+            new("name", "Ada Lovelace"),
+            new("preferred_username", "ada@example.com"),
+        ];
     }
 
     private sealed class RecordingInvitations : IInvitationService
@@ -349,7 +432,12 @@ public class InvitationsHttpTests
 
         public Task<Invitation> RevokeInvitationAsync(string accessPointKey, string invitationId, string actorId) => throw new NotImplementedException();
 
-        public Task<Invitation> DeclineInvitationAsync(string invitationId, InvitationIdentity invitee) => throw new NotImplementedException();
+        public Task<Invitation> DeclineInvitationAsync(string invitationId, InvitationIdentity invitee)
+        {
+            Calls.Add($"decline:{invitationId}");
+            LastInvitee = invitee;
+            return Task.FromResult(Invitation("acme.billing") with { Status = InvitationStatus.Declined });
+        }
 
         private static Invitation Invitation(string accessPointKey) => new()
         {

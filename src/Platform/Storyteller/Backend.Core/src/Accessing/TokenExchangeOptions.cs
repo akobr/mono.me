@@ -25,4 +25,26 @@ public class TokenExchangeOptions
 
     // Per actor and subject token (jti, else the hash of the token), in memory per instance.
     public int MaxExchangesPerSubjectTokenPerMinute { get; set; } = 10;
+
+    // True when one of the audiences (a token's aud) is in the SubjectAudiences of an actor, enabled or not: the token was
+    // issued to the actor for the exchange, and presenting it as a bearer token is token passthrough. Compared as the start
+    // check compares audiences: trimmed, without a trailing '/', ignoring case.
+    public bool IsIssuedToAnActor(IEnumerable<string> audiences)
+    {
+        ArgumentNullException.ThrowIfNull(audiences);
+
+        var actorAudiences = Actors
+            .SelectMany(actor => actor.SubjectAudiences)
+            .Select(NormalizeAudience)
+            .Where(audience => audience.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return actorAudiences.Count > 0
+            && audiences.Any(audience => actorAudiences.Contains(NormalizeAudience(audience)));
+    }
+
+    private static string NormalizeAudience(string? audience)
+    {
+        return audience?.Trim().TrimEnd('/') ?? string.Empty;
+    }
 }

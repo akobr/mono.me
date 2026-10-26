@@ -38,11 +38,14 @@ public sealed class DependencyManifests : IDisposable
         });
     }
 
-    // The actor and the channel of a read: the audit trail of the binding reads (BindingRead) tells callers apart by them.
+    // The actor and the channel of a read: the audit trail of the binding reads (BindingRead) tells callers apart by them,
+    // also a user acting through an actor (Via) from the same user calling directly, whatever the actor's restrictions.
+    // Via goes with the kind: neither has a ':' (actor ids are URL-safe), so the parts stay apart.
     public static string CallerOf(SecretRights rights)
     {
         var caller = rights.Caller;
-        return $"{caller.Actor.Kind}:{caller.Actor.Id}:{caller.Channel}";
+        var kind = caller.Actor.Via is { } via ? $"{caller.Actor.Kind}.{via}" : caller.Actor.Kind.ToString();
+        return $"{kind}:{caller.Actor.Id}:{caller.Channel}";
     }
 
     public string GetRuntimeVersion()

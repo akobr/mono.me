@@ -159,7 +159,8 @@ public partial class ConfigurationHttp
             return badRequestResult;
         }
 
-        // secrets go to machines only over mTLS when the project says so; a withheld read says why in a header
+        // secrets go to machines only over mTLS when the project says so, and never through an actor under NoSecretReveal;
+        // a withheld read says why in a header
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         var configurationModel = await _configuration.GetRawConfigurationAsync(fullKey);
@@ -708,12 +709,18 @@ public partial class ConfigurationHttp
     }
 
     // The same on the 200 and the 304s. Only the read right counts: mTLS would not let a machine with Secrets.Write alone
-    // read secrets.
+    // read secrets. A user acting through an actor under NoSecretReveal is a user and never a machine, so at most one
+    // reason applies.
     private static void SetResolvedHeaders(HttpRequestData request, SecretRights rights)
     {
         if (rights.IsReadWithheldByMtls)
         {
             request.SetResponseHeader(SecretRights.WithheldHeader, SecretRights.WithheldByMtls);
+        }
+
+        if (rights.IsReadWithheldByActor)
+        {
+            request.SetResponseHeader(SecretRights.WithheldHeader, SecretRights.WithheldByActor);
         }
 
         if (rights.CanReadSecrets)

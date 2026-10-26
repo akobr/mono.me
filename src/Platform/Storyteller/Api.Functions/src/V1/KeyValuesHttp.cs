@@ -117,6 +117,12 @@ public class KeyValuesHttp
 
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
 
+        // a reveal is refused before the service is asked, also of a public pair: by the actor, then by the mTLS rule
+        if (options.Reveal && rights.IsReadWithheldByActor)
+        {
+            throw KeyValueErrors.ActorRestricted();
+        }
+
         if (options.Reveal && rights.IsReadWithheldByMtls)
         {
             throw KeyValueErrors.MtlsRequired();
@@ -414,6 +420,11 @@ public class KeyValuesHttp
         var reveal = KeyValueQuery.GetBool(request, Definitions.Parameters.Reveal);
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
 
+        if (reveal && rights.IsReadWithheldByActor)
+        {
+            throw KeyValueErrors.ActorRestricted();
+        }
+
         if (reveal && rights.IsReadWithheldByMtls)
         {
             throw KeyValueErrors.MtlsRequired();
@@ -628,7 +639,8 @@ public class KeyValuesHttp
             request.MarkNoStore();
         }
 
-        return await KeyValueAuthorization.UnderMtlsReadRuleAsync(
+        // only the diff of a secret is refused for the actor or the mTLS rule: the service asks for secret rights for it alone
+        return await KeyValueAuthorization.UnderSecretReadRuleAsync(
             rights,
             () => _keyValues.GetVersionChangesAsync(organization, project, view, key, fromVersion, toVersion, rights.Caller).ToDiffResponseAsync(request));
     }

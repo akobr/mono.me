@@ -219,9 +219,15 @@ public class InvitationsHttp
 
     // email_verified decides when the token carries it. Without it, AuthKit tokens count as verified only
     // when RequireVerifiedEmail is off, and Keycloak tokens never (the email scope adds the claim); Entra ID
-    // has no such claim and its directory names are trusted.
+    // has no such claim and its directory names are trusted. A call through an actor (a Storyteller user token) is never
+    // verified: its preferred_username is the account's stored name, added for audit, not what the provider asserts now.
     internal static bool IsEmailVerified(HttpRequestData request, UserAuthenticationOptions options)
     {
+        if (request.TryGetDelegatedActor(out _))
+        {
+            return false;
+        }
+
         var claim = request.GetClaim(EmailVerifiedClaimType);
 
         if (claim is not null)

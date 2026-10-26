@@ -527,6 +527,56 @@ public class TokenExchangeOptionsTests
         Actor(actor => actor.AllowSecrets = true).GetRestrictions().ShouldBeEmpty();
     }
 
+    // A token for an actor's audience is for the exchange only, compared as the start check compares audiences.
+    [Theory]
+    [InlineData("https://mcp.example.com/mcp")]
+    [InlineData("https://mcp.example.com/mcp/")]
+    [InlineData("HTTPS://MCP.EXAMPLE.COM/MCP")]
+    [InlineData(" https://mcp.example.com/mcp ")]
+    [InlineData("6C0F1A2E-1F43-4B0E-9A4D-2F5E8F0C9B12")]
+    public void IsIssuedToAnActor_AnAudienceOfAnActor_IsTrue(string audience)
+    {
+        var options = new TokenExchangeOptions
+        {
+            Actors =
+            [
+                new TokenExchangeActorOptions { Id = "other", SubjectAudiences = ["https://other.example.com"] },
+                new TokenExchangeActorOptions { Id = "mcp", SubjectAudiences = ["https://mcp.example.com/mcp/", "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b12"] },
+            ],
+        };
+
+        options.IsIssuedToAnActor([$"api://{ApiClientId}", audience]).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("https://mcp.example.com/mcp/other")]
+    [InlineData("https://mcp.example.com")]
+    [InlineData("")]
+    [InlineData("/")]
+    public void IsIssuedToAnActor_AnotherAudience_IsFalse(string audience)
+    {
+        var options = new TokenExchangeOptions
+        {
+            Actors = [new TokenExchangeActorOptions { Id = "mcp", SubjectAudiences = ["https://mcp.example.com/mcp", " ", "/"] }],
+        };
+
+        options.IsIssuedToAnActor([audience]).ShouldBeFalse();
+        new TokenExchangeOptions().IsIssuedToAnActor(["https://mcp.example.com/mcp"]).ShouldBeFalse();
+    }
+
+    // Whether the exchange is on or not: actors' tokens are never bearer tokens of the API.
+    [Fact]
+    public void IsIssuedToAnActor_WhileTheExchangeIsDisabled_IsTrue()
+    {
+        var options = new TokenExchangeOptions
+        {
+            Enabled = false,
+            Actors = [new TokenExchangeActorOptions { Id = "mcp", SubjectAudiences = ["https://mcp.example.com/mcp"] }],
+        };
+
+        options.IsIssuedToAnActor(["https://mcp.example.com/mcp"]).ShouldBeTrue();
+    }
+
     private static ValidateOptionsResult Validate(
         TokenExchangeOptions options,
         string environment = "Production",

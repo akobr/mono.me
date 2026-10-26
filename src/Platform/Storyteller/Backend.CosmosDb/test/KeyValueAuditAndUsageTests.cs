@@ -101,6 +101,54 @@ public class KeyValueAuditAndUsageTests(Startup startup)
         reads.Items[0].Channel.Should().Be(KeyValueChannel.MachineMtls);
     }
 
+    // A reveal through an actor (a Storyteller user token of the MCP server) is audited as the account via the actor.
+    [Fact]
+    public async Task SecretOperationsThroughAnActor_AreAuditedWithTheActor()
+    {
+        var project = $"kv-audit-via-{Guid.NewGuid().ToString("N")[..8]}";
+        var throughMcp = new KeyValueCaller(AuditActor.Account("admin", "Ada") with { Via = "mcp" }, true, true, KeyValueChannel.User) { CorrelationId = "corr-2" };
+        await KeyValues.SetAsync(Org, project, View, "sec", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s1" }, Admin);
+        await KeyValues.GetAsync(Org, project, View, "sec", new KeyValueReadOptions { Reveal = true }, throughMcp);
+
+        var all = await Audit.QueryAsync(Org, project, new KeyValueAuditQuery());
+
+        all.Items.Single(entry => entry.Operation == KeyValueAuditOperation.Reveal).Actor.Should().Be(throughMcp.Actor);
+        var created = all.Items.Single(entry => entry.Operation == KeyValueAuditOperation.Create);
+        created.Actor.Should().Be(AuditActor.Account("admin"));
+        created.Actor.Via.Should().BeNull();
+    }
+
+    // The actor is part of the aggregation key: binding reads through it count apart from the direct ones of the account.
+    [Fact]
+    public async Task BindingReadsThroughAnActor_AreAggregatedApartFromDirectOnes()
+    {
+        var project = $"kv-bind-via-{Guid.NewGuid().ToString("N")[..8]}";
+        await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "v" }, Admin);
+        var direct = new KeyValueCaller(AuditActor.Account("ada", "Ada"), true, true, KeyValueChannel.User);
+        var throughMcp = direct with { Actor = direct.Actor with { Via = "mcp" } };
+
+        try
+        {
+            KeyValueCallerContext.Current = direct;
+            await KeyValues.LookupAsync(Org, project, View, "s", includeSecrets: true);
+            await KeyValues.LookupAsync(Org, project, View, "s", includeSecrets: true);
+            KeyValueCallerContext.Current = throughMcp;
+            await KeyValues.LookupAsync(Org, project, View, "s", includeSecrets: true);
+        }
+        finally
+        {
+            KeyValueCallerContext.Current = null;
+        }
+
+        await Usage.FlushAsync();
+
+        var reads = await Audit.QueryAsync(Org, project, new KeyValueAuditQuery { Operation = KeyValueAuditOperation.BindingRead });
+        reads.Items.Should().HaveCount(2);
+        reads.Items.Single(entry => entry.Actor.Via == "mcp").Count.Should().Be(1);
+        reads.Items.Single(entry => entry.Actor.Via is null).Count.Should().Be(2);
+        reads.Items.Should().OnlyContain(entry => entry.Actor.Id == "ada" && entry.Actor.Name == "Ada");
+    }
+
     [Fact]
     public async Task Usage_CountersFlushAndTheSnapshotCountsKeys()
     {

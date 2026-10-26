@@ -16,4 +16,10 @@ public class FunctionContextItemKeys
     // The stored MachineAccess of a machine identity, read once by the access check of the request; the secret rights
     // and the view transfer reuse it.
     public const string StoredMachine = nameof(StoredMachine);
+
+    // The actor that acts for the user of a Storyteller user token (its act.sub, a string), and the token's restrictions
+    // plus those of the actor's current settings (ActorRestrictions, an IReadOnlyList<string>). Set only from the
+    // Delegation of the Storyteller token validator, never from claims.
+    public const string DelegatedActor = nameof(DelegatedActor);
+    public const string DelegatedRestrictions = nameof(DelegatedRestrictions);
 }
