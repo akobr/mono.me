@@ -42,7 +42,8 @@ public class ConfigCompositionCommand : BaseContextCommand
                 Context.OrganizationName,
                 Context.ProjectName,
                 Context.ViewName,
-                annotationKey);
+                annotationKey,
+                if_None_Match: null);
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {

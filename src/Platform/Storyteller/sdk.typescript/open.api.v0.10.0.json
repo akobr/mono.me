@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.50.40497"
+    "version": "0.10.0.13575"
   },
   "servers": [
     {
@@ -1338,6 +1338,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -1445,6 +1455,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -1573,6 +1593,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -1694,6 +1724,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -1808,6 +1848,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -1943,6 +1993,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -2052,6 +2112,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -2177,6 +2247,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -2302,6 +2382,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -2435,6 +2525,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -2568,6 +2668,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -2709,6 +2819,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -2834,6 +2954,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -2983,6 +3113,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -3091,6 +3231,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -3197,6 +3347,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -3425,6 +3585,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -3529,6 +3699,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -3635,6 +3815,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -3741,6 +3931,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -3804,6 +4004,10 @@
         "security": [
           {
             "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -4051,6 +4255,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4059,6 +4271,12 @@
             "headers": {
               "ETag": {
                 "description": "Weak entity tag of the configuration, for If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "private, no-cache: shared caches do not store the response, and a client revalidates its copy before each use.",
                 "schema": {
                   "type": "string"
                 }
@@ -4120,6 +4338,12 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Cache-Control": {
+                "description": "private, no-cache: shared caches do not store the response, and a client revalidates its copy before each use.",
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -4136,6 +4360,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -4254,6 +4488,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -4301,6 +4545,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4309,6 +4561,12 @@
             "headers": {
               "ETag": {
                 "description": "Weak entity tag of the configuration, for If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "private, no-cache: shared caches do not store the response, and a client revalidates its copy before each use.",
                 "schema": {
                   "type": "string"
                 }
@@ -4370,6 +4628,12 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Cache-Control": {
+                "description": "private, no-cache: shared caches do not store the response, and a client revalidates its copy before each use.",
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -4386,6 +4650,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -4524,6 +4798,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -4672,6 +4956,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -4778,6 +5072,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -4825,6 +5129,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4833,6 +5145,18 @@
             "headers": {
               "ETag": {
                 "description": "Weak entity tag of the configuration, for If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "no-store when the caller may read secrets, otherwise private, no-cache.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-2S-Secrets-Withheld": {
+                "description": "mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; the secrets then stay unbound, as their @ expressions. Absent otherwise.",
                 "schema": {
                   "type": "string"
                 }
@@ -4904,6 +5228,18 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "Cache-Control": {
+                "description": "no-store when the caller may read secrets, otherwise private, no-cache.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-2S-Secrets-Withheld": {
+                "description": "mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; the secrets then stay unbound, as their @ expressions. Absent otherwise.",
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -4920,6 +5256,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -5025,6 +5371,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -5147,6 +5503,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -5283,6 +5649,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -5422,6 +5798,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -5550,6 +5936,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -5655,6 +6051,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -5783,6 +6189,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -5889,6 +6305,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -5994,6 +6420,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -6122,6 +6558,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -6228,6 +6674,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -6342,6 +6798,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -6479,6 +6945,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -6594,6 +7070,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -6699,6 +7185,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -6786,6 +7282,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -6891,6 +7397,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -7006,6 +7522,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -7142,6 +7668,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -7288,6 +7824,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -7393,6 +7939,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -7508,6 +8064,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -7644,6 +8210,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -7790,6 +8366,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -7904,6 +8490,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -8028,6 +8624,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -8173,6 +8779,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -8328,6 +8944,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -9580,6 +10206,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -10098,6 +10734,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -10556,6 +11202,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -10705,6 +11361,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -10867,6 +11533,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -11008,6 +11684,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -11113,6 +11799,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -11363,6 +12059,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -11479,6 +12185,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -11630,6 +12346,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -11777,6 +12503,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -11934,6 +12670,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -12058,6 +12804,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -12227,6 +12983,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -12830,6 +13596,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -12935,6 +13711,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -13065,6 +13851,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -13205,6 +14001,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -13311,6 +14117,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -13416,6 +14232,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -13531,6 +14357,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -13667,6 +14503,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -13813,6 +14659,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -13899,6 +14755,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       },
@@ -14220,6 +15086,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -14323,6 +15199,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -14437,6 +15323,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -14608,6 +15504,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -14711,6 +15617,16 @@
               "api:///User.Impersonation",
               "api:///.default"
             ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
           }
         ]
       }
@@ -18081,7 +18997,7 @@
     "securitySchemes": {
       "manual": {
         "type": "http",
-        "description": "Manually by token in Authorization HTTP header.",
+        "description": "A bearer token in the Authorization header: a user's token, a client-credentials token of the identity provider, or the Storyteller token a federated machine gets from ExchangeMachineToken.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -18103,16 +19019,16 @@
           }
         }
       },
-      "mtls": {
-        "type": "apiKey",
-        "description": "Machine certificate authentication via mTLS. Mutual TLS client certificate authentication. The client certificate is presented during the TLS handshake (production) or via the X-ARR-ClientCert header (development). Configure the certificate on HttpClientHandler or equivalent, this is a transport-layer concern, not an API parameter.",
-        "name": "X-ARR-ClientCert",
-        "in": "header"
-      },
       "apiKey": {
         "type": "apiKey",
-        "description": "Machine access via structured API key. Format: 'ApiKey 2s.[base64(org:project:machineAccessId)].[secret]'. Issued through the machine access creation endpoint.",
+        "description": "A machine's API key in the Authorization header, the scheme included in the value: 'ApiKey 2s.<base64url(organization:project:machineAccessId)>.<secret>'. The ApiKey and CertificateAndApiKey kinds, when the project's machine authentication policy enables them.",
         "name": "Authorization",
+        "in": "header"
+      },
+      "mtls": {
+        "type": "apiKey",
+        "description": "The machine's client certificate of the TLS handshake. The platform's front end passes it to the API in X-ARR-ClientCert; a client never sets the header itself, except against a local development host that allows it. The Certificate and CertificateAndApiKey kinds, when the project's machine authentication policy enables them. A shared certificate needs apiKey as well, and the policy can require a certificate for secret reads (ErrorCode MtlsRequired).",
+        "name": "X-ARR-ClientCert",
         "in": "header"
       }
     }

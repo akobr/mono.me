@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.10.0.13575
  */
 import * as zod from "zod";
 
@@ -71,6 +71,15 @@ export const GetConfigurationCompositionParams = zod.object({
   project: zod.string().describe("Target project name."),
   view: zod.string().describe("The target view inside the project."),
   key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const GetConfigurationCompositionHeader = zod.object({
+  "If-None-Match": zod
+    .string()
+    .optional()
+    .describe(
+      "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
+    ),
 });
 
 export const getConfigurationCompositionResponseSourcesItemKindDefault = `Configuration`;
@@ -241,6 +250,15 @@ export const GetConfigurationParams = zod.object({
   key: zod.string().describe("The key of the requested annotation."),
 });
 
+export const GetConfigurationHeader = zod.object({
+  "If-None-Match": zod
+    .string()
+    .optional()
+    .describe(
+      "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
+    ),
+});
+
 export const getConfigurationResponseModifiedByKindDefault = `Account`;
 
 export const GetConfigurationResponse = zod.object({
@@ -387,6 +405,15 @@ export const GetResolvedConfigurationParams = zod.object({
   project: zod.string().describe("Target project name."),
   view: zod.string().describe("The target view inside the project."),
   key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const GetResolvedConfigurationHeader = zod.object({
+  "If-None-Match": zod
+    .string()
+    .optional()
+    .describe(
+      "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
+    ),
 });
 
 export const getResolvedConfigurationResponseModifiedByKindDefault = `Account`;

@@ -9961,9 +9961,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The composition of the effective configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -9973,9 +9974,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The composition of the effective configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken);
 
         /// <remarks>
         /// Configurations of the view without their documents, up to 1000 per page.
@@ -10011,9 +10013,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string if_None_Match);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10023,9 +10026,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -10093,9 +10097,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model with resolved substitutions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string if_None_Match);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10105,9 +10110,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model with resolved substitutions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -10391,11 +10397,12 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The composition of the effective configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key)
+        public virtual System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match)
         {
-            return GetConfigurationCompositionAsync(organization, project, view, key, System.Threading.CancellationToken.None);
+            return GetConfigurationCompositionAsync(organization, project, view, key, if_None_Match, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -10406,9 +10413,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The composition of the effective configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -10428,6 +10436,9 @@ namespace _42.Platform.Storyteller.Sdk
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
+
+                    if (if_None_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-None-Match", ConvertToString(if_None_Match, System.Globalization.CultureInfo.InvariantCulture));
                     request_.Method = new System.Net.Http.HttpMethod("GET");
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
@@ -10716,11 +10727,12 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key)
+        public virtual System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string if_None_Match)
         {
-            return GetConfigurationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
+            return GetConfigurationAsync(organization, project, view, key, if_None_Match, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -10731,9 +10743,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -10753,6 +10766,9 @@ namespace _42.Platform.Storyteller.Sdk
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
+
+                    if (if_None_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-None-Match", ConvertToString(if_None_Match, System.Globalization.CultureInfo.InvariantCulture));
                     request_.Method = new System.Net.Http.HttpMethod("GET");
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
@@ -11390,11 +11406,12 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model with resolved substitutions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key)
+        public virtual System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string if_None_Match)
         {
-            return GetResolvedConfigurationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
+            return GetResolvedConfigurationAsync(organization, project, view, key, if_None_Match, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -11405,9 +11422,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model with resolved substitutions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -11427,6 +11445,9 @@ namespace _42.Platform.Storyteller.Sdk
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
+
+                    if (if_None_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-None-Match", ConvertToString(if_None_Match, System.Globalization.CultureInfo.InvariantCulture));
                     request_.Method = new System.Net.Http.HttpMethod("GET");
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 

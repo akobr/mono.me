@@ -77,7 +77,7 @@ npm test               # vitest
 npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 ```
 
-To generate from a specific document: `SPEC=../open.api.v0.9.0.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.9.0.json'; npm run generate`). The package version follows `info.version` of the document (`0.8.91.29486` → `0.8.91`).
+To generate from a specific document: `SPEC=../open.api.v0.10.0.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.0.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.0.13575` → `0.10.0`).
 
 Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer) corrects the document:
 
@@ -220,7 +220,7 @@ Both helpers post the form with plain `fetch` (or the `fetch` option), without `
 
 ## Conditional reads
 
-The effective and the resolved read of a configuration answer with a weak `ETag`. Sent back in `If-None-Match`, it gets `304 Not Modified` without a body while the configuration stays the same (`docs/Platform/Storyteller/inheritance.md`, "Conditional reads"). The generated `getConfiguration` and `getResolvedConfiguration` return only the body, and throw `StorytellerError` with `status: 304` when the caller sets `If-None-Match` itself, so a poller uses `getConfigurationConditional` and `getResolvedConfigurationConditional` (`lib/conditional.ts`). They go through the configured fetcher (base URL, token, the retry after a `401`) and return a `ConditionalResult<Configuration>`:
+The effective and the resolved read of a configuration answer with a weak `ETag`. Sent back in `If-None-Match`, it gets `304 Not Modified` without a body while the configuration stays the same (`docs/Platform/Storyteller/inheritance.md`, "Conditional reads"). The document declares `If-None-Match` as an optional header parameter of the three configuration reads, but the generated functions take no header parameters (`output.headers` is off in `orval.config.ts`; only the Zod output has `GetConfigurationHeader` and its siblings). The generated `getConfiguration` and `getResolvedConfiguration` return only the body, and throw `StorytellerError` with `status: 304` when the caller sets `If-None-Match` itself, so a poller uses `getConfigurationConditional` and `getResolvedConfigurationConditional` (`lib/conditional.ts`). They go through the configured fetcher (base URL, token, the retry after a `401`) and return a `ConditionalResult<Configuration>`:
 
 | Member | Content |
 | --- | --- |
