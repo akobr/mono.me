@@ -31,9 +31,12 @@ internal static class FunctionTestDoubles
             TenantId = "tenant",
             ClientId = "client-id",
         });
-        IBearerClaimsNormalizer normalizer = resolved.Value.Provider == IdentityProviderKind.AuthKit
-            ? new AuthKitClaimNormalizer(resolved)
-            : new EntraIdClaimNormalizer(resolved);
+        IBearerClaimsNormalizer normalizer = resolved.Value.Provider switch
+        {
+            IdentityProviderKind.AuthKit => new AuthKitClaimNormalizer(resolved),
+            IdentityProviderKind.Keycloak => new KeycloakClaimNormalizer(resolved),
+            _ => new EntraIdClaimNormalizer(resolved),
+        };
 
         var services = new ServiceCollection();
         services.AddSingleton(validator);

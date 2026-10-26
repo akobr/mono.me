@@ -8,6 +8,7 @@ namespace _42.Platform.Storyteller.Accessing;
 public static class UserAuthenticationEntryPoint
 {
     private const string PermissionMapPath = "AuthKit:PermissionMap";
+    private const string RoleMapPath = "Keycloak:RoleMap";
 
     // Shared by every user and machine identity provider registration. Idempotent: binding the
     // section twice would append array values such as DefaultUserScopes a second time.
@@ -26,14 +27,18 @@ public static class UserAuthenticationEntryPoint
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<UserAuthenticationOptions>, UserAuthenticationOptionsValidator>());
         services.AddOptions<UserAuthenticationOptions>()
             .Bind(section)
-            .Configure(options => options.AuthKit.PermissionMap = ReadPermissionMap(section.GetSection(PermissionMapPath)))
+            .Configure(options =>
+            {
+                options.AuthKit.PermissionMap = ReadPermissionMap(section.GetSection(PermissionMapPath));
+                options.Keycloak.RoleMap = ReadPermissionMap(section.GetSection(RoleMapPath));
+            })
             .ValidateOnStart();
         return services;
     }
 
     // ':' is the configuration path separator, so the binder splits a slug such as
     // "storyteller:annotation-read" into nested sections. Every leaf below the map is
-    // read here with its relative path as the WorkOS permission slug.
+    // read here with its relative path as the key: the WorkOS permission slug, or the Keycloak role.
     public static Dictionary<string, string> ReadPermissionMap(IConfigurationSection section)
     {
         var map = new Dictionary<string, string>(StringComparer.Ordinal);

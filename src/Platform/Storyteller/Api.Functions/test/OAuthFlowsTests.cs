@@ -71,6 +71,44 @@ public class OAuthFlowsTests
         flows.Password.ShouldBeNull();
     }
 
+    [Fact]
+    public void Keycloak_WithIssuer_DescribesTheAuthorizationCodeFlowOfTheRealm()
+    {
+        var flows = Create(new Dictionary<string, string?>
+        {
+            ["Auth:Provider"] = "keycloak",
+            ["Auth:TenantId"] = "left-over-tenant",
+            ["Auth:ClientId"] = "left-over-client",
+            ["Auth:Keycloak:Issuer"] = "https://keycloak.example/realms/storyteller/",
+        });
+
+        flows.Implicit.ShouldBeNull();
+        flows.ClientCredentials.ShouldBeNull();
+        flows.AuthorizationCode.ShouldNotBeNull();
+        flows.AuthorizationCode.AuthorizationUrl.ShouldBe(new Uri("https://keycloak.example/realms/storyteller/protocol/openid-connect/auth"));
+        flows.AuthorizationCode.TokenUrl.ShouldBe(new Uri("https://keycloak.example/realms/storyteller/protocol/openid-connect/token"));
+        flows.AuthorizationCode.RefreshUrl.ShouldBe(new Uri("https://keycloak.example/realms/storyteller/protocol/openid-connect/token"));
+        flows.AuthorizationCode.Scopes.Keys.ShouldBe(["openid", "profile", "email"], ignoreOrder: true);
+        OAuthFlows.IsPlaceholder(flows).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    [InlineData("keycloak.example/realms/storyteller")]
+    public void Keycloak_WithoutAnIssuerUrl_HasOnlyTheMarkedStandIn(string? issuer)
+    {
+        var flows = Create(new Dictionary<string, string?>
+        {
+            ["Auth:Provider"] = "Keycloak",
+            ["Auth:Keycloak:Issuer"] = issuer,
+        });
+
+        OAuthFlows.IsPlaceholder(flows).ShouldBeTrue();
+        flows.Implicit.ShouldBeNull();
+        flows.AuthorizationCode.ShouldBeNull();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("https://example.authkit.app")]

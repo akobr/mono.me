@@ -48,6 +48,17 @@ public class AuthConfigurationHttp
             };
         }
 
+        if (options.Provider == IdentityProviderKind.Keycloak)
+        {
+            // Clients find the endpoints in the realm's OpenID metadata under the issuer.
+            return new AuthConfiguration
+            {
+                Provider = nameof(IdentityProviderKind.Keycloak),
+                ClientId = options.Keycloak.ClientId?.Trim() ?? string.Empty,
+                Issuer = options.Keycloak.GetIssuer(),
+            };
+        }
+
         var clientId = options.ClientId ?? string.Empty;
 
         // A user needs only User.Impersonation; the role decides the rest. sform requests the same.

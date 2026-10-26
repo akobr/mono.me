@@ -39,6 +39,13 @@ var dbCreator = builder.AddProject<Projects.DbCreator>("db-creator")
     .WaitFor(cosmos)
     .WithExplicitStart();
 
+// The owner account DbCreator seeds (BaseAccount:Id in the user secrets of this host): under Entra ID the owner's
+// lower-case {tid}:{oid}, under AuthKit or Keycloak the sub. Without it DbCreator seeds its legacy Entra ID sub.
+if (builder.Configuration["BaseAccount:Id"] is { Length: > 0 } baseAccountId)
+{
+    dbCreator.WithEnvironment("baseAccount__id", baseAccountId);
+}
+
 // Local Key Vault emulator (Lowkey Vault): the key-encryption keys of the Standard level of key/value secrets.
 // Relaxed ports let the vault answer on the host port that Aspire maps to 8443.
 var keyVault = builder.AddContainer("keyvault", "nagyesta/lowkey-vault", "7.3.112")

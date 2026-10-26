@@ -44,12 +44,30 @@ public sealed class EntraIdMachineTokenValidatorTests : IDisposable
         result.MachineId.ShouldBe("machine-app");
     }
 
+    // A user token the user validator accepts: tid and oid name its account.
     [Fact]
     public async Task UserToken_IsNotAMachineResult()
     {
-        var result = await _validator.ValidateAsync(Token([new Claim("sub", "user-1"), new Claim("azp", ClientId)]));
+        var result = await _validator.ValidateAsync(Token(
+            [
+                new Claim("sub", "user-1"),
+                new Claim("azp", ClientId),
+                new Claim("tid", "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d"),
+                new Claim("oid", "3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d"),
+            ]));
 
         result.ShouldBeNull();
+    }
+
+    // Machines are not keyed by tid and oid: a machine token keeps its sub, and needs neither.
+    [Fact]
+    public async Task MachineToken_KeepsItsClaims()
+    {
+        var result = await _validator.ValidateAsync(Token([new Claim("sub", "sp-1"), new Claim("azp", "machine-app")]));
+
+        result.ShouldNotBeNull();
+        result.Claims.ShouldContain(claim => claim.Type == ClaimTypes.NameIdentifier && claim.Value == "sp-1");
+        result.Claims.ShouldNotContain(claim => claim.Type == "sub" || claim.Type == UserIdentity.EntraSubjectClaimType);
     }
 
     [Fact]

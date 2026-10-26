@@ -76,6 +76,7 @@ namespace _42.Platform.Storyteller.DbCreator
         private static void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
         {
             services.Configure<LoggingOptions>(configuration.GetSection(LoggingOptions.SECTION));
+            services.Configure<BaseAccountOptions>(configuration.GetSection(BaseAccountOptions.SECTION));
         }
     }
 }

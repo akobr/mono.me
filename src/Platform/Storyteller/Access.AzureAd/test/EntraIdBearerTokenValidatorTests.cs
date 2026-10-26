@@ -17,6 +17,11 @@ public class EntraIdBearerTokenValidatorTests
 {
     private const string McpClientId = "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11";
     private const string McpTenantId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d";
+    private const string TenantId = "0f1e2d3c-4b5a-4968-8776-655443322110";
+    private const string ObjectId = "3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d";
+    private const string AccountId = $"{TenantId}:{ObjectId}";
+    private const string MappedTenantId = "http://schemas.microsoft.com/identity/claims/tenantid";
+    private const string MappedObjectId = "http://schemas.microsoft.com/identity/claims/objectidentifier";
 
     [Fact]
     public async Task Validate_UserToken_ReturnsClaimsAndIsNotAMachine()
@@ -25,20 +30,18 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [
-                new Claim("sub", "user-1"),
+            UserClaims(
                 new Claim("name", "Ada Lovelace"),
                 new Claim("preferred_username", "ada@example.com"),
                 new Claim("scp", "User.Impersonation Annotation.Write"),
-                new Claim("azp", fixture.ClientId),
-            ]);
+                new Claim("azp", fixture.ClientId)));
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
         result.ShouldNotBeNull();
         result.IsMachine.ShouldBeFalse();
         result.MachineId.ShouldBeNull();
-        FindClaim(result, "sub", ClaimTypes.NameIdentifier).ShouldBe("user-1");
+        FindClaim(result, "sub", ClaimTypes.NameIdentifier).ShouldBe(AccountId);
         FindClaim(result, "name").ShouldBe("Ada Lovelace");
         FindClaim(result, "preferred_username").ShouldBe("ada@example.com");
         result.Claims.ShouldContain(claim => claim.Value.Contains("User.Impersonation", StringComparison.Ordinal));
@@ -50,7 +53,7 @@ public class EntraIdBearerTokenValidatorTests
     public async Task Validate_ClientIdAudience_IsAccepted()
     {
         using var fixture = new TokenFixture();
-        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ClientId, [new Claim("sub", "user-1")]);
+        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ClientId, UserClaims());
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
@@ -62,7 +65,7 @@ public class EntraIdBearerTokenValidatorTests
     public async Task Validate_V1Issuer_IsAccepted()
     {
         using var fixture = new TokenFixture();
-        var rawToken = fixture.CreateToken(fixture.V1Issuer, fixture.ApiAudience, [new Claim("sub", "user-1")]);
+        var rawToken = fixture.CreateToken(fixture.V1Issuer, fixture.ApiAudience, UserClaims());
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
@@ -73,7 +76,7 @@ public class EntraIdBearerTokenValidatorTests
     public async Task Validate_IssuerComparison_IsCaseInsensitive()
     {
         using var fixture = new TokenFixture();
-        var rawToken = fixture.CreateToken(fixture.V2Issuer.ToUpperInvariant(), fixture.ApiAudience, [new Claim("sub", "user-1")]);
+        var rawToken = fixture.CreateToken(fixture.V2Issuer.ToUpperInvariant(), fixture.ApiAudience, UserClaims());
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
@@ -124,13 +127,109 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1"), new Claim("azp", "client-id"), new Claim("appid", "other-app")]);
+            UserClaims(new Claim("azp", "client-id"), new Claim("appid", "other-app")));
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
         result.ShouldNotBeNull();
         result.IsMachine.ShouldBeFalse();
         result.MachineId.ShouldBeNull();
+    }
+
+    // sub is pairwise per application; tid and oid name the person in every app of the tenant. The handler maps the
+    // claim types (sub to NameIdentifier, tid and oid to their schema URIs), and one sub replaces sub and NameIdentifier.
+    [Fact]
+    public async Task Validate_UserToken_IsKeyedByTenantAndObjectId()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, UserClaims());
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.Claims.Where(claim => claim.Type == "sub").ShouldHaveSingleItem().Value.ShouldBe(AccountId);
+        result.Claims.ShouldNotContain(claim => claim.Type == ClaimTypes.NameIdentifier);
+        result.Claims.Where(claim => claim.Type == UserIdentity.EntraSubjectClaimType).ShouldHaveSingleItem().Value.ShouldBe("user-1");
+        FindClaim(result, MappedTenantId).ShouldBe(TenantId);
+        FindClaim(result, MappedObjectId).ShouldBe(ObjectId);
+    }
+
+    [Fact]
+    public async Task Validate_UpperCaseTenantAndObjectId_AreKeyedInLowerCase()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1"), new Claim("tid", TenantId.ToUpperInvariant()), new Claim("oid", ObjectId.ToUpperInvariant())]);
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        FindClaim(result, "sub").ShouldBe(AccountId);
+    }
+
+    [Theory]
+    [InlineData(null, ObjectId)]
+    [InlineData(TenantId, null)]
+    [InlineData(null, null)]
+    [InlineData("tenant-id", ObjectId)]
+    [InlineData(TenantId, "user-1")]
+    public async Task Validate_UserTokenWithoutAGuidTenantAndObjectId_ReturnsNull(string? tenantId, string? objectId)
+    {
+        using var fixture = new TokenFixture();
+        List<Claim> claims = [new("sub", "user-1"), new("azp", fixture.ClientId), new("scp", "User.Impersonation")];
+
+        if (tenantId is not null)
+        {
+            claims.Add(new Claim("tid", tenantId));
+        }
+
+        if (objectId is not null)
+        {
+            claims.Add(new Claim("oid", objectId));
+        }
+
+        var result = await fixture.Validator.ValidateAsync(fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, claims));
+
+        result.ShouldBeNull();
+    }
+
+    // The kept pairwise sub is the token's sub, never an entra_sub claim of its own.
+    [Fact]
+    public async Task Validate_UserTokenWithItsOwnEntraSub_KeepsItsSub()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, UserClaims(new Claim(UserIdentity.EntraSubjectClaimType, "chosen")));
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.Claims.Where(claim => claim.Type == UserIdentity.EntraSubjectClaimType).ShouldHaveSingleItem().Value.ShouldBe("user-1");
+    }
+
+    // Machines are not keyed by tid and oid: their claims stay as the handler gave them, and they need neither.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Validate_MachineToken_KeepsItsClaims(bool withTenantAndObjectId)
+    {
+        using var fixture = new TokenFixture();
+        List<Claim> claims = [new("sub", "machine-sp"), new("azp", "machine-app"), new("roles", "Annotation.Write")];
+
+        if (withTenantAndObjectId)
+        {
+            claims.Add(new Claim("tid", TenantId));
+            claims.Add(new Claim("oid", ObjectId));
+        }
+
+        var result = await fixture.Validator.ValidateAsync(fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, claims));
+
+        result.ShouldNotBeNull();
+        result.IsMachine.ShouldBeTrue();
+        result.MachineId.ShouldBe("machine-app");
+        FindClaim(result, ClaimTypes.NameIdentifier).ShouldBe("machine-sp");
+        result.Claims.ShouldNotContain(claim => claim.Type == "sub" || claim.Type == UserIdentity.EntraSubjectClaimType);
     }
 
     [Fact]
@@ -140,14 +239,14 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("oid", ObjectId), new Claim("scp", "User.Impersonation")]);
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
         result.ShouldNotBeNull();
         result.IsMachine.ShouldBeFalse();
         result.MachineId.ShouldBeNull();
-        FindClaim(result, "sub", ClaimTypes.NameIdentifier).ShouldBe("user-1");
+        FindClaim(result, "sub", ClaimTypes.NameIdentifier).ShouldBe($"{McpTenantId}:{ObjectId}");
     }
 
     [Fact]
@@ -157,12 +256,13 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1"), new Claim("azp", McpClientId.ToUpperInvariant()), new Claim("tid", McpTenantId.ToUpperInvariant()), new Claim("scp", "User.Impersonation")]);
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId.ToUpperInvariant()), new Claim("tid", McpTenantId.ToUpperInvariant()), new Claim("oid", ObjectId.ToUpperInvariant()), new Claim("scp", "User.Impersonation")]);
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
         result.ShouldNotBeNull();
         result.IsMachine.ShouldBeFalse();
+        FindClaim(result, "sub").ShouldBe($"{McpTenantId}:{ObjectId}");
     }
 
     [Theory]
@@ -174,7 +274,7 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("oid", ObjectId), new Claim("scp", "User.Impersonation")]);
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
@@ -201,7 +301,7 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V1Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1"), new Claim("appid", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", "User.Impersonation")]);
+            [new Claim("sub", "user-1"), new Claim("appid", McpClientId), new Claim("tid", McpTenantId), new Claim("oid", ObjectId), new Claim("scp", "User.Impersonation")]);
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
@@ -294,7 +394,7 @@ public class EntraIdBearerTokenValidatorTests
     public async Task Validate_WrongIssuer_ReturnsNull(string issuer)
     {
         using var fixture = new TokenFixture();
-        var rawToken = fixture.CreateToken(issuer, fixture.ApiAudience, [new Claim("sub", "user-1")]);
+        var rawToken = fixture.CreateToken(issuer, fixture.ApiAudience, UserClaims());
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
@@ -305,7 +405,7 @@ public class EntraIdBearerTokenValidatorTests
     public async Task Validate_WrongAudience_ReturnsNull()
     {
         using var fixture = new TokenFixture();
-        var rawToken = fixture.CreateToken(fixture.V2Issuer, "api://someone-else", [new Claim("sub", "user-1")]);
+        var rawToken = fixture.CreateToken(fixture.V2Issuer, "api://someone-else", UserClaims());
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
@@ -319,7 +419,7 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1")],
+            UserClaims(),
             expires: DateTime.UtcNow.AddHours(-1));
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
@@ -334,7 +434,7 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1")],
+            UserClaims(),
             notBefore: DateTime.UtcNow.AddHours(1),
             expires: DateTime.UtcNow.AddHours(2));
 
@@ -354,7 +454,7 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1")],
+            UserClaims(),
             signingKey: symmetric,
             algorithm: SecurityAlgorithms.HmacSha256);
 
@@ -372,7 +472,7 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1")],
+            UserClaims(),
             signingKey: otherKey);
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
@@ -406,13 +506,13 @@ public class EntraIdBearerTokenValidatorTests
         var rawToken = fixture.CreateToken(
             fixture.V2Issuer,
             fixture.ApiAudience,
-            [new Claim("sub", "user-1")],
+            UserClaims(),
             signingKey: rolledKey);
 
         var result = await validator.ValidateAsync(rawToken);
 
         result.ShouldNotBeNull();
-        FindClaim(result, "sub", ClaimTypes.NameIdentifier).ShouldBe("user-1");
+        FindClaim(result, "sub", ClaimTypes.NameIdentifier).ShouldBe(AccountId);
         manager.RefreshRequests.ShouldBe(1);
         manager.Calls.ShouldBe(2);
     }
@@ -435,7 +535,7 @@ public class EntraIdBearerTokenValidatorTests
     public async Task Validate_KeyRetrievalFailure_Throws()
     {
         using var fixture = new TokenFixture(failure: new HttpRequestException("jwks down"));
-        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, [new Claim("sub", "user-1")]);
+        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, UserClaims());
 
         var exception = await Should.ThrowAsync<BearerKeyRetrievalException>(() => fixture.Validator.ValidateAsync(rawToken));
 
@@ -446,7 +546,7 @@ public class EntraIdBearerTokenValidatorTests
     public async Task Validate_RepeatedCalls_ReuseTheConfigurationManager()
     {
         using var fixture = new TokenFixture();
-        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, [new Claim("sub", "user-1")]);
+        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, UserClaims());
 
         (await fixture.Validator.ValidateAsync(rawToken)).ShouldNotBeNull();
         (await fixture.Validator.ValidateAsync(rawToken)).ShouldNotBeNull();
@@ -458,7 +558,7 @@ public class EntraIdBearerTokenValidatorTests
     public async Task Validate_Cancellation_Propagates()
     {
         using var fixture = new TokenFixture();
-        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, [new Claim("sub", "user-1")]);
+        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, UserClaims());
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
@@ -485,6 +585,12 @@ public class EntraIdBearerTokenValidatorTests
         await Should.ThrowAsync<InvalidOperationException>(() => validator.ValidateAsync("token"));
     }
 
+    // A user token: tid and oid name the account, sub is the pairwise subject.
+    private static Claim[] UserClaims(params Claim[] claims)
+    {
+        return [new Claim("sub", "user-1"), new Claim("tid", TenantId), new Claim("oid", ObjectId), .. claims];
+    }
+
     private static TokenFixture DelegatedFixture()
     {
         return new TokenFixture(delegatedClients: [new DelegatedClientOptions { ClientId = McpClientId, TenantId = McpTenantId }]);
@@ -508,7 +614,7 @@ public class EntraIdBearerTokenValidatorTests
     {
         public TokenFixture(
             string clientId = "client-id",
-            string tenantId = "tenant-id",
+            string tenantId = EntraIdBearerTokenValidatorTests.TenantId,
             Exception? failure = null,
             List<DelegatedClientOptions>? delegatedClients = null)
         {

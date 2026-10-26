@@ -27,6 +27,45 @@ public class AuthConfigurationHttpTests
         configuration.TenantId.ShouldBe("common");
         configuration.Scopes.ShouldBe(["api://client-id/User.Impersonation"]);
         configuration.AuthKitDomain.ShouldBeNull();
+        configuration.Issuer.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Describe_Keycloak_ReturnsTheRealmIssuerAndTheClientOnly()
+    {
+        var configuration = AuthConfigurationHttp.Describe(new UserAuthenticationOptions
+        {
+            Provider = IdentityProviderKind.Keycloak,
+            TenantId = "left-over-entra-tenant",
+            ClientId = "left-over-entra-client",
+            AuthKit = new AuthKitOptions { ClientId = "client_123", AuthKitDomain = "https://example.authkit.app" },
+            Keycloak = new KeycloakUserOptions
+            {
+                Issuer = "https://keycloak.example/realms/storyteller/",
+                Audience = "storyteller-api",
+                ClientId = "sform",
+            },
+        });
+
+        configuration.Provider.ShouldBe("Keycloak");
+        configuration.ClientId.ShouldBe("sform");
+        configuration.Issuer.ShouldBe("https://keycloak.example/realms/storyteller");
+        configuration.TenantId.ShouldBeNull();
+        configuration.Scopes.ShouldBeNull();
+        configuration.AuthKitDomain.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Describe_KeycloakWithoutAClient_HasAnEmptyClientId()
+    {
+        var configuration = AuthConfigurationHttp.Describe(new UserAuthenticationOptions
+        {
+            Provider = IdentityProviderKind.Keycloak,
+            Keycloak = new KeycloakUserOptions { Issuer = "https://keycloak.example/realms/storyteller", Audience = "storyteller-api" },
+        });
+
+        configuration.ClientId.ShouldBeEmpty();
+        configuration.Issuer.ShouldBe("https://keycloak.example/realms/storyteller");
     }
 
     [Fact]
@@ -84,6 +123,27 @@ public class AuthConfigurationHttpTests
         json.ShouldNotContain("sk_test_secret");
         json.ShouldNotContain("org_machines");
         json.ShouldNotContain("storyteller:admin");
+    }
+
+    [Fact]
+    public void Describe_Keycloak_NeverExposesTheRoleMapOrTheAllowedClients()
+    {
+        var configuration = AuthConfigurationHttp.Describe(new UserAuthenticationOptions
+        {
+            Provider = IdentityProviderKind.Keycloak,
+            Keycloak = new KeycloakUserOptions
+            {
+                Issuer = "https://keycloak.example/realms/storyteller",
+                Audience = "storyteller-api",
+                AllowedClientIds = ["internal-tool"],
+                RoleMap = new Dictionary<string, string> { ["storyteller-api:admin"] = "Annotation.Write" },
+            },
+        });
+
+        var json = JsonSerializer.Serialize(configuration);
+
+        json.ShouldNotContain("internal-tool");
+        json.ShouldNotContain("storyteller-api");
     }
 
     [Fact]

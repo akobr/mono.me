@@ -11,7 +11,8 @@ using Microsoft.IdentityModel.Tokens;
 namespace _42.Platform.Storyteller;
 
 // Keycloak client-credentials tokens of machine clients: issuer {ServerUrl}/realms/{Realm}, keys
-// from the realm's OpenID metadata, audience Keycloak:Audience, RS256. The machine is the azp; its
+// from the realm's OpenID metadata, audience Keycloak:Audience, RS256. The machine is the azp of a
+// service-account token (client_id/clientId, or preferred_username service-account-{client}); its
 // Storyteller scopes come from the storyteller_scope claim the client's mapper adds.
 public class KeycloakMachineTokenValidator : IMachineTokenValidator
 {
@@ -23,7 +24,7 @@ public class KeycloakMachineTokenValidator : IMachineTokenValidator
     private readonly JsonWebTokenHandler _handler = new();
 
     public KeycloakMachineTokenValidator(IOptions<KeycloakOptions> options)
-        : this(options, CreateConfigurationManager(options.Value))
+        : this(options, CreateConfigurationManager(options.Value.GetIssuer()))
     {
     }
 
@@ -92,7 +93,12 @@ public class KeycloakMachineTokenValidator : IMachineTokenValidator
         var claims = result.ClaimsIdentity.Claims.ToList();
         var clientId = claims.FirstOrDefault(claim => claim.Type == "azp")?.Value;
 
-        return string.IsNullOrWhiteSpace(clientId) ? null : Normalize(claims, clientId);
+        // Only a client's service account is a machine (client-credentials tokens always are one). A person's token of the
+        // realm, such as one KeycloakBearerTokenValidator refused (a client outside AllowedClientIds, no sub, an ID token), is
+        // never a machine, whatever its azp.
+        return string.IsNullOrWhiteSpace(clientId) || !KeycloakClaimNormalizer.IsServiceAccount(claims)
+            ? null
+            : Normalize(claims, clientId);
     }
 
     // Scope-bearing claims are rebuilt from storyteller_scope only, so realm roles or other mappers
@@ -119,13 +125,14 @@ public class KeycloakMachineTokenValidator : IMachineTokenValidator
         return new BearerValidationResult(normalized, IsMachine: true, MachineId: clientId);
     }
 
-    private static ConfigurationManager<OpenIdConnectConfiguration> CreateConfigurationManager(KeycloakOptions options)
+    // The realm's OpenID metadata and keys, for machine and user tokens alike.
+    internal static ConfigurationManager<OpenIdConnectConfiguration> CreateConfigurationManager(string issuer)
     {
         // A local Keycloak (http://localhost:8080) has no TLS; anything else must use HTTPS.
-        var requireHttps = !Uri.TryCreate(options.ServerUrl, UriKind.Absolute, out var server) || !server.IsLoopback;
+        var requireHttps = !Uri.TryCreate(issuer, UriKind.Absolute, out var realm) || !realm.IsLoopback;
 
         return new ConfigurationManager<OpenIdConnectConfiguration>(
-            $"{options.GetIssuer()}/.well-known/openid-configuration",
+            $"{issuer}/.well-known/openid-configuration",
             new OpenIdConnectConfigurationRetriever(),
             new HttpDocumentRetriever { RequireHttps = requireHttps });
     }

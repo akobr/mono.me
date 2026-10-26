@@ -4,4 +4,5 @@ public enum IdentityProviderKind
 {
     EntraId = 0,
     AuthKit,
+    Keycloak,
 }

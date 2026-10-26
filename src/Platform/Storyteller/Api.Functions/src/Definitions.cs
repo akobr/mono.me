@@ -504,7 +504,7 @@ public static class Definitions
         public const string ContinuationToken = "The continuation token for multi-page queries.";
         public const string IdMachine = "The id of the machine access.";
         public const string AccessPointKey = "The key of the access point: organization, or organization.project.";
-        public const string AccountId = "The id of the account (the identity provider's subject).";
+        public const string AccountId = "The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.";
         public const string InvitationId = "The id of the invitation.";
         public const string Key = "The key of the requested annotation.";
         public const string ConditionalRead = "The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.";
