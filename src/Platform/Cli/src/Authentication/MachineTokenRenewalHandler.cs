@@ -7,8 +7,8 @@ using System.Threading.Tasks;
 
 namespace _42.Platform.Cli.Authentication;
 
-// On the typed clients of the Storyteller SDK: after a 401, a request is sent once more with the token of a new
-// exchange, so a federated token the API refused before its expiry does not end a long job. Every other kind
+// On the typed clients of the Storyteller SDK: after a 401, a request is sent once more with a new token, so a
+// client-credentials or federated token the API refused before its expiry does not end a long job. Every other kind
 // gets the 401 as it is.
 public sealed class MachineTokenRenewalHandler : DelegatingHandler
 {
@@ -37,7 +37,7 @@ public sealed class MachineTokenRenewalHandler : DelegatingHandler
 
         try
         {
-            // No cancellation, like the token factory: the timeout of the exchange client ends a hanging exchange.
+            // No cancellation, like the token factory: the attempt timeouts of the token requests end a hanging one.
             token = await _machine.RenewAccessTokenAsync(rejectedToken, CancellationToken.None);
         }
         catch

@@ -91,7 +91,7 @@ public class CommandContext : ICommandContext
 
         if (!isExplicitProject && settings.Project is not null && !MachineSignInSettings.TrySplitProject(settings.Project, out _, out _))
         {
-            throw Invalid($"{StorytellerVariables.PROJECT} must be <organization>.<project>.");
+            throw Invalid($"{TargetVariables.PROJECT} must be <organization>.<project>.");
         }
 
         if (!_machine.IsConfigured)
@@ -104,7 +104,7 @@ public class CommandContext : ICommandContext
 
         if (!IsProjectKnown)
         {
-            throw Invalid($"No project is set for the machine: set {StorytellerVariables.PROJECT}=<organization>.<project> or pass -p.");
+            throw Invalid($"No project is set for the machine: set {TargetVariables.PROJECT}=<organization>.<project> or pass -p.");
         }
 
         if (identity is { Organization: not null, Project: not null }

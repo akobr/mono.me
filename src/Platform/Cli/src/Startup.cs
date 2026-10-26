@@ -1,6 +1,5 @@
 using System;
 using System.IO.Abstractions;
-using System.Net.Http;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
@@ -8,6 +7,7 @@ using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -81,7 +81,8 @@ namespace _42.Platform.Cli
 
         /// <summary>
         /// Registers the non-interactive sign-in of a machine from the STORYTELLER_* environment variables.
-        /// With machine credentials, STORYTELLER_API_URL replaces general.baseUrl; a user session is never sent to it.
+        /// With machine credentials, STORYTELLER_ENDPOINT (or the deprecated STORYTELLER_API_URL) replaces general.baseUrl;
+        /// a user session is never sent to it. The SDK credential makes its token requests on its own client.
         /// </summary>
         /// <param name="services">The service collection to configure.</param>
         internal static void ConfigureMachineSignIn(IServiceCollection services)
@@ -90,22 +91,19 @@ namespace _42.Platform.Cli
             services.AddSingleton<MachineAuthenticationService>();
             services.AddSingleton<IMachineSignIn>(provider => provider.GetRequiredService<MachineAuthenticationService>());
 
-            // A redirect would resend the client secret to another host.
-            services.AddHttpClient(nameof(MachineAuthenticationService))
-                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-
             services.AddOptions<GeneralOptions>().PostConfigure<MachineSignInSettings>((options, machine) =>
             {
-                if (machine.IsConfigured && machine.ApiUrl is not null)
+                if (machine.IsConfigured && machine.Endpoint is not null)
                 {
-                    options.BaseUrl = machine.ApiUrl;
+                    options.BaseUrl = machine.Endpoint;
                 }
             });
         }
 
         /// <summary>
         /// Registers the clients of the Storyteller SDK with the token of the IAuthenticationService the commands use.
-        /// After a 401, a federated machine sends the request once more with the token of a new exchange.
+        /// After a 401, a machine with a token it can renew (client credentials or federated) sends the request once more
+        /// with a new token.
         /// </summary>
         /// <param name="services">The service collection to configure.</param>
         internal static void ConfigureStorytellerSdk(IServiceCollection services)
@@ -140,7 +138,7 @@ namespace _42.Platform.Cli
                 };
             });
 
-            // Only on the typed clients: the exchange client of MachineAuthenticationService and the AuthKit client get no resend.
+            // Only on the typed clients: the token requests of the SDK credential and the AuthKit client get no resend.
             services.AddStorytellerSdk(null, builder => builder.AddHttpMessageHandler(
                 provider => new MachineTokenRenewalHandler(provider.GetRequiredService<IMachineSignIn>())));
         }
@@ -194,7 +192,7 @@ namespace _42.Platform.Cli
         private static bool IsLocalHttp(string? baseUrl)
         {
             return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
-                && MachineSignInSettings.IsLocalHttp(uri);
+                && StorytellerUrlRule.IsLocalHttp(uri);
         }
     }
 }

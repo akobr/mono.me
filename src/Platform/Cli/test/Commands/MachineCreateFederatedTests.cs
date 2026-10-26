@@ -8,6 +8,7 @@ using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Moq;

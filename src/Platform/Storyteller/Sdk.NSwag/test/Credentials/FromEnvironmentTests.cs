@@ -115,6 +115,16 @@ public class FromEnvironmentTests
     }
 
     [Fact]
+    public void ClientCredentials_WithoutASecret_NameIt()
+    {
+        _variables["STORYTELLER_CLIENT_ID"] = "machine-client";
+        _variables["STORYTELLER_TOKEN_URL"] = "https://idp.example.com/token";
+
+        ShouldFail("STORYTELLER_CLIENT_SECRET").Message.ShouldBe(
+            "Client credentials need STORYTELLER_CLIENT_ID and STORYTELLER_CLIENT_SECRET; STORYTELLER_CLIENT_SECRET is missing.");
+    }
+
+    [Fact]
     public void ClientCredentials_WithoutAClientId_NameIt()
     {
         _variables["STORYTELLER_CLIENT_SECRET"] = ClientSecret;
@@ -190,10 +200,13 @@ public class FromEnvironmentTests
         (await credential.GetAuthorizationAsync(null, CancellationToken.None))!.Parameter.ShouldBe("token");
     }
 
-    [Fact]
-    public void AClientIdAlone_NamesTheMissingVariables()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Configuration.Read")]
+    public void AClientIdAlone_NamesTheMissingVariables(string? scope)
     {
         _variables["STORYTELLER_CLIENT_ID"] = "machine-client";
+        _variables["STORYTELLER_TOKEN_SCOPE"] = scope;
 
         var exception = ShouldFail("STORYTELLER_CLIENT_SECRET");
 
@@ -214,6 +227,10 @@ public class FromEnvironmentTests
     [InlineData("STORYTELLER_CERTIFICATE_FILE", "/run/machine.pfx", "STORYTELLER_SUBJECT_TOKEN_FILE", "/run/token")]
     [InlineData("STORYTELLER_TOKEN_FILE", "/run/token", "STORYTELLER_SUBJECT_TOKEN_FILE", "/run/token")]
     [InlineData("STORYTELLER_API_KEY", ApiKey, "STORYTELLER_TOKEN_SCOPE", "Configuration.Read")]
+    [InlineData("STORYTELLER_API_KEY", ApiKey, "STORYTELLER_CLIENT_ID", "machine-client")]
+    [InlineData("STORYTELLER_CLIENT_SECRET", ClientSecret, "STORYTELLER_SUBJECT_TOKEN_FILE", "/run/token")]
+    [InlineData("STORYTELLER_TOKEN_URL", "https://idp.example.com/token", "STORYTELLER_SUBJECT_TOKEN_FILE", "/run/token")]
+    [InlineData("STORYTELLER_CLIENT_SECRET", ClientSecret, "STORYTELLER_SUBJECT_TOKEN_TYPE", "jwt")]
     public void TwoKindsAtOnce_AreAConfigurationError_ThatNamesThem(string first, string firstValue, string second, string secondValue)
     {
         _variables[first] = firstValue;

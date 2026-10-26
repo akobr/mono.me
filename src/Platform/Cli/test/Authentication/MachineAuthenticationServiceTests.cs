@@ -4,14 +4,20 @@ using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
+using _42.Platform.Storyteller.Sdk.Credentials;
+using _42.Platform.Storyteller.Sdk.Resilience;
 using Shouldly;
 using Xunit;
 
 namespace _42.Platform.Cli.UnitTests.Authentication;
 
+// The service on the SDK credential. The token requests, the exchange and the GitHub Actions request themselves are
+// tested in Sdk.NSwag/test/Credentials; these tests cover what sform adds: the identity, the target, the expiry of
+// sform account and the mapping of the SDK's failures to sform's reasons and exit codes.
 public class MachineAuthenticationServiceTests
 {
     private const string ApiUrl = "https://storyteller.example.com/api";
@@ -19,22 +25,22 @@ public class MachineAuthenticationServiceTests
     private const string ClientSecret = "client-secret-value";
     private const string MachineId = "6d0f2c4e-0000-4000-8000-000000000001";
     private const string TokenEndpoint = "https://storyteller.example.com/api/v1/acme/billing/access/token";
+    private const string DiscoveryUrl = "https://storyteller.example.com/api/v1/auth/configuration";
     private const string GitHubRequestUrl = "https://pipelines.actions.githubusercontent.com/abc/idtoken?api-version=2.0";
+    private const string GitHubRunner = "https://pipelines.actions.githubusercontent.com/abc/idtoken";
     private const string GitHubRequestToken = "github-request-token-value";
-    private const string EscapedTokenEndpoint = "https%3A%2F%2Fstoryteller.example.com%2Fapi%2Fv1%2Facme%2Fbilling%2Faccess%2Ftoken";
 
     private static readonly DateTimeOffset Start = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
 
     private readonly ScriptedHttpHandler _http = new();
     private readonly ManualTimeProvider _time = new(Start);
     private readonly MockFileSystem _fileSystem = new(new Dictionary<string, MockFileData>(), P(@"C:\work"));
-    private readonly FakeResolver _resolver = new();
-    private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.API_URL] = ApiUrl };
+    private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.ENDPOINT] = ApiUrl };
 
     [Fact]
     public async Task WithoutCredentialVariables_NothingIsConfigured()
     {
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         var service = CreateService();
 
         service.IsConfigured.ShouldBeFalse();
@@ -42,13 +48,14 @@ public class MachineAuthenticationServiceTests
         service.TryGetCertificate().ShouldBeNull();
         (await service.GetAccessTokenAsync()).ShouldBeNull();
         (await service.GetSignedInUserAsync()).ShouldBeNull();
+        (await service.RenewAccessTokenAsync("token")).ShouldBeNull();
     }
 
     [Fact]
     public async Task ApiKey_IsSentWithTheApiKeySchemeAndNamesTheMachine()
     {
         var key = TestApiKeys.Create("acme", "billing", "3f2c");
-        _environment[StorytellerVariables.API_KEY] = key;
+        _environment[StorytellerVariables.API_KEY] = $"ApiKey {key}";
         var service = CreateService();
 
         (await service.GetAccessTokenAsync()).ShouldBe($"ApiKey {key}");
@@ -86,24 +93,26 @@ public class MachineAuthenticationServiceTests
         (identity.MachineId, identity.Organization, identity.Project).ShouldBe(("3f2c", "acme", "billing"));
     }
 
+    // CreateCredential loads the certificate: its failure keeps the message and the inner exception.
     [Fact]
     public async Task Certificate_WithAWrongPassword_IsAConfigurationError()
     {
-        AddCertificate(TestCertificates.MachineUri("acme", "billing", "3f2c"));
-        _environment[StorytellerVariables.CERTIFICATE_PASSWORD] = "wrong";
+        var path = AddCertificate(TestCertificates.MachineUri("acme", "billing", "3f2c"));
+        _environment[StorytellerVariables.CLIENT_CERTIFICATE_PASSWORD] = "wrong";
         var service = CreateService();
 
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
-        exception.Message.ShouldBe("The certificate in STORYTELLER_CERTIFICATE_FILE could not be loaded; check the file and STORYTELLER_CERTIFICATE_PASSWORD.");
+        exception.Message.ShouldBe($"The certificate file {path} in STORYTELLER_CLIENT_CERTIFICATE could not be loaded; check the file and its password.");
         exception.Message.ShouldNotContain("wrong");
+        exception.InnerException.ShouldBeAssignableTo<CryptographicException>();
         service.TryGetCertificate().ShouldBeNull();
         service.TryGetIdentity().ShouldBeNull();
     }
 
     [Fact]
-    public async Task Certificate_ThatDoesNotExist_IsAConfigurationError()
+    public async Task Certificate_ThatDoesNotExist_NamesTheVariableAsSet()
     {
         _environment[StorytellerVariables.CERTIFICATE_FILE] = P(@"C:\ci\missing.pfx");
 
@@ -116,14 +125,15 @@ public class MachineAuthenticationServiceTests
     [Fact]
     public async Task Certificate_WithoutAPrivateKey_IsNeverHandedToTheSdk()
     {
-        _fileSystem.AddFile(P(@"C:\ci\machine.pfx"), new MockFileData(TestCertificates.Pkcs12WithoutPrivateKey(TestCertificates.MachineUri("acme", "billing", "3f2c"))));
-        _environment[StorytellerVariables.CERTIFICATE_FILE] = P(@"C:\ci\machine.pfx");
-        _environment[StorytellerVariables.CERTIFICATE_PASSWORD] = TestCertificates.Password;
+        var path = P(@"C:\ci\machine.pfx");
+        _fileSystem.AddFile(path, new MockFileData(TestCertificates.Pkcs12WithoutPrivateKey(TestCertificates.MachineUri("acme", "billing", "3f2c"))));
+        _environment[StorytellerVariables.CLIENT_CERTIFICATE] = path;
+        _environment[StorytellerVariables.CLIENT_CERTIFICATE_PASSWORD] = TestCertificates.Password;
         var service = CreateService();
 
         service.TryGetCertificate().ShouldBeNull();
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
-        exception.Message.ShouldBe("The certificate in STORYTELLER_CERTIFICATE_FILE has no private key; use the .pfx file sform account machine create wrote.");
+        exception.Message.ShouldBe($"The certificate in {path} in STORYTELLER_CLIENT_CERTIFICATE has no private key; use the .pfx file that sform account machine create wrote.");
     }
 
     [Fact]
@@ -165,11 +175,12 @@ public class MachineAuthenticationServiceTests
     }
 
     [Theory]
-    [InlineData("acme", "web", "3f2c", "The certificate in STORYTELLER_CERTIFICATE_FILE belongs to acme.billing but the API key to acme.web.")]
-    [InlineData("acme", "billing", "9a1b", "The certificate in STORYTELLER_CERTIFICATE_FILE belongs to machine 3f2c but the API key to machine 9a1b.")]
-    public async Task CertificateAndKey_OfDifferentMachines_AreRefusedBeforeAnyCall(string organization, string project, string machineId, string message)
+    [InlineData(StorytellerVariables.CLIENT_CERTIFICATE, "acme", "web", "3f2c", "The certificate in STORYTELLER_CLIENT_CERTIFICATE belongs to acme.billing but the API key to acme.web.")]
+    [InlineData(StorytellerVariables.CLIENT_CERTIFICATE, "acme", "billing", "9a1b", "The certificate in STORYTELLER_CLIENT_CERTIFICATE belongs to machine 3f2c but the API key to machine 9a1b.")]
+    [InlineData(StorytellerVariables.CERTIFICATE_FILE, "acme", "billing", "9a1b", "The certificate in STORYTELLER_CERTIFICATE_FILE belongs to machine 3f2c but the API key to machine 9a1b.")]
+    public async Task CertificateAndKey_OfDifferentMachines_AreRefusedBeforeAnyCall(string fileVariable, string organization, string project, string machineId, string message)
     {
-        AddCertificate(TestCertificates.MachineUri("acme", "billing", "3f2c"));
+        AddCertificate(TestCertificates.MachineUri("acme", "billing", "3f2c"), fileVariable);
         _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create(organization, project, machineId);
         var service = CreateService();
 
@@ -180,7 +191,7 @@ public class MachineAuthenticationServiceTests
     }
 
     [Fact]
-    public async Task ClientCredentials_ExchangesOnceAndRenewsShortlyBeforeExpiry()
+    public async Task ClientCredentials_RequestOnceAndRenewShortlyBeforeExpiry()
     {
         UseClientCredentials("client_01");
         _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","token_type":"Bearer","expires_in":3600}""")
@@ -195,60 +206,48 @@ public class MachineAuthenticationServiceTests
         _time.Now = Start.AddMinutes(59.5);
         (await service.GetAccessTokenAsync()).ShouldBe("cc-2");
 
-        _http.Requests.Count.ShouldBe(2);
-        var request = _http.Requests[0];
-        request.Method.ShouldBe(HttpMethod.Post);
-        request.Uri.ShouldBe(new Uri(TokenUrl));
-        request.Authorization.ShouldBeNull();
-        request.Form.ShouldBe(new Dictionary<string, string>
-        {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = "client_01",
-            ["client_secret"] = ClientSecret,
-        });
+        _http.Requests.Select(request => (request.Method, request.Uri.AbsoluteUri, request.Authorization))
+            .ShouldBe([(HttpMethod.Post, TokenUrl, null), (HttpMethod.Post, TokenUrl, null)]);
     }
 
+    // sform account shows the exp of the token; the lifetime that renews it is the SDK's (expires_in first).
     [Fact]
-    public async Task ClientCredentials_SendTheScopeWhenItIsSet()
+    public async Task ClientCredentials_SignIn_ShowsTheExpiryOfAJwt()
     {
-        UseClientCredentials("6d0f2c4e-0000-4000-8000-000000000001");
+        UseClientCredentials(MachineId);
         _environment[StorytellerVariables.TOKEN_SCOPE] = "api://storyteller/.default";
-        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
+        _http.Respond(HttpStatusCode.OK, $$"""{"access_token":"{{TestTokens.AccessToken(Start.AddMinutes(30))}}","expires_in":3600}""");
 
         var identity = await CreateService().SignInAsync();
 
         _http.Requests[0].Form["scope"].ShouldBe("api://storyteller/.default");
-        identity.MachineId.ShouldBe("6d0f2c4e-0000-4000-8000-000000000001");
+        identity.MachineId.ShouldBe(MachineId);
         identity.Organization.ShouldBeNull();
-        identity.TokenExpiresAt.ShouldBe(Start.AddHours(1));
-    }
-
-    [Theory]
-    [InlineData(""", "expires_in":"120" """, 2)]
-    [InlineData(""", "expires_in":9223372036854775807 """, 24 * 60)]
-    [InlineData("", 5)]
-    public async Task ClientCredentials_WithoutAUsableLifetime_FallBack(string lifetime, int minutes)
-    {
-        UseClientCredentials("client_01");
-        _http.Respond(HttpStatusCode.OK, $$"""{"access_token":"cc-1"{{lifetime}}}""");
-
-        (await CreateService().SignInAsync()).TokenExpiresAt.ShouldBe(Start.AddMinutes(minutes));
+        identity.TokenExpiresAt.ShouldBe(Start.AddMinutes(30));
     }
 
     [Fact]
-    public async Task ClientCredentials_WithoutALifetime_UseTheJwtExpiry()
+    public async Task ClientCredentials_WithAnOpaqueToken_HaveNoKnownExpiry()
     {
         UseClientCredentials("client_01");
-        _http.Respond(HttpStatusCode.OK, $$"""{"access_token":"{{TestTokens.AccessToken(Start.AddMinutes(30))}}"}""");
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
 
-        (await CreateService().SignInAsync()).TokenExpiresAt.ShouldBe(Start.AddMinutes(30));
+        (await CreateService().SignInAsync()).TokenExpiresAt.ShouldBeNull();
     }
 
+    // Change against today's sform: a 403, a 404 and an answer without a bearer token are refusals (44), not service
+    // errors (3).
     [Theory]
-    [InlineData(HttpStatusCode.BadRequest, """{"error":"invalid_client","error_description":"Bad secret."}""", "The token request to https://auth.example.com/oauth2/token was rejected: invalid_client: Bad secret.")]
-    [InlineData(HttpStatusCode.Unauthorized, """{"code":"invalid_client","message":"Unknown client"}""", "The token request to https://auth.example.com/oauth2/token was rejected: Unknown client.")]
-    [InlineData(HttpStatusCode.Unauthorized, "", "The token request to https://auth.example.com/oauth2/token was rejected.")]
-    public async Task ClientCredentials_Rejected_AreDenied(HttpStatusCode status, string body, string message)
+    [InlineData(HttpStatusCode.BadRequest, """{"error":"invalid_client","error_description":"Bad secret."}""", "The token request to https://auth.example.com/oauth2/token was rejected with 400: invalid_client: Bad secret.")]
+    [InlineData(HttpStatusCode.Unauthorized, """{"code":"invalid_client","message":"Unknown client"}""", "The token request to https://auth.example.com/oauth2/token was rejected with 401: Unknown client.")]
+    [InlineData(HttpStatusCode.Unauthorized, "", "The token request to https://auth.example.com/oauth2/token was rejected with 401.")]
+    [InlineData(HttpStatusCode.Forbidden, "", "The token request to https://auth.example.com/oauth2/token was rejected with 403.")]
+    [InlineData(HttpStatusCode.NotFound, "", "The token request to https://auth.example.com/oauth2/token was rejected with 404.")]
+    [InlineData(HttpStatusCode.Found, "", "The token request to https://auth.example.com/oauth2/token was answered with a redirect (302), which is not followed.")]
+    [InlineData(HttpStatusCode.OK, """{"access_token":"cc-1","token_type":"mac"}""", "The token endpoint https://auth.example.com/oauth2/token returned no bearer token.")]
+    [InlineData(HttpStatusCode.OK, "{}", "The token endpoint https://auth.example.com/oauth2/token returned no bearer token.")]
+    [InlineData(HttpStatusCode.OK, "<html/>", "The token endpoint https://auth.example.com/oauth2/token returned no bearer token.")]
+    public async Task ClientCredentials_Refused_AreDenied(HttpStatusCode status, string body, string message)
     {
         UseClientCredentials("client_01");
         _http.Respond(status, body);
@@ -262,11 +261,8 @@ public class MachineAuthenticationServiceTests
 
     [Theory]
     [InlineData(HttpStatusCode.InternalServerError, "", "The token request to https://auth.example.com/oauth2/token failed with 500.")]
-    [InlineData(HttpStatusCode.Found, "", "The token request to https://auth.example.com/oauth2/token failed with 302.")]
-    [InlineData(HttpStatusCode.OK, """{"access_token":"cc-1","token_type":"mac"}""", "The token endpoint https://auth.example.com/oauth2/token returned no bearer token.")]
-    [InlineData(HttpStatusCode.OK, "{}", "The token endpoint https://auth.example.com/oauth2/token returned no bearer token.")]
-    [InlineData(HttpStatusCode.OK, "<html/>", "The token endpoint https://auth.example.com/oauth2/token returned no bearer token.")]
-    public async Task ClientCredentials_UnusableAnswers_AreServiceErrors(HttpStatusCode status, string body, string message)
+    [InlineData(HttpStatusCode.TooManyRequests, "", "The token request to https://auth.example.com/oauth2/token failed with 429.")]
+    public async Task ClientCredentials_UnavailableEndpoint_IsAServiceError(HttpStatusCode status, string body, string message)
     {
         UseClientCredentials("client_01");
         _http.Respond(status, body);
@@ -278,56 +274,98 @@ public class MachineAuthenticationServiceTests
     }
 
     [Fact]
-    public async Task ClientCredentials_UnreachableEndpoint_IsAServiceError()
+    public async Task ClientCredentials_UnreachableEndpoint_IsAServiceErrorWithItsCause()
     {
         UseClientCredentials("client_01");
-        _http.Fail(new HttpRequestException("No such host is known."));
+        var cause = new HttpRequestException("No such host is known.");
+        _http.Fail(cause);
 
         var exception = await Should.ThrowAsync<AuthenticationException>(() => CreateService().GetAccessTokenAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
-        exception.Message.ShouldBe("The token endpoint https://auth.example.com/oauth2/token could not be reached.");
+        exception.Message.ShouldBe("The token request to https://auth.example.com/oauth2/token failed: No such host is known.");
+        exception.InnerException.ShouldBeSameAs(cause);
     }
 
+    // Change against today's sform: token requests are retried after a transient failure.
     [Fact]
-    public async Task ClientCredentials_OfAnAuthKitClient_UseTheDiscoveredDomain()
+    public async Task ClientCredentials_ATransientFailure_IsRetried()
+    {
+        UseClientCredentials("client_01");
+        _http.Respond(HttpStatusCode.ServiceUnavailable, string.Empty)
+            .Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
+        var service = CreateService(resilience: new StorytellerResilienceOptions { BaseDelay = TimeSpan.Zero });
+
+        (await service.GetAccessTokenAsync()).ShouldBe("cc-1");
+
+        _http.Requests.Count.ShouldBe(2);
+    }
+
+    // Change against today's sform: a renewal that fails before the token expires keeps the token.
+    [Fact]
+    public async Task ClientCredentials_AFailedEarlyRenewal_KeepsTheToken()
+    {
+        UseClientCredentials("client_01");
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""")
+            .Respond(HttpStatusCode.ServiceUnavailable, string.Empty);
+        var service = CreateService();
+
+        (await service.GetAccessTokenAsync()).ShouldBe("cc-1");
+        _time.Now = Start.AddMinutes(59.5);
+        (await service.GetAccessTokenAsync()).ShouldBe("cc-1");
+
+        _http.Requests.Count.ShouldBe(2);
+    }
+
+    // Change against today's sform: discovery asks the endpoint directly; authentication.provider and the
+    // auth.discovery.json cache no longer play a part for a machine.
+    [Fact]
+    public async Task ClientCredentials_OfAnAuthKitClient_DiscoverTheTokenUrlAtTheEndpoint()
     {
         UseClientCredentials("client_01", tokenUrl: null);
-        _resolver.Answer = new ResolvedAuthentication { Provider = AuthenticationProvider.AuthKit, ClientId = "client_user", AuthKitDomain = "https://acme.authkit.app/" };
-        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
+        _http.Respond(HttpStatusCode.OK, """{"Provider":"AuthKit","AuthKitDomain":"https://acme.authkit.app/"}""")
+            .Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
 
         (await CreateService().GetAccessTokenAsync()).ShouldBe("cc-1");
 
-        _http.Requests[0].Uri.ShouldBe(new Uri("https://acme.authkit.app/oauth2/token"));
+        _http.Requests.Select(request => (request.Method, request.Uri.AbsoluteUri, request.Authorization)).ShouldBe(
+        [
+            (HttpMethod.Get, DiscoveryUrl, null),
+            (HttpMethod.Post, "https://acme.authkit.app/oauth2/token", null),
+        ]);
     }
 
-    [Theory]
-    [InlineData("42.sform.acme.billing.0a1b", AuthenticationProvider.AuthKit, "https://acme.authkit.app", false)]
-    [InlineData("client_01", AuthenticationProvider.EntraId, null, true)]
-    [InlineData("client_01", AuthenticationProvider.AuthKit, "http://acme.authkit.app", true)]
-    [InlineData("client_01", AuthenticationProvider.AuthKit, null, true)]
-    public async Task ClientCredentials_WithoutATrustedTokenUrl_AskForIt(string clientId, AuthenticationProvider provider, string? domain, bool isDiscoveryAsked)
+    [Fact]
+    public async Task ClientCredentials_OutsideAuthKit_WithoutATokenUrl_AskForItBeforeAnyRequest()
     {
-        UseClientCredentials(clientId, tokenUrl: null);
-        _resolver.Answer = new ResolvedAuthentication { Provider = provider, ClientId = "client_user", AuthKitDomain = domain };
+        UseClientCredentials("42.sform.acme.billing.0a1b", tokenUrl: null);
 
         var exception = await Should.ThrowAsync<AuthenticationException>(() => CreateService().GetAccessTokenAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
-        exception.Message.ShouldBe("Set STORYTELLER_TOKEN_URL to the token URL that sform account machine create printed.");
-        _resolver.Resolutions.ShouldBe(isDiscoveryAsked ? 1 : 0);
+        exception.Message.ShouldBe("Set STORYTELLER_TOKEN_URL to the token URL that sform account machine create printed; only an AuthKit client id (client_…) discovers it.");
         _http.Requests.ShouldBeEmpty();
     }
 
-    [Fact]
-    public async Task ClientCredentials_WhenDiscoveryFails_AskForTheTokenUrl()
+    // Change against today's sform: a platform that is not AuthKit, or a domain that cannot be trusted, is a refusal
+    // (44, was 2); a refused discovery is 44, an unavailable one 3.
+    [Theory]
+    [InlineData(HttpStatusCode.OK, """{"Provider":"EntraId"}""", AuthenticationFailureReason.Denied, "The platform at https://storyteller.example.com/api signs in with EntraId, not AuthKit, so the token URL of client_01 cannot be discovered; set the token URL.")]
+    [InlineData(HttpStatusCode.OK, """{"Provider":"AuthKit","AuthKitDomain":"http://acme.authkit.app"}""", AuthenticationFailureReason.Denied, "The platform at https://storyteller.example.com/api names no https AuthKit domain without a path; set the token URL.")]
+    [InlineData(HttpStatusCode.OK, """{"Provider":"AuthKit","AuthKitDomain":"https://acme.authkit.app/tenant"}""", AuthenticationFailureReason.Denied, "The platform at https://storyteller.example.com/api names no https AuthKit domain without a path; set the token URL.")]
+    [InlineData(HttpStatusCode.OK, """{"Provider":"AuthKit"}""", AuthenticationFailureReason.Denied, "The platform at https://storyteller.example.com/api names no https AuthKit domain without a path; set the token URL.")]
+    [InlineData(HttpStatusCode.NotFound, "", AuthenticationFailureReason.Denied, $"The sign-in discovery at {DiscoveryUrl} was rejected with 404.")]
+    [InlineData(HttpStatusCode.BadGateway, "", AuthenticationFailureReason.ServiceError, $"The sign-in discovery at {DiscoveryUrl} failed with 502.")]
+    public async Task ClientCredentials_WhenDiscoveryCannotHelp_SayWhy(HttpStatusCode status, string body, AuthenticationFailureReason reason, string message)
     {
         UseClientCredentials("client_01", tokenUrl: null);
-        _resolver.Failure = new AuthenticationException(AuthenticationFailureReason.ServiceError, "not discoverable");
+        _http.Respond(status, body);
 
         var exception = await Should.ThrowAsync<AuthenticationException>(() => CreateService().GetAccessTokenAsync());
 
-        exception.Message.ShouldBe("Set STORYTELLER_TOKEN_URL to the token URL that sform account machine create printed.");
+        exception.Reason.ShouldBe(reason);
+        exception.Message.ShouldBe(message);
+        _http.Requests.ShouldHaveSingleItem().Uri.AbsoluteUri.ShouldBe(DiscoveryUrl);
     }
 
     [Fact]
@@ -375,7 +413,7 @@ public class MachineAuthenticationServiceTests
     [Theory]
     [InlineData(null, "does not exist")]
     [InlineData("  \n", "is empty")]
-    [InlineData("Bearer ", "is empty")]
+    [InlineData("Bearer ", "holds no token")]
     public async Task TokenFile_MissingOrEmpty_IsAConfigurationError(string? content, string problem)
     {
         var path = P(@"C:\ci\token");
@@ -395,17 +433,52 @@ public class MachineAuthenticationServiceTests
     [Fact]
     public async Task InvalidVariables_FailEveryCallWithTheSameReason()
     {
-        _environment.Remove(StorytellerVariables.API_URL);
+        _environment.Remove(StorytellerVariables.ENDPOINT);
         _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create("acme", "billing", "3f2c");
         var service = CreateService();
 
         var first = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
         var second = await Should.ThrowAsync<AuthenticationException>(() => service.SignInAsync());
 
-        first.Message.ShouldBe("Set STORYTELLER_API_URL to the API base URL, for example https://<host>/api.");
+        first.Message.ShouldBe("Set STORYTELLER_ENDPOINT to the API base URL, for example https://<host>/api.");
         second.Message.ShouldBe(first.Message);
         second.ShouldNotBeSameAs(first);
         service.TryGetIdentity().ShouldBeNull();
+    }
+
+    // Read: an error of the shared contract is a configuration error, with its message.
+    [Fact]
+    public async Task VariablesTheSdkRefuses_AreAConfigurationError()
+    {
+        _environment[StorytellerVariables.API_KEY] = "ApiKey";
+        var service = CreateService();
+
+        service.IsConfigured.ShouldBeTrue();
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe("STORYTELLER_API_KEY holds no key.");
+        _http.Requests.ShouldBeEmpty();
+    }
+
+    // Bind: whatever the binding of the credential throws is mapped too.
+    [Theory]
+    [InlineData(false, AuthenticationFailureReason.Configuration)]
+    [InlineData(true, AuthenticationFailureReason.ServiceError)]
+    public async Task AFailureOfTheBinding_IsMapped(bool isSdkFailure, AuthenticationFailureReason reason)
+    {
+        UseClientCredentials("client_01");
+        Exception failure = isSdkFailure
+            ? new StorytellerAuthenticationException(StorytellerAuthenticationFailureReason.Unavailable, "The binding failed.", new TimeoutException())
+            : new ArgumentException("The binding failed.");
+        var hooks = new MachineCredentialHooks { Decorate = _ => throw failure };
+        var service = TestMachines.Create(TestMachines.Settings(_environment), _fileSystem, hooks, _time);
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(reason);
+        exception.Message.ShouldBe("The binding failed.");
+        exception.InnerException.ShouldBeSameAs(isSdkFailure ? failure.InnerException : failure);
     }
 
     [Fact]
@@ -422,8 +495,9 @@ public class MachineAuthenticationServiceTests
         (await service.GetAccessTokenAsync()).ShouldStartWith("ApiKey ");
     }
 
+    // Change against today's sform: STORYTELLER_TOKEN_FILE with STORYTELLER_CLIENT_ID is federation (was exit 2).
     [Fact]
-    public async Task Federated_ExchangesThePlatformTokenAtTheTokenEndpointOfTheProject()
+    public async Task Federated_ATokenFileWithAClientId_ExchangesThePlatformTokenAtTheTokenEndpointOfTheProject()
     {
         UseFederatedFile("platform-token-1");
         _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
@@ -436,19 +510,14 @@ public class MachineAuthenticationServiceTests
         request.Method.ShouldBe(HttpMethod.Post);
         request.Uri.ShouldBe(new Uri(TokenEndpoint));
         request.Authorization.ShouldBeNull();
-        request.Form.ShouldBe(new Dictionary<string, string>
-        {
-            ["grant_type"] = "urn:ietf:params:oauth:grant-type:token-exchange",
-            ["client_id"] = MachineId,
-            ["subject_token"] = "platform-token-1",
-            ["subject_token_type"] = "urn:ietf:params:oauth:token-type:jwt",
-        });
+        request.Form["client_id"].ShouldBe(MachineId);
+        request.Form["subject_token"].ShouldBe("platform-token-1");
     }
 
     [Fact]
     public async Task Federated_EscapesTheTargetAndSendsTheScopeAndTheTokenType()
     {
-        _environment[StorytellerVariables.API_URL] = $"{ApiUrl}/";
+        _environment[StorytellerVariables.ENDPOINT] = $"{ApiUrl}/";
         _environment[StorytellerVariables.TOKEN_SCOPE] = "story:read annotation:write";
         _environment[StorytellerVariables.SUBJECT_TOKEN_TYPE] = "access_token";
         UseFederatedFile();
@@ -505,9 +574,9 @@ public class MachineAuthenticationServiceTests
     public async Task Federated_AJobOf40Minutes_KeepsGettingTokens()
     {
         UseFederatedFile();
-        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
-            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"))
-            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-3"));
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer(TestTokens.AccessToken(Start.AddMinutes(15))))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer(TestTokens.AccessToken(Start.AddMinutes(29))))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer(TestTokens.AccessToken(Start.AddMinutes(43))));
         var service = CreateService();
         service.BindTarget("acme", "billing");
 
@@ -542,7 +611,7 @@ public class MachineAuthenticationServiceTests
     [Fact]
     public async Task Federated_TheBoundTarget_WinsOverStorytellerProject()
     {
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         UseFederatedFile();
         _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-web"));
         var service = CreateService();
@@ -559,7 +628,7 @@ public class MachineAuthenticationServiceTests
     public async Task Federated_WithoutABoundTarget_SendsNoTokenAndAsksNothing()
     {
         // sform account ca and the user-only commands bind no target.
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         UseFederatedGitHub();
         var service = CreateService();
 
@@ -572,15 +641,15 @@ public class MachineAuthenticationServiceTests
     [Fact]
     public async Task Federated_SignIn_WithoutABoundTarget_UsesStorytellerProject()
     {
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         UseFederatedFile();
-        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer(TestTokens.AccessToken(Start.AddMinutes(15))));
         var service = CreateService();
 
         var identity = await service.SignInAsync();
 
         identity.ShouldBe(
-            new MachineIdentity(MachineSignInKind.Federated, [StorytellerVariables.CLIENT_ID, StorytellerVariables.SUBJECT_TOKEN_FILE], MachineId, "acme", "billing", Start.AddMinutes(15)),
+            new MachineIdentity(MachineSignInKind.Federated, [StorytellerVariables.CLIENT_ID, StorytellerVariables.TOKEN_FILE], MachineId, "acme", "billing", Start.AddMinutes(15)),
             new IdentityComparer());
         (await service.GetSignedInUserAsync()).ShouldBe(new SignedInUser(MachineId, $"machine {MachineId} (acme.billing)", null));
         _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
@@ -599,17 +668,22 @@ public class MachineAuthenticationServiceTests
     }
 
     [Theory]
-    [InlineData(false, new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.SUBJECT_TOKEN_FILE })]
-    [InlineData(true, new[] { StorytellerVariables.CLIENT_ID, GitHubActionsVariables.ID_TOKEN_REQUEST_URL, GitHubActionsVariables.ID_TOKEN_REQUEST_TOKEN })]
-    public void Federated_Identity_NamesTheMachineAndTheVariablesButNoProject(bool isGitHub, string[] variables)
+    [InlineData("file", new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.TOKEN_FILE })]
+    [InlineData("deprecated file", new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.SUBJECT_TOKEN_FILE })]
+    [InlineData("GitHub Actions", new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN })]
+    public void Federated_Identity_NamesTheMachineAndTheVariablesButNoProject(string source, string[] variables)
     {
-        if (isGitHub)
+        switch (source)
         {
-            UseFederatedGitHub();
-        }
-        else
-        {
-            UseFederatedFile();
+            case "GitHub Actions":
+                UseFederatedGitHub();
+                break;
+            case "deprecated file":
+                UseFederatedFile(fileVariable: StorytellerVariables.SUBJECT_TOKEN_FILE);
+                break;
+            default:
+                UseFederatedFile();
+                break;
         }
 
         var service = CreateService();
@@ -620,12 +694,10 @@ public class MachineAuthenticationServiceTests
         _http.Requests.ShouldBeEmpty();
     }
 
-    [Theory]
-    [InlineData(GitHubRequestUrl, $"{GitHubRequestUrl}&audience={EscapedTokenEndpoint}")]
-    [InlineData("https://token.actions.example.com/idtoken", $"https://token.actions.example.com/idtoken?audience={EscapedTokenEndpoint}")]
-    public async Task GitHub_RequestsAnIdTokenForTheTokenEndpoint(string requestUrl, string expectedUrl)
+    [Fact]
+    public async Task GitHub_AsksTheRunnerForTheTokenEndpoint_AndExchanges()
     {
-        UseFederatedGitHub(requestUrl);
+        UseFederatedGitHub();
         _http.Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-1"))
             .Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
         var service = CreateService();
@@ -633,49 +705,22 @@ public class MachineAuthenticationServiceTests
 
         (await service.GetAccessTokenAsync()).ShouldBe("st-1");
 
-        _http.Requests.Count.ShouldBe(2);
-        var gitHub = _http.Requests[0];
-        gitHub.Method.ShouldBe(HttpMethod.Get);
-        gitHub.Uri.AbsoluteUri.ShouldBe(expectedUrl);
-        gitHub.Authorization.ShouldBe($"Bearer {GitHubRequestToken}");
-        gitHub.Headers!["Accept"].ShouldBe("application/json");
-        var exchange = _http.Requests[1];
-        exchange.Uri.ShouldBe(new Uri(TokenEndpoint));
-        exchange.Form["subject_token"].ShouldBe("gh-jwt-1");
-        exchange.Form["subject_token_type"].ShouldBe("urn:ietf:params:oauth:token-type:jwt");
+        _http.Requests.Select(request => (request.Method, request.Uri.AbsoluteUri, request.Authorization)).ShouldBe(
+        [
+            (HttpMethod.Get, $"{GitHubRequestUrl}&audience={Uri.EscapeDataString(TokenEndpoint)}", $"Bearer {GitHubRequestToken}"),
+            (HttpMethod.Post, TokenEndpoint, null),
+        ]);
+        _http.Requests[1].Form["subject_token"].ShouldBe("gh-jwt-1");
     }
 
-    [Fact]
-    public async Task GitHub_TheRequestTokenGoesToTheRunnerOnly()
-    {
-        UseFederatedGitHub();
-        _http.Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-1"))
-            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
-            .Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-2"))
-            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"));
-        var service = CreateService();
-        service.BindTarget("acme", "billing");
-
-        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
-
-        // The ID token lives about 5 minutes, so every exchange gets a fresh one.
-        _time.Now = Start.AddMinutes(14);
-        (await service.GetAccessTokenAsync()).ShouldBe("st-2");
-
-        _http.Requests.Select(request => request.Method).ShouldBe([HttpMethod.Get, HttpMethod.Post, HttpMethod.Get, HttpMethod.Post]);
-        _http.Requests[3].Form["subject_token"].ShouldBe("gh-jwt-2");
-        var exchanges = _http.Requests.Where(request => request.Method == HttpMethod.Post).ToList();
-        exchanges.ShouldAllBe(request => request.Authorization == null);
-        exchanges.ShouldAllBe(request => !request.Headers!.Values.Any(value => value.Contains(GitHubRequestToken)));
-        exchanges.ShouldAllBe(request => !request.Form.Values.Contains(GitHubRequestToken));
-    }
-
+    // Change against today's sform: a refusing runner (3xx, 4xx, or no token) is 44, was 3; 5xx and network failures stay 3.
     [Theory]
-    [InlineData(HttpStatusCode.Forbidden, "", "The GitHub Actions ID token request failed with 403.")]
-    [InlineData(HttpStatusCode.Found, "", "The GitHub Actions ID token request failed with 302.")]
-    [InlineData(HttpStatusCode.OK, """{"count":0}""", "The GitHub Actions ID token request returned no token.")]
-    [InlineData(HttpStatusCode.OK, "<html/>", "The GitHub Actions ID token request returned no token.")]
-    public async Task GitHub_UnusableAnswers_AreServiceErrors(HttpStatusCode status, string body, string message)
+    [InlineData(HttpStatusCode.Forbidden, "", AuthenticationFailureReason.Denied, $"The GitHub Actions ID token request to {GitHubRunner} was rejected with 403.")]
+    [InlineData(HttpStatusCode.Found, "", AuthenticationFailureReason.Denied, $"The GitHub Actions ID token request to {GitHubRunner} was answered with a redirect (302), which is not followed.")]
+    [InlineData(HttpStatusCode.OK, """{"count":0}""", AuthenticationFailureReason.Denied, $"The GitHub Actions ID token request to {GitHubRunner} returned no token.")]
+    [InlineData(HttpStatusCode.OK, "<html/>", AuthenticationFailureReason.Denied, $"The GitHub Actions ID token request to {GitHubRunner} returned no token.")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "", AuthenticationFailureReason.ServiceError, $"The GitHub Actions ID token request to {GitHubRunner} failed with 503.")]
+    public async Task GitHub_UnusableAnswers_SayWhy(HttpStatusCode status, string body, AuthenticationFailureReason reason, string message)
     {
         UseFederatedGitHub();
         _http.Respond(status, body);
@@ -684,8 +729,9 @@ public class MachineAuthenticationServiceTests
 
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
 
-        exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
+        exception.Reason.ShouldBe(reason);
         exception.Message.ShouldBe(message);
+        exception.Message.ShouldNotContain(GitHubRequestToken);
         _http.Requests.ShouldHaveSingleItem().Method.ShouldBe(HttpMethod.Get);
     }
 
@@ -702,7 +748,7 @@ public class MachineAuthenticationServiceTests
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
-        exception.Message.ShouldBe("The GitHub Actions ID token could not be requested.");
+        exception.Message.ShouldStartWith($"The GitHub Actions ID token request to {GitHubRunner} failed: ");
     }
 
     [Fact]
@@ -716,7 +762,7 @@ public class MachineAuthenticationServiceTests
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.Denied);
-        exception.Message.ShouldBe($"The token request to {TokenEndpoint} was rejected: invalid_request: The subject token was not accepted.");
+        exception.Message.ShouldBe($"The token request to {TokenEndpoint} was rejected with 400: invalid_request: The subject token was not accepted.");
         exception.Message.ShouldNotContain("platform-token-secret");
     }
 
@@ -733,16 +779,16 @@ public class MachineAuthenticationServiceTests
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.Denied);
         exception.Message.ShouldBe(
-            $"The token request to {TokenEndpoint} was rejected: invalid_request: The subject token was not accepted; the GitHub Actions token of this job was requested for the audience {TokenEndpoint}, which a rule of the machine must name exactly. For client credentials, set STORYTELLER_CLIENT_SECRET instead.");
+            $"The token request to {TokenEndpoint} was rejected with 400: invalid_request: The subject token was not accepted; the GitHub Actions token of this job was requested for the audience {TokenEndpoint}, which a rule of the machine must name exactly. For client credentials, set STORYTELLER_CLIENT_SECRET instead.");
         exception.Message.ShouldNotContain("gh-jwt-secret");
         exception.Message.ShouldNotContain(GitHubRequestToken);
     }
 
     [Theory]
-    [InlineData(HttpStatusCode.ServiceUnavailable, """{"error":"temporarily_unavailable"}""", $"The token request to {TokenEndpoint} failed with 503.")]
-    [InlineData(HttpStatusCode.Found, "", $"The token request to {TokenEndpoint} failed with 302.")]
-    [InlineData(HttpStatusCode.OK, "{}", $"The token endpoint {TokenEndpoint} returned no bearer token.")]
-    public async Task Federated_UnusableAnswers_AreServiceErrors(HttpStatusCode status, string body, string message)
+    [InlineData(HttpStatusCode.ServiceUnavailable, """{"error":"temporarily_unavailable"}""", AuthenticationFailureReason.ServiceError, $"The token request to {TokenEndpoint} failed with 503: temporarily_unavailable.")]
+    [InlineData(HttpStatusCode.Found, "", AuthenticationFailureReason.Denied, $"The token request to {TokenEndpoint} was answered with a redirect (302), which is not followed.")]
+    [InlineData(HttpStatusCode.OK, "{}", AuthenticationFailureReason.Denied, $"The token endpoint {TokenEndpoint} returned no bearer token.")]
+    public async Task Federated_UnusableAnswers_SayWhy(HttpStatusCode status, string body, AuthenticationFailureReason reason, string message)
     {
         UseFederatedFile();
         _http.Respond(status, body);
@@ -751,7 +797,7 @@ public class MachineAuthenticationServiceTests
 
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
 
-        exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
+        exception.Reason.ShouldBe(reason);
         exception.Message.ShouldBe(message);
     }
 
@@ -766,17 +812,18 @@ public class MachineAuthenticationServiceTests
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
-        exception.Message.ShouldBe($"The token endpoint {TokenEndpoint} could not be reached.");
+        exception.Message.ShouldBe($"The token request to {TokenEndpoint} failed: No such host is known.");
     }
 
     [Theory]
-    [InlineData(null, "does not exist")]
-    [InlineData("  \n", "is empty")]
-    public async Task Federated_MissingOrEmptyFile_IsAConfigurationError(string? content, string problem)
+    [InlineData(StorytellerVariables.TOKEN_FILE, null, "does not exist")]
+    [InlineData(StorytellerVariables.TOKEN_FILE, "  \n", "is empty")]
+    [InlineData(StorytellerVariables.SUBJECT_TOKEN_FILE, null, "does not exist")]
+    public async Task Federated_MissingOrEmptyFile_IsAConfigurationError(string fileVariable, string? content, string problem)
     {
         var path = P(@"C:\ci\platform-token");
         _environment[StorytellerVariables.CLIENT_ID] = MachineId;
-        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = path;
+        _environment[fileVariable] = path;
 
         if (content is not null)
         {
@@ -789,7 +836,7 @@ public class MachineAuthenticationServiceTests
         var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
-        exception.Message.ShouldBe($"The platform token file {path} in STORYTELLER_SUBJECT_TOKEN_FILE {problem}.");
+        exception.Message.ShouldBe($"The platform token file {path} in {fileVariable} {problem}.");
         _http.Requests.ShouldBeEmpty();
     }
 
@@ -847,26 +894,47 @@ public class MachineAuthenticationServiceTests
         _http.Requests.Count.ShouldBe(2);
     }
 
+    // Change against today's sform: client credentials are renewed after a 401 too, not only a federated token.
     [Fact]
-    public async Task Renew_IsOnlyForAFederatedMachine()
+    public async Task Renew_IsForEveryCredentialThatCanRenew()
     {
-        (await CreateService().RenewAccessTokenAsync("token")).ShouldBeNull();
-
         _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create("acme", "billing", "3f2c");
         var apiKey = CreateService();
         apiKey.BindTarget("acme", "billing");
         (await apiKey.RenewAccessTokenAsync((await apiKey.GetAccessTokenAsync())!)).ShouldBeNull();
 
         _environment.Remove(StorytellerVariables.API_KEY);
-        UseClientCredentials("client_01");
-        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
-        var clientCredentials = CreateService();
-        clientCredentials.BindTarget("acme", "billing");
-        (await clientCredentials.GetAccessTokenAsync()).ShouldBe("cc-1");
-        (await clientCredentials.RenewAccessTokenAsync("cc-1")).ShouldBeNull();
-        (await clientCredentials.GetAccessTokenAsync()).ShouldBe("cc-1");
+        var path = P(@"C:\ci\token");
+        _fileSystem.AddFile(path, new MockFileData("file-token"));
+        _environment[StorytellerVariables.TOKEN_FILE] = path;
+        var tokenFile = CreateService();
+        (await tokenFile.RenewAccessTokenAsync("file-token")).ShouldBeNull();
 
-        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenUrl));
+        _environment.Remove(StorytellerVariables.TOKEN_FILE);
+        UseClientCredentials("client_01");
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""")
+            .Respond(HttpStatusCode.OK, """{"access_token":"cc-2","expires_in":3600}""");
+        var clientCredentials = CreateService();
+        (await clientCredentials.GetAccessTokenAsync()).ShouldBe("cc-1");
+        (await clientCredentials.RenewAccessTokenAsync("cc-1")).ShouldBe("cc-2");
+        (await clientCredentials.GetAccessTokenAsync()).ShouldBe("cc-2");
+
+        _http.Requests.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Renew_ThatIsRefused_IsDenied()
+    {
+        UseClientCredentials("client_01");
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""")
+            .Respond(HttpStatusCode.BadRequest, """{"error":"invalid_client"}""");
+        var service = CreateService();
+        (await service.GetAccessTokenAsync()).ShouldBe("cc-1");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.RenewAccessTokenAsync("cc-1"));
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Denied);
+        exception.Message.ShouldBe($"The token request to {TokenUrl} was rejected with 400: invalid_client.");
     }
 
     [Fact]
@@ -897,12 +965,13 @@ public class MachineAuthenticationServiceTests
         return $$"""{"count":1,"value":"{{idToken}}"}""";
     }
 
-    private void AddCertificate(string spiffeUri)
+    private string AddCertificate(string spiffeUri, string fileVariable = StorytellerVariables.CLIENT_CERTIFICATE)
     {
         var path = P(@"C:\ci\machine.pfx");
         _fileSystem.AddFile(path, new MockFileData(TestCertificates.Pkcs12(spiffeUri)));
-        _environment[StorytellerVariables.CERTIFICATE_FILE] = path;
-        _environment[StorytellerVariables.CERTIFICATE_PASSWORD] = TestCertificates.Password;
+        _environment[fileVariable] = path;
+        _environment[fileVariable == StorytellerVariables.CLIENT_CERTIFICATE ? StorytellerVariables.CLIENT_CERTIFICATE_PASSWORD : StorytellerVariables.CERTIFICATE_PASSWORD] = TestCertificates.Password;
+        return path;
     }
 
     private void UseClientCredentials(string clientId, string? tokenUrl = TokenUrl)
@@ -916,27 +985,26 @@ public class MachineAuthenticationServiceTests
         }
     }
 
-    private string UseFederatedFile(string content = "platform-token")
+    private string UseFederatedFile(string content = "platform-token", string fileVariable = StorytellerVariables.TOKEN_FILE)
     {
         var path = P(@"C:\ci\platform-token");
         _fileSystem.AddFile(path, new MockFileData(content));
         _environment[StorytellerVariables.CLIENT_ID] = MachineId;
-        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = path;
+        _environment[fileVariable] = path;
         return path;
     }
 
     // The variables of a GitHub Actions job with permissions: id-token: write.
-    private void UseFederatedGitHub(string requestUrl = GitHubRequestUrl)
+    private void UseFederatedGitHub()
     {
         _environment[StorytellerVariables.CLIENT_ID] = MachineId;
-        _environment[GitHubActionsVariables.ID_TOKEN_REQUEST_URL] = requestUrl;
-        _environment[GitHubActionsVariables.ID_TOKEN_REQUEST_TOKEN] = GitHubRequestToken;
+        _environment[StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL] = GitHubRequestUrl;
+        _environment[StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN] = GitHubRequestToken;
     }
 
-    private MachineAuthenticationService CreateService(HttpMessageHandler? handler = null)
+    private MachineAuthenticationService CreateService(HttpMessageHandler? handler = null, StorytellerResilienceOptions? resilience = null)
     {
-        var settings = MachineSignInSettings.FromEnvironment(name => _environment.GetValueOrDefault(name));
-        return new MachineAuthenticationService(settings, _fileSystem, new StubHttpClientFactory(handler ?? _http), _resolver, _time);
+        return TestMachines.Create(TestMachines.Settings(_environment), _fileSystem, TestMachines.Hooks(handler ?? _http, resilience), _time);
     }
 
     private sealed class IdentityComparer : IEqualityComparer<MachineIdentity>
@@ -955,32 +1023,6 @@ public class MachineAuthenticationServiceTests
         public int GetHashCode(MachineIdentity obj)
         {
             return HashCode.Combine(obj.Kind, obj.MachineId);
-        }
-    }
-
-    private sealed class FakeResolver : IAuthenticationConfigurationResolver
-    {
-        public ResolvedAuthentication? Answer { get; set; }
-
-        public Exception? Failure { get; set; }
-
-        public int Resolutions { get; private set; }
-
-        public Task<ResolvedAuthentication> ResolveAsync(CancellationToken cancellationToken = default)
-        {
-            Resolutions++;
-
-            if (Failure is not null)
-            {
-                return Task.FromException<ResolvedAuthentication>(Failure);
-            }
-
-            return Task.FromResult(Answer ?? throw new InvalidOperationException("No discovery answer scripted."));
-        }
-
-        public Task ForgetAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
         }
     }
 

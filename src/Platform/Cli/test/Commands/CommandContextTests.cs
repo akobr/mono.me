@@ -7,8 +7,8 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.UnitTests.Authentication;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.Options;
-using Moq;
 using Shouldly;
 using Xunit;
 
@@ -20,7 +20,7 @@ public class CommandContextTests
 
     private readonly ScriptedHttpHandler _http = new();
     private readonly MockFileSystem _fileSystem = new();
-    private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.API_URL] = "https://storyteller.example.com/api" };
+    private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.ENDPOINT] = "https://storyteller.example.com/api" };
     private readonly AccessDefaultOptions _file = new() { OrganizationName = "house", ProjectName = "stored", ViewName = "staging" };
     private MachineAuthenticationService? _machine;
 
@@ -45,7 +45,7 @@ public class CommandContextTests
     [Fact]
     public void EnvironmentProject_WinsOverTheFileAndDropsItsView()
     {
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
 
         var context = CreateContext();
 
@@ -55,7 +55,7 @@ public class CommandContextTests
     [Fact]
     public void EnvironmentView_WinsOverTheFileView()
     {
-        _environment[StorytellerVariables.VIEW] = "preview";
+        _environment[TargetVariables.VIEW] = "preview";
 
         var context = CreateContext();
 
@@ -65,8 +65,8 @@ public class CommandContextTests
     [Fact]
     public void ExplicitTarget_WinsOverTheEnvironment()
     {
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
-        _environment[StorytellerVariables.VIEW] = "preview";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.VIEW] = "preview";
         var context = CreateContext();
 
         context.TrySetExplicitTarget("acme.web", "release");
@@ -89,7 +89,7 @@ public class CommandContextTests
     [Fact]
     public void MalformedEnvironmentProject_IsReportedUnlessAProjectIsPassed()
     {
-        _environment[StorytellerVariables.PROJECT] = "billing";
+        _environment[TargetVariables.PROJECT] = "billing";
         var context = CreateContext();
 
         var exception = Should.Throw<AuthenticationException>(() => context.TrySetExplicitTarget(null, null));
@@ -130,7 +130,7 @@ public class CommandContextTests
     {
         UseClientCredentials();
         var passed = CreateContext();
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         var configured = CreateContext();
 
         passed.TrySetExplicitTarget("acme.web", null);
@@ -149,7 +149,7 @@ public class CommandContextTests
 
         if (environmentProject is not null)
         {
-            _environment[StorytellerVariables.PROJECT] = environmentProject;
+            _environment[TargetVariables.PROJECT] = environmentProject;
         }
 
         var exception = Should.Throw<AuthenticationException>(() => CreateContext().TrySetExplicitTarget(option, null));
@@ -160,18 +160,18 @@ public class CommandContextTests
     [Fact]
     public void Machine_WithInvalidVariables_ReportsThemRatherThanTheMissingProject()
     {
-        _environment.Remove(StorytellerVariables.API_URL);
+        _environment.Remove(StorytellerVariables.ENDPOINT);
         _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create("acme", "billing", "3f2c");
 
         var exception = Should.Throw<AuthenticationException>(() => CreateContext().TrySetExplicitTarget(null, null));
 
-        exception.Message.ShouldBe("Set STORYTELLER_API_URL to the API base URL, for example https://<host>/api.");
+        exception.Message.ShouldBe("Set STORYTELLER_ENDPOINT to the API base URL, for example https://<host>/api.");
     }
 
     [Fact]
     public async Task FederatedMachine_IsBoundToTheOptionOverStorytellerProject()
     {
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         UseFederated();
         _http.Respond(HttpStatusCode.OK, """{"access_token":"st-web","token_type":"Bearer","expires_in":900}""");
         var context = CreateContext();
@@ -214,7 +214,7 @@ public class CommandContextTests
         var path = MockUnixSupport.Path(@"C:\ci\platform-token");
         _fileSystem.AddFile(path, new MockFileData("platform-token"));
         _environment[StorytellerVariables.CLIENT_ID] = FederatedMachineId;
-        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = path;
+        _environment[StorytellerVariables.TOKEN_FILE] = path;
     }
 
     private void UseClientCredentials()
@@ -226,12 +226,7 @@ public class CommandContextTests
 
     private CommandContext CreateContext(AccessDefaultOptions? file = null)
     {
-        var settings = MachineSignInSettings.FromEnvironment(name => _environment.GetValueOrDefault(name));
-        _machine = new MachineAuthenticationService(
-            settings,
-            _fileSystem,
-            new StubHttpClientFactory(_http),
-            Mock.Of<IAuthenticationConfigurationResolver>());
+        _machine = TestMachines.Create(_environment, _fileSystem, _http);
         return new CommandContext(Options.Create(file ?? _file), _machine);
     }
 }

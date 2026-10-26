@@ -277,6 +277,28 @@ public class StorytellerCredentialVariablesTests
         ShouldFail("STORYTELLER_CLIENT_SECRET").Message.ShouldContain("GitHub Actions");
     }
 
+    // An Entra ID appId is a GUID too: with its secret, it stays client credentials in a job with id-token: write.
+    [Theory]
+    [InlineData(StorytellerCredentialKind.ApiKey, "STORYTELLER_API_KEY", ApiKey)]
+    [InlineData(StorytellerCredentialKind.ClientCredentials, "STORYTELLER_CLIENT_SECRET", ClientSecret)]
+    public void AnotherKind_InAGitHubActionsJob_StaysThatKind(StorytellerCredentialKind kind, string variable, string value)
+    {
+        UseGitHubActions();
+        _variables[variable] = value;
+
+        if (kind == StorytellerCredentialKind.ClientCredentials)
+        {
+            _variables["STORYTELLER_CLIENT_ID"] = MachineId;
+            _variables["STORYTELLER_TOKEN_URL"] = "https://idp.example.com/token";
+        }
+
+        var variables = Read().ShouldNotBeNull();
+
+        variables.Kind.ShouldBe(kind);
+        variables.SubjectTokenSource.ShouldBeNull();
+        variables.Names.ShouldNotContain(name => name.StartsWith("ACTIONS_"));
+    }
+
     [Fact]
     public void ATokenScopeWithoutAClientId_IsAnError_EvenInAGitHubActionsJob()
     {
