@@ -189,7 +189,7 @@ internal sealed class FakeConfigurationService(ExportReads? reads = null, Import
 
     public Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, AuditActor actor, bool force = false) => throw new NotSupportedException();
 
-    public Task ClearConfigurationAsync(FullKey key, AuditActor? actor = null) => throw new NotSupportedException();
+    public Task<bool> ClearConfigurationAsync(FullKey key, AuditActor? actor = null) => throw new NotSupportedException();
 
     public Task DeleteAsync(FullKey key, AuditActor? actor = null) => throw new NotSupportedException();
 

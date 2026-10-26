@@ -410,6 +410,22 @@ public partial class MachineRestrictionHttpTests
         recorders.SelectMany(recorder => recorder.Calls).ShouldNotBeEmpty();
     }
 
+    // The delete route always asks the service to clear, which finishes an earlier clear left pending: nothing to
+    // clear answers 404.
+    [Theory]
+    [InlineData(true, typeof(OkResult))]
+    [InlineData(false, typeof(NotFoundResult))]
+    public async Task DeleteConfiguration_AnswersWhatTheClearDid(bool cleared, Type expected)
+    {
+        var (http, recorders) = RecordingHandlers(new RoleAccess(AccountRole.Contributor), asUser: true);
+        recorders[1].Returns(nameof(IConfigurationService.ClearConfigurationAsync), cleared);
+
+        var result = await http.Configuration.DeleteConfiguration(http.Request("DELETE"), Org, Project, DefaultView, Restriction);
+
+        result.ShouldBeOfType(expected);
+        recorders[1].Calls.ShouldContain(call => call.Method == nameof(IConfigurationService.ClearConfigurationAsync));
+    }
+
     // A user keeps the role check of Release builds: deleting needs a Contributor.
     [Fact]
     public async Task DeleteAnnotation_ByAReader_IsDenied()
@@ -502,8 +518,8 @@ public partial class MachineRestrictionHttpTests
             carried);
     }
 
-    // The services answer the reads that the handlers do not check for null: an empty page of annotations, content to
-    // delete, and no version yet.
+    // The services answer the reads that the handlers do not check for null: an empty page of annotations, a cleared
+    // configuration, and no version yet.
     private static (HttpHandlers Http, RecordingProxy[] Recorders) RecordingHandlers(
         IAccessService? access = null,
         IReadOnlyList<MachineScope>? carried = null,
@@ -515,7 +531,7 @@ public partial class MachineRestrictionHttpTests
         var (templates, templateCalls) = Recording<IConfigurationTemplateService>();
         var (bindings, bindingCalls) = Recording<IBindingCatalog>();
         annotationCalls.Returns(nameof(IAnnotationService.GetAnnotationsAsync), new AnnotationsResponse());
-        configurationCalls.Returns(nameof(IConfigurationService.HasConfigurationContentAsync), true);
+        configurationCalls.Returns(nameof(IConfigurationService.ClearConfigurationAsync), true);
         configurationCalls.Returns(nameof(IConfigurationService.GetConfigurationVersionsAsync), Array.Empty<ConfigurationVersion>());
 
         var http = new HttpHandlers(annotations, configuration, schemas, templates, bindings, access ?? Restricted(), carried, asUser);

@@ -222,7 +222,7 @@ public partial class ConfigurationHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The configuration model.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The created or updated configuration.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The configuration violates the schema, or the annotation is deleted (ErrorCode AnnotationDeleted).")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The configuration violates the schema, the annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationWrite)]
@@ -311,7 +311,7 @@ public partial class ConfigurationHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The patched configuration.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The configuration doesn't exist or has no content to patch.")]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The patch violates the configuration schema, or the annotation is deleted (ErrorCode AnnotationDeleted).")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The patch violates the configuration schema, the annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationWrite)]
@@ -401,7 +401,7 @@ public partial class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The configuration doesn't exist.")]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The annotation is deleted (ErrorCode AnnotationDeleted).")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationWrite)]
@@ -423,17 +423,18 @@ public partial class ConfigurationHttp
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
 
-        if (!await _configuration.HasConfigurationContentAsync(fullKey))
+        try
         {
-            return await _annotations.GetDeletedAnnotationAsync(fullKey) is null
-                ? new NotFoundResult()
-                : ErrorResponseMapping.ToActionResult(new ConflictException(
-                    $"The annotation '{fullKey.Annotation}' is deleted; restore it before changing its configuration.",
-                    ErrorCodes.AnnotationDeleted));
+            // a clear that finds nothing still finishes the cache invalidation an earlier clear left pending
+            return await _configuration.ClearConfigurationAsync(fullKey, request.GetAuditActor())
+                ? new OkResult()
+                : new NotFoundResult();
         }
-
-        await _configuration.ClearConfigurationAsync(fullKey, request.GetAuditActor());
-        return new OkResult();
+        catch (StorytellerException ex)
+        {
+            // a deleted annotation answers 409 AnnotationDeleted, a write that kept losing to concurrent ones 409 Conflict
+            return ErrorResponseMapping.ToActionResult(ex);
+        }
     }
 
     [Function(nameof(GetConfigurationVersions))]

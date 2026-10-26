@@ -381,9 +381,9 @@ The outcome and the warnings come from the states read before the write, so a dr
   - with `AnnotationDeleted` when it is deleted. With `Skip`, a deleted annotation stays deleted, so its configuration is skipped too;
   - with `AnnotationNotFound` when it is missing.
 - **Content.** `$remove` and `$patch` apply to the document alone, as on a create. A broken directive fails with `PatchInvalid` or `PatchTestFailed`. A document that ends empty is `Skipped` with `EmptyDocument`: a configuration is cleared by `DELETE`.
-- **Existing.** An equal document is `Unchanged`. With `Skip`, a different one is `Skipped` with `DocumentExists`. The configuration of a re-created annotation counts as none: the re-create emptied it, so the file is `Created` as the next version.
+- **Existing.** An equal document is `Unchanged`. With `Skip`, a different one is `Skipped` with `DocumentExists`. Outside a dry run, both finish a cache invalidation that an earlier write of the configuration left pending ([inheritance.md](inheritance.md#cache-and-descendant-freshness)). The configuration of a re-created annotation counts as none: the re-create emptied it, so the file is `Created` as the next version.
 - **Validation.** The document is validated against its combined schema (see [Overlay](#overlay) for the layers). A violation fails with `SchemaViolation`. With `force`, it is written with the warning `SchemaViolation`, which lists the errors.
-- **Write.** The version is stamped with the importing caller, and the annotation's audit gets `ConfigurationChanged`.
+- **Write.** The version is stamped with the importing caller, and the annotation's audit gets `ConfigurationChanged`. A write that keeps losing to concurrent ones fails only its file (`Conflict`). A committed write whose cache invalidation fails stops the job, as for templates; importing again finishes the invalidation.
 
 ### Outcomes, codes and warnings
 
