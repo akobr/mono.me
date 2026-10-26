@@ -275,20 +275,20 @@ public class MachineCreateCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 
-    // The STORYTELLER_* variables of a non-interactive sform sign-in as this machine. Secrets point at the
-    // value printed above instead of being printed twice.
+    // The STORYTELLER_* variables of a non-interactive sform sign-in as this machine, by their canonical names, which the
+    // configuration provider reads too. Secrets point at the value printed above instead of being printed twice.
     private void WritePipelineVariables(_42.Platform.Storyteller.Sdk.MachineAccess machine, string? certificatePath, string? tokenUrl)
     {
         var kind = machine.CredentialKind;
-        var federatedApiUrl = kind == MachineAccessCredentialKind.Federated ? GetFederatedApiUrl(machine) : null;
-        var apiUrl = federatedApiUrl ?? _general.BaseUrl;
-        var variables = new List<string> { $"{StorytellerVariables.API_URL}={apiUrl}" };
+        var federatedEndpoint = kind == MachineAccessCredentialKind.Federated ? GetFederatedEndpoint(machine) : null;
+        var endpoint = federatedEndpoint ?? _general.BaseUrl;
+        var variables = new List<string> { $"{StorytellerVariables.ENDPOINT}={endpoint}" };
 
         if (kind == MachineAccessCredentialKind.Federated)
         {
             variables.Add($"{TargetVariables.PROJECT}={Context.OrganizationName}.{Context.ProjectName}");
             variables.Add($"{StorytellerVariables.CLIENT_ID}={machine.Id}");
-            variables.Add($"{StorytellerVariables.SUBJECT_TOKEN_FILE}=<file with the platform token>");
+            variables.Add($"{StorytellerVariables.TOKEN_FILE}=<file with the platform token>");
         }
 
         if (kind == MachineAccessCredentialKind.ClientCredentials)
@@ -317,16 +317,16 @@ public class MachineCreateCommand : BaseContextCommand
         {
             if (machine.UsesSharedCertificate)
             {
-                variables.Add($"{StorytellerVariables.CERTIFICATE_FILE}=<shared certificate .pfx>");
-                variables.Add($"{StorytellerVariables.CERTIFICATE_PASSWORD}=<its password>");
+                variables.Add($"{StorytellerVariables.CLIENT_CERTIFICATE}=<shared certificate .pfx>");
+                variables.Add($"{StorytellerVariables.CLIENT_CERTIFICATE_PASSWORD}=<its password>");
             }
             else
             {
-                variables.Add($"{StorytellerVariables.CERTIFICATE_FILE}={certificatePath ?? "<certificate .pfx>"}");
+                variables.Add($"{StorytellerVariables.CLIENT_CERTIFICATE}={certificatePath ?? "<certificate .pfx>"}");
 
                 if (!string.IsNullOrEmpty(machine.CertificatePassword))
                 {
-                    variables.Add($"{StorytellerVariables.CERTIFICATE_PASSWORD}=<certificate password above>");
+                    variables.Add($"{StorytellerVariables.CLIENT_CERTIFICATE_PASSWORD}=<certificate password above>");
                 }
             }
         }
@@ -344,21 +344,21 @@ public class MachineCreateCommand : BaseContextCommand
             return;
         }
 
-        if (federatedApiUrl is null)
+        if (federatedEndpoint is null)
         {
             Console.WriteLine(
-                $"{StorytellerVariables.API_URL} could not be derived from the token endpoint; the rule's audience must then equal {apiUrl?.TrimEnd('/')}{GetTokenEndpointPath()}."
+                $"{StorytellerVariables.ENDPOINT} could not be derived from the token endpoint; the rule's audience must then equal {endpoint?.TrimEnd('/')}{GetTokenEndpointPath()}."
                     .ThemedLowlight(Console.Theme));
         }
 
-        Console.WriteLine($"In a GitHub Actions job with permissions: id-token: write, leave out {StorytellerVariables.SUBJECT_TOKEN_FILE}: sform asks the runner for a token for the token endpoint above.");
+        Console.WriteLine($"In a GitHub Actions job with permissions: id-token: write, leave out {StorytellerVariables.TOKEN_FILE}: sform asks the runner for a token for the token endpoint above.");
         Console.WriteLine(
             $"Optional: {StorytellerVariables.SUBJECT_TOKEN_TYPE}=jwt (access_token for Azure managed identity, id_token for Google Cloud) and {StorytellerVariables.TOKEN_SCOPE}=<a subset of the machine's scopes>.");
     }
 
     // The base of the server's token endpoint: the endpoint sform builds from it, and the audience it asks GitHub
     // for, then equal the endpoint byte for byte, also when the server's public URL is another host than general.baseUrl.
-    private string? GetFederatedApiUrl(_42.Platform.Storyteller.Sdk.MachineAccess machine)
+    private string? GetFederatedEndpoint(_42.Platform.Storyteller.Sdk.MachineAccess machine)
     {
         var path = GetTokenEndpointPath();
         var endpoint = machine.TokenEndpoint;

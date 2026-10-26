@@ -105,7 +105,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         var credential = GetCredential();
 
         // Only for the target a command bound: sform account ca and the user-only commands must not exchange, nor ask
-        // GitHub for a token, just because STORYTELLER_PROJECT is set.
+        // GitHub for a token, just because STORYTELLER_PROJECT or STORYTELLER_KEY is set.
         if (credential.Identity.Kind == MachineSignInKind.Federated && _target is null)
         {
             return null;
@@ -297,12 +297,15 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 $"The token in {StorytellerVariables.TOKEN_FILE} expired at {expiresAt:O}.");
     }
 
-    // A command binds its target; without one, STORYTELLER_PROJECT names the project to sign in to.
+    // A command binds its target; without one, STORYTELLER_PROJECT, and then the project of STORYTELLER_KEY, names the
+    // project to sign in to.
     private async Task<MachineIdentity> SignInFederatedAsync(LoadedCredential credential, CancellationToken cancellationToken)
     {
         var target = _target
             ?? (MachineSignInSettings.TrySplitProject(Settings.Project, out var organization, out var project) ? new ExchangeTarget(organization, project) : null)
-            ?? throw Invalid($"No project is set for the machine: set {TargetVariables.PROJECT}=<organization>.<project> or pass -p.");
+            ?? (Settings.Key is { } key ? new ExchangeTarget(key.OrganizationName, key.ProjectName) : null)
+            ?? throw Invalid(
+                $"No project is set for the machine: set {TargetVariables.PROJECT}=<organization>.<project>, set {StorytellerVariables.KEY} to a full key of the project, or pass -p.");
         var token = await GetTokenAsync(credential, target, null, cancellationToken);
 
         return credential.Identity with { Organization = target.Organization, Project = target.Project, TokenExpiresAt = JwtExpiry.Read(token) };

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Sdk.Credentials;
 
 namespace _42.Platform.Cli.Authentication;
@@ -47,6 +48,10 @@ public sealed class MachineSignInSettings
 
     public string? View { get; private init; }
 
+    // STORYTELLER_KEY, the full key of the annotation a provider of the job reads: a machine targets its project and view
+    // (CommandContext), a user ignores it. Null when unset or not a full key, which GetKind reports.
+    public FullKey? Key { get; private init; }
+
     // Any credential variable is set, valid or not: sform signs in as that machine and never as the stored user.
     // The GitHub Actions variables are not among them: a job with id-token: write may run sform as a user.
     public bool IsConfigured => CredentialVariables.Count > 0;
@@ -58,11 +63,16 @@ public sealed class MachineSignInSettings
     // the SDK reports a deprecated credential name next to its canonical one.
     public IReadOnlyList<string> DeprecatedVariables { get; }
 
+    private bool IsKeyInvalid { get; init; }
+
     public static MachineSignInSettings FromEnvironment(Func<string, string?> getVariable)
     {
         var target = new StorytellerVariableReader(getVariable);
         var project = target.Read(TargetVariables.PROJECT);
         var view = target.Read(TargetVariables.VIEW);
+        var keyText = target.Read(StorytellerVariables.KEY);
+        FullKey? key = null;
+        var isKeyInvalid = keyText is not null && !FullKey.TryParse(keyText, out key);
 
         var names = new StorytellerVariableReader(getVariable);
         var credentialVariables = StorytellerVariables.Credentials.Where(name => names.Read(name) is not null).ToList().AsReadOnly();
@@ -101,6 +111,8 @@ public sealed class MachineSignInSettings
         {
             Project = project,
             View = view,
+            Key = key,
+            IsKeyInvalid = isKeyInvalid,
         };
     }
 
@@ -121,8 +133,8 @@ public sealed class MachineSignInSettings
         return true;
     }
 
-    // The credential, the endpoint and STORYTELLER_PROJECT are checked; throws AuthenticationException (Configuration),
-    // a new one on every call.
+    // The credential, the endpoint, STORYTELLER_PROJECT and STORYTELLER_KEY are checked; throws AuthenticationException
+    // (Configuration), a new one on every call.
     public MachineSignInKind GetKind()
     {
         var kind = GetCredential().Kind switch
@@ -141,6 +153,11 @@ public sealed class MachineSignInSettings
         if (Project is not null && !TrySplitProject(Project, out _, out _))
         {
             throw Invalid($"{TargetVariables.PROJECT} must be <organization>.<project>.");
+        }
+
+        if (IsKeyInvalid)
+        {
+            throw Invalid($"{StorytellerVariables.KEY} must be a full key, @{{organization}}.{{project}}.{{view}}.{{annotation key}}.");
         }
 
         return kind;

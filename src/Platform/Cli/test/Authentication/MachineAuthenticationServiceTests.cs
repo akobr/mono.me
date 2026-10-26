@@ -683,6 +683,46 @@ public class MachineAuthenticationServiceTests
         _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
     }
 
+    [Theory]
+    [InlineData(null, "acme.billing")]
+    [InlineData("acme.billing", "acme.web")]
+    public async Task Federated_SignIn_WithoutABoundTarget_UsesStorytellerProjectAndThenStorytellerKey(string? environmentProject, string keyProject)
+    {
+        if (environmentProject is not null)
+        {
+            _environment[TargetVariables.PROJECT] = environmentProject;
+        }
+
+        _environment[StorytellerVariables.KEY] = $"@{keyProject}.staging.sbt.contoso";
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer(TestTokens.AccessToken(Start.AddMinutes(15))));
+        var service = CreateService();
+
+        var identity = await service.SignInAsync();
+
+        (identity.Organization, identity.Project).ShouldBe(("acme", "billing"));
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
+    }
+
+    // A machine reads STORYTELLER_KEY as the provider does: a key that is not a full key fails every call, before any request.
+    [Fact]
+    public async Task AnInvalidStorytellerKey_FailsEveryCallWithAConfigurationError()
+    {
+        _environment[StorytellerVariables.KEY] = "@acme.billing";
+        UseFederatedFile();
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var first = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+        var second = await Should.ThrowAsync<AuthenticationException>(() => service.SignInAsync());
+
+        first.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        first.Message.ShouldBe("STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}.");
+        second.Message.ShouldBe(first.Message);
+        service.TryGetIdentity().ShouldBeNull();
+        _http.Requests.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Federated_SignIn_WithoutAnyProject_IsAConfigurationError()
     {
@@ -691,7 +731,7 @@ public class MachineAuthenticationServiceTests
         var exception = await Should.ThrowAsync<AuthenticationException>(() => CreateService().SignInAsync());
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
-        exception.Message.ShouldBe("No project is set for the machine: set STORYTELLER_PROJECT=<organization>.<project> or pass -p.");
+        exception.Message.ShouldBe("No project is set for the machine: set STORYTELLER_PROJECT=<organization>.<project>, set STORYTELLER_KEY to a full key of the project, or pass -p.");
         _http.Requests.ShouldBeEmpty();
     }
 

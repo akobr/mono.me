@@ -64,7 +64,7 @@ The generated `GetConfigurationAsync`, `GetResolvedConfigurationAsync` and `GetC
 * `ClientCertificate` is added to the `HttpClientHandler` of every client for mutual TLS. It needs a private key, and it must be set before the first client is resolved, because the handler is built then.
 * `ClientCertificateHeaderName` is for development only. When it is set together with `ClientCertificate`, every request also carries the certificate (base64 DER) in that header, for a host without TLS. `sform` sets `X-ARR-ClientCert` for an `http` API on `localhost`, which the local Functions host accepts with `MachineAuth:IsCertificateHeaderFromClientAllowed`.
 
-`AddStorytellerSdk(configurationFactory, configureHttpClient)` calls `configureHttpClient` with the `IHttpClientBuilder` of each of the seven typed clients, after their primary handler (the one that carries `ClientCertificate`) is set, for example to add a `DelegatingHandler`. `sform` adds one that sends a request once more after a `401`, with the token of a new exchange for a federated machine:
+`AddStorytellerSdk(configurationFactory, configureHttpClient)` calls `configureHttpClient` with the `IHttpClientBuilder` of each of the seven typed clients, after their primary handler (the one that carries `ClientCertificate`) is set, for example to add a `DelegatingHandler`. `sform` adds one that sends a request once more after a `401`, with a new token of a machine whose credential can renew it (client credentials or federation):
 
 ```csharp
 services.AddStorytellerSdk(null, builder => builder.AddHttpMessageHandler(

@@ -173,11 +173,11 @@ public class MachineCreateFederatedTests
             "! The machine has no secret: its workload signs in with a token of its platform that matches a rule.",
             string.Empty,
             "To sign in sform in a pipeline, set:",
-            "  STORYTELLER_API_URL=https://api.example.com/api",
+            "  STORYTELLER_ENDPOINT=https://api.example.com/api",
             "  STORYTELLER_PROJECT=org1.proj1",
             $"  STORYTELLER_CLIENT_ID={MachineId}",
-            "  STORYTELLER_SUBJECT_TOKEN_FILE=<file with the platform token>",
-            "In a GitHub Actions job with permissions: id-token: write, leave out STORYTELLER_SUBJECT_TOKEN_FILE: sform asks the runner for a token for the token endpoint above.",
+            "  STORYTELLER_TOKEN_FILE=<file with the platform token>",
+            "In a GitHub Actions job with permissions: id-token: write, leave out STORYTELLER_TOKEN_FILE: sform asks the runner for a token for the token endpoint above.",
             "Optional: STORYTELLER_SUBJECT_TOKEN_TYPE=jwt (access_token for Azure managed identity, id_token for Google Cloud) and STORYTELLER_TOKEN_SCOPE=<a subset of the machine's scopes>.",
         ]);
         _console.Lines.ShouldNotContain(line => line.Contains(StorytellerVariables.CLIENT_SECRET) || line.Contains(StorytellerVariables.API_KEY));
@@ -196,10 +196,10 @@ public class MachineCreateFederatedTests
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
         var lines = PipelineLines();
-        lines.ShouldContain("  STORYTELLER_API_URL=https://api.example.test/api");
+        lines.ShouldContain("  STORYTELLER_ENDPOINT=https://api.example.test/api");
         lines.ShouldContain(
-            "STORYTELLER_API_URL could not be derived from the token endpoint; the rule's audience must then equal https://api.example.test/api/v1/org1/proj1/access/token.");
-        lines.IndexOf("  STORYTELLER_SUBJECT_TOKEN_FILE=<file with the platform token>").ShouldBeLessThan(lines.FindIndex(line => line.Contains("could not be derived")));
+            "STORYTELLER_ENDPOINT could not be derived from the token endpoint; the rule's audience must then equal https://api.example.test/api/v1/org1/proj1/access/token.");
+        lines.IndexOf("  STORYTELLER_TOKEN_FILE=<file with the platform token>").ShouldBeLessThan(lines.FindIndex(line => line.Contains("could not be derived")));
     }
 
     [Fact]

@@ -20,27 +20,31 @@ Every other command uses the stored session and refreshes it silently. `sform ac
 
 In a CI/CD pipeline or a GitHub Action nobody can type a code, so `sform` signs in as a machine instead. Create the machine once, then give the job the variables that `sform account machine create` prints. With any of them set, `sform` never asks anyone to sign in, and it stores no credential or token.
 
+`sform` reads the same `STORYTELLER_*` variables as the .NET configuration provider and the C# SDK, so one set of variables serves a job that runs `sform` and an application that reads its configuration.
+
 | Machine | Variables |
 |---|---|
 | API key | `STORYTELLER_API_KEY` |
-| Certificate | `STORYTELLER_CERTIFICATE_FILE`, `STORYTELLER_CERTIFICATE_PASSWORD` |
+| Certificate | `STORYTELLER_CLIENT_CERTIFICATE`, `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD` |
 | Certificate and API key | all three of the above |
 | Client credentials | `STORYTELLER_CLIENT_ID`, `STORYTELLER_CLIENT_SECRET`, `STORYTELLER_TOKEN_URL`, `STORYTELLER_TOKEN_SCOPE` |
-| Federated | `STORYTELLER_CLIENT_ID`, the machine id, and `STORYTELLER_SUBJECT_TOKEN_FILE`, a file with a token of your platform; in a GitHub Actions job with `permissions: id-token: write`, the machine id alone |
-| Any bearer token | `STORYTELLER_TOKEN_FILE`, a file the token is read from before every request |
+| Federated | `STORYTELLER_CLIENT_ID`, the machine id, and `STORYTELLER_TOKEN_FILE`, a file with a token of your platform; in a GitHub Actions job with `permissions: id-token: write`, the machine id alone |
+| Any bearer token | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID`, a file the token is read from before every request |
 
-Every machine also needs `STORYTELLER_API_URL`, the address of the API. An API key or a certificate already names its project. For the other kinds, set `STORYTELLER_PROJECT=<organization>.<project>` or pass `-p` to each command.
+Every machine also needs `STORYTELLER_ENDPOINT`, the address of the API, `/api` included. An API key or a certificate already names its project. For the other kinds, set `STORYTELLER_PROJECT=<organization>.<project>`, set `STORYTELLER_KEY` to a full key of the project, or pass `-p` to each command. `STORYTELLER_KEY` is the key the configuration provider reads, `@<organization>.<project>.<view>.<annotation key>`: `sform` works on its project, in its view, unless `-p` or `STORYTELLER_PROJECT` names another project.
 
-A federated machine has no secret. `sform` exchanges the platform token for a short-lived Storyteller token at the token endpoint of the project, `<STORYTELLER_API_URL>/v1/<organization>/<project>/access/token`, and exchanges again before that token expires. In GitHub Actions it asks the runner for the platform token itself, for the audience of that address, so the audience of the machine's GitHub rule must be exactly that address, in the same case: use the `TokenEndpoint` and the variables that `sform account machine create` prints. A token from `STORYTELLER_SUBJECT_TOKEN_FILE` is sent as it is, so its audience is whatever your platform put in it, and the rule's audience must match that instead. The `TokenEndpoint` is a good choice where you pick the audience yourself, as in the Kubernetes example below.
+The older names still work, but are deprecated, and `sform account` names them: `STORYTELLER_API_URL` (now `STORYTELLER_ENDPOINT`), `STORYTELLER_CERTIFICATE_FILE` and `STORYTELLER_CERTIFICATE_PASSWORD` (now `STORYTELLER_CLIENT_CERTIFICATE` and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD`), and `STORYTELLER_SUBJECT_TOKEN_FILE` (now `STORYTELLER_TOKEN_FILE` with `STORYTELLER_CLIENT_ID`). A new and an old name with different values stop the job.
 
-`STORYTELLER_TOKEN_FILE` and `STORYTELLER_SUBJECT_TOKEN_FILE` differ: the first holds a token the API accepts and is sent as it is, the second holds a token of your platform, which `sform` exchanges.
+A federated machine has no secret. `sform` exchanges the platform token for a short-lived Storyteller token at the token endpoint of the project, `<STORYTELLER_ENDPOINT>/v1/<organization>/<project>/access/token`, and exchanges again before that token expires. In GitHub Actions it asks the runner for the platform token itself, for the audience of that address, so the audience of the machine's GitHub rule must be exactly that address, in the same case: use the `TokenEndpoint` and the variables that `sform account machine create` prints. A token from a file is sent as it is, so its audience is whatever your platform put in it, and the rule's audience must match that instead. The `TokenEndpoint` is a good choice where you pick the audience yourself, as in the Kubernetes example below.
+
+`STORYTELLER_CLIENT_ID` decides what `STORYTELLER_TOKEN_FILE` holds: without it, a token the API accepts, sent as it is; with it, a token of your platform, which `sform` exchanges.
 
 ``` yaml
 # GitHub Actions
 - run: dotnet tool install 42.Platform.Cli --global --prerelease
 - run: sform story config set sbt.northwind -i configuration/northwind.json
   env:
-    STORYTELLER_API_URL: https://storyteller.example.com/api
+    STORYTELLER_ENDPOINT: https://storyteller.example.com/api
     STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
 ```
 
@@ -51,8 +55,8 @@ permissions:
   id-token: write
   contents: read
 env:
-  STORYTELLER_API_URL: https://storyteller.example.com/api
-  STORYTELLER_PROJECT: acme.billing
+  STORYTELLER_ENDPOINT: https://storyteller.example.com/api
+  STORYTELLER_KEY: "@acme.billing.production.sbt.northwind"   # the project and view of sform, the key of the provider
   STORYTELLER_CLIENT_ID: 3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07
 steps:
   - uses: actions/checkout@v4
@@ -65,10 +69,10 @@ steps:
 containers:
   - name: sync
     env:
-      - { name: STORYTELLER_API_URL, value: https://storyteller.example.com/api }
+      - { name: STORYTELLER_ENDPOINT, value: https://storyteller.example.com/api }
       - { name: STORYTELLER_PROJECT, value: acme.billing }
       - { name: STORYTELLER_CLIENT_ID, value: 3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07 }
-      - { name: STORYTELLER_SUBJECT_TOKEN_FILE, value: /var/run/secrets/storyteller/token }
+      - { name: STORYTELLER_TOKEN_FILE, value: /var/run/secrets/storyteller/token }
     volumeMounts:
       - { name: storyteller-token, mountPath: /var/run/secrets/storyteller, readOnly: true }
 volumes:
@@ -80,7 +84,7 @@ volumes:
             audience: https://storyteller.example.com/api/v1/acme/billing/access/token
 ```
 
-`sform account` checks the variables without calling the account API, which is a good first step of a job. For client credentials and a federated machine it also gets a token; a federated machine needs `STORYTELLER_PROJECT` for that, as `sform account` has no `-p`. A wrong setting or a missing platform token file stops the job with exit code `2`, a token endpoint or GitHub request that fails with `3`, rejected credentials or a refused exchange with `44`.
+`sform account` checks the variables without calling the account API, which is a good first step of a job. For client credentials and a federated machine it also gets a token; a federated machine needs `STORYTELLER_PROJECT` or `STORYTELLER_KEY` for that, as `sform account` has no `-p`. A wrong setting or a missing token file stops the job with exit code `2`. A token endpoint or GitHub request that fails, after up to three retries, or gets no answer within 100 seconds stops it with `3`. Rejected credentials, a refused exchange, or a token request that is refused or redirected stop it with `44`.
 
 A machine can do what its scopes allow, and it gets them when it is created. **Runtime scopes** read and write single documents. **Management scopes** add bulk and structural work, on top of the runtime scope of the operation. `sform account machine create` picks them:
 
@@ -99,7 +103,7 @@ A machine can do what its scopes allow, and it gets them when it is created. **R
 | `annotation-write` | `Annotation.Write` | `AnnotationWrite` | Runtime | `sform story set` |
 | `configuration-read` | `Configuration.Read` | `ConfigurationRead` | Runtime | the reads of `sform story config`, `schema`, `template` and `kv` |
 | `configuration-write` | `Configuration.Write` | `ConfigurationWrite` | Runtime | the writes of `sform story config` and `kv`; with `schema-write` or `template-write`, those of `schema` and `template` |
-| `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config get --resolved`, `sform story kv export --include-secrets` |
+| `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config <key> --resolved`, `sform story kv export --include-secrets` |
 | `secrets-write` | `Secrets.Write` | `SecretsWrite` | Runtime | `sform story kv set` of a secret, and `sform story kv protect` |
 | `configuration-transfer` | `Configuration.Transfer` | `ConfigurationTransfer` | Management | `sform story export` and `import`, `sform story kv export` and `import`; an import of a view also needs `schema-write`, `template-write` and `annotation-manage` for those kinds |
 | `schema-write` | `Schema.Write` | `SchemaWrite` | Management | the writes and deletes of `sform story schema`, and `sform story import` of schemas |

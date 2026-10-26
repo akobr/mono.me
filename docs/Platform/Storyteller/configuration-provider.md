@@ -101,9 +101,9 @@ The `configure` callback runs first. Every option it left `null` is then read fr
 
 ### Credentials
 
-`StorytellerCredential.FromEnvironment()` reads the names of the shared integration contract. It also accepts the names that `sform account machine create` prints, as fallbacks, so one set of variables drives `sform` and the provider.
+`StorytellerCredential.FromEnvironment()` reads the names of the shared integration contract. `sform` reads its machine credential with the same contract of the SDK and prints these names in `sform account machine create`, so one set of variables drives `sform` and the provider. The older `sform` names are deprecated, but still read when the canonical name is unset.
 
-| Variable | `sform` fallback | Meaning |
+| Variable | Deprecated | Meaning |
 | --- | --- | --- |
 | `STORYTELLER_ENDPOINT` | `STORYTELLER_API_URL` | The API base URL, `/api` included |
 | `STORYTELLER_API_KEY` | – | The structured `2s.` API key, sent as `Authorization: ApiKey`. A leading `ApiKey ` is removed. |
@@ -125,10 +125,10 @@ The `configure` callback runs first. Every option it left `null` is then read fr
 | Federation | `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_FILE`, without a client-credentials variable, or `STORYTELLER_CLIENT_ID` in a GitHub Actions job; optionally `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE` |
 | Token file | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID` |
 
-- **Fallbacks.** A name and its fallback set to different values are an error that names both. The same value in both is accepted.
+- **Deprecated names.** A name and its deprecated name set to different values are an error that names both. The same value in both is accepted.
 - **One kind.** Variables of two kinds at once are an error that names them. So is `STORYTELLER_CLIENT_ID` alone (or with `STORYTELLER_TOKEN_SCOPE`), unless it federates through GitHub Actions; the message names both ways, a client secret, or a token file or a GitHub Actions job.
 - **GitHub Actions.** In a job with `permissions: id-token: write`, `STORYTELLER_CLIENT_ID` without a token file federates with the job's ID token when the id is a GUID, as every federated machine id is, or, for any id, together with `STORYTELLER_SUBJECT_TOKEN_TYPE`. The credential asks the runner for a new ID token before every exchange, for the audience of the token endpoint of the project of `Key`, built from `Endpoint` as written. The GitHub variables alone mean anonymous requests. A runner that is unreachable or answers `408`, `429` or `5xx` is a transient failure, so the cache entry or `Optional` applies; a runner that refuses (a redirect, another `4xx`, or no token) is definitive, like a refused exchange. See the [SDK readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md#github-actions).
-- **Not read:** `STORYTELLER_PROJECT` and `STORYTELLER_VIEW`, which `STORYTELLER_KEY` replaces.
+- **Not read:** `STORYTELLER_PROJECT` and `STORYTELLER_VIEW`, which `STORYTELLER_KEY` replaces. `sform` reads all three: a machine targets the project and view of `STORYTELLER_KEY` when `-p` and `STORYTELLER_PROJECT` are not set, so a job that sets the key once runs `sform` in the project its configuration belongs to (see [Machine sign-in for pipelines](authentication.md#machine-sign-in-for-pipelines)).
 - **Code wins.** A `Credential` set in code replaces the credential variables; they are not read.
 - **Binding.** The credential, from the environment or from code, is bound to the validated `Endpoint`, the organization and project of `Key`, `ConfigurePrimaryHandler`, `TimeProvider` and `Resilience`. A value set in the credential's own options wins; the binding fills what they leave unset. A key set in code therefore also decides the project at whose token endpoint a federated machine exchanges its token, unless the credential's own options name the organization and project.
 

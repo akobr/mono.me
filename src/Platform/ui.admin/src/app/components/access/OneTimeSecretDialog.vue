@@ -70,7 +70,7 @@ const snippets = computed(() => {
     result.push({ label: 'curl', code: `curl -H "Authorization: Bearer <access_token>" ${base}/v1/...` })
   } else if (secret.apiKey) {
     result.push({ label: 'curl', code: `curl -H "Authorization: ApiKey ${secret.apiKey}" ${base}/v1/...` })
-    result.push({ label: '.env', code: `STORYTELLER_API_URL=${base}\nSTORYTELLER_API_KEY=${secret.apiKey}` })
+    result.push({ label: '.env', code: `STORYTELLER_ENDPOINT=${base}\nSTORYTELLER_API_KEY=${secret.apiKey}` })
   }
   return result
 })

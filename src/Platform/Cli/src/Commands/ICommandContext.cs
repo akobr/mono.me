@@ -8,7 +8,7 @@ public interface ICommandContext
 
     string ViewName { get; }
 
-    // False only for a machine sign-in without a project from -p, STORYTELLER_PROJECT or its credential.
+    // False only for a machine sign-in without a project from -p, STORYTELLER_PROJECT, STORYTELLER_KEY or its credential.
     bool IsProjectKnown { get; }
 
     void TrySetExplicitTarget(string? projectKey, string? viewName);
