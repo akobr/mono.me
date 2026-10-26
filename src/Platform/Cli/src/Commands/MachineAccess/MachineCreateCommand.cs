@@ -275,8 +275,9 @@ public class MachineCreateCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 
-    // The STORYTELLER_* variables of a non-interactive sform sign-in as this machine, by their canonical names, which the
-    // configuration provider reads too. Secrets point at the value printed above instead of being printed twice.
+    // The STORYTELLER_* variables of a non-interactive sform sign-in as this machine, by their canonical names. The
+    // configuration provider reads the same endpoint and credential variables, but not STORYTELLER_PROJECT. Secrets point at
+    // the value printed above instead of being printed twice.
     private void WritePipelineVariables(_42.Platform.Storyteller.Sdk.MachineAccess machine, string? certificatePath, string? tokenUrl)
     {
         var kind = machine.CredentialKind;

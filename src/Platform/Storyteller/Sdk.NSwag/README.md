@@ -95,7 +95,7 @@ A `DelegatingHandler` wraps the primary handler, which follows redirects: a hand
 
 #### Variables
 
-`FromEnvironment` reads the names of the shared integration contract. The older `sform` names are deprecated, but still read when the canonical name is unset; a canonical name and its deprecated name set to different values are an error that names both. Values are trimmed; an empty value is unset. Messages name the variables as they were set, never a value.
+`FromEnvironment` reads the names of the shared integration contract. The older `sform` names are deprecated, but still read when the canonical name is unset; a canonical name and its deprecated name set to different values are an error that names both. Values are trimmed; an empty value is unset. Messages name the variables as they were set, and never print a secret: they print file paths, and URLs without user info, query or fragment.
 
 | Canonical | Deprecated | Meaning |
 |---|---|---|
