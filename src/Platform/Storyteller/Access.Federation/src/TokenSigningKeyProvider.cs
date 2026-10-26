@@ -85,6 +85,66 @@ public class TokenSigningKeyProvider
             return null;
         }
 
+        var key = await GetLoadedKeyAsync(kid, cancellationToken);
+        return key?.Kid == kid ? key.PublicKey : null;
+    }
+
+    // The public keys Storyteller tokens are validated with, for the JWKS: today the one stored key, or none. Like
+    // validation it never creates a key and reads the store at most once per reload interval, so the anonymous JWKS
+    // costs no more than a token with a forged kid. BearerKeyRetrievalException when the store cannot be read and no
+    // key is loaded.
+    public async Task<IReadOnlyList<StorytellerJsonWebKey>> GetPublicJsonWebKeysAsync(CancellationToken cancellationToken = default)
+    {
+        var key = await GetLoadedKeyAsync(kid: null, cancellationToken);
+        return key is null ? [] : [key.JsonWebKey];
+    }
+
+    // RFC 7638: the SHA-256 thumbprint of the public key, base64url encoded.
+    internal static string ComputeKid(RSA rsa)
+    {
+        var publicKey = new RsaSecurityKey(rsa.ExportParameters(includePrivateParameters: false));
+        return Base64UrlEncoder.Encode(publicKey.ComputeJwkThumbprint());
+    }
+
+    private static LoadedSigningKey? Load(TokenSigningKey stored)
+    {
+        if (!string.Equals(stored.Algorithm, Algorithm, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var rsa = RSA.Create();
+
+        try
+        {
+            rsa.ImportPkcs8PrivateKey(stored.PrivateKeyPkcs8, out _);
+        }
+        catch (CryptographicException)
+        {
+            // A corrupt key is unusable, like one of another algorithm.
+            rsa.Dispose();
+            return null;
+        }
+
+        var publicParameters = rsa.ExportParameters(includePrivateParameters: false);
+
+        return new LoadedSigningKey(
+            stored.Kid,
+            new RsaSecurityKey(rsa) { KeyId = stored.Kid },
+            new RsaSecurityKey(publicParameters) { KeyId = stored.Kid },
+            new StorytellerJsonWebKey(
+                stored.Kid,
+                JsonWebAlgorithmsKeyTypes.RSA,
+                Base64UrlEncoder.Encode(publicParameters.Modulus),
+                Base64UrlEncoder.Encode(publicParameters.Exponent),
+                Algorithm,
+                JsonWebKeyUseNames.Sig));
+    }
+
+    // The loaded key, reading the store only when the reload gate lets it. kid: the key a token names, which a loaded
+    // key of another kid does not answer once it may be stale; null: whatever key is loaded (the JWKS).
+    private async Task<LoadedSigningKey?> GetLoadedKeyAsync(string? kid, CancellationToken cancellationToken)
+    {
         if (TryAnswerFromLoaded(kid, out var loadedKey))
         {
             return loadedKey;
@@ -126,14 +186,14 @@ public class TokenSigningKeyProvider
                 // Keep answering from the loaded key; read again after the reload interval.
                 _validation = current with { CheckedAt = now };
                 _logger.LogWarning(exception, "The signing key of Storyteller tokens could not be reloaded; the loaded one stays in use");
-                return current.Key?.Kid == kid ? current.Key.PublicKey : null;
+                return current.Key;
             }
 
             var key = stored is null
                 ? null
                 : current?.Key is { } same && same.Kid == stored.Kid ? same : Load(stored);
             _validation = new ValidationState(key, now, now);
-            return key?.Kid == kid ? key.PublicKey : null;
+            return key;
         }
         finally
         {
@@ -141,41 +201,8 @@ public class TokenSigningKeyProvider
         }
     }
 
-    // RFC 7638: the SHA-256 thumbprint of the public key, base64url encoded.
-    internal static string ComputeKid(RSA rsa)
-    {
-        var publicKey = new RsaSecurityKey(rsa.ExportParameters(includePrivateParameters: false));
-        return Base64UrlEncoder.Encode(publicKey.ComputeJwkThumbprint());
-    }
-
-    private static LoadedSigningKey? Load(TokenSigningKey stored)
-    {
-        if (!string.Equals(stored.Algorithm, Algorithm, StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        var rsa = RSA.Create();
-
-        try
-        {
-            rsa.ImportPkcs8PrivateKey(stored.PrivateKeyPkcs8, out _);
-        }
-        catch (CryptographicException)
-        {
-            // A corrupt key is unusable, like one of another algorithm.
-            rsa.Dispose();
-            return null;
-        }
-
-        return new LoadedSigningKey(
-            stored.Kid,
-            new RsaSecurityKey(rsa) { KeyId = stored.Kid },
-            new RsaSecurityKey(rsa.ExportParameters(includePrivateParameters: false)) { KeyId = stored.Kid });
-    }
-
     // Answers without I/O: the loaded key while fresh, and between reloads whatever was loaded last.
-    private bool TryAnswerFromLoaded(string kid, out SecurityKey? key)
+    private bool TryAnswerFromLoaded(string? kid, out LoadedSigningKey? key)
     {
         key = null;
         var state = _validation;
@@ -188,15 +215,15 @@ public class TokenSigningKeyProvider
         var now = _timeProvider.GetUtcNow();
 
         // Re-read now and then, so deleting the stored key (the emergency rotation) reaches instances that loaded it.
-        if (state.Key is { } loaded && loaded.Kid == kid && now - state.LoadedAt < IssuingCacheDuration)
+        if (state.Key is { } loaded && (kid is null || loaded.Kid == kid) && now - state.LoadedAt < IssuingCacheDuration)
         {
-            key = loaded.PublicKey;
+            key = loaded;
             return true;
         }
 
         if (now - state.CheckedAt < ValidationReloadInterval)
         {
-            key = state.Key?.Kid == kid ? state.Key.PublicKey : null;
+            key = state.Key;
             return true;
         }
 
@@ -256,7 +283,7 @@ public class TokenSigningKeyProvider
             ?? throw new TokenSigningKeyUnavailableException("The signing key of Storyteller tokens was created concurrently but cannot be read.");
     }
 
-    private sealed record LoadedSigningKey(string Kid, RsaSecurityKey PrivateKey, RsaSecurityKey PublicKey);
+    private sealed record LoadedSigningKey(string Kid, RsaSecurityKey PrivateKey, RsaSecurityKey PublicKey, StorytellerJsonWebKey JsonWebKey);
 
     // Key: the key to sign with, or null when the store has no usable one (UnavailableReason says why).
     private sealed record IssuingState(LoadedSigningKey? Key, string? UnavailableReason);

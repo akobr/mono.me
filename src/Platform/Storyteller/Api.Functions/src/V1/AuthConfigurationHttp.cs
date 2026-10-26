@@ -17,13 +17,13 @@ public class AuthConfigurationHttp
 {
     private readonly AuthConfiguration _configuration;
 
-    public AuthConfigurationHttp(IOptions<UserAuthenticationOptions> options)
+    public AuthConfigurationHttp(IOptions<UserAuthenticationOptions> options, IOptions<TokenExchangeOptions>? tokenExchangeOptions = null)
     {
-        _configuration = Describe(options.Value);
+        _configuration = Describe(options.Value, tokenExchangeOptions?.Value);
     }
 
     [Function(nameof(GetAuthConfiguration))]
-    [OpenApiOperation(Definitions.RouteIds.Access.GetAuthConfiguration, Definitions.Tags.Access, Description = "Anonymous. Tells clients which identity provider signs users in and with which public settings.")]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetAuthConfiguration, Definitions.Tags.Access, Description = "Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AuthConfiguration), Description = "The user identity provider of this deployment.")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public IActionResult GetAuthConfiguration(
@@ -33,9 +33,11 @@ public class AuthConfigurationHttp
         return new OkObjectResult(_configuration);
     }
 
-    // Only public identifiers. The WorkOS management key and other secrets stay out.
-    internal static AuthConfiguration Describe(UserAuthenticationOptions options)
+    // Only public identifiers. The WorkOS management key and other secrets stay out, and so do the actors of the exchange.
+    internal static AuthConfiguration Describe(UserAuthenticationOptions options, TokenExchangeOptions? tokenExchangeOptions = null)
     {
+        var tokenExchange = new TokenExchangeConfiguration { Enabled = tokenExchangeOptions?.Enabled == true };
+
         if (options.Provider == IdentityProviderKind.AuthKit)
         {
             var authKitDomain = options.AuthKit.AuthKitDomain.TrimEnd('/');
@@ -45,6 +47,7 @@ public class AuthConfigurationHttp
                 Provider = nameof(IdentityProviderKind.AuthKit),
                 ClientId = options.AuthKit.ClientId,
                 AuthKitDomain = string.IsNullOrWhiteSpace(authKitDomain) ? null : authKitDomain,
+                TokenExchange = tokenExchange,
             };
         }
 
@@ -56,6 +59,7 @@ public class AuthConfigurationHttp
                 Provider = nameof(IdentityProviderKind.Keycloak),
                 ClientId = options.Keycloak.ClientId?.Trim() ?? string.Empty,
                 Issuer = options.Keycloak.GetIssuer(),
+                TokenExchange = tokenExchange,
             };
         }
 
@@ -71,6 +75,7 @@ public class AuthConfigurationHttp
             [
                 $"api://{clientId}/{Scopes.User.Impersonation}",
             ],
+            TokenExchange = tokenExchange,
         };
     }
 }

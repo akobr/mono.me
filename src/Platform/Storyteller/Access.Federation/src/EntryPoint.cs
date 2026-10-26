@@ -49,4 +49,29 @@ public static class EntryPoint
         services.AddSingleton<IMachineTokenValidator, StorytellerTokenValidator>();
         return services;
     }
+
+    // The user token exchange (Auth:TokenExchange) behind POST v1/access/token: actors, their proofs and Storyteller user
+    // tokens. Call it after AddFederatedMachineAccess, whose issuer, signing keys and key resolver it shares, and next to
+    // the user registration of the deployment's provider, which registers IUserSubjectTokenValidator. Idempotent.
+    public static IServiceCollection AddUserTokenExchange(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(UserTokenExchangeService)))
+        {
+            return services;
+        }
+
+        // Registering the federation here could put its in-memory stores before the Cosmos DB ones.
+        if (!services.Any(descriptor => descriptor.ServiceType == typeof(FederatedMachineAccessService)))
+        {
+            throw new InvalidOperationException($"Call {nameof(AddFederatedMachineAccess)} before {nameof(AddUserTokenExchange)}.");
+        }
+
+        services.AddUserAuthenticationOptions(configuration);
+        services.AddSingleton<ActorAuthenticator>();
+        services.AddSingleton<UserTokenExchangeService>();
+        services.AddSingleton<IUserTokenExchange>(provider => provider.GetRequiredService<UserTokenExchangeService>());
+        return services;
+    }
 }

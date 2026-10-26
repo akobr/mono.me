@@ -297,6 +297,41 @@ public class FederationValidationTests
             .ShouldBe("Required claims: the claim owner needs 1 to 10 accepted values.");
     }
 
+    // Storyteller's own tokens are never exchanged for machine tokens, whatever the key source.
+    [Theory]
+    [InlineData("urn:storyteller:test")]
+    [InlineData("urn:storyteller:test/")]
+    [InlineData("URN:storyteller:TEST")]
+    public void ValidateIssuer_RefusesStorytellerItself(string issuer)
+    {
+        var options = new FederationOptions { Issuer = "urn:storyteller:test" };
+
+        FederationValidation.ValidateIssuer(JwksIssuer(issuer), options)
+            .ShouldBe($"The issuer {issuer} is Storyteller itself; its tokens cannot be exchanged for machine tokens.");
+        FederationValidation.ValidateIssuer(JwksUriIssuer(issuer), options).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void ValidateIssuer_AcceptsAnotherIssuerNextToStoryteller()
+    {
+        var options = new FederationOptions { Issuer = "urn:storyteller:test" };
+
+        FederationValidation.ValidateIssuer(JwksIssuer("urn:storyteller:other"), options).ShouldBeNull();
+        FederationValidation.ValidateIssuer(JwksIssuer("urn:storyteller:test:api"), options).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("https://storyteller.example.com", "https://storyteller.example.com/", true)]
+    [InlineData("https://storyteller.example.com/", "https://storyteller.example.com", true)]
+    [InlineData("https://storyteller.example.com//", "https://storyteller.example.com", false)]
+    [InlineData("https://storyteller.example.com", "", false)]
+    [InlineData(null, "https://storyteller.example.com", false)]
+    [InlineData("", "https://storyteller.example.com", false)]
+    public void IsOwnIssuer_ComparesIgnoringCaseAndOneTrailingSlash(string? issuer, string ownIssuer, bool expected)
+    {
+        FederationValidation.IsOwnIssuer(issuer, new FederationOptions { Issuer = ownIssuer }).ShouldBe(expected);
+    }
+
     [Fact]
     public void ValidateIssuer_AcceptsADescriptionOf256CharactersButNot257()
     {

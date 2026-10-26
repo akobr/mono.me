@@ -4,8 +4,6 @@ using System.Security.Cryptography;
 
 using _42.Platform.Storyteller.Accessing;
 
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -756,16 +754,5 @@ public class EntraIdBearerTokenValidatorTests
             RefreshRequests++;
             _refreshed = true;
         }
-    }
-
-    private sealed class TestHostEnvironment : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = Environments.Production;
-
-        public string ApplicationName { get; set; } = "tests";
-
-        public string ContentRootPath { get; set; } = ".";
-
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }
