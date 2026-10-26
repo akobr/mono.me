@@ -23,6 +23,9 @@ public record class ConfigurationEntity : ExtendableEntity
 
     public string? CalculatedContentHash { get; init; }
 
+    // The token of the write whose cache invalidation hasn't finished yet; removed when it has.
+    public string? PendingInvalidationId { get; init; }
+
     // Set while the annotation is soft-deleted: the configuration is hidden and expires with the annotation.
     public string? AnnotationDeletionId { get; init; }
 

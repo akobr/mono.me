@@ -23,7 +23,13 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 public class Startup : IAsyncLifetime, ITestContext
 {
-    private const bool UseContainer = false;
+    // STORYTELLER_TESTS_USE_CONTAINER=true runs against a Testcontainers emulator instead of the local one, whose
+    // databases the cleanup deletes
+    private static readonly bool UseContainer =
+        string.Equals(
+            Environment.GetEnvironmentVariable("STORYTELLER_TESTS_USE_CONTAINER"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
 
     public IConfiguration Configuration { get; private set; }
 
@@ -96,9 +102,10 @@ public class Startup : IAsyncLifetime, ITestContext
 
     private void Configure(IConfigurationBuilder builder)
     {
+        // the emulator image serves HTTPS, the connection string of Testcontainers names HTTP
         var connectionString = UseContainer
-            ? DbContainer.GetConnectionString()
-            : "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
+            ? DbContainer.GetConnectionString().Replace("http://", "https://", StringComparison.Ordinal)
+            :"AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
 
         builder.Add(new MemoryConfigurationSource
         {

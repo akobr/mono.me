@@ -47,6 +47,17 @@ internal sealed record DocumentArchiveRow
     public string? AnnotationDeletionId { get; init; }
 }
 
+// A configuration version archived by a clear whose cache invalidation hasn't finished yet.
+internal sealed record PendingInvalidationRow
+{
+    [JsonProperty("id")]
+    public string? Id { get; init; }
+
+    public string? PendingInvalidationId { get; init; }
+
+    public ulong Version { get; init; }
+}
+
 // One page of a stream query.
 internal sealed record QueryPage<TRow>
 {

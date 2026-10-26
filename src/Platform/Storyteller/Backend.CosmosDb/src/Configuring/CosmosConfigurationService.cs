@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
@@ -24,6 +25,11 @@ namespace _42.Platform.Storyteller.Configuring;
 
 public partial class CosmosConfigurationService : IConfigurationService
 {
+    private const int MaxRetries = 3;
+
+    // below the 2 MB request limit of a transactional batch, as in BatchPlan
+    private const long MaxBatchPayloadBytes = 1_500_000;
+
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly IConfigurationBindingResolver? _bindingResolver;
     private readonly IConfigurationSchemaService? _schemaService;
@@ -281,11 +287,10 @@ public partial class CosmosConfigurationService : IConfigurationService
             .OrderBy(history => history.Version)
             .ToFeedIterator();
 
-        var versions = new List<ConfigurationVersion>();
+        var history = new List<ConfigurationHistoryEntity>();
         while (feed.HasMoreResults)
         {
-            var results = await feed.ReadNextAsync();
-            versions.AddRange(results.Select(entity => entity.ToConfigurationVersion()));
+            history.AddRange(await feed.ReadNextAsync());
         }
 
         var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
@@ -295,6 +300,14 @@ public partial class CosmosConfigurationService : IConfigurationService
             configurationId,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        // version 0 is no written version (an old patch archived cache rows so), and an archive of the current or a
+        // later version is a leftover that a write counts as archived, as in an export
+        var versions = history
+            .Where(entity => entity.Version > 0 || entity.Content.HasValues)
+            .Where(entity => configuration is null || configuration.Version == 0 || entity.Version < configuration.Version)
+            .Select(entity => entity.ToConfigurationVersion())
+            .ToList();
 
         if (configuration is not null)
         {
@@ -316,30 +329,26 @@ public partial class CosmosConfigurationService : IConfigurationService
         var annotationKey = key.Annotation.ToString();
         var partitionKeyValue = key.GetPartitionKey();
         var partitionKey = new PartitionKey(partitionKeyValue);
-        var configVersionId = $"{key.ViewName}.{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{version}";
-        var versionEntity = await repository.Container.TryReadItemAsync(
-            configVersionId,
-            partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationHistoryEntity>(_serializerOptions));
-
-        if (versionEntity is not null)
-        {
-            return versionEntity.ToConfiguration();
-        }
-
         var configId = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKey}";
         var configEntity = await repository.Container.TryReadItemAsync(
             configId,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
 
-        if (configEntity is null
-            || configEntity.Version != version)
+        // the current version wins over an archive of the same version, which can be a leftover of another lifetime
+        if (configEntity is not null
+            && configEntity.Version == version)
         {
-            return null;
+            return configEntity.ToConfigurationFromContent();
         }
 
-        return configEntity.ToConfigurationFromContent();
+        var configVersionId = $"{key.ViewName}.{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{version}";
+        var versionEntity = await repository.Container.TryReadItemAsync(
+            configVersionId,
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<ConfigurationHistoryEntity>(_serializerOptions));
+
+        return versionEntity?.ToConfiguration();
     }
 
     public Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint version)
@@ -371,296 +380,200 @@ public partial class CosmosConfigurationService : IConfigurationService
         return WriteConfigurationAsync(key, value, actor, force, merge: true);
     }
 
-    // Merges the value into the stored document, or replaces the document with it (an import).
+    // Merges the value into the stored document, or replaces the document with it (an import). Every attempt reads the
+    // row with its ETag and writes guarded by it, so a concurrent change starts the attempt over.
     private async Task<Configuration> WriteConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force, bool merge)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
-        var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{annotationKey}";
-        var id = $"{key.ViewName}.{configurationKey}";
+        var id = GetConfigurationId(key);
         var partitionKeyValue = key.GetPartitionKey();
         var partitionKey = new PartitionKey(partitionKeyValue);
 
-        var existingConfiguration = await repository.Container.TryReadItemAsync(
-            id,
-            partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
-
-        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
-
-        if (existingConfiguration is null)
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            // create a new configuration if there is nothing yet
-            value = value.RemoveRequested();
-            value = await value.ApplyPatchRequested();
+            var (existingConfiguration, etag) = await ReadForWriteAsync(key, repository, id, partitionKey);
 
-            if (!force && _schemaService is not null && value.HasValues)
+            // the requested operations change their input, each attempt works on a fresh copy
+            var input = (JObject)value.DeepClone();
+
+            if (existingConfiguration is null)
             {
-                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, value);
+                // create a new configuration if there is nothing yet
+                input = input.RemoveRequested();
+                input = await input.ApplyPatchRequested();
+
+                if (!force && _schemaService is not null && input.HasValues)
+                {
+                    await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, input);
+                }
+
+                var configuration = new ConfigurationEntity
+                {
+                    PartitionKey = partitionKeyValue,
+                    Id = id,
+                    AnnotationKey = annotationKey,
+                    IsServerSubstitutionDisabled = false,
+                    Name = key.Annotation.Name,
+                    ProjectName = key.ProjectName,
+                    ViewName = key.ViewName,
+                    Content = input,
+                    Version = await GetHighestArchivedVersionAsync(key, repository) + 1,
+                    Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
+                    PendingInvalidationId = NewWriteInvalidationId(key),
+                };
+
+                // a calculation may have created the row meanwhile (409), then the next attempt updates it
+                var batch = repository.Container.CreateTransactionalBatch(partitionKey);
+                batch.CreateItem(configuration);
+
+                if (!await TryExecuteWriteAsync(batch, annotationKey, partitionKeyValue))
+                {
+                    continue;
+                }
+
+                // invalidate the cached calculations of all descendants once the document exists, so a calculation
+                // that read it as missing is either cleared here or fails to cache on the changed ETag
+                await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, configuration.Version);
+                await CompleteInvalidationAsync(key, repository, configuration.PendingInvalidationId);
+                return configuration.ToConfiguration();
             }
 
-            var highestArchivedVersion = await GetHighestArchivedVersionAsync(key, repository);
+            JObject newContent;
 
-            var configuration = new ConfigurationEntity
+            // merge into stored content when there is some; an empty document is replaced
+            if (merge && existingConfiguration.Content.HasValues)
             {
-                PartitionKey = partitionKeyValue,
-                Id = id,
-                AnnotationKey = annotationKey,
-                IsServerSubstitutionDisabled = false,
-                Name = key.Annotation.Name,
-                ProjectName = key.ProjectName,
-                ViewName = key.ViewName,
-                Content = value,
-                Version = highestArchivedVersion + 1,
-                Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-            };
-
-            await repository.Container.CreateItemAsync(configuration, partitionKey);
-
-            // invalidate the cached calculations of all descendants once the document exists, so a calculation
-            // that read it as missing is either cleared here or fails to cache on the changed ETag
-            await InvalidateConfigurationsAsync(key, repository);
-            await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, configuration.Version);
-            return configuration.ToConfiguration();
-        }
-
-        var newContent = value;
-
-        // merge into stored content when there is some; an empty document is replaced
-        if (merge && existingConfiguration.Content.HasValues)
-        {
-            newContent = (JObject)existingConfiguration.Content.DeepClone();
-            newContent.MergeInto(value);
-            newContent = newContent.RemoveRequested();
-            newContent = await newContent.ApplyPatchRequested();
-
-            if (JToken.DeepEquals(existingConfiguration.Content, newContent))
-            {
-                // check for no change after merge
-                return existingConfiguration.ToConfigurationFromContent();
+                newContent = (JObject)existingConfiguration.Content.DeepClone();
+                newContent.MergeInto(input);
+                newContent = newContent.RemoveRequested();
+                newContent = await newContent.ApplyPatchRequested();
             }
-        }
-        else
-        {
-            newContent = newContent.RemoveRequested();
-            newContent = await newContent.ApplyPatchRequested();
+            else
+            {
+                newContent = input.RemoveRequested();
+                newContent = await newContent.ApplyPatchRequested();
+            }
 
-            if (!merge
-                && existingConfiguration.Content.HasValues
+            // an equal document writes nothing, also an empty one over an emptied version; a cache row is no version
+            // yet, so any document written over it is its first one
+            if (IsWrittenVersion(existingConfiguration)
                 && JToken.DeepEquals(existingConfiguration.Content, newContent))
             {
-                // a replacement by an equal document writes nothing
                 return existingConfiguration.ToConfigurationFromContent();
             }
-        }
 
-        // validate before any write, so a rejection cannot leave a history item
-        if (!force && _schemaService is not null && newContent.HasValues)
-        {
-            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, newContent);
-        }
-
-        if (existingConfiguration.Content.HasValues)
-        {
-            var historyVersion = existingConfiguration.Version;
-            var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{historyVersion}";
-            var historyId = $"{key.ViewName}.{historyKey}";
-            var history = new ConfigurationHistoryEntity
+            // validate before any write, so a rejection cannot leave a history item
+            if (!force && _schemaService is not null && newContent.HasValues)
             {
-                PartitionKey = partitionKeyValue,
-                Id = historyId,
-                AnnotationKey = annotationKey,
-                Version = historyVersion,
-                Name = existingConfiguration.Name,
-                ProjectName = existingConfiguration.ProjectName,
-                ViewName = existingConfiguration.ViewName,
-                Content = existingConfiguration.Content,
-                Modified = existingConfiguration.Modified,
-            };
+                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, newContent);
+            }
 
-            await repository.Container.CreateItemAsync(history, partitionKey);
+            var newConfiguration = await TryWriteNextVersionAsync(key, repository, existingConfiguration, etag!, newContent, actor);
+
+            if (newConfiguration is null)
+            {
+                continue;
+            }
+
+            await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, newConfiguration.Version);
+            await CompleteInvalidationAsync(key, repository, newConfiguration.PendingInvalidationId);
+            return newConfiguration.ToConfigurationFromContent();
         }
 
-        // an item that only cached the effective document (version 0) continues after the archived versions,
-        // which a clear left behind, so the next archive cannot collide with them
-        var previousVersion = existingConfiguration.Content.HasValues
-            ? existingConfiguration.Version
-            : Math.Max(existingConfiguration.Version, await GetHighestArchivedVersionAsync(key, repository));
-
-        // invalidate the cached calculations of all descendants
-        await InvalidateConfigurationsAsync(key, repository);
-
-        // save a new version of the configuration
-        var newConfiguration = existingConfiguration with
-        {
-            Version = previousVersion + 1,
-            Content = newContent,
-            Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-            CalculatedContent = null,
-            CalculatedContentHash = null,
-        };
-        await repository.Container.UpsertItemAsync(newConfiguration, partitionKey);
-        await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, newConfiguration.Version);
-
-        return newConfiguration.ToConfigurationFromContent();
+        throw ConcurrentChange(annotationKey);
     }
 
     public async Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, AuditActor actor, bool force = false)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
-        var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{annotationKey}";
-        var id = $"{key.ViewName}.{configurationKey}";
-        var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var id = GetConfigurationId(key);
+        var partitionKey = key.GetCosmosPartitionKey();
 
-        var existingConfiguration = await repository.Container.TryReadItemAsync(
-            id,
-            partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
-
-        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
-
-        if (existingConfiguration is null)
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            throw new ConfigurationNotFoundException(key.Annotation);
+            var (existingConfiguration, etag) = await ReadForWriteAsync(key, repository, id, partitionKey);
+
+            if (existingConfiguration is null)
+            {
+                throw new ConfigurationNotFoundException(key.Annotation);
+            }
+
+            // the patch is applied to the content of this attempt's read, the operations stay unchanged
+            var newContent = await existingConfiguration.Content.ApplyPatch(patchOperations);
+
+            if (JToken.DeepEquals(existingConfiguration.Content, newContent))
+            {
+                return existingConfiguration.ToConfigurationFromContent();
+            }
+
+            if (!force && _schemaService is not null && newContent.HasValues)
+            {
+                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, newContent);
+            }
+
+            var newConfiguration = await TryWriteNextVersionAsync(key, repository, existingConfiguration, etag!, newContent, actor);
+
+            if (newConfiguration is null)
+            {
+                continue;
+            }
+
+            await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, newConfiguration.Version);
+            await CompleteInvalidationAsync(key, repository, newConfiguration.PendingInvalidationId);
+            return newConfiguration.ToConfigurationFromContent();
         }
 
-        var newContent = await existingConfiguration.Content.ApplyPatch(patchOperations);
-
-        if (JToken.DeepEquals(existingConfiguration.Content, newContent))
-        {
-            return existingConfiguration.ToConfigurationFromContent();
-        }
-
-        if (!force && _schemaService is not null && newContent.HasValues)
-        {
-            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, newContent);
-        }
-
-        // invalidate all dependent configurations before mutating this partition
-        await InvalidateConfigurationsAsync(key, repository);
-
-        // save history of the previous version together with the next version atomically
-        var historyVersion = existingConfiguration.Version;
-        var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{historyVersion}";
-        var historyId = $"{key.ViewName}.{historyKey}";
-        var history = new ConfigurationHistoryEntity
-        {
-            PartitionKey = partitionKeyValue,
-            Id = historyId,
-            AnnotationKey = annotationKey,
-            Version = historyVersion,
-            Name = existingConfiguration.Name,
-            ProjectName = existingConfiguration.ProjectName,
-            ViewName = existingConfiguration.ViewName,
-            Content = existingConfiguration.Content,
-            Modified = existingConfiguration.Modified,
-        };
-
-        var newConfiguration = existingConfiguration with
-        {
-            Version = existingConfiguration.Version + 1,
-            Content = newContent,
-            Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-            CalculatedContent = null,
-            CalculatedContentHash = null,
-        };
-
-        var batch = repository.Container.CreateTransactionalBatch(partitionKey);
-        batch.CreateItem(history);
-        batch.UpsertItem(newConfiguration);
-        using var response = await batch.ExecuteAsync();
-
-        // the version was already archived by a concurrent writer (409); the read can't guard the upsert by ETag,
-        // because invalidating the dependent configurations above may rewrite this document too
-        if (response.StatusCode == HttpStatusCode.Conflict)
-        {
-            throw new ConflictException($"The configuration '{annotationKey}' was changed concurrently, try again.", ErrorCodes.Conflict);
-        }
-
-        if (!response.IsSuccessStatusCode)
-        {
-            // the database details stay in the log, the caller gets only the status
-            _logger.LogError(
-                "Patching the configuration {AnnotationKey} in {PartitionKey} failed with {StatusCode} (activity {ActivityId}): {ErrorMessage}",
-                annotationKey,
-                partitionKeyValue,
-                response.StatusCode,
-                response.ActivityId,
-                response.ErrorMessage);
-            throw new ConfigurationStorageException(
-                $"Failed to patch configuration '{annotationKey}' with status {response.StatusCode}.",
-                response.StatusCode);
-        }
-
-        await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, newConfiguration.Version);
-        return newConfiguration.ToConfigurationFromContent();
+        throw ConcurrentChange(annotationKey);
     }
 
-    public async Task ClearConfigurationAsync(FullKey key, AuditActor? actor = null)
+    public async Task<bool> ClearConfigurationAsync(FullKey key, AuditActor? actor = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
-        var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{annotationKey}";
-        var id = $"{key.ViewName}.{configurationKey}";
-        var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var id = GetConfigurationId(key);
+        var partitionKey = key.GetCosmosPartitionKey();
 
-        var existingConfiguration = await repository.Container.TryReadItemAsync(
-            id,
-            partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
-
-        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
-
-        if (existingConfiguration is null
-            || !existingConfiguration.Content.HasValues)
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            // if there is no entity or there is no configuration content (only pre-calculated content)
-            return;
+            // finishes also the invalidation of an earlier clear, which a repeated clear finds without a document
+            var (existingConfiguration, etag) = await ReadForWriteAsync(key, repository, id, partitionKey);
+
+            if (existingConfiguration is null
+                || !existingConfiguration.Content.HasValues)
+            {
+                // if there is no entity or there is no configuration content (only pre-calculated content)
+                return false;
+            }
+
+            var archived = await TryArchiveAndDeleteAsync(key, repository, existingConfiguration, etag!);
+
+            if (archived is null)
+            {
+                continue;
+            }
+
+            await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationDeleted, archived.Version);
+            await CompletePendingClearsAsync(key, repository, archived);
+            return true;
         }
 
-        var historyVersion = existingConfiguration.Version;
-        var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{historyVersion}";
-        var historyId = $"{key.ViewName}.{historyKey}";
-        var history = new ConfigurationHistoryEntity
-        {
-            PartitionKey = partitionKeyValue,
-            Id = historyId,
-            AnnotationKey = annotationKey,
-            Version = historyVersion,
-            Name = existingConfiguration.Name,
-            ProjectName = existingConfiguration.ProjectName,
-            ViewName = existingConfiguration.ViewName,
-            Content = existingConfiguration.Content,
-            Modified = existingConfiguration.Modified,
-        };
-
-        var transaction = repository.Container.CreateTransactionalBatch(partitionKey);
-        transaction.CreateItem(history);
-        transaction.DeleteItem(id);
-        await transaction.ExecuteAsync();
-        await InvalidateConfigurationsAsync(key, repository);
-        await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationDeleted, historyVersion);
+        throw ConcurrentChange(annotationKey);
     }
 
     public async Task DeleteAsync(FullKey key, AuditActor? actor = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
-        var existingConfiguration = await repository.Container.TryReadItemAsync(
-            $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{key.Annotation}",
-            key.GetCosmosPartitionKey(),
-            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+        var (deletedConfiguration, archived) = await ForceDeleteConfigurationAsync(key, repository);
 
-        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
-        await ForceDeleteConfigurationAsync(key, repository);
-        await InvalidateConfigurationsAsync(key, repository);
-
-        if (existingConfiguration?.Content.HasValues == true)
+        if (deletedConfiguration?.Content.HasValues == true)
         {
-            await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationDeleted, existingConfiguration.Version);
+            await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationDeleted, archived?.Version ?? deletedConfiguration.Version);
         }
+
+        // always invalidates, so a repeated delete finishes the invalidation of an earlier one
+        await CompletePendingClearsAsync(key, repository, archived, always: true);
     }
 
     public async Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(
@@ -780,11 +693,22 @@ public partial class CosmosConfigurationService : IConfigurationService
 
         if (hasContent && JToken.DeepEquals(existing!.Content, document))
         {
+            if (!options.DryRun)
+            {
+                // finish an invalidation of an earlier committed change, for example of an interrupted import
+                await CompletePendingWorkAsync(key, repository, existing);
+            }
+
             return new ViewImportResult(ViewImportOutcome.Unchanged, existing.Version);
         }
 
         if (hasContent && options.Existing == ViewImportExisting.Skip)
         {
+            if (!options.DryRun)
+            {
+                await CompletePendingWorkAsync(key, repository, existing);
+            }
+
             return new ViewImportResult(
                 ViewImportOutcome.Skipped,
                 ErrorCode: ErrorCodes.DocumentExists,
@@ -1160,52 +1084,444 @@ public partial class CosmosConfigurationService : IConfigurationService
         }
     }
 
-    private async Task ForceDeleteConfigurationAsync(FullKey key, IContainerRepository repository)
+    // Deletes the row: a written version is archived first, a cache row (version 0) is deleted directly. Returns the
+    // deleted row, and the archive with its pending invalidation.
+    private async Task<(ConfigurationEntity? Deleted, PendingClear? Archived)> ForceDeleteConfigurationAsync(FullKey key, IContainerRepository repository)
     {
-        var id = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
-        var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
-        var existingConfiguration = await repository.Container.TryReadItemAsync(
+        var annotationKey = key.Annotation.ToString();
+        var id = GetConfigurationId(key);
+        var partitionKey = key.GetCosmosPartitionKey();
+
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            var (existingConfiguration, etag) = await ReadConfigurationAsync(repository, id, partitionKey);
+            await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
+
+            if (existingConfiguration is null)
+            {
+                // if there is no entity
+                return (null, null);
+            }
+
+            if (!IsWrittenVersion(existingConfiguration))
+            {
+                // a cache row is no version, it is deleted directly
+                using var response = await repository.Container.DeleteItemStreamAsync(
+                    id,
+                    partitionKey,
+                    new ItemRequestOptions { IfMatchEtag = etag, EnableContentResponseOnWrite = false });
+
+                if (response.StatusCode == HttpStatusCode.PreconditionFailed)
+                {
+                    continue;
+                }
+
+                if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound)
+                {
+                    throw new ConfigurationStorageException(
+                        $"Failed to delete configuration '{annotationKey}' with status {response.StatusCode}.",
+                        response.StatusCode);
+                }
+
+                return (existingConfiguration, null);
+            }
+
+            var archived = await TryArchiveAndDeleteAsync(key, repository, existingConfiguration, etag!);
+
+            if (archived is null)
+            {
+                continue;
+            }
+
+            return (existingConfiguration, archived);
+        }
+
+        throw ConcurrentChange(annotationKey);
+    }
+
+    private Task<(ConfigurationEntity? Item, string? ETag)> ReadConfigurationAsync(IContainerRepository repository, string id, PartitionKey partitionKey)
+    {
+        return repository.Container.TryReadItemWithETagAsync(
             id,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+    }
 
-        if (existingConfiguration is null)
+    // Decides how the stored version is archived, see ArchivePlan.
+    private async Task<ArchivePlan> PlanArchiveAsync(FullKey key, IContainerRepository repository, ConfigurationEntity existing)
+    {
+        if (!IsWrittenVersion(existing))
         {
-            // if there is no entity
-            return;
+            // a cache row is no version; the next one continues after the archived versions, which a clear left behind
+            return new ArchivePlan(null, IsStored: false, await GetHighestArchivedVersionAsync(key, repository) + 1);
         }
 
-        if (!existingConfiguration.Content.HasValues)
+        var stored = await ReadHistoryAsync(key, repository, existing.Version);
+
+        if (stored is null || IsArchiveOf(stored, existing))
         {
-            // if there is only precalculated entity with no content it can be directly deleted
-            await repository.Container.DeleteItemStreamAsync(
-                id,
-                partitionKey,
-                new ItemRequestOptions { EnableContentResponseOnWrite = false });
-            return;
+            // an equal archive is left by a write that failed after its archive, or by a snapshot of the annotation
+            // lifecycle; a version 0 with content was written before versions were counted, the next one follows the
+            // archived ones
+            var next = existing.Version > 0
+                ? existing.Version + 1
+                : await GetHighestArchivedVersionAsync(key, repository) + 1;
+            return new ArchivePlan(existing.Version, IsStored: stored is not null, next);
         }
 
-        var transaction = repository.Container.CreateTransactionalBatch(partitionKey);
-        var historyVersion = existingConfiguration.Version;
+        // the version is held by an item of an earlier lifetime of the configuration, which is kept; the current
+        // content goes after the highest archived version, unless an earlier attempt has put it there already
+        var highest = await GetHighestArchivedVersionAsync(key, repository);
+        var latest = highest == existing.Version ? stored : await ReadHistoryAsync(key, repository, highest);
+
+        return latest is not null && IsArchiveOf(latest, existing)
+            ? new ArchivePlan(highest, IsStored: true, highest + 1)
+            : new ArchivePlan(highest + 1, IsStored: false, highest + 2);
+    }
+
+    private Task<ConfigurationHistoryEntity?> ReadHistoryAsync(FullKey key, IContainerRepository repository, ulong version)
+    {
+        return repository.Container.TryReadItemAsync(
+            GetHistoryId(key, version),
+            key.GetCosmosPartitionKey(),
+            stream => stream.DeserializeNewtonsoft<ConfigurationHistoryEntity>(_serializerOptions));
+    }
+
+    private static bool IsArchiveOf(ConfigurationHistoryEntity history, ConfigurationEntity current)
+    {
+        return JToken.DeepEquals(history.Content, current.Content) && history.Modified == current.Modified;
+    }
+
+    // Every write gives version 1 or more; a calculation creates a cache row with version 0 and no content. A version
+    // 0 with content comes from the time before versions were counted.
+    private static bool IsWrittenVersion(ConfigurationEntity configuration)
+    {
+        return configuration.Version > 0 || configuration.Content.HasValues;
+    }
+
+    // Archives the stored version and writes the next one, guarded by the ETag of the read. Returns null when another
+    // writer changed or deleted the row meanwhile.
+    private async Task<ConfigurationEntity?> TryWriteNextVersionAsync(
+        FullKey key,
+        IContainerRepository repository,
+        ConfigurationEntity existing,
+        string etag,
+        JObject newContent,
+        AuditActor actor)
+    {
         var annotationKey = key.Annotation.ToString();
-        var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{historyVersion}";
-        var historyId = $"{key.ViewName}.{historyKey}";
-        var history = new ConfigurationHistoryEntity
+        var partitionKeyValue = key.GetPartitionKey();
+        var partitionKey = new PartitionKey(partitionKeyValue);
+        var archive = await PlanArchiveAsync(key, repository, existing);
+        var history = archive.Version is { } archivedVersion && !archive.IsStored
+            ? ToHistory(key, existing, archivedVersion, pendingInvalidationId: null)
+            : null;
+
+        var next = existing with
         {
-            PartitionKey = partitionKeyValue,
-            Id = historyId,
-            AnnotationKey = annotationKey,
-            Version = historyVersion,
-            Name = existingConfiguration.Name,
-            ProjectName = existingConfiguration.ProjectName,
-            ViewName = existingConfiguration.ViewName,
-            Content = existingConfiguration.Content,
-            Modified = existingConfiguration.Modified,
+            Version = archive.NextVersion,
+            Content = newContent,
+            Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
+            CalculatedContent = null,
+            CalculatedContentHash = null,
+            PendingInvalidationId = NewWriteInvalidationId(key),
         };
-        transaction.CreateItem(history);
-        transaction.DeleteItem(id);
-        await transaction.ExecuteAsync();
+
+        if (history is null
+            || EstimateBytes(history.Content) + EstimateBytes(newContent) <= MaxBatchPayloadBytes)
+        {
+            // save history of the previous version together with the next version atomically
+            var batch = repository.Container.CreateTransactionalBatch(partitionKey);
+
+            if (history is not null)
+            {
+                batch.CreateItem(history);
+            }
+
+            batch.ReplaceItem(existing.Id, next, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
+            return await TryExecuteWriteAsync(batch, annotationKey, partitionKeyValue) ? next : null;
+        }
+
+        // too large for one batch: the archive goes first, a failed write leaves it equal to the row, which the next
+        // attempt counts as archived
+        var isArchived = await TryWriteItemAsync(
+            () => repository.Container.CreateItemAsync(history, partitionKey, new ItemRequestOptions { EnableContentResponseOnWrite = false }),
+            annotationKey,
+            partitionKeyValue);
+
+        return isArchived
+               && await TryWriteItemAsync(
+                   () => repository.Container.ReplaceItemAsync(next, existing.Id, partitionKey, new ItemRequestOptions { IfMatchEtag = etag, EnableContentResponseOnWrite = false }),
+                   annotationKey,
+                   partitionKeyValue)
+            ? next
+            : null;
+    }
+
+    // Archives the stored version with the token of a pending invalidation and deletes the row in one batch, guarded
+    // by the ETag of the read. Returns the archive, or null when another writer changed or deleted the row meanwhile.
+    private async Task<PendingClear?> TryArchiveAndDeleteAsync(FullKey key, IContainerRepository repository, ConfigurationEntity existing, string etag)
+    {
+        var annotationKey = key.Annotation.ToString();
+        var partitionKeyValue = key.GetPartitionKey();
+        var archive = await PlanArchiveAsync(key, repository, existing);
+        var version = archive.Version ?? throw new InvalidOperationException("Only a written version is archived.");
+        var archived = new PendingClear(GetHistoryId(key, version), NewInvalidationId(), version);
+        var batch = repository.Container.CreateTransactionalBatch(new PartitionKey(partitionKeyValue));
+
+        if (archive.IsStored)
+        {
+            batch.PatchItem(archived.Id, [PatchOperation.Set($"/{nameof(ConfigurationHistoryEntity.PendingInvalidationId)}", archived.Token)]);
+        }
+        else
+        {
+            batch.CreateItem(ToHistory(key, existing, version, archived.Token));
+        }
+
+        batch.DeleteItem(existing.Id, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
+        return await TryExecuteWriteAsync(batch, annotationKey, partitionKeyValue) ? archived : null;
+    }
+
+    // Executes a configuration write batch. Returns false on a concurrent modification: the version archived (409),
+    // the row changed (412) or deleted (404) by another writer.
+    private async Task<bool> TryExecuteWriteAsync(TransactionalBatch batch, string annotationKey, string partitionKeyValue)
+    {
+        using var response = await batch.ExecuteAsync();
+
+        if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            // the database details stay in the log, the caller gets only the status
+            _logger.LogError(
+                "Writing the configuration {AnnotationKey} in {PartitionKey} failed with {StatusCode} (activity {ActivityId}): {ErrorMessage}",
+                annotationKey,
+                partitionKeyValue,
+                response.StatusCode,
+                response.ActivityId,
+                response.ErrorMessage);
+            throw new ConfigurationStorageException(
+                $"Failed to write configuration '{annotationKey}' with status {response.StatusCode}.",
+                response.StatusCode);
+        }
+
+        return true;
+    }
+
+    // A single write outside a batch, classified like TryExecuteWriteAsync.
+    private async Task<bool> TryWriteItemAsync(Func<Task> write, string annotationKey, string partitionKeyValue)
+    {
+        try
+        {
+            await write();
+            return true;
+        }
+        catch (CosmosException exception) when (exception.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+        catch (CosmosException exception)
+        {
+            _logger.LogError(
+                exception,
+                "Writing the configuration {AnnotationKey} in {PartitionKey} failed with {StatusCode} (activity {ActivityId})",
+                annotationKey,
+                partitionKeyValue,
+                exception.StatusCode,
+                exception.ActivityId);
+            throw new ConfigurationStorageException(
+                $"Failed to write configuration '{annotationKey}' with status {exception.StatusCode}.",
+                exception.StatusCode);
+        }
+    }
+
+    // Finishes what an earlier request left pending on the configuration, before a write looks at its input: the
+    // invalidation of the row's last write, and of the clears that archived the versions of a missing or empty row.
+    // True when it did something, which can have changed the row since it was read.
+    private async Task<bool> CompletePendingWorkAsync(FullKey key, IContainerRepository repository, ConfigurationEntity? existing)
+    {
+        var clears = existing is null || !existing.Content.HasValues
+            ? await ReadPendingClearsAsync(key, repository)
+            : [];
+
+        if (existing?.PendingInvalidationId is null && clears.Count == 0)
+        {
+            return false;
+        }
+
+        await InvalidateAndCompleteAsync(key, repository, existing?.PendingInvalidationId, clears);
+        return true;
+    }
+
+    // Reads the row for a write, after finishing what an earlier request left pending on it; finishing removes a token
+    // from the row, so the row is read again for the ETag that guards the write.
+    private async Task<(ConfigurationEntity? Item, string? ETag)> ReadForWriteAsync(FullKey key, IContainerRepository repository, string id, PartitionKey partitionKey)
+    {
+        var (existingConfiguration, etag) = await ReadConfigurationAsync(repository, id, partitionKey);
+        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
+
+        if (!await CompletePendingWorkAsync(key, repository, existingConfiguration))
+        {
+            return (existingConfiguration, etag);
+        }
+
+        (existingConfiguration, etag) = await ReadConfigurationAsync(repository, id, partitionKey);
+        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
+        return (existingConfiguration, etag);
+    }
+
+    // Invalidates the descendants of a write and removes its token from the row; a write without a token has none.
+    private Task CompleteInvalidationAsync(FullKey key, IContainerRepository repository, string? token)
+    {
+        return token is null
+            ? Task.CompletedTask
+            : InvalidateAndCompleteAsync(key, repository, token, []);
+    }
+
+    // Invalidates the descendants of the clears that archived the versions of the configuration and removes their
+    // tokens: of the given one and of every one still pending. Without any, only an unconditional call invalidates.
+    private async Task CompletePendingClearsAsync(FullKey key, IContainerRepository repository, PendingClear? archived, bool always = false)
+    {
+        var clears = await ReadPendingClearsAsync(key, repository);
+
+        if (archived is not null && clears.All(clear => clear.Id != archived.Id))
+        {
+            clears.Add(archived);
+        }
+
+        if (clears.Count == 0 && !always)
+        {
+            return;
+        }
+
+        await InvalidateAndCompleteAsync(key, repository, rowToken: null, clears);
+    }
+
+    // The tokens are known before the invalidation starts, so a write or clear that commits during it keeps its own.
+    // A failed invalidation keeps every token, a later request finishes it.
+    private async Task InvalidateAndCompleteAsync(FullKey key, IContainerRepository repository, string? rowToken, IReadOnlyCollection<PendingClear> clears)
+    {
+        await InvalidateConfigurationsAsync(key, repository);
+        var partitionKey = key.GetCosmosPartitionKey();
+
+        if (rowToken is not null)
+        {
+            // a soft-deleted row is not rewritten, its expiry stays; it keeps the token for the request after a restore
+            await RemovePendingInvalidationAsync(
+                repository,
+                GetConfigurationId(key),
+                partitionKey,
+                $"FROM c WHERE c.{nameof(ConfigurationEntity.PendingInvalidationId)} = '{rowToken}' AND NOT IS_DEFINED(c.{nameof(ConfigurationEntity.AnnotationDeletionId)})");
+        }
+
+        foreach (var clear in clears)
+        {
+            await RemovePendingInvalidationAsync(
+                repository,
+                clear.Id,
+                partitionKey,
+                $"FROM c WHERE c.{nameof(ConfigurationHistoryEntity.PendingInvalidationId)} = '{clear.Token}'");
+        }
+    }
+
+    // A newer write or clear sets its own token, so the filter never removes one whose invalidation is still owed.
+    private async Task RemovePendingInvalidationAsync(IContainerRepository repository, string id, PartitionKey partitionKey, string filterPredicate)
+    {
+        using var response = await repository.Container.PatchItemStreamAsync(
+            id,
+            partitionKey,
+            [PatchOperation.Remove($"/{nameof(ConfigurationEntity.PendingInvalidationId)}")],
+            new PatchItemRequestOptions { FilterPredicate = filterPredicate, EnableContentResponseOnWrite = false });
+
+        // a newer token (412) or a deleted item (404) is expected; anything else is logged, the work itself is done
+        if (!response.IsSuccessStatusCode
+            && response.StatusCode is not (HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound))
+        {
+            _logger.LogWarning(
+                "Removing the pending invalidation of {Id} failed with {StatusCode}; a later request repeats the invalidation.",
+                id,
+                response.StatusCode);
+        }
+    }
+
+    // The archives of the configuration whose clear has not finished its invalidation.
+    private static async Task<List<PendingClear>> ReadPendingClearsAsync(FullKey key, IContainerRepository repository)
+    {
+        var query = new QueryDefinition(
+                "SELECT c.id, c.PendingInvalidationId, c.Version FROM c "
+                + "WHERE STARTSWITH(c.id, @historyPrefix) AND IS_STRING(c.PendingInvalidationId)")
+            .WithParameter("@historyPrefix", $"{key.ViewName}.{EntityIdPrefixTypes.ConfigurationVersion}.{key.Annotation}.");
+
+        using var iterator = repository.Container.GetItemQueryIterator<PendingInvalidationRow>(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = key.GetCosmosPartitionKey() });
+
+        var clears = new List<PendingClear>();
+
+        while (iterator.HasMoreResults)
+        {
+            foreach (var row in await iterator.ReadNextAsync())
+            {
+                if (row.Id is not null && row.PendingInvalidationId is not null)
+                {
+                    clears.Add(new PendingClear(row.Id, row.PendingInvalidationId, row.Version));
+                }
+            }
+        }
+
+        return clears;
+    }
+
+    private static ConfigurationHistoryEntity ToHistory(FullKey key, ConfigurationEntity current, ulong version, string? pendingInvalidationId)
+    {
+        return new ConfigurationHistoryEntity
+        {
+            PartitionKey = key.GetPartitionKey(),
+            Id = GetHistoryId(key, version),
+            AnnotationKey = key.Annotation.ToString(),
+            Version = version,
+            Name = current.Name,
+            ProjectName = current.ProjectName,
+            ViewName = current.ViewName,
+            Content = current.Content,
+            Modified = current.Modified,
+            PendingInvalidationId = pendingInvalidationId,
+        };
+    }
+
+    private static string GetConfigurationId(FullKey key)
+    {
+        return $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
+    }
+
+    private static string GetHistoryId(FullKey key, ulong version)
+    {
+        return $"{key.ViewName}.{EntityIdPrefixTypes.ConfigurationVersion}.{key.Annotation}.{version}";
+    }
+
+    private static string NewInvalidationId()
+    {
+        return Guid.NewGuid().ToString("N");
+    }
+
+    // A unit of execution has no descendants, so its write leaves no invalidation to finish and needs no token.
+    private static string? NewWriteInvalidationId(FullKey key)
+    {
+        return key.Annotation.Type == AnnotationType.UnitOfExecution ? null : NewInvalidationId();
+    }
+
+    // The size of a document in a batch; its content dominates, the rest is a small allowance.
+    private static long EstimateBytes(JObject content)
+    {
+        return Encoding.UTF8.GetByteCount(content.ToString(Formatting.None)) + 1024;
+    }
+
+    private static ConflictException ConcurrentChange(string annotationKey)
+    {
+        return new ConflictException($"The configuration '{annotationKey}' was changed concurrently, try again.", ErrorCodes.Conflict);
     }
 
     // The highest version in the history of the configuration, 0 without one.
@@ -1352,4 +1668,11 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     private sealed record class TemplateSnapshot(JObject? Content, string? ETag);
+
+    // How a write archives the stored version: Version is the archived version (null for a cache row, which has none),
+    // IsStored that an equal archive exists already, NextVersion the version the write stores.
+    private sealed record class ArchivePlan(ulong? Version, bool IsStored, ulong NextVersion);
+
+    // The archive of a clear or delete, with the token of its pending cache invalidation.
+    private sealed record class PendingClear(string Id, string Token, ulong Version);
 }

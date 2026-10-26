@@ -226,9 +226,10 @@ The next read of an item whose `CalculatedContent` is present returns that objec
 
 These writes clear cached calculations, which makes the following read load the template again:
 
-- `CreateOrUpdateConfigurationAsync`, when the configuration item already exists, sets `CalculatedContent` to null on that item and calls `InvalidateConfigurationsAsync` for affected configurations. When no item exists yet, it creates the item without a cache and then calls `InvalidateConfigurationsAsync`.
+- `CreateOrUpdateConfigurationAsync`, when the configuration item already exists, writes the new version without a cache and then calls `InvalidateConfigurationsAsync` for affected configurations. When no item exists yet, it creates the item without a cache and then calls `InvalidateConfigurationsAsync`.
 - `PatchConfigurationAsync` does the same for an existing item. `ImportConfigurationAsync` writes through the same two paths.
 - `ClearConfigurationAsync`, when stored `Content` has values, deletes the item and then invalidates affected configurations. `DeleteAsync` deletes the item and then invalidates.
+- Every one of them writes first and invalidates after; a failed invalidation is finished by the next write request on the same configuration ([inheritance.md](inheritance.md#cache-and-descendant-freshness)).
 - Every template write (`CreateOrUpdateTemplateAsync` or `ImportTemplateAsync` with a changed content, `PatchTemplateAsync`, `DeleteTemplateAsync`) invalidates the configurations that merge the template, after the template has been written.
 
 Invalidation (`ConfigurationCacheInvalidator`, `Backend.CosmosDb/src/Configuring/`) sets `CalculatedContent` and `CalculatedContentHash` to null and increments `AffectedCounter`. The patches are sent in transactional batches of at most 100 items per partition, which is the Cosmos DB limit. A failed batch is reported as an error. If an item was deleted in the meantime, its batch falls back to patching items one by one, skipping deleted ones.
@@ -257,7 +258,7 @@ When the invalidation after a template write fails, the write stays committed an
 
 A template item written directly into Cosmos, bypassing the service, leaves existing `CalculatedContent` in place. That template is applied on the next calculation, after one of the writes above has cleared the cached document.
 
-`ClearConfigurationAsync` returns immediately when `Content` is empty, so a system-created item stays in place. `DeleteAsync` calls `ForceDeleteConfigurationAsync`, which deletes that item directly and writes no history row. A system-created item gains history once a caller writes real `Content` into it.
+`ClearConfigurationAsync` clears nothing when `Content` is empty, so a system-created item stays in place; it still finishes the invalidation of an earlier clear that was left pending. `DeleteAsync` calls `ForceDeleteConfigurationAsync`, which deletes a system-created item (version 0) directly and writes no history row. A system-created item gains history once a caller writes real `Content` into it.
 
 ## What each read returns
 

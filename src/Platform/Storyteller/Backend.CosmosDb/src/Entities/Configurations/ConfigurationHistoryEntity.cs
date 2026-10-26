@@ -13,6 +13,9 @@ public record class ConfigurationHistoryEntity : Entity
     // The write that produced this version.
     public required AuditStamp Modified { get; init; }
 
+    // The token of the clear or delete that archived this version while its cache invalidation hasn't finished yet.
+    public string? PendingInvalidationId { get; init; }
+
     [JsonProperty("ttl")]
     [JsonPropertyName("ttl")]
     public int TimeToLiveInSeconds { get; init; } = 60 * 60 * 24 * 365; // default to 12 months (365 days)

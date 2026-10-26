@@ -301,7 +301,7 @@ Each also loads its root and ancestors (point reads) and its descendants (one qu
 
 ## Configuration writes
 
-`CreateOrUpdateConfigurationAsync`, `PatchConfigurationAsync`, `ClearConfigurationAsync` and `DeleteAsync` work as before. After the write they append an audit entry, best effort and outside the configuration's batch. If the annotation has no configuration item yet, they also read it once to reject a deleted annotation.
+`CreateOrUpdateConfigurationAsync`, `PatchConfigurationAsync`, `ClearConfigurationAsync` and `DeleteAsync` append an audit entry after the write commits, best effort and outside the configuration's batch, and before they invalidate the dependent calculations; a committed change is therefore audited also when its invalidation fails. If the annotation has no configuration item yet, they also read it once to reject a deleted annotation. The write itself, its retries and the pending invalidation are described in [inheritance.md](inheritance.md#cache-and-descendant-freshness).
 
 ```mermaid
 sequenceDiagram
@@ -310,17 +310,24 @@ sequenceDiagram
   participant C as CosmosConfigurationService
   participant P as Annotation partition
   A->>C: PatchConfigurationAsync (actor)
-  C->>P: read cnf (AnnotationDeletionId set means 409 AnnotationDeleted)
-  C->>P: invalidate dependent calculations
-  C->>P: batch [create cfv, upsert cnf]
+  C->>P: read cnf with ETag (AnnotationDeletionId set means 409 AnnotationDeleted)
+  Note over C,P: a PendingInvalidationId left by an earlier write is finished first, then cnf is read again
+  C->>P: read cfv of the stored version
+  C->>P: batch [create cfv, replace cnf (if-match) with PendingInvalidationId]
+  Note over C,P: 409, 412 or 404 starts over from the read, up to 3 times, then 409 Conflict
   C->>P: read annotation and adt (ETag)
   C->>P: replace adt with ConfigurationChanged (if-match, up to 3 attempts)
   Note over C,P: a failed append is logged, the write still succeeds
+  C->>P: invalidate dependent calculations
+  C->>P: patch cnf: remove PendingInvalidationId (filtered on the token)
 ```
 
 **Cost:**
 
 - The audit append adds ≈ 13–34 RU per configuration write: 1 + (1…7) + (10.6…25.7).
+- The archive check adds a point read of the stored version's `cfv` (1 RU), and the removal of the token a patch (≈ 10 RU). A unit of execution has no descendants and stores no token.
+- A write to a configuration without an item or without content, and a clear that finds nothing to clear, query the key's versions for pending clears (≈ 3 RU).
+- A write that loses to a concurrent change repeats its reads and its batch.
 - Configuration reads that check the annotation's state add 1 RU: the version list, one version, the hierarchy view, and the raw read when no configuration item exists.
 - The API's `404` with `AnnotationDeleted` costs one more point read, only on that path.
 

@@ -48,7 +48,9 @@ public interface IConfigurationService
 
     Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, AuditActor actor, bool force = false);
 
-    Task ClearConfigurationAsync(FullKey key, AuditActor? actor = null);
+    // True when stored content was cleared. Every clear first finishes the cache invalidation an earlier one left
+    // pending, also a clear that finds nothing to clear.
+    Task<bool> ClearConfigurationAsync(FullKey key, AuditActor? actor = null);
 
     Task DeleteAsync(FullKey key, AuditActor? actor = null);
 

@@ -217,5 +217,5 @@ A violation answers `InvalidInputException` with `ErrorCode` `InvalidAnnotation`
 | `AnnotationNotDeleted` | A permanent delete of an active annotation. |
 | `AnnotationInactive` | `GET …/annotations/{key}` of a disabled, scheduled or expired annotation without `includeInactive=true` (`404`). |
 | `NotFound` | A restore of a key that does not exist or was purged. |
-| `Conflict` | The annotations changed concurrently three times in a row, or a descendant was restored during a permanent delete. |
+| `Conflict` | The annotations changed concurrently three times in a row, a configuration write lost to concurrent changes on every retry, or a descendant was restored during a permanent delete. |
 | `BodyTooLarge` | `413`: the body of a bulk create is larger than 16 MiB, that of a single annotation larger than 4 MiB, or that of `…/simple`, a lookup or a restore larger than 1 MiB. |
