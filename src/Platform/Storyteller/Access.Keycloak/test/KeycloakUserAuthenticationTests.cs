@@ -245,31 +245,14 @@ public class KeycloakUserAuthenticationTests
     }
 
     [Fact]
-    public void Validate_DelegatedClientsUnderKeycloak_Fail()
-    {
-        var options = KeycloakOptions(Issuer);
-        options.DelegatedClients.Add(new DelegatedClientOptions
-        {
-            ClientId = "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11",
-            TenantId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d",
-        });
-
-        var result = _validator.Validate(null, options);
-
-        result.Failed.ShouldBeTrue();
-        result.FailureMessage.ShouldContain("Entra ID only");
-    }
-
-    [Fact]
     public void Validate_EveryKeycloakFailure_IsReported()
     {
         var options = new UserAuthenticationOptions { Provider = IdentityProviderKind.Keycloak };
         options.Keycloak.AllowedClientIds = [string.Empty];
-        options.DelegatedClients.Add(new DelegatedClientOptions());
 
         var result = _validator.Validate(null, options);
 
-        result.Failures.ShouldNotBeNull().Count().ShouldBe(4);
+        result.Failures.ShouldNotBeNull().Count().ShouldBe(3);
     }
 
     private static UserAuthenticationOptions KeycloakOptions(string issuer)

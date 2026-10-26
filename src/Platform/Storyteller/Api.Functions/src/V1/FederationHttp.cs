@@ -261,7 +261,8 @@ public class FederationHttp
         }
 
         // The rules decide which workload gets the machine's tokens, and with them its scopes.
-        await AccessHttp.EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
+        var stored = await AccessHttp.EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
+        AccessHttp.EnsureActorMayGiveOutSecretReads(request, stored?.Scopes ?? []);
 
         var (rules, invalidBody) = await request.ReadJsonBodyAsync<List<FederationRule>>(_bodyJsonOptions, "a list of federation rules", RequestBodyLimits.FederationRules, ErrorCodes.InvalidFederation);
 

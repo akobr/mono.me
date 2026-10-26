@@ -14,11 +14,17 @@ namespace _42.Platform.Storyteller.Api.Security;
 
 // The outcome of GetSecretRightsAsync: the caller, and per direction whether a right of the machine was withheld
 // because the request has no mTLS. A refusal names mTLS only for a right the machine has, where mTLS would help.
+// IsReadWithheldByActor is the same for a user acting through an actor under NoSecretReveal: the role gives the read
+// right and the actor withholds it. Writes are never withheld by an actor.
 public sealed record SecretRights(KeyValueCaller Caller, bool IsReadWithheldByMtls, bool IsWriteWithheldByMtls)
 {
     public const string WithheldHeader = "X-2S-Secrets-Withheld";
 
     public const string WithheldByMtls = "mtls-required";
+
+    public const string WithheldByActor = "actor-restricted";
+
+    public bool IsReadWithheldByActor { get; init; }
 
     public bool CanReadSecrets => Caller.CanReadSecrets;
 
@@ -80,7 +86,8 @@ public static class HttpRequestDataExtensions
     }
 
     // Who makes the request, for every audit stamp: the machine, or the account (its sub) with a display name from
-    // the token. The profile resolver is not called, so recording the actor adds no latency. Debug builds (DEV_AUTH)
+    // the token, and Via the actor that acts for it (a Storyteller user token, whose name the bearer middleware read from
+    // the account). The profile resolver is not called, so recording the actor adds no latency. Debug builds (DEV_AUTH)
     // also serve requests without an identity; those are System.
     public static AuditActor GetAuditActor(this HttpRequestData @this)
     {
@@ -98,17 +105,19 @@ public static class HttpRequestDataExtensions
 
         var name = @this.GetClaim(NameClaimType)?.Trim();
         var userName = @this.GetClaim(UniqueNameClaimTypes)?.Trim();
-        return AuditActor.Account(
+        var account = AuditActor.Account(
             @this.GetIdentityUniqueId(),
             string.IsNullOrEmpty(name) ? (string.IsNullOrEmpty(userName) ? null : userName) : name);
+        return @this.TryGetDelegatedActor(out var actorId) ? account with { Via = actorId } : account;
     }
 
     // Who the caller is for key/value secrets, and what it may do with secret values. A machine reads them with
     // Secrets.Read and writes them with Secrets.Write, each stored on the machine and carried by its credentials, in
     // every build; when the project delivers secrets only over mTLS and the request has none, both are withheld, and
     // each is reported withheld only when the machine has it. A user needs ContributorWithSecrets for both, and no scope
-    // gives them; Debug builds (DEV_AUTH) skip that role check. Handlers call AsAmbient() on the result before they
-    // resolve bindings.
+    // gives them; Debug builds (DEV_AUTH) skip that role check. An actor under NoSecretReveal withholds the read right
+    // of the user it acts for, in every build, and it is reported withheld only when the role gives it; the write right
+    // stays. Handlers call AsAmbient() on the result before they resolve bindings.
     public static async Task<SecretRights> GetSecretRightsAsync(
         this HttpRequestData @this,
         IAccessService accessService,
@@ -136,21 +145,25 @@ public static class HttpRequestDataExtensions
         }
 
 #if DEV_AUTH
-        var canUseSecrets = true;
+        var canReadSecrets = true;
+        var canWriteSecrets = true;
 #else
-        var canUseSecrets = false;
+        var canReadSecrets = false;
+        var canWriteSecrets = false;
 
         // A token that does not act for a user has no account to look up; the access check refused it already.
         if (@this.GetScopes().Contains(Scopes.User.Impersonation))
         {
             var accountId = @this.GetIdentityUniqueId();
             var accessRole = await accessService.GetAccountRoleAsync(accountId, $"{organization}.{project}");
-            canUseSecrets = accessRole >= AccountRole.ContributorWithSecrets;
+            canReadSecrets = canWriteSecrets = accessRole >= AccountRole.ContributorWithSecrets;
         }
 #endif
 
-        var user = new KeyValueCaller(actor, canUseSecrets, canUseSecrets, KeyValueChannel.User) { CorrelationId = correlationId };
-        return new SecretRights(user, IsReadWithheldByMtls: false, IsWriteWithheldByMtls: false);
+        // After the DEV_AUTH block, so the restriction of the actor holds in every build.
+        var withheldByActor = canReadSecrets && @this.HasActorRestriction(ActorRestrictions.NoSecretReveal);
+        var user = new KeyValueCaller(actor, canReadSecrets && !withheldByActor, canWriteSecrets, KeyValueChannel.User) { CorrelationId = correlationId };
+        return new SecretRights(user, IsReadWithheldByMtls: false, IsWriteWithheldByMtls: false) { IsReadWithheldByActor = withheldByActor };
     }
 
     // The scopes a machine may use in this request: stored on the machine and carried by its credentials. It reads the
@@ -357,6 +370,30 @@ public static class HttpRequestDataExtensions
 
         appId = null;
         return false;
+    }
+
+    // The actor that acts for the user (the act.sub of a Storyteller user token, such as the MCP server). The request is
+    // still the user's: roles decide, and the actor's restrictions narrow what the user may do.
+    public static bool TryGetDelegatedActor(this HttpRequestData @this, [MaybeNullWhen(false)] out string actorId)
+    {
+        if (@this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.DelegatedActor, out var value)
+            && value is string delegatedActor
+            && !string.IsNullOrEmpty(delegatedActor))
+        {
+            actorId = delegatedActor;
+            return true;
+        }
+
+        actorId = null;
+        return false;
+    }
+
+    // True when the actor of the request carries the restriction (ActorRestrictions); false for every direct call.
+    public static bool HasActorRestriction(this HttpRequestData @this, string restriction)
+    {
+        return @this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.DelegatedRestrictions, out var value)
+            && value is IReadOnlyCollection<string> restrictions
+            && restrictions.Contains(restriction, StringComparer.Ordinal);
     }
 
     public static string? GetClaim(this HttpRequestData @this, params string[] claimTypes)

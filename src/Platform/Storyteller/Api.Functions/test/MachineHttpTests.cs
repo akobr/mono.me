@@ -42,6 +42,13 @@ public class MachineHttpTests
         ([MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite, MachineScope.SecretsRead, MachineScope.KeyValueManage], AccountRole.Administrator),
         ([.. MachineScopes.All], AccountRole.Administrator));
 
+    // Scopes whose credentials read secrets (SecretsWrite brings SecretsRead).
+    public static TheoryData<MachineScope[]> SecretReadingScopes => new()
+    {
+        { [MachineScope.ConfigurationRead, MachineScope.SecretsRead] },
+        { [MachineScope.SecretsWrite] },
+    };
+
     private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;
 
     // The role checks of users look up one role per check; Debug builds (DEV_AUTH) skip them.
@@ -524,6 +531,98 @@ public class MachineHttpTests
         access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
     }
 
+    // An actor under NoSecretReveal may not give out what reads secrets: the credentials of a new machine with a Secrets
+    // scope would enter its context. Refused in every build, before the machine is created.
+    [Theory]
+    [MemberData(nameof(SecretReadingScopes))]
+    public async Task PostMachines_WithASecretsScope_ThroughARestrictedActor_IsActorRestricted(MachineScope[] scopes)
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.ContributorWithSecrets };
+        var http = CreateHttp(access);
+        var body = FunctionTestDoubles.ToJsonBody(MachineCreate(null) with { Scopes = scopes });
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.PostMachines(RestrictedActorRequest("POST", body), "org1", "proj1"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        access.Created.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task PostMachines_WithoutASecretsScope_ThroughARestrictedActor_IsCreated()
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.ContributorWithSecrets };
+        var http = CreateHttp(access);
+        var body = FunctionTestDoubles.ToJsonBody(MachineCreate(null));
+
+        (await http.PostMachines(RestrictedActorRequest("POST", body), "org1", "proj1")).ShouldBeOfType<OkObjectResult>();
+
+        access.Created.ShouldNotBeNull().Scopes.ShouldBe([MachineScope.ConfigurationRead]);
+    }
+
+    // An actor that allows secrets (no NoSecretReveal) gives out what the user's role may.
+    [Fact]
+    public async Task PostMachines_WithASecretsScope_ThroughAnActorThatAllowsSecrets_IsCreated()
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.ContributorWithSecrets };
+        var http = CreateHttp(access);
+        var body = FunctionTestDoubles.ToJsonBody(MachineCreate(null) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
+
+        (await http.PostMachines(TestRequests.DelegatedUser([], "POST", body), "org1", "proj1")).ShouldBeOfType<OkObjectResult>();
+
+        access.Created.ShouldNotBeNull();
+    }
+
+    // A reset gives out new credentials of the stored scopes, so through a restricted actor it is refused for a machine
+    // with a Secrets scope; the delete gives nothing out and passes.
+    [Fact]
+    public async Task ResetAndDelete_OfASecretsMachine_ThroughARestrictedActor_RefuseOnlyTheReset()
+    {
+        var access = new RecordingAccess(Machine() with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] }) { Role = AccountRole.ContributorWithSecrets };
+        var http = CreateHttp(access);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.PutMachine(RestrictedActorRequest("PUT"), "org1", "proj1", KeycloakId));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}"]);
+
+        (await http.DeleteMachine(RestrictedActorRequest("DELETE"), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkResult>();
+
+        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
+    }
+
+    [Fact]
+    public async Task PutMachine_OfAMachineWithoutASecretsScope_ThroughARestrictedActor_IsReset()
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.ContributorWithSecrets };
+        var http = CreateHttp(access);
+
+        var reset = await http.PutMachine(RestrictedActorRequest("PUT"), "org1", "proj1", KeycloakId);
+
+        reset.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().AccessKey.ShouldBe("new-secret");
+        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"reset:org1/proj1/{KeycloakId}"]);
+    }
+
+    // The role check comes first: without ContributorWithSecrets a restricted actor is refused like a direct call
+    // (AccessDenied). Debug builds (DEV_AUTH) skip the role checks of users, so there the actor's restriction refuses.
+    [Theory]
+    [InlineData(AccountRole.Reader)]
+    [InlineData(AccountRole.Contributor)]
+    public async Task SecretsMachine_ThroughARestrictedActorWithoutTheRole_IsRefusedForTheRoleFirst(AccountRole role)
+    {
+        var access = new RecordingAccess(Machine() with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] }) { Role = role };
+        var http = CreateHttp(access);
+        var body = FunctionTestDoubles.ToJsonBody(MachineCreate(null) with { Scopes = [MachineScope.SecretsRead] });
+        var expected = DevAuth ? ErrorCodes.ActorRestricted : ErrorCodes.AccessDenied;
+
+        (await Should.ThrowAsync<AccessDeniedException>(() => http.PostMachines(RestrictedActorRequest("POST", body), "org1", "proj1")))
+            .ErrorCode.ShouldBe(expected);
+        (await Should.ThrowAsync<AccessDeniedException>(() => http.PutMachine(RestrictedActorRequest("PUT"), "org1", "proj1", KeycloakId)))
+            .ErrorCode.ShouldBe(expected);
+
+        access.Created.ShouldBeNull();
+        access.Calls.ShouldNotContain($"reset:org1/proj1/{KeycloakId}");
+    }
+
     // Spec 4: reading and listing a machine stay at Contributor, whatever its scopes; below Contributor the delete is
     // refused by its route first, before the machine is read. Debug builds (DEV_AUTH) skip the role checks of users.
     [Theory]
@@ -668,6 +767,12 @@ public class MachineHttpTests
             new("scp", Scopes.User.Impersonation),
         };
         return request;
+    }
+
+    // A user's request through the actor mcp under NoSecretReveal (the role is the one of RecordingAccess).
+    private static TestHttpRequestData RestrictedActorRequest(string method = "GET", string? body = null)
+    {
+        return TestRequests.DelegatedUser([ActorRestrictions.NoSecretReveal], method, body);
     }
 
     private static MachineAccess Machine()

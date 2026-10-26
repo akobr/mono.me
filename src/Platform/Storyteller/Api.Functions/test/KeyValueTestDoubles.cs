@@ -11,8 +11,8 @@ using _42.Platform.Storyteller.KeyValues.Usage;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
-// Requests of the key/value tests: a user with a project role, or a machine with scopes and an optional mTLS
-// certificate. A user token carries only User.Impersonation: user secret rights come from the role. A machine's
+// Requests of the key/value tests: a user with a project role, directly or through an actor, or a machine with scopes
+// and an optional mTLS certificate. A user token carries only User.Impersonation: user secret rights come from the role. A machine's
 // credentials carry scope strings as roles, as the machine validators put them. A body goes as JSON, with its content
 // type.
 internal static class KeyValueRequests
@@ -26,6 +26,18 @@ internal static class KeyValueRequests
     public static TestHttpRequestData User(string method = "GET", Action<NameValueCollection>? query = null, string? body = null)
     {
         var request = TestRequests.User(method, body);
+        query?.Invoke(request.Query);
+        return request;
+    }
+
+    // The same user acting through the actor of TestRequests.DelegatedUser: NoSecretReveal unless restrictions are given.
+    public static TestHttpRequestData DelegatedUser(
+        string method = "GET",
+        Action<NameValueCollection>? query = null,
+        string? body = null,
+        IReadOnlyList<string>? restrictions = null)
+    {
+        var request = TestRequests.DelegatedUser(restrictions, method, body);
         query?.Invoke(request.Query);
         return request;
     }

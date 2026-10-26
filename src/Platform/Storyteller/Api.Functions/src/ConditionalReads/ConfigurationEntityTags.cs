@@ -94,11 +94,15 @@ public static class ConfigurationEntityTags
         return Finish(hash, CompositionPrefix);
     }
 
-    // s: the caller may read secrets; w: the read right is withheld from a machine without mTLS; p: neither.
-    // w and p get the same body, but only w gets the withheld header, so they don't share a tag either.
+    // s: the caller may read secrets; w: the read right is withheld from a machine without mTLS; a: the read right is
+    // withheld from a user by the actor it acts through (NoSecretReveal); p: none of them. w, a and p get the same body,
+    // but w and a get the withheld header, each with its own value, so none of them shares a tag either.
     private static string RightsCode(SecretRights rights)
     {
-        return rights.CanReadSecrets ? "s" : rights.IsReadWithheldByMtls ? "w" : "p";
+        return rights.CanReadSecrets ? "s"
+            : rights.IsReadWithheldByMtls ? "w"
+            : rights.IsReadWithheldByActor ? "a"
+            : "p";
     }
 
     private static EntityTagHeaderValue Create(IncrementalHash hash, string prefix, FullKey key, SecretRights? rights, Configuration configuration)

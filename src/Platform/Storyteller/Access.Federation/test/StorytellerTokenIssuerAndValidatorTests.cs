@@ -26,7 +26,7 @@ public sealed class StorytellerTokenIssuerAndValidatorTests
         var options = Options.Create(_options);
         _keyProvider = new TokenSigningKeyProvider(_store, options, _time, NullLogger<TokenSigningKeyProvider>.Instance);
         _issuer = new StorytellerTokenIssuer(_keyProvider, options, _time);
-        _validator = new StorytellerTokenValidator(_keyProvider, options, _time, NullLogger<StorytellerTokenValidator>.Instance);
+        _validator = new StorytellerTokenValidator(_keyProvider, options, Options.Create(new TokenExchangeOptions()), _time, NullLogger<StorytellerTokenValidator>.Instance);
     }
 
     [Fact]

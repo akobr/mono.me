@@ -19,7 +19,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 // checked: the runtime scope, the management scope of a management operation, and Secrets.Write for protect. Secret
 // values need a secrets scope, stored on the machine and carried by its credentials: Secrets.Read to reveal, diff and
 // export them, Secrets.Write to write them and to protect. Users carry no data scope: the role decides, and only
-// ContributorWithSecrets gives them the secret rights. The Administrator operations are for users only.
+// ContributorWithSecrets gives them the secret rights. An actor under NoSecretReveal withholds the secret values from the
+// user it acts for, in every build, and leaves the writes alone. The Administrator operations are for users only.
 public class KeyValuesHttpTests
 {
     private const string Org = "acme";
@@ -664,6 +665,148 @@ public class KeyValuesHttpTests
         service.Calls.ShouldBe(["get:db.password", "export", "set:db.password", "protect:a"]);
         service.LastCaller!.CanReadSecrets.ShouldBeTrue();
         service.LastCaller.CanWriteSecrets.ShouldBeTrue();
+    }
+
+    // An actor under NoSecretReveal (the MCP server by default): a reveal is ActorRestricted before the service is asked,
+    // as for mTLS, in every build; Debug builds (DEV_AUTH) give the user the rights and the actor still withholds them.
+    [Fact]
+    public async Task GetKeyValue_RevealThroughARestrictedActor_IsActorRestrictedBeforeTheService()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+
+        var act = () => http.GetKeyValue(KeyValueRequests.DelegatedUser(query: q => q["reveal"] = "true"), Org, Project, View, "db.password");
+
+        var exception = await act.ShouldThrowAsync<AccessDeniedException>();
+        exception.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        exception.Message.ShouldBe(KeyValueErrors.ActorRestricted().Message);
+        service.Calls.ShouldBeEmpty("the restriction is decided before the service is asked");
+    }
+
+    // Like the mTLS rule, a reveal is refused before the pair is known, of a public pair too; without reveal the public
+    // value and the secret without its value are returned.
+    [Fact]
+    public async Task GetKeyValue_ThroughARestrictedActor_ReadsWithoutReveal()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Public("db.host", "db-1");
+
+        var revealPublic = await Should.ThrowAsync<AccessDeniedException>(() => http.GetKeyValue(KeyValueRequests.DelegatedUser(query: q => q["reveal"] = "true"), Org, Project, View, "db.host"));
+        var @public = await http.GetKeyValue(KeyValueRequests.DelegatedUser(), Org, Project, View, "db.host");
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+        var secret = await http.GetKeyValue(KeyValueRequests.DelegatedUser(), Org, Project, View, "db.password");
+
+        revealPublic.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        @public.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBe("db-1");
+        secret.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBeNull();
+        service.Calls.ShouldBe(["get:db.host", "get:db.password"]);
+        service.LastCaller!.CanReadSecrets.ShouldBeFalse();
+        service.LastCaller.Actor.Via.ShouldBe(TestRequests.ActorId);
+    }
+
+    [Fact]
+    public async Task GetKeyValueVersion_RevealThroughARestrictedActor_IsActorRestrictedBeforeTheService()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+
+        var revealed = await Should.ThrowAsync<AccessDeniedException>(() => http.GetKeyValueVersion(KeyValueRequests.DelegatedUser(query: q => q["reveal"] = "true"), Org, Project, View, "db.password", 2));
+        var callsOfTheReveal = service.Calls.Count;
+        var hidden = await http.GetKeyValueVersion(KeyValueRequests.DelegatedUser(), Org, Project, View, "db.password", 2);
+
+        revealed.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        callsOfTheReveal.ShouldBe(0, "the restriction is decided before the service is asked");
+        hidden.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBeNull();
+    }
+
+    // The diff of a secret carries its text and is ActorRestricted when the service refuses it; the diffs of public
+    // versions keep working (the MCP server's diff_key_value compares them).
+    [Fact]
+    public async Task Diff_ThroughARestrictedActor_IsActorRestrictedForASecretOnly()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Public("db.host", "db-1");
+
+        var @public = await http.GetKeyValueVersionDiff(KeyValueRequests.DelegatedUser(), Org, Project, View, "db.host", 2);
+        var publicCustom = await http.GetKeyValueVersionDiffCustom(KeyValueRequests.DelegatedUser(), Org, Project, View, "db.host", 3, 1);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+        var secret = await Should.ThrowAsync<AccessDeniedException>(() => http.GetKeyValueVersionDiff(KeyValueRequests.DelegatedUser(), Org, Project, View, "db.password", 2));
+        var secretCustom = await Should.ThrowAsync<AccessDeniedException>(() => http.GetKeyValueVersionDiffCustom(KeyValueRequests.DelegatedUser(), Org, Project, View, "db.password", 3, 1));
+
+        @public.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<DiffResult>();
+        publicCustom.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<DiffResult>();
+        secret.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        secretCustom.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        service.Calls.ShouldBe(["diff:db.host", "diff:db.host", "diff:db.password", "diff:db.password"]);
+    }
+
+    [Fact]
+    public async Task Export_WithSecretsThroughARestrictedActor_IsActorRestrictedBeforeTheService()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+
+        var withSecrets = await Should.ThrowAsync<AccessDeniedException>(() => http.ExportKeyValues(KeyValueRequests.DelegatedUser("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true })), Org, Project, View));
+        var callsOfTheExport = service.Calls.Count;
+        var withoutSecrets = await http.ExportKeyValues(KeyValueRequests.DelegatedUser("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest())), Org, Project, View);
+
+        withSecrets.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        callsOfTheExport.ShouldBe(0, "the restriction is decided before the service is asked");
+        withoutSecrets.ShouldBeOfType<OkObjectResult>();
+        service.LastExport!.IncludeSecrets.ShouldBeFalse();
+    }
+
+    // NoSecretReveal is about reading: the writes of secrets keep the write right of the role.
+    [Fact]
+    public async Task Writes_ThroughARestrictedActor_KeepTheWriteRight()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+        var import = new KeyValueDocument { Items = [new KeyValueDocumentItem { Key = "db.password", Protection = KeyValueProtection.Standard, Value = "s3cret" }] };
+
+        var set = await http.SetKeyValue(KeyValueRequests.DelegatedUser("PUT", body: FunctionTestDoubles.ToJsonBody(new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s3cret" })), Org, Project, View, "db.password");
+        var protect = await http.ProtectKeyValues(KeyValueRequests.DelegatedUser("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["db.password"], Protection = KeyValueProtection.Hsm })), Org, Project, View);
+        var imported = await http.ImportKeyValues(KeyValueRequests.DelegatedUser("POST", body: FunctionTestDoubles.ToJsonBody(import)), Org, Project, View);
+        var deleted = await http.DeleteKeyValue(KeyValueRequests.DelegatedUser("DELETE"), Org, Project, View, "db.password");
+
+        set.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBeNull();
+        protect.ShouldBeOfType<OkObjectResult>();
+        imported.ShouldBeOfType<OkObjectResult>();
+        deleted.ShouldBeOfType<NoContentResult>();
+        service.Calls.ShouldBe(["set:db.password", "protect:db.password", "import", "delete:db.password"]);
+        service.LastCaller!.CanWriteSecrets.ShouldBeTrue();
+        service.LastCaller.CanReadSecrets.ShouldBeFalse();
+        service.LastCaller.Actor.Via.ShouldBe(TestRequests.ActorId);
+    }
+
+    // An actor that allows secrets (no NoSecretReveal in the token) leaves the user the rights of the role.
+    [Fact]
+    public async Task Secrets_ThroughAnActorThatAllowsSecrets_AreRevealed()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+
+        var reveal = await http.GetKeyValue(KeyValueRequests.DelegatedUser(query: q => q["reveal"] = "true", restrictions: []), Org, Project, View, "db.password");
+        var diff = await http.GetKeyValueVersionDiff(KeyValueRequests.DelegatedUser(restrictions: []), Org, Project, View, "db.password", 2);
+        var export = await http.ExportKeyValues(KeyValueRequests.DelegatedUser("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true }), restrictions: []), Org, Project, View);
+
+        reveal.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBe("s3cret");
+        diff.ShouldBeOfType<OkObjectResult>();
+        export.ShouldBeOfType<OkObjectResult>();
+        service.LastCaller!.CanReadSecrets.ShouldBeTrue();
+    }
+
+    // A delegated Reader has no read right for the actor to withhold, so it is refused like a direct Reader, by the
+    // service (AccessDenied). Debug builds (DEV_AUTH) give every user the rights, so there the actor withholds them.
+    [Fact]
+    public async Task GetKeyValue_RevealByAReaderThroughARestrictedActor_IsRefusedLikeAReader()
+    {
+        var (http, service) = Create(AccountRole.Reader);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.GetKeyValue(KeyValueRequests.DelegatedUser(query: q => q["reveal"] = "true"), Org, Project, View, "db.password"));
+
+        exception.ErrorCode.ShouldBe(DevAuth ? ErrorCodes.ActorRestricted : ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe(DevAuth ? KeyValueErrors.ActorRestricted().Message : NoRightsToTheSecret);
     }
 
     [Fact]

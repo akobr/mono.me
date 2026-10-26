@@ -583,25 +583,25 @@ public class MachineAccessCheckTests
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
     }
 
-    // A delegated token of a listed client app (424-84, the MCP server's on-behalf-of token) is classified as a user
-    // by the Entra validator: no machine identity, its own azp and tid. It goes through the same role check.
+    // A user acting through an actor (a Storyteller user token of the MCP server) is a user: no machine identity, and the
+    // same role check, which the actor cannot raise. Every reach, the access point of the project too.
     [Theory]
-    [MemberData(nameof(EveryReach))]
-    public async Task UserOfADelegatedClient_WithTheRole_Passes(Reach reach)
+    [MemberData(nameof(UserWithTheMinimalRole))]
+    public async Task UserThroughAnActor_WithTheMinimalRole_Passes(Reach reach, AccountRole role, AccountRole minimalRole)
     {
-        await Check(reach, DelegatedUser(), new RoleAccess(AccountRole.Contributor), AccountRole.Contributor, MachineScope.AnnotationWrite);
+        await Check(reach, TestRequests.DelegatedUser(), new RoleAccess(role), minimalRole, MachineScope.AnnotationWrite);
     }
 
     [Theory]
-    [MemberData(nameof(EveryReach))]
-    public async Task UserOfADelegatedClient_BelowTheRole_IsDenied(Reach reach)
+    [MemberData(nameof(UserBelowTheMinimalRole))]
+    public async Task UserThroughAnActor_BelowTheMinimalRole_IsDenied(Reach reach, AccountRole role, AccountRole minimalRole)
     {
         if (DevAuth)
         {
             return;
         }
 
-        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Check(reach, DelegatedUser(), new RoleAccess(AccountRole.Reader), AccountRole.Contributor));
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Check(reach, TestRequests.DelegatedUser(), new RoleAccess(role), minimalRole));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
     }
@@ -736,17 +736,6 @@ public class MachineAccessCheckTests
     }
 
     private static RoleAccess Restricted() => new(AccountRole.Reader, Restriction);
-
-    // The claims of an on-behalf-of token of a listed client app, as the Entra validator leaves a user: no machine
-    // identity, the azp and tid of the client next to sub and User.Impersonation.
-    private static TestHttpRequestData DelegatedUser()
-    {
-        var request = TestRequests.User();
-        var claims = (List<System.Security.Claims.Claim>)request.FunctionContext.Items[FunctionContextItemKeys.CachedClaims];
-        claims.Add(new System.Security.Claims.Claim("azp", "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11"));
-        claims.Add(new System.Security.Claims.Claim("tid", "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d"));
-        return request;
-    }
 
     // The credentials carry the runtime scope Configuration.Read and the given management scopes as roles.
     private static TestHttpRequestData MachineRequest(

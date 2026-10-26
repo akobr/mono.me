@@ -22,6 +22,10 @@ public record class AuditActor
 
     public string? Name { get; init; }
 
+    // The actor that acted for the account (the act.sub of a Storyteller user token, such as the MCP server), so a change
+    // reads "Ada via mcp". Null for a direct call, and then left out of stored and returned documents.
+    public string? Via { get; init; }
+
     public static AuditActor System { get; } = new() { Kind = AuditActorKind.System, Id = "system" };
 
     public static AuditActor Account(string id, string? name = null) => new() { Kind = AuditActorKind.Account, Id = id, Name = name };

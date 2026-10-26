@@ -15,6 +15,10 @@ public static class ErrorCodes
     // A machine restricted to an annotation addressed another annotation, or an operation of the whole project.
     public const string AnnotationRestricted = "AnnotationRestricted";
 
+    // A token acts for the user through an actor (the MCP server) whose restrictions refuse the operation, such as
+    // NoSecretReveal for a request of secret values.
+    public const string ActorRestricted = "ActorRestricted";
+
     public const string AccountExists = "AccountExists";
     public const string AccessPointExists = "AccessPointExists";
     public const string LastOwner = "LastOwner";

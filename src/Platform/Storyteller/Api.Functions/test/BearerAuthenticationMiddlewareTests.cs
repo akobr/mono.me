@@ -281,50 +281,6 @@ public class BearerAuthenticationMiddlewareTests
     }
 
     [Fact]
-    public async Task Invoke_DebugDecode_DelegatedTokenOfListedClient_IsNotAMachine()
-    {
-        await WithModeAsync(decodeWithoutValidation: true, async () =>
-        {
-            var validator = new RecordingBearerTokenValidator();
-            using var services = FunctionTestDoubles.CreateServices(validator, new UserAuthenticationOptions
-            {
-                ClientId = "api-client",
-                DelegatedClients = [new DelegatedClientOptions { ClientId = "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11", TenantId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d" }],
-            });
-            var (context, _) = FunctionTestDoubles.CreateRequest(
-                services,
-                Bearer(UnsignedJwt("""{"sub":"user-1","azp":"6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11","tid":"8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d","oid":"3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d","scp":"User.Impersonation"}""")));
-
-            var called = await InvokeAsync(context);
-
-            called.ShouldBeTrue();
-            context.Items.ContainsKey(FunctionContextItemKeys.CachedClaims).ShouldBeTrue();
-            context.Items.ContainsKey(FunctionContextItemKeys.MachineIdentity).ShouldBeFalse();
-        });
-    }
-
-    [Fact]
-    public async Task Invoke_DebugDecode_AppOnlyTokenOfListedClient_IsAMachine()
-    {
-        await WithModeAsync(decodeWithoutValidation: true, async () =>
-        {
-            var validator = new RecordingBearerTokenValidator();
-            using var services = FunctionTestDoubles.CreateServices(validator, new UserAuthenticationOptions
-            {
-                ClientId = "api-client",
-                DelegatedClients = [new DelegatedClientOptions { ClientId = "6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11", TenantId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d" }],
-            });
-            var (context, _) = FunctionTestDoubles.CreateRequest(
-                services,
-                Bearer(UnsignedJwt("""{"sub":"6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11","azp":"6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11","tid":"8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d","roles":["Configuration.Read"]}""")));
-
-            await InvokeAsync(context);
-
-            context.Items[FunctionContextItemKeys.MachineIdentity].ShouldBe("6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11");
-        });
-    }
-
-    [Fact]
     public async Task Invoke_DebugDecode_UnreadableBearer_PassesThrough()
     {
         await WithModeAsync(decodeWithoutValidation: true, async () =>

@@ -17,9 +17,21 @@ internal static class TestRequests
 
     public const string MachineId = "machine-1";
 
+    public const string ActorId = "mcp";
+
     public static TestHttpRequestData User(string method = "GET", string? body = null, IServiceProvider? services = null, string userId = UserId)
     {
         return UserCarrying([Scopes.User.Impersonation], method, body, services, userId);
+    }
+
+    // A user acting through an actor, as the bearer middleware leaves a Storyteller user token: the claims of User (the
+    // name from the account), and the actor ActorId and its restrictions as items; NoSecretReveal unless others are given.
+    public static TestHttpRequestData DelegatedUser(IReadOnlyList<string>? restrictions = null, string method = "GET", string? body = null)
+    {
+        var request = User(method, body);
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedActor] = ActorId;
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedRestrictions] = restrictions ?? [ActorRestrictions.NoSecretReveal];
+        return request;
     }
 
     // A user token whose scp carries the given strings as they are: none, or data scopes next to User.Impersonation.
