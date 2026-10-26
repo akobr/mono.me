@@ -34,6 +34,7 @@ public static class McpHostExtensions
         }
 
         services.AddMcpAuthentication();
+        services.AddHostedService<McpStartupNotice>();
         services.AddStorytellerTokenExchange();
         services.AddStorytellerClients();
 

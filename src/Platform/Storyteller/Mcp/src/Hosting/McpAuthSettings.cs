@@ -81,6 +81,10 @@ public sealed class McpAuthSettings
 
     public IReadOnlyList<string> ValidIssuers { get; }
 
+    // The aud values an inbound token may carry: under Entra ID the MCP app's client id (v2 tokens) and Audience (v1
+    // tokens, the App ID URI), otherwise Audience. Every one of these must be in the API actor's
+    // Auth:TokenExchange:Actors[].SubjectAudiences; otherwise the exchange refuses the token with invalid_grant.
+    // McpStartupNotice logs them at start.
     public IReadOnlyList<string> ValidAudiences { get; }
 
     public string MetadataAddress { get; }

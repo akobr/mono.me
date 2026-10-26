@@ -506,6 +506,9 @@ public static class Definitions
 
         // Create, reset and the federation rules: a machine's scopes may not exceed what its creator may do or grant.
         public const string ResponseForbiddenMachineScopes = ResponseForbiddenUserOnly + " Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).";
+
+        // Replacing a trusted issuer redirects the tokens of the machines whose rules name it, as new rules would.
+        public const string ResponseForbiddenFederatedIssuerReplace = ResponseForbiddenUserOnly + " Replacing an existing trusted issuer is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).";
         public const string ResponseConfigurationNotFound = "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).";
         public const string ResponseConcurrentChange = "The annotations changed concurrently three times in a row (Conflict); try again.";
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";

@@ -14,8 +14,8 @@ public static class ApiErrors
 
     public const string UnauthorizedMessage =
         "The Storyteller API did not accept the token the MCP server got for the person from its token exchange. Sign in "
-        + "to the MCP server again; if that does not help, an administrator checks the person's account and the API's "
-        + "Auth:TokenExchange settings.";
+        + "to the MCP server again. If the person's Storyteller account was removed, register again with sform or the "
+        + "admin UI; otherwise an administrator checks the person's account and the API's Auth:TokenExchange settings.";
 
     // The API's ErrorCode for what it refuses to the actor the token acts through (NoSecretReveal): a secret read, and
     // giving out credentials that read secrets (creating or resetting a machine with a Secrets scope, or replacing its

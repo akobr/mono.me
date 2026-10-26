@@ -75,10 +75,15 @@ builder.AddViteApp("ui-admin", "../../ui.admin/src", "dev:aspire")
     .WithEnvironment("VITE_API_BASE_URL", ReferenceExpression.Create($"{apiFunctions.GetEndpoint("http")}/api"))
     .WithReference(apiFunctions);
 
-// MCP server (Storyteller/Mcp): needs its sign-in settings in its user secrets (Mcp:Provider, Mcp:Authentication:*)
-// and its actor for the API's token exchange (Mcp:Actor:Id and, in Development, Mcp:Actor:ClientSecret), which the
-// API's Auth:TokenExchange:Actors must list, so it starts from the dashboard. The API accepts HTTP in Development, as
-// the admin UI uses it.
+// MCP server (Storyteller/Mcp), started from the dashboard. Its user secrets need Mcp:ResourceUrl (its own URL ending
+// in /mcp, for example https://localhost:7180/mcp), Mcp:Provider and Mcp:Authentication:* (the same provider as the
+// API's Auth:Provider), and its actor: Mcp:Actor:Id and, in Development, Mcp:Actor:ClientSecret. The API (its
+// local.settings.json) must turn the exchange on and list that actor, or every tool answers that the exchange is off:
+// Auth:TokenExchange:Enabled true, Auth:TokenExchange:Actors:0:Id = Mcp:Actor:Id,
+// Actors:0:Authentication:ClientSecretHash = the hex SHA-256 of Mcp:Actor:ClientSecret, and Actors:0:SubjectAudiences
+// = the MCP's audience (Mcp:Authentication:Audience, else Mcp:ResourceUrl; under Entra ID also
+// Mcp:Authentication:ClientId). The MCP server logs the audiences to list at start. The API accepts HTTP in
+// Development, as the admin UI uses it.
 builder.AddProject<Projects.Mcp>("mcp")
     .WithReference(apiFunctions)
     .WaitFor(apiFunctions)
