@@ -444,6 +444,9 @@ public static class Definitions
         public const string Include = "include";
         public const string Existing = "existing";
         public const string Name = "name";
+
+        // A request header; HeaderNames.IfNoneMatch is not a constant, so attributes cannot use it.
+        public const string IfNoneMatch = "If-None-Match";
     }
 
     public static class Tags
@@ -496,7 +499,11 @@ public static class Definitions
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
         public const string ResponseInternalServerError = "Unexpected error occurred on the service.";
 
-        public const string SecureManual = "Manually by token in Authorization HTTP header.";
+        // The security schemes. Whether a machine's kind is accepted also depends on the project's machine authentication
+        // policy, which the requirements of an operation cannot say.
+        public const string SecureManual = "A bearer token in the Authorization header: a user's token, a client-credentials token of the identity provider, or the Storyteller token a federated machine gets from ExchangeMachineToken.";
+        public const string SecureApiKey = "A machine's API key in the Authorization header, the scheme included in the value: 'ApiKey 2s.<base64url(organization:project:machineAccessId)>.<secret>'. The ApiKey and CertificateAndApiKey kinds, when the project's machine authentication policy enables them.";
+        public const string SecureMtls = "The machine's client certificate of the TLS handshake. The platform's front end passes it to the API in X-ARR-ClientCert; a client never sets the header itself, except against a local development host that allows it. The Certificate and CertificateAndApiKey kinds, when the project's machine authentication policy enables them. A shared certificate needs apiKey as well, and the policy can require a certificate for secret reads (ErrorCode MtlsRequired).";
 
         public const string Organization = "Target organization name.";
         public const string Project = "Target project name.";
@@ -512,6 +519,10 @@ public static class Definitions
         public const string ConfigurationComposition = "How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation.";
         public const string ResponseNotModified = "The configuration is unchanged since the ETag sent in If-None-Match.";
         public const string EntityTag = "Weak entity tag of the configuration, for If-None-Match.";
+        public const string IfNoneMatch = "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.";
+        public const string CacheControlConfigurationRead = "private, no-cache: shared caches do not store the response, and a client revalidates its copy before each use.";
+        public const string CacheControlResolvedRead = "no-store when the caller may read secrets, otherwise private, no-cache.";
+        public const string SecretsWithheld = "mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; the secrets then stay unbound, as their @ expressions. Absent otherwise.";
         public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";
         public const string DiffFormat = "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.";
         public const string KeyValueKey = "The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.";

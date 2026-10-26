@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 using System.Text.Json;
 
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1;
 
@@ -348,6 +349,84 @@ public class OpenApiExportTests
         Definitions.Descriptions.ResponseForbiddenUserOnly.ShouldContain("a machine is refused (ErrorCode AccessDenied)");
     }
 
+    // 424-96 §3: the security requirements say who may call an operation, OR between the requirement objects and AND
+    // inside one (written "apiKey+mtls" here). An operation for machines takes a bearer token, the API key, the client
+    // certificate or both, one for users only no machine credential, the renewal the certificate alone or with the API
+    // key, and an anonymous one nothing. Exact sets: a requirement object without a scheme would mean no authentication.
+    [Fact]
+    public async Task Document_SecurityRequirements_MatchWhoMayCall()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        var schemes = document.RootElement.GetProperty("components").GetProperty("securitySchemes");
+        var hasIntegrated = schemes.TryGetProperty(Definitions.SecuritySchemas.Integrated, out _);
+        var operations = document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject())
+            .Select(operation => (Id: operation.Value.GetProperty("operationId").GetString()!, Operation: operation.Value))
+            .ToList();
+        var machineOperations = MachineOperations();
+        var both = $"{Definitions.SecuritySchemas.ApiKey}+{Definitions.SecuritySchemas.Mtls}";
+        string[] forMachines = hasIntegrated
+            ? [Definitions.SecuritySchemas.Manual, Definitions.SecuritySchemas.Integrated, Definitions.SecuritySchemas.ApiKey, Definitions.SecuritySchemas.Mtls, both]
+            : [Definitions.SecuritySchemas.Manual, Definitions.SecuritySchemas.ApiKey, Definitions.SecuritySchemas.Mtls, both];
+
+        foreach (var (id, operation) in operations)
+        {
+            var requirements = Requirements(operation);
+            requirements.ShouldNotContain(string.Empty, id);
+
+            if (machineOperations.ContainsKey(id))
+            {
+                requirements.ShouldBe(forMachines, ignoreOrder: true, customMessage: id);
+            }
+            else if (UserOnlyOperations.Contains(id))
+            {
+                requirements.ShouldContain(Definitions.SecuritySchemas.Manual, id);
+                requirements.SelectMany(requirement => requirement.Split('+')).ShouldNotContain(Definitions.SecuritySchemas.ApiKey, id);
+                requirements.SelectMany(requirement => requirement.Split('+')).ShouldNotContain(Definitions.SecuritySchemas.Mtls, id);
+            }
+            else if (id == Definitions.RouteIds.Access.RenewMachineCertificate)
+            {
+                requirements.ShouldBe([Definitions.SecuritySchemas.Mtls, both]);
+            }
+            else
+            {
+                AnonymousOperations.ShouldContain(id);
+                operation.TryGetProperty("security", out _).ShouldBeFalse(id);
+            }
+        }
+
+        // The schemes the requirements reference; the two of the machines come from their document filters.
+        schemes.GetProperty(Definitions.SecuritySchemas.Manual).GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.SecureManual);
+
+        foreach (var (name, header, description) in new[]
+                 {
+                     (Definitions.SecuritySchemas.ApiKey, "Authorization", Definitions.Descriptions.SecureApiKey),
+                     (Definitions.SecuritySchemas.Mtls, "X-ARR-ClientCert", Definitions.Descriptions.SecureMtls),
+                 })
+        {
+            var scheme = schemes.GetProperty(name);
+            scheme.GetProperty("type").GetString().ShouldBe("apiKey", name);
+            scheme.GetProperty("in").GetString().ShouldBe("header", name);
+            scheme.GetProperty("name").GetString().ShouldBe(header, name);
+            scheme.GetProperty("description").GetString().ShouldBe(description, name);
+        }
+    }
+
+    // OperationAccess, from which the document filter writes the requirements, and the tables of these tests are two
+    // entries of one fact, so a route added to one and not the other fails here.
+    [Fact]
+    public async Task OperationAccess_MatchesTheTablesOfTheTests()
+    {
+        OperationAccess.UserOnly.ShouldBe(UserOnlyOperations, ignoreOrder: true);
+
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        AnonymousOperations.Where(id => Operation(document, id).TryGetProperty("security", out _))
+            .ShouldBe(OperationAccess.CertificateRenewal, ignoreOrder: true);
+    }
+
     // Spec 3 and 4: the 400 of a new machine names an undefined scope and a list without a runtime scope, and its 403
     // and those of the reset, the federation rules and the delete name the role the scopes of the machine need.
     [Fact]
@@ -509,6 +588,17 @@ public class OpenApiExportTests
             .Select(operation => operation.Value)
             .Where(operation => operation.GetProperty("operationId").GetString() == operationId)
             .ToList();
+    }
+
+    // The requirement objects of an operation in order, each as its scheme names sorted and joined by "+"; empty without
+    // security, and an empty string for a requirement object without a scheme.
+    private static List<string> Requirements(JsonElement operation)
+    {
+        return operation.TryGetProperty("security", out var security)
+            ? security.EnumerateArray()
+                .Select(requirement => string.Join("+", requirement.EnumerateObject().Select(scheme => scheme.Name).Order(StringComparer.Ordinal)))
+                .ToList()
+            : [];
     }
 
     // The machine scope strings a description names; none of them is a part of another.

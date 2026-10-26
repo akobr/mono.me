@@ -131,6 +131,30 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
 
 ## OpenAPI and Swagger UI
 
+The document declares four security schemes:
+
+| Scheme | In the document | The caller sends |
+|---|---|---|
+| `manual` | HTTP bearer | `Authorization: Bearer` with a user's token, a client-credentials token of the identity provider, or the Storyteller token a federated machine gets from `ExchangeMachineToken`. |
+| `integrated` | OAuth2, see below | The OAuth2 sign-in of a user or of a client-credentials client. |
+| `apiKey` | API key in the `Authorization` header | `Authorization: ApiKey 2s.<…>.<secret>`, the `ApiKey` scheme included in the value. |
+| `mtls` | API key in the `X-ARR-ClientCert` header | The machine's client certificate in the TLS handshake, which the platform's front end passes on in `X-ARR-ClientCert` (see [Certificates](#machine-sign-in-for-pipelines)). OpenAPI 3.0 has no scheme for mutual TLS. |
+
+Each operation lists the requirements it accepts: any one requirement object is enough, and the schemes inside one object are needed together.
+
+| Operations | Requirements | Meaning |
+|---|---|---|
+| For users and machines | `{manual}`, `{integrated}`, `{apiKey}`, `{mtls}`, `{mtls, apiKey}` | A bearer token (a user, client credentials or a federated machine), the `ApiKey` kind, the `Certificate` kind, or the `CertificateAndApiKey` kind, which is also the only way a shared certificate is accepted. The 403 of the operation names the scopes a machine needs. |
+| For users only | `{manual}`, `{integrated}`; `{manual}` alone for the shared certificates | Machines are refused whatever they send. |
+| `RenewMachineCertificate` | `{mtls}`, `{mtls, apiKey}` | The machine's own certificate, with its API key when its kind needs both. |
+| `ExchangeMachineToken`, `GetCertificateAuthority`, `GetAuthConfiguration` | none | Anonymous. |
+
+`{integrated}` is left out wherever the scheme is removed (AuthKit without `AuthKitDomain`, below). Whether a machine's kind is accepted also depends on the project's [machine authentication policy](#machine-authentication-policy), and the policy can deliver secrets only over mTLS (`403 MtlsRequired`, see [secret delivery](key-values.md#secret-delivery)). The scheme descriptions say so; the requirements cannot.
+
+The operations for users only are listed in `OperationAccess` (`Api.Functions/src/OpenApi/`). `MachineSecurityRequirementDocumentFilter` writes the machine requirements from that list, because `[OpenApiSecurity]` attributes can only add alternatives and cannot say `{mtls, apiKey}`. The runtime decides in the handlers; a test checks the list against the tables of the OpenAPI tests.
+
+Swagger UI lists the four schemes under **Authorize**, and each operation shows the ones it accepts. An `apiKey` value must include the `ApiKey ` prefix. `mtls` works only against a host that accepts `X-ARR-ClientCert` from clients, such as the local Functions host.
+
 The `integrated` OAuth2 security scheme follows `Auth:Provider`:
 
 * **Entra ID:** the implicit and client-credentials flows against `login.microsoftonline.com`. The implicit flow offers one scope, `api://{ClientId}/User.Impersonation`; the client-credentials flow uses `api://{ClientId}/.default`.
