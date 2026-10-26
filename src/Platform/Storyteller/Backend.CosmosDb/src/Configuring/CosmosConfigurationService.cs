@@ -171,7 +171,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         }
 
         var node = BuildInheritanceGraph(key);
-        var calculatedConfig = await CalculateAndCacheConfigurationAsync(node, repository, new Dictionary<string, TemplateSnapshot>());
+        var calculatedConfig = await CalculateAndCacheConfigurationAsync(node, repository);
 
         if (calculatedConfig is null)
         {
@@ -785,23 +785,13 @@ public partial class CosmosConfigurationService : IConfigurationService
         return await ResolveConfigurationAsync(key, config, includeSecrets);
     }
 
-    private async Task TryAutogeneratePropertiesAsync(
-        JObject config,
-        FullKey key,
-        IContainerRepository repository,
-        Dictionary<string, TemplateSnapshot> templates)
+    // Merges the view template of the node's type. It is read on every calculation, after the node's item, so a cache
+    // written under the ETag of that read never holds a template older than the read.
+    private async Task TryAutogeneratePropertiesAsync(JObject config, FullKey key, IContainerRepository repository)
     {
-        var typeCode = key.Annotation.TypeCode.ToLowerInvariant();
+        var (template, _) = await ReadTemplateAsync(key, key.Annotation.TypeCode.ToLowerInvariant(), repository);
 
-        // the whole inheritance graph is in one view, so the view template is read only once per calculation
-        if (!templates.TryGetValue(typeCode, out var template))
-        {
-            var (typeTemplateEntity, etag) = await ReadTemplateAsync(key, typeCode, repository);
-            template = new TemplateSnapshot(typeTemplateEntity?.Content, etag);
-            templates[typeCode] = template;
-        }
-
-        if (template.Content is null)
+        if (template?.Content is null)
         {
             return;
         }
@@ -815,20 +805,6 @@ public partial class CosmosConfigurationService : IConfigurationService
             CosmosConfigurationTemplateService.GetTemplateId(key.ViewName, typeCode),
             PartitionKeys.GetCosmosTemplate(key.ProjectName),
             stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
-    }
-
-    private async Task<bool> HaveTemplatesChangedAsync(FullKey key, IContainerRepository repository, Dictionary<string, TemplateSnapshot> templates)
-    {
-        foreach (var (typeCode, template) in templates)
-        {
-            var (_, etag) = await ReadTemplateAsync(key, typeCode, repository);
-            if (etag != template.ETag)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private async Task CollectHierarchyNodesAsync(
@@ -862,34 +838,87 @@ public partial class CosmosConfigurationService : IConfigurationService
         }
     }
 
-    private async Task<JObject?> CalculateAndCacheConfigurationAsync(
-        InheritanceGraphNode node,
-        IContainerRepository repository,
-        Dictionary<string, TemplateSnapshot> templates)
+    // Calculates the effective document of the node and caches it on its item. A cache is written only under an ETag
+    // the item had before every read of the calculation: the item is read first, then the ancestors and the template.
+    // An invalidation that patches the item meanwhile makes the cache write fail, and a missing item is created first,
+    // so that it is either reached by an invalidation or created after it.
+    private async Task<JObject?> CalculateAndCacheConfigurationAsync(InheritanceGraphNode node, IContainerRepository repository)
     {
         var key = node.Key;
         var partitionKeyValue = key.GetPartitionKey();
         var partitionKey = new PartitionKey(partitionKeyValue);
-        var annotationKeyString = key.Annotation.ToString();
-        var configEntryId = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKeyString}";
-        var (configEntry, configEntryETag) = await repository.Container.TryReadItemWithETagAsync(
-            configEntryId,
-            partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
-        var exist = configEntry is not null;
+        var configEntryId = GetConfigurationId(key);
+        var (configEntry, configEntryETag) = await ReadConfigurationAsync(repository, configEntryId, partitionKey);
 
         // If the configuration is already calculated, return it directly (cached in DB)
-        if (exist && configEntry.CalculatedContent is not null)
+        if (configEntry?.CalculatedContent is not null)
         {
             return configEntry.CalculatedContent;
         }
 
+        var config = await CalculateConfigurationAsync(node, repository, configEntry);
+
+        if (!config.HasValues)
+        {
+            return config;
+        }
+
+        if (configEntry is not null)
+        {
+            await TryCacheConfigurationAsync(repository, configEntry, configEntryETag!, config);
+            return config;
+        }
+
+        // an invalidation cannot reach an item that does not exist yet, so the item is created without a cache first,
+        // and the calculation runs again from reads after the creation, under its ETag
+        var createdEntry = new ConfigurationEntity
+        {
+            Id = configEntryId,
+            PartitionKey = partitionKeyValue,
+            AnnotationKey = key.Annotation.ToString(),
+            IsServerSubstitutionDisabled = false,
+            Name = key.Annotation.Name,
+            ProjectName = key.ProjectName,
+            ViewName = key.ViewName,
+            Content = new JObject(),
+            Modified = AuditStamp.Of(AuditActor.System, _timeProvider.GetUtcNow()),
+        };
+
+        ItemResponse<ConfigurationEntity> created;
+
+        try
+        {
+            created = await repository.Container.CreateItemAsync(
+                createdEntry,
+                partitionKey,
+                new ItemRequestOptions { EnableContentResponseOnWrite = false });
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            // created meanwhile by another calculation or write, keep theirs
+            return config;
+        }
+
+        config = await CalculateConfigurationAsync(node, repository, createdEntry);
+
+        if (config.HasValues)
+        {
+            await TryCacheConfigurationAsync(repository, createdEntry, created.ETag, config);
+        }
+
+        return config;
+    }
+
+    // The effective document of the node: the documents of its ancestors, the template of its type, and its own
+    // content, merged in this order.
+    private async Task<JObject> CalculateConfigurationAsync(InheritanceGraphNode node, IContainerRepository repository, ConfigurationEntity? configEntry)
+    {
         var config = new JObject();
 
         // Inherit parent configurations (responsibility <|- unit <|- subject <|- usage <|- context <|- execution <|- unit-of-execution) as graph
         foreach (var ancestorNode in node.GetAncestors())
         {
-            var parentConfig = await CalculateAndCacheConfigurationAsync(ancestorNode, repository, templates);
+            var parentConfig = await CalculateAndCacheConfigurationAsync(ancestorNode, repository);
             if (parentConfig is not null)
             {
                 config.MergeInto(parentConfig);
@@ -897,184 +926,152 @@ public partial class CosmosConfigurationService : IConfigurationService
         }
 
         // Fill auto-generated content for the type from the view template (if any)
-        await TryAutogeneratePropertiesAsync(config, key, repository, templates);
+        await TryAutogeneratePropertiesAsync(config, node.Key, repository);
 
         // The most specific configuration has precedence, is merged last
-        if (exist)
+        if (configEntry is not null)
         {
-            config.MergeInto(configEntry!.Content);
-
-            if (config.HasValues)
-            {
-                var hash = config.CalculateMurmurHash32Bits(_jsonSettingsProvider.GetSettings(JsonSettingNames.Unique));
-                configEntry = configEntry with
-                {
-                    CalculatedContent = config,
-                    CalculatedContentHash = $"{hash:x8}",
-                };
-
-                // an invalidation (or any other write) since the read means this calculation can be stale, then it is not cached
-                try
-                {
-                    await repository.Container.ReplaceItemAsync(
-                        configEntry,
-                        configEntryId,
-                        partitionKey,
-                        new ItemRequestOptions { IfMatchEtag = configEntryETag, EnableContentResponseOnWrite = false });
-                }
-                catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
-                {
-                    // the next read calculates again
-                }
-            }
-        }
-        else if (config.HasValues)
-        {
-            var hash = config.CalculateMurmurHash32Bits(_jsonSettingsProvider.GetSettings(JsonSettingNames.Unique));
-            ItemResponse<ConfigurationEntity> created;
-
-            try
-            {
-                created = await repository.Container.CreateItemAsync(
-                    new ConfigurationEntity
-                    {
-                        Id = configEntryId,
-                        PartitionKey = partitionKeyValue,
-                        AnnotationKey = annotationKeyString,
-                        IsServerSubstitutionDisabled = false,
-                        Name = key.Annotation.Name,
-                        ProjectName = key.ProjectName,
-                        ViewName = key.ViewName,
-                        Content = new JObject(),
-                        CalculatedContent = config,
-                        CalculatedContentHash = $"{hash:x8}",
-                        Modified = AuditStamp.Of(AuditActor.System, _timeProvider.GetUtcNow()),
-                    },
-                    partitionKey,
-                    new ItemRequestOptions { EnableContentResponseOnWrite = false });
-            }
-            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
-            {
-                // created meanwhile by another calculation or write, keep theirs
-                return config;
-            }
-
-            // an invalidation cannot reach an item which didn't exist yet, verify the used templates are still the same
-            if (await HaveTemplatesChangedAsync(key, repository, templates))
-            {
-                using var clearResponse = await repository.Container.PatchItemStreamAsync(
-                    configEntryId,
-                    partitionKey,
-                    [
-                        PatchOperation.Set<object?>($"/{nameof(ConfigurationEntity.CalculatedContent)}", null),
-                        PatchOperation.Set<object?>($"/{nameof(ConfigurationEntity.CalculatedContentHash)}", null),
-                    ],
-                    new PatchItemRequestOptions { IfMatchEtag = created.ETag });
-            }
+            config.MergeInto(configEntry.Content);
         }
 
         return config;
     }
 
-    private async Task InvalidateConfigurationsAsync(FullKey key, IContainerRepository repository)
+    // An invalidation (or any other write) since the ETag was taken means the calculation can be stale; then it is
+    // not cached, and the next read calculates again.
+    private async Task TryCacheConfigurationAsync(IContainerRepository repository, ConfigurationEntity configEntry, string etag, JObject config)
     {
-        switch (key.Annotation.Type)
+        var hash = config.CalculateMurmurHash32Bits(_jsonSettingsProvider.GetSettings(JsonSettingNames.Unique));
+
+        try
+        {
+            await repository.Container.ReplaceItemAsync(
+                configEntry with
+                {
+                    CalculatedContent = config,
+                    CalculatedContentHash = $"{hash:x8}",
+                },
+                configEntry.Id,
+                new PartitionKey(configEntry.PartitionKey),
+                new ItemRequestOptions { IfMatchEtag = etag, EnableContentResponseOnWrite = false });
+        }
+        catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
+        {
+            // the next read calculates again
+        }
+    }
+
+    private Task InvalidateConfigurationsAsync(FullKey key, IContainerRepository repository)
+    {
+        var targets = GetDescendantTargets(key);
+        return targets.Count == 0
+            ? Task.CompletedTask
+            : ConfigurationCacheInvalidator.InvalidateAsync(repository, targets);
+    }
+
+    // The descendants whose effective document includes the annotation, by type (see BuildInheritanceGraph); the
+    // invalidator patches them level by level. The written item is no target: its own write has cleared its cache.
+    private static IReadOnlyCollection<InvalidationTarget> GetDescendantTargets(FullKey key)
+    {
+        var project = key.ProjectName;
+        var view = key.ViewName;
+        var prefix = $"{view}.{EntityIdPrefixTypes.Configuration}.";
+        var annotation = key.Annotation;
+        var partitionKey = key.GetCosmosPartitionKey();
+
+        InvalidationTarget Target(string typeCode, string idPrefix, PartitionKey? targetPartitionKey)
+        {
+            return new InvalidationTarget(
+                typeCode,
+                config => config.ProjectName == project && config.ViewName == view && config.Id.StartsWith(idPrefix),
+                targetPartitionKey);
+        }
+
+        switch (annotation.Type)
         {
             case AnnotationType.Responsibility:
             {
-                // invalidate all units, usages, executions, and unit-of-executions (one responsibility partition)
-                // invalidate all configuration in one responsibility partition
-                await ConfigurationCacheInvalidator.InvalidateAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}."),
-                    key.GetCosmosPartitionKey());
-                break;
+                // all units, usages, executions and units of execution (one responsibility partition)
+                return
+                [
+                    Target(AnnotationTypeCodes.Unit, $"{prefix}{AnnotationTypeCodes.Unit}.", partitionKey),
+                    Target(AnnotationTypeCodes.Usage, $"{prefix}{AnnotationTypeCodes.Usage}.", partitionKey),
+                    Target(AnnotationTypeCodes.Execution, $"{prefix}{AnnotationTypeCodes.Execution}.", partitionKey),
+                    Target(AnnotationTypeCodes.UnitOfExecution, $"{prefix}{AnnotationTypeCodes.UnitOfExecution}.", partitionKey),
+                ];
             }
 
             case AnnotationType.Unit:
             {
-                // invalidate all unit-of-executions (one responsibility partition)
-                await ConfigurationCacheInvalidator.InvalidateAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.") && config.Id.EndsWith($".{key.Annotation.UnitName}")),
-                    key.GetCosmosPartitionKey());
-                return;
+                // all units of execution of the unit (one responsibility partition)
+                var idPrefix = $"{prefix}{AnnotationTypeCodes.UnitOfExecution}.";
+                var idSuffix = $".{annotation.UnitName}";
+                return
+                [
+                    new InvalidationTarget(
+                        AnnotationTypeCodes.UnitOfExecution,
+                        config => config.ProjectName == project && config.ViewName == view && config.Id.StartsWith(idPrefix) && config.Id.EndsWith(idSuffix),
+                        partitionKey),
+                ];
             }
 
             case AnnotationType.Usage:
             {
-                // invalidate all executions, unit-of-executions (one responsibility partition)
-                await ConfigurationCacheInvalidator.InvalidateAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.")),
-                    key.GetCosmosPartitionKey());
-                break;
+                // all executions and units of execution of the subject (one responsibility partition)
+                return
+                [
+                    Target(AnnotationTypeCodes.Execution, $"{prefix}{AnnotationTypeCodes.Execution}.{annotation.SubjectName}.", partitionKey),
+                    Target(AnnotationTypeCodes.UnitOfExecution, $"{prefix}{AnnotationTypeCodes.UnitOfExecution}.{annotation.SubjectName}.", partitionKey),
+                ];
             }
 
             case AnnotationType.Subject:
             {
-                // invalidate all usages, contexts, executions, unit-of-executions
-                // invalidate the context configurations in the subject partitions
-                await ConfigurationCacheInvalidator.InvalidateAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Context}."),
-                    key.GetCosmosPartitionKey());
-
-                // invalidate usages, executions, unit-of-executions in the responsibility partitions
-                await ConfigurationCacheInvalidator.InvalidateAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Usage}.{key.Annotation.SubjectName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.")));
-                break;
+                // the contexts in the subject partition, the usages, executions and units of execution in the
+                // responsibility partitions
+                return
+                [
+                    Target(AnnotationTypeCodes.Context, $"{prefix}{AnnotationTypeCodes.Context}.", partitionKey),
+                    Target(AnnotationTypeCodes.Usage, $"{prefix}{AnnotationTypeCodes.Usage}.{annotation.SubjectName}.", null),
+                    Target(AnnotationTypeCodes.Execution, $"{prefix}{AnnotationTypeCodes.Execution}.{annotation.SubjectName}.", null),
+                    Target(AnnotationTypeCodes.UnitOfExecution, $"{prefix}{AnnotationTypeCodes.UnitOfExecution}.{annotation.SubjectName}.", null),
+                ];
             }
 
             case AnnotationType.Context:
             {
-                // invalidate executions, and unit-of-executions configurations in the responsibility partitions
-                await ConfigurationCacheInvalidator.InvalidateAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && ((config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.") && config.Id.EndsWith($".{key.Annotation.ContextName}"))
-                            || (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.") && config.Id.Contains($".{key.Annotation.ContextName}."))));
-                break;
+                // the executions and units of execution of the context in the responsibility partitions
+                var executionPrefix = $"{prefix}{AnnotationTypeCodes.Execution}.{annotation.SubjectName}.";
+                var executionSuffix = $".{annotation.ContextName}";
+                var unitOfExecutionPrefix = $"{prefix}{AnnotationTypeCodes.UnitOfExecution}.{annotation.SubjectName}.";
+                var unitOfExecutionPart = $".{annotation.ContextName}.";
+                return
+                [
+                    new InvalidationTarget(
+                        AnnotationTypeCodes.Execution,
+                        config => config.ProjectName == project && config.ViewName == view && config.Id.StartsWith(executionPrefix) && config.Id.EndsWith(executionSuffix)),
+                    new InvalidationTarget(
+                        AnnotationTypeCodes.UnitOfExecution,
+                        config => config.ProjectName == project && config.ViewName == view && config.Id.StartsWith(unitOfExecutionPrefix) && config.Id.Contains(unitOfExecutionPart)),
+                ];
             }
 
             case AnnotationType.Execution:
             {
-                // invalidate unit-of-executions (one responsibility partition)
-                await ConfigurationCacheInvalidator.InvalidateAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.{key.Annotation.ContextName}."),
-                    key.GetCosmosPartitionKey());
-                return;
+                // the units of execution of the execution (one responsibility partition)
+                return
+                [
+                    Target(
+                        AnnotationTypeCodes.UnitOfExecution,
+                        $"{prefix}{AnnotationTypeCodes.UnitOfExecution}.{annotation.SubjectName}.{annotation.ResponsibilityName}.{annotation.ContextName}.",
+                        partitionKey),
+                ];
             }
 
             case AnnotationType.UnitOfExecution:
             {
                 // nothing to invalidate (it is the deepest configuration)
-                return;
+                return [];
             }
 
             default:
@@ -1666,8 +1663,6 @@ public partial class CosmosConfigurationService : IConfigurationService
 
         return targetNode;
     }
-
-    private sealed record class TemplateSnapshot(JObject? Content, string? ETag);
 
     // How a write archives the stored version: Version is the archived version (null for a cache row, which has none),
     // IsStored that an equal archive exists already, NextVersion the version the write stores.

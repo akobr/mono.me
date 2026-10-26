@@ -218,7 +218,8 @@ Calculation of that execution, with no other stored documents and no other templ
 When the merged object has at least one property, calculation persists it:
 
 - An existing configuration item is replaced with `CalculatedContent` and `CalculatedContentHash`, conditionally on the ETag read at the start of the calculation. Stored `Content`, `Version`, and `Modified` stay as they were. When the item changed in the meantime (for example, an invalidation after a template write), the result is returned but not cached, because it may be stale.
-- A missing configuration item is created with empty `Content`, `Modified` stamped by `System`, `CalculatedContent` set to the merge, and `Name` set to the annotation name. The id is the normal configuration id, `{viewName}.cnf.{annotationKey}`. An invalidation cannot reach an item that did not exist yet, so after the creation the templates used by the calculation are read again. If any of their ETags changed, `CalculatedContent` of the new item is cleared. If the item was created concurrently by someone else, theirs is kept.
+- A missing configuration item is first created without a cache, with empty `Content`, `Modified` stamped by `System`, and `Name` set to the annotation name. The id is the normal configuration id, `{viewName}.cnf.{annotationKey}`. An invalidation cannot reach an item that did not exist yet, so the calculation then runs again, reading the ancestors and the template after the creation, and its merge is stored conditionally on the ETag of the creation. If the item was created concurrently by someone else, theirs is kept.
+- The template is read on every calculation of a node, after the node's item. A node reached twice in one read (a responsibility under a unit of execution, a subject under an execution) reads it twice, so a template written between the two visits is not cached under the item's newer ETag.
 
 `CalculatedContentHash` is eight lowercase hex digits. It is MurmurHash3 32-bit, seed `42`, of the calculated JSON serialized with `JsonSettingNames.Unique` (properties ordered by name).
 
@@ -232,11 +233,11 @@ These writes clear cached calculations, which makes the following read load the 
 - Every one of them writes first and invalidates after; a failed invalidation is finished by the next write request on the same configuration ([inheritance.md](inheritance.md#cache-and-descendant-freshness)).
 - Every template write (`CreateOrUpdateTemplateAsync` or `ImportTemplateAsync` with a changed content, `PatchTemplateAsync`, `DeleteTemplateAsync`) invalidates the configurations that merge the template, after the template has been written.
 
-Invalidation (`ConfigurationCacheInvalidator`, `Backend.CosmosDb/src/Configuring/`) sets `CalculatedContent` and `CalculatedContentHash` to null and increments `AffectedCounter`. The patches are sent in transactional batches of at most 100 items per partition, which is the Cosmos DB limit. A failed batch is reported as an error. If an item was deleted in the meantime, its batch falls back to patching items one by one, skipping deleted ones.
+Invalidation (`ConfigurationCacheInvalidator`, `Backend.CosmosDb/src/Configuring/`) sets `CalculatedContent` and `CalculatedContentHash` to null and increments `AffectedCounter`. It works level by level along the ancestor graph (responsibilities and subjects, then units, usages and contexts, then executions, then units of execution), and queries a level only after every patch of the levels above it has finished ([inheritance.md](inheritance.md#cache-and-descendant-freshness) explains why). The patches are sent in transactional batches of at most 100 items per partition, which is the Cosmos DB limit. A failed batch is reported as an error and stops before the next level. If an item was deleted in the meantime, its batch falls back to patching items one by one, skipping deleted ones.
 
 A configuration update invalidates descendants:
 
-- A responsibility update invalidates every configuration in that responsibility partition and view.
+- A responsibility update invalidates every other configuration in that responsibility partition and view; its own item loses its cache with the write.
 - Other types invalidate the descendants listed in `CosmosConfigurationService.InvalidateConfigurationsAsync`.
 - The first insert of a configuration item, when none exists yet, invalidates the same descendants after `CreateItemAsync`. [inheritance.md](inheritance.md#cache-and-descendant-freshness) explains why the invalidation follows the insert.
 

@@ -80,9 +80,11 @@ Two nodes are shared:
 2. When `CalculatedContent` is already stored, return it.
 3. Start from an empty object.
 4. For each direct ancestor in `AnnotationType` order, calculate that ancestor and `MergeInto` its calculated document.
-5. `MergeInto` the view template of this node's type (`{view}.gen.{typeCode}` in partition `{project}.template`), when that item exists. See [templating.md](templating.md).
+5. `MergeInto` the view template of this node's type (`{view}.gen.{typeCode}` in partition `{project}.template`), when that item exists. The template is read on every calculation of a node, after step 1, also when the node is calculated twice in one read. See [templating.md](templating.md).
 6. `MergeInto` this node's stored `Content`, when the configuration item exists.
-7. When the merged object has at least one property, persist it. An existing item is replaced with `CalculatedContent` and `CalculatedContentHash`, conditionally on the ETag read in step 1; stored `Content`, `Version`, and `Modified` stay as they were. A missing item is created with empty `Content`, `Modified` stamped by `System`, and the merge in `CalculatedContent`. An empty merge is returned and left unstored, so the next read calculates it again.
+7. When the merged object has at least one property, persist it. An existing item is replaced with `CalculatedContent` and `CalculatedContentHash`, conditionally on the ETag read in step 1; stored `Content`, `Version`, and `Modified` stay as they were. A missing item is first created without a cache, with empty `Content` and `Modified` stamped by `System`; then steps 3 to 6 run again, and their merge is stored conditionally on the ETag of the creation. An empty merge is returned and left unstored, and no item is created for it, so the next read calculates it again.
+
+Every cache is therefore written under an ETag the item had before every read its calculation made. "Cache and descendant freshness" explains why that matters.
 
 The value merged from an ancestor is that ancestor's full calculated document. It already contains the ancestor's own ancestors, the ancestor's template, and the ancestor's stored content. A node that has no configuration item contributes an empty object, plus anything its ancestors and its template produced.
 
@@ -188,17 +190,19 @@ Responsibility `{ "address": { "city": "Oslo", "zip": "0001" } }` and execution 
 
 A later read of an item whose `CalculatedContent` is present returns that object and skips the walk. `ConfigurationEntity.IsCachingDisabled` is stored on the item and is unread by this path, so the flag leaves caching on.
 
-These writes clear the target item's `CalculatedContent` and `CalculatedContentHash`, and clear the same fields on the descendants whose effective document includes this annotation. The patch also increments `AffectedCounter`.
+These writes clear the target item's `CalculatedContent` and `CalculatedContentHash` with the write itself, and then clear the same fields on the descendants whose effective document includes this annotation. The patch also increments `AffectedCounter`.
 
 | Written annotation | Descendants whose cache is cleared |
 | --- | --- |
-| Responsibility | Every configuration item in that responsibility partition and view |
-| Unit | Unit-of-execution items in that partition and view whose id ends with `.{unit}` |
-| Usage | Execution and unit-of-execution items in that partition and view for that subject |
-| Subject | Context items in the subject partition and view, plus usage, execution, and unit-of-execution items of that subject in the same project and view |
-| Context | Execution items of that subject ending in `.{context}`, and unit-of-execution items of that subject whose id contains `.{context}.`, in the same project and view |
-| Execution | Unit-of-execution items in that partition and view under that subject, responsibility, and context |
+| Responsibility | The unit and usage items (level 1), the execution items (level 2) and the unit-of-execution items (level 3) in that responsibility partition and view |
+| Unit | Unit-of-execution items in that partition and view whose id ends with `.{unit}` (level 3) |
+| Usage | Execution items (level 2) and unit-of-execution items (level 3) in that partition and view for that subject |
+| Subject | Context items in the subject partition and view, and usage items of that subject in the same project and view (level 1); execution items (level 2) and unit-of-execution items (level 3) of that subject in the same project and view |
+| Context | Execution items of that subject ending in `.{context}` (level 2), and unit-of-execution items of that subject whose id contains `.{context}.` (level 3), in the same project and view |
+| Execution | Unit-of-execution items in that partition and view under that subject, responsibility, and context (level 3) |
 | Unit of execution | None |
+
+The levels follow the ancestor graph: responsibilities and subjects are level 0, units, usages and contexts level 1, executions level 2, units of execution level 3, and every ancestor of an item is on a lower level. `ConfigurationCacheInvalidator` queries and patches one level at a time, in that order: a level is queried only after every patch of the levels above it has finished. Within a level, the patches go out in transactional batches of at most 100 items per partition, several at a time. A failure stops before the next level.
 
 **Writes.** Every write commits first, then appends its audit entry, then invalidates the descendants. Each write reads the item with its ETag and is guarded by it:
 
@@ -209,16 +213,23 @@ These writes clear the target item's `CalculatedContent` and `CalculatedContentH
 
 The invalidation follows the write. A calculation caches its result on an existing item only while the item still has the ETag that was read before the walk, and the invalidation patch changes that ETag. A descendant calculation that read the descendant before its patch therefore fails to cache, or its cache is cleared by the patch. A descendant calculation that reads the descendant after its patch reads the written ancestor too, which was committed before the invalidation started.
 
-**Archives.** A system cache row has version 0 and no content; every other item is a written version (every write gives version 1 or more, and a version 0 with content was written before versions were counted). A write archives every written version, also an empty one, and a document equal to a written version's content, also `{}` over an emptied version, writes nothing. An archive of the same version that exists already with the same `Content` and `Modified` counts as archived; a write that failed after its archive, or a lifecycle snapshot, leaves one. An archive of the same version with other content belongs to an earlier lifetime of the configuration and is kept; the current content is then archived after the highest archived version. The version list skips archives of version 0 and archives of the current or a later version, and `GetConfigurationVersionContentAsync` prefers the current item.
+**Archives.** A system cache row has version 0 and no content; every other item is a written version (every write gives version 1 or more, and a version 0 with content was written before versions were counted). A write archives every written version, also an empty one, and a document equal to a written version's content, also `{}` over an emptied version, writes nothing. An archive of the same version that exists already with the same `Content` and `Modified` counts as archived; a write that failed after its archive, or a lifecycle snapshot, leaves one. An archive of the same version with other content belongs to an earlier lifetime of the configuration and is kept; the current content is then archived after the highest archived version. The version list skips empty archives of version 0 and archives of the current or a later version, and `GetConfigurationVersionContentAsync` prefers the current item.
 
 **Pending invalidation.** The batch that writes a version also stores a token, `PendingInvalidationId`, on the item; a clear and a delete store it on the archive they write. The token is removed after the invalidation by a patch filtered on that token, so a newer write keeps its own, and on an item of a soft-deleted annotation it stays until a restore. When the invalidation fails, the request answers `500` with the change committed, and the token stays. The next write request on the same configuration finishes it before it looks at its input: a repeated or a different write, patch or import, also a patch whose `test` operation now fails, a clear, also one that finds nothing to clear (the `DELETE` route then answers `404`), and an import whose document is `Unchanged` or `Skipped`. A unit of execution has no descendants, so its writes store no token. Reads never finish a pending invalidation: until a request does, the descendants keep serving their caches.
 
-The invalidation of each item holds as described, not the invalidation as a whole:
+**Why no stale cache survives a completed write.** Every cache is written under an ETag that its item had before every read of its calculation (see "How a read is assembled", step 7), and the write is committed before its invalidation starts. Then, for every descendant:
 
-- The patches go out in transactional batches of at most 100 items per partition, several at a time and in no fixed order. A descendant cleared in an earlier batch can be calculated again from an intermediate descendant whose stale cache is still in a later batch, and cached with the old document. For example, an execution can be recalculated from its usage before the usage is cleared.
-- A descendant item that a calculation creates after the invalidation has queried the items is not reached.
+- A calculation that read the descendant before its patch cannot cache: the patch changed the ETag. A cache it wrote before the patch is cleared by the patch.
+- A calculation that read the descendant after its patch reads the ancestors and the template after that too. The ancestors are on lower levels, so they were written or patched before, and each cache they hold was calculated from reads after their own patch, by the same rule one level up. The template was written before the invalidation started.
+- A descendant item that a calculation created after its level was queried was created after every lower level was patched. Its cache is calculated again after the creation, from reads after it.
+- An item created before its level was queried is found and patched like any other.
 
-Both gaps apply to every write that invalidates, not only to the first insert.
+Limits that remain:
+
+- Reads serve a stale cache while an invalidation runs, and while it stays pending after a failure. A pending invalidation is finished by the next write request on the configuration, never by a read.
+- Writes made directly in Cosmos bypass the invalidation.
+- An older build that writes whole items during a deployment overlap drops a `PendingInvalidationId` it does not know.
+- The argument assumes that the invalidation's queries see every item created before they run. Session consistency guarantees that within one client only.
 
 A type-template write through the service invalidates every configuration that merges the template. A template item written directly into Cosmos leaves existing `CalculatedContent` in place. [templating.md](templating.md#cache) covers both cases.
 

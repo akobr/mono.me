@@ -39,6 +39,19 @@ internal static class ConfigurationCacheInvalidator
             { AnnotationTypeCodes.UnitOfExecution, [AnnotationTypeCodes.UnitOfExecution] },
         };
 
+    // The levels of BuildInheritanceGraph: every ancestor of a configuration is on a lower level
+    private static readonly IReadOnlyDictionary<string, int> Levels
+        = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            { AnnotationTypeCodes.Responsibility, 0 },
+            { AnnotationTypeCodes.Subject, 0 },
+            { AnnotationTypeCodes.Unit, 1 },
+            { AnnotationTypeCodes.Usage, 1 },
+            { AnnotationTypeCodes.Context, 1 },
+            { AnnotationTypeCodes.Execution, 2 },
+            { AnnotationTypeCodes.UnitOfExecution, 3 },
+        };
+
     // Set to null instead of remove, a remove of a missing property fails the whole batch
     private static readonly IReadOnlyList<PatchOperation> InvalidationPatch =
     [
@@ -59,22 +72,54 @@ internal static class ConfigurationCacheInvalidator
     /// </summary>
     public static Task InvalidateForTemplateAsync(IContainerRepository repository, string projectName, string viewName, string typeCode)
     {
-        var predicate = BuildTemplatePredicate(projectName, viewName, GetTemplateAffectedTypeCodes(typeCode));
-        return InvalidateAsync(repository, predicate);
+        var targets = GetTemplateAffectedTypeCodes(typeCode)
+            .Select(code => new InvalidationTarget(code, BuildTemplatePredicate(projectName, viewName, [code])))
+            .ToList();
+
+        return InvalidateAsync(repository, targets);
     }
 
-    public static async Task InvalidateAsync(
-        IContainerRepository repository,
-        Expression<Func<ConfigurationEntity, bool>> predicate)
+    /// <summary>
+    /// Invalidates cached calculations level by level, from the roots to the units of execution. A level is queried
+    /// only after every item of the levels above it is patched, so a calculation that reads its item after the patch
+    /// reads only ancestors that are patched already, and an item created after its level was queried was created
+    /// after them. A failure stops before the next level.
+    /// </summary>
+    public static async Task InvalidateAsync(IContainerRepository repository, IReadOnlyCollection<InvalidationTarget> targets)
+    {
+        foreach (var level in targets.GroupBy(target => GetLevel(target.TypeCode)).OrderBy(level => level.Key))
+        {
+            var groups = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+
+            foreach (var target in level)
+            {
+                await CollectAsync(repository, target, groups);
+            }
+
+            await PatchAsync(repository, groups);
+        }
+    }
+
+    private static int GetLevel(string typeCode)
+    {
+        return Levels.TryGetValue(typeCode, out var level)
+            ? level
+            : throw new ArgumentOutOfRangeException(nameof(typeCode), typeCode, "Unknown annotation type code.");
+    }
+
+    private static async Task CollectAsync(IContainerRepository repository, InvalidationTarget target, Dictionary<string, List<string>> groups)
     {
         var feed = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
-                requestOptions: new QueryRequestOptions { MaxItemCount = CosmosConstants.MaxItemCountPerPage })
-            .Where(predicate)
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = target.PartitionKey,
+                    MaxItemCount = CosmosConstants.MaxItemCountPerPage,
+                })
+            .Where(target.Predicate)
             .Where(config => !config.AnnotationDeletionId.IsDefined())
             .Select(config => new EntityIndices { PartitionKey = config.PartitionKey, Id = config.Id })
             .ToFeedIterator();
 
-        var groups = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         while (feed.HasMoreResults)
         {
             foreach (var indices in await feed.ReadNextAsync())
@@ -82,33 +127,6 @@ internal static class ConfigurationCacheInvalidator
                 AddToGroup(groups, indices.PartitionKey, indices.Id);
             }
         }
-
-        await PatchAsync(repository, groups);
-    }
-
-    public static async Task InvalidateAsync(
-        IContainerRepository repository,
-        Expression<Func<ConfigurationEntity, bool>> predicate,
-        PartitionKey partitionKey)
-    {
-        var feed = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
-                requestOptions: new QueryRequestOptions
-                {
-                    PartitionKey = partitionKey,
-                    MaxItemCount = CosmosConstants.MaxItemCountPerPage,
-                })
-            .Where(predicate)
-            .Where(config => !config.AnnotationDeletionId.IsDefined())
-            .Select(config => config.Id)
-            .ToFeedIterator();
-
-        var ids = new List<string>();
-        while (feed.HasMoreResults)
-        {
-            ids.AddRange(await feed.ReadNextAsync());
-        }
-
-        await PatchAsync(repository, [(partitionKey, ids)]);
     }
 
     private static Task PatchAsync(IContainerRepository repository, Dictionary<string, List<string>> groups)
