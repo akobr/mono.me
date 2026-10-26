@@ -41,6 +41,7 @@ public class OpenApiConfigurationOptions : DefaultOpenApiConfigurationOptions
         new ApiKeySecuritySchemeDocumentFilter(),
         new MtlsSecuritySchemeDocumentFilter(),
         new OAuthSecuritySchemeDocumentFilter(),
+        new MachineSecurityRequirementDocumentFilter(),
         new DiffUnifiedResponseDocumentFilter(),
         new NullableEnumDefaultDocumentFilter(),
         new DateOnlySchemaDocumentFilter(),

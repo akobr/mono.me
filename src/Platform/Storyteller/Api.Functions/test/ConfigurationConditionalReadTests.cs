@@ -743,11 +743,13 @@ public class ConfigurationConditionalReadTests
         exception.Message.ShouldContain("ConditionalReads:EntityTagKey");
     }
 
+    // The contract of a conditional read in the document: the optional If-None-Match header, and on the 200 and the 304
+    // the tag and the caching; the resolved read also says when the mTLS policy withheld the secrets.
     [Theory]
-    [InlineData(Definitions.RouteIds.Configuration.GetConfiguration)]
-    [InlineData(Definitions.RouteIds.Configuration.GetResolvedConfiguration)]
-    [InlineData(Definitions.RouteIds.Configuration.GetConfigurationComposition)]
-    public async Task Document_ConfigurationReads_DeclareTheNotModifiedAndTheTag(string operationId)
+    [InlineData(Definitions.RouteIds.Configuration.GetConfiguration, false)]
+    [InlineData(Definitions.RouteIds.Configuration.GetResolvedConfiguration, true)]
+    [InlineData(Definitions.RouteIds.Configuration.GetConfigurationComposition, false)]
+    public async Task Document_ConfigurationReads_DeclareTheConditionalReadContract(string operationId, bool isResolved)
     {
         var json = await OpenApiExportTests.RenderAsync();
         using var document = JsonDocument.Parse(json);
@@ -757,11 +759,45 @@ public class ConfigurationConditionalReadTests
             .Select(entry => entry.Value)
             .Single(entry => entry.GetProperty("operationId").GetString() == operationId);
 
+        // after the four path parameters, so a generated client takes it last
+        var parameters = operation.GetProperty("parameters").EnumerateArray().ToList();
+        parameters.Select(parameter => parameter.GetProperty("name").GetString()).ShouldBe(
+            [Definitions.Parameters.Organization, Definitions.Parameters.Project, Definitions.Parameters.View, Definitions.Parameters.Key, Definitions.Parameters.IfNoneMatch]);
+        parameters.Take(4).Select(parameter => parameter.GetProperty("in").GetString()).ShouldAllBe(location => location == "path");
+        var ifNoneMatch = parameters[^1];
+        ifNoneMatch.GetProperty("in").GetString().ShouldBe("header");
+        (ifNoneMatch.TryGetProperty("required", out var required) && required.GetBoolean()).ShouldBeFalse();
+        ifNoneMatch.GetProperty("schema").GetProperty("type").GetString().ShouldBe("string");
+        ifNoneMatch.GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.IfNoneMatch);
+
         var responses = operation.GetProperty("responses");
-        responses.GetProperty("200").GetProperty("headers").TryGetProperty(HeaderNames.ETag, out _).ShouldBeTrue();
-        responses.GetProperty("304").GetProperty("headers").TryGetProperty(HeaderNames.ETag, out _).ShouldBeTrue();
+
+        foreach (var status in new[] { "200", "304" })
+        {
+            var headers = responses.GetProperty(status).GetProperty("headers");
+            headers.GetProperty(HeaderNames.ETag).GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.EntityTag, status);
+            headers.GetProperty(HeaderNames.CacheControl).GetProperty("description").GetString().ShouldBe(
+                isResolved ? Definitions.Descriptions.CacheControlResolvedRead : Definitions.Descriptions.CacheControlConfigurationRead,
+                status);
+            headers.TryGetProperty(SecretRights.WithheldHeader, out var withheld).ShouldBe(isResolved, status);
+
+            if (isResolved)
+            {
+                withheld.GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.SecretsWithheld, status);
+            }
+
+            headers.EnumerateObject().ShouldAllBe(header => header.Value.GetProperty("schema").GetProperty("type").GetString() == "string", status);
+        }
+
         responses.GetProperty("304").TryGetProperty("content", out _).ShouldBeFalse();
         operation.GetProperty("description").GetString()!.ShouldContain("If-None-Match");
+    }
+
+    // An attribute argument must be a constant, which HeaderNames.IfNoneMatch is not.
+    [Fact]
+    public void IfNoneMatchParameter_IsTheHeaderName()
+    {
+        Definitions.Parameters.IfNoneMatch.ShouldBe(HeaderNames.IfNoneMatch);
     }
 
     // A resolve that records one input, db.host in the version of ConfigurationProxy.Marker.

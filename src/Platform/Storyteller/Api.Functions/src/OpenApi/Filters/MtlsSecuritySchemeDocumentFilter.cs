@@ -4,7 +4,8 @@ using Microsoft.OpenApi.Models;
 namespace _42.Platform.Storyteller.Api.OpenApi.Filters;
 
 /// <summary>
-/// Adds the <c>mtls</c> security scheme to the OpenAPI document.
+/// Sets the <c>mtls</c> security scheme of the OpenAPI document. The operations reference it through
+/// <see cref="MachineSecurityRequirementDocumentFilter"/>.
 /// <para>
 /// OpenAPI 3.1 defines <c>type: mutualTLS</c> natively, but the Azure Functions
 /// OpenAPI extension uses 3.0.x which does not support it. We represent mTLS as
@@ -22,24 +23,20 @@ namespace _42.Platform.Storyteller.Api.OpenApi.Filters;
 /// </summary>
 public class MtlsSecuritySchemeDocumentFilter : IDocumentFilter
 {
+    // The header of MachineAuthenticationOptions.CertificateHeaderName by default, which App Service fills.
+    private const string CertificateHeaderName = "X-ARR-ClientCert";
+
     public void Apply(IHttpRequestDataObject req, OpenApiDocument document)
     {
         document.Components ??= new OpenApiComponents();
         document.Components.SecuritySchemes ??= new Dictionary<string, OpenApiSecurityScheme>();
 
-        if (!document.Components.SecuritySchemes.ContainsKey("mtls"))
+        document.Components.SecuritySchemes[Definitions.SecuritySchemas.Mtls] = new OpenApiSecurityScheme
         {
-            document.Components.SecuritySchemes["mtls"] = new OpenApiSecurityScheme
-            {
-                Type = SecuritySchemeType.ApiKey,
-                In = ParameterLocation.Header,
-                Name = "X-ARR-ClientCert",
-                Description = "Mutual TLS client certificate authentication. "
-                    + "The client certificate is presented during the TLS handshake (production) "
-                    + "or via the X-ARR-ClientCert header (development). "
-                    + "Configure the certificate on HttpClientHandler or equivalent, "
-                    + "this is a transport-layer concern, not an API parameter.",
-            };
-        }
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Name = CertificateHeaderName,
+            Description = Definitions.Descriptions.SecureMtls,
+        };
     }
 }
