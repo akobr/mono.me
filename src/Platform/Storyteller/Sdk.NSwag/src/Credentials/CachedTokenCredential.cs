@@ -130,7 +130,7 @@ internal abstract class CachedTokenCredential : StorytellerCredential
             ?? throw StorytellerAuthenticationException.Configuration(
                 $"{purpose} needs the API endpoint: bind the credential, set the endpoint of its options, or set {StorytellerVariables.ENDPOINT}.");
 
-        return LocalUrlRule.RequireEndpoint(endpoint, "The endpoint of the credential");
+        return StorytellerUrlRule.RequireEndpoint(endpoint, "The endpoint of the credential");
     }
 
     private static bool IsRejected(AccessToken token, AuthenticationHeaderValue? rejected)

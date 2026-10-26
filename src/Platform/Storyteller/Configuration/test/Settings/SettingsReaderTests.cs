@@ -10,6 +10,8 @@ namespace _42.Platform.Storyteller.Sdk.Configuring.UnitTests.Settings;
 public class SettingsReaderTests
 {
     private const string ApiKey = "2s.YWNtZTpiaWxsaW5nOm1hY2hpbmUtMQ.k3y-s3cret";
+    private const string FederatedMachineId = "0b9f6a52-5d1c-4c47-9d0c-0f1e2d3c4b5a";
+    private const string GitHubRequestToken = "github-request-t0ken";
 
     private readonly Dictionary<string, string?> _environment = new()
     {
@@ -182,7 +184,7 @@ public class SettingsReaderTests
         exception.IsTransient.ShouldBeFalse();
     }
 
-    // LocalUrl copies the SDK's internal rule: an endpoint the provider accepts is one its credentials accept.
+    // The provider applies the SDK's StorytellerUrlRule: an endpoint the provider accepts is one its credentials accept.
     [Theory]
     [InlineData("https://storyteller.example.com/api")]
     [InlineData("https://storyteller.example.com:8443/api/")]
@@ -488,6 +490,73 @@ public class SettingsReaderTests
     public void NoCredentialVariables_MeanAnonymousRequests()
     {
         Read().Credential.ShouldBeNull();
+    }
+
+    // Both are in every step of a job with id-token: write, which many jobs have for other reasons.
+    [Fact]
+    public void TheGitHubActionsVariablesAlone_MeanAnonymousRequests()
+    {
+        UseGitHubActions();
+
+        Read().Credential.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task AMachineIdInAGitHubActionsJob_FederatesThroughTheRunner()
+    {
+        UseGitHubActions("http://127.0.0.1:9/idtoken?api-version=2.0");
+        _environment["STORYTELLER_CLIENT_ID"] = FederatedMachineId;
+
+        var settings = Read(options =>
+        {
+            options.Resilience.MaxRetryAttempts = 0;
+
+            // No network: the runner's request fails as transient, and its message names the runner without its query.
+            options.ConfigurePrimaryHandler = handler => handler.ConnectCallback = (_, _) => ValueTask.FromException<Stream>(new IOException("Offline."));
+        });
+
+        var credential = settings.Credential.ShouldNotBeNull();
+        credential.ToString().ShouldBe($"StorytellerCredential {{ Kind = Federated, ClientId = {FederatedMachineId}, SubjectTokenSource = GitHubActions }}");
+
+        var exception = await Should.ThrowAsync<StorytellerAuthenticationException>(() => credential.GetAuthorizationAsync(null, CancellationToken.None).AsTask());
+
+        exception.Reason.ShouldBe(StorytellerAuthenticationFailureReason.Unavailable);
+        exception.Message.ShouldContain("The GitHub Actions ID token request to http://127.0.0.1:9/idtoken failed");
+        exception.Message.ShouldNotContain("api-version");
+        exception.Message.ShouldNotContain(GitHubRequestToken);
+    }
+
+    [Fact]
+    public void AClientIdThatIsNoGuid_InAGitHubActionsJob_IsAConfigurationError()
+    {
+        UseGitHubActions();
+        _environment["STORYTELLER_CLIENT_ID"] = "client_01MACHINE";
+
+        var exception = ShouldFail();
+
+        exception.Message.ShouldContain("STORYTELLER_CLIENT_SECRET");
+        exception.Message.ShouldContain("GitHub Actions");
+        exception.InnerException.ShouldBeOfType<StorytellerAuthenticationException>().Reason.ShouldBe(StorytellerAuthenticationFailureReason.Configuration);
+    }
+
+    [Fact]
+    public void ARunnerUrlThatBreaksTheUrlRule_IsAConfigurationError_ThatNamesTheVariable()
+    {
+        UseGitHubActions("http://runner.example.com/idtoken?api-version=2.0&code=p4ssw0rd");
+        _environment["STORYTELLER_CLIENT_ID"] = FederatedMachineId;
+
+        var exception = ShouldFail();
+
+        exception.Message.ShouldContain("ACTIONS_ID_TOKEN_REQUEST_URL");
+        exception.Message.ShouldNotContain("p4ssw0rd");
+        exception.Message.ShouldNotContain(GitHubRequestToken);
+    }
+
+    // The variables of a GitHub Actions job with permissions: id-token: write.
+    private void UseGitHubActions(string requestUrl = "https://pipelines.actions.githubusercontent.com/abc/idtoken?api-version=2.0")
+    {
+        _environment["ACTIONS_ID_TOKEN_REQUEST_URL"] = requestUrl;
+        _environment["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = GitHubRequestToken;
     }
 
     private StorytellerConfigurationOptions Options(Action<StorytellerConfigurationOptions>? configure = null)

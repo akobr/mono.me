@@ -2,7 +2,7 @@ using _42.Platform.Storyteller.Sdk.Credentials;
 
 namespace _42.Platform.Storyteller.Sdk.UnitTests.Credentials;
 
-public class LocalUrlRuleTests
+public class StorytellerUrlRuleTests
 {
     [Theory]
     [InlineData("https://api.example.com/api")]
@@ -13,7 +13,7 @@ public class LocalUrlRuleTests
     [InlineData("http://[::1]:7071/api")]
     public void Allows(string url)
     {
-        LocalUrlRule.IsAllowed(new Uri(url)).ShouldBeTrue();
+        StorytellerUrlRule.IsAllowed(new Uri(url)).ShouldBeTrue();
     }
 
     [Theory]
@@ -26,13 +26,13 @@ public class LocalUrlRuleTests
     [InlineData("ftp://api.example.com/api")]
     public void Refuses(string url)
     {
-        LocalUrlRule.IsAllowed(new Uri(url)).ShouldBeFalse();
+        StorytellerUrlRule.IsAllowed(new Uri(url)).ShouldBeFalse();
     }
 
     [Fact]
     public void Require_NamesTheSettingButNotTheValue()
     {
-        var exception = Should.Throw<StorytellerAuthenticationException>(() => LocalUrlRule.Require("https://user:password@api.example.com/api", "STORYTELLER_ENDPOINT"));
+        var exception = Should.Throw<StorytellerAuthenticationException>(() => StorytellerUrlRule.Require("https://user:password@api.example.com/api", "STORYTELLER_ENDPOINT"));
 
         exception.Reason.ShouldBe(StorytellerAuthenticationFailureReason.Configuration);
         exception.Message.ShouldContain("STORYTELLER_ENDPOINT");
@@ -42,10 +42,10 @@ public class LocalUrlRuleTests
     [Fact]
     public void Describe_DropsUserInfoQueryAndFragment()
     {
-        LocalUrlRule.Describe(new Uri("https://u:p4ss@idp.example.com:8443/oauth2/token?tenant=x#f")).ShouldBe("https://idp.example.com:8443/oauth2/token");
-        LocalUrlRule.Describe(new Uri("https://api.example.com/api/")).ShouldBe("https://api.example.com/api/");
-        LocalUrlRule.Describe(new Uri("/token", UriKind.Relative)).ShouldBe("<relative>");
-        LocalUrlRule.Describe(null).ShouldBeNull();
+        StorytellerUrlRule.Describe(new Uri("https://u:p4ss@idp.example.com:8443/oauth2/token?tenant=x#f")).ShouldBe("https://idp.example.com:8443/oauth2/token");
+        StorytellerUrlRule.Describe(new Uri("https://api.example.com/api/")).ShouldBe("https://api.example.com/api/");
+        StorytellerUrlRule.Describe(new Uri("/token", UriKind.Relative)).ShouldBe("<relative>");
+        StorytellerUrlRule.Describe(null).ShouldBeNull();
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public class LocalUrlRuleTests
     [Fact]
     public void Require_RefusesARelativeUrl()
     {
-        Should.Throw<StorytellerAuthenticationException>(() => LocalUrlRule.Require("/api", "STORYTELLER_ENDPOINT"));
+        Should.Throw<StorytellerAuthenticationException>(() => StorytellerUrlRule.Require("/api", "STORYTELLER_ENDPOINT"));
     }
 
     [Theory]
@@ -77,9 +77,9 @@ public class LocalUrlRuleTests
     [InlineData("https://api.example.com/api#p4ssw0rd")]
     public void RequireEndpoint_RefusesAQueryOrAFragment_ThatPathsWouldFollow(string url)
     {
-        LocalUrlRule.Require(url, "STORYTELLER_ENDPOINT").ShouldBe(new Uri(url));
+        StorytellerUrlRule.Require(url, "STORYTELLER_ENDPOINT").ShouldBe(new Uri(url));
 
-        var exception = Should.Throw<StorytellerAuthenticationException>(() => LocalUrlRule.RequireEndpoint(url, "STORYTELLER_ENDPOINT"));
+        var exception = Should.Throw<StorytellerAuthenticationException>(() => StorytellerUrlRule.RequireEndpoint(url, "STORYTELLER_ENDPOINT"));
 
         exception.Reason.ShouldBe(StorytellerAuthenticationFailureReason.Configuration);
         exception.Message.ShouldContain("STORYTELLER_ENDPOINT");
@@ -90,8 +90,8 @@ public class LocalUrlRuleTests
     [Fact]
     public void RequireEndpoint_AppliesTheLocalUrlRule()
     {
-        LocalUrlRule.RequireEndpoint("http://localhost:7071/api/", "STORYTELLER_ENDPOINT").ShouldBe(new Uri("http://localhost:7071/api/"));
-        Should.Throw<StorytellerAuthenticationException>(() => LocalUrlRule.RequireEndpoint("http://loopback/api", "STORYTELLER_ENDPOINT"));
+        StorytellerUrlRule.RequireEndpoint("http://localhost:7071/api/", "STORYTELLER_ENDPOINT").ShouldBe(new Uri("http://localhost:7071/api/"));
+        Should.Throw<StorytellerAuthenticationException>(() => StorytellerUrlRule.RequireEndpoint("http://loopback/api", "STORYTELLER_ENDPOINT"));
     }
 
     [Fact]

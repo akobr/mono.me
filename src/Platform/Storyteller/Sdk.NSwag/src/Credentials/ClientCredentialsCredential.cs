@@ -35,24 +35,29 @@ internal sealed class ClientCredentialsCredential : CachedTokenCredential
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.ClientId, "options.ClientId");
         ArgumentException.ThrowIfNullOrWhiteSpace(options.ClientSecret, "options.ClientSecret");
+        RequireTokenUrl(options.ClientId, options.TokenUrl, tokenUrlName);
 
-        if (options.TokenUrl is not null)
+        if (options.Endpoint is not null)
         {
-            LocalUrlRule.Require(options.TokenUrl, tokenUrlName);
+            StorytellerUrlRule.RequireEndpoint(options.Endpoint, "ClientCredentialsOptions.Endpoint");
         }
-        else if (!options.ClientId.StartsWith(AuthKitClientIdPrefix, StringComparison.Ordinal))
+
+        return new ClientCredentialsCredential(options, null, getVariable, null);
+    }
+
+    // A token URL by the URL rule, or else an AuthKit client id, which discovers it.
+    public static void RequireTokenUrl(string clientId, Uri? tokenUrl, string tokenUrlName)
+    {
+        if (tokenUrl is not null)
+        {
+            StorytellerUrlRule.Require(tokenUrl, tokenUrlName);
+        }
+        else if (!clientId.StartsWith(AuthKitClientIdPrefix, StringComparison.Ordinal))
         {
             // Discovery describes the user provider and is anonymous: a Keycloak or Entra ID secret never goes to WorkOS.
             throw StorytellerAuthenticationException.Configuration(
                 $"Set {tokenUrlName} to the token URL that sform account machine create printed; only an AuthKit client id ({AuthKitClientIdPrefix}…) discovers it.");
         }
-
-        if (options.Endpoint is not null)
-        {
-            LocalUrlRule.RequireEndpoint(options.Endpoint, "ClientCredentialsOptions.Endpoint");
-        }
-
-        return new ClientCredentialsCredential(options, null, getVariable, null);
     }
 
     public override StorytellerCredential Bind(StorytellerCredentialBinding binding)
@@ -94,7 +99,7 @@ internal sealed class ClientCredentialsCredential : CachedTokenCredential
     {
         var endpoint = ResolveEndpoint(_options.Endpoint, "The AuthKit discovery of a client-credentials credential without a token URL");
         var discovery = await client.DiscoverSignInAsync(endpoint, cancellationToken).ConfigureAwait(false);
-        var target = LocalUrlRule.Describe(endpoint);
+        var target = StorytellerUrlRule.Describe(endpoint);
 
         if (!string.Equals(discovery.Provider, AuthKitProvider, StringComparison.OrdinalIgnoreCase))
         {

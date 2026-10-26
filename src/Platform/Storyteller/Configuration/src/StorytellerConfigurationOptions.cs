@@ -9,7 +9,7 @@ namespace _42.Platform.Storyteller.Sdk.Configuring;
 // then read from its STORYTELLER_* variable. Validated once, when the source is added.
 public sealed class StorytellerConfigurationOptions
 {
-    // The API base, /api included: STORYTELLER_ENDPOINT, or STORYTELLER_API_URL as the sform fallback. https, or http
+    // The API base, /api included: STORYTELLER_ENDPOINT, or the deprecated STORYTELLER_API_URL of sform. https, or http
     // to localhost or a loopback address.
     public string? Endpoint { get; set; }
 

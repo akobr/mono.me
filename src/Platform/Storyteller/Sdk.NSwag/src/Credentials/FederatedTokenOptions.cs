@@ -37,6 +37,6 @@ public sealed record FederatedTokenOptions
 
     public override string ToString()
     {
-        return $"{nameof(FederatedTokenOptions)} {{ Endpoint = {LocalUrlRule.Describe(Endpoint)}, Organization = {Organization}, Project = {Project}, ClientId = {ClientId}, SubjectTokenPath = {SubjectTokenPath}, SubjectTokenType = {SubjectTokenType}, Scope = {Scope} }}";
+        return $"{nameof(FederatedTokenOptions)} {{ Endpoint = {StorytellerUrlRule.Describe(Endpoint)}, Organization = {Organization}, Project = {Project}, ClientId = {ClientId}, SubjectTokenPath = {SubjectTokenPath}, SubjectTokenType = {SubjectTokenType}, Scope = {Scope} }}";
     }
 }

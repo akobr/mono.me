@@ -36,13 +36,14 @@ internal static class SettingsReader
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var variables = new VariableReader(options.GetEnvironmentVariable ?? Environment.GetEnvironmentVariable);
+        var getVariable = options.GetEnvironmentVariable ?? Environment.GetEnvironmentVariable;
+        var variables = new StorytellerVariableReader(getVariable);
         var endpoint = ReadEndpoint(options, variables);
         var (key, keyText) = ReadKey(options, variables, requireKey);
         var timeProvider = options.TimeProvider ?? TimeProvider.System;
         var fileSystem = options.FileSystem ?? new FileSystem();
         var resilience = CopyResilience(options.Resilience, keyText);
-        var credential = ReadCredential(options, variables, fileSystem, timeProvider, keyText);
+        var credential = ReadCredential(options, getVariable, fileSystem, timeProvider, keyText);
 
         if (isProvider && !Enum.IsDefined(options.Placement))
         {
@@ -80,42 +81,40 @@ internal static class SettingsReader
         };
     }
 
-    private static Uri ReadEndpoint(StorytellerConfigurationOptions options, VariableReader variables)
+    private static Uri ReadEndpoint(StorytellerConfigurationOptions options, StorytellerVariableReader variables)
     {
-        var (text, source) = FromCode(options.Endpoint, nameof(options.Endpoint))
-            ?? (variables.ReadWithFallback(ConfigurationVariables.ENDPOINT, ConfigurationVariables.API_URL, out var variable), variable);
-
-        if (text is null)
+        try
         {
-            throw Invalid(
-                $"The Storyteller endpoint is not set: set {ConfigurationVariables.ENDPOINT} (or {ConfigurationVariables.API_URL}) or {OptionsName}.{nameof(options.Endpoint)} to the API base, /api included.",
-                null);
-        }
+            var (text, source) = FromCode(options.Endpoint, nameof(options.Endpoint))
+                ?? (variables.ReadWithFallback(StorytellerVariables.ENDPOINT, StorytellerVariables.API_URL, out var variable), variable);
 
-        // The value is not printed: it may carry user info.
-        if (!Uri.TryCreate(text, UriKind.Absolute, out var endpoint) || !LocalUrl.IsAllowed(endpoint))
+            if (text is null)
+            {
+                throw Invalid(
+                    $"The Storyteller endpoint is not set: set {StorytellerVariables.ENDPOINT} (or {StorytellerVariables.API_URL}) or {OptionsName}.{nameof(options.Endpoint)} to the API base, /api included.",
+                    null);
+            }
+
+            // The SDK's rule, so an endpoint the provider accepts is one its credentials accept. Paths are appended to it,
+            // and the value is not printed: it may carry user info.
+            return StorytellerUrlRule.RequireEndpoint(text, source);
+        }
+        catch (StorytellerAuthenticationException exception)
         {
-            throw Invalid($"{source} must be an absolute https URL without user info; http is allowed only for localhost or a loopback address.", null);
+            // A name and its deprecated name that disagree, or a URL the rule refuses; the message names the source.
+            throw Invalid(exception.Message, null);
         }
-
-        // Paths are appended to it.
-        if (endpoint.Query.Length > 0 || endpoint.Fragment.Length > 0)
-        {
-            throw Invalid($"{source} must not have a query or a fragment; set the API base, /api included.", null);
-        }
-
-        return endpoint;
     }
 
-    private static (FullKey? Key, string? Text) ReadKey(StorytellerConfigurationOptions options, VariableReader variables, bool requireKey)
+    private static (FullKey? Key, string? Text) ReadKey(StorytellerConfigurationOptions options, StorytellerVariableReader variables, bool requireKey)
     {
         var (text, source) = FromCode(options.Key, nameof(options.Key))
-            ?? (variables.Read(ConfigurationVariables.KEY), ConfigurationVariables.KEY);
+            ?? (variables.Read(StorytellerVariables.KEY), StorytellerVariables.KEY);
 
         if (text is null)
         {
             return requireKey
-                ? throw Invalid($"The Storyteller key is not set: set {ConfigurationVariables.KEY} or {OptionsName}.{nameof(options.Key)} to the full key of the configuration, @{{organization}}.{{project}}.{{view}}.{{annotation key}}.", null)
+                ? throw Invalid($"The Storyteller key is not set: set {StorytellerVariables.KEY} or {OptionsName}.{nameof(options.Key)} to the full key of the configuration, @{{organization}}.{{project}}.{{view}}.{{annotation key}}.", null)
                 : (null, null);
         }
 
@@ -129,7 +128,7 @@ internal static class SettingsReader
         }
     }
 
-    private static StorytellerReadMode ReadMode(StorytellerConfigurationOptions options, VariableReader variables, string? key)
+    private static StorytellerReadMode ReadMode(StorytellerConfigurationOptions options, StorytellerVariableReader variables, string? key)
     {
         if (options.Mode is { } mode)
         {
@@ -150,7 +149,7 @@ internal static class SettingsReader
             : throw Invalid($"{ConfigurationVariables.MODE} must be resolved or effective.", key);
     }
 
-    private static TimeSpan ReadRefreshInterval(StorytellerConfigurationOptions options, VariableReader variables, string? key)
+    private static TimeSpan ReadRefreshInterval(StorytellerConfigurationOptions options, StorytellerVariableReader variables, string? key)
     {
         string source;
         TimeSpan interval;
@@ -180,7 +179,7 @@ internal static class SettingsReader
             : throw Invalid($"{source} must be 0, which disables the refresh, or between one second and {MaximumRefreshInterval.TotalDays} days.", key);
     }
 
-    private static bool ReadOptional(StorytellerConfigurationOptions options, VariableReader variables, string? key)
+    private static bool ReadOptional(StorytellerConfigurationOptions options, StorytellerVariableReader variables, string? key)
     {
         if (options.Optional is { } optional)
         {
@@ -199,7 +198,7 @@ internal static class SettingsReader
             : throw Invalid($"{ConfigurationVariables.OPTIONAL} must be true, false, 1 or 0.", key);
     }
 
-    private static string? ReadCacheDirectory(StorytellerConfigurationOptions options, VariableReader variables, IFileSystem fileSystem, string? key)
+    private static string? ReadCacheDirectory(StorytellerConfigurationOptions options, StorytellerVariableReader variables, IFileSystem fileSystem, string? key)
     {
         var (text, source) = FromCode(options.CacheDirectory, nameof(options.CacheDirectory))
             ?? (variables.Read(ConfigurationVariables.CACHE_DIR), ConfigurationVariables.CACHE_DIR);
@@ -222,7 +221,7 @@ internal static class SettingsReader
 
     private static StorytellerCredential? ReadCredential(
         StorytellerConfigurationOptions options,
-        VariableReader variables,
+        Func<string, string?> getVariable,
         IFileSystem fileSystem,
         TimeProvider timeProvider,
         string? key)
@@ -234,7 +233,7 @@ internal static class SettingsReader
 
         try
         {
-            return StorytellerCredential.FromEnvironment(variables.GetVariable, fileSystem, timeProvider);
+            return StorytellerCredential.FromEnvironment(getVariable, fileSystem, timeProvider);
         }
         catch (StorytellerAuthenticationException exception)
         {

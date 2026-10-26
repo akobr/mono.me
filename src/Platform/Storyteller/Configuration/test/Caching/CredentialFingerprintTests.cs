@@ -13,6 +13,7 @@ public class CredentialFingerprintTests
     private const string MachineOneKey = "2s.YWNtZTpiaWxsaW5nOm1hY2hpbmUtMQ.k3y-s3cret";
     private const string MachineOneRotatedKey = "2s.YWNtZTpiaWxsaW5nOm1hY2hpbmUtMQ.r0tated-s3cret";
     private const string MachineTwoKey = "2s.YWNtZTpiaWxsaW5nOm1hY2hpbmUtMg.k3y-s3cret";
+    private const string FederatedMachineId = "0b9f6a52-5d1c-4c47-9d0c-0f1e2d3c4b5a";
 
     [Fact]
     public async Task NoCredential_IsAnonymous()
@@ -147,6 +148,47 @@ public class CredentialFingerprintTests
 
         (await Compute(StorytellerCredential.FromTokenFile("/run/token", fileSystem)))
             .ShouldNotBe(await Compute(StorytellerCredential.FromApiKey(MachineOneKey)));
+    }
+
+    // Pinned: the entries a federated machine wrote must still match after an upgrade of the SDK.
+    [Fact]
+    public async Task AFederatedCredential_FromATokenFile_KeepsItsFingerprint()
+    {
+        var credential = StorytellerCredential.FromEnvironment(Variables(new Dictionary<string, string?>
+        {
+            ["STORYTELLER_TOKEN_FILE"] = "/run/platform-token",
+        }));
+
+        credential.ShouldNotBeNull().ToString().ShouldBe($"StorytellerCredential {{ Kind = Federated, ClientId = {FederatedMachineId}, SubjectTokenPath = /run/platform-token }}");
+        (await Compute(credential)).ShouldBe("FederatedTokenCredential:f90d14ab91f0f9bf9a1d25655aa18750");
+    }
+
+    // The client id keeps two machines of one job apart; the runner's URL and request token are not part of it.
+    [Fact]
+    public async Task AFederatedCredential_OfGitHubActions_HasAFingerprintOfItsOwn()
+    {
+        var credential = StorytellerCredential.FromEnvironment(Variables(new Dictionary<string, string?>
+        {
+            ["ACTIONS_ID_TOKEN_REQUEST_URL"] = "https://pipelines.actions.githubusercontent.com/abc/idtoken?api-version=2.0",
+            ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = "github-request-t0ken",
+        }));
+
+        credential.ShouldNotBeNull().ToString().ShouldBe($"StorytellerCredential {{ Kind = Federated, ClientId = {FederatedMachineId}, SubjectTokenSource = GitHubActions }}");
+        var fingerprint = await Compute(credential);
+
+        fingerprint.ShouldBe("FederatedTokenCredential:72ba6a4a99252cbd65c5e262d5a090f4");
+        fingerprint.ShouldNotBe(await Compute(StorytellerCredential.FromEnvironment(Variables(new Dictionary<string, string?>
+        {
+            ["ACTIONS_ID_TOKEN_REQUEST_URL"] = "https://pipelines.actions.githubusercontent.com/other/idtoken?api-version=2.0",
+            ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = "github-request-t0ken",
+            ["STORYTELLER_CLIENT_ID"] = "7c4d2b1a-0e9f-4a3b-8c7d-6e5f4a3b2c1d",
+        }))));
+    }
+
+    private static Func<string, string?> Variables(Dictionary<string, string?> variables)
+    {
+        variables.TryAdd("STORYTELLER_CLIENT_ID", FederatedMachineId);
+        return name => variables.GetValueOrDefault(name);
     }
 
     private static Task<string> Compute(StorytellerCredential? credential)

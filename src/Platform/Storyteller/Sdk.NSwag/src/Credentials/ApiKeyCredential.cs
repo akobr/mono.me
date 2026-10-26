@@ -39,7 +39,7 @@ internal sealed class ApiKeyCredential : StorytellerCredential
     }
 
     // The scheme of the Authorization header is accepted too, as curl snippets show it.
-    private static string Normalize(string apiKey)
+    internal static string Normalize(string apiKey)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
 

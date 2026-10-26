@@ -45,13 +45,14 @@ public abstract class StorytellerCredential
         return FederatedTokenCredential.Create(options, null, Environment.GetEnvironmentVariable);
     }
 
-    // The credential the STORYTELLER_* variables describe, still unbound; null when they describe none.
+    // The credential the STORYTELLER_* variables describe, still unbound; null when they describe none. See
+    // StorytellerCredentialVariables for the rules.
     public static StorytellerCredential? FromEnvironment(
         Func<string, string?>? getVariable = null,
         IFileSystem? fileSystem = null,
         TimeProvider? timeProvider = null)
     {
-        return EnvironmentCredential.Read(getVariable ?? Environment.GetEnvironmentVariable, fileSystem ?? new FileSystem(), timeProvider);
+        return StorytellerCredentialVariables.Read(getVariable)?.CreateCredential(fileSystem, timeProvider);
     }
 
     // rejected is the value the API refused, null for a normal call. A cached value is dropped only when it equals
