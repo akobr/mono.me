@@ -29,7 +29,10 @@ public sealed class EntraOnBehalfOfTokenProvider : IStorytellerTokenProvider
     {
         var entra = options.Value.EntraId;
         _scopes = api.Value.Scopes.ToArray();
-        _application = new Lazy<IConfidentialClientApplication>(() => CreateApplication(entra, settings));
+
+        // PublicationOnly: a failed creation (an unreadable certificate, an unreachable identity endpoint) is not cached,
+        // so the next call tries again.
+        _application = new Lazy<IConfidentialClientApplication>(() => CreateApplication(entra, settings), LazyThreadSafetyMode.PublicationOnly);
     }
 
     public async Task<string> GetTokenAsync(string userToken, CancellationToken cancellationToken)

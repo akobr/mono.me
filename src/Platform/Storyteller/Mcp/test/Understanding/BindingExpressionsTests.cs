@@ -99,9 +99,9 @@ public class BindingExpressionsTests
     }
 
     [Fact]
-    public void Parse_TenThousandNestedCalls_IsInvalid_WithoutExhaustingTheStack()
+    public void Parse_TenThousandNestedCalls_ExceedsMaxLength_AndIsInvalid()
     {
-        // about 40 KB, far under the API's document limit; read recursively, it would overflow the host's stack
+        // about 40 KB: longer than MaxLength, so it is refused before the reader starts (the depth limit is tested below)
         var parsed = BindingExpressions.Parse(NestedCalls(10_000));
 
         parsed.Form.ShouldBe(BindingForm.Invalid);

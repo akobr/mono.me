@@ -221,11 +221,13 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         return Summaries(page);
     }
 
-    [McpServerTool(Name = "set_annotation", Title = "Create or update an annotation", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = "set_annotation", Title = "Create or update an annotation", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description(
         "Creates or updates one annotation; the body is built from the key (its type, name and the keys and names of "
         + "its ancestors). On an update the fields left out keep their stored values, clearFields removes fields, and "
-        + "values replaces the whole set of values. On a create: " + NameRule + " A unit needs unitType and "
+        + "values replaces the whole set of values; annotation fields keep no versions and there is no rollback: "
+        + "get_annotation_history shows earlier fields, labels and simple values for a manual restore, but only flags a changed "
+        + "description, so a replaced description is lost. On a create: " + NameRule + " A unit needs unitType and "
         + "unitDefinition. Missing ancestors are created by the API with the validity window, time zone, disabled flag "
         + "and labels of this annotation (a unit created that way gets UnitType \"event\" and UnitDefinition "
         + "\"unknown\"). " + DeletedRule + " Needs the Contributor role. Returns the stored annotation.")]
@@ -318,7 +320,7 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         return ToolResults.Json(await annotations.SetAnnotationAsync(organization, project, view, keyText, body, cancellationToken));
     }
 
-    [McpServerTool(Name = "create_annotations", Title = "Create annotations", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [McpServerTool(Name = "create_annotations", Title = "Create annotations", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
     [Description(
         "Creates up to 100 annotations, with their missing ancestors, from keys or compact lines; keys that exist are "
         + "skipped. A compact line has no type code: subject (sbt), subject.responsibility (usg), "
