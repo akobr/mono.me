@@ -72,6 +72,15 @@ public sealed partial class CatalogTests : IDisposable
         }
     }
 
+    // Annotation fields keep no version history: an update or a re-creation replaces them for good.
+    [Theory]
+    [InlineData("set_annotation")]
+    [InlineData("create_annotations")]
+    public void Tools_ThatReplaceAnnotationFields_AreDestructive(string name)
+    {
+        Tools().Single(tool => tool.ProtocolTool.Name == name).ProtocolTool.Annotations!.DestructiveHint.ShouldBe(true);
+    }
+
     [Fact]
     public void Tools_ThatRead_AreReadOnly_ExceptTheSecretTools()
     {
