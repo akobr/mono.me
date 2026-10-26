@@ -13,15 +13,32 @@ public static class ApiErrors
     public const string ServerMessage = "The Storyteller API failed. Try again later.";
 
     public const string UnauthorizedMessage =
-        "The Storyteller API did not accept the token of the MCP server. Check that the API lists the MCP app and "
-        + "tenant in Auth:DelegatedClients and that the token carries User.Impersonation.";
+        "The Storyteller API did not accept the token the MCP server got for the person from its token exchange. Sign in "
+        + "to the MCP server again; if that does not help, an administrator checks the person's account and the API's "
+        + "Auth:TokenExchange settings.";
+
+    // The API's ErrorCode for what it refuses to the actor the token acts through (NoSecretReveal): a secret read, and
+    // giving out credentials that read secrets (creating or resetting a machine with a Secrets scope, or replacing its
+    // federation rules).
+    public const string ActorRestrictedCode = "ActorRestricted";
+
+    public const string ActorRestrictedMessage =
+        "The Storyteller API refuses this to the assistant: it acts through the MCP server, whose actor may not reveal "
+        + "secrets (NoSecretReveal). The API withholds secret values from it and gives out no credentials that read them "
+        + "(creating or resetting a machine with a Secrets scope, replacing its federation rules). Do this with sform or "
+        + "the admin UI.";
 
     public static CallToolResult ToResult(Sdk.ApiException exception)
     {
         var (errorCode, message, hint, errors) = Read(exception);
         var status = exception.StatusCode;
 
-        if (status == 422)
+        if (string.Equals(errorCode, ActorRestrictedCode, StringComparison.Ordinal))
+        {
+            message = ActorRestrictedMessage;
+            hint = null;
+        }
+        else if (status == 422)
         {
             message = BindingMessage;
             hint = null;

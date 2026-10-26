@@ -6,17 +6,20 @@ using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
-// On-behalf-of without Entra: the downstream token names the person (downstream:{sub}), so a test sees whose token the
-// API got. Failure replaces the exchange with an exception.
+// The token exchange without the API: the Storyteller token names the person (downstream:{sub}), so a test sees whose
+// token the API got. Restrictions are those of the actor (none by default); Failure replaces the exchange with an
+// exception.
 internal sealed class StubTokenProvider : IStorytellerTokenProvider
 {
     public ConcurrentQueue<string> UserTokens { get; } = new();
 
     public Exception? Failure { get; set; }
 
+    public IReadOnlySet<string> Restrictions { get; set; } = new HashSet<string>(StringComparer.Ordinal);
+
     public static string DownstreamFor(string subject) => $"downstream:{subject}";
 
-    public Task<string> GetTokenAsync(string userToken, CancellationToken cancellationToken)
+    public Task<StorytellerToken> GetTokenAsync(string userToken, CancellationToken cancellationToken)
     {
         UserTokens.Enqueue(userToken);
 
@@ -26,6 +29,6 @@ internal sealed class StubTokenProvider : IStorytellerTokenProvider
         }
 
         var subject = new JsonWebToken(userToken).Subject;
-        return Task.FromResult(DownstreamFor(subject));
+        return Task.FromResult(new StorytellerToken(DownstreamFor(subject), DateTimeOffset.UtcNow.AddMinutes(10), "User.Impersonation", Restrictions));
     }
 }

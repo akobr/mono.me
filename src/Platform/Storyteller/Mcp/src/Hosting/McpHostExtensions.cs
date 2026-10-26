@@ -1,8 +1,10 @@
+using System.IO.Abstractions;
 using System.Reflection;
 
 using _42.Platform.Storyteller.Mcp.Authentication;
 using _42.Platform.Storyteller.Mcp.Tools;
 
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 
@@ -32,7 +34,7 @@ public static class McpHostExtensions
         }
 
         services.AddMcpAuthentication();
-        services.AddSingleton<IStorytellerTokenProvider, EntraOnBehalfOfTokenProvider>();
+        services.AddStorytellerTokenExchange();
         services.AddStorytellerClients();
 
         var secretTools = builder.Configuration.GetValue<bool>($"{McpHostOptions.SectionName}:SecretTools:Enabled");
@@ -42,7 +44,16 @@ public static class McpHostExtensions
                 options.ServerInstructions = McpInstructions.Text;
             })
             .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
-            .WithRequestFilters(filters => filters.AddCallToolFilter(StorytellerCallFilter.Create))
+            .WithRequestFilters(filters =>
+            {
+                filters.AddCallToolFilter(StorytellerCallFilter.Create);
+
+                // The secret tools follow the API: tools/list hides them while it withholds secrets from the actor.
+                if (secretTools)
+                {
+                    filters.AddListToolsFilter(SecretToolsFilter.Create);
+                }
+            })
             .WithStorytellerTools(secretTools);
 
         return builder;
@@ -53,12 +64,14 @@ public static class McpHostExtensions
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapOAuthMetadata();
+        app.MapActorKeys();
         app.MapMcp(McpPath).RequireAuthorization(McpPolicies.User);
         app.MapDefaultEndpoints();
         return app;
     }
 
-    // Explicit registration: the catalog is exactly these classes, and the secret tools only when the setting asks.
+    // Explicit registration: the catalog is exactly these classes, and the secret tools (SecretToolNames) only when the
+    // setting asks.
     public static IMcpServerBuilder WithStorytellerTools(this IMcpServerBuilder builder, bool secretTools)
     {
         builder
@@ -79,6 +92,28 @@ public static class McpHostExtensions
         }
 
         return builder;
+    }
+
+    // The client of the API's token exchange and the actor's credential. Its HttpClient drops the defaults' resilience
+    // handler, because a retried exchange counts again against the API's replay limit per subject token, and follows no
+    // redirect, so a person's token goes to the configured URL only. StorytellerTokenExchangeProvider.ExchangeTimeout
+    // bounds each exchange.
+    public static IServiceCollection AddStorytellerTokenExchange(this IServiceCollection services)
+    {
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<IFileSystem, FileSystem>();
+        services.TryAddSingleton<McpActorKey>();
+        services.TryAddSingleton<McpActorCredential>();
+        services.AddSingleton<IStorytellerTokenProvider, StorytellerTokenExchangeProvider>();
+
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is experimental; it drops the defaults' handler that retries.
+        services.AddHttpClient(StorytellerTokenExchangeProvider.HttpClientName)
+            .RemoveAllResilienceHandlers()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false })
+            .ConfigureHttpClient(http => http.Timeout = Timeout.InfiniteTimeSpan);
+#pragma warning restore EXTEXP0001
+
+        return services;
     }
 
     // The scoped ISdkConfiguration wins over the SDK's own singleton (TryAdd): every request's clients send the token of

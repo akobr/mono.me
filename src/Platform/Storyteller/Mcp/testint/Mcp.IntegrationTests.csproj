@@ -20,8 +20,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
-  <!-- The host's shared framework: restore then prunes its packages, which Microsoft.Identity.Web.TokenCache brings
-       in at vulnerable versions (Microsoft.AspNetCore.DataProtection, System.Security.Cryptography.Xml 10.0.0). -->
+  <!-- The host's shared framework, which the MCP server's types run on; restore prunes the packages it already holds. -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

@@ -13,11 +13,6 @@ public sealed class StorytellerApiOptionsValidator(IHostEnvironment environment)
             failures.Add($"Storyteller:BaseUrl {problem}");
         }
 
-        if (options.Scopes.Count == 0 || options.Scopes.Any(string.IsNullOrWhiteSpace))
-        {
-            failures.Add("Storyteller:Scopes must list the delegated scopes of the API, for example api://{ApiClientId}/User.Impersonation.");
-        }
-
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 }

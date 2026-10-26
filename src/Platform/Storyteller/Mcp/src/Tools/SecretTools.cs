@@ -5,8 +5,9 @@ using ModelContextProtocol.Server;
 
 namespace _42.Platform.Storyteller.Mcp.Tools;
 
-// The tools that return secret values, registered only with Mcp:SecretTools:Enabled. None is read-only, so clients that
-// confirm writes confirm these too, and each is a tool of its own, so clients that allow or deny per tool tell them apart.
+// The tools that return secret values, registered only with Mcp:SecretTools:Enabled and offered only while the API lets
+// the MCP server's actor read secrets (SecretToolNames). None is read-only, so clients that confirm writes confirm these
+// too, and each is a tool of its own, so clients that allow or deny per tool tell them apart.
 [McpServerToolType]
 public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigurationsApiClient configurations)
 {
@@ -14,7 +15,7 @@ public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigur
         "Ask the person first: the value enters the conversation, the client's transcript and the model provider, and it "
         + "cannot be taken back.";
 
-    [McpServerTool(Name = "reveal_key_value", Title = "Reveal a key/value pair", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = SecretToolNames.RevealKeyValue, Title = "Reveal a key/value pair", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
         "Returns a pair with its value, a secret's value included, or one stored version of it. " + AskFirst + " Needs "
         + "ContributorWithSecrets on the project for a secret. The API audits secret reads: a reveal of the current value, "
@@ -55,7 +56,7 @@ public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigur
         return ToolResults.Json(KeyValueProtections.Describe(await keyValues.GetKeyValueVersionAsync(organization, project, view, name, number, true, cancellationToken)));
     }
 
-    [McpServerTool(Name = "get_resolved_configuration", Title = "Get a configuration with its bindings evaluated", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = SecretToolNames.GetResolvedConfiguration, Title = "Get a configuration with its bindings evaluated", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
         "Returns the effective configuration of an annotation with its bindings evaluated: @key references and $binding "
         + "objects replaced by their values. With ContributorWithSecrets the secret bindings are filled in with the secret "

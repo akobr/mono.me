@@ -75,8 +75,10 @@ builder.AddViteApp("ui-admin", "../../ui.admin/src", "dev:aspire")
     .WithEnvironment("VITE_API_BASE_URL", ReferenceExpression.Create($"{apiFunctions.GetEndpoint("http")}/api"))
     .WithReference(apiFunctions);
 
-// MCP server (Storyteller/Mcp): needs an Entra ID app registration in its user secrets (Mcp:*, Storyteller:Scopes),
-// so it starts from the dashboard. The API accepts HTTP in Development, as the admin UI uses it.
+// MCP server (Storyteller/Mcp): needs its sign-in settings in its user secrets (Mcp:Provider, Mcp:Authentication:*)
+// and its actor for the API's token exchange (Mcp:Actor:Id and, in Development, Mcp:Actor:ClientSecret), which the
+// API's Auth:TokenExchange:Actors must list, so it starts from the dashboard. The API accepts HTTP in Development, as
+// the admin UI uses it.
 builder.AddProject<Projects.Mcp>("mcp")
     .WithReference(apiFunctions)
     .WaitFor(apiFunctions)
