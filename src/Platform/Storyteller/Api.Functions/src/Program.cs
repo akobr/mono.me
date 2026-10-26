@@ -135,6 +135,10 @@ var host = new HostBuilder()
             throw new InvalidOperationException($"Auth:Provider '{authProvider}' is not a known identity provider.");
         }
 
+        // The user token exchange of actors such as the MCP server (Auth:TokenExchange, POST v1/access/token): after the
+        // federation, whose issuer and signing keys it shares, and the user provider, which validates the subject tokens.
+        services.AddUserTokenExchange(context.Configuration);
+
         // ClientCredentials machine access: at most one identity provider issues machine client
         // credentials, independently of the user provider. Projects opt in with the ClientCredentials policy.
         var authKitOptions = context.Configuration.GetSection($"{UserAuthenticationOptions.SectionName}:AuthKit").Get<AuthKitOptions>();

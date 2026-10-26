@@ -10,8 +10,8 @@ public static class UserAuthenticationEntryPoint
     private const string PermissionMapPath = "AuthKit:PermissionMap";
     private const string RoleMapPath = "Keycloak:RoleMap";
 
-    // Shared by every user and machine identity provider registration. Idempotent: binding the
-    // section twice would append array values such as DefaultUserScopes a second time.
+    // Shared by every user and machine identity provider registration, with the user token exchange (Auth:TokenExchange).
+    // Idempotent: binding the sections twice would append array values such as DefaultUserScopes or Actors a second time.
     public static IServiceCollection AddUserAuthenticationOptions(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -32,6 +32,13 @@ public static class UserAuthenticationEntryPoint
                 options.AuthKit.PermissionMap = ReadPermissionMap(section.GetSection(PermissionMapPath));
                 options.Keycloak.RoleMap = ReadPermissionMap(section.GetSection(RoleMapPath));
             })
+            .ValidateOnStart();
+
+        // Its validator reads the environment (ClientSecretHash is for Development only), Auth:Provider, and
+        // MachineAuth:Federation:PublicBaseUrl when an actor proves itself with a ClientAssertion.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<TokenExchangeOptions>, TokenExchangeOptionsValidator>());
+        services.AddOptions<TokenExchangeOptions>()
+            .Bind(configuration.GetSection(TokenExchangeOptions.SectionName))
             .ValidateOnStart();
         return services;
     }

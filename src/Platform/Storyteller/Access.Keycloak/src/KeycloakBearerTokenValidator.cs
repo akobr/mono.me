@@ -72,6 +72,24 @@ public class KeycloakBearerTokenValidator : IBearerTokenValidator
             return null;
         }
 
+        var result = await ValidateTokenAsync(rawToken, [_audience], cancellationToken);
+
+        if (!result.IsValid)
+        {
+            return null;
+        }
+
+        var claims = result.ClaimsIdentity.Claims.ToList();
+        return IsPersonToken(claims) && IsAllowedClient(claims) ? _normalizer.NormalizeUser(claims) : null;
+    }
+
+    // The realm's keys, issuer and lifetime rules with the given audiences; the result keeps the reason of a refusal.
+    // KeycloakUserSubjectTokenValidator shares them. Throws BearerKeyRetrievalException when the keys cannot be retrieved.
+    internal async Task<TokenValidationResult> ValidateTokenAsync(
+        string rawToken,
+        IReadOnlyCollection<string> audiences,
+        CancellationToken cancellationToken)
+    {
         OpenIdConnectConfiguration configuration;
 
         try
@@ -94,25 +112,19 @@ public class KeycloakBearerTokenValidator : IBearerTokenValidator
             IssuerValidator = (issuer, _, _) => IssuerMatches(issuer)
                 ? issuer
                 : throw new SecurityTokenInvalidIssuerException($"Invalid issuer: {issuer}"),
-            ValidAudience = _audience,
+            ValidAudiences = audiences,
             ValidateLifetime = true,
             RequireExpirationTime = true,
             ClockSkew = ClockSkew,
         });
 
-        if (!result.IsValid)
+        if (!result.IsValid && result.Exception is SecurityTokenSignatureKeyNotFoundException)
         {
-            if (result.Exception is SecurityTokenSignatureKeyNotFoundException)
-            {
-                // A rotated key: the next request fetches the metadata again (rate limited by the manager).
-                _configurationManager.RequestRefresh();
-            }
-
-            return null;
+            // A rotated key: the next request fetches the metadata again (rate limited by the manager).
+            _configurationManager.RequestRefresh();
         }
 
-        var claims = result.ClaimsIdentity.Claims.ToList();
-        return IsPersonToken(claims) && IsAllowedClient(claims) ? _normalizer.NormalizeUser(claims) : null;
+        return result;
     }
 
     // A person of the realm: a sub (a lightweight token, or one without the basic client scope, has none), not a
@@ -127,7 +139,7 @@ public class KeycloakBearerTokenValidator : IBearerTokenValidator
     }
 
     // Unverified; only decides whether this validator checks the token. Null when unreadable.
-    private static string? TryReadIssuer(string rawToken)
+    internal static string? TryReadIssuer(string rawToken)
     {
         var handler = new JsonWebTokenHandler();
 
@@ -146,14 +158,15 @@ public class KeycloakBearerTokenValidator : IBearerTokenValidator
         }
     }
 
+    // The realm issuer, exactly; only a trailing '/' may differ.
+    internal bool IssuerMatches(string? issuer)
+    {
+        return issuer is not null && string.Equals(issuer.TrimEnd('/'), _issuer, StringComparison.Ordinal);
+    }
+
     private static string? FindValue(IReadOnlyList<Claim> claims, string claimType)
     {
         return claims.FirstOrDefault(claim => claim.Type == claimType)?.Value;
-    }
-
-    private bool IssuerMatches(string? issuer)
-    {
-        return issuer is not null && string.Equals(issuer.TrimEnd('/'), _issuer, StringComparison.Ordinal);
     }
 
     // The client the person signed in through (azp) is one of AllowedClientIds.

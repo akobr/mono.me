@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 
 using _42.Platform.Storyteller.Api.V1;
 
+using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.Azure.Functions.Worker;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
@@ -165,6 +166,52 @@ public partial class RouteTableTests
         routes.ShouldContain(expected);
     }
 
+    // The user token exchange beside the project's machine exchange, and the discovery of the issuer under the API base.
+    [Theory]
+    [InlineData("POST v1/access/token")]
+    [InlineData("GET .well-known/oauth-authorization-server")]
+    [InlineData("GET .well-known/jwks.json")]
+    public void UserTokenExchangeRoutes_AreRegistered(string expected)
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
+
+        routes.ShouldContain(expected);
+    }
+
+    // The Functions host parses each route as an ASP.NET Core route template; a template it refuses leaves the function out.
+    [Fact]
+    public void HttpRoutes_AreValidRouteTemplates()
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .Select(trigger => trigger!.Route!)
+            .ToList();
+
+        routes.ShouldNotBeEmpty();
+        routes.Where(route => !IsRouteTemplate(route)).ShouldBeEmpty();
+    }
+
+    // Literal segments only, so /api/.well-known/... matches nothing else and nothing else matches it.
+    [Theory]
+    [InlineData(Definitions.Routes.Access.WellKnown.AuthorizationServer, ".well-known", "oauth-authorization-server")]
+    [InlineData(Definitions.Routes.Access.WellKnown.Jwks, ".well-known", "jwks.json")]
+    public void WellKnownRoutes_AreLiteralSegments(string route, string first, string second)
+    {
+        var pattern = RoutePatternFactory.Parse(route);
+
+        pattern.Parameters.ShouldBeEmpty();
+        pattern.PathSegments.Select(segment => segment.Parts.ShouldHaveSingleItem().ShouldBeOfType<RoutePatternLiteralPart>().Content)
+            .ShouldBe([first, second]);
+    }
+
     // Under the configuration's own path, which a client's invalidation of the configuration covers.
     [Fact]
     public void ConfigurationCompositionRoute_IsRegisteredOnce()
@@ -190,6 +237,20 @@ public partial class RouteTableTests
     public void TokenEndpoint_IsAnonymousAndPublishesNoSecurity()
     {
         var method = typeof(FederationHttp).GetMethod(nameof(FederationHttp.PostMachineToken))!;
+
+        method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()).OfType<HttpTriggerAttribute>()
+            .ShouldHaveSingleItem().AuthLevel.ShouldBe(AuthorizationLevel.Anonymous);
+        method.GetCustomAttributes<Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes.OpenApiSecurityAttribute>().ShouldBeEmpty();
+    }
+
+    // The user token exchange and the discovery of its issuer are anonymous too: the actor's proof is in the form.
+    [Theory]
+    [InlineData(typeof(TokenExchangeHttp), nameof(TokenExchangeHttp.PostUserToken))]
+    [InlineData(typeof(AuthorizationServerHttp), nameof(AuthorizationServerHttp.GetAuthorizationServerMetadata))]
+    [InlineData(typeof(AuthorizationServerHttp), nameof(AuthorizationServerHttp.GetJsonWebKeySet))]
+    public void UserTokenEndpointAndDiscovery_AreAnonymousAndPublishNoSecurity(Type type, string name)
+    {
+        var method = type.GetMethod(name)!;
 
         method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()).OfType<HttpTriggerAttribute>()
             .ShouldHaveSingleItem().AuthLevel.ShouldBe(AuthorizationLevel.Anonymous);
@@ -253,6 +314,19 @@ public partial class RouteTableTests
             .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
 
         routes.ShouldContain(expected);
+    }
+
+    private static bool IsRouteTemplate(string route)
+    {
+        try
+        {
+            RoutePatternFactory.Parse(route);
+            return true;
+        }
+        catch (RoutePatternException)
+        {
+            return false;
+        }
     }
 
     [GeneratedRegex("{[^}]+}")]

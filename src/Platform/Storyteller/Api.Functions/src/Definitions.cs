@@ -45,6 +45,18 @@ public static class Definitions
                 public const string MachineToken = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/token";
                 public const string SharedCertificates = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/certificates";
                 public const string SharedCertificate = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/certificates/{{{Parameters.Thumbprint}}}";
+
+                // The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange); "access" is a reserved organization
+                // name, so it never meets a project route.
+                public const string UserToken = "v1/access/token";
+            }
+
+            // Discovery of the Storyteller issuer under the API base (/api/.well-known/...): RFC 8414 metadata and the
+            // JWKS of its signing keys. Not versioned, as the RFCs name the documents.
+            public static class WellKnown
+            {
+                public const string AuthorizationServer = ".well-known/oauth-authorization-server";
+                public const string Jwks = ".well-known/jwks.json";
             }
         }
 
@@ -255,6 +267,9 @@ public static class Definitions
             public const string DeleteFederatedIssuer = nameof(DeleteFederatedIssuer);
             public const string SetMachineFederationRules = nameof(SetMachineFederationRules);
             public const string ExchangeMachineToken = nameof(ExchangeMachineToken);
+            public const string ExchangeUserToken = nameof(ExchangeUserToken);
+            public const string GetAuthorizationServerMetadata = nameof(GetAuthorizationServerMetadata);
+            public const string GetJsonWebKeySet = nameof(GetJsonWebKeySet);
 
             public const string GetAuthConfiguration = nameof(GetAuthConfiguration);
         }

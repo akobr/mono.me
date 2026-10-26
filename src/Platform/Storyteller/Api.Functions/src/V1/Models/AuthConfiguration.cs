@@ -21,4 +21,7 @@ public record class AuthConfiguration
 
     // Keycloak only: the realm issuer, whose OpenID metadata names the sign-in endpoints.
     public string? Issuer { get; init; }
+
+    // The user token exchange, for every provider.
+    public required TokenExchangeConfiguration TokenExchange { get; init; }
 }

@@ -4,8 +4,6 @@ using System.Security.Cryptography;
 
 using _42.Platform.Storyteller.Accessing;
 
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -30,7 +28,7 @@ public sealed class EntraIdMachineTokenValidatorTests : IDisposable
 
         _validator = new EntraIdMachineTokenValidator(new EntraIdBearerTokenValidator(
             Options.Create(new UserAuthenticationOptions { TenantId = "tenant-id", ClientId = ClientId }),
-            new ProductionEnvironment(),
+            new TestHostEnvironment(),
             new StaticConfigurationManager(configuration)));
     }
 
@@ -117,16 +115,5 @@ public sealed class EntraIdMachineTokenValidatorTests : IDisposable
         public void RequestRefresh()
         {
         }
-    }
-
-    private sealed class ProductionEnvironment : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = Environments.Production;
-
-        public string ApplicationName { get; set; } = "tests";
-
-        public string ContentRootPath { get; set; } = ".";
-
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }

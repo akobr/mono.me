@@ -22,7 +22,11 @@ public static class AuthKitEntryPoint
         services.AddUserAuthenticationOptions(configuration);
         services.TryAddSingleton<AuthKitClaimNormalizer>();
         services.AddSingleton<IBearerClaimsNormalizer>(provider => provider.GetRequiredService<AuthKitClaimNormalizer>());
-        services.AddSingleton<IBearerTokenValidator, AuthKitBearerTokenValidator>();
+
+        // One instance (one key set of Auth:AuthKit:Issuer) for API routes and the subject tokens of the user token exchange.
+        services.TryAddSingleton<AuthKitBearerTokenValidator>();
+        services.AddSingleton<IBearerTokenValidator>(provider => provider.GetRequiredService<AuthKitBearerTokenValidator>());
+        services.TryAddSingleton<IUserSubjectTokenValidator, AuthKitUserSubjectTokenValidator>();
 
         // Typed clients are transient, so the resolver and the invitation sender are too.
         services.AddWorkOsManagementClient();

@@ -12,6 +12,8 @@ internal sealed class FederationAccessService : IAccessService
 
     public List<string> Calls { get; } = [];
 
+    public Dictionary<string, Account> Accounts { get; } = new(StringComparer.Ordinal);
+
     // What CreateMachineAccessAsync returns; the router's work is not part of these tests.
     public MachineAccess? Created { get; set; }
 
@@ -87,7 +89,8 @@ internal sealed class FederationAccessService : IAccessService
 
     public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
 
-    public Task<Account?> GetAccountAsync(string id) => throw new NotImplementedException();
+    // The accounts the user token exchange finds.
+    public Task<Account?> GetAccountAsync(string id) => Task.FromResult(Accounts.GetValueOrDefault(id));
 
     public Task<Account> CreateAccountAsync(AccountCreate model) => throw new NotImplementedException();
 

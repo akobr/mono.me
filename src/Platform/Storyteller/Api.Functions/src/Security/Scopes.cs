@@ -1,3 +1,5 @@
+using _42.Platform.Storyteller.Accessing;
+
 namespace _42.Platform.Storyteller.Api.Security;
 
 // The scope strings that claims and tokens carry, as constants for the OpenAPI descriptions. MachineScopes is the
@@ -7,7 +9,7 @@ public static class Scopes
 {
     public static class User
     {
-        public const string Impersonation = "User.Impersonation";
+        public const string Impersonation = UserScopes.Impersonation;
     }
 
     public static class Annotation

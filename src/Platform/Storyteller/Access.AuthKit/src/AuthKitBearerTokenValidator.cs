@@ -56,10 +56,14 @@ public class AuthKitBearerTokenValidator : IBearerTokenValidator
         }
     }
 
+    // Auth:AuthKit:Issuer with its key set, shared with AuthKitUserSubjectTokenValidator.
+    internal AuthKitTokenSource Source => _source;
+
     public async Task<BearerValidationResult?> ValidateAsync(string rawToken, CancellationToken cancellationToken = default)
     {
         // A token from another issuer (an M2M token from the AuthKit domain, for example) is not
-        // this validator's; no keys are fetched for it.
+        // this validator's; no keys are fetched for it. The Auth:TokenExchange:AdditionalIssuers are such issuers:
+        // their tokens serve the exchange only.
         if (!AuthKitTokenSource.IssuerMatches(AuthKitTokenSource.TryReadIssuer(rawToken), _source.Issuer))
         {
             return null;
