@@ -1,5 +1,7 @@
 using System.ComponentModel;
 
+using _42.Platform.Storyteller.Mcp.Authentication;
+
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -8,10 +10,8 @@ namespace _42.Platform.Storyteller.Mcp.Tools;
 [McpServerToolType]
 public sealed class DiscoveryTools(Sdk.IAccessApiClient access, Sdk.IAnnotationsApiClient annotations)
 {
-    public const string MissingAccountMessage =
-        "No Storyteller account matches this sign-in. If the person has an account through sform or the admin UI, the "
-        + "identity (sub) of the MCP sign-in may differ from it; see docs/Platform/Storyteller/mcp.md, \"Identity\". "
-        + "Otherwise the person registers first, with sform or the admin UI.";
+    // The same text as the token exchange's refusal of a sign-in without an account.
+    public const string MissingAccountMessage = StorytellerSignInRefusedException.NoAccountMessage;
 
     [McpServerTool(Name = "get_my_account", Title = "Get my account", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Returns the signed-in person's Storyteller account: id, user name, name and the role per organization and project (AccessMap).")]

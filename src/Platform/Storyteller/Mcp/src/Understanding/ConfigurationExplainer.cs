@@ -19,7 +19,7 @@ public static class ConfigurationExplainer
 
     private static readonly string[] FixedNotes =
     [
-        "Bindings are not evaluated in this read: an Expression is the binding as stored. check_configuration_bindings evaluates them, when the server enables the secret tools.",
+        "Bindings are not evaluated in this read: an Expression is the binding as stored. check_configuration_bindings evaluates them, when the server offers the secret tools.",
         "A template is merged at every node of its type, after that node's ancestors and before the node's own content. In this document it can still lose to the content and templates of deeper nodes, and to an ancestor brought back by a later branch (see Via and AlsoSetBy).",
         "A shared ancestor is merged once per branch, so a later branch can bring its value back over what an earlier branch set (see Via and AlsoSetBy).",
         "Views never inherit from each other.",

@@ -88,11 +88,63 @@ public class ApiErrorsTests
     }
 
     [Fact]
-    public void Unauthorized_NamesTheDelegatedClientSetting()
+    public void Unauthorized_PointsAtTheTokenExchange()
     {
         var result = ApiErrors.ToResult(new Sdk.ApiException("Unauthorized", 401, "Scope(s): User.Impersonation", NoHeaders, null));
 
-        result.Text().ShouldContain("Auth:DelegatedClients");
+        result.Text().ShouldBe($"Storyteller API answered 401: {ApiErrors.UnauthorizedMessage}");
+        result.Text().ShouldContain("Auth:TokenExchange");
+        result.Text().ShouldNotContain("DelegatedClients");
+    }
+
+    [Fact]
+    public void ActorRestricted_SaysTheApiWithholdsSecretsFromTheAssistant()
+    {
+        var response = new Sdk.ErrorResponse
+        {
+            Message = $"The token acts for the person through an actor that may not reveal secrets. {Marker}",
+            Hint = Marker,
+            ErrorCode = ApiErrors.ActorRestrictedCode,
+        };
+
+        var result = ApiErrors.ToResult(Error(403, response));
+
+        result.IsError.ShouldBe(true);
+        result.Text().ShouldBe($"Storyteller API answered 403 ActorRestricted: {ApiErrors.ActorRestrictedMessage}");
+        result.Text().ShouldContain("NoSecretReveal");
+        result.Text().ShouldContain("withholds secret values");
+        result.StructuredContent!.Value.GetProperty("ErrorCode").GetString().ShouldBe("ActorRestricted");
+        result.StructuredContent.Value.GetProperty("Message").GetString().ShouldBe(ApiErrors.ActorRestrictedMessage);
+        result.StructuredContent.Value.GetRawText().ShouldNotContain(Marker);
+    }
+
+    // The API refuses a machine with a Secrets scope (or its reset, or its federation rules) to the actor with the same
+    // code: the text covers that refusal too, and does not send the person off to read secrets.
+    [Fact]
+    public void ActorRestricted_FromAMachineRoute_DoesNotTalkAboutReadingSecrets()
+    {
+        var response = new Sdk.ErrorResponse
+        {
+            ErrorCode = ApiErrors.ActorRestrictedCode,
+            Message = "The token acts for the person through an actor that may not reveal secrets.",
+        };
+
+        var result = ApiErrors.ToResult(Error(403, response));
+
+        result.Text().ShouldBe($"Storyteller API answered 403 ActorRestricted: {ApiErrors.ActorRestrictedMessage}");
+        result.Text().ShouldContain("NoSecretReveal");
+        result.Text().ShouldContain("sform");
+        result.Text().ShouldContain("creating or resetting a machine with a Secrets scope");
+        result.Text().ShouldNotContain("Read secret values");
+    }
+
+    // Another 403 keeps the API's own text: only ActorRestricted is about the assistant.
+    [Fact]
+    public void OtherForbidden_KeepsTheApiMessage()
+    {
+        var result = ApiErrors.ToResult(Error(403, new Sdk.ErrorResponse { Message = "Secret values are delivered to machines only over mTLS in this project.", ErrorCode = "MtlsRequired" }));
+
+        result.Text().ShouldBe("Storyteller API answered 403 MtlsRequired: Secret values are delivered to machines only over mTLS in this project.");
     }
 
     [Fact]

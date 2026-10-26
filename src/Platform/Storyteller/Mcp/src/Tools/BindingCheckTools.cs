@@ -25,7 +25,7 @@ public sealed class BindingCheckTools(Sdk.IConfigurationsApiClient configuration
         + "resolved read evaluates the bindings on the server, fills in secret bindings for a caller with secret rights (ContributorWithSecrets) and "
         + "records a BindingRead audit event for each secret it reads. Needs the Reader role on the project.";
 
-    [McpServerTool(Name = "check_configuration_bindings", Title = "Check configuration bindings", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = SecretToolNames.CheckConfigurationBindings, Title = "Check configuration bindings", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(CheckDescription)]
     public async Task<CallToolResult> CheckConfigurationBindings(
         [Description(ToolText.Organization)] string organization,

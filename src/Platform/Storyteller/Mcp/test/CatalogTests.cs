@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+using _42.Platform.Storyteller.Mcp.Tools;
 using _42.Platform.Storyteller.Mcp.UnitTests.Support;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -84,11 +85,9 @@ public sealed partial class CatalogTests : IDisposable
     [Fact]
     public void Tools_ThatRead_AreReadOnly_ExceptTheSecretTools()
     {
-        var secretTools = new[] { "reveal_key_value", "get_resolved_configuration", "check_configuration_bindings" };
-
         foreach (var tool in Tools().Select(tool => tool.ProtocolTool).Where(tool => ReadVerbs.Contains(tool.Name.Split('_')[0])))
         {
-            tool.Annotations!.ReadOnlyHint.ShouldBe(!secretTools.Contains(tool.Name), tool.Name);
+            tool.Annotations!.ReadOnlyHint.ShouldBe(!SecretToolNames.Contains(tool.Name), tool.Name);
         }
     }
 
