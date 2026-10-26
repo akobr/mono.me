@@ -241,7 +241,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 ? [.. variables.Names, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN]
                 : variables.Names;
             var key = kind is MachineSignInKind.ApiKey or MachineSignInKind.CertificateAndApiKey
-                ? MachineApiKey.TryParse(variables.ApiKey)
+                ? MachineApiKey.TryParseMachine(variables.ApiKeyMachine)
                 : null;
             MachineCertificateIdentity? certificateIdentity = null;
 
@@ -340,7 +340,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         {
             throw new AuthenticationException(
                 AuthenticationFailureReason.ServiceError,
-                $"The machine got no token within {deadline.TotalSeconds:0} seconds; the token endpoint or the GitHub Actions runner did not answer in time.");
+                $"The machine got no token within {deadline.TotalSeconds:0} seconds, retries and Retry-After waits included: the token endpoint, the sign-in discovery or the GitHub Actions runner did not answer, or kept failing.");
         }
     }
 
