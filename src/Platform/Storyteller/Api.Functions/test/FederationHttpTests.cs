@@ -766,6 +766,36 @@ public class FederationHttpTests
         _access.Find(Org, Project, MachineId)!.Scopes.ShouldBe(stored);
     }
 
+    // An actor under NoSecretReveal may not hand the tokens of a machine with a Secrets scope to a workload of its choosing,
+    // in every build, before the body is read; the rules of a machine without one may be replaced.
+    [Fact]
+    public async Task PutRules_OfASecretsMachine_ThroughARestrictedActor_IsActorRestrictedAndNotStored()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub());
+        _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
+        _access.Role = AccountRole.ContributorWithSecrets;
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(
+            () => Http.PutMachineFederationRules(RestrictedActorRulesRequest([Rule("repo:attacker/app:ref:refs/heads/main")]), Org, Project, MachineId));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        _access.Find(Org, Project, MachineId)!.FederationRules!.Single().Subject.ShouldBe(Rule().Subject);
+        _access.Calls.ShouldNotContain(call => call.StartsWith("rules:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PutRules_OfAMachineWithoutASecretsScope_ThroughARestrictedActor_AreReplaced()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub());
+        _access.Add(Org, Project, FederatedMachine(Rule()));
+        _access.Role = AccountRole.ContributorWithSecrets;
+
+        var result = await Http.PutMachineFederationRules(RestrictedActorRulesRequest([Rule("repo:acme/app:environment:prod")]), Org, Project, MachineId);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        _access.Find(Org, Project, MachineId)!.FederationRules!.Single().Subject.ShouldBe("repo:acme/app:environment:prod");
+    }
+
     // Token endpoint URL
     [Fact]
     public void TokenEndpoint_WithoutPublicBaseUrl_IsTheRequestSchemeAndHost_NeverAForwardedHost()
@@ -864,6 +894,15 @@ public class FederationHttpTests
     private static TestHttpRequestData RulesRequest(IEnumerable<FederationRule>? rules)
     {
         return RawRequest(rules is null ? string.Empty : FunctionTestDoubles.ToJsonBody(rules.ToList()));
+    }
+
+    // RulesRequest through the actor mcp under NoSecretReveal, as the bearer middleware leaves a Storyteller user token.
+    private static TestHttpRequestData RestrictedActorRulesRequest(IEnumerable<FederationRule> rules)
+    {
+        var request = RulesRequest(rules);
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedActor] = TestRequests.ActorId;
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedRestrictions] = new[] { ActorRestrictions.NoSecretReveal };
+        return request;
     }
 
     private static TestHttpRequestData RawRequest(string body)

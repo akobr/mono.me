@@ -21,7 +21,6 @@ public class EntraIdClaimNormalizerTests
         Provider = IdentityProviderKind.EntraId,
         TenantId = "tenant-id",
         ClientId = "client-id",
-        DelegatedClients = [new DelegatedClientOptions { ClientId = McpClientId, TenantId = McpTenantId }],
     }));
 
     // Decoded (DEV_AUTH) claims are raw: sub, tid and oid.
@@ -103,65 +102,16 @@ public class EntraIdClaimNormalizerTests
         result.Claims.ShouldBeSameAs(claims);
     }
 
+    // A delegated token (scp) of another client app is a machine, as on the validated path.
     [Fact]
-    public void Normalize_DelegatedTokenOfListedClient_IsAUser()
+    public void Normalize_DelegatedTokenOfAnotherClientApp_IsAMachine()
     {
-        var result = _normalizer.Normalize(
-            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("oid", ObjectId), new Claim("scp", "User.Impersonation")]);
-
-        result.IsMachine.ShouldBeFalse();
-        result.MachineId.ShouldBeNull();
-        result.Claims.Where(claim => claim.Type == "sub").ShouldHaveSingleItem().Value.ShouldBe($"{McpTenantId}:{ObjectId}");
-    }
-
-    [Theory]
-    [InlineData("{6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11}", "{8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d}")]
-    [InlineData("6c0f1a2e1f434b0e9a4d2f5e8f0c9b11", "8A7B6C5D4E3F4A1B8C9D0E1F2A3B4C5D")]
-    public void Normalize_DelegatedTokenOfAClientListedInAnotherGuidForm_IsAUser(string clientId, string tenantId)
-    {
-        var normalizer = new EntraIdClaimNormalizer(Options.Create(new UserAuthenticationOptions
-        {
-            Provider = IdentityProviderKind.EntraId,
-            TenantId = "tenant-id",
-            ClientId = "client-id",
-            DelegatedClients = [new DelegatedClientOptions { ClientId = clientId, TenantId = tenantId }],
-        }));
-
-        var result = normalizer.Normalize(
-            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("oid", ObjectId), new Claim("scp", "User.Impersonation")]);
-
-        result.IsMachine.ShouldBeFalse();
-        result.MachineId.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Normalize_AppOnlyTokenOfListedClient_IsAMachine()
-    {
-        List<Claim> claims = [new("sub", McpClientId), new("azp", McpClientId), new("tid", McpTenantId), new("roles", "Configuration.Read")];
+        List<Claim> claims = [new("sub", "user-1"), new("azp", McpClientId), new("tid", McpTenantId), new("oid", ObjectId), new("scp", "User.Impersonation")];
 
         var result = _normalizer.Normalize(claims);
 
         result.IsMachine.ShouldBeTrue();
         result.MachineId.ShouldBe(McpClientId);
         result.Claims.ShouldBeSameAs(claims);
-    }
-
-    [Fact]
-    public void Normalize_BlankScopeOfListedClient_IsAMachine()
-    {
-        var result = _normalizer.Normalize(
-            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("tid", McpTenantId), new Claim("scp", " ")]);
-
-        result.IsMachine.ShouldBeTrue();
-    }
-
-    [Fact]
-    public void Normalize_ListedClientFromAnotherTenant_IsAMachine()
-    {
-        var result = _normalizer.Normalize(
-            [new Claim("sub", "user-1"), new Claim("azp", McpClientId), new Claim("scp", "User.Impersonation")]);
-
-        result.IsMachine.ShouldBeTrue();
-        result.MachineId.ShouldBe(McpClientId);
     }
 }

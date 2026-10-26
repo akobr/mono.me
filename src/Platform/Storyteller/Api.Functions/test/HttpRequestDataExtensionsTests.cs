@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api;
 using _42.Platform.Storyteller.Api.Security;
 
@@ -129,6 +130,75 @@ public class HttpRequestDataExtensionsTests
         request.IsApplicationIdentity().ShouldBeFalse();
         request.TryGetApplicationIdentity(out var appId).ShouldBeFalse();
         appId.ShouldBeNull();
+    }
+
+    // A user acting through an actor: the actor and its restrictions come from the items the bearer middleware stored.
+    [Fact]
+    public void TryGetDelegatedActor_UserThroughAnActor_ReturnsTheActorAndItsRestrictions()
+    {
+        var request = TestRequests.DelegatedUser([ActorRestrictions.NoSecretReveal]);
+
+        request.TryGetDelegatedActor(out var actorId).ShouldBeTrue();
+        actorId.ShouldBe(TestRequests.ActorId);
+        request.HasActorRestriction(ActorRestrictions.NoSecretReveal).ShouldBeTrue();
+        request.HasActorRestriction("NoWrites").ShouldBeFalse();
+        request.IsApplicationIdentity().ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TryGetDelegatedActor_ActorWithoutRestrictions_HasNone()
+    {
+        var request = TestRequests.DelegatedUser([]);
+
+        request.TryGetDelegatedActor(out _).ShouldBeTrue();
+        request.HasActorRestriction(ActorRestrictions.NoSecretReveal).ShouldBeFalse();
+    }
+
+    // Claims never name an actor: only the items do.
+    [Fact]
+    public void TryGetDelegatedActor_DirectUser_HasNoActor()
+    {
+        var request = TestRequests.User();
+        var claims = (List<Claim>)request.FunctionContext.Items[FunctionContextItemKeys.CachedClaims];
+        claims.Add(new Claim("act", """{"sub":"mcp"}""", "JSON"));
+        claims.Add(new Claim("restrictions", ActorRestrictions.NoSecretReveal));
+
+        request.TryGetDelegatedActor(out var actorId).ShouldBeFalse();
+        actorId.ShouldBeNull();
+        request.HasActorRestriction(ActorRestrictions.NoSecretReveal).ShouldBeFalse();
+        request.GetAuditActor().Via.ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetAuditActor_UserThroughAnActor_IsTheAccountViaTheActor()
+    {
+        var actor = TestRequests.DelegatedUser().GetAuditActor();
+
+        actor.ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada") with { Via = TestRequests.ActorId });
+        actor.Kind.ShouldBe(AuditActorKind.Account);
+    }
+
+    [Fact]
+    public void GetAuditActor_DirectUser_HasNoVia()
+    {
+        TestRequests.User().GetAuditActor().ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada"));
+    }
+
+    // The key/value caller carries the audit actor, so key/value audit events record Via too.
+    [Fact]
+    public async Task GetSecretRights_UserThroughAnActor_CallerIsTheAccountViaTheActor()
+    {
+        var rights = await TestRequests.DelegatedUser().GetSecretRightsAsync(new RoleAccess(AccountRole.ContributorWithSecrets), new FixedKeyValuePolicies(), "acme", "web");
+
+        rights.Caller.Actor.ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada") with { Via = TestRequests.ActorId });
+        rights.Caller.Channel.ShouldBe(KeyValueChannel.User);
+    }
+
+    // The token of a user acting through an actor carries User.Impersonation (scp), so the user checks pass in every build.
+    [Fact]
+    public void EnsureUser_UserThroughAnActor_Passes()
+    {
+        Should.NotThrow(() => TestRequests.DelegatedUser().EnsureUser());
     }
 
     [Theory]

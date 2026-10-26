@@ -508,7 +508,7 @@ public static class Definitions
         public const string ResponseForbiddenBindingCatalog = MetadataForbidden + MachineNeedsScope + Scopes.Configuration.Read + MachineDenied;
 
         // Create, reset and the federation rules: a machine's scopes may not exceed what its creator may do or grant.
-        public const string ResponseForbiddenMachineScopes = ResponseForbiddenUserOnly + " Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).";
+        public const string ResponseForbiddenMachineScopes = ResponseForbiddenUserOnly + " Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).";
         public const string ResponseConfigurationNotFound = "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).";
         public const string ResponseConcurrentChange = "The annotations changed concurrently three times in a row (Conflict); try again.";
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
@@ -548,12 +548,17 @@ public static class Definitions
         public const string ResponseServiceUnavailable = "The key-encryption key is not reachable right now (ErrorCode KeyEncryptionUnavailable); Retry-After says when to try again.";
         public const string ResponseMtlsRequired = "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).";
 
-        // The 403 of the key/value routes with secret values: the secret rights and the mTLS rule, and the machine scopes.
-        public const string ResponseMtlsRequiredConfigurationRead = ResponseMtlsRequired + MachineNeedsScope + Scopes.Configuration.Read + ", and " + Scopes.Secrets.Read + " for secret values" + MachineDenied;
+        // The reads of secret values: an actor under NoSecretReveal withholds them from the user it acts for too. Writes
+        // are never withheld by an actor, so they keep ResponseMtlsRequired.
+        public const string ResponseMtlsRequiredRead = "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).";
+
+        // The 403 of the key/value routes with secret values: the secret rights, the mTLS rule and the actor's
+        // restriction (reads only), and the machine scopes.
+        public const string ResponseMtlsRequiredConfigurationRead = ResponseMtlsRequiredRead + MachineNeedsScope + Scopes.Configuration.Read + ", and " + Scopes.Secrets.Read + " for secret values" + MachineDenied;
         public const string ResponseMtlsRequiredConfigurationWrite = ResponseMtlsRequired + MachineNeedsScope + Scopes.Configuration.Write + ", and " + Scopes.Secrets.Write + " for secret levels" + MachineDenied;
         public const string ResponseMtlsRequiredDeleteKeyValue = ResponseMtlsRequired + MachineNeedsScope + Scopes.Configuration.Write + ", and " + Scopes.Secrets.Write + " for a secret key" + MachineDenied + " A permanent delete is for users with the Administrator role only.";
         public const string ResponseMtlsRequiredKeyValueManage = ResponseMtlsRequired + MachineNeedsScopes + Scopes.Configuration.Write + ", " + Scopes.KeyValue.Manage + " and " + Scopes.Secrets.Write + MachineDenied;
-        public const string ResponseMtlsRequiredKeyValueExport = ResponseMtlsRequired + MachineNeedsScopes + Scopes.Configuration.Read + " and " + Scopes.Configuration.Transfer + ", and " + Scopes.Secrets.Read + " to export secrets" + MachineDenied;
+        public const string ResponseMtlsRequiredKeyValueExport = ResponseMtlsRequiredRead + MachineNeedsScopes + Scopes.Configuration.Read + " and " + Scopes.Configuration.Transfer + ", and " + Scopes.Secrets.Read + " to export secrets" + MachineDenied;
         public const string ResponseMtlsRequiredKeyValueImport = ResponseMtlsRequired + MachineNeedsScopes + Scopes.Configuration.Write + " and " + Scopes.Configuration.Transfer + ", and " + Scopes.Secrets.Write + " for secret items" + MachineDenied;
         public const string NoStore = "Responses with a secret value are Cache-Control: no-store.";
         public const string IncludeInactive = "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.";

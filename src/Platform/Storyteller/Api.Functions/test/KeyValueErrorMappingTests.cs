@@ -13,7 +13,8 @@ using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
-// The client errors of key/value pairs: 412, 424, 501 and 503 with Retry-After, and the items of a failed import.
+// The client errors of key/value pairs: 403 for mTLS and the actor, 412, 424, 501 and 503 with Retry-After, and the
+// items of a failed import.
 public class KeyValueErrorMappingTests
 {
     public static TheoryData<Exception, HttpStatusCode, string> Errors => new()
@@ -23,6 +24,7 @@ public class KeyValueErrorMappingTests
         { new FeatureNotConfiguredException("no vault", ErrorCodes.ProtectionNotConfigured), HttpStatusCode.NotImplemented, ErrorCodes.ProtectionNotConfigured },
         { new ServiceUnavailableException("throttled", ErrorCodes.KeyEncryptionUnavailable, TimeSpan.FromSeconds(7)), HttpStatusCode.ServiceUnavailable, ErrorCodes.KeyEncryptionUnavailable },
         { KeyValueErrors.MtlsRequired(), HttpStatusCode.Forbidden, ErrorCodes.MtlsRequired },
+        { KeyValueErrors.ActorRestricted(), HttpStatusCode.Forbidden, ErrorCodes.ActorRestricted },
         { new InvalidInputException("http", ErrorCodes.HttpsRequired), HttpStatusCode.BadRequest, ErrorCodes.HttpsRequired },
     };
 

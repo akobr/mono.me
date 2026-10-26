@@ -25,6 +25,15 @@ internal static class FunctionTestDoubles
         UserAuthenticationOptions? options = null,
         params IMachineTokenValidator[] machineValidators)
     {
+        return CreateServiceCollection(validator, options, machineValidators).BuildServiceProvider();
+    }
+
+    // The services of CreateServices, for a test that adds its own (an access service, the token exchange settings).
+    public static ServiceCollection CreateServiceCollection(
+        IBearerTokenValidator validator,
+        UserAuthenticationOptions? options = null,
+        params IMachineTokenValidator[] machineValidators)
+    {
         var resolved = Options.Create(options ?? new UserAuthenticationOptions
         {
             Provider = IdentityProviderKind.EntraId,
@@ -48,7 +57,7 @@ internal static class FunctionTestDoubles
             services.AddSingleton(machineValidator);
         }
 
-        return services.BuildServiceProvider();
+        return services;
     }
 
     public static (TestFunctionContext Context, TestHttpRequestData Request) CreateRequest(

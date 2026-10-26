@@ -70,6 +70,14 @@ public static class KeyValueErrors
             ErrorCodes.MtlsRequired);
     }
 
+    // The user may read the secrets, but the actor the token acts through (NoSecretReveal) may not reveal them.
+    public static AccessDeniedException ActorRestricted()
+    {
+        return new AccessDeniedException(
+            "The token acts for the person through an actor that may not reveal secrets.",
+            ErrorCodes.ActorRestricted);
+    }
+
     public static InvalidInputException ProtectionRequired(string key)
     {
         return new InvalidInputException(

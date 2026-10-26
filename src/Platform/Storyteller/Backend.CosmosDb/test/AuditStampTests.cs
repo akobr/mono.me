@@ -91,6 +91,35 @@ public class AuditStampTests(Startup startup)
         updated.Created.Should().Be(created.Created);
     }
 
+    // A change made through an actor keeps it in its stamp ("Ada via mcp"); a direct change has no Via.
+    [Fact]
+    public async Task ConfigurationVersions_KeepTheActorThatActedForTheAccount()
+    {
+        var project = NewProject();
+        var key = await CreateAnnotationAsync(project, AnnotationKey.CreateResponsibility("via"));
+        var throughMcp = AuditActor.Account("user-1", "Ada") with { Via = "mcp" };
+
+        await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 1 }"""), throughMcp);
+        await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 2 }"""), AuditActor.Account("user-1", "Ada"));
+
+        var versions = (await Configs.GetConfigurationVersionsAsync(key)).ToList();
+        versions[0].Modified.By.Should().Be(throughMcp);
+        versions[1].Modified.By.Should().Be(AuditActor.Account("user-1", "Ada"));
+        versions[1].Modified.By.Via.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task View_KeepsTheActorThatActedForItsCreator()
+    {
+        var project = NewProject();
+        var throughMcp = AuditActor.Account("creator", "Ada") with { Via = "mcp" };
+
+        await Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "rollout" }, throughMcp);
+
+        var view = (await Views.GetViewsAsync(Organization, project, discover: false)).Single(candidate => candidate.Name == "rollout");
+        view.Created!.By.Should().Be(throughMcp);
+    }
+
     [Fact]
     public async Task OrganizationContainer_KeepsTheAuditStampsOutOfTheIndex()
     {

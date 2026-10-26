@@ -23,7 +23,7 @@ internal static class KeyValueAuthorization
             return;
         }
 
-        throw Refused(rights.IsReadWithheldByMtls);
+        throw Refused(rights, isRead: true);
     }
 
     // A write that is all about secrets (protect) by a caller without the write rights; the service checks the same bit.
@@ -34,39 +34,55 @@ internal static class KeyValueAuthorization
             return;
         }
 
-        throw Refused(rights.IsWriteWithheldByMtls);
+        throw Refused(rights, isRead: false);
     }
 
-    // A read the service may refuse for a secret it would reveal (the diff of a secret's text).
-    public static Task<T> UnderMtlsReadRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
+    // A read the service may refuse for a secret it would reveal (the diff of a secret's text): under the actor's
+    // NoSecretReveal and under the mTLS rule.
+    public static Task<T> UnderSecretReadRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
     {
-        return UnderMtlsRuleAsync(rights.IsReadWithheldByMtls, action);
+        return UnderSecretRuleAsync(rights, isRead: true, action);
     }
 
-    // A write the service may refuse for a secret key or item (set, delete, import).
+    // A write the service may refuse for a secret key or item (set, delete, import): under the mTLS rule only, because
+    // an actor never withholds writes.
     public static Task<T> UnderMtlsWriteRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
     {
-        return UnderMtlsRuleAsync(rights.IsWriteWithheldByMtls, action);
+        return UnderSecretRuleAsync(rights, isRead: false, action);
     }
 
-    // The service refuses a secret with AccessDenied; when the only reason is the missing mTLS, the client learns that.
-    // Only the right of the direction counts: a machine without it would not get it over mTLS either.
-    private static async Task<T> UnderMtlsRuleAsync<T>(bool isWithheldByMtls, Func<Task<T>> action)
+    // The service refuses a secret with AccessDenied; when the only reason is the actor or the missing mTLS, the client
+    // learns that. Only the right of the direction counts: a machine without it would not get it over mTLS either.
+    private static async Task<T> UnderSecretRuleAsync<T>(SecretRights rights, bool isRead, Func<Task<T>> action)
     {
         try
         {
             return await action();
         }
-        catch (AccessDeniedException exception) when (isWithheldByMtls && exception.ErrorCode == ErrorCodes.AccessDenied)
+        catch (AccessDeniedException exception) when (IsWithheld(rights, isRead) && exception.ErrorCode == ErrorCodes.AccessDenied)
         {
-            throw KeyValueErrors.MtlsRequired();
+            throw Refused(rights, isRead);
         }
     }
 
-    // When the right was withheld only for the missing mTLS, the client learns that.
-    private static AccessDeniedException Refused(bool isWithheldByMtls)
+    // Whether the right of the direction was withheld from a caller that has it: by the actor (reads only) or for the
+    // missing mTLS.
+    private static bool IsWithheld(SecretRights rights, bool isRead)
     {
-        return isWithheldByMtls
+        return isRead
+            ? rights.IsReadWithheldByActor || rights.IsReadWithheldByMtls
+            : rights.IsWriteWithheldByMtls;
+    }
+
+    // When the right was withheld only by the actor or for the missing mTLS, the client learns that, the actor first.
+    private static AccessDeniedException Refused(SecretRights rights, bool isRead)
+    {
+        if (isRead && rights.IsReadWithheldByActor)
+        {
+            return KeyValueErrors.ActorRestricted();
+        }
+
+        return (isRead ? rights.IsReadWithheldByMtls : rights.IsWriteWithheldByMtls)
             ? KeyValueErrors.MtlsRequired()
             : new AccessDeniedException("The caller has no rights to the secrets of the project.");
     }

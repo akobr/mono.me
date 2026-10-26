@@ -15,11 +15,8 @@ namespace _42.Platform.Storyteller;
 public class EntraIdBearerTokenValidator : IBearerTokenValidator
 {
     private const string SubjectClaimType = "sub";
-    private const string ScopeClaimType = "http://schemas.microsoft.com/identity/claims/scope";
-    private const string TenantIdClaimType = "http://schemas.microsoft.com/identity/claims/tenantid";
 
     private readonly string _clientId;
-    private readonly IReadOnlyList<DelegatedClientOptions> _delegatedClients;
     private readonly IConfigurationManager<OpenIdConnectConfiguration> _configurationManager;
 
     public EntraIdBearerTokenValidator(IOptions<UserAuthenticationOptions> options, IHostEnvironment environment)
@@ -38,7 +35,6 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
 
         var configured = options.Value;
         _clientId = configured.ClientId ?? string.Empty;
-        _delegatedClients = NormalizeDelegatedClients(configured.DelegatedClients);
         _configurationManager = configurationManager;
 
         if (environment.IsDevelopment())
@@ -57,35 +53,18 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
                 || issuer.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase));
     }
 
+    // A token of another client app (azp, or appid in v1 tokens) is a machine; the API's own client's tokens are users.
     public static string? TryGetMachineId(IReadOnlyList<Claim> claims, string? clientId)
-    {
-        return TryGetMachineId(claims, clientId, []);
-    }
-
-    // A listed client app acts for the user only with a delegated token from its own tenant: a scope claim and no
-    // idtyp=app. Its app-only tokens, and its tokens from another tenant, stay machines like every other azp.
-    public static string? TryGetMachineId(IReadOnlyList<Claim> claims, string? clientId, IReadOnlyList<DelegatedClientOptions> delegatedClients)
     {
         var appId = FirstClaim(claims, "azp") ?? FirstClaim(claims, "appid");
 
         if (string.IsNullOrEmpty(appId)
-            || string.Equals(appId, clientId, StringComparison.OrdinalIgnoreCase)
-            || IsDelegatedTokenOfListedClient(claims, appId, delegatedClients))
+            || string.Equals(appId, clientId, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
         return appId;
-    }
-
-    // The settings accept any GUID form ({...}, 32 digits); tokens carry azp and tid in the dashed form (D).
-    public static IReadOnlyList<DelegatedClientOptions> NormalizeDelegatedClients(IEnumerable<DelegatedClientOptions> delegatedClients)
-    {
-        ArgumentNullException.ThrowIfNull(delegatedClients);
-
-        return delegatedClients
-            .Select(client => new DelegatedClientOptions { ClientId = NormalizeGuid(client.ClientId), TenantId = NormalizeGuid(client.TenantId) })
-            .ToArray();
     }
 
     public async Task<BearerValidationResult?> ValidateAsync(string rawToken, CancellationToken cancellationToken = default)
@@ -198,7 +177,7 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
 
         var principal = handler.ValidateToken(rawToken, validationParameters, out _);
         var claims = principal.Claims.ToList();
-        var machineId = TryGetMachineId(claims, _clientId, _delegatedClients);
+        var machineId = TryGetMachineId(claims, _clientId);
 
         if (machineId is not null)
         {
@@ -219,33 +198,6 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
 
         var metadataAddress = $"https://login.microsoftonline.com/{options.TenantId}/v2.0/.well-known/openid-configuration";
         return new ConfigurationManager<OpenIdConnectConfiguration>(metadataAddress, new OpenIdConnectConfigurationRetriever());
-    }
-
-    private static bool IsDelegatedTokenOfListedClient(IReadOnlyList<Claim> claims, string appId, IReadOnlyList<DelegatedClientOptions> delegatedClients)
-    {
-        if (delegatedClients.Count == 0)
-        {
-            return false;
-        }
-
-        // Validated claims arrive mapped (JwtSecurityTokenHandler), decoded claims raw: both names are read.
-        var tenantId = FirstClaim(claims, "tid") ?? FirstClaim(claims, TenantIdClaimType);
-        var isListed = delegatedClients.Any(client =>
-            string.Equals(client.ClientId, appId, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(client.TenantId, tenantId, StringComparison.OrdinalIgnoreCase));
-
-        if (!isListed || string.Equals(FirstClaim(claims, "idtyp"), "app", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return claims.Any(claim => claim.Type is ("scp" or ScopeClaimType) && !string.IsNullOrWhiteSpace(claim.Value));
-    }
-
-    // A value that is not a GUID stays as it is; the options validator refuses it.
-    private static string NormalizeGuid(string? value)
-    {
-        return Guid.TryParse(value, out var id) ? id.ToString("D") : value ?? string.Empty;
     }
 
     private static string? FirstClaim(IReadOnlyList<Claim> claims, string type)

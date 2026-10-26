@@ -550,7 +550,42 @@ public class OpenApiExportTests
 
         Definitions.Descriptions.ResponseForbiddenMachineScopes.ShouldBe(
             Definitions.Descriptions.ResponseForbiddenUserOnly
-            + " Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).");
+            + " Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied)."
+            + " Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).");
+    }
+
+    // An actor under NoSecretReveal refuses the reads of secret values (ActorRestricted), never the writes: only the 403
+    // of the reads names it.
+    [Fact]
+    public async Task Document_SecretReads_NameTheActorRestrictionInTheir403_AndWritesDoNot()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        string[] reads =
+        [
+            Definitions.RouteIds.KeyValues.GetKeyValue,
+            Definitions.RouteIds.KeyValues.GetKeyValueVersion,
+            Definitions.RouteIds.KeyValues.GetKeyValueVersionDiff,
+            Definitions.RouteIds.KeyValues.GetKeyValueVersionDiffCustom,
+            Definitions.RouteIds.KeyValues.ExportKeyValues,
+        ];
+        string[] writes =
+        [
+            Definitions.RouteIds.KeyValues.SetKeyValue,
+            Definitions.RouteIds.KeyValues.DeleteKeyValue,
+            Definitions.RouteIds.KeyValues.RestoreKeyValues,
+            Definitions.RouteIds.KeyValues.ProtectKeyValues,
+            Definitions.RouteIds.KeyValues.ImportKeyValues,
+        ];
+
+        foreach (var routeId in reads.Concat(writes))
+        {
+            var description = Operation(document, routeId).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()!;
+            description.Contains("(ErrorCode ActorRestricted)", StringComparison.Ordinal).ShouldBe(reads.Contains(routeId), routeId);
+        }
+
+        Definitions.Descriptions.ResponseMtlsRequiredRead.ShouldBe(
+            "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).");
     }
 
     // The description of a project (424-78): its update and the caller's projects, under the Access tag, for users, with

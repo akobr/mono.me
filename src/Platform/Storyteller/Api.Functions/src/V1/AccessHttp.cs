@@ -7,6 +7,7 @@ using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.KeyValues;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -448,6 +449,7 @@ public class AccessHttp
 
         // Secrets scopes need ContributorWithSecrets and management scopes an Administrator; a Contributor gives the rest.
         await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, scopes);
+        EnsureActorMayGiveOutSecretReads(request, scopes);
 
         // TODO: [P1] hide the model from the client
         machineModel = machineModel with
@@ -498,7 +500,8 @@ public class AccessHttp
         }
 
         // A new secret gives out the machine's scopes, so the reset needs the role they need.
-        await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
+        var machine = await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
+        EnsureActorMayGiveOutSecretReads(request, machine?.Scopes ?? []);
 
         try
         {
@@ -653,8 +656,9 @@ public class AccessHttp
 
     // The creator of a machine can use its credentials, so whatever gives them out or redirects them (reset, the
     // federation rules) needs the role the stored scopes need, and so does the delete, which takes them away from what
-    // runs with them. One point read; a missing machine is left to the route, which answers as before.
-    internal static async Task EnsureRoleForMachineScopesAsync(
+    // runs with them. One point read, whose machine is returned; a missing machine is left to the route, which answers
+    // as before.
+    internal static async Task<MachineAccess?> EnsureRoleForMachineScopesAsync(
         HttpRequestData request,
         IAccessService accessService,
         string organization,
@@ -666,6 +670,20 @@ public class AccessHttp
         if (machine is not null)
         {
             await EnsureRoleForMachineScopesAsync(request, accessService, organization, project, machine.Scopes);
+        }
+
+        return machine;
+    }
+
+    // An actor under NoSecretReveal may not give out what reads secrets: the credentials of a new or reset machine with a
+    // Secrets scope, or its tokens through new federation rules (SecretsWrite brings SecretsRead). Not a role check, so it
+    // runs in every build, DEV_AUTH included; called after the role check, so a user without the role still gets
+    // AccessDenied. Deleting such a machine gives nothing out and is not refused.
+    internal static void EnsureActorMayGiveOutSecretReads(HttpRequestData request, IEnumerable<MachineScope> scopes)
+    {
+        if (request.HasActorRestriction(ActorRestrictions.NoSecretReveal) && scopes.Any(MachineScopes.IsSecrets))
+        {
+            throw KeyValueErrors.ActorRestricted();
         }
     }
 
