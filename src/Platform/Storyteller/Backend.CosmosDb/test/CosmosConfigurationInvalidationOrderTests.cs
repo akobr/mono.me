@@ -67,6 +67,31 @@ public class CosmosConfigurationInvalidationOrderTests(Startup startup)
     }
 
     [Fact]
+    public async Task ItemCreatedDuringTheInvalidation_IsReachedByALaterLevel()
+    {
+        var (responsibility, unitOfExecution) = await CreateTreeAsync("order-late");
+        var storage = new InterceptedRepositoryProvider(Context.Services.GetRequiredService<IContainerRepositoryProvider>());
+        var configs = ActivatorUtilities.CreateInstance<CosmosConfigurationService>(Context.Services, storage);
+        await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+        await Configurations.GetRawConfigurationAsync(unitOfExecution);
+        string lateId = null;
+
+        // a cached execution appears while the level above it is patched; its level is queried only afterwards
+        storage.Interceptor.AfterBatch = async batch =>
+        {
+            if (lateId is null && batch.IsInvalidation && LevelOf(batch) == 1)
+            {
+                lateId = (await InsertCachedExecutionsAsync(responsibility, 1, "late"))[0];
+            }
+        };
+
+        await configs.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 2 }"""), AuditActor.System);
+
+        lateId.Should().NotBeNull();
+        (await HasCachedCalculationAsync(responsibility, lateId)).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ResponsibilityTemplateWrite_InvalidatesLevelByLevel()
     {
         var project = "order-template";
@@ -181,24 +206,26 @@ public class CosmosConfigurationInvalidationOrderTests(Startup startup)
         return (FullKey.Create(annotationKey.GetResponsibilityKey(), unitOfExecution), unitOfExecution);
     }
 
-    // Cached rows of executions without annotations: the invalidation needs only their id, project and view.
-    private async Task<List<string>> InsertCachedExecutionsAsync(FullKey responsibility, int count)
+    // Cached rows of executions without annotations: the invalidation needs only their id, project and view. They are
+    // written in transactional batches, a burst of single writes times out on a small emulator.
+    private async Task<List<string>> InsertCachedExecutionsAsync(FullKey responsibility, int count, string name = "raw")
     {
-        var partitionKey = responsibility.GetPartitionKey();
-        var ids = new List<string>();
-        var writes = new List<Task>();
+        var partitionKey = new PartitionKey(responsibility.GetPartitionKey());
+        var ids = Enumerable.Range(0, count)
+            .Select(index => $"{View}.cnf.exe.{name}{index}.{responsibility.Annotation.Name}.c")
+            .ToList();
 
-        for (var index = 0; index < count; index++)
+        foreach (var chunk in ids.Chunk(MaxBatchOperations))
         {
-            var annotationKey = $"exe.raw{index}.{responsibility.Annotation.Name}.c";
-            var id = $"{View}.cnf.{annotationKey}";
-            ids.Add(id);
-            writes.Add(GetContainer().UpsertItemAsync(
-                new JObject
+            var batch = GetContainer().CreateTransactionalBatch(partitionKey);
+
+            foreach (var id in chunk)
+            {
+                batch.UpsertItem(new JObject
                 {
                     ["id"] = id,
-                    ["PartitionKey"] = partitionKey,
-                    ["AnnotationKey"] = annotationKey,
+                    ["PartitionKey"] = responsibility.GetPartitionKey(),
+                    ["AnnotationKey"] = id[$"{View}.cnf.".Length..],
                     ["Name"] = "c",
                     ["ProjectName"] = responsibility.ProjectName,
                     ["ViewName"] = View,
@@ -208,11 +235,13 @@ public class CosmosConfigurationInvalidationOrderTests(Startup startup)
                     ["CalculatedContent"] = JObject.Parse("""{ "a": 1 }"""),
                     ["CalculatedContentHash"] = "00000000",
                     ["Modified"] = JObject.FromObject(AuditStamp.Of(AuditActor.System, System.DateTimeOffset.UtcNow)),
-                },
-                new PartitionKey(partitionKey)));
+                });
+            }
+
+            using var response = await batch.ExecuteAsync();
+            response.IsSuccessStatusCode.Should().BeTrue();
         }
 
-        await Task.WhenAll(writes);
         return ids;
     }
 

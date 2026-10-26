@@ -109,7 +109,8 @@ public partial class CosmosConfigurationService
         return configuration;
     }
 
-    // Each template of the view is read once per request, as in the Effective calculation.
+    // Each template of the view is read once per request. The composition writes no cache, unlike the Effective
+    // calculation, which reads the template on every calculation of a node to keep its cache write guarded.
     private async Task<GenerateTemplateEntity?> ReadCompositionTemplateAsync(FullKey key, CompositionWalk walk)
     {
         var typeCode = key.Annotation.TypeCode.ToLowerInvariant();

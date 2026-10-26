@@ -238,8 +238,8 @@ Invalidation (`ConfigurationCacheInvalidator`, `Backend.CosmosDb/src/Configuring
 A configuration update invalidates descendants:
 
 - A responsibility update invalidates every other configuration in that responsibility partition and view; its own item loses its cache with the write.
-- Other types invalidate the descendants listed in `CosmosConfigurationService.InvalidateConfigurationsAsync`.
-- The first insert of a configuration item, when none exists yet, invalidates the same descendants after `CreateItemAsync`. [inheritance.md](inheritance.md#cache-and-descendant-freshness) explains why the invalidation follows the insert.
+- Other types invalidate the descendants listed in `CosmosConfigurationService.GetDescendantTargets` (the level table in [inheritance.md](inheritance.md#cache-and-descendant-freshness)).
+- The first insert of a configuration item, when none exists yet, creates it in a guarded batch with its `PendingInvalidationId`, appends the audit entry, and then invalidates the same descendants. [inheritance.md](inheritance.md#cache-and-descendant-freshness) explains why the invalidation follows the insert.
 
 A template write invalidates, in the template's view only, all configurations of the template's type and of every type that inherits from it:
 
