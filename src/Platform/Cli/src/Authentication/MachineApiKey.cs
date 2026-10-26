@@ -21,7 +21,16 @@ public sealed record MachineApiKey(string Organization, string Project, string M
 
         var parts = rawKey.Split(Separator, 3);
 
-        if (parts.Length != 3 || parts[0] != Prefix || parts[1].Length == 0 || parts[2].Length == 0)
+        return parts.Length == 3 && parts[0] == Prefix && parts[2].Length > 0
+            ? TryParseMachine(parts[1])
+            : null;
+    }
+
+    // The machine segment alone, base64url("organization:project:machineId"), as StorytellerCredentialVariables.ApiKeyMachine
+    // gives it without the secret.
+    public static MachineApiKey? TryParseMachine(string? segment)
+    {
+        if (string.IsNullOrEmpty(segment))
         {
             return null;
         }
@@ -30,7 +39,7 @@ public sealed record MachineApiKey(string Organization, string Project, string M
 
         try
         {
-            decoded = Encoding.UTF8.GetString(DecodeBase64Url(parts[1]));
+            decoded = Encoding.UTF8.GetString(DecodeBase64Url(segment));
         }
         catch (FormatException)
         {

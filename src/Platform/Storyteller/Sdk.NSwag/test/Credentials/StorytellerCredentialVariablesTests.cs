@@ -62,7 +62,8 @@ public class StorytellerCredentialVariablesTests
         var variables = Read().ShouldNotBeNull();
 
         variables.Kind.ShouldBe(StorytellerCredentialKind.ApiKey);
-        variables.ApiKey.ShouldBe(ApiKey);
+        variables.ApiKeyMachine.ShouldBe("YWNtZTpiaWxsaW5nOm1hY2hpbmUtMQ");
+        PublicValues(variables).ShouldNotContain(value => value.Contains("s3cret"));
         variables.Names.ShouldBe(["STORYTELLER_API_KEY"]);
         variables.DeprecatedNames.ShouldBeEmpty();
         variables.SubjectTokenSource.ShouldBeNull();
@@ -89,7 +90,7 @@ public class StorytellerCredentialVariablesTests
         variables.Kind.ShouldBe(StorytellerCredentialKind.Certificate);
         variables.Names.ShouldBe(["STORYTELLER_CERTIFICATE_FILE", "STORYTELLER_CERTIFICATE_PASSWORD"]);
         variables.DeprecatedNames.ShouldBe(["STORYTELLER_CERTIFICATE_FILE", "STORYTELLER_CERTIFICATE_PASSWORD"]);
-        variables.ApiKey.ShouldBeNull();
+        variables.ApiKeyMachine.ShouldBeNull();
         variables.CreateCredential(_fileSystem).ShouldBeOfType<CertificateCredential>().ClientCertificate.ShouldNotBeNull();
     }
 
@@ -103,7 +104,8 @@ public class StorytellerCredentialVariablesTests
         var variables = Read().ShouldNotBeNull();
 
         variables.Kind.ShouldBe(StorytellerCredentialKind.CertificateAndApiKey);
-        variables.ApiKey.ShouldBe(ApiKey);
+        variables.ApiKeyMachine.ShouldBe("YWNtZTpiaWxsaW5nOm1hY2hpbmUtMQ");
+        PublicValues(variables).ShouldNotContain(value => value.Contains("s3cret"));
         variables.DeprecatedNames.ShouldBeEmpty();
         variables.CreateCredential(_fileSystem).ShouldBeOfType<ApiKeyCredential>().ClientCertificate.ShouldNotBeNull();
     }
@@ -442,6 +444,16 @@ public class StorytellerCredentialVariablesTests
     private StorytellerCredentialVariables? Read()
     {
         return StorytellerCredentialVariables.Read(name => _variables.GetValueOrDefault(name));
+    }
+
+    // What a structured logger or a serializer would print: the public properties, not ToString.
+    private static List<string> PublicValues(StorytellerCredentialVariables variables)
+    {
+        return typeof(StorytellerCredentialVariables)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .Select(property => property.GetValue(variables))
+            .SelectMany(value => value is IEnumerable<string> list ? list : [value?.ToString() ?? string.Empty])
+            .ToList();
     }
 
     private StorytellerAuthenticationException ShouldFail(string text)

@@ -32,8 +32,9 @@ public sealed class StorytellerCredentialVariables
     // The deprecated names among Names.
     public IReadOnlyList<string> DeprecatedNames { get; }
 
-    // Without the ApiKey scheme; of the ApiKey and CertificateAndApiKey kinds, for the machine identity.
-    public string? ApiKey { get; private init; }
+    // The machine segment of a structured API key, 2s.{segment}.{secret}: base64url of organization:project:machineAccessId,
+    // for the machine identity. Null for a key in another format. The key is a secret, so it stays internal.
+    public string? ApiKeyMachine { get; private init; }
 
     // Of the ClientCredentials and Federated kinds.
     public string? ClientId { get; private init; }
@@ -167,7 +168,7 @@ public sealed class StorytellerCredentialVariables
             Kind = certificateFile is null
                 ? StorytellerCredentialKind.ApiKey
                 : apiKey is null ? StorytellerCredentialKind.Certificate : StorytellerCredentialKind.CertificateAndApiKey,
-            ApiKey = apiKey is null ? null : ApiKeyCredential.Normalize(apiKey),
+            ApiKeyMachine = apiKey is null ? null : ReadMachine(ApiKeyCredential.Normalize(apiKey)),
             ApiKeyAsSet = apiKey,
             CertificateFile = certificateFile,
             CertificateSource = certificateSource,
@@ -267,6 +268,12 @@ public sealed class StorytellerCredentialVariables
             GitHubRequestUrl = gitHubRequestUrl,
             GitHubRequestToken = path is null ? gitHub.Token : null,
         };
+    }
+
+    private static string? ReadMachine(string apiKey)
+    {
+        var segments = apiKey.Split('.', 3);
+        return segments is ["2s", { Length: > 0 } machine, { Length: > 0 }] ? machine : null;
     }
 
     // ACTIONS_ID_TOKEN_REQUEST_URL and ACTIONS_ID_TOKEN_REQUEST_TOKEN; a source only when both are set.

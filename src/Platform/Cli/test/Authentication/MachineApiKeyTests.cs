@@ -29,4 +29,16 @@ public class MachineApiKeyTests
         // YWNtZTpiaWxsaW5nOjNmMmM is acme:billing:3f2c, YWNtZTpiaWxsaW5n is acme:billing.
         MachineApiKey.TryParse(key).ShouldBeNull();
     }
+
+    // The machine segment as the SDK's StorytellerCredentialVariables.ApiKeyMachine gives it, without the secret.
+    [Theory]
+    [InlineData("YWNtZTpiaWxsaW5nOjNmMmM", true)]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("!!!", false)]
+    [InlineData("YWNtZTpiaWxsaW5n", false)]
+    public void TryParseMachine_ReadsTheSegmentAlone(string? segment, bool isStructured)
+    {
+        MachineApiKey.TryParseMachine(segment).ShouldBe(isStructured ? new MachineApiKey("acme", "billing", "3f2c") : null);
+    }
 }
