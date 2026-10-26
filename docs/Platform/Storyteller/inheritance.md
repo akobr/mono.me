@@ -328,10 +328,11 @@ A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, ov
   With `Version`, `Hash` and `Content` hashed together, the tag follows every field of the body that can change.
 - **`Modified`.** Not hashed in `e`, `r`, `b` and `d`. Past version 0 it changes only with `Version`. A configuration without an item gets `Modified` set to the time of the read, which would defeat every revalidation. The `c` tag hashes the stamps of the merged documents: a stored document's stamp changes only with its version, and a `Missing` one has none.
 - **The full key.** The same document under another key gets another tag, so nobody can make the server compute someone else's tag in their own configuration.
-- **The secret rights.** There are three values:
+- **The secret rights.** There are four values:
   - the caller may read secrets;
-  - secrets are withheld from a machine with `Secrets.Read` that has no mTLS, which also gets `X-2S-Secrets-Withheld`;
-  - neither.
+  - secrets are withheld from a machine with `Secrets.Read` that has no mTLS, which also gets `X-2S-Secrets-Withheld: mtls-required`;
+  - secrets that the role gives are withheld from a user by the [actor](access.md#actors) the token acts through (`NoSecretReveal`); the user also gets `X-2S-Secrets-Withheld: actor-restricted`;
+  - none of these.
 
   Callers with different rights never share a resolved tag.
 
@@ -359,7 +360,7 @@ A resolve gets a `BindingDependencies` collector on its `BindingScope`. Every bi
 
   A volatile read is tagged `b` and nothing is kept. JSON Logic, `@config`, an unregistered binding and a Key Vault source without secret rights read nothing outside the effective document and the registry, so they are not volatile.
 - **The `d` tag** hashes the `r` tag of the read (the full key, the secret rights and the effective document), the runtime version and the recorded inputs. The runtime version is the module version ids of the assemblies that take part in a resolve, the informational version of the API and the names of the registered sources and functions. A new build of that code changes every `d` tag once.
-- **The cache.** `DependencyManifests` keeps a manifest per caller (actor and channel) and tag, in its own cache of `ConditionalReads:ManifestCacheSizeLimit` (100,000: one per manifest plus one per input), for `ConditionalReads:ManifestLifetime` (5 minutes) after the resolve that recorded it. The lifetime is absolute: a polled manifest is not kept longer.
+- **The cache.** `DependencyManifests` keeps a manifest per caller (actor and channel; a user through an [actor](access.md#actors), with `Via`, is another caller than the same user directly) and tag, in its own cache of `ConditionalReads:ManifestCacheSizeLimit` (100,000: one per manifest plus one per input), for `ConditionalReads:ManifestLifetime` (5 minutes) after the resolve that recorded it. The lifetime is absolute: a polled manifest is not kept longer.
 - **A conditional read** with bindings looks at the first four distinct `d` tags of `If-None-Match`. A tag is a candidate when the caller has a manifest under it that was recorded under the same `r` tag and runtime version. The candidates are revalidated in order with `AreDependenciesUnchangedAsync`: one ReadMany per candidate of the items over the partitions of the organization container, reading only `id`, `PartitionKey` and `_etag`. When every marker of one is the same, the read answers 304 with its tag. A candidate that changed is dropped; when none is left, the read resolves.
 - **A cache miss** (another instance, an eviction, the lifetime) resolves. A `d` tag is the same on every instance, so the read still answers 304 when nothing changed, after evaluating. `If-None-Match: *` always resolves.
 - **The order rule.** The effective document is read before the resolve, and each marker comes from the read that produced the value. A write that races the read can only make the tag older than the data; the next poll's revalidation then answers 200.
@@ -379,7 +380,7 @@ The headers are the same on a 200 and a 304, and are never sent on a 400, 404 or
 | --- | --- |
 | `ETag` | The tag; a 304 from a manifest sends its weak tag also when the client sent the strong form |
 | `Cache-Control` | `no-store` when the caller may read secrets (resolved read). Otherwise `private, no-cache`: shared caches do not store the response, and a browser revalidates its copy before each use. |
-| `X-2S-Secrets-Withheld` | `mtls-required` when secrets were withheld |
+| `X-2S-Secrets-Withheld` | When secrets were withheld (resolved read): `mtls-required` from a machine without mTLS, `actor-restricted` from a user by the actor the token acts through (`NoSecretReveal`, see [Actors](access.md#actors)) |
 
 The admin UI calls the API cross-origin. It cannot read the `ETag`, but the browser revalidates on its own and turns a 304 back into the stored 200.
 
