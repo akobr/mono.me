@@ -7,6 +7,7 @@ using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1.Models;
+using _42.Platform.Storyteller.KeyValues;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -144,7 +145,7 @@ public class FederationHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The issuer is not valid, its Issuer would change, or the project already has 20 trusted issuers (ErrorCode InvalidFederation).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "Federation rules of machines still reference the name of a deleted issuer (ErrorCode FederatedIssuerInUse); the message names up to 10 machines.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenFederatedIssuerReplace)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutFederatedIssuer(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.FederatedIssuer)]
@@ -171,6 +172,15 @@ public class FederationHttp
         }
 
         var existing = await _issuerStore.GetAsync(organization, project, name, cancellationToken);
+
+        // Replacing the keys or pins of an issuer that rules name redirects the tokens of those machines, Secrets machines
+        // included, as new federation rules would; an actor under NoSecretReveal may not. A new name has no rules yet (the
+        // 409 below), so creating one stays open, and so does the delete (the kill switch). Not a role check, so it runs
+        // in every build, DEV_AUTH included; after the Administrator check, so a user without the role gets AccessDenied.
+        if (existing is not null && request.HasActorRestriction(ActorRestrictions.NoSecretReveal))
+        {
+            throw KeyValueErrors.ActorRestricted();
+        }
 
         if (existing is null)
         {

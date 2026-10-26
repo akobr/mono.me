@@ -43,7 +43,9 @@ public class TokenExchangeOptions
             && audiences.Any(audience => actorAudiences.Contains(NormalizeAudience(audience)));
     }
 
-    private static string NormalizeAudience(string? audience)
+    // Trimmed and without a trailing '/'; compare the result ignoring case. Shared with the start check of actors that
+    // list the same audience.
+    internal static string NormalizeAudience(string? audience)
     {
         return audience?.Trim().TrimEnd('/') ?? string.Empty;
     }
