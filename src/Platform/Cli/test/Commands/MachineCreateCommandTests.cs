@@ -4,6 +4,7 @@ using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
@@ -11,6 +12,7 @@ using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -224,7 +226,7 @@ public class MachineCreateCommandTests
 
         await Execute();
 
-        PipelineVariables().ShouldBe([$"STORYTELLER_API_URL={ApiUrl}", "STORYTELLER_API_KEY=<access key above>"]);
+        PipelineVariables().ShouldBe([$"STORYTELLER_ENDPOINT={ApiUrl}", "STORYTELLER_API_KEY=<access key above>"]);
     }
 
     [Fact]
@@ -243,7 +245,7 @@ public class MachineCreateCommandTests
 
         PipelineVariables().ShouldBe(
         [
-            $"STORYTELLER_API_URL={ApiUrl}",
+            $"STORYTELLER_ENDPOINT={ApiUrl}",
             "STORYTELLER_PROJECT=org1.proj1",
             "STORYTELLER_CLIENT_ID=11111111-2222-3333-4444-555555555555",
             "STORYTELLER_CLIENT_SECRET=<client secret above>",
@@ -286,9 +288,9 @@ public class MachineCreateCommandTests
         var file = MockUnixSupport.Path(@"C:\work\m1.pfx");
         fileSystem.File.Exists(file).ShouldBeTrue();
         PipelineVariables().ShouldBe(
-            new[] { $"STORYTELLER_API_URL={ApiUrl}" }
+            new[] { $"STORYTELLER_ENDPOINT={ApiUrl}" }
                 .Concat(hasKey ? ["STORYTELLER_API_KEY=<access key above>"] : [])
-                .Concat([$"STORYTELLER_CERTIFICATE_FILE={file}", "STORYTELLER_CERTIFICATE_PASSWORD=<certificate password above>"]));
+                .Concat([$"STORYTELLER_CLIENT_CERTIFICATE={file}", "STORYTELLER_CLIENT_CERTIFICATE_PASSWORD=<certificate password above>"]));
         _console.Lines.ShouldNotContain(line => line.StartsWith("  STORYTELLER_") && line.Contains("pfx-password"));
     }
 
@@ -301,11 +303,59 @@ public class MachineCreateCommandTests
 
         PipelineVariables().ShouldBe(
         [
-            $"STORYTELLER_API_URL={ApiUrl}",
+            $"STORYTELLER_ENDPOINT={ApiUrl}",
             "STORYTELLER_API_KEY=<access key above>",
-            "STORYTELLER_CERTIFICATE_FILE=<shared certificate .pfx>",
-            "STORYTELLER_CERTIFICATE_PASSWORD=<its password>",
+            "STORYTELLER_CLIENT_CERTIFICATE=<shared certificate .pfx>",
+            "STORYTELLER_CLIENT_CERTIFICATE_PASSWORD=<its password>",
         ]);
+    }
+
+    // Every STORYTELLER_* name the command prints, hints included, is a constant of the SDK, which the configuration
+    // provider reads too, and none is deprecated. STORYTELLER_PROJECT is sform's own: the target of a machine whose
+    // credential names no project.
+    [Theory]
+    [InlineData(MachineAccessCredentialKind.ApiKey, false, false)]
+    [InlineData(MachineAccessCredentialKind.Certificate, true, false)]
+    [InlineData(MachineAccessCredentialKind.CertificateAndApiKey, true, false)]
+    [InlineData(MachineAccessCredentialKind.CertificateAndApiKey, false, true)]
+    [InlineData(MachineAccessCredentialKind.ClientCredentials, false, false)]
+    [InlineData(MachineAccessCredentialKind.Federated, false, false)]
+    public async Task PrintedVariables_AreCanonicalNamesOfTheSdk(MachineAccessCredentialKind kind, bool hasCertificate, bool usesSharedCertificate)
+    {
+        var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>(), MockUnixSupport.Path(@"C:\work"));
+        var machine = new MachineAccess
+        {
+            Id = "11111111-2222-3333-4444-555555555555",
+            AccessKey = kind == MachineAccessCredentialKind.Federated ? string.Empty : "secret-value",
+            CredentialKind = kind,
+            UsesSharedCertificate = usesSharedCertificate,
+            TokenEndpoint = kind == MachineAccessCredentialKind.Federated ? $"{ApiUrl}/v1/org1/proj1/access/token" : "https://auth.example.com/oauth2/token",
+            TokenScope = "story:read",
+        };
+
+        if (hasCertificate)
+        {
+            machine.Certificate = Convert.ToBase64String([1, 2, 3]);
+            machine.CertificatePassword = "pfx-password";
+        }
+
+        Returns(machine);
+
+        await Execute(useSharedCertificate: usesSharedCertificate, fileSystem: fileSystem);
+
+        var sdkNames = typeof(StorytellerVariables)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field => field.IsLiteral)
+            .Select(field => (string)field.GetRawConstantValue()!)
+            .ToHashSet(StringComparer.Ordinal);
+        var printed = _console.Lines
+            .SelectMany(line => Regex.Matches(line, "STORYTELLER_[A-Z_]+").Select(match => match.Value))
+            .Distinct()
+            .ToList();
+
+        printed.ShouldContain(StorytellerVariables.ENDPOINT);
+        printed.Where(name => name != TargetVariables.PROJECT).ShouldAllBe(name => sdkNames.Contains(name));
+        printed.ShouldNotContain(name => StorytellerVariables.Deprecated.ContainsKey(name));
     }
 
     [Fact]

@@ -206,13 +206,15 @@ public class AccountCommand : BaseCommand
     {
         if (!_context.IsProjectKnown)
         {
-            Console.WriteImportant($"No project is set: set {TargetVariables.PROJECT}=<organization>.<project> or pass -p to each command.");
+            Console.WriteImportant(
+                $"No project is set: set {TargetVariables.PROJECT}=<organization>.<project>, set {StorytellerVariables.KEY} to a full key of the project, or pass -p to each command.");
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         try
         {
-            // The checks every command runs: e.g. STORYTELLER_PROJECT names another project than the key.
+            // The checks every command runs: e.g. STORYTELLER_PROJECT or STORYTELLER_KEY names another project than the
+            // credential, or STORYTELLER_KEY is no full key.
             _context.TrySetExplicitTarget(null, null);
             return null;
         }

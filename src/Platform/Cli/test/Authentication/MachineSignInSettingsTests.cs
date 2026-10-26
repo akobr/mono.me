@@ -222,6 +222,37 @@ public class MachineSignInSettingsTests
     }
 
     [Fact]
+    public void Key_IsReadAsAFullKey_TrimmedAsEveryVariable()
+    {
+        var settings = Read(new()
+        {
+            [StorytellerVariables.ENDPOINT] = Endpoint,
+            [StorytellerVariables.API_KEY] = "2s.a.b",
+            [StorytellerVariables.KEY] = " @acme.billing.staging.sbt.contoso\n",
+        });
+
+        settings.GetKind().ShouldBe(MachineSignInKind.ApiKey);
+        (settings.Key!.OrganizationName, settings.Key.ProjectName, settings.Key.ViewName).ShouldBe(("acme", "billing", "staging"));
+    }
+
+    // Read for every process, reported only for a machine: a user never reads STORYTELLER_KEY.
+    [Fact]
+    public void Key_ThatIsNoFullKey_IsReportedByGetKind()
+    {
+        var settings = Read(new()
+        {
+            [StorytellerVariables.ENDPOINT] = Endpoint,
+            [StorytellerVariables.API_KEY] = "2s.a.b",
+            [StorytellerVariables.KEY] = "acme.billing",
+        });
+
+        settings.Key.ShouldBeNull();
+        var exception = Should.Throw<AuthenticationException>(() => settings.GetKind());
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe("STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}.");
+    }
+
+    [Fact]
     public void DeprecatedVariables_NameEveryDeprecatedNameInUse()
     {
         var settings = Read(new()

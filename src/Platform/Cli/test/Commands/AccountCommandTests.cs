@@ -169,7 +169,7 @@ public class AccountCommandTests
         var exitCode = await Execute(fileSystem: _fileSystem);
 
         exitCode.ShouldBe(ExitCodes.WARNING_INTERACTION_NEEDED);
-        _console.Lines.ShouldBe(["! No project is set: set STORYTELLER_PROJECT=<organization>.<project> or pass -p to each command."]);
+        _console.Lines.ShouldBe(["! No project is set: set STORYTELLER_PROJECT=<organization>.<project>, set STORYTELLER_KEY to a full key of the project, or pass -p to each command."]);
         _http.Requests.ShouldBeEmpty();
     }
 
@@ -290,6 +290,50 @@ public class AccountCommandTests
         _console.Lines.ShouldBe(["! The token in STORYTELLER_TOKEN_FILE expired at 2026-10-17T11:00:00.0000000+00:00."]);
     }
 
+    // Without STORYTELLER_PROJECT, a federated machine signs in to the project of STORYTELLER_KEY, in the view of the key.
+    [Fact]
+    public async Task Machine_Federated_TakesTheProjectOfStorytellerKey()
+    {
+        UseFederatedFile();
+        _environment[StorytellerVariables.KEY] = "@acme.billing.staging.sbt.contoso";
+        _http.Respond(HttpStatusCode.OK, JwtExchangeAnswer);
+
+        var exitCode = await Execute(fileSystem: _fileSystem);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _console.Lines.ShouldContain("Project acme.billing with staging view.");
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
+    }
+
+    [Fact]
+    public async Task Machine_Federated_StorytellerProject_WinsOverStorytellerKey()
+    {
+        UseFederatedFile();
+        _environment[StorytellerVariables.KEY] = "@acme.web.staging.sbt.contoso";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+        _http.Respond(HttpStatusCode.OK, JwtExchangeAnswer);
+
+        var exitCode = await Execute(fileSystem: _fileSystem);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _console.Lines.ShouldContain("Project acme.billing with default view.");
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
+    }
+
+    [Theory]
+    [InlineData("@acme.web.default.sbt.contoso", "! The machine credentials in STORYTELLER_API_KEY belong to acme.billing, not acme.web.")]
+    [InlineData("acme.billing", "! STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}.")]
+    public async Task Machine_WithAStorytellerKeyItCannotUse_IsAWrongInput(string key, string message)
+    {
+        _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create("acme", "billing", "3f2c");
+        _environment[StorytellerVariables.KEY] = key;
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _console.Lines.ShouldContain(message);
+    }
+
     [Fact]
     public async Task Machine_WithoutAProject_AsksForOne()
     {
@@ -299,7 +343,7 @@ public class AccountCommandTests
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.WARNING_INTERACTION_NEEDED);
-        _console.Lines.ShouldContain("! No project is set: set STORYTELLER_PROJECT=<organization>.<project> or pass -p to each command.");
+        _console.Lines.ShouldContain("! No project is set: set STORYTELLER_PROJECT=<organization>.<project>, set STORYTELLER_KEY to a full key of the project, or pass -p to each command.");
     }
 
     [Fact]

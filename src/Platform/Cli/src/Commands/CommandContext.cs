@@ -1,20 +1,26 @@
 using System;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Storyteller;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Cli.Commands;
 
 // The organization, project and view a command works on. The first that applies wins:
-// -p/-v, then STORYTELLER_PROJECT/STORYTELLER_VIEW, then for a machine the project of its credential,
-// for a user access.default.json. A machine never falls back to access.default.json or house.main,
-// as the file survives between jobs on a self-hosted runner.
+// -p/-v, then STORYTELLER_PROJECT/STORYTELLER_VIEW, then for a machine STORYTELLER_KEY and then the project of its
+// credential, for a user access.default.json. The view of STORYTELLER_KEY belongs to the project of the key, as the view
+// of access.default.json belongs to the project of the file. A machine never falls back to access.default.json or
+// house.main, as the file survives between jobs on a self-hosted runner.
 public class CommandContext : ICommandContext
 {
     private readonly IMachineSignIn _machine;
 
     // The project whose view came from access.default.json; that view belongs to it only.
     private readonly string? _fileViewProjectKey;
+
+    // STORYTELLER_KEY of a machine; a user never reads it.
+    private readonly FullKey? _key;
 
     public CommandContext(IOptions<AccessDefaultOptions> accessDefaultOptions, IMachineSignIn machine)
     {
@@ -23,12 +29,19 @@ public class CommandContext : ICommandContext
         var access = accessDefaultOptions.Value;
         var settings = machine.Settings;
         var identity = machine.TryGetIdentity();
+        var key = machine.IsConfigured ? settings.Key : null;
         var projectFromFile = false;
 
         if (MachineSignInSettings.TrySplitProject(settings.Project, out var organization, out var project))
         {
             OrganizationName = organization;
             ProjectName = project;
+            IsProjectKnown = true;
+        }
+        else if (key is not null)
+        {
+            OrganizationName = key.OrganizationName;
+            ProjectName = key.ProjectName;
             IsProjectKnown = true;
         }
         else if (machine.IsConfigured)
@@ -45,12 +58,14 @@ public class CommandContext : ICommandContext
             projectFromFile = true;
         }
 
-        // A view of the file belongs to the project of the file.
+        // A view of the file belongs to the project of the file, a view of the key to the project of the key.
         _fileViewProjectKey = settings.View is null && projectFromFile && access.ViewName is not null
             ? $"{OrganizationName}.{ProjectName}"
             : null;
+        _key = key;
         ViewName = settings.View
             ?? (projectFromFile ? access.ViewName : null)
+            ?? GetKeyView()
             ?? Platform.Storyteller.Constants.DefaultViewName;
     }
 
@@ -63,11 +78,12 @@ public class CommandContext : ICommandContext
     public bool IsProjectKnown { get; private set; }
 
     // Throws AuthenticationException (Configuration) when the target cannot be right: a malformed
-    // STORYTELLER_PROJECT, or a machine without a project or with another project than its credential.
-    // A machine is then bound to the target.
+    // STORYTELLER_PROJECT or STORYTELLER_KEY, or a machine without a project or with another project than its
+    // credential. A machine is then bound to the target.
     public void TrySetExplicitTarget(string? projectKey, string? viewName)
     {
         var isExplicitProject = !string.IsNullOrWhiteSpace(projectKey) && projectKey.Contains('.');
+        var settings = _machine.Settings;
 
         if (isExplicitProject)
         {
@@ -80,14 +96,18 @@ public class CommandContext : ICommandContext
             {
                 ViewName = Platform.Storyteller.Constants.DefaultViewName;
             }
+
+            // The view of the key follows the project of the key; STORYTELLER_VIEW stays.
+            if (_key is not null && settings.View is null)
+            {
+                ViewName = GetKeyView() ?? Platform.Storyteller.Constants.DefaultViewName;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(viewName))
         {
             ViewName = viewName;
         }
-
-        var settings = _machine.Settings;
 
         if (!isExplicitProject && settings.Project is not null && !MachineSignInSettings.TrySplitProject(settings.Project, out _, out _))
         {
@@ -104,7 +124,8 @@ public class CommandContext : ICommandContext
 
         if (!IsProjectKnown)
         {
-            throw Invalid($"No project is set for the machine: set {TargetVariables.PROJECT}=<organization>.<project> or pass -p.");
+            throw Invalid(
+                $"No project is set for the machine: set {TargetVariables.PROJECT}=<organization>.<project>, set {StorytellerVariables.KEY} to a full key of the project, or pass -p.");
         }
 
         if (identity is { Organization: not null, Project: not null }
@@ -122,5 +143,15 @@ public class CommandContext : ICommandContext
     private static AuthenticationException Invalid(string message)
     {
         return new AuthenticationException(AuthenticationFailureReason.Configuration, message);
+    }
+
+    // The view of STORYTELLER_KEY while the target is the project of the key.
+    private string? GetKeyView()
+    {
+        return _key is not null
+            && string.Equals(_key.OrganizationName, OrganizationName, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(_key.ProjectName, ProjectName, StringComparison.OrdinalIgnoreCase)
+                ? _key.ViewName
+                : null;
     }
 }

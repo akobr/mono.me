@@ -859,6 +859,20 @@ describe('OneTimeSecretDialog', () => {
     view.host.unmount()
   })
 
+  it('writes the .env snippet of an API key with the canonical variable names of sform and the SDK', async () => {
+    const view = mountInApp(OneTimeSecretDialog, {
+      secret: { title: 'Created', apiKey: 'st_secret', credentialKind: 'ApiKey', baseUrl: 'https://storyteller.example.com/api' },
+      onClose: () => {},
+    })
+    await settle()
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('STORYTELLER_ENDPOINT=https://storyteller.example.com/api')
+    expect(text).toContain('STORYTELLER_API_KEY=st_secret')
+    expect(text).not.toContain('STORYTELLER_API_URL')
+    view.host.unmount()
+  })
+
   it('tells that a machine with a shared certificate got no certificate of its own', async () => {
     const view = mountInApp(OneTimeSecretDialog, {
       secret: {
