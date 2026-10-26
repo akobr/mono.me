@@ -31,6 +31,9 @@ public class FederationHttpTests
     private const string FormContentType = "application/x-www-form-urlencoded";
     private const string TokenUrl = "https://api.example/api/v1/org1/proj1/access/token";
 
+    // A public key of someone else, as an inline JWKS.
+    private const string AttackerJwks = """{"keys":[{"kty":"RSA","kid":"attacker-1","use":"sig","alg":"RS256","n":"0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw","e":"AQAB"}]}""";
+
     private static readonly FederatedIssuer SharedGitHub = new()
     {
         Name = "github",
@@ -564,6 +567,56 @@ public class FederationHttpTests
         (await Http.DeleteFederatedIssuer(UserRequest(), Org, Project, "github")).ShouldBeOfType<OkResult>();
     }
 
+    // New keys for an issuer that rules name hand the tokens of those machines, Secrets machines included, to whoever
+    // holds the keys: an actor under NoSecretReveal may not replace an issuer, in every build. Creating one (a name no
+    // rules reference) and the delete (the kill switch) stay open.
+    [Fact]
+    public async Task PutIssuer_ReplacingAnExistingIssuer_ThroughARestrictedActor_IsActorRestrictedAndNotStored()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub());
+        _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(
+            () => Http.PutFederatedIssuer(RestrictedActorIssuerRequest(Rekeyed()), Org, Project, "github"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        ShouldBeIssuer(await _issuers.GetAsync(Org, Project, "github"), GitHub());
+    }
+
+    [Fact]
+    public async Task PutIssuer_NewIssuer_ThroughARestrictedActor_IsStored()
+    {
+        var result = await Http.PutFederatedIssuer(RestrictedActorIssuerRequest(GitHub()), Org, Project, "github");
+
+        ShouldBeIssuer(result.ShouldBeOfType<OkObjectResult>().Value, GitHub());
+        ShouldBeIssuer(await _issuers.GetAsync(Org, Project, "github"), GitHub());
+    }
+
+    [Fact]
+    public async Task DeleteIssuer_ThroughARestrictedActor_IsDeleted()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub());
+        _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
+
+        (await Http.DeleteFederatedIssuer(RestrictedActor(UserRequest(method: "DELETE")), Org, Project, "github")).ShouldBeOfType<OkResult>();
+        (await _issuers.ListAsync(Org, Project)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task PutIssuer_ReplacingAnExistingIssuer_ThroughAnActorThatAllowsSecrets_IsStored()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub());
+        _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
+        var request = IssuerRequest(Rekeyed());
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedActor] = TestRequests.ActorId;
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedRestrictions] = Array.Empty<string>();
+
+        var result = await Http.PutFederatedIssuer(request, Org, Project, "github");
+
+        ShouldBeIssuer(result.ShouldBeOfType<OkObjectResult>().Value, Rekeyed());
+        ShouldBeIssuer(await _issuers.GetAsync(Org, Project, "github"), Rekeyed());
+    }
+
     [Theory]
     [InlineData(AccountRole.Reader, false, false)]
     [InlineData(AccountRole.Contributor, true, false)]
@@ -905,6 +958,19 @@ public class FederationHttpTests
         return request;
     }
 
+    // IssuerRequest through the actor mcp under NoSecretReveal.
+    private static TestHttpRequestData RestrictedActorIssuerRequest(FederatedIssuer issuer)
+    {
+        return RestrictedActor(IssuerRequest(issuer));
+    }
+
+    private static TestHttpRequestData RestrictedActor(TestHttpRequestData request)
+    {
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedActor] = TestRequests.ActorId;
+        request.FunctionContext.Items[FunctionContextItemKeys.DelegatedRestrictions] = new[] { ActorRestrictions.NoSecretReveal };
+        return request;
+    }
+
     private static TestHttpRequestData RawRequest(string body)
     {
         return UserRequest(headers: FunctionTestDoubles.JsonContentType(), method: "PUT", body: body);
@@ -985,6 +1051,12 @@ public class FederationHttpTests
     private static FederatedIssuer GitHub(string name = "github")
     {
         return SharedGitHub with { Name = name };
+    }
+
+    // The same Issuer with other keys and without its pins.
+    private static FederatedIssuer Rekeyed()
+    {
+        return GitHub() with { KeySource = FederatedIssuerKeySource.Jwks, Jwks = AttackerJwks, RequiredClaims = null };
     }
 
     private static FederatedIssuer Custom(string name)

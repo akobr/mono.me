@@ -140,6 +140,22 @@ public static partial class FederationValidation
             && string.Equals(TrimOneTrailingSlash(issuer), TrimOneTrailingSlash(options.Issuer), StringComparison.OrdinalIgnoreCase);
     }
 
+    // True when a token for the audience is a credential of another relying party (AWS, Entra's federation audience,
+    // Kubernetes, Azure resources, Google pools, the GitHub and Vercel defaults), so it must not be accepted here.
+    // Compared ignoring case and one trailing '/'.
+    public static bool IsForeignAudience(string? audience)
+    {
+        if (string.IsNullOrEmpty(audience))
+        {
+            return false;
+        }
+
+        var trimmed = TrimOneTrailingSlash(audience);
+
+        return ForeignAudiences.Any(foreign => string.Equals(trimmed, foreign, StringComparison.OrdinalIgnoreCase))
+            || ForeignAudiencePrefixes.Any(prefix => audience.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+    }
+
     // Null when the issuer can be stored next to the project's current issuers: an existing name keeps its Issuer
     // (rules were written for it), a new name needs room.
     public static string? ValidateIssuerChange(FederatedIssuer requested, IReadOnlyCollection<FederatedIssuer> currentIssuers)
@@ -516,16 +532,13 @@ public static partial class FederationValidation
             return $"the audience can have at most {MaxAudienceLength} characters.";
         }
 
-        var trimmed = TrimOneTrailingSlash(audience);
-
-        if (ForeignAudiences.Any(foreign => string.Equals(trimmed, foreign, StringComparison.OrdinalIgnoreCase))
-            || ForeignAudiencePrefixes.Any(prefix => audience.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+        if (IsForeignAudience(audience))
         {
             return $"the audience {audience} belongs to another service.";
         }
 
         // Kubernetes puts its issuer into the default --api-audiences, so every pod's default token carries it.
-        if (string.Equals(trimmed, TrimOneTrailingSlash(issuer.Issuer), StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(TrimOneTrailingSlash(audience), TrimOneTrailingSlash(issuer.Issuer), StringComparison.OrdinalIgnoreCase))
         {
             return $"the audience {audience} is the issuer itself, the default audience of its tokens for other services.";
         }

@@ -280,7 +280,24 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
         }
 
         var error = answer is { } refusal ? GetErrorCode(refusal) : null;
-        _logger.LogWarning("The Storyteller API refused the token exchange: {Status} {Error}.", status, error ?? "(no error code)");
+
+        // A sign-in the API refuses for another reason than a missing account: when it refuses every person, the API's
+        // actor usually lacks an aud this server accepts (McpAuthSettings.ValidAudiences, logged at start). The API's
+        // own log names the reason; no token or description is logged here.
+        if (status is 400 or 401
+            && error == StorytellerSignInRefusedException.ErrorCodeValue
+            && !string.Equals(GetDescription(answer), StorytellerSignInRefusedException.NoAccountMessage, StringComparison.Ordinal))
+        {
+            _logger.LogWarning(
+                "The Storyteller API refused the token exchange: {Status} {Error}. If it refuses every sign-in, check that the API's Auth:TokenExchange:Actors entry '{ActorId}' lists in SubjectAudiences every audience this server accepts (logged at start).",
+                status,
+                error,
+                _credential.ActorId);
+        }
+        else
+        {
+            _logger.LogWarning("The Storyteller API refused the token exchange: {Status} {Error}.", status, error ?? "(no error code)");
+        }
 
         if (status is 502 or 503 or 504 || error == StorytellerSignInUnavailableException.ErrorCodeValue)
         {

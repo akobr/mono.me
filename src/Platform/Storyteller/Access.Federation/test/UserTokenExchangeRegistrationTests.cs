@@ -74,7 +74,7 @@ public class UserTokenExchangeRegistrationTests
     [Fact]
     public async Task WorkloadIdentityActor_WithoutPublicBaseUrl_Starts()
     {
-        var settings = ActorSettings("WorkloadIdentity:Issuer", "https://login.microsoftonline.com/9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/v2.0");
+        var settings = ActorSettings("WorkloadIdentity:Issuer", "https://sts.windows.net/9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/");
         settings["Auth:TokenExchange:Actors:0:Authentication:WorkloadIdentity:Subject"] = "managed-identity-oid";
         settings["Auth:TokenExchange:Actors:0:Authentication:WorkloadIdentity:Audience"] = "api://storyteller-token-exchange";
         using var host = BuildHost(Environments.Production, settings);

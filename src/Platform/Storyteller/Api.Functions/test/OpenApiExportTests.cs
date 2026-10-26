@@ -554,6 +554,24 @@ public class OpenApiExportTests
             + " Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).");
     }
 
+    // Replacing a trusted issuer redirects the tokens of the machines whose rules name it, so an actor under
+    // NoSecretReveal may not; the delete stays open.
+    [Fact]
+    public async Task Document_SetFederatedIssuer_NamesTheActorRestrictionInIts403()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        Operation(document, Definitions.RouteIds.Access.SetFederatedIssuer).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
+            .ShouldBe(Definitions.Descriptions.ResponseForbiddenFederatedIssuerReplace);
+        Operation(document, Definitions.RouteIds.Access.DeleteFederatedIssuer).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
+            .ShouldBe(Definitions.Descriptions.ResponseForbiddenUserOnly);
+
+        Definitions.Descriptions.ResponseForbiddenFederatedIssuerReplace.ShouldBe(
+            Definitions.Descriptions.ResponseForbiddenUserOnly
+            + " Replacing an existing trusted issuer is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).");
+    }
+
     // An actor under NoSecretReveal refuses the reads of secret values (ActorRestricted), never the writes: only the 403
     // of the reads names it.
     [Fact]

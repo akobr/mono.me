@@ -9,7 +9,9 @@ public sealed class StorytellerActorException : StorytellerSignInException
         + "the API's Auth:TokenExchange:Actors lists Mcp:Actor:Id with the credential the MCP server uses (Mcp:Actor). "
         + "With Mcp:Actor:ClientAssertionKey, the assertion's aud ({Storyteller:BaseUrl}/v1/access/token, or "
         + "Mcp:Actor:ClientAssertionKey:Audience) must be the API's {MachineAuth:Federation:PublicBaseUrl}/v1/access/token "
-        + "or its MachineAuth:Federation:Issuer.";
+        + "or its MachineAuth:Federation:Issuer. With Mcp:Actor:WorkloadIdentity, the API actor's WorkloadIdentity Issuer "
+        + "and Audience must match the token's iss and aud (Entra v1: https://sts.windows.net/{tid}/ with the App ID URI; "
+        + "v2: .../v2.0 with the client id).";
 
     public const string ExchangeDisabledMessage =
         "The Storyteller API has the user token exchange turned off (Auth:TokenExchange:Enabled), so the MCP server cannot "

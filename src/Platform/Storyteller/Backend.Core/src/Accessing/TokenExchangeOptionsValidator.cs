@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Accessing.Federation;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -8,6 +9,8 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
     private const string Section = TokenExchangeOptions.SectionName;
     private const int MaxActorIdLength = 64;
     private const int ClientSecretHashLength = 64;
+    private const string EntraLoginPrefix = "https://login.microsoftonline.com/";
+    private const string EntraV2IssuerSuffix = "/v2.0";
 
     private readonly IHostEnvironment _environment;
     private readonly IOptions<UserAuthenticationOptions> _userOptions;
@@ -59,6 +62,7 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
     {
         var apiAudiences = GetApiAudiences(userOptions);
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var audienceOwners = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         for (var index = 0; index < actors.Count; index++)
         {
@@ -81,6 +85,7 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
 
             ValidateAuthentication(actor.Authentication, $"{path}:Authentication", failures);
             ValidateSubjectAudiences(actor.SubjectAudiences, apiAudiences, $"{path}:SubjectAudiences", failures);
+            ValidateSharedSubjectAudiences(actors, index, audienceOwners, $"{path}:SubjectAudiences", failures);
 
             if (actor.AllowedClientIds.Any(string.IsNullOrWhiteSpace))
             {
@@ -121,6 +126,18 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
             if (string.IsNullOrWhiteSpace(workloadIdentity.Audience))
             {
                 failures.Add($"{path}:WorkloadIdentity:Audience is required.");
+            }
+            else if (FederationValidation.IsForeignAudience(workloadIdentity.Audience.Trim()))
+            {
+                // A token for it is a credential of that service (an api://AzureADTokenExchange token signs in as every
+                // app that trusts the identity), and whoever holds one could also present it here.
+                failures.Add($"{path}:WorkloadIdentity:Audience {workloadIdentity.Audience} belongs to another service: a token for it is a credential there. Use an audience only Storyteller accepts, for example api://storyteller-token-exchange.");
+            }
+            else if (IsEntraV2Issuer(workloadIdentity.Issuer) && !Guid.TryParse(workloadIdentity.Audience.Trim(), out _))
+            {
+                // The token's version comes from the requestedAccessTokenVersion of the app registration it is requested
+                // for, and an App ID URI is the aud of v1 tokens only: with this pair every actor token would be refused.
+                failures.Add($"{path}:WorkloadIdentity:Audience must be the app's client id with the Entra v2 issuer {workloadIdentity.Issuer}: Entra v2 tokens carry the app's client id as aud. Pair an App ID URI such as {workloadIdentity.Audience} with the v1 issuer https://sts.windows.net/{{tid}}/.");
             }
 
             if (!string.IsNullOrEmpty(workloadIdentity.JwksUri) && !IsHttpsUrl(workloadIdentity.JwksUri))
@@ -181,6 +198,46 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
         {
             failures.Add($"{path} must not name the API's own audience '{audience}'.");
         }
+    }
+
+    // One resource may have several actors (one per workload identity), but only with one policy: else a token issued for
+    // the restricted actor could be exchanged by the other, which would lift its restrictions. Compared as
+    // IsIssuedToAnActor compares audiences.
+    private static void ValidateSharedSubjectAudiences(
+        List<TokenExchangeActorOptions> actors,
+        int index,
+        Dictionary<string, int> audienceOwners,
+        string path,
+        List<string> failures)
+    {
+        var actor = actors[index];
+        var audiences = actor.SubjectAudiences
+            .Where(audience => !string.IsNullOrWhiteSpace(audience))
+            .Select(TokenExchangeOptions.NormalizeAudience)
+            .Where(audience => audience.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var audience in audiences)
+        {
+            if (audienceOwners.TryAdd(audience, index))
+            {
+                continue;
+            }
+
+            var ownerIndex = audienceOwners[audience];
+            var owner = actors[ownerIndex];
+
+            if (!HasSamePolicy(actor, owner))
+            {
+                failures.Add($"{path} names '{audience}', which {Section}:Actors:{ownerIndex} ('{owner.Id}') also lists with other Restrictions, AllowSecrets or Scopes; a token issued for one actor could be exchanged by the other.");
+            }
+        }
+    }
+
+    private static bool HasSamePolicy(TokenExchangeActorOptions actor, TokenExchangeActorOptions other)
+    {
+        return actor.GetRestrictions().ToHashSet(StringComparer.Ordinal).SetEquals(other.GetRestrictions())
+            && actor.GetScopes().ToHashSet(StringComparer.Ordinal).SetEquals(other.GetScopes());
     }
 
     private static void ValidateScopes(TokenExchangeActorOptions actor, string path, List<string> failures)
@@ -289,6 +346,14 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
     private static bool IsUrlSafe(char character)
     {
         return char.IsAsciiLetterOrDigit(character) || character is '-' or '.' or '_' or '~';
+    }
+
+    // The issuer of Entra v2 tokens, https://login.microsoftonline.com/{tid}/v2.0, whose aud is always a client id.
+    private static bool IsEntraV2Issuer(string? issuer)
+    {
+        var trimmed = issuer?.Trim().TrimEnd('/') ?? string.Empty;
+        return trimmed.StartsWith(EntraLoginPrefix, StringComparison.OrdinalIgnoreCase)
+            && trimmed.EndsWith(EntraV2IssuerSuffix, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsHttpsUrl(string? value)

@@ -678,6 +678,24 @@ public sealed class TokenExchangeProviderTests : IDisposable
         fixture.Logs.Entries.ShouldNotContain(entry => entry.Contains(userToken, StringComparison.Ordinal));
     }
 
+    // A refusal for every person usually means the API's actor lacks an audience this server accepts; a missing account
+    // does not.
+    [Theory]
+    [InlineData("The subject token is not accepted for this actor.", true)]
+    [InlineData(null, true)]
+    [InlineData(StorytellerSignInRefusedException.NoAccountMessage, false)]
+    public async Task RefusedSignIn_HintsAtTheActorsSubjectAudiences_UnlessTheAccountIsMissing(string? description, bool hinted)
+    {
+        var fixture = TokenFileFixture();
+        fixture.Endpoint.Respond = _ => Task.FromResult(TokenEndpointHandler.Error("invalid_grant", description));
+
+        await Should.ThrowAsync<StorytellerSignInRefusedException>(() => fixture.Provider.GetTokenAsync(TestTokens.Create(), CancellationToken.None));
+
+        var logged = fixture.Logs.Entries.Where(entry => entry.Contains("The Storyteller API refused the token exchange: 400 invalid_grant.", StringComparison.Ordinal)).ToList();
+        logged.ShouldHaveSingleItem();
+        logged[0].Contains($"Auth:TokenExchange:Actors entry '{ExchangeFixture.ActorId}' lists in SubjectAudiences", StringComparison.Ordinal).ShouldBe(hinted);
+    }
+
     public void Dispose()
     {
         foreach (var fixture in _fixtures)

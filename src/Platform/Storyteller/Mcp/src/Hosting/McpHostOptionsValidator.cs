@@ -158,7 +158,7 @@ public sealed class McpHostOptionsValidator(IHostEnvironment environment) : IVal
         {
             if (string.IsNullOrWhiteSpace(identity.Audience))
             {
-                failures.Add("Mcp:Actor:WorkloadIdentity:Audience must be the audience the API's actor expects: the App ID URI of an app registration only Storyteller accepts, for example api://storyteller-token-exchange.");
+                failures.Add("Mcp:Actor:WorkloadIdentity:Audience must be the audience the API's actor expects: the App ID URI or client id of an app registration only Storyteller accepts, exactly as the API's Auth:TokenExchange:Actors WorkloadIdentity:Audience (v1 tokens carry the requested App ID URI, v2 tokens the client id), for example api://storyteller-token-exchange.");
             }
             else if (identity.Audience.Trim().EndsWith("/.default", StringComparison.OrdinalIgnoreCase))
             {
@@ -166,7 +166,7 @@ public sealed class McpHostOptionsValidator(IHostEnvironment environment) : IVal
             }
             else if (IsForeignAudience(identity.Audience))
             {
-                failures.Add($"Mcp:Actor:WorkloadIdentity:Audience {identity.Audience} belongs to another service: a token for it is a credential there (an api://AzureADTokenExchange token signs in as every app that trusts this identity). Use an audience only Storyteller accepts, for example api://storyteller-token-exchange.");
+                failures.Add($"Mcp:Actor:WorkloadIdentity:Audience {identity.Audience} belongs to another service: a token for it is a credential there (an api://AzureADTokenExchange token signs in as every app that trusts this identity). Use the App ID URI or client id of an app registration only Storyteller accepts, exactly as the API's Auth:TokenExchange:Actors WorkloadIdentity:Audience (v1 tokens carry the requested App ID URI, v2 tokens the client id), for example api://storyteller-token-exchange.");
             }
 
             if (!string.IsNullOrWhiteSpace(identity.TokenFilePath))

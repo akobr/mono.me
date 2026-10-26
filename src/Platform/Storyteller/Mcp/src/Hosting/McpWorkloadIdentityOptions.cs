@@ -6,9 +6,12 @@ public sealed class McpWorkloadIdentityOptions
 {
     public McpWorkloadIdentityKind? Kind { get; set; }
 
-    // ManagedIdentity: the audience of the token, asked for as {Audience}/.default: the App ID URI of an app registration
-    // only Storyteller accepts, for example api://storyteller-token-exchange. Never api://AzureADTokenExchange or an
-    // Azure resource, whose tokens are credentials there. The API's actor names the same audience.
+    // ManagedIdentity: the resource the token is requested for, as {Audience}/.default: the App ID URI of an app
+    // registration only Storyteller accepts, for example api://storyteller-token-exchange. Never api://AzureADTokenExchange
+    // or an Azure resource, whose tokens are credentials there.
+    // The API actor's WorkloadIdentity:Audience must equal the token's aud. With v1 tokens (the default, iss
+    // https://sts.windows.net/{tid}/) that is this same App ID URI. With v2 tokens (requestedAccessTokenVersion 2, iss
+    // https://login.microsoftonline.com/{tid}/v2.0) it is the app's client id, so use the client id here as well.
     public string? Audience { get; set; }
 
     // ManagedIdentity: the client id of a user-assigned identity; empty means the system-assigned one.

@@ -16,6 +16,9 @@ public class TokenExchangeOptionsTests
     private const string AuthKitDomain = "https://auth.example.com";
     private const string SecretHash = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
     private const string PublicBaseUrl = "https://storyteller.example.com/api";
+    private const string WorkloadClientId = "3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b0a";
+    private const string EntraV1Issuer = $"https://sts.windows.net/{TenantId}/";
+    private const string EntraV2Issuer = $"https://login.microsoftonline.com/{TenantId}/v2.0";
 
     [Fact]
     public void AddUserAuthenticationOptions_WithoutTheSection_DisablesTheExchange()
@@ -38,7 +41,7 @@ public class TokenExchangeOptionsTests
             [$"{Section}:TokenLifetimeMinutes"] = "15",
             [$"{Section}:MaxExchangesPerSubjectTokenPerMinute"] = "3",
             [$"{Section}:Actors:0:Id"] = "mcp",
-            [$"{Section}:Actors:0:Authentication:WorkloadIdentity:Issuer"] = $"https://login.microsoftonline.com/{TenantId}/v2.0",
+            [$"{Section}:Actors:0:Authentication:WorkloadIdentity:Issuer"] = EntraV1Issuer,
             [$"{Section}:Actors:0:Authentication:WorkloadIdentity:Subject"] = "managed-identity-oid",
             [$"{Section}:Actors:0:Authentication:WorkloadIdentity:Audience"] = "api://storyteller-token-exchange",
             [$"{Section}:Actors:0:SubjectAudiences:0"] = "https://mcp.example.com/mcp",
@@ -212,6 +215,75 @@ public class TokenExchangeOptionsTests
         result.Failures.ShouldBe([$"{Section}:Actors:1:Id 'MCP' is not unique; actor ids are compared ignoring case."]);
     }
 
+    // A token issued for the restricted actor must not be exchangeable by a less restricted one. Audiences are compared
+    // as IsIssuedToAnActor compares them.
+    [Fact]
+    public void Validate_ActorsSharingAnAudience_WithOtherSecretPolicies_Fail()
+    {
+        var result = Validate(new TokenExchangeOptions
+        {
+            Actors =
+            [
+                Actor(),
+                Actor(actor =>
+                {
+                    actor.Id = "ops";
+                    actor.SubjectAudiences = ["HTTPS://MCP.EXAMPLE.COM/MCP/"];
+                    actor.AllowSecrets = true;
+                }),
+            ],
+        });
+
+        result.Failures.ShouldBe(
+        [
+            $"{Section}:Actors:1:SubjectAudiences names 'HTTPS://MCP.EXAMPLE.COM/MCP', which {Section}:Actors:0 ('mcp') also lists with other Restrictions, AllowSecrets or Scopes; a token issued for one actor could be exchanged by the other.",
+        ]);
+    }
+
+    [Fact]
+    public void Validate_ActorsSharingAnAudience_WithOtherScopes_Fail()
+    {
+        var result = Validate(new TokenExchangeOptions
+        {
+            Actors =
+            [
+                Actor(actor => actor.SubjectAudiences = ["https://other.example.com", "https://mcp.example.com/mcp"]),
+                Actor(actor =>
+                {
+                    actor.Id = "ops";
+                    actor.SubjectAudiences = [" https://mcp.example.com/mcp/ "];
+                    actor.Scopes = [UserScopes.Impersonation, "Annotation.Read"];
+                }),
+            ],
+        });
+
+        result.Failures.ShouldBe(
+        [
+            $"{Section}:Actors:1:SubjectAudiences names 'https://mcp.example.com/mcp', which {Section}:Actors:0 ('mcp') also lists with other Restrictions, AllowSecrets or Scopes; a token issued for one actor could be exchanged by the other.",
+        ]);
+    }
+
+    // One server with two workload identities (or a staging and a production one) shares a resource and a policy.
+    [Fact]
+    public void Validate_ActorsSharingAnAudience_WithTheSamePolicy_Succeed()
+    {
+        var result = Validate(new TokenExchangeOptions
+        {
+            Actors =
+            [
+                Actor(actor => actor.Restrictions = [ActorRestrictions.NoSecretReveal]),
+                Actor(actor =>
+                {
+                    actor.Id = "mcp-staging";
+                    actor.SubjectAudiences = ["https://mcp.example.com/mcp/", "https://mcp.example.com/mcp"];
+                    actor.Scopes = [UserScopes.Impersonation];
+                }),
+            ],
+        });
+
+        result.Succeeded.ShouldBeTrue();
+    }
+
     [Fact]
     public void Validate_ActorWithoutAnAuthenticationMethod_Fails()
     {
@@ -255,6 +327,65 @@ public class TokenExchangeOptionsTests
             $"{Section}:Actors:0:Authentication:WorkloadIdentity:Subject is required.",
             $"{Section}:Actors:0:Authentication:WorkloadIdentity:Audience is required.",
             $"{Section}:Actors:0:Authentication:WorkloadIdentity:JwksUri must be an absolute HTTPS URL when set.",
+        ]);
+    }
+
+    // A token for one of them is a credential of another service, and a holder of it could present it here as well.
+    [Theory]
+    [InlineData("api://AzureADTokenExchange")]
+    [InlineData("API://azureadtokenexchange/")]
+    [InlineData(" api://AzureADTokenExchange ")]
+    [InlineData("https://management.azure.com/")]
+    [InlineData("https://vault.azure.net")]
+    [InlineData("sts.amazonaws.com")]
+    [InlineData("https://kubernetes.default.svc")]
+    [InlineData("https://github.com/contoso")]
+    public void Validate_WorkloadIdentity_ForeignAudience_Fails(string audience)
+    {
+        var result = Validate(new TokenExchangeOptions { Actors = [Actor(actor => actor.Authentication.WorkloadIdentity!.Audience = audience)] });
+
+        result.Failures.ShouldBe(
+        [
+            $"{Section}:Actors:0:Authentication:WorkloadIdentity:Audience {audience} belongs to another service: a token for it is a credential there. Use an audience only Storyteller accepts, for example api://storyteller-token-exchange.",
+        ]);
+    }
+
+    // Entra v1 tokens (the default) carry the requested App ID URI as aud; v2 tokens always the app's client id.
+    [Theory]
+    [InlineData(EntraV1Issuer, "api://storyteller-token-exchange")]
+    [InlineData(EntraV1Issuer, WorkloadClientId)]
+    [InlineData(EntraV2Issuer, WorkloadClientId)]
+    [InlineData("https://token.actions.githubusercontent.com", "api://storyteller-token-exchange")]
+    public void Validate_WorkloadIdentity_MatchingEntraIssuerAndAudience_Succeeds(string issuer, string audience)
+    {
+        var result = Validate(new TokenExchangeOptions
+        {
+            Actors =
+            [
+                Actor(actor =>
+                {
+                    actor.Authentication.WorkloadIdentity!.Issuer = issuer;
+                    actor.Authentication.WorkloadIdentity.Audience = audience;
+                }),
+            ],
+        });
+
+        result.Succeeded.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(EntraV2Issuer)]
+    [InlineData($"HTTPS://LOGIN.MICROSOFTONLINE.COM/{TenantId}/v2.0/")]
+    public void Validate_WorkloadIdentity_EntraV2IssuerWithAnAppIdUri_Fails(string issuer)
+    {
+        var result = Validate(new TokenExchangeOptions
+        {
+            Actors = [Actor(actor => actor.Authentication.WorkloadIdentity!.Issuer = issuer)],
+        });
+
+        result.Failures.ShouldBe(
+        [
+            $"{Section}:Actors:0:Authentication:WorkloadIdentity:Audience must be the app's client id with the Entra v2 issuer {issuer}: Entra v2 tokens carry the app's client id as aud. Pair an App ID URI such as api://storyteller-token-exchange with the v1 issuer https://sts.windows.net/{{tid}}/.",
         ]);
     }
 
@@ -599,7 +730,7 @@ public class TokenExchangeOptionsTests
             {
                 WorkloadIdentity = new ActorWorkloadIdentityOptions
                 {
-                    Issuer = $"https://login.microsoftonline.com/{TenantId}/v2.0",
+                    Issuer = EntraV1Issuer,
                     Subject = "managed-identity-oid",
                     Audience = "api://storyteller-token-exchange",
                 },

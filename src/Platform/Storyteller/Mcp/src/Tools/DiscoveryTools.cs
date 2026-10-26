@@ -23,6 +23,9 @@ public sealed class DiscoveryTools(Sdk.IAccessApiClient access, Sdk.IAnnotations
         }
         catch (Sdk.ApiException exception) when (exception.StatusCode == 404)
         {
+            // With an exchanged token the API answers 401 for a missing account (BearerAuthenticationMiddleware) and the
+            // exchange refuses a sign-in without one (NoAccount), so this 404 only guards a race in which the account
+            // disappears between the middleware's read and the handler's. Kept as defence in depth.
             return ToolResults.Error(MissingAccountMessage, new { Status = 404 });
         }
     }
