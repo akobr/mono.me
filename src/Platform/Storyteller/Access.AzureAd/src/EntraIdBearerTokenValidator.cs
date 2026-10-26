@@ -14,6 +14,7 @@ namespace _42.Platform.Storyteller;
 
 public class EntraIdBearerTokenValidator : IBearerTokenValidator
 {
+    private const string SubjectClaimType = "sub";
     private const string ScopeClaimType = "http://schemas.microsoft.com/identity/claims/scope";
     private const string TenantIdClaimType = "http://schemas.microsoft.com/identity/claims/tenantid";
 
@@ -142,7 +143,37 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
         }
     }
 
-    private BearerValidationResult Validate(JwtSecurityTokenHandler handler, string rawToken, OpenIdConnectConfiguration configuration)
+    // The claims of a user, keyed by the account id {tid}:{oid} (UserIdentity): it replaces sub and the mapped
+    // NameIdentifier as sub, and the pairwise sub stays as entra_sub. Without a GUID tid and oid, accountId is null and
+    // the claims keep no sub.
+    internal static List<Claim> KeyByAccountId(IReadOnlyList<Claim> claims, out string? accountId)
+    {
+        accountId = UserIdentity.GetAccountId(claims, IdentityProviderKind.EntraId);
+        var pairwiseSubject = FirstClaim(claims, SubjectClaimType) ?? FirstClaim(claims, ClaimTypes.NameIdentifier);
+        var keyed = new List<Claim>(claims.Count + 1);
+
+        foreach (var claim in claims)
+        {
+            if (claim.Type is not (SubjectClaimType or ClaimTypes.NameIdentifier or UserIdentity.EntraSubjectClaimType))
+            {
+                keyed.Add(claim);
+            }
+        }
+
+        if (accountId is not null)
+        {
+            keyed.Add(new Claim(SubjectClaimType, accountId));
+
+            if (!string.IsNullOrWhiteSpace(pairwiseSubject))
+            {
+                keyed.Add(new Claim(UserIdentity.EntraSubjectClaimType, pairwiseSubject));
+            }
+        }
+
+        return keyed;
+    }
+
+    private BearerValidationResult? Validate(JwtSecurityTokenHandler handler, string rawToken, OpenIdConnectConfiguration configuration)
     {
         // Entra keeps the handler default clock skew of five minutes. AuthKit uses 30 seconds.
         var validationParameters = new TokenValidationParameters
@@ -157,7 +188,15 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
         var principal = handler.ValidateToken(rawToken, validationParameters, out _);
         var claims = principal.Claims.ToList();
         var machineId = TryGetMachineId(claims, _clientId, _delegatedClients);
-        return new BearerValidationResult(claims, machineId is not null, machineId);
+
+        if (machineId is not null)
+        {
+            return new BearerValidationResult(claims, true, machineId);
+        }
+
+        // A user token names its account by tid and oid; without them it is refused (401).
+        var keyed = KeyByAccountId(claims, out var accountId);
+        return accountId is null ? null : new BearerValidationResult(keyed, false, null);
     }
 
     private static ConfigurationManager<OpenIdConnectConfiguration> CreateConfigurationManager(UserAuthenticationOptions options)

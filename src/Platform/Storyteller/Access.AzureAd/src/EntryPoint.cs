@@ -48,6 +48,9 @@ public static class EntryPoint
         // One instance (one OpenID configuration manager) when Entra ID machine access is added too.
         services.TryAddSingleton<EntraIdBearerTokenValidator>();
         services.AddSingleton<IBearerTokenValidator>(provider => provider.GetRequiredService<EntraIdBearerTokenValidator>());
+
+        // The start log notes that users are keyed by {tid}:{oid}, once per host also when this runs twice.
+        services.AddHostedService<EntraIdAccountIdNotice>();
         return services;
     }
 }

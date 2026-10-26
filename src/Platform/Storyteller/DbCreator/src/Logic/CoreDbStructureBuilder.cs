@@ -1,9 +1,11 @@
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.DbCreator.Configuration;
 using Colorful;
+using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller.DbCreator.Logic;
 
-public class CoreDbStructureBuilder(IContainerFactory containerFactory)
+public class CoreDbStructureBuilder(IContainerFactory containerFactory, IOptions<BaseAccountOptions> baseAccount)
 {
     public async Task BuildAsync()
     {
@@ -16,7 +18,7 @@ public class CoreDbStructureBuilder(IContainerFactory containerFactory)
         await Data.CreateCoreAccess(
             coreContainer,
             Constants.ORGANIZATION,
-            Constants.BASE_ACCOUNT_ID,
+            baseAccount.Value.GetAccountId(),
             Constants.BASE_ACCOUNT_USER_NAME,
             Constants.BASE_ACCOUNT_NAME);
         Console.WriteLine("Basic access created in container 'core'.");

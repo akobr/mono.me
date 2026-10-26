@@ -9,6 +9,7 @@ using _42.Platform.Storyteller.Api.V1;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 using ApiAccountCreate = _42.Platform.Storyteller.Api.V1.Models.AccountCreate;
 
@@ -16,6 +17,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 public class MembersHttpTests
 {
+    private const string EntraAccountId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d:3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d";
+
     [Fact]
     public async Task SetMemberRole_UsesTheCallerAndANormalizedKey()
     {
@@ -117,7 +120,7 @@ public class MembersHttpTests
     public async Task PostAccount_OnlyOneOfOrganizationAndProject_ReturnsBadRequest(string? organization, string? project)
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var http = AccountHttp(access);
 
         var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { Organization = organization, Project = project })));
 
@@ -129,7 +132,7 @@ public class MembersHttpTests
     public async Task PostAccount_WithoutOrganizationAndProject_CreatesABareAccount()
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var http = AccountHttp(access);
 
         var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate())));
 
@@ -145,7 +148,7 @@ public class MembersHttpTests
     public async Task PostAccount_WithAProjectDescription_PassesIt()
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var http = AccountHttp(access);
         var body = FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { Organization = "acme", Project = "billing", ProjectDescription = " Billing of Acme. " });
 
         var result = await http.PostAccount(UserRequest(body));
@@ -162,7 +165,7 @@ public class MembersHttpTests
     public async Task PostAccount_ProjectDescriptionWithoutOrganizationAndProject_ReturnsBadRequest()
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var http = AccountHttp(access);
 
         var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { ProjectDescription = "Billing of Acme." })));
 
@@ -179,7 +182,7 @@ public class MembersHttpTests
     public async Task PostAccount_BlankProjectDescriptionWithoutOrganizationAndProject_CreatesABareAccount(string description)
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var http = AccountHttp(access);
 
         var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { ProjectDescription = description })));
 
@@ -197,7 +200,7 @@ public class MembersHttpTests
     public async Task PostAccount_MissingOrInvalidBody_ReturnsBadRequestWithoutCreatingAnAccount(string body, string message)
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var http = AccountHttp(access);
 
         var result = await http.PostAccount(UserRequest(body));
 
@@ -205,6 +208,39 @@ public class MembersHttpTests
         error.Message.ShouldBe(message);
         error.ErrorCode.ShouldBeNull();
         access.Calls.ShouldBe(["account:user-1"]);
+        access.Created.ShouldBeNull();
+    }
+
+    // The Entra ID modules write sub as {tid}:{oid}, the id the account is created under.
+    [Fact]
+    public async Task PostAccount_EntraId_CreatesTheAccountUnderTheTenantAndObjectId()
+    {
+        var access = new RecordingAccess();
+        var http = AccountHttp(access, IdentityProviderKind.EntraId);
+
+        var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate()), userId: EntraAccountId));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Created.ShouldNotBeNull().IdentityId.ShouldBe(EntraAccountId);
+    }
+
+    // Any other id under Entra ID means a token passed without the rewrite: a programming error, before any lookup.
+    // Without the options, the provider is Entra ID, the default of Auth:Provider.
+    [Theory]
+    [InlineData("user-1", true)]
+    [InlineData("user-1", false)]
+    [InlineData("8A7B6C5D-4E3F-4A1B-8C9D-0E1F2A3B4C5D:3F2C6A8E-6C1D-4A59-9A47-0A2F4F4C1B2D", true)]
+    [InlineData("8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d", true)]
+    public async Task PostAccount_EntraIdWithAnotherId_IsAProgrammingError(string userId, bool withOptions)
+    {
+        var access = new RecordingAccess();
+        var http = withOptions
+            ? AccountHttp(access, IdentityProviderKind.EntraId)
+            : new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        await Should.ThrowAsync<InvalidOperationException>(() => http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate()), userId: userId)));
+
+        access.Calls.ShouldBeEmpty();
         access.Created.ShouldBeNull();
     }
 
@@ -224,15 +260,25 @@ public class MembersHttpTests
         access.Calls.ShouldBeEmpty();
     }
 
+    // The handler of account registration under the provider; AuthKit keys accounts by the sub as it is.
+    private static AccessHttp AccountHttp(RecordingAccess access, IdentityProviderKind provider = IdentityProviderKind.AuthKit)
+    {
+        return new AccessHttp(
+            access,
+            FunctionTestDoubles.ApiJsonOptions,
+            NullLogger<AccessHttp>.Instance,
+            authOptions: Options.Create(new UserAuthenticationOptions { Provider = provider }));
+    }
+
     // A user's request; a body goes as JSON, with its content type unless contentType is false.
-    private static TestHttpRequestData UserRequest(string? body = null, bool contentType = true)
+    private static TestHttpRequestData UserRequest(string? body = null, bool contentType = true, string userId = "user-1")
     {
         using var services = new ServiceCollection().BuildServiceProvider();
         var headers = body is not null && contentType ? FunctionTestDoubles.JsonContentType() : null;
         var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, body: body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
-            new("sub", "user-1"),
+            new("sub", userId),
             new("preferred_username", "ada@example.com"),
             new("name", "Ada"),
             new("scp", Scopes.User.Impersonation),
