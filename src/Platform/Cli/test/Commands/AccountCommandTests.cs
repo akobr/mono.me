@@ -372,7 +372,11 @@ public class AccountCommandTests
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _console.Lines.ShouldBe(["! STORYTELLER_ENDPOINT and STORYTELLER_API_URL are both set, to different values; set one of them."]);
+        _console.Lines.ShouldBe(
+        [
+            "! STORYTELLER_ENDPOINT and STORYTELLER_API_URL are both set, to different values; set one of them.",
+            "! STORYTELLER_API_URL is deprecated; use STORYTELLER_ENDPOINT.",
+        ]);
     }
 
     private void UseFederatedFile()

@@ -13,4 +13,7 @@ internal sealed class MachineCredentialHooks
     public Func<StorytellerCredential, StorytellerCredential>? Decorate { get; init; }
 
     public StorytellerResilienceOptions? Resilience { get; init; }
+
+    // How long a token request may take, retries and Retry-After waits included; 100 seconds when null.
+    public TimeSpan? TokenDeadline { get; init; }
 }

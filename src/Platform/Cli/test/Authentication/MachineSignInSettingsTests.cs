@@ -163,7 +163,9 @@ public class MachineSignInSettingsTests
         {
             settings.GetKind().ShouldBe(MachineSignInKind.ApiKey);
             settings.EndpointVariable.ShouldBe(StorytellerVariables.ENDPOINT);
-            settings.DeprecatedVariables.ShouldBeEmpty();
+
+            // Reported whenever it is set, as the SDK reports a deprecated credential name next to its canonical one.
+            settings.DeprecatedVariables.ShouldBe([StorytellerVariables.API_URL]);
             return;
         }
 
@@ -265,8 +267,20 @@ public class MachineSignInSettingsTests
             [StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN] = "top-secret-request-token",
         });
 
+        // The class has no ToString of its own; this guards against one that would print the values.
         settings.ToString()!.ShouldNotContain("top-secret");
         Should.Throw<AuthenticationException>(() => settings.GetKind()).Message.ShouldNotContain("top-secret");
+
+        var clientCredentials = Read(new()
+        {
+            [StorytellerVariables.ENDPOINT] = Endpoint,
+            [StorytellerVariables.CLIENT_ID] = "client_01",
+            [StorytellerVariables.CLIENT_SECRET] = "top-secret-client",
+        });
+
+        clientCredentials.GetKind().ShouldBe(MachineSignInKind.ClientCredentials);
+        clientCredentials.GetCredential().ToString().ShouldNotContain("top-secret");
+        clientCredentials.ToString()!.ShouldNotContain("top-secret");
     }
 
     private static MachineSignInSettings Machine(params string[] variables)

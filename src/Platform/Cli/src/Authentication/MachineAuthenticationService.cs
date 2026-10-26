@@ -19,6 +19,10 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     private const string ApiKeyScheme = "ApiKey";
     private const string BearerScheme = "Bearer";
 
+    // The token factory and the renewal handler pass no cancellation, and the SDK honours any Retry-After. A token request
+    // therefore ends here, retries included, as a single request did with the 100-second default of HttpClient.
+    private static readonly TimeSpan DefaultTokenDeadline = TimeSpan.FromSeconds(100);
+
     private readonly IFileSystem _fileSystem;
     private readonly TimeProvider _time;
     private readonly MachineCredentialHooks _hooks;
@@ -314,14 +318,27 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
             ?? throw new InvalidOperationException($"The machine credential of the kind {credential.Identity.Kind} has no token.");
     }
 
-    private Task<AuthenticationHeaderValue?> GetAuthorizationAsync(
+    private async Task<AuthenticationHeaderValue?> GetAuthorizationAsync(
         LoadedCredential credential,
         ExchangeTarget? target,
         AuthenticationHeaderValue? rejected,
         CancellationToken cancellationToken)
     {
         var bound = Bind(credential, target);
-        return CredentialFailures.GuardAsync(() => bound.GetAuthorizationAsync(rejected, cancellationToken));
+        var deadline = _hooks.TokenDeadline ?? DefaultTokenDeadline;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(deadline);
+
+        try
+        {
+            return await CredentialFailures.GuardAsync(() => bound.GetAuthorizationAsync(rejected, timeout.Token));
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new AuthenticationException(
+                AuthenticationFailureReason.ServiceError,
+                $"The machine got no token within {deadline.TotalSeconds:0} seconds; the token endpoint or the GitHub Actions runner did not answer in time.");
+        }
     }
 
     // One bound copy at a time: it holds the token. A federated machine is bound to the organization and project of its

@@ -462,10 +462,12 @@ public class MachineAuthenticationServiceTests
     }
 
     // Bind: whatever the binding of the credential throws is mapped too.
+    // The guard around the bound copy: the SDK's Bind itself throws only for a null binding, so the hook, which runs in
+    // the same guarded call, stands for a failure there.
     [Theory]
     [InlineData(false, AuthenticationFailureReason.Configuration)]
     [InlineData(true, AuthenticationFailureReason.ServiceError)]
-    public async Task AFailureOfTheBinding_IsMapped(bool isSdkFailure, AuthenticationFailureReason reason)
+    public async Task AFailureWhileBinding_IsMapped(bool isSdkFailure, AuthenticationFailureReason reason)
     {
         UseClientCredentials("client_01");
         Exception failure = isSdkFailure
@@ -479,6 +481,32 @@ public class MachineAuthenticationServiceTests
         exception.Reason.ShouldBe(reason);
         exception.Message.ShouldBe("The binding failed.");
         exception.InnerException.ShouldBeSameAs(isSdkFailure ? failure.InnerException : failure);
+    }
+
+    // Neither the token factory nor the renewal handler can cancel, and the SDK honours any Retry-After: the service ends
+    // a token request at its deadline (100 seconds), as a single request ended at the default timeout of HttpClient.
+    [Fact]
+    public async Task ATokenRequestThatDoesNotEnd_IsAServiceErrorAtTheDeadline()
+    {
+        UseClientCredentials("client_01");
+        var scripted = TestMachines.Hooks(new HangingHttpHandler());
+        var hooks = new MachineCredentialHooks { Decorate = scripted.Decorate, Resilience = scripted.Resilience, TokenDeadline = TimeSpan.FromMilliseconds(50) };
+        var service = TestMachines.Create(TestMachines.Settings(_environment), _fileSystem, hooks, _time);
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
+        exception.Message.ShouldStartWith("The machine got no token within ");
+    }
+
+    [Fact]
+    public async Task ACancelledCaller_IsNotADeadline()
+    {
+        UseClientCredentials("client_01");
+        var service = CreateService(new HangingHttpHandler());
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        await Should.ThrowAsync<OperationCanceledException>(() => service.GetAccessTokenAsync(cancellation.Token));
     }
 
     [Fact]
@@ -1023,6 +1051,16 @@ public class MachineAuthenticationServiceTests
         public int GetHashCode(MachineIdentity obj)
         {
             return HashCode.Combine(obj.Kind, obj.MachineId);
+        }
+    }
+
+    // Answers no request: it waits until the request is cancelled.
+    private sealed class HangingHttpHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable: the delay ends only by cancellation.");
         }
     }
 
