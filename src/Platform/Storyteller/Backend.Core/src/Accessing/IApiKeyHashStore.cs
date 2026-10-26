@@ -9,6 +9,16 @@ public interface IApiKeyHashStore
         string hashedSecret,
         IReadOnlyList<MachineScope> scopes);
 
+    // Replaces the hash of an existing machine, only while it still holds currentHashedSecret, and changes nothing else.
+    // False when another hash replaced it meanwhile; NotFoundException when the machine or its hash is gone (a delete
+    // removes the hash first). Never creates a machine.
+    Task<bool> ReplaceAsync(
+        string organization,
+        string project,
+        string machineAccessId,
+        string currentHashedSecret,
+        string newHashedSecret);
+
     Task<ApiKeyHashEntry?> GetAsync(string organization, string project, string machineAccessId);
 
     Task<bool> DeleteAsync(string organization, string project, string machineAccessId);

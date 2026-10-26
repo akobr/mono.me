@@ -51,9 +51,14 @@ public class ApiKeyMachineAccessService : IMachineAccessService, IApiKeyValidato
         var secret = GenerateSecret();
         var structuredKey = new StructuredApiKey(organization, project, objectId, secret);
 
-        // A new secret keeps what the machine was granted.
-        await _hashStore.StoreAsync(
-            organization, project, objectId, HashSecret(secret), existing.Scopes);
+        // Only over the hash read above, so of two concurrent resets exactly one wins. The scopes stay as granted.
+        var replaced = await _hashStore.ReplaceAsync(
+            organization, project, objectId, existing.HashedSecret, HashSecret(secret));
+
+        if (!replaced)
+        {
+            throw new ConflictException($"The API key of the machine access {objectId} was reset concurrently; reload and retry.");
+        }
 
         return structuredKey.Format();
     }

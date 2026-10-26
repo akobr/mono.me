@@ -38,8 +38,9 @@ public class CosmosFixture : IAsyncLifetime
 
         await containerTask;
 
+        // The module's connection string names http, but the pinned image serves HTTPS.
         var connectionString = UseContainer
-            ? DbContainer.GetConnectionString()
+            ? DbContainer.GetConnectionString().Replace("http://", "https://")
             : "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
 
         configBuilder.Add(new MemoryConfigurationSource
