@@ -26,8 +26,9 @@ public sealed record ExplainedValue
 
     public sealed record ValueNode(string AnnotationKey, int Depth);
 
-    // BeforeWinner: merged before the winning step, so overridden. Otherwise merged after it inside a branch that was
-    // merged again later (or with the same value), so not applied.
+    // BeforeWinner: merged before the winning step, so overridden. Otherwise a later step that sets the same value: the
+    // merge keeps an equal token with its earlier origin, so the later step is applied too, and changing only the
+    // winning step leaves the effective value as it is.
     public sealed record Setter
     {
         public required int Step { get; init; }
