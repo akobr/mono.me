@@ -197,6 +197,10 @@ var token = await access.ExchangeMachineTokenAsync("acme", "billing", new Machin
 
 `StorytellerCredential.FromFederatedTokenFile` (see [Machine credentials](#machine-credentials)) makes the exchange and caches its token, like `createFederatedTokenProvider` of the TypeScript SDK.
 
+## User token exchange
+
+`ExchangeUserTokenAsync` posts the RFC 8693 exchange of an actor, such as the MCP server, to `POST v1/access/token`: the person's token for the actor (`Subject_token`), the actor's id (`Client_id`) and its proof (`Actor_token`, `Client_assertion`, or `Client_secret` in Development) give a short-lived Storyteller user token that names the person and the actor, with the actor's `Restrictions`. Like `ExchangeMachineTokenAsync`, it throws `ApiException<OAuthErrorResponse>` for `400` and `503`, and the endpoint refuses any `Authorization` header: call it through a client without `ISdkConfiguration`, on an `HttpClient` that does not follow redirects, never through the clients of `AddStorytellerSdk`. `GetAuthorizationServerMetadataAsync` (RFC 8414) and `GetJsonWebKeySetAsync` read the issuer's metadata and signing keys anonymously.
+
 ## Client-side encryption
 
 `src/ClientSideEncryption/KeyValueClientEncryption.cs` encrypts a key/value secret for the recipients of a project (`GET …/key-values/recipients`) and decrypts a returned document with a recipient's private key, on top of the `KeyValues.ClientEncryption` library (JWE General JSON Serialization, A256GCM, RSA-OAEP-256). The TypeScript SDK (`./hyok`) and the CLI produce and read the same format.
