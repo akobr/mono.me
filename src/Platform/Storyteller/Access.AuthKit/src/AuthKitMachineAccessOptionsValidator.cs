@@ -9,9 +9,7 @@ namespace _42.Platform.Storyteller;
 // the organization that owns them and a PermissionMap that creation can look up one slug per scope in.
 public sealed class AuthKitMachineAccessOptionsValidator : IValidateOptions<UserAuthenticationOptions>
 {
-    private const string UserImpersonation = "User.Impersonation";
-
-    private static readonly string KnownScopes = $"{string.Join(", ", MachineScopes.ToScopeStrings(MachineScopes.All))} or {UserImpersonation}";
+    private static readonly string KnownScopes = $"{string.Join(", ", MachineScopes.ToScopeStrings(MachineScopes.All))} or {UserScopes.Impersonation}";
 
     public ValidateOptionsResult Validate(string? name, UserAuthenticationOptions options)
     {
@@ -61,7 +59,7 @@ public sealed class AuthKitMachineAccessOptionsValidator : IValidateOptions<User
                         $"Auth:AuthKit:PermissionMap maps both {slugsByScope[scope]} and {slug} to {scopeString}; a machine scope needs exactly one WorkOS permission.");
                 }
             }
-            else if (!string.Equals(scopeString, UserImpersonation, StringComparison.Ordinal))
+            else if (!string.Equals(scopeString, UserScopes.Impersonation, StringComparison.Ordinal))
             {
                 failures.Add($"Auth:AuthKit:PermissionMap maps {slug} to '{value}', which is not exactly one of {KnownScopes}.");
             }

@@ -1,8 +1,5 @@
 using System.Net;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Federation;
 using _42.Platform.Storyteller.Api.ErrorHandling;
@@ -11,7 +8,6 @@ using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
@@ -35,20 +31,6 @@ public class FederationHttp
 
     // The Functions host serves every route below /api; host.json sets no other routePrefix.
     public const string RoutePrefix = "/api";
-
-    private const string RetryAfterSeconds = "5";
-
-    private static readonly JsonSerializerOptions TokenJsonOptions = new()
-    {
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
-    // RFC 8693 section 2.1 lets audience and resource repeat; any other parameter appears once (RFC 6749 section 3.2).
-    private static readonly HashSet<string> RepeatableParameters = new(StringComparer.OrdinalIgnoreCase)
-    {
-        MachineTokenRequest.AudienceName,
-        MachineTokenRequest.ResourceName,
-    };
 
     private static readonly HashSet<string> KnownParameters = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -334,14 +316,14 @@ public class FederationHttp
                 project,
                 error.Error,
                 error.ErrorDescription);
-            return await RespondAsync(request, HttpStatusCode.BadRequest, error);
+            return await OAuthTokenForm.RespondAsync(request, HttpStatusCode.BadRequest, error);
         }
 
         var result = await _tokenExchange.ExchangeAsync(tokenRequest!, cancellationToken);
 
         if (result.Succeeded)
         {
-            return await RespondAsync(request, HttpStatusCode.OK, new MachineTokenResponse
+            return await OAuthTokenForm.RespondAsync(request, HttpStatusCode.OK, new MachineTokenResponse
             {
                 AccessToken = result.AccessToken!,
                 IssuedTokenType = result.IssuedTokenType!,
@@ -352,16 +334,14 @@ public class FederationHttp
         }
 
         var body = new OAuthErrorResponse { Error = result.Error!, ErrorDescription = result.ErrorDescription };
-        return await RespondAsync(request, result.IsUnavailable ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.BadRequest, body);
+        return await OAuthTokenForm.RespondAsync(request, result.IsUnavailable ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.BadRequest, body);
     }
 
     // {PublicBaseUrl, or the request's scheme and host with /api}/v1/{organization}/{project}/access/token. Never from
     // X-Forwarded-Host: workloads send their platform tokens wherever this URL points.
     public static string GetTokenEndpoint(HttpRequestData request, FederationOptions options, string organization, string project)
     {
-        var baseUrl = string.IsNullOrWhiteSpace(options.PublicBaseUrl)
-            ? $"{request.Url.Scheme}://{request.Url.Authority}{RoutePrefix}"
-            : options.PublicBaseUrl.TrimEnd('/');
+        var baseUrl = OAuthTokenForm.GetApiBaseUrl(request, options);
         var route = Definitions.Routes.Access.V1.MachineToken
             .Replace($"{{{Definitions.Parameters.Organization}}}", Uri.EscapeDataString(organization), StringComparison.Ordinal)
             .Replace($"{{{Definitions.Parameters.Project}}}", Uri.EscapeDataString(project), StringComparison.Ordinal);
@@ -386,41 +366,14 @@ public class FederationHttp
         FederationOptions options,
         CancellationToken cancellationToken)
     {
-        // A bearer header would already have been validated as an API credential; the subject token is the credential.
-        if (request.Headers.Contains("Authorization"))
+        var (parameters, formError) = await OAuthTokenForm.ReadAsync(request, MaxTokenRequestBytes, KnownParameters, cancellationToken);
+
+        if (parameters is null)
         {
-            return Refuse("The token request must not carry an Authorization header.");
+            return Refuse(formError!);
         }
 
-        if (!IsFormContent(request.Headers))
-        {
-            return Refuse($"The content type must be {Definitions.ContentTypes.FormUrlEncoded}.");
-        }
-
-        var body = await ReadBodyAsync(request.Body, cancellationToken);
-
-        if (body is null)
-        {
-            return Refuse($"The request body exceeds {MaxTokenRequestBytes} bytes.");
-        }
-
-        // An empty value counts as absent (RFC 6749 section 3.2).
-        var parameters = QueryHelpers.ParseQuery(body)
-            .Select(parameter => (Name: parameter.Key, Values: parameter.Value.Where(value => !string.IsNullOrEmpty(value)).Select(value => value!).ToArray()))
-            .Where(parameter => parameter.Values.Length > 0)
-            .ToDictionary(parameter => parameter.Name, parameter => parameter.Values, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var (name, values) in parameters)
-        {
-            if (values.Length > 1 && !RepeatableParameters.Contains(name))
-            {
-                return Refuse(KnownParameters.Contains(name)
-                    ? $"The parameter {name.ToLowerInvariant()} is given more than once."
-                    : "A parameter is given more than once.");
-            }
-        }
-
-        var grantType = GetSingle(parameters, MachineTokenRequest.GrantTypeName);
+        var grantType = OAuthTokenForm.GetSingle(parameters, MachineTokenRequest.GrantTypeName);
 
         if (grantType is null)
         {
@@ -432,14 +385,14 @@ public class FederationHttp
             return Refuse("Only the token exchange grant type is supported.", OAuthTokenExchange.Errors.UnsupportedGrantType);
         }
 
-        var subjectToken = GetSingle(parameters, MachineTokenRequest.SubjectTokenName);
+        var subjectToken = OAuthTokenForm.GetSingle(parameters, MachineTokenRequest.SubjectTokenName);
 
         if (subjectToken is null)
         {
             return Missing(MachineTokenRequest.SubjectTokenName);
         }
 
-        var subjectTokenType = GetSingle(parameters, MachineTokenRequest.SubjectTokenTypeName);
+        var subjectTokenType = OAuthTokenForm.GetSingle(parameters, MachineTokenRequest.SubjectTokenTypeName);
 
         if (subjectTokenType is null)
         {
@@ -451,7 +404,7 @@ public class FederationHttp
             return Refuse("The subject token type is not supported.");
         }
 
-        var clientId = GetSingle(parameters, MachineTokenRequest.ClientIdName);
+        var clientId = OAuthTokenForm.GetSingle(parameters, MachineTokenRequest.ClientIdName);
 
         if (clientId is null)
         {
@@ -463,14 +416,14 @@ public class FederationHttp
             return Refuse("Actor tokens are not supported.");
         }
 
-        var targets = GetAll(parameters, MachineTokenRequest.AudienceName).Concat(GetAll(parameters, MachineTokenRequest.ResourceName));
+        var targets = OAuthTokenForm.GetAll(parameters, MachineTokenRequest.AudienceName).Concat(OAuthTokenForm.GetAll(parameters, MachineTokenRequest.ResourceName));
 
         if (targets.Any(target => !string.Equals(target, options.Audience, StringComparison.Ordinal)))
         {
             return Refuse("The audience or resource is not this API.", OAuthTokenExchange.Errors.InvalidTarget);
         }
 
-        var requestedTokenType = GetSingle(parameters, MachineTokenRequest.RequestedTokenTypeName) ?? OAuthTokenExchange.TokenTypes.AccessToken;
+        var requestedTokenType = OAuthTokenForm.GetSingle(parameters, MachineTokenRequest.RequestedTokenTypeName) ?? OAuthTokenExchange.TokenTypes.AccessToken;
 
         if (!RequestedTokenTypes.Contains(requestedTokenType, StringComparer.Ordinal))
         {
@@ -478,9 +431,9 @@ public class FederationHttp
         }
 
         // Only the syntax here; the subset of the machine's scopes is checked once the machine is known.
-        var scope = GetSingle(parameters, MachineTokenRequest.ScopeName);
+        var scope = OAuthTokenForm.GetSingle(parameters, MachineTokenRequest.ScopeName);
 
-        if (scope is not null && !IsScopeSyntax(scope))
+        if (scope is not null && !OAuthTokenExchange.IsScopeSyntax(scope))
         {
             return Refuse("The parameter scope is malformed.", OAuthTokenExchange.Errors.InvalidScope);
         }
@@ -507,76 +460,6 @@ public class FederationHttp
     private static (FederatedTokenExchangeRequest? Request, OAuthErrorResponse? Error) Missing(string name)
     {
         return Refuse($"The parameter {name} is missing.");
-    }
-
-    private static string? GetSingle(Dictionary<string, string[]> parameters, string name)
-    {
-        return parameters.TryGetValue(name, out var values) ? values[0] : null;
-    }
-
-    private static string[] GetAll(Dictionary<string, string[]> parameters, string name)
-    {
-        return parameters.TryGetValue(name, out var values) ? values : [];
-    }
-
-    // RFC 6749 section 3.3: scope-tokens of %x21 / %x23-5B / %x5D-7E, separated by single spaces.
-    private static bool IsScopeSyntax(string scope)
-    {
-        return scope.Split(' ').All(token => token.Length > 0
-            && token.All(character => character is '\x21' or (>= '\x23' and <= '\x5B') or (>= '\x5D' and <= '\x7E')));
-    }
-
-    // One Content-Type of application/x-www-form-urlencoded; parameters such as charset are allowed.
-    private static bool IsFormContent(HttpHeadersCollection headers)
-    {
-        if (!headers.TryGetValues("Content-Type", out var values))
-        {
-            return false;
-        }
-
-        var contentTypes = values.ToList();
-
-        return contentTypes.Count == 1
-            && MediaTypeHeaderValue.TryParse(contentTypes[0], out var mediaType)
-            && string.Equals(mediaType.MediaType, Definitions.ContentTypes.FormUrlEncoded, StringComparison.OrdinalIgnoreCase);
-    }
-
-    // Null when the body is longer than MaxTokenRequestBytes; nothing beyond one more byte is read.
-    private static async Task<string?> ReadBodyAsync(Stream body, CancellationToken cancellationToken)
-    {
-        var buffer = new byte[MaxTokenRequestBytes + 1];
-        var length = 0;
-
-        while (length < buffer.Length)
-        {
-            var read = await body.ReadAsync(buffer.AsMemory(length), cancellationToken);
-
-            if (read == 0)
-            {
-                break;
-            }
-
-            length += read;
-        }
-
-        return length > MaxTokenRequestBytes ? null : Encoding.UTF8.GetString(buffer, 0, length);
-    }
-
-    // OAuth responses go out as they are, not through ErrorResponse, and are never cached (RFC 6749 section 5.1).
-    private static async Task<HttpResponseData> RespondAsync(HttpRequestData request, HttpStatusCode statusCode, object body)
-    {
-        var response = request.CreateResponse(statusCode);
-        response.Headers.Add("Content-Type", "application/json; charset=utf-8");
-        response.Headers.Add("Cache-Control", "no-store");
-        response.Headers.Add("Pragma", "no-cache");
-
-        if (statusCode == HttpStatusCode.ServiceUnavailable)
-        {
-            response.Headers.Add("Retry-After", RetryAfterSeconds);
-        }
-
-        await response.WriteBytesAsync(JsonSerializer.SerializeToUtf8Bytes(body, body.GetType(), TokenJsonOptions));
-        return response;
     }
 
     private static BadRequestObjectResult InvalidFederation(string message)

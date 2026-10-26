@@ -49,6 +49,9 @@ public static class EntryPoint
         services.TryAddSingleton<EntraIdBearerTokenValidator>();
         services.AddSingleton<IBearerTokenValidator>(provider => provider.GetRequiredService<EntraIdBearerTokenValidator>());
 
+        // Subject tokens of the user token exchange, with the bearer validator's signing keys.
+        services.TryAddSingleton<IUserSubjectTokenValidator, EntraIdUserSubjectTokenValidator>();
+
         // The start log notes that users are keyed by {tid}:{oid}, once per host also when this runs twice.
         services.AddHostedService<EntraIdAccountIdNotice>();
         return services;

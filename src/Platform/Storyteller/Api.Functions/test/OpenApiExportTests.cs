@@ -77,11 +77,14 @@ public class OpenApiExportTests
         Definitions.RouteIds.KeyValues.GetKeyValueUsage,
     ];
 
-    // Without a bearer token: the token exchange, the public CA certificate and the sign-in configuration are anonymous,
-    // and a machine renews its certificate with the certificate itself.
+    // Without a bearer token: the token exchanges, the discovery of the Storyteller issuer, the public CA certificate and
+    // the sign-in configuration are anonymous, and a machine renews its certificate with the certificate itself.
     private static readonly string[] AnonymousOperations =
     [
         Definitions.RouteIds.Access.ExchangeMachineToken,
+        Definitions.RouteIds.Access.ExchangeUserToken,
+        Definitions.RouteIds.Access.GetAuthorizationServerMetadata,
+        Definitions.RouteIds.Access.GetJsonWebKeySet,
         Definitions.RouteIds.Access.GetCertificateAuthority,
         Definitions.RouteIds.Access.GetAuthConfiguration,
         Definitions.RouteIds.Access.RenewMachineCertificate,
@@ -241,6 +244,107 @@ public class OpenApiExportTests
 
         PropertyNames(schemas, "FederatedIssuer").ShouldContain("RequiredClaims");
         PropertyNames(schemas, "MachineAccess").ShouldContain("FederationRules");
+    }
+
+    // The user token exchange speaks OAuth like the machine one: a form of string members only, which the generated C#
+    // client sends through a string dictionary, and snake_case JSON that names the actor's restrictions.
+    [Fact]
+    public async Task Document_UserTokenExchange_UsesTheOAuthFormAndSnakeCaseModels()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+
+        PropertyNames(schemas, "UserTokenRequest").ShouldBe(
+            [
+                "grant_type",
+                "subject_token",
+                "subject_token_type",
+                "actor_token",
+                "actor_token_type",
+                "client_assertion",
+                "client_assertion_type",
+                "client_id",
+                "client_secret",
+                "audience",
+                "resource",
+                "scope",
+                "requested_token_type",
+            ],
+            ignoreOrder: true);
+        RequiredNames(schemas, "UserTokenRequest").ShouldBe(["grant_type", "subject_token", "subject_token_type", "client_id"], ignoreOrder: true);
+        schemas.GetProperty("UserTokenRequest").GetProperty("properties").EnumerateObject()
+            .Where(property => property.Value.GetProperty("type").GetString() != "string")
+            .Select(property => property.Name)
+            .ShouldBeEmpty("every form member is a string");
+        PropertyNames(schemas, "UserTokenResponse").ShouldBe(["access_token", "issued_token_type", "token_type", "expires_in", "scope", "restrictions"], ignoreOrder: true);
+        RequiredNames(schemas, "UserTokenResponse").ShouldBe(["access_token", "issued_token_type", "token_type", "expires_in", "scope", "restrictions"], ignoreOrder: true);
+        var restrictions = schemas.GetProperty("UserTokenResponse").GetProperty("properties").GetProperty("restrictions");
+        restrictions.GetProperty("type").GetString().ShouldBe("array");
+        restrictions.GetProperty("items").GetProperty("type").GetString().ShouldBe("string");
+
+        var (path, method, exchange) = PathOperation(document, Definitions.RouteIds.Access.ExchangeUserToken);
+        $"{method.ToUpperInvariant()} {path}".ShouldBe("POST /v1/access/token");
+        exchange.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access]);
+        var body = exchange.GetProperty("requestBody").GetProperty("content");
+        body.EnumerateObject().Select(content => content.Name).ShouldBe([Definitions.ContentTypes.FormUrlEncoded]);
+        body.GetProperty(Definitions.ContentTypes.FormUrlEncoded).GetProperty("schema").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/UserTokenRequest");
+        Reference(exchange, "200").ShouldBe("#/components/schemas/UserTokenResponse");
+        Reference(exchange, "400").ShouldBe("#/components/schemas/OAuthErrorResponse");
+        Reference(exchange, "503").ShouldBe("#/components/schemas/OAuthErrorResponse");
+
+        // Anonymous: no security requirement and no 403.
+        (exchange.TryGetProperty("security", out var security) && security.GetArrayLength() > 0).ShouldBeFalse();
+        exchange.GetProperty("responses").TryGetProperty("403", out _).ShouldBeFalse();
+
+        // The machine exchange keeps its own models.
+        PropertyNames(schemas, "MachineTokenResponse").ShouldNotContain("restrictions");
+    }
+
+    // The discovery of the Storyteller issuer under the API base: anonymous, in RFC names. The JWK is a model of its own,
+    // so the RsaJsonWebKey of client encryption keeps its names.
+    [Fact]
+    public async Task Document_Discovery_PublishesTheMetadataAndTheJwksUnderTheApiBase()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+
+        foreach (var (routeId, expectedPath, schema) in new[]
+                 {
+                     (Definitions.RouteIds.Access.GetAuthorizationServerMetadata, "/.well-known/oauth-authorization-server", "AuthorizationServerMetadata"),
+                     (Definitions.RouteIds.Access.GetJsonWebKeySet, "/.well-known/jwks.json", "PublicJsonWebKeySet"),
+                 })
+        {
+            var (path, method, operation) = PathOperation(document, routeId);
+            $"{method.ToUpperInvariant()} {path}".ShouldBe($"GET {expectedPath}", routeId);
+            operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access], routeId);
+            Reference(operation, "200").ShouldBe($"#/components/schemas/{schema}", routeId);
+            (operation.TryGetProperty("security", out var security) && security.GetArrayLength() > 0).ShouldBeFalse(routeId);
+            operation.GetProperty("responses").TryGetProperty("403", out _).ShouldBeFalse(routeId);
+        }
+
+        PropertyNames(schemas, "AuthorizationServerMetadata").ShouldBe(
+            [
+                "issuer",
+                "token_endpoint",
+                "jwks_uri",
+                "response_types_supported",
+                "grant_types_supported",
+                "token_endpoint_auth_methods_supported",
+                "token_endpoint_auth_signing_alg_values_supported",
+            ],
+            ignoreOrder: true);
+        PropertyNames(schemas, "PublicJsonWebKeySet").ShouldBe(["keys"]);
+        schemas.GetProperty("PublicJsonWebKeySet").GetProperty("properties").GetProperty("keys").GetProperty("items").GetProperty("$ref").GetString()
+            .ShouldBe("#/components/schemas/PublicJsonWebKey");
+        PropertyNames(schemas, "PublicJsonWebKey").ShouldBe(["kty", "kid", "use", "alg", "n", "e"], ignoreOrder: true);
+        PropertyNames(schemas, "RsaJsonWebKey").ShouldBe(["Kty", "N", "E"], ignoreOrder: true);
+
+        // v1/auth/configuration tells clients whether the exchange is on.
+        schemas.GetProperty("AuthConfiguration").GetProperty("properties").GetProperty("TokenExchange").GetProperty("$ref").GetString()
+            .ShouldBe("#/components/schemas/TokenExchangeConfiguration");
+        PropertyNames(schemas, "TokenExchangeConfiguration").ShouldBe(["Enabled"]);
     }
 
     // The scopes of a machine (424-79): one list on the create model and the machine, of one shared enum of the 11
@@ -494,6 +598,20 @@ public class OpenApiExportTests
     private static List<string?> RequiredNames(JsonElement schemas, string schema)
     {
         return schemas.GetProperty(schema).GetProperty("required").EnumerateArray().Select(name => name.GetString()).ToList();
+    }
+
+    private static (string Path, string Method, JsonElement Operation) PathOperation(JsonDocument document, string operationId)
+    {
+        return document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject().Select(operation => (Path: path.Name, Method: operation.Name, Operation: operation.Value)))
+            .Single(operation => operation.Operation.GetProperty("operationId").GetString() == operationId);
+    }
+
+    // The schema of a JSON response.
+    private static string? Reference(JsonElement operation, string status)
+    {
+        return operation.GetProperty("responses").GetProperty(status).GetProperty("content").GetProperty(Definitions.ContentTypes.Json)
+            .GetProperty("schema").GetProperty("$ref").GetString();
     }
 
     private static JsonElement Operation(JsonDocument document, string operationId)

@@ -146,6 +146,72 @@ public class AuthConfigurationHttpTests
         json.ShouldNotContain("storyteller-api");
     }
 
+    // Spec 5: clients see whether actors may exchange user tokens, for every provider; off without the settings.
+    [Theory]
+    [InlineData(IdentityProviderKind.EntraId)]
+    [InlineData(IdentityProviderKind.AuthKit)]
+    [InlineData(IdentityProviderKind.Keycloak)]
+    public void Describe_TellsWhetherTheTokenExchangeIsEnabled(IdentityProviderKind provider)
+    {
+        var options = new UserAuthenticationOptions
+        {
+            Provider = provider,
+            ClientId = "client-id",
+            AuthKit = new AuthKitOptions { ClientId = "client_123" },
+            Keycloak = new KeycloakUserOptions { Issuer = "https://keycloak.example/realms/storyteller", Audience = "storyteller-api" },
+        };
+
+        AuthConfigurationHttp.Describe(options).TokenExchange.Enabled.ShouldBeFalse();
+        AuthConfigurationHttp.Describe(options, new TokenExchangeOptions()).TokenExchange.Enabled.ShouldBeFalse();
+        AuthConfigurationHttp.Describe(options, new TokenExchangeOptions { Enabled = true }).TokenExchange.Enabled.ShouldBeTrue();
+    }
+
+    // Only the flag: who may act for users stays in the configuration.
+    [Fact]
+    public void Describe_NeverExposesTheActorsOrTheAdditionalIssuers()
+    {
+        var configuration = AuthConfigurationHttp.Describe(
+            new UserAuthenticationOptions { Provider = IdentityProviderKind.AuthKit, AuthKit = new AuthKitOptions { ClientId = "client_123" } },
+            new TokenExchangeOptions
+            {
+                Enabled = true,
+                AdditionalIssuers = [new TokenExchangeIssuerOptions { Issuer = "https://auth.example.com", JwksUri = "https://auth.example.com/oauth2/jwks" }],
+                Actors =
+                [
+                    new TokenExchangeActorOptions
+                    {
+                        Id = "mcp-actor",
+                        Authentication = new ActorAuthenticationOptions { ClientSecretHash = new string('a', 64) },
+                        SubjectAudiences = ["https://mcp.example/mcp"],
+                        AllowedClientIds = ["client_mcp"],
+                    },
+                ],
+            });
+
+        var json = JsonSerializer.Serialize(configuration);
+
+        json.ShouldContain("\"TokenExchange\":{\"Enabled\":true}");
+        json.ShouldNotContain("mcp-actor");
+        json.ShouldNotContain("aaaaaaaa");
+        json.ShouldNotContain("mcp.example");
+        json.ShouldNotContain("client_mcp");
+        json.ShouldNotContain("auth.example.com");
+    }
+
+    [Fact]
+    public void GetAuthConfiguration_ReportsTheTokenExchangeOfItsOptions()
+    {
+        var function = new AuthConfigurationHttp(
+            Options.Create(new UserAuthenticationOptions { Provider = IdentityProviderKind.EntraId, ClientId = "client-id" }),
+            Options.Create(new TokenExchangeOptions { Enabled = true }));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var (_, request) = FunctionTestDoubles.CreateRequest(services);
+
+        var result = function.GetAuthConfiguration(request);
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<AuthConfiguration>().TokenExchange.Enabled.ShouldBeTrue();
+    }
+
     [Fact]
     public void GetAuthConfiguration_ReturnsOkWithTheDescription()
     {

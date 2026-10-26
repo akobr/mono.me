@@ -3,7 +3,6 @@ using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Federation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller;
@@ -26,11 +25,9 @@ public class SubjectTokenVerifier
         SecurityAlgorithms.EcdsaSha512,
     ];
 
-    private readonly FederatedIssuerKeyResolver _keyResolver;
+    private readonly IssuerTokenVerifier _tokenVerifier;
     private readonly IOptions<FederationOptions> _options;
-    private readonly TimeProvider _timeProvider;
     private readonly ILogger<SubjectTokenVerifier> _logger;
-    private readonly JsonWebTokenHandler _handler = new() { MapInboundClaims = false };
 
     public SubjectTokenVerifier(
         FederatedIssuerKeyResolver keyResolver,
@@ -38,9 +35,8 @@ public class SubjectTokenVerifier
         TimeProvider timeProvider,
         ILogger<SubjectTokenVerifier> logger)
     {
-        _keyResolver = keyResolver;
+        _tokenVerifier = new IssuerTokenVerifier(keyResolver, timeProvider);
         _options = options;
-        _timeProvider = timeProvider;
         _logger = logger;
     }
 
@@ -63,6 +59,13 @@ public class SubjectTokenVerifier
         if (!UnverifiedJwt.TryRead(subjectToken, options.MaxSubjectTokenBytes, out var token, out var formError))
         {
             LogRefusal(machine, null, formError);
+            return null;
+        }
+
+        // Storyteller's own tokens never become machine tokens, even through a trusted issuer stored before that was refused.
+        if (FederationValidation.IsOwnIssuer(token.Issuer, options))
+        {
+            LogRefusal(machine, null, "the token is a Storyteller token");
             return null;
         }
 
@@ -137,50 +140,30 @@ public class SubjectTokenVerifier
         CancellationToken cancellationToken)
     {
         var issuer = group[0].Issuer!;
-        var keys = await _keyResolver.GetKeysAsync(organization, project, issuer, cancellationToken);
-
-        if (keys is null)
-        {
-            LogRefusal(machine, issuer, "the trusted issuer is misconfigured");
-            return GroupOutcome.Refused;
-        }
-
         var audiences = group.Select(candidate => candidate.Rule.Audience).Distinct(StringComparer.Ordinal).ToList();
-        var result = await ValidateAsync(subjectToken, issuer, keys, audiences, options);
 
-        if (result.Exception is SecurityTokenSignatureKeyNotFoundException)
+        // A platform token has one aud, an iat and a short life: the issuer's maximum, else an hour.
+        var policy = new IssuerTokenPolicy(
+            audiences,
+            TimeSpan.FromSeconds(options.ClockSkewSeconds),
+            RequireSingleAudience: true,
+            RequireIssuedAt: true,
+            MaxLifetimeSeconds: issuer.MaxTokenLifetimeSeconds ?? FederationValidation.DefaultMaxTokenLifetimeSeconds);
+        var verification = await _tokenVerifier.VerifyAsync(subjectToken, token, organization, project, issuer, policy, cancellationToken);
+
+        if (!verification.IsValid)
         {
-            var refreshed = await _keyResolver.RefreshForUnknownKeyAsync(organization, project, issuer, keys, cancellationToken);
-
-            if (refreshed is null)
-            {
-                LogRefusal(machine, issuer, "the token's kid is not in the issuer's key set");
-                return GroupOutcome.Refused;
-            }
-
-            result = await ValidateAsync(subjectToken, issuer, refreshed, audiences, options);
-
-            // Just fetched, so the issuer may still be publishing the key: retry later.
-            if (result.Exception is SecurityTokenSignatureKeyNotFoundException)
-            {
-                throw new BearerKeyRetrievalException($"The trusted issuer {issuer.Name} did not publish the key {token.KeyId}.");
-            }
+            LogRefusal(machine, issuer, verification.RefusalReason);
+            return verification.SignatureVerified ? GroupOutcome.VerifiedWithoutMatch : GroupOutcome.Refused;
         }
 
-        if (!result.IsValid)
+        if (IssuerTokenVerifier.GetString(token.Payload, "sub") is not { } subject)
         {
-            LogRefusal(machine, issuer, $"the token did not validate ({result.Exception?.GetType().Name})");
-            return GroupOutcome.Refused;
-        }
-
-        if (CheckVerifiedToken(token.Payload, issuer, options) is { } tokenError)
-        {
-            LogRefusal(machine, issuer, tokenError);
+            LogRefusal(machine, issuer, "the token has no sub");
             return GroupOutcome.VerifiedWithoutMatch;
         }
 
-        var audience = GetSingleAudience(token.Payload)!;
-        var subject = token.Payload.GetProperty("sub").GetString()!;
+        var audience = IssuerTokenVerifier.GetSingleAudience(token.Payload)!;
 
         foreach (var candidate in group)
         {
@@ -203,79 +186,6 @@ public class SubjectTokenVerifier
         return GroupOutcome.VerifiedWithoutMatch;
     }
 
-    private async Task<TokenValidationResult> ValidateAsync(
-        string subjectToken,
-        FederatedIssuer issuer,
-        FederatedIssuerKeys keys,
-        IReadOnlyList<string> audiences,
-        FederationOptions options)
-    {
-        var clockSkew = TimeSpan.FromSeconds(options.ClockSkewSeconds);
-
-        return await _handler.ValidateTokenAsync(subjectToken, new TokenValidationParameters
-        {
-            IssuerSigningKeys = keys.Keys,
-            TryAllIssuerSigningKeys = false,
-            RequireSignedTokens = true,
-            ValidAlgorithms = AllowedAlgorithms,
-            ValidateIssuer = true,
-            IssuerValidator = (tokenIssuer, _, _) => string.Equals(tokenIssuer, issuer.Issuer, StringComparison.Ordinal)
-                ? tokenIssuer
-                : throw new SecurityTokenInvalidIssuerException("The issuer is not the trusted issuer."),
-            ValidateAudience = true,
-            RequireAudience = true,
-            ValidAudiences = audiences,
-            IgnoreTrailingSlashWhenValidatingAudience = false,
-            ValidateLifetime = true,
-            RequireExpirationTime = true,
-            ClockSkew = clockSkew,
-            LifetimeValidator = TokenLifetime.CreateValidator(_timeProvider, clockSkew),
-        });
-    }
-
-    // The checks the handler doesn't make, on the verified payload. Null when they pass, else why not.
-    private string? CheckVerifiedToken(JsonElement payload, FederatedIssuer issuer, FederationOptions options)
-    {
-        // A token minted for several relying parties may be replayed by any of them.
-        if (GetSingleAudience(payload) is null)
-        {
-            return "the token has not exactly one audience";
-        }
-
-        if (!payload.TryGetProperty("iat", out var issuedAtValue) || !issuedAtValue.TryGetDouble(out var issuedAt))
-        {
-            return "the token has no iat";
-        }
-
-        if (!payload.TryGetProperty("exp", out var expiresValue) || !expiresValue.TryGetDouble(out var expires))
-        {
-            return "the token has no exp";
-        }
-
-        var now = _timeProvider.GetUtcNow().ToUnixTimeSeconds();
-
-        if (issuedAt > now + options.ClockSkewSeconds)
-        {
-            return "the token was issued in the future";
-        }
-
-        var maxLifetime = issuer.MaxTokenLifetimeSeconds ?? FederationValidation.DefaultMaxTokenLifetimeSeconds;
-
-        if (expires - issuedAt > maxLifetime)
-        {
-            return $"the token lives longer than {maxLifetime} seconds";
-        }
-
-        if (!payload.TryGetProperty("sub", out var subject)
-            || subject.ValueKind != JsonValueKind.String
-            || string.IsNullOrEmpty(subject.GetString()))
-        {
-            return "the token has no sub";
-        }
-
-        return null;
-    }
-
     private static string? FindRuleMismatch(FederationRule rule, FederatedIssuer issuer, JsonElement payload, string audience, string subject)
     {
         if (!string.Equals(rule.Audience, audience, StringComparison.Ordinal))
@@ -296,22 +206,6 @@ public class SubjectTokenVerifier
         return FederationClaimMatcher.FindMismatch(payload, issuer.RequiredClaims) is { } required
             ? $"the required claim {required} of the issuer"
             : null;
-    }
-
-    // A string or a one-element array of a string.
-    private static string? GetSingleAudience(JsonElement payload)
-    {
-        if (!payload.TryGetProperty("aud", out var audience))
-        {
-            return null;
-        }
-
-        if (audience.ValueKind == JsonValueKind.Array && audience.GetArrayLength() == 1)
-        {
-            audience = audience[0];
-        }
-
-        return audience.ValueKind == JsonValueKind.String ? audience.GetString() : null;
     }
 
     private void LogRefusal(MachineAccess machine, FederatedIssuer? issuer, string reason)

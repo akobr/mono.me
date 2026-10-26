@@ -91,6 +91,14 @@ public static partial class FederationValidation
             return $"The issuer can have at most {MaxIssuerLength} characters.";
         }
 
+        // Storyteller's own tokens (machine tokens, and user tokens of the exchange) are never subject tokens: a user token
+        // with an actor would become a machine token without the actor's restrictions, and a machine token of one project
+        // a machine of another.
+        if (IsOwnIssuer(issuer.Issuer, options))
+        {
+            return $"The issuer {issuer.Issuer} is Storyteller itself; its tokens cannot be exchanged for machine tokens.";
+        }
+
         // Only a discovered issuer is fetched; with JwksUri or Jwks it is just compared with `iss`.
         if (issuer.KeySource == FederatedIssuerKeySource.Discovery
             && ValidateMetadataUrl(issuer.Issuer, options.AllowPrivateNetworks, allowQuery: false) is { } issuerError)
@@ -120,6 +128,16 @@ public static partial class FederationValidation
         }
 
         return null;
+    }
+
+    // True when issuer is MachineAuth:Federation:Issuer, ignoring case and one trailing '/'. False while that is not set.
+    public static bool IsOwnIssuer(string? issuer, FederationOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        return !string.IsNullOrEmpty(issuer)
+            && !string.IsNullOrEmpty(options.Issuer)
+            && string.Equals(TrimOneTrailingSlash(issuer), TrimOneTrailingSlash(options.Issuer), StringComparison.OrdinalIgnoreCase);
     }
 
     // Null when the issuer can be stored next to the project's current issuers: an existing name keeps its Issuer

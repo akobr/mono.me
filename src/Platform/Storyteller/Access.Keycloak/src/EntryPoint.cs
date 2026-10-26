@@ -36,7 +36,11 @@ public static class EntryPoint
         services.AddUserAuthenticationOptions(configuration);
         services.TryAddSingleton<KeycloakClaimNormalizer>();
         services.AddSingleton<IBearerClaimsNormalizer>(provider => provider.GetRequiredService<KeycloakClaimNormalizer>());
-        services.AddSingleton<IBearerTokenValidator, KeycloakBearerTokenValidator>();
+
+        // One instance (one realm metadata manager) for API routes and the subject tokens of the user token exchange.
+        services.TryAddSingleton<KeycloakBearerTokenValidator>();
+        services.AddSingleton<IBearerTokenValidator>(provider => provider.GetRequiredService<KeycloakBearerTokenValidator>());
+        services.TryAddSingleton<IUserSubjectTokenValidator, KeycloakUserSubjectTokenValidator>();
         return services;
     }
 }

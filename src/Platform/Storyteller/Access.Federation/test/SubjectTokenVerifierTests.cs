@@ -451,6 +451,30 @@ public sealed class SubjectTokenVerifierTests : IDisposable
         (await VerifyAsync(_rsa.Sign(Payload()), Machine(Rule("deleted"), Rule()), Issuer())).ShouldNotBeNull();
     }
 
+    // A trusted issuer stored before Storyteller's own issuer was refused, with its published keys: a user token of the
+    // exchange (act, restrictions) never becomes a machine token.
+    [Theory]
+    [InlineData("urn:storyteller:test")]
+    [InlineData("urn:storyteller:test/")]
+    public async Task StorytellerToken_IsRefusedEvenByATrustedIssuerOfStoryteller(string issuer)
+    {
+        var payload = Payload("user_01");
+        payload["iss"] = issuer;
+        payload["aud"] = _options.Audience;
+        payload["token_use"] = "user";
+        payload["act"] = new Dictionary<string, object> { ["sub"] = "mcp" };
+        payload["restrictions"] = new[] { ActorRestrictions.NoSecretReveal };
+        var rule = new FederationRule { Issuer = "storyteller", Audience = _options.Audience, Subject = "user_01" };
+
+        (await VerifyAsync(_rsa.Sign(payload), Machine(rule), Issuer("storyteller", issuer))).ShouldBeNull();
+
+        _logger.Entries.ShouldContain(entry => entry.Message.Contains("the token is a Storyteller token"));
+
+        // The same token of another issuer matches, so only the issuer refuses it.
+        payload["iss"] = "urn:storyteller:copy";
+        (await VerifyAsync(_rsa.Sign(payload), Machine(rule), Issuer("storyteller", "urn:storyteller:copy"))).ShouldNotBeNull();
+    }
+
     private static MachineAccess Machine(params FederationRule[] rules)
     {
         var id = Guid.NewGuid().ToString("D");

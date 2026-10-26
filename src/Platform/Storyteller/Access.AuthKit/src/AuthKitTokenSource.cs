@@ -69,6 +69,17 @@ internal sealed class AuthKitTokenSource
     // Null when the token is not valid for this source.
     public async Task<List<Claim>?> ValidateAsync(string rawToken, CancellationToken cancellationToken)
     {
+        var result = await ValidateTokenAsync(rawToken, Audience is null ? null : [Audience], cancellationToken);
+        return result.IsValid ? result.ClaimsIdentity.Claims.ToList() : null;
+    }
+
+    // The source's keys, issuer and lifetime rules with the given audiences (null: aud is not checked); the result keeps
+    // the reason of a refusal. Throws BearerKeyRetrievalException when the key set cannot be retrieved.
+    public async Task<TokenValidationResult> ValidateTokenAsync(
+        string rawToken,
+        IReadOnlyCollection<string>? audiences,
+        CancellationToken cancellationToken)
+    {
         JsonWebKeySet keySet;
 
         try
@@ -92,8 +103,8 @@ internal sealed class AuthKitTokenSource
             IssuerValidator = (issuer, _, _) => IssuerMatches(issuer, Issuer)
                 ? issuer
                 : throw new SecurityTokenInvalidIssuerException($"Invalid issuer: {issuer}"),
-            ValidateAudience = Audience is not null,
-            ValidAudience = Audience,
+            ValidateAudience = audiences is not null,
+            ValidAudiences = audiences,
             ValidateLifetime = true,
             RequireExpirationTime = true,
             ClockSkew = ClockSkew,
@@ -101,17 +112,12 @@ internal sealed class AuthKitTokenSource
 
         var result = await _handler.ValidateTokenAsync(rawToken, validationParameters);
 
-        if (!result.IsValid)
+        if (!result.IsValid && result.Exception is SecurityTokenSignatureKeyNotFoundException)
         {
-            if (result.Exception is SecurityTokenSignatureKeyNotFoundException)
-            {
-                // A rotated key: the next request fetches the key set again (rate limited by the manager).
-                Keys.RequestRefresh();
-            }
-
-            return null;
+            // A rotated key: the next request fetches the key set again (rate limited by the manager).
+            Keys.RequestRefresh();
         }
 
-        return result.ClaimsIdentity.Claims.ToList();
+        return result;
     }
 }

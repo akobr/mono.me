@@ -109,21 +109,7 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
 
         try
         {
-            // The singleton manager keeps one snapshot of the signing keys. An unknown kid is
-            // how a rollover shows up in that snapshot. Ask for a refresh and try the new set once.
-            // The manager's RefreshInterval stops a made-up kid from fetching metadata on every call.
-            var configuration = await _configurationManager.GetConfigurationAsync(cancellationToken);
-
-            try
-            {
-                return Validate(handler, rawToken, configuration);
-            }
-            catch (SecurityTokenSignatureKeyNotFoundException)
-            {
-                _configurationManager.RequestRefresh();
-                configuration = await _configurationManager.GetConfigurationAsync(cancellationToken);
-                return Validate(handler, rawToken, configuration);
-            }
+            return await ValidateWithSigningKeysAsync(configuration => Validate(handler, rawToken, configuration), cancellationToken);
         }
         catch (SecurityTokenException)
         {
@@ -132,14 +118,6 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
         catch (ArgumentException)
         {
             return null;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or IOException or OperationCanceledException)
-        {
-            throw new BearerKeyRetrievalException("The OpenID signing keys could not be retrieved.", exception);
         }
     }
 
@@ -171,6 +149,39 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
         }
 
         return keyed;
+    }
+
+    // Runs validate with the signing keys of the tenant's metadata; EntraIdUserSubjectTokenValidator shares them. The
+    // validation exceptions of validate reach the caller. Throws BearerKeyRetrievalException when the keys cannot be
+    // retrieved.
+    internal async Task<T> ValidateWithSigningKeysAsync<T>(Func<OpenIdConnectConfiguration, T> validate, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // The singleton manager keeps one snapshot of the signing keys. An unknown kid is
+            // how a rollover shows up in that snapshot. Ask for a refresh and try the new set once.
+            // The manager's RefreshInterval stops a made-up kid from fetching metadata on every call.
+            var configuration = await _configurationManager.GetConfigurationAsync(cancellationToken);
+
+            try
+            {
+                return validate(configuration);
+            }
+            catch (SecurityTokenSignatureKeyNotFoundException)
+            {
+                _configurationManager.RequestRefresh();
+                configuration = await _configurationManager.GetConfigurationAsync(cancellationToken);
+                return validate(configuration);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException or IOException or OperationCanceledException)
+        {
+            throw new BearerKeyRetrievalException("The OpenID signing keys could not be retrieved.", exception);
+        }
     }
 
     private BearerValidationResult? Validate(JwtSecurityTokenHandler handler, string rawToken, OpenIdConnectConfiguration configuration)
