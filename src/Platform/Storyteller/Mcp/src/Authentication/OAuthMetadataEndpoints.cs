@@ -7,11 +7,13 @@ using ModelContextProtocol.Authentication;
 
 namespace _42.Platform.Storyteller.Mcp.Authentication;
 
-// The two discovery documents MCP clients read before they sign in. Both are built from the options, so every URL is
-// right behind a TLS-terminating proxy.
-// - Protected resource metadata (RFC 9728): the resource, its scope and the authorization server.
-// - Authorization server metadata (RFC 8414) on the host's own origin: Entra's endpoints, plus the facts MCP clients
-//   require and Entra's own metadata does not publish (PKCE with S256). Entra issues every token.
+// The discovery documents MCP clients read before they sign in. They are built from the options, so every URL is right
+// behind a TLS-terminating proxy.
+// - Protected resource metadata (RFC 9728): the resource, its scope and the authorization server: the AuthKit domain
+//   or the Keycloak realm, which publish their own metadata, or under Entra ID the host itself.
+// - Authorization server metadata (RFC 8414) on the host's own origin, under Entra ID only: Entra's endpoints, plus the
+//   facts MCP clients require and Entra's own metadata does not publish (PKCE with S256). Entra issues every token.
+//   Under the other providers the path answers 404.
 public static class OAuthMetadataEndpoints
 {
     public const string ResourceName = "2S Platform";
@@ -35,7 +37,7 @@ public static class OAuthMetadataEndpoints
         return new ProtectedResourceMetadata
         {
             Resource = settings.ResourceUrl,
-            AuthorizationServers = [settings.Origin],
+            AuthorizationServers = [settings.AuthorizationServer],
             ScopesSupported = [settings.FullScope],
             BearerMethodsSupported = ["header"],
             ResourceName = ResourceName,
@@ -61,6 +63,8 @@ public static class OAuthMetadataEndpoints
 
     private static IResult AuthorizationServer(McpAuthSettings settings)
     {
-        return Results.Json(CreateAuthorizationServer(settings), SerializerOptions);
+        return settings.ServesAuthorizationServerMetadata
+            ? Results.Json(CreateAuthorizationServer(settings), SerializerOptions)
+            : Results.NotFound();
     }
 }

@@ -1,7 +1,7 @@
 namespace _42.Platform.Storyteller.Mcp.Authentication;
 
-// Gets an access token for the Storyteller API on behalf of the person whose MCP token is given.
+// Gets a Storyteller token that acts for the person whose MCP token is given.
 public interface IStorytellerTokenProvider
 {
-    Task<string> GetTokenAsync(string userToken, CancellationToken cancellationToken);
+    Task<StorytellerToken> GetTokenAsync(string userToken, CancellationToken cancellationToken);
 }

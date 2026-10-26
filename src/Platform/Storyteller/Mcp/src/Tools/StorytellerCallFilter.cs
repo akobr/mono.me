@@ -5,14 +5,18 @@ using Microsoft.AspNetCore.Authentication;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
+using Newtonsoft.Json.Linq;
+
 using Polly.Timeout;
 
 namespace _42.Platform.Storyteller.Mcp.Tools;
 
-// The one call-tool filter. Before a tool runs it gets the Storyteller token for the person (on-behalf-of) and puts it
-// into the request's StorytellerAccessToken, where the SDK clients of the same scope read it; the inbound MCP token never
-// reaches the API. After the tool it turns API, sign-in and input errors into isError results, and so a call to the API
-// that did not finish (a timeout, a broken connection).
+// The one call-tool filter. Before a tool runs it gets the Storyteller token for the person (the API's token exchange)
+// and puts it into the request's StorytellerAccessToken, where the SDK clients of the same scope read it; the inbound
+// MCP token never reaches the API. A secret tool is refused while the API withholds secrets from the MCP server's actor
+// (NoSecretReveal): SecretToolsFilter hides it from tools/list then, but a hidden tool can still be called. After the
+// tool it turns API, sign-in and input errors into isError results, and so a call to the API that did not finish (a
+// timeout, a broken connection).
 //
 // Logs carry the tool name, the status and the error code only: never an exception object of the SDK (its message and
 // ToString hold the response body), an argument or a result.
@@ -36,17 +40,33 @@ public static class StorytellerCallFilter
 
             try
             {
-                var httpContext = services.GetRequiredService<IHttpContextAccessor>().HttpContext
-                    ?? throw new InvalidOperationException("A tool call runs outside an HTTP request.");
-                var userToken = await httpContext.GetTokenAsync("access_token");
+                var userToken = await GetUserTokenAsync(services);
 
                 if (string.IsNullOrEmpty(userToken))
                 {
                     return ToolResults.Error("The request carries no token of the signed-in person.");
                 }
 
-                var token = await services.GetRequiredService<IStorytellerTokenProvider>().GetTokenAsync(userToken, cancellationToken);
-                services.GetRequiredService<StorytellerAccessToken>().Value = token;
+                StorytellerToken token;
+
+                try
+                {
+                    token = await services.GetRequiredService<IStorytellerTokenProvider>().GetTokenAsync(userToken, cancellationToken);
+                }
+                catch (Exception exception) when (IsUnfinishedCall(exception, cancellationToken))
+                {
+                    // The exchange maps its own failures; one that still escapes it is a failed sign-in, never a tool error.
+                    logger.LogWarning("Tool {Tool}: the token exchange did not finish ({ExceptionType}).", tool, exception.GetType().Name);
+                    throw new StorytellerSignInUnavailableException();
+                }
+
+                if (token.WithholdsSecrets && SecretToolNames.Contains(tool))
+                {
+                    logger.LogWarning("Tool {Tool}: refused, the API withholds secrets from the MCP server's actor ({Restriction}).", tool, StorytellerToken.NoSecretReveal);
+                    return ToolResults.Error(ApiErrors.ActorRestrictedMessage, new JObject { ["ErrorCode"] = ApiErrors.ActorRestrictedCode });
+                }
+
+                services.GetRequiredService<StorytellerAccessToken>().Value = token.AccessToken;
 
                 // Only the tool's own calls: a failed token exchange above is a sign-in error, not an unfinished write.
                 try
@@ -74,6 +94,14 @@ public static class StorytellerCallFilter
                 return ToolResults.Error(exception.Message);
             }
         };
+    }
+
+    // The person's MCP token, which the bearer handler saved (SaveToken); null without one.
+    internal static async Task<string?> GetUserTokenAsync(IServiceProvider services)
+    {
+        var httpContext = services.GetRequiredService<IHttpContextAccessor>().HttpContext
+            ?? throw new InvalidOperationException("An MCP request runs outside an HTTP request.");
+        return await httpContext.GetTokenAsync("access_token");
     }
 
     // The resilience handler's timeout, a transport failure, or a cancellation the caller did not ask for (HttpClient's
