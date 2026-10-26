@@ -12,6 +12,7 @@ using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Commands.SharedCertificates;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Sharprompt;
@@ -135,8 +136,21 @@ public class AccountCommand : BaseCommand
         };
     }
 
-    // Non-interactive: no device code, no prompt and no account call, which machines are not allowed.
+    // Non-interactive: no device code, no prompt and no account call, which machines are not allowed. A deprecated
+    // variable is named whatever the outcome; other commands stay quiet about it.
     private async Task<int> SignInMachineAsync()
+    {
+        var exitCode = await SignInAndDescribeMachineAsync();
+
+        foreach (var variable in _machine.Settings.DeprecatedVariables)
+        {
+            Console.WriteImportant($"{variable} is deprecated; use {StorytellerVariables.Deprecated[variable]}.");
+        }
+
+        return exitCode;
+    }
+
+    private async Task<int> SignInAndDescribeMachineAsync()
     {
         // A federated machine exchanges at the token endpoint of its project, so the project is checked and bound
         // before any request. Invalid variables fall through to SignInAsync, which reports them.
@@ -174,10 +188,16 @@ public class AccountCommand : BaseCommand
             " with ",
             _context.ViewName.ThemedHighlight(Console.Theme),
             " view.");
-        Console.WriteLine("API ", (_machine.Settings.ApiUrl ?? string.Empty).ThemedHighlight(Console.Theme));
-        Console.WriteLine(identity.TokenExpiresAt is { } expiresAt
-            ? $"Token valid until {expiresAt:O}.".ThemedLowlight(Console.Theme)
-            : "The API checks the credentials on the first call.".ThemedLowlight(Console.Theme));
+        Console.WriteLine("API ", (_machine.Settings.Endpoint ?? string.Empty).ThemedHighlight(Console.Theme));
+
+        // The expiry is the exp of a JWT; an opaque token that sform requested has none.
+        var expiry = (identity.TokenExpiresAt, identity.Kind) switch
+        {
+            ({ } expiresAt, _) => $"Token valid until {expiresAt:O}.",
+            (null, MachineSignInKind.ClientCredentials or MachineSignInKind.Federated) => "Signed in; the expiry of the token is unknown.",
+            _ => "The API checks the credentials on the first call.",
+        };
+        Console.WriteLine(expiry.ThemedLowlight(Console.Theme));
         return ExitCodes.SUCCESS;
     }
 
@@ -186,7 +206,7 @@ public class AccountCommand : BaseCommand
     {
         if (!_context.IsProjectKnown)
         {
-            Console.WriteImportant($"No project is set: set {StorytellerVariables.PROJECT}=<organization>.<project> or pass -p to each command.");
+            Console.WriteImportant($"No project is set: set {TargetVariables.PROJECT}=<organization>.<project> or pass -p to each command.");
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 

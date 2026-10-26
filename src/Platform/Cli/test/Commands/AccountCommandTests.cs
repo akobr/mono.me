@@ -12,6 +12,7 @@ using _42.Platform.Cli.Commands.Account;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.UnitTests.Authentication;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
@@ -29,6 +30,7 @@ public class AccountCommandTests
     private const string ExchangeAnswer = """{"access_token":"st-1","token_type":"Bearer","expires_in":900}""";
 
     private static readonly DateTimeOffset Start = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
+    private static readonly string JwtExchangeAnswer = $$"""{"access_token":"{{TestTokens.AccessToken(Start.AddMinutes(15))}}","token_type":"Bearer","expires_in":900}""";
     private static readonly string SubjectTokenPath = MockUnixSupport.Path(@"C:\ci\platform-token");
 
     private readonly RecordingConsole _console = new();
@@ -36,7 +38,7 @@ public class AccountCommandTests
     private readonly Mock<IAuthenticationService> _authentication = new(MockBehavior.Strict);
     private readonly ScriptedHttpHandler _http = new();
     private readonly MockFileSystem _fileSystem = new();
-    private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.API_URL] = ApiUrl };
+    private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.ENDPOINT] = ApiUrl };
 
     [Fact]
     public async Task Machine_WithAnApiKey_SignsInWithoutAnyCall()
@@ -61,9 +63,9 @@ public class AccountCommandTests
     public async Task Machine_WithClientCredentials_GetsATokenAndShowsItsExpiry()
     {
         UseClientCredentials();
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
-        _environment[StorytellerVariables.VIEW] = "preview";
-        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.VIEW] = "preview";
+        _http.Respond(HttpStatusCode.OK, $$"""{"access_token":"{{TestTokens.AccessToken(Start.AddHours(1))}}","expires_in":3600}""");
 
         var exitCode = await Execute();
 
@@ -74,13 +76,34 @@ public class AccountCommandTests
         _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenUrl));
     }
 
+    // The expiry is the exp of a JWT: an opaque token that sform got has none.
+    [Fact]
+    public async Task Machine_WithClientCredentials_AndAnOpaqueToken_SaysTheExpiryIsUnknown()
+    {
+        UseClientCredentials();
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _console.Lines.ShouldBe(
+        [
+            "# Machine sign-in",
+            "Signed in as machine client_01 with client credentials (STORYTELLER_CLIENT_ID, STORYTELLER_CLIENT_SECRET, STORYTELLER_TOKEN_URL).",
+            "Project acme.billing with default view.",
+            $"API {ApiUrl}",
+            "Signed in; the expiry of the token is unknown.",
+        ]);
+    }
+
     [Fact]
     public async Task Machine_WithATokenFile_IsAnUnnamedMachine()
     {
         var fileSystem = new MockFileSystem();
         fileSystem.AddFile(MockUnixSupport.Path(@"C:\ci\token"), new MockFileData("opaque-token"));
         _environment[StorytellerVariables.TOKEN_FILE] = MockUnixSupport.Path(@"C:\ci\token");
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
 
         var exitCode = await Execute(fileSystem: fileSystem);
 
@@ -92,36 +115,33 @@ public class AccountCommandTests
     [Fact]
     public async Task Machine_Federated_WithAFile_ExchangesAndShowsTheMachineAndTheProject()
     {
-        var fileSystem = new MockFileSystem();
-        fileSystem.AddFile(MockUnixSupport.Path(@"C:\ci\platform-token"), new MockFileData("platform-token"));
-        _environment[StorytellerVariables.CLIENT_ID] = "6d0f2c4e-0000-4000-8000-000000000001";
-        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = MockUnixSupport.Path(@"C:\ci\platform-token");
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
-        _http.Respond(HttpStatusCode.OK, """{"access_token":"st-1","token_type":"Bearer","expires_in":900}""");
+        UseFederatedFile();
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+        _http.Respond(HttpStatusCode.OK, JwtExchangeAnswer);
 
-        var exitCode = await Execute(fileSystem: fileSystem);
+        var exitCode = await Execute(fileSystem: _fileSystem);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
         _console.Lines.ShouldBe(
         [
             "# Machine sign-in",
-            "Signed in as machine 6d0f2c4e-0000-4000-8000-000000000001 with workload identity federation (STORYTELLER_CLIENT_ID, STORYTELLER_SUBJECT_TOKEN_FILE).",
+            $"Signed in as machine {FederatedMachineId} with workload identity federation (STORYTELLER_CLIENT_ID, STORYTELLER_TOKEN_FILE).",
             "Project acme.billing with default view.",
             $"API {ApiUrl}",
             "Token valid until 2026-10-17T12:15:00.0000000+00:00.",
         ]);
-        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri($"{ApiUrl}/v1/acme/billing/access/token"));
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
     }
 
     [Fact]
     public async Task Machine_Federated_FromGitHubActions_AsksTheRunnerAndExchanges()
     {
         _environment[StorytellerVariables.CLIENT_ID] = FederatedMachineId;
-        _environment[GitHubActionsVariables.ID_TOKEN_REQUEST_URL] = GitHubRequestUrl;
-        _environment[GitHubActionsVariables.ID_TOKEN_REQUEST_TOKEN] = "github-request-token";
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL] = GitHubRequestUrl;
+        _environment[StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN] = "github-request-token";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         _http.Respond(HttpStatusCode.OK, """{"count":1,"value":"gh-jwt"}""")
-            .Respond(HttpStatusCode.OK, ExchangeAnswer);
+            .Respond(HttpStatusCode.OK, JwtExchangeAnswer);
 
         var exitCode = await Execute();
 
@@ -158,16 +178,21 @@ public class AccountCommandTests
         HttpStatusCode.BadRequest,
         """{"error":"invalid_request","error_description":"The subject token was not accepted."}""",
         ExitCodes.WARNING_UNAUTHORIZED_ACCESS,
-        $"The token request to {TokenEndpoint} was rejected: invalid_request: The subject token was not accepted.")]
+        $"The token request to {TokenEndpoint} was rejected with 400: invalid_request: The subject token was not accepted.")]
     [InlineData(
         HttpStatusCode.ServiceUnavailable,
         """{"error":"temporarily_unavailable"}""",
         ExitCodes.ERROR_SERVICE_FAILURE,
-        $"The token request to {TokenEndpoint} failed with 503.")]
+        $"The token request to {TokenEndpoint} failed with 503: temporarily_unavailable.")]
+    [InlineData(
+        HttpStatusCode.OK,
+        "{}",
+        ExitCodes.WARNING_UNAUTHORIZED_ACCESS,
+        $"The token endpoint {TokenEndpoint} returned no bearer token.")]
     public async Task Machine_Federated_ThatCannotExchange_SaysWhy(HttpStatusCode status, string body, int expectedExitCode, string message)
     {
         UseFederatedFile();
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         _http.Respond(status, body);
 
         var exitCode = await Execute(fileSystem: _fileSystem);
@@ -180,26 +205,25 @@ public class AccountCommandTests
     public async Task Machine_Federated_WithAnUnreachableTokenEndpoint_IsAServiceFailure()
     {
         UseFederatedFile();
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         _http.Fail(new HttpRequestException("No such host is known."));
 
         var exitCode = await Execute(fileSystem: _fileSystem);
 
         exitCode.ShouldBe(ExitCodes.ERROR_SERVICE_FAILURE);
-        _console.Lines.ShouldBe([$"! The token endpoint {TokenEndpoint} could not be reached."]);
+        _console.Lines.ShouldBe([$"! The token request to {TokenEndpoint} failed: No such host is known."]);
     }
 
     [Theory]
-    [InlineData(StorytellerVariables.SUBJECT_TOKEN_FILE, "The platform token file {0} in STORYTELLER_SUBJECT_TOKEN_FILE does not exist.")]
-    [InlineData(StorytellerVariables.CLIENT_ID, "A federated machine needs STORYTELLER_CLIENT_ID, the machine id.")]
-    [InlineData(StorytellerVariables.API_URL, "Set STORYTELLER_API_URL to the API base URL, for example https://<host>/api.")]
-    public async Task Machine_Federated_WithoutAVariableOrTheFile_IsAWrongInputWithoutARequest(string missing, string message)
+    [InlineData("file", "The platform token file {0} in STORYTELLER_TOKEN_FILE does not exist.")]
+    [InlineData(StorytellerVariables.ENDPOINT, "Set STORYTELLER_ENDPOINT to the API base URL, for example https://<host>/api.")]
+    public async Task Machine_Federated_WithoutTheEndpointOrTheFile_IsAWrongInputWithoutARequest(string missing, string message)
     {
         UseFederatedFile();
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
 
         // The variable of the file stays: only the file is missing.
-        if (missing == StorytellerVariables.SUBJECT_TOKEN_FILE)
+        if (missing == "file")
         {
             _fileSystem.RemoveFile(SubjectTokenPath);
         }
@@ -215,11 +239,30 @@ public class AccountCommandTests
         _http.Requests.ShouldBeEmpty();
     }
 
+    // The deprecated name always means federation, so it needs the machine id; it is named as deprecated even then.
+    [Fact]
+    public async Task Machine_WithTheDeprecatedSubjectTokenFileAndNoClientId_IsAWrongInputThatNamesTheDeprecation()
+    {
+        _fileSystem.AddFile(SubjectTokenPath, new MockFileData("platform-token"));
+        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = SubjectTokenPath;
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+
+        var exitCode = await Execute(fileSystem: _fileSystem);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _console.Lines.ShouldBe(
+        [
+            "! A federated machine needs STORYTELLER_CLIENT_ID, the machine id.",
+            "! STORYTELLER_SUBJECT_TOKEN_FILE is deprecated; use STORYTELLER_TOKEN_FILE.",
+        ]);
+        _http.Requests.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Machine_Federated_NeverUsesTheStoredUserSessionNorStartsADeviceCode()
     {
         UseFederatedFile();
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         _http.Respond(HttpStatusCode.OK, ExchangeAnswer);
         _authentication
             .Setup(authentication => authentication.GetSignedInUserAsync(It.IsAny<CancellationToken>()))
@@ -239,7 +282,7 @@ public class AccountCommandTests
         var fileSystem = new MockFileSystem();
         fileSystem.AddFile(MockUnixSupport.Path(@"C:\ci\token"), new MockFileData(TestTokens.AccessToken(Start.AddHours(-1))));
         _environment[StorytellerVariables.TOKEN_FILE] = MockUnixSupport.Path(@"C:\ci\token");
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
 
         var exitCode = await Execute(fileSystem: fileSystem);
 
@@ -263,7 +306,7 @@ public class AccountCommandTests
     public async Task Machine_TargetingAnotherProjectThanItsKey_IsAWrongInput()
     {
         _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create("acme", "billing", "3f2c");
-        _environment[StorytellerVariables.PROJECT] = "acme.web";
+        _environment[TargetVariables.PROJECT] = "acme.web";
 
         var exitCode = await Execute();
 
@@ -272,18 +315,19 @@ public class AccountCommandTests
     }
 
     [Theory]
-    [InlineData(null, HttpStatusCode.OK, ExitCodes.ERROR_WRONG_INPUT, "Set STORYTELLER_API_URL to the API base URL, for example https://<host>/api.")]
-    [InlineData(ApiUrl, HttpStatusCode.Unauthorized, ExitCodes.WARNING_UNAUTHORIZED_ACCESS, "The token request to https://auth.example.com/oauth2/token was rejected.")]
+    [InlineData(null, HttpStatusCode.OK, ExitCodes.ERROR_WRONG_INPUT, "Set STORYTELLER_ENDPOINT to the API base URL, for example https://<host>/api.")]
+    [InlineData(ApiUrl, HttpStatusCode.Unauthorized, ExitCodes.WARNING_UNAUTHORIZED_ACCESS, "The token request to https://auth.example.com/oauth2/token was rejected with 401.")]
+    [InlineData(ApiUrl, HttpStatusCode.Forbidden, ExitCodes.WARNING_UNAUTHORIZED_ACCESS, "The token request to https://auth.example.com/oauth2/token was rejected with 403.")]
     [InlineData(ApiUrl, HttpStatusCode.BadGateway, ExitCodes.ERROR_SERVICE_FAILURE, "The token request to https://auth.example.com/oauth2/token failed with 502.")]
     public async Task Machine_ThatCannotSignIn_SaysWhy(string? apiUrl, HttpStatusCode tokenStatus, int expectedExitCode, string message)
     {
         UseClientCredentials();
-        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _environment[TargetVariables.PROJECT] = "acme.billing";
         _http.Respond(tokenStatus, string.Empty);
 
         if (apiUrl is null)
         {
-            _environment.Remove(StorytellerVariables.API_URL);
+            _environment.Remove(StorytellerVariables.ENDPOINT);
         }
 
         var exitCode = await Execute();
@@ -292,11 +336,50 @@ public class AccountCommandTests
         _console.Lines.ShouldBe([$"! {message}"]);
     }
 
+    [Fact]
+    public async Task Machine_WithDeprecatedNames_NamesEachOneAfterTheSignIn()
+    {
+        _environment.Remove(StorytellerVariables.ENDPOINT);
+        _environment[StorytellerVariables.API_URL] = ApiUrl;
+        _fileSystem.AddFile(SubjectTokenPath, new MockFileData("platform-token"));
+        _environment[StorytellerVariables.CLIENT_ID] = FederatedMachineId;
+        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = SubjectTokenPath;
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+        _http.Respond(HttpStatusCode.OK, JwtExchangeAnswer);
+
+        var exitCode = await Execute(fileSystem: _fileSystem);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _console.Lines.ShouldBe(
+        [
+            "# Machine sign-in",
+            $"Signed in as machine {FederatedMachineId} with workload identity federation (STORYTELLER_CLIENT_ID, STORYTELLER_SUBJECT_TOKEN_FILE).",
+            "Project acme.billing with default view.",
+            $"API {ApiUrl}",
+            "Token valid until 2026-10-17T12:15:00.0000000+00:00.",
+            "! STORYTELLER_API_URL is deprecated; use STORYTELLER_ENDPOINT.",
+            "! STORYTELLER_SUBJECT_TOKEN_FILE is deprecated; use STORYTELLER_TOKEN_FILE.",
+        ]);
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
+    }
+
+    [Fact]
+    public async Task Machine_WithTheEndpointUnderBothNames_ThatDiffer_IsAWrongInput()
+    {
+        _environment[StorytellerVariables.API_URL] = "https://other.example.com/api";
+        _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create("acme", "billing", "3f2c");
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _console.Lines.ShouldBe(["! STORYTELLER_ENDPOINT and STORYTELLER_API_URL are both set, to different values; set one of them."]);
+    }
+
     private void UseFederatedFile()
     {
         _fileSystem.AddFile(SubjectTokenPath, new MockFileData("platform-token"));
         _environment[StorytellerVariables.CLIENT_ID] = FederatedMachineId;
-        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = SubjectTokenPath;
+        _environment[StorytellerVariables.TOKEN_FILE] = SubjectTokenPath;
     }
 
     private void UseClientCredentials()
@@ -309,13 +392,7 @@ public class AccountCommandTests
     // The strict mocks prove that a machine never starts a device code sign-in or calls the account API.
     private Task<int> Execute(bool openBrowser = false, MockFileSystem? fileSystem = null)
     {
-        var settings = MachineSignInSettings.FromEnvironment(name => _environment.GetValueOrDefault(name));
-        var machine = new MachineAuthenticationService(
-            settings,
-            fileSystem ?? new MockFileSystem(),
-            new StubHttpClientFactory(_http),
-            Mock.Of<IAuthenticationConfigurationResolver>(),
-            new ManualTimeProvider(Start));
+        var machine = TestMachines.Create(_environment, fileSystem ?? new MockFileSystem(), _http, new ManualTimeProvider(Start));
         var stored = Options.Create(new AccessDefaultOptions { OrganizationName = "house", ProjectName = "stored" });
         var command = new AccountCommand(_console.Object, _accessApi.Object, _authentication.Object, stored, machine, new CommandContext(stored, machine))
         {

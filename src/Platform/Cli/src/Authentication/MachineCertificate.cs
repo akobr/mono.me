@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Formats.Asn1;
-using System.IO;
-using System.IO.Abstractions;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
@@ -15,48 +12,8 @@ internal static class MachineCertificate
     private const string SpiffeScheme = "spiffe";
     private const int UriGeneralNameTag = 6;
 
-    // The PKCS#12 file of STORYTELLER_CERTIFICATE_FILE. Default key storage flags: Windows cannot use
-    // an ephemeral key for TLS client authentication.
-    public static X509Certificate2 Load(IFileSystem fileSystem, string path, string? password)
-    {
-        byte[] content;
-
-        try
-        {
-            if (!fileSystem.File.Exists(path))
-            {
-                throw Invalid($"The certificate file {path} in {StorytellerVariables.CERTIFICATE_FILE} does not exist.");
-            }
-
-            content = fileSystem.File.ReadAllBytes(path);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
-        {
-            throw Invalid($"The certificate file {path} in {StorytellerVariables.CERTIFICATE_FILE} could not be read.", exception);
-        }
-
-        X509Certificate2 certificate;
-
-        try
-        {
-            certificate = X509CertificateLoader.LoadPkcs12(content, password);
-        }
-        catch (CryptographicException exception)
-        {
-            throw Invalid(
-                $"The certificate in {StorytellerVariables.CERTIFICATE_FILE} could not be loaded; check the file and {StorytellerVariables.CERTIFICATE_PASSWORD}.",
-                exception);
-        }
-
-        if (!certificate.HasPrivateKey)
-        {
-            certificate.Dispose();
-            throw Invalid($"The certificate in {StorytellerVariables.CERTIFICATE_FILE} has no private key; use the .pfx file sform account machine create wrote.");
-        }
-
-        return certificate;
-    }
-
+    // The identity in the URI SAN of a machine or shared certificate; the SDK loads the file
+    // (StorytellerClientCertificate.Load).
     public static MachineCertificateIdentity? ReadIdentity(X509Certificate2 certificate)
     {
         var platformUris = certificate.Extensions
@@ -118,10 +75,5 @@ internal static class MachineCertificate
         }
 
         return uris;
-    }
-
-    private static AuthenticationException Invalid(string message, Exception? innerException = null)
-    {
-        return new AuthenticationException(AuthenticationFailureReason.Configuration, message, innerException);
     }
 }

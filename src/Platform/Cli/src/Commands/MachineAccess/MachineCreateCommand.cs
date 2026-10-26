@@ -8,6 +8,7 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 
@@ -285,14 +286,14 @@ public class MachineCreateCommand : BaseContextCommand
 
         if (kind == MachineAccessCredentialKind.Federated)
         {
-            variables.Add($"{StorytellerVariables.PROJECT}={Context.OrganizationName}.{Context.ProjectName}");
+            variables.Add($"{TargetVariables.PROJECT}={Context.OrganizationName}.{Context.ProjectName}");
             variables.Add($"{StorytellerVariables.CLIENT_ID}={machine.Id}");
             variables.Add($"{StorytellerVariables.SUBJECT_TOKEN_FILE}=<file with the platform token>");
         }
 
         if (kind == MachineAccessCredentialKind.ClientCredentials)
         {
-            variables.Add($"{StorytellerVariables.PROJECT}={Context.OrganizationName}.{Context.ProjectName}");
+            variables.Add($"{TargetVariables.PROJECT}={Context.OrganizationName}.{Context.ProjectName}");
             variables.Add($"{StorytellerVariables.CLIENT_ID}={machine.Id}");
             variables.Add($"{StorytellerVariables.CLIENT_SECRET}=<client secret above>");
 
@@ -367,7 +368,7 @@ public class MachineCreateCommand : BaseContextCommand
             : null;
     }
 
-    // As MachineAuthenticationService builds it, with the organization and project in the case of the context.
+    // As the SDK credential builds it, with the organization and project in the case of the context.
     private string GetTokenEndpointPath()
     {
         return $"/v1/{Uri.EscapeDataString(Context.OrganizationName)}/{Uri.EscapeDataString(Context.ProjectName)}/access/token";

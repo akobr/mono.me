@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -23,11 +24,11 @@ public class MachineTokenRenewalHandlerTests
 
     private static readonly DateTimeOffset Start = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
 
-    // The API behind the handler, and the token endpoint of the machine's own client.
+    // The API behind the handler, and the token endpoint of the machine's SDK credential.
     private readonly ScriptedHttpHandler _api = new();
     private readonly ScriptedHttpHandler _tokens = new();
     private readonly MockFileSystem _fileSystem = new();
-    private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.API_URL] = ApiUrl };
+    private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.ENDPOINT] = ApiUrl };
 
     [Fact]
     public async Task Unauthorized_IsSentOnceMoreWithANewToken_AndItsResponseDisposed()
@@ -78,13 +79,34 @@ public class MachineTokenRenewalHandlerTests
         _tokens.Requests.ShouldHaveSingleItem();
     }
 
+    // Change against today's sform: client credentials are renewed too, not only a federated token.
     [Fact]
-    public async Task NonFederatedMachine_GetsTheUnauthorized()
+    public async Task ClientCredentials_AreRenewedToo()
     {
         _environment[StorytellerVariables.CLIENT_ID] = "client_01";
         _environment[StorytellerVariables.CLIENT_SECRET] = "client-secret";
         _environment[StorytellerVariables.TOKEN_URL] = "https://auth.example.com/oauth2/token";
-        _tokens.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
+        _tokens.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""")
+            .Respond(HttpStatusCode.OK, """{"access_token":"cc-2","expires_in":3600}""");
+        _api.Respond(HttpStatusCode.Unauthorized, string.Empty)
+            .Respond(HttpStatusCode.OK, "[]");
+        var machine = CreateMachine();
+        machine.BindTarget("acme", "billing");
+
+        using var response = await SendAsync(machine, _api, await BearerRequestAsync(machine));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        _api.Requests.Select(request => request.Authorization).ShouldBe(["Bearer cc-1", "Bearer cc-2"]);
+        _tokens.Requests.Count.ShouldBe(2);
+    }
+
+    // A token file cannot renew: the file is read again by the next request.
+    [Fact]
+    public async Task TokenFileMachine_GetsTheUnauthorized()
+    {
+        var path = MockUnixSupport.Path(@"C:\ci\token");
+        _fileSystem.AddFile(path, new MockFileData("file-token"));
+        _environment[StorytellerVariables.TOKEN_FILE] = path;
         _api.Respond(HttpStatusCode.Unauthorized, string.Empty);
         var machine = CreateMachine();
         machine.BindTarget("acme", "billing");
@@ -92,8 +114,8 @@ public class MachineTokenRenewalHandlerTests
         using var response = await SendAsync(machine, _api, await BearerRequestAsync(machine));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-        _api.Requests.ShouldHaveSingleItem().Authorization.ShouldBe("Bearer cc-1");
-        _tokens.Requests.ShouldHaveSingleItem();
+        _api.Requests.ShouldHaveSingleItem().Authorization.ShouldBe("Bearer file-token");
+        _tokens.Requests.ShouldBeEmpty();
     }
 
     [Fact]
@@ -181,7 +203,7 @@ public class MachineTokenRenewalHandlerTests
     [Fact]
     public async Task Renewal_IsNeverCancelledByTheRequest()
     {
-        // The token factory passes none either; the timeout of the exchange client ends a hanging exchange.
+        // The token factory passes none either; the attempt timeouts of the token requests end a hanging one.
         var machine = new Mock<IMachineSignIn>();
         machine.SetupGet(signIn => signIn.IsConfigured).Returns(true);
         machine.Setup(signIn => signIn.RenewAccessTokenAsync("st-1", It.IsAny<CancellationToken>())).ReturnsAsync("st-2");
@@ -240,7 +262,7 @@ public class MachineTokenRenewalHandlerTests
         var path = MockUnixSupport.Path(@"C:\ci\platform-token");
         _fileSystem.AddFile(path, new MockFileData("platform-token"));
         _environment[StorytellerVariables.CLIENT_ID] = "6d0f2c4e-0000-4000-8000-000000000001";
-        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = path;
+        _environment[StorytellerVariables.TOKEN_FILE] = path;
 
         if (exchange)
         {
@@ -254,13 +276,7 @@ public class MachineTokenRenewalHandlerTests
 
     private MachineAuthenticationService CreateMachine()
     {
-        var settings = MachineSignInSettings.FromEnvironment(name => _environment.GetValueOrDefault(name));
-        return new MachineAuthenticationService(
-            settings,
-            _fileSystem,
-            new StubHttpClientFactory(_tokens),
-            Mock.Of<IAuthenticationConfigurationResolver>(),
-            new ManualTimeProvider(Start));
+        return TestMachines.Create(_environment, _fileSystem, _tokens, new ManualTimeProvider(Start));
     }
 
     // Keeps the responses of the API, so a test can tell which ones the handler disposed.

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
@@ -18,8 +19,8 @@ using Xunit;
 
 namespace _42.Platform.Cli.UnitTests.Authentication;
 
-// The registrations of Startup with a federated machine in a GitHub Actions job: one call of a typed client asks
-// the runner for an ID token, exchanges it, and sends the Storyteller token to the API.
+// The registrations of Startup with a machine: one call of a typed client gets a token from the SDK credential (for a
+// federated machine in a GitHub Actions job: asks the runner for an ID token and exchanges it) and sends it to the API.
 public class FederatedSignInWiringTests : IDisposable
 {
     private const string ApiUrl = "https://storyteller.example.com/api";
@@ -27,46 +28,21 @@ public class FederatedSignInWiringTests : IDisposable
     private const string GitHubRequestUrl = "https://pipelines.actions.githubusercontent.com/abc/idtoken?api-version=2.0";
     private const string GitHubRequestToken = "github-request-token-value";
     private const string TokenEndpoint = "https://storyteller.example.com/api/v1/acme/billing/access/token";
+    private const string TokenUrl = "https://auth.example.com/oauth2/token";
     private const string AnnotationsUrl = "https://storyteller.example.com/api/v1/acme/billing/default/annotations";
     private const string AnnotationsAnswer = """{"Annotations":[],"Count":0}""";
 
-    // The primary handler of every client: the runner, the token endpoint and the API answer in turn.
+    // The primary handler of every client and of the token requests: the runner, the token endpoint and the API
+    // answer in turn.
     private readonly ScriptedHttpHandler _http = new();
-    private readonly ServiceProvider _provider;
-
-    public FederatedSignInWiringTests()
-    {
-        var environment = new Dictionary<string, string>
-        {
-            [StorytellerVariables.API_URL] = ApiUrl,
-            [StorytellerVariables.CLIENT_ID] = MachineId,
-            [GitHubActionsVariables.ID_TOKEN_REQUEST_URL] = GitHubRequestUrl,
-            [GitHubActionsVariables.ID_TOKEN_REQUEST_TOKEN] = GitHubRequestToken,
-        };
-        var services = new ServiceCollection();
-
-        // As Startup.ConfigureServices registers them; the token store and discovery are never used by a machine.
-        services.AddSingleton<IFileSystem>(new MockFileSystem());
-        services.AddHttpClient();
-        Startup.ConfigureMachineSignIn(services);
-
-        // Startup reads the variables of the process.
-        services.Replace(ServiceDescriptor.Singleton(MachineSignInSettings.FromEnvironment(name => environment.GetValueOrDefault(name))));
-        services.AddSingleton<ITokenStore, InMemoryTokenStore>();
-        services.AddSingleton(Mock.Of<IAuthenticationConfigurationResolver>());
-        services.AddSingleton<IAuthenticationService, AuthenticationServiceSelector>();
-        services.AddSingleton<ICommandContext, CommandContext>();
-        Startup.ConfigureStorytellerSdk(services);
-        services.PostConfigureAll<HttpClientFactoryOptions>(options => options.HttpMessageHandlerBuilderActions.Add(builder => builder.PrimaryHandler = _http));
-
-        _provider = services.BuildServiceProvider();
-    }
+    private ServiceProvider? _provider;
 
     [Fact]
     public async Task ACallOfATypedClient_AsksTheRunner_Exchanges_AndSendsTheStorytellerToken()
     {
+        UseFederatedMachineInAGitHubActionsJob();
         _http.Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-1"))
-            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, TokenAnswer("st-1"))
             .Respond(HttpStatusCode.OK, AnnotationsAnswer);
 
         var annotations = await CallAsync();
@@ -84,11 +60,12 @@ public class FederatedSignInWiringTests : IDisposable
     [Fact]
     public async Task AnUnauthorizedCall_IsRenewedOnce_AndSentOnceMore()
     {
+        UseFederatedMachineInAGitHubActionsJob();
         _http.Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-1"))
-            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, TokenAnswer("st-1"))
             .Respond(HttpStatusCode.Unauthorized, string.Empty)
             .Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-2"))
-            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"))
+            .Respond(HttpStatusCode.OK, TokenAnswer("st-2"))
             .Respond(HttpStatusCode.OK, AnnotationsAnswer);
 
         await CallAsync();
@@ -105,29 +82,49 @@ public class FederatedSignInWiringTests : IDisposable
         _http.Requests[4].Form["subject_token"].ShouldBe("gh-jwt-2");
     }
 
-    // The tests above replace every primary handler. The real one of the exchange client must not follow a
-    // redirect: the GitHub request carries the request token, and the exchange the platform token in its body.
+    // Change against today's sform: a client-credentials token the API refused is renewed too.
     [Fact]
-    public void TheExchangeClient_FollowsNoRedirect()
+    public async Task AnUnauthorizedCall_OfClientCredentials_IsRenewedOnce_AndSentOnceMore()
+    {
+        Build(new()
+        {
+            [StorytellerVariables.ENDPOINT] = ApiUrl,
+            [StorytellerVariables.CLIENT_ID] = "client_01",
+            [StorytellerVariables.CLIENT_SECRET] = "client-secret",
+            [StorytellerVariables.TOKEN_URL] = TokenUrl,
+        });
+        _http.Respond(HttpStatusCode.OK, TokenAnswer("cc-1"))
+            .Respond(HttpStatusCode.Unauthorized, string.Empty)
+            .Respond(HttpStatusCode.OK, TokenAnswer("cc-2"))
+            .Respond(HttpStatusCode.OK, AnnotationsAnswer);
+
+        await CallAsync();
+
+        _http.Requests.Select(request => (request.Method, request.Uri.AbsoluteUri, request.Authorization)).ShouldBe(
+        [
+            (HttpMethod.Post, TokenUrl, null),
+            (HttpMethod.Get, AnnotationsUrl, "Bearer cc-1"),
+            (HttpMethod.Post, TokenUrl, null),
+            (HttpMethod.Get, AnnotationsUrl, "Bearer cc-2"),
+        ]);
+    }
+
+    // Startup registers the service with its public constructor: the settings and the file system, no HTTP client of
+    // its own, as the SDK credential makes the token requests.
+    [Fact]
+    public void Startup_ResolvesTheMachineSignIn()
     {
         var services = new ServiceCollection();
-        services.AddHttpClient();
+        services.AddSingleton<IFileSystem>(new MockFileSystem());
         Startup.ConfigureMachineSignIn(services);
         using var provider = services.BuildServiceProvider();
 
-        var handler = provider.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(nameof(MachineAuthenticationService));
-
-        while (handler is DelegatingHandler { InnerHandler: { } inner })
-        {
-            handler = inner;
-        }
-
-        handler.ShouldBeOfType<HttpClientHandler>().AllowAutoRedirect.ShouldBeFalse();
+        provider.GetRequiredService<IMachineSignIn>().ShouldBeSameAs(provider.GetRequiredService<MachineAuthenticationService>());
     }
 
     public void Dispose()
     {
-        _provider.Dispose();
+        _provider?.Dispose();
     }
 
     private static string GitHubAnswer(string idToken)
@@ -135,15 +132,51 @@ public class FederatedSignInWiringTests : IDisposable
         return $$"""{"count":1,"value":"{{idToken}}"}""";
     }
 
-    private static string ExchangeAnswer(string accessToken)
+    private static string TokenAnswer(string accessToken)
     {
         return $$"""{"access_token":"{{accessToken}}","issued_token_type":"urn:ietf:params:oauth:token-type:access_token","token_type":"Bearer","expires_in":900,"scope":"story:read"}""";
+    }
+
+    private void UseFederatedMachineInAGitHubActionsJob()
+    {
+        Build(new()
+        {
+            [StorytellerVariables.ENDPOINT] = ApiUrl,
+            [StorytellerVariables.CLIENT_ID] = MachineId,
+            [StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL] = GitHubRequestUrl,
+            [StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN] = GitHubRequestToken,
+        });
+    }
+
+    private void Build(Dictionary<string, string> environment)
+    {
+        var services = new ServiceCollection();
+
+        // As Startup.ConfigureServices registers them; the token store and discovery are never used by a machine.
+        services.AddSingleton<IFileSystem>(new MockFileSystem());
+        services.AddHttpClient();
+        Startup.ConfigureMachineSignIn(services);
+
+        // Startup reads the variables of the process, and the SDK credential sends its token requests to the network.
+        services.Replace(ServiceDescriptor.Singleton(TestMachines.Settings(environment)));
+        services.Replace(ServiceDescriptor.Singleton(provider => TestMachines.Create(
+            provider.GetRequiredService<MachineSignInSettings>(),
+            provider.GetRequiredService<IFileSystem>(),
+            TestMachines.Hooks(_http))));
+        services.AddSingleton<ITokenStore, InMemoryTokenStore>();
+        services.AddSingleton(Mock.Of<IAuthenticationConfigurationResolver>());
+        services.AddSingleton<IAuthenticationService, AuthenticationServiceSelector>();
+        services.AddSingleton<ICommandContext, CommandContext>();
+        Startup.ConfigureStorytellerSdk(services);
+        services.PostConfigureAll<HttpClientFactoryOptions>(options => options.HttpMessageHandlerBuilderActions.Add(builder => builder.PrimaryHandler = _http));
+
+        _provider = services.BuildServiceProvider();
     }
 
     // A command first checks and binds its target (BaseContextCommand), then calls the API.
     private async Task<AnnotationsResponse> CallAsync()
     {
-        _provider.GetRequiredService<ICommandContext>().TrySetExplicitTarget("acme.billing", null);
-        return await _provider.GetRequiredService<IAnnotationsApiClient>().GetAnnotationsAsync("acme", "billing", "default", null, null, null);
+        _provider!.GetRequiredService<ICommandContext>().TrySetExplicitTarget("acme.billing", null);
+        return await _provider!.GetRequiredService<IAnnotationsApiClient>().GetAnnotationsAsync("acme", "billing", "default", null, null, null);
     }
 }

@@ -15,6 +15,9 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="42.Platform.Storyteller.Sdk.NSwag.UnitTests" />
+
+    <!-- The test seam of sform's machine sign-in: WithPrimaryHandler. -->
+    <InternalsVisibleTo Include="42.Platform.Cli.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>

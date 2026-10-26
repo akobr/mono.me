@@ -6,6 +6,7 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands.Account;
 using _42.Platform.Cli.UnitTests.Authentication;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -22,7 +23,7 @@ public class AccountLogoutCommandTests
     [Fact]
     public async Task Machine_HasNothingToLogOutAndKeepsTheUserSession()
     {
-        _environment[StorytellerVariables.API_URL] = "https://storyteller.example.com/api";
+        _environment[StorytellerVariables.ENDPOINT] = "https://storyteller.example.com/api";
         _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create("acme", "billing", "3f2c");
 
         var exitCode = await Execute();
@@ -46,12 +47,7 @@ public class AccountLogoutCommandTests
 
     private Task<int> Execute()
     {
-        var settings = MachineSignInSettings.FromEnvironment(name => _environment.GetValueOrDefault(name));
-        var machine = new MachineAuthenticationService(
-            settings,
-            new MockFileSystem(),
-            new StubHttpClientFactory(new ScriptedHttpHandler()),
-            Mock.Of<IAuthenticationConfigurationResolver>());
+        var machine = TestMachines.Create(_environment, new MockFileSystem(), new ScriptedHttpHandler());
 
         return new AccountLogoutCommand(_console.Object, _accessApi.Object, _authentication.Object, machine).OnExecuteAsync();
     }

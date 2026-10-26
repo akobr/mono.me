@@ -4,6 +4,7 @@ using System.IO.Abstractions;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Shouldly;
 using Xunit;
 
@@ -25,7 +26,7 @@ public class AuthenticationServiceSelectorTests
                 User = new AuthKitSessionUser("user_01", "ada@example.com", null, null),
             },
         };
-        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, Machine(resolver));
+        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, Machine());
 
         (await selector.GetAccessTokenAsync()).ShouldBe("access-fresh");
         (await selector.GetSignedInUserAsync()).ShouldBe(new SignedInUser("user_01", "ada@example.com", null));
@@ -37,7 +38,7 @@ public class AuthenticationServiceSelectorTests
     {
         var resolver = new FixedResolver(AuthenticationProvider.AuthKit);
         var store = new InMemoryTokenStore();
-        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, Machine(resolver));
+        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, Machine());
 
         await selector.LogoutAsync();
 
@@ -49,7 +50,7 @@ public class AuthenticationServiceSelectorTests
     public async Task ResolutionFailure_ReachesTheCaller()
     {
         var resolver = new FixedResolver(AuthenticationProvider.AuthKit, new AuthenticationException(AuthenticationFailureReason.ServiceError, "no provider"));
-        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), new InMemoryTokenStore(), Machine(resolver));
+        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), new InMemoryTokenStore(), Machine());
 
         var exception = await Should.ThrowAsync<AuthenticationException>(() => selector.GetAccessTokenAsync());
 
@@ -71,9 +72,9 @@ public class AuthenticationServiceSelectorTests
             },
         };
         var key = TestApiKeys.Create("acme", "billing", "3f2c");
-        var machine = Machine(resolver, new()
+        var machine = Machine(new()
         {
-            [StorytellerVariables.API_URL] = "https://storyteller.example.com/api",
+            [StorytellerVariables.ENDPOINT] = "https://storyteller.example.com/api",
             [StorytellerVariables.API_KEY] = key,
         });
         using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, machine);
@@ -89,10 +90,10 @@ public class AuthenticationServiceSelectorTests
         store.Session.ShouldNotBeNull();
     }
 
-    private static MachineAuthenticationService Machine(IAuthenticationConfigurationResolver resolver, Dictionary<string, string>? environment = null)
+    private static MachineAuthenticationService Machine(Dictionary<string, string>? environment = null)
     {
         var settings = MachineSignInSettings.FromEnvironment(name => environment?.GetValueOrDefault(name));
-        return new MachineAuthenticationService(settings, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), resolver);
+        return new MachineAuthenticationService(settings, new FileSystem());
     }
 
     private sealed class FixedResolver : IAuthenticationConfigurationResolver

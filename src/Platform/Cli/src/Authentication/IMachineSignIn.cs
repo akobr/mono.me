@@ -18,7 +18,7 @@ public interface IMachineSignIn
     // As GetIdentity, but null when no machine credential is set or it is invalid.
     MachineIdentity? TryGetIdentity();
 
-    // The certificate of STORYTELLER_CERTIFICATE_FILE when it loads and has a private key, else null.
+    // The certificate of STORYTELLER_CLIENT_CERTIFICATE when it loads and has a private key, else null.
     X509Certificate2? TryGetCertificate();
 
     // Validates the variables; for client credentials, token files and federated machines it also gets the token.
@@ -30,6 +30,7 @@ public interface IMachineSignIn
     void BindTarget(string organization, string project);
 
     // After the API refused rejectedToken with 401: forget it, unless a newer token replaced it already,
-    // and return a token to send again. Null for every kind but Federated. Throws AuthenticationException.
+    // and return a token to send again. Null for a credential that cannot renew (an API key, a certificate,
+    // a token file) and for a federated machine without a bound target. Throws AuthenticationException.
     Task<string?> RenewAccessTokenAsync(string rejectedToken, CancellationToken cancellationToken = default);
 }

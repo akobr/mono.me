@@ -6,6 +6,7 @@ using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.UnitTests.Authentication;
 using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
@@ -20,11 +21,10 @@ public class CaDownloadCommandTests
     {
         var environment = new Dictionary<string, string>
         {
-            [StorytellerVariables.API_URL] = "https://storyteller.example.com/api",
+            [StorytellerVariables.ENDPOINT] = "https://storyteller.example.com/api",
             [StorytellerVariables.TOKEN_FILE] = "/ci/token",
         };
-        var settings = MachineSignInSettings.FromEnvironment(name => environment.GetValueOrDefault(name));
-        var machine = new MachineAuthenticationService(settings, new MockFileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), Mock.Of<IAuthenticationConfigurationResolver>());
+        var machine = TestMachines.Create(environment, new MockFileSystem(), new ScriptedHttpHandler());
         var accessApi = new Mock<IAccessApiClient>();
         accessApi.Setup(api => api.GetCertificateAuthorityAsync()).ReturnsAsync("-----BEGIN CERTIFICATE-----");
         var console = new RecordingConsole();
