@@ -301,8 +301,8 @@ public partial class CosmosConfigurationService : IConfigurationService
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
 
-        // version 0 is no written version (an old patch archived cache rows so), and an archive of the current or a
-        // later version is a leftover that a write counts as archived, as in an export
+        // an empty archive of version 0 holds no written version (an old patch archived cache rows so), and an archive
+        // of the current or a later version is a leftover that a write counts as archived, as in an export
         var versions = history
             .Where(entity => entity.Version > 0 || entity.Content.HasValues)
             .Where(entity => configuration is null || configuration.Version == 0 || entity.Version < configuration.Version)
@@ -335,8 +335,10 @@ public partial class CosmosConfigurationService : IConfigurationService
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
 
-        // the current version wins over an archive of the same version, which can be a leftover of another lifetime
+        // the current written version wins over an archive of the same version, which can be a leftover of another
+        // lifetime; a cache row (version 0) does not hide an archive of version 0 with content
         if (configEntity is not null
+            && IsWrittenVersion(configEntity)
             && configEntity.Version == version)
         {
             return configEntity.ToConfigurationFromContent();
@@ -348,7 +350,14 @@ public partial class CosmosConfigurationService : IConfigurationService
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationHistoryEntity>(_serializerOptions));
 
-        return versionEntity?.ToConfiguration();
+        if (versionEntity is not null)
+        {
+            return versionEntity.ToConfiguration();
+        }
+
+        return configEntity is not null && configEntity.Version == version
+            ? configEntity.ToConfigurationFromContent()
+            : null;
     }
 
     public Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint version)
@@ -420,7 +429,7 @@ public partial class CosmosConfigurationService : IConfigurationService
                     Content = input,
                     Version = await GetHighestArchivedVersionAsync(key, repository) + 1,
                     Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-                    PendingInvalidationId = NewWriteInvalidationId(key),
+                    PendingInvalidationId = NewInvalidationId(key),
                 };
 
                 // a calculation may have created the row meanwhile (409), then the next attempt updates it
@@ -1221,7 +1230,7 @@ public partial class CosmosConfigurationService : IConfigurationService
             Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
             CalculatedContent = null,
             CalculatedContentHash = null,
-            PendingInvalidationId = NewWriteInvalidationId(key),
+            PendingInvalidationId = NewInvalidationId(key),
         };
 
         if (history is null
@@ -1263,16 +1272,16 @@ public partial class CosmosConfigurationService : IConfigurationService
         var partitionKeyValue = key.GetPartitionKey();
         var archive = await PlanArchiveAsync(key, repository, existing);
         var version = archive.Version ?? throw new InvalidOperationException("Only a written version is archived.");
-        var archived = new PendingClear(GetHistoryId(key, version), NewInvalidationId(), version);
+        var archived = new PendingClear(GetHistoryId(key, version), NewInvalidationId(key), version);
         var batch = repository.Container.CreateTransactionalBatch(new PartitionKey(partitionKeyValue));
 
-        if (archive.IsStored)
-        {
-            batch.PatchItem(archived.Id, [PatchOperation.Set($"/{nameof(ConfigurationHistoryEntity.PendingInvalidationId)}", archived.Token)]);
-        }
-        else
+        if (!archive.IsStored)
         {
             batch.CreateItem(ToHistory(key, existing, version, archived.Token));
+        }
+        else if (archived.Token is not null)
+        {
+            batch.PatchItem(archived.Id, [PatchOperation.Set($"/{nameof(ConfigurationHistoryEntity.PendingInvalidationId)}", archived.Token)]);
         }
 
         batch.DeleteItem(existing.Id, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
@@ -1384,7 +1393,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     {
         var clears = await ReadPendingClearsAsync(key, repository);
 
-        if (archived is not null && clears.All(clear => clear.Id != archived.Id))
+        if (archived?.Token is not null && clears.All(clear => clear.Id != archived.Id))
         {
             clears.Add(archived);
         }
@@ -1447,6 +1456,12 @@ public partial class CosmosConfigurationService : IConfigurationService
     // The archives of the configuration whose clear has not finished its invalidation.
     private static async Task<List<PendingClear>> ReadPendingClearsAsync(FullKey key, IContainerRepository repository)
     {
+        if (key.Annotation.Type == AnnotationType.UnitOfExecution)
+        {
+            // its clears store no token
+            return [];
+        }
+
         var query = new QueryDefinition(
                 "SELECT c.id, c.PendingInvalidationId, c.Version FROM c "
                 + "WHERE STARTSWITH(c.id, @historyPrefix) AND IS_STRING(c.PendingInvalidationId)")
@@ -1499,15 +1514,11 @@ public partial class CosmosConfigurationService : IConfigurationService
         return $"{key.ViewName}.{EntityIdPrefixTypes.ConfigurationVersion}.{key.Annotation}.{version}";
     }
 
-    private static string NewInvalidationId()
+    // The token of a pending invalidation. A unit of execution has no descendants, so its writes and clears leave no
+    // invalidation to finish and get no token.
+    private static string? NewInvalidationId(FullKey key)
     {
-        return Guid.NewGuid().ToString("N");
-    }
-
-    // A unit of execution has no descendants, so its write leaves no invalidation to finish and needs no token.
-    private static string? NewWriteInvalidationId(FullKey key)
-    {
-        return key.Annotation.Type == AnnotationType.UnitOfExecution ? null : NewInvalidationId();
+        return key.Annotation.Type == AnnotationType.UnitOfExecution ? null : Guid.NewGuid().ToString("N");
     }
 
     // The size of a document in a batch; its content dominates, the rest is a small allowance.
@@ -1668,6 +1679,6 @@ public partial class CosmosConfigurationService : IConfigurationService
     // IsStored that an equal archive exists already, NextVersion the version the write stores.
     private sealed record class ArchivePlan(ulong? Version, bool IsStored, ulong NextVersion);
 
-    // The archive of a clear or delete, with the token of its pending cache invalidation.
-    private sealed record class PendingClear(string Id, string Token, ulong Version);
+    // The archive of a clear or delete, with the token of its pending cache invalidation (none for a unit of execution).
+    private sealed record class PendingClear(string Id, string? Token, ulong Version);
 }

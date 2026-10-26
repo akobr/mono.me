@@ -45,7 +45,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
             await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
         }
 
-        (await Configurations.GetRawConfigurationAsync(unitOfExecution))!.Content["a"]?.Value<int>().Should().Be(operation == "create" ? null : 1);
+        (await Configurations.GetRawConfigurationAsync(unitOfExecution))!.Content.Value<int?>("a").Should().Be(operation == "create" ? null : 1);
         (await HasCachedCalculationAsync(unitOfExecution)).Should().BeTrue();
         var expectedVersion = operation == "create" ? 1UL : 2UL;
 
@@ -62,7 +62,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         var committed = await ReadRowAsync(responsibility);
         committed["Version"]!.Value<ulong>().Should().Be(expectedVersion);
         committed["Content"]!["a"]!.Value<int>().Should().Be(2);
-        committed["PendingInvalidationId"]?.Type.Should().Be(JTokenType.String);
+        committed.Value<string>("PendingInvalidationId").Should().NotBeNullOrEmpty();
         (await HasCachedCalculationAsync(unitOfExecution)).Should().BeTrue("the invalidation failed");
 
         storage.Interceptor.Reset();
@@ -256,7 +256,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         await FluentActions.Awaiting(() => configs.ClearConfigurationAsync(responsibility)).Should().ThrowAsync<ConfigurationStorageException>();
 
         (await Configurations.HasConfigurationContentAsync(responsibility)).Should().BeFalse("the clear committed");
-        (await ReadItemAsync(responsibility, HistoryId(responsibility, 1)))["PendingInvalidationId"]?.Type.Should().Be(JTokenType.String);
+        (await ReadItemAsync(responsibility, HistoryId(responsibility, 1))).Value<string>("PendingInvalidationId").Should().NotBeNullOrEmpty();
         (await HasCachedCalculationAsync(unitOfExecution)).Should().BeTrue("the invalidation failed");
 
         storage.Interceptor.Reset();
@@ -404,7 +404,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
 
         failure.Which.ErrorCode.Should().Be(ErrorCodes.AnnotationDeleted);
         var row = await ReadRowAsync(responsibility);
-        row["AnnotationDeletionId"]?.Type.Should().Be(JTokenType.String);
+        row.Value<string>("AnnotationDeletionId").Should().NotBeNullOrEmpty();
         row["Content"]!["a"]!.Value<int>().Should().Be(1);
     }
 
@@ -478,6 +478,29 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         written.Version.Should().Be(1);
         (await ReadItemAsync(responsibility, HistoryId(responsibility, 0)))["Content"]!["a"]!.Value<int>().Should().Be(1);
         (await Configurations.GetConfigurationVersionsAsync(responsibility)).Select(version => version.Version).Should().Equal(0U, 1U);
+
+        // a cache row, version 0 without content, does not hide the archived version 0
+        await Configurations.ClearConfigurationAsync(responsibility);
+        var cacheRow = (JObject)row.DeepClone();
+        cacheRow["Content"] = new JObject();
+        await GetContainer().UpsertItemAsync(cacheRow, new PartitionKey(responsibility.GetPartitionKey()));
+        (await Configurations.GetConfigurationVersionContentAsync(responsibility, 0))!.Content["a"]!.Value<int>().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task UnitOfExecution_WritesAndClearsStoreNoToken()
+    {
+        var (_, unitOfExecution) = await CreateTreeAsync("rec-uxe-token");
+        var (configs, storage) = CreateService();
+
+        await configs.CreateOrUpdateConfigurationAsync(unitOfExecution, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+        (await ReadRowAsync(unitOfExecution)).ContainsKey("PendingInvalidationId").Should().BeFalse();
+
+        storage.Interceptor.Reset();
+        (await configs.ClearConfigurationAsync(unitOfExecution)).Should().BeTrue();
+
+        (await ReadItemAsync(unitOfExecution, HistoryId(unitOfExecution, 1))).ContainsKey("PendingInvalidationId").Should().BeFalse();
+        storage.Interceptor.Batches.Should().ContainSingle("the clear writes its archive and deletes the row, and has nothing to invalidate");
     }
 
     private static Task<HttpStatusCode?> FailInvalidation(RecordedBatch batch)

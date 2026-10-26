@@ -21,7 +21,7 @@ public sealed class StorageInterceptor
     // Runs after a batch executed or was failed.
     public Func<RecordedBatch, Task> AfterBatch { get; set; }
 
-    // Runs after a point read, with the id of the item.
+    // Runs after a point read through ReadItemStreamAsync, with the id of the item.
     public Func<string, Task> AfterRead { get; set; }
 
     // The batches in the order they finished.
