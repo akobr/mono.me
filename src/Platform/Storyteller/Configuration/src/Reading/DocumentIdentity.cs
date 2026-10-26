@@ -1,5 +1,5 @@
 using System.Text.Json;
-using _42.Platform.Storyteller.Sdk.Configuring.Settings;
+using _42.Platform.Storyteller.Sdk.Credentials;
 
 namespace _42.Platform.Storyteller.Sdk.Configuring.Reading;
 
@@ -43,7 +43,7 @@ internal sealed record DocumentIdentity
         var typeCode = key.Annotation.TypeCode;
 
         return new DocumentIdentity(
-            LocalUrl.Describe(endpoint).TrimEnd('/'),
+            StorytellerUrlRule.Describe(endpoint).TrimEnd('/'),
             key.OrganizationName,
             key.ProjectName,
             key.ViewName,

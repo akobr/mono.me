@@ -12,10 +12,13 @@ using Polly.CircuitBreaker;
 
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
-// Token and discovery requests: their own HttpClient, which follows no redirect (a secret is in the body) and sends no
-// Authorization, behind the resilience pipeline with POST retries, as a token request has no side effect.
+// Token, discovery and GitHub Actions ID token requests: their own HttpClient, which follows no redirect (a secret is in
+// the body, or in the header of the ID token request) and sends no Authorization, except the request token on the ID
+// token request only; behind the resilience pipeline with POST retries, as a token request has no side effect.
 internal sealed class TokenEndpointClient
 {
+    private const string BearerScheme = "Bearer";
+
     private static readonly TimeSpan FallbackTokenLifetime = TimeSpan.FromMinutes(5);
 
     // Longer lifetimes are cut: a huge value would overflow, and a day is long enough.
@@ -51,7 +54,7 @@ internal sealed class TokenEndpointClient
 
     public async Task<AccessToken> RequestTokenAsync(Uri tokenUrl, IReadOnlyDictionary<string, string> form, CancellationToken cancellationToken)
     {
-        var target = LocalUrlRule.Describe(tokenUrl);
+        var target = StorytellerUrlRule.Describe(tokenUrl);
         using var request = new HttpRequestMessage(HttpMethod.Post, tokenUrl) { Content = new FormUrlEncodedContent(form) };
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -65,11 +68,33 @@ internal sealed class TokenEndpointClient
                 $"The token endpoint {target} returned no bearer token.");
     }
 
+    // GET {requestUrl}&audience={audience}: the ID token of a GitHub Actions job with permissions: id-token: write. The
+    // request token goes on this request only, never to the token endpoint; messages name the runner without its query.
+    public async Task<string> RequestGitHubIdTokenAsync(Uri requestUrl, string requestToken, string audience, CancellationToken cancellationToken)
+    {
+        var target = StorytellerUrlRule.Describe(requestUrl);
+
+        // As written: the runner's URL has a query already (api-version=2.0).
+        var separator = requestUrl.Query.Length > 0 ? "&" : "?";
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri($"{requestUrl.OriginalString}{separator}audience={Uri.EscapeDataString(audience)}", UriKind.Absolute));
+        request.Headers.Authorization = new AuthenticationHeaderValue(BearerScheme, requestToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        using var response = await SendAsync(request, $"The GitHub Actions ID token request to {target}", cancellationToken).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        EnsureSuccess(response, body, $"The GitHub Actions ID token request to {target}");
+
+        return ReadGitHubIdToken(body)
+            ?? throw new StorytellerAuthenticationException(
+                StorytellerAuthenticationFailureReason.Rejected,
+                $"The GitHub Actions ID token request to {target} returned no token.");
+    }
+
     // GET {endpoint}/v1/auth/configuration, anonymous: it describes the sign-in provider of the platform.
     public async Task<SignInDiscovery> DiscoverSignInAsync(Uri endpoint, CancellationToken cancellationToken)
     {
-        var discoveryUrl = new Uri($"{LocalUrlRule.TrimBase(endpoint)}/v1/auth/configuration", UriKind.Absolute);
-        var target = LocalUrlRule.Describe(discoveryUrl);
+        var discoveryUrl = new Uri($"{StorytellerUrlRule.TrimBase(endpoint)}/v1/auth/configuration", UriKind.Absolute);
+        var target = StorytellerUrlRule.Describe(discoveryUrl);
         using var request = new HttpRequestMessage(HttpMethod.Get, discoveryUrl);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -142,6 +167,20 @@ internal sealed class TokenEndpointClient
         catch (JsonException)
         {
             return string.Empty;
+        }
+    }
+
+    // { "count": 1, "value": "<jwt>" }
+    private static string? ReadGitHubIdToken(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            return document.RootElement.ValueKind == JsonValueKind.Object ? ReadString(document.RootElement, "value") : null;
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
@@ -229,7 +268,7 @@ internal sealed class TokenEndpointClient
 
             if (root.ValueKind != JsonValueKind.Object
                 || ReadString(root, "access_token") is not { } accessToken
-                || (ReadString(root, "token_type") is { } tokenType && !string.Equals(tokenType, "Bearer", StringComparison.OrdinalIgnoreCase)))
+                || (ReadString(root, "token_type") is { } tokenType && !string.Equals(tokenType, BearerScheme, StringComparison.OrdinalIgnoreCase)))
             {
                 return null;
             }

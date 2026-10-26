@@ -84,26 +84,68 @@ A `DelegatingHandler` wraps the primary handler, which follows redirects: a hand
 | `FromClientCredentials(new ClientCredentialsOptions { … })` | `Bearer` from a `client_credentials` token request. Without `TokenUrl`, only an AuthKit client id (`client_…`) works: it reads the AuthKit domain from the endpoint's `v1/auth/configuration` and posts to `{domain}/oauth2/token`. |
 | `FromTokenFile(path)` | `Bearer` with the content of the file, read again before every request. It cannot renew, so a `401` is not retried: the rotated file is read by the next request. |
 | `FromFederatedTokenFile(new FederatedTokenOptions { … })` | `Bearer` from an RFC 8693 exchange at `{endpoint}/v1/{organization}/{project}/access/token`, with the platform token of the file, read again before every exchange. |
-| `FromEnvironment()` | the credential of the `STORYTELLER_*` variables below, or `null` when they describe none. |
+| `FromEnvironment()` | the credential of the `STORYTELLER_*` variables below, or `null` when they describe none. A federated machine of a GitHub Actions job gets its platform token from the runner, see [GitHub Actions](#github-actions). |
 
 * **Token cache.** Client credentials and federation keep their token in memory. Concurrent callers share one token request, and its failure. The token is renewed 60 seconds before it expires, or halfway through a token that lives less than two minutes: `expires_in` capped at a day, else the JWT `exp`, else five minutes. A renewal that fails before the token expires keeps the token until then.
 * **Renewal.** `GetAuthorizationAsync(rejected, cancellationToken)` takes the value the API refused. The cached token is dropped only when it is that value, so a burst of `401`s makes one token request.
-* **Token requests** use their own `HttpClient`: no redirects, no `Authorization` header, and the [resilience pipeline](#resilience) with retries of the `POST`. `ConfigureHandler` of the options (or of the binding) configures its `SocketsHttpHandler`, for a proxy; redirects stay off.
-* **Binding.** `credential.Bind(new StorytellerCredentialBinding(endpoint) { Organization = …, Project = … })` returns a copy that knows its endpoint and target project. Federation needs both; AuthKit discovery needs the endpoint. A value set in the options wins over the binding. An unbound credential falls back to `STORYTELLER_ENDPOINT` (or `STORYTELLER_API_URL`) and to the organization and project of `STORYTELLER_KEY` (`@{organization}.{project}.…`). Bind once and reuse the result, as a singleton: every copy of a client-credentials or federated credential has its own token cache and its own connection pool for token requests, so a `Bind` per request or per scope makes a token request each time.
+* **Token requests** use their own `HttpClient`: no redirects, no `Authorization` header, and the [resilience pipeline](#resilience) with retries of the `POST`. The one exception is the ID token request to the GitHub Actions runner, which carries the runner's request token, on that request only. `ConfigureHandler` of the options (or of the binding) configures its `SocketsHttpHandler`, for a proxy; redirects stay off.
+* **Binding.** `credential.Bind(new StorytellerCredentialBinding(endpoint) { Organization = …, Project = … })` returns a copy that knows its endpoint and target project. Federation needs both; AuthKit discovery needs the endpoint. A value set in the options wins over the binding. An unbound credential falls back to `STORYTELLER_ENDPOINT` (or the deprecated `STORYTELLER_API_URL`) and to the organization and project of `STORYTELLER_KEY` (`@{organization}.{project}.…`). Bind once and reuse the result, as a singleton: every copy of a client-credentials or federated credential has its own token cache and its own connection pool for token requests, so a `Bind` per request or per scope makes a token request each time.
 * **URLs** must be `https`, or `http` to `localhost` or a loopback address literal (`127.0.0.1`, `[::1]`), and carry no user info. An endpoint, which paths are appended to, has no query or fragment either.
-* **Failures** throw `StorytellerAuthenticationException` with a `Reason`: `Configuration` (variables, files, a missing binding, a URL), `Rejected` (a `4xx` other than `408` and `429` from a token or discovery request, or a platform that does not sign in with AuthKit) or `Unavailable` (a network error, a timeout, an open circuit, or `408`, `429` or `5xx`; all but `501` and `505` after retries). Messages include the `error` and `error_description` of an OAuth answer; neither they nor `ToString()` contain a secret.
+* **Failures** throw `StorytellerAuthenticationException` with a `Reason`: `Configuration` (variables, files, a missing binding, a URL), `Rejected` (a redirect or a `4xx` other than `408` and `429` from a token, discovery or GitHub Actions request, an answer without a token, or a platform that does not sign in with AuthKit) or `Unavailable` (a network error, a timeout, an open circuit, or `408`, `429` or `5xx`; all but `501` and `505` after retries). Messages include the `error` and `error_description` of an OAuth answer; neither they nor `ToString()` contain a secret.
 
-`FromEnvironment` reads the names of the shared integration contract and accepts the `sform` names as fallbacks. A name and its fallback set to different values are an error that names both. Values are trimmed; an empty value is unset.
+#### Variables
+
+`FromEnvironment` reads the names of the shared integration contract. The older `sform` names are deprecated, but still read when the canonical name is unset; a canonical name and its deprecated name set to different values are an error that names both. Values are trimmed; an empty value is unset. Messages name the variables as they were set, never a value.
+
+| Canonical | Deprecated | Meaning |
+|---|---|---|
+| `STORYTELLER_ENDPOINT` | `STORYTELLER_API_URL` | The API base, `/api` included; read only by an unbound credential |
+| `STORYTELLER_KEY` | – | The full key `@{organization}.{project}.{view}.{annotation key}`; an unbound federated credential takes its organization and project |
+| `STORYTELLER_API_KEY` | – | The structured API key; a leading `ApiKey` scheme is removed |
+| `STORYTELLER_CLIENT_CERTIFICATE` | `STORYTELLER_CERTIFICATE_FILE` | The machine's PKCS#12 file (`.pfx`) |
+| `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD` | `STORYTELLER_CERTIFICATE_PASSWORD` | Its password |
+| `STORYTELLER_CLIENT_ID` | – | The client id of client credentials, or the federated machine id |
+| `STORYTELLER_CLIENT_SECRET`, `STORYTELLER_TOKEN_URL`, `STORYTELLER_TOKEN_SCOPE` | – | Client credentials; the scope also for federation |
+| `STORYTELLER_TOKEN_FILE` | `STORYTELLER_SUBJECT_TOKEN_FILE`, federation only | With `STORYTELLER_CLIENT_ID` and no client-credentials variable: the platform token a federated machine exchanges. Alone: a bearer token the API accepts |
+| `STORYTELLER_SUBJECT_TOKEN_TYPE` | – | `jwt` (the default), `id_token`, `access_token` or the full URN, in any case |
+| `ACTIONS_ID_TOKEN_REQUEST_URL`, `ACTIONS_ID_TOKEN_REQUEST_TOKEN` | – | Set by GitHub Actions in a job with `id-token: write`: the platform token source of a federated machine without a token file |
 
 | Kind | Variables |
 |---|---|
 | API key | `STORYTELLER_API_KEY` |
-| Certificate | `STORYTELLER_CLIENT_CERTIFICATE` (fallback `STORYTELLER_CERTIFICATE_FILE`) and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD` (fallback `STORYTELLER_CERTIFICATE_PASSWORD`); alone or with an API key |
+| Certificate | `STORYTELLER_CLIENT_CERTIFICATE` and, when the file has one, its password; alone or with an API key |
 | Client credentials | `STORYTELLER_CLIENT_ID`, `STORYTELLER_CLIENT_SECRET`, `STORYTELLER_TOKEN_URL` (recommended; `sform account machine create` prints it), `STORYTELLER_TOKEN_SCOPE` |
-| Federation | `STORYTELLER_CLIENT_ID` (the machine id) with `STORYTELLER_TOKEN_FILE` (fallback `STORYTELLER_SUBJECT_TOKEN_FILE`) and no client secret; optional `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE` |
+| Federation | `STORYTELLER_CLIENT_ID` (the machine id) with `STORYTELLER_TOKEN_FILE` and no client-credentials variable, or in a GitHub Actions job; optional `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE` |
 | Token file | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID` |
 
-Variables of two kinds at once, and `STORYTELLER_CLIENT_ID` alone, are errors. The GitHub Actions token source of `sform` is not supported here.
+* **One kind.** Variables of two kinds at once are an error that names them.
+* **`STORYTELLER_SUBJECT_TOKEN_FILE` is no plain alias.** Set, it always makes a federated machine, never a bearer token file, so it needs `STORYTELLER_CLIENT_ID`; with `STORYTELLER_TOKEN_FILE` and no client id it is two kinds. With a client id, it and `STORYTELLER_TOKEN_FILE` must agree.
+* **`STORYTELLER_TOKEN_FILE` with `STORYTELLER_SUBJECT_TOKEN_TYPE`** and no client id is two kinds.
+* **`STORYTELLER_CLIENT_ID` alone**, or with `STORYTELLER_TOKEN_SCOPE`, federates through GitHub Actions when the id is a GUID and both GitHub variables are set; otherwise it is an error that names both ways (a client secret, or a token file or a GitHub Actions job). `STORYTELLER_TOKEN_SCOPE` without a client id is an error.
+* **`STORYTELLER_SUBJECT_TOKEN_TYPE` without a file** needs `STORYTELLER_CLIENT_ID` (any id), then takes the platform token from GitHub Actions when both GitHub variables are set; otherwise it is an error that names `STORYTELLER_TOKEN_FILE` and GitHub Actions.
+* **The GitHub variables alone** describe no credential: `FromEnvironment` returns `null` in a job with `id-token: write` that sets no `STORYTELLER_*` credential variable.
+* **Client credentials** need `STORYTELLER_CLIENT_ID` and `STORYTELLER_CLIENT_SECRET`. Without `STORYTELLER_TOKEN_URL`, only an AuthKit client id (`client_…`) works, through discovery. **A certificate password** without a file is an error.
+
+#### GitHub Actions
+
+A federated machine in a GitHub Actions job with `permissions: id-token: write` needs no token file: the credential asks the runner for a new ID token before every exchange.
+
+* **The request.** `GET {ACTIONS_ID_TOKEN_REQUEST_URL}&audience={audience, escaped}` (`?audience=` when the URL has no query), with `Authorization: Bearer {ACTIONS_ID_TOKEN_REQUEST_TOKEN}` on that request only, on the client of the token requests: no redirects and the same resilience. The token is the `value` of the answer. `ACTIONS_ID_TOKEN_REQUEST_URL` follows the URL rule; it may have a query.
+* **The audience** is the token endpoint built from the endpoint as written, without its trailing `/`, plus `/v1/{organization}/{project}/access/token` with escaped segments: byte for byte what `sform` requests and what `sform account machine create` prints, which is what a federation rule's audience must name. The exchange itself posts to the normalised URI.
+* **Failures.** A network error, a timeout, `408`, `429` and `5xx` of the runner are `Unavailable` (after retries); a redirect, another `4xx`, or an answer without a token are `Rejected`. Messages name the runner's URL without its query, never the request token.
+* **A refused exchange.** When the exchange of a GitHub token is `Rejected`, its message ends with "; the GitHub Actions token of this job was requested for the audience {audience}, which a rule of the machine must name exactly. For client credentials, set STORYTELLER_CLIENT_SECRET instead."
+* `ToString()` is `StorytellerCredential { Kind = Federated, ClientId = {id}, SubjectTokenSource = GitHubActions }`.
+
+#### The shared contract
+
+The rules above are public, so that `sform` and other tools read the same variables in the same way:
+
+* `StorytellerVariables`: the names as constants, `Credentials` (every name that makes a credential, deprecated ones included; not the endpoint, the key or the GitHub names) and `Deprecated` (a deprecated name and its canonical name).
+* `StorytellerVariableReader`: trimmed values, an empty value as unset, `ReadWithFallback` with the conflict error, and `SetNames`.
+* `StorytellerUrlRule`: `IsAllowed`, `IsLocalHttp`, `Require`, `RequireEndpoint` and `Describe` (a URL without user info, query or fragment, for messages).
+* `StorytellerCredentialVariables.Read(getVariable)`: `null` when no credential variable is set, otherwise the checked variables with their `Kind` (`StorytellerCredentialKind`), `SubjectTokenSource` (`StorytellerSubjectTokenSource`, federated only), `Names`, `DeprecatedNames`, `ApiKey` (without its scheme), `ClientId` and `TokenFile`. The secrets are not exposed, and `ToString()` prints only the kind and the names. `CreateCredential(fileSystem, timeProvider)` builds the unbound credential and loads the certificate; `FromEnvironment` is `Read(getVariable)?.CreateCredential(fileSystem, timeProvider)`.
+
+#### The credential handler
 
 `IHttpClientBuilder.AddStorytellerCredential(credential)` adds a `StorytellerCredentialHandler`. It sets `Authorization` on every request. After a `401` it asks the credential once more and sends the request again, when the credential `CanRenew`, the body is empty or a `ByteArrayContent`, and no redirect changed the request. On that path:
 

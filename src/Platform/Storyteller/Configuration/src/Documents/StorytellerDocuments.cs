@@ -5,6 +5,7 @@ using _42.Platform.Storyteller.Sdk.Configuring.Reading;
 using _42.Platform.Storyteller.Sdk.Configuring.References;
 using _42.Platform.Storyteller.Sdk.Configuring.Settings;
 using _42.Platform.Storyteller.Sdk.Configuring.Transport;
+using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Internal;
 using Microsoft.Extensions.Logging;
@@ -138,7 +139,7 @@ internal sealed class StorytellerDocuments : IStorytellerDocuments, IDisposable
         return _settings.Key is { } scope
             ? FullKey.Create(annotationKey, scope)
             : throw new ArgumentException(
-                $"'{text}' is an annotation key, and there is no default scope for it: pass a full key, or set {ConfigurationVariables.KEY} or {nameof(StorytellerConfigurationOptions)}.{nameof(StorytellerConfigurationOptions.Key)}.",
+                $"'{text}' is an annotation key, and there is no default scope for it: pass a full key, or set {StorytellerVariables.KEY} or {nameof(StorytellerConfigurationOptions)}.{nameof(StorytellerConfigurationOptions.Key)}.",
                 nameof(key));
     }
 

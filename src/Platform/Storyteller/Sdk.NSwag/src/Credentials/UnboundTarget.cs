@@ -2,21 +2,21 @@ using System;
 
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
-// What an unbound credential falls back to: the endpoint of STORYTELLER_ENDPOINT (or STORYTELLER_API_URL), and the
-// organization and project of STORYTELLER_KEY, split as @{organization}.{project}.… without parsing the rest.
+// What an unbound credential falls back to: the endpoint of STORYTELLER_ENDPOINT (or the deprecated STORYTELLER_API_URL),
+// and the organization and project of STORYTELLER_KEY, split as @{organization}.{project}.… without parsing the rest.
 internal static class UnboundTarget
 {
     public static Uri? ReadEndpoint(Func<string, string?> getVariable)
     {
-        var variables = new EnvironmentVariables(getVariable);
+        var variables = new StorytellerVariableReader(getVariable);
         var endpoint = variables.ReadWithFallback(StorytellerVariables.ENDPOINT, StorytellerVariables.API_URL, out var source);
 
-        return endpoint is null ? null : LocalUrlRule.RequireEndpoint(endpoint, source);
+        return endpoint is null ? null : StorytellerUrlRule.RequireEndpoint(endpoint, source);
     }
 
     public static (string? Organization, string? Project) ReadProject(Func<string, string?> getVariable)
     {
-        var key = new EnvironmentVariables(getVariable).Read(StorytellerVariables.KEY);
+        var key = new StorytellerVariableReader(getVariable).Read(StorytellerVariables.KEY);
 
         if (key is null)
         {

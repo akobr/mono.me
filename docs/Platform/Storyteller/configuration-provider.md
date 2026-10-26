@@ -113,20 +113,22 @@ The `configure` callback runs first. Every option it left `null` is then read fr
 | `STORYTELLER_CLIENT_SECRET` | – | The client secret of a `ClientCredentials` machine |
 | `STORYTELLER_TOKEN_URL` | – | The token URL that `machine create` printed. Without it, only an AuthKit client id (`client_…`) works, through discovery. |
 | `STORYTELLER_TOKEN_SCOPE` | – | The token scope of client credentials, or the Storyteller scopes a federated exchange asks for |
-| `STORYTELLER_TOKEN_FILE` | `STORYTELLER_SUBJECT_TOKEN_FILE`, for a federated machine | Alone: a file with a bearer token, read again before every request. With `STORYTELLER_CLIENT_ID` and no client secret: the platform token of a federated machine, read again before every exchange. |
+| `STORYTELLER_TOKEN_FILE` | `STORYTELLER_SUBJECT_TOKEN_FILE`, for a federated machine only | Alone: a file with a bearer token, read again before every request. With `STORYTELLER_CLIENT_ID` and no client-credentials variable: the platform token of a federated machine, read again before every exchange. `STORYTELLER_SUBJECT_TOKEN_FILE` is never a bearer token file: set, it makes a federated machine, which needs `STORYTELLER_CLIENT_ID`. |
 | `STORYTELLER_SUBJECT_TOKEN_TYPE` | – | A federated machine, optional: `jwt` (the default), `id_token`, `access_token`, or the full URN |
+| `ACTIONS_ID_TOKEN_REQUEST_URL`, `ACTIONS_ID_TOKEN_REQUEST_TOKEN` | – | Set by GitHub Actions in a job with `permissions: id-token: write`. Not credential variables: they only give a federated machine without a token file its platform token, see below. |
 
 | Kind | Variables |
 | --- | --- |
 | API key | `STORYTELLER_API_KEY` |
 | Certificate | `STORYTELLER_CLIENT_CERTIFICATE` and, when the file has one, its password; alone or with an API key |
 | Client credentials | `STORYTELLER_CLIENT_ID`, `STORYTELLER_CLIENT_SECRET`, and usually `STORYTELLER_TOKEN_URL` and `STORYTELLER_TOKEN_SCOPE` |
-| Federation | `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_FILE`, without a client secret; optionally `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE` |
+| Federation | `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_FILE`, without a client-credentials variable, or `STORYTELLER_CLIENT_ID` in a GitHub Actions job; optionally `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE` |
 | Token file | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID` |
 
 - **Fallbacks.** A name and its fallback set to different values are an error that names both. The same value in both is accepted.
-- **One kind.** Variables of two kinds at once are an error that names them. So is `STORYTELLER_CLIENT_ID` alone.
-- **Not read:** the GitHub Actions token source of a federated `sform` sign-in (`ACTIONS_ID_TOKEN_REQUEST_*`), and `STORYTELLER_PROJECT` and `STORYTELLER_VIEW`, which `STORYTELLER_KEY` replaces.
+- **One kind.** Variables of two kinds at once are an error that names them. So is `STORYTELLER_CLIENT_ID` alone (or with `STORYTELLER_TOKEN_SCOPE`), unless it federates through GitHub Actions; the message names both ways, a client secret, or a token file or a GitHub Actions job.
+- **GitHub Actions.** In a job with `permissions: id-token: write`, `STORYTELLER_CLIENT_ID` without a token file federates with the job's ID token when the id is a GUID, as every federated machine id is, or, for any id, together with `STORYTELLER_SUBJECT_TOKEN_TYPE`. The credential asks the runner for a new ID token before every exchange, for the audience of the token endpoint of the project of `Key`, built from `Endpoint` as written. The GitHub variables alone mean anonymous requests. A runner that is unreachable or answers `408`, `429` or `5xx` is a transient failure, so the cache entry or `Optional` applies; a runner that refuses (a redirect, another `4xx`, or no token) is definitive, like a refused exchange. See the [SDK readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md#github-actions).
+- **Not read:** `STORYTELLER_PROJECT` and `STORYTELLER_VIEW`, which `STORYTELLER_KEY` replaces.
 - **Code wins.** A `Credential` set in code replaces the credential variables; they are not read.
 - **Binding.** The credential, from the environment or from code, is bound to the validated `Endpoint`, the organization and project of `Key`, `ConfigurePrimaryHandler`, `TimeProvider` and `Resilience`. A value set in the credential's own options wins; the binding fills what they leave unset. A key set in code therefore also decides the project at whose token endpoint a federated machine exchanges its token, unless the credential's own options name the organization and project.
 

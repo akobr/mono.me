@@ -48,7 +48,7 @@ internal static class TransportFactory
             BaseUrl = settings.Endpoint.AbsoluteUri,
             AccessTokenFactory = null,
             ClientCertificate = certificate,
-            ClientCertificateHeaderName = certificate is not null && LocalUrl.IsLocalHttp(settings.Endpoint) ? LocalCertificateHeaderName : null,
+            ClientCertificateHeaderName = certificate is not null && StorytellerUrlRule.IsLocalHttp(settings.Endpoint) ? LocalCertificateHeaderName : null,
         });
 
         return new StorytellerTransport(httpClient, client);

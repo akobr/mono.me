@@ -30,6 +30,6 @@ public sealed class StorytellerCredentialBinding
 
     public override string ToString()
     {
-        return $"{nameof(StorytellerCredentialBinding)} {{ Endpoint = {LocalUrlRule.Describe(Endpoint)}, Organization = {Organization}, Project = {Project} }}";
+        return $"{nameof(StorytellerCredentialBinding)} {{ Endpoint = {StorytellerUrlRule.Describe(Endpoint)}, Organization = {Organization}, Project = {Project} }}";
     }
 }

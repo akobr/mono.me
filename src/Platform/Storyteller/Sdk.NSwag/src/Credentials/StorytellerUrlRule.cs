@@ -4,14 +4,15 @@ using System.Diagnostics.CodeAnalysis;
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
 // Credentials never cross a network in clear text: an absolute https URL without user info, or http to localhost or a
-// loopback address literal, never to a name that DNS resolves. The provider keeps a copy, LocalUrl in
-// Configuration/src/Settings, because this one is internal; a change here goes there too.
-internal static class LocalUrlRule
+// loopback address literal, never to a name that DNS resolves. Public, so the provider and sform apply the same rule.
+public static class StorytellerUrlRule
 {
     private static readonly char[] AuthorityEnd = ['/', '?', '#', '\\'];
 
     public static bool IsAllowed(Uri uri)
     {
+        ArgumentNullException.ThrowIfNull(uri);
+
         return uri.IsAbsoluteUri
             && string.IsNullOrEmpty(uri.UserInfo)
             && (uri.Scheme == Uri.UriSchemeHttps || IsLocalHttp(uri));
@@ -19,6 +20,8 @@ internal static class LocalUrlRule
 
     public static bool IsLocalHttp(Uri uri)
     {
+        ArgumentNullException.ThrowIfNull(uri);
+
         return uri.IsAbsoluteUri
             && uri.Scheme == Uri.UriSchemeHttp
             && uri.IsLoopback
@@ -26,36 +29,37 @@ internal static class LocalUrlRule
                 || string.Equals(ReadWrittenHost(uri), "localhost", StringComparison.OrdinalIgnoreCase));
     }
 
-    // The name is a variable or an option, printed in the message; the value is not, as it may carry user info.
-    public static Uri Require(string value, string name)
+    // The source is a variable or an option, printed in the message; the value is not, as it may carry user info. The
+    // Uri keeps the text as written (OriginalString). A refused URL is a StorytellerAuthenticationException (Configuration).
+    public static Uri Require(string value, string source)
     {
         return Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            ? Require(uri, name)
-            : throw Invalid(name);
+            ? Require(uri, source)
+            : throw Invalid(source);
     }
 
-    public static Uri Require(Uri uri, string name)
+    public static Uri Require(Uri uri, string source)
     {
-        return IsAllowed(uri) ? uri : throw Invalid(name);
+        return IsAllowed(uri) ? uri : throw Invalid(source);
     }
 
     // The API base: paths are appended to it, so it has no query or fragment either, as the provider requires.
-    public static Uri RequireEndpoint(string value, string name)
+    public static Uri RequireEndpoint(string value, string source)
     {
-        return RequireEndpoint(Require(value, name), name);
+        return RequireEndpoint(Require(value, source), source);
     }
 
-    public static Uri RequireEndpoint(Uri uri, string name)
+    public static Uri RequireEndpoint(Uri uri, string source)
     {
-        Require(uri, name);
+        Require(uri, source);
 
         return uri.Query.Length == 0 && uri.Fragment.Length == 0
             ? uri
-            : throw StorytellerAuthenticationException.Configuration($"{name} must not have a query or a fragment; set the API base, /api included.");
+            : throw StorytellerAuthenticationException.Configuration($"{source} must not have a query or a fragment; set the API base, /api included.");
     }
 
-    // For messages and ToString(): scheme, host, port and path, never user info, a query or a fragment. A relative URL,
-    // which no check has refused yet, has none of them to print.
+    // For messages, ToString() and identities: scheme, host, port and path, never user info, a query or a fragment. A
+    // relative URL, which no check has refused yet, has none of them to print.
     [return: NotNullIfNotNull(nameof(uri))]
     public static string? Describe(Uri? uri)
     {
@@ -68,7 +72,7 @@ internal static class LocalUrlRule
     }
 
     // A base URL to append paths to, without its trailing slash.
-    public static string TrimBase(Uri uri)
+    internal static string TrimBase(Uri uri)
     {
         return uri.AbsoluteUri.TrimEnd('/');
     }
@@ -92,9 +96,9 @@ internal static class LocalUrlRule
         return port < 0 ? authority : authority[..port];
     }
 
-    private static StorytellerAuthenticationException Invalid(string name)
+    private static StorytellerAuthenticationException Invalid(string source)
     {
         return StorytellerAuthenticationException.Configuration(
-            $"{name} must be an absolute https URL without user info; http is allowed only for localhost or a loopback address.");
+            $"{source} must be an absolute https URL without user info; http is allowed only for localhost or a loopback address.");
     }
 }

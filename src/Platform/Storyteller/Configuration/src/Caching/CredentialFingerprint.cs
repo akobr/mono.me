@@ -7,8 +7,8 @@ namespace _42.Platform.Storyteller.Sdk.Configuring.Caching;
 
 // Who reads a document, for the cache identity: the kind of the credential, plus what tells two principals of one kind
 // apart, all hashed. The SDK keeps its credentials' fields to itself, so the public surface is read:
-// - ToString(), which every SDK kind prints without secrets and with the client id, the subject token path or the
-//   certificate thumbprint;
+// - ToString(), which every SDK kind prints without secrets and with the client id, the subject token path (or the
+//   GitHub Actions source) or the certificate thumbprint; CredentialFingerprintTests pins the federated texts;
 // - the thumbprint of ClientCertificate;
 // - the machine segment of an API key, 2s.{base64url(organization:project:machine)}.{secret}.
 // A credential of the application is told apart by its type, ToString() and certificate, plus the machine of an API

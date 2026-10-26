@@ -8,7 +8,8 @@ using System.Threading.Tasks;
 
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
-// RFC 8693 at the token endpoint of the target project, with the platform token read again for every exchange.
+// RFC 8693 at the token endpoint of the target project, with a platform token got again for every exchange: from a file,
+// or from the GitHub Actions runner.
 internal sealed class FederatedTokenCredential : CachedTokenCredential
 {
     private const string GrantType = "urn:ietf:params:oauth:grant-type:token-exchange";
@@ -17,26 +18,25 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
     private static readonly string[] SubjectTokenTypes =
         [FederatedTokenOptions.JwtTokenType, FederatedTokenOptions.IdTokenType, FederatedTokenOptions.AccessTokenType];
 
-    private readonly FederatedTokenOptions _options;
-    private readonly string _subjectTokenType;
-    private readonly IFileSystem _fileSystem;
-    private readonly string? _pathSource;
-    private Uri? _exchangeUrl;
+    private readonly Exchange _exchange;
+    private readonly PlatformTokenSource _source;
+    private ExchangeTarget? _target;
 
     private FederatedTokenCredential(
-        FederatedTokenOptions options,
-        string subjectTokenType,
-        string? pathSource,
+        Exchange exchange,
+        PlatformTokenSource source,
         StorytellerCredentialBinding? binding,
         Func<string, string?> getVariable,
         HttpMessageHandler? primaryHandler)
-        : base(options.ConfigureHandler, options.TimeProvider, binding, getVariable, primaryHandler)
+        : base(exchange.ConfigureHandler, exchange.TimeProvider, binding, getVariable, primaryHandler)
     {
-        _options = options;
-        _subjectTokenType = subjectTokenType;
-        _fileSystem = options.FileSystem ?? new FileSystem();
-        _pathSource = pathSource;
+        _exchange = exchange;
+        _source = source;
     }
+
+    public StorytellerSubjectTokenSource SubjectTokenSource => _source is GitHubActionsSource
+        ? StorytellerSubjectTokenSource.GitHubActions
+        : StorytellerSubjectTokenSource.File;
 
     // pathSource names the variable the subject token path came from, for messages; null for code.
     public static FederatedTokenCredential Create(FederatedTokenOptions options, string? pathSource, Func<string, string?> getVariable)
@@ -51,26 +51,56 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
 
         if (options.Endpoint is not null)
         {
-            LocalUrlRule.RequireEndpoint(options.Endpoint, "FederatedTokenOptions.Endpoint");
+            StorytellerUrlRule.RequireEndpoint(options.Endpoint, "FederatedTokenOptions.Endpoint");
         }
 
-        return new FederatedTokenCredential(options, subjectTokenType, pathSource, null, getVariable, null);
+        var exchange = new Exchange(
+            options.ClientId,
+            subjectTokenType,
+            options.Scope,
+            options.Endpoint,
+            options.Organization,
+            options.Project,
+            options.ConfigureHandler,
+            options.TimeProvider);
+
+        return new FederatedTokenCredential(exchange, new FileSource(options.SubjectTokenPath, options.FileSystem ?? new FileSystem(), pathSource), null, getVariable, null);
+    }
+
+    // The ID token of the GitHub Actions job, for the audience of the token endpoint; reached through the variables only.
+    // The request URL is checked by the URL rule already.
+    public static FederatedTokenCredential CreateGitHubActions(
+        string clientId,
+        string subjectTokenType,
+        string? scope,
+        Uri requestUrl,
+        string requestToken,
+        TimeProvider? timeProvider,
+        Func<string, string?> getVariable)
+    {
+        var exchange = new Exchange(clientId, subjectTokenType, scope, null, null, null, null, timeProvider);
+        return new FederatedTokenCredential(exchange, new GitHubActionsSource(requestUrl, requestToken), null, getVariable, null);
     }
 
     public override StorytellerCredential Bind(StorytellerCredentialBinding binding)
     {
         ArgumentNullException.ThrowIfNull(binding);
-        return new FederatedTokenCredential(_options, _subjectTokenType, _pathSource, binding, GetVariable, PrimaryHandler);
+        return new FederatedTokenCredential(_exchange, _source, binding, GetVariable, PrimaryHandler);
     }
 
+    // Part of the cache identity of the provider (CredentialFingerprint): the file-sourced text must not change.
     public override string ToString()
     {
-        return $"{nameof(StorytellerCredential)} {{ Kind = Federated, ClientId = {_options.ClientId}, SubjectTokenPath = {_options.SubjectTokenPath} }}";
+        return _source switch
+        {
+            FileSource file => $"{nameof(StorytellerCredential)} {{ Kind = Federated, ClientId = {_exchange.ClientId}, SubjectTokenPath = {file.Path} }}",
+            _ => $"{nameof(StorytellerCredential)} {{ Kind = Federated, ClientId = {_exchange.ClientId}, SubjectTokenSource = {StorytellerSubjectTokenSource.GitHubActions} }}",
+        };
     }
 
     internal override StorytellerCredential WithPrimaryHandler(HttpMessageHandler primaryHandler)
     {
-        return new FederatedTokenCredential(_options, _subjectTokenType, _pathSource, Binding, GetVariable, primaryHandler);
+        return new FederatedTokenCredential(_exchange, _source, Binding, GetVariable, primaryHandler);
     }
 
     // jwt, id_token or access_token (any case), or one of the three URNs; null when the value is none of them.
@@ -89,30 +119,41 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
 
     protected override async Task<AccessToken> RequestTokenAsync(TokenEndpointClient client, CancellationToken cancellationToken)
     {
-        var exchangeUrl = _exchangeUrl ??= ResolveExchangeUrl();
+        var target = _target ??= ResolveTarget();
         var form = new Dictionary<string, string>
         {
             ["grant_type"] = GrantType,
-            ["client_id"] = _options.ClientId,
+            ["client_id"] = _exchange.ClientId,
 
             // A projected Kubernetes token has no scheme; sent as it is.
-            ["subject_token"] = CredentialFiles.ReadText(_fileSystem, _options.SubjectTokenPath, _pathSource, "platform token file"),
-            ["subject_token_type"] = _subjectTokenType,
+            ["subject_token"] = await _source.GetTokenAsync(client, target.Audience, cancellationToken).ConfigureAwait(false),
+            ["subject_token_type"] = _exchange.SubjectTokenType,
         };
 
-        if (!string.IsNullOrWhiteSpace(_options.Scope))
+        if (!string.IsNullOrWhiteSpace(_exchange.Scope))
         {
-            form["scope"] = _options.Scope;
+            form["scope"] = _exchange.Scope;
         }
 
-        return await client.RequestTokenAsync(exchangeUrl, form, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await client.RequestTokenAsync(target.Url, form, cancellationToken).ConfigureAwait(false);
+        }
+        catch (StorytellerAuthenticationException exception) when (exception.Reason == StorytellerAuthenticationFailureReason.Rejected && _source is GitHubActionsSource)
+        {
+            // A refused GitHub token most likely has an audience no rule names, or the job meant client credentials.
+            throw new StorytellerAuthenticationException(
+                exception.Reason,
+                $"{exception.Message.TrimEnd('.')}; the GitHub Actions token of this job was requested for the audience {target.Audience}, which a rule of the machine must name exactly. For client credentials, set {StorytellerVariables.CLIENT_SECRET} instead.",
+                exception);
+        }
     }
 
-    private Uri ResolveExchangeUrl()
+    private ExchangeTarget ResolveTarget()
     {
-        var endpoint = ResolveEndpoint(_options.Endpoint, "A federated credential");
-        var organization = _options.Organization;
-        var project = _options.Project;
+        var endpoint = ResolveEndpoint(_exchange.Endpoint, "A federated credential");
+        var organization = _exchange.Organization;
+        var project = _exchange.Project;
 
         if (organization is null || project is null)
         {
@@ -129,6 +170,55 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
                 $"A federated credential exchanges at the token endpoint of a project: bind it to the organization and project, set them in its options, or set {StorytellerVariables.KEY}.");
         }
 
-        return new Uri($"{LocalUrlRule.TrimBase(endpoint)}/v1/{Uri.EscapeDataString(organization)}/{Uri.EscapeDataString(project)}/access/token", UriKind.Absolute);
+        var path = $"/v1/{Uri.EscapeDataString(organization)}/{Uri.EscapeDataString(project)}/access/token";
+
+        // The audience is built from the endpoint as written, as sform builds it and machine create prints it: the
+        // server compares the token's aud with a rule's audience byte for byte. The exchange posts to the normalised URI.
+        return new ExchangeTarget(
+            new Uri($"{StorytellerUrlRule.TrimBase(endpoint)}{path}", UriKind.Absolute),
+            $"{endpoint.OriginalString.TrimEnd('/')}{path}");
+    }
+
+    // What every copy shares, apart from the source of the platform token.
+    private sealed record Exchange(
+        string ClientId,
+        string SubjectTokenType,
+        string? Scope,
+        Uri? Endpoint,
+        string? Organization,
+        string? Project,
+        Action<SocketsHttpHandler>? ConfigureHandler,
+        TimeProvider? TimeProvider);
+
+    private sealed record ExchangeTarget(Uri Url, string Audience);
+
+    // Asked again before every exchange: a file the platform renews, or an ID token that lives about 5 minutes.
+    private abstract class PlatformTokenSource
+    {
+        public abstract Task<string> GetTokenAsync(TokenEndpointClient client, string audience, CancellationToken cancellationToken);
+    }
+
+    private sealed class FileSource(string path, IFileSystem fileSystem, string? pathSource) : PlatformTokenSource
+    {
+        public string Path => path;
+
+        public override Task<string> GetTokenAsync(TokenEndpointClient client, string audience, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(CredentialFiles.ReadText(fileSystem, path, pathSource, "platform token file"));
+        }
+    }
+
+    private sealed class GitHubActionsSource(Uri requestUrl, string requestToken) : PlatformTokenSource
+    {
+        public override Task<string> GetTokenAsync(TokenEndpointClient client, string audience, CancellationToken cancellationToken)
+        {
+            return client.RequestGitHubIdTokenAsync(requestUrl, requestToken, audience, cancellationToken);
+        }
+
+        // The request token is a secret.
+        public override string ToString()
+        {
+            return $"{nameof(GitHubActionsSource)} {{ RequestUrl = {StorytellerUrlRule.Describe(requestUrl)} }}";
+        }
     }
 }

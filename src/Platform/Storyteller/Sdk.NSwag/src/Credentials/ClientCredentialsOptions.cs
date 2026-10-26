@@ -25,6 +25,6 @@ public sealed record ClientCredentialsOptions
     // A record prints its members; the secret must never reach a log.
     public override string ToString()
     {
-        return $"{nameof(ClientCredentialsOptions)} {{ TokenUrl = {LocalUrlRule.Describe(TokenUrl)}, ClientId = {ClientId}, Scope = {Scope}, Endpoint = {LocalUrlRule.Describe(Endpoint)} }}";
+        return $"{nameof(ClientCredentialsOptions)} {{ TokenUrl = {StorytellerUrlRule.Describe(TokenUrl)}, ClientId = {ClientId}, Scope = {Scope}, Endpoint = {StorytellerUrlRule.Describe(Endpoint)} }}";
     }
 }

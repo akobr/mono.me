@@ -3,19 +3,21 @@ using System.Collections.Generic;
 
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
-// Reads STORYTELLER_* values: trimmed, an empty value counts as unset, and a name and its sform fallback must agree.
-// Remembers the names it found set, never their values.
-internal sealed class EnvironmentVariables
+// Reads STORYTELLER_* values: trimmed, an empty value counts as unset, and a name and its deprecated name must agree.
+// Remembers the names it found set, never their values; messages name variables, never values.
+public sealed class StorytellerVariableReader
 {
     private readonly Func<string, string?> _getVariable;
     private readonly List<string> _setNames = [];
 
-    public EnvironmentVariables(Func<string, string?> getVariable)
+    // The process environment when getVariable is null.
+    public StorytellerVariableReader(Func<string, string?>? getVariable = null)
     {
-        _getVariable = getVariable;
+        _getVariable = getVariable ?? Environment.GetEnvironmentVariable;
     }
 
-    public IReadOnlyList<string> SetNames => _setNames;
+    // The names read so far that were set, in the order they were read.
+    public IReadOnlyList<string> SetNames => _setNames.AsReadOnly();
 
     public string? Read(string name)
     {
@@ -30,7 +32,7 @@ internal sealed class EnvironmentVariables
         return value;
     }
 
-    // source is the name the value came from, for messages.
+    // fallback is the deprecated name, read when name is unset; source is the name the value came from, for messages.
     public string? ReadWithFallback(string name, string fallback, out string source)
     {
         var value = Read(name);
