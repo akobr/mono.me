@@ -36,7 +36,7 @@ The body is the effective configuration: ancestors merged, `@` expressions still
 GET /v1/house/main/default/configuration/exe.northwind.invoicing.production/resolved
 ```
 
-The body is the same document with expressions evaluated. Secret sources are included only for a caller with secret rights: a user with a project role of `ContributorWithSecrets` or higher, or a machine with the scope `Secrets.Read`. A project can deliver secrets to machines only over mTLS; a machine with `Secrets.Read` that calls without its client certificate then gets the header `X-2S-Secrets-Withheld: mtls-required` instead of the secrets. Everyone else receives the document with those secret expressions left unresolved.
+The body is the same document with expressions evaluated. Secret sources are included only for a caller with secret rights: a user with a project role of `ContributorWithSecrets` or higher, or a machine with the scope `Secrets.Read`. A project can deliver secrets to machines only over mTLS; a machine with `Secrets.Read` that calls without its client certificate then gets the header `X-2S-Secrets-Withheld: mtls-required` instead of the secrets. A person who calls through an assistant's actor, such as the MCP server, has secret reads withheld by default and gets `X-2S-Secrets-Withheld: actor-restricted`. Everyone else receives the document with those secret expressions left unresolved.
 
 ```text
 GET /v1/house/main/default/configuration/exe.northwind.invoicing.production/composition
