@@ -593,26 +593,44 @@ public class CosmosAccessService : IAccessService
 
         var accessKey = await MachineAccessService.ResetMachineAccessAsync(machineAccess.ToMachineAccess(), organization, project);
 
+        // Only a delete removes a hash, and it does so before it deletes the document.
+        var deletedMessage = $"The machine access {appId} was deleted during its reset.";
+
         if (accessKey is null)
         {
-            throw new InvalidOperationException($"The machine access {appId} reset failed.");
+            throw machineAccess.HashedSecret is not null
+                ? new NotFoundException(deletedMessage)
+                : new InvalidOperationException($"The machine access {appId} reset failed.");
         }
 
         var maskedKey = !string.IsNullOrEmpty(accessKey) && accessKey.Length >= 3
             ? $"{accessKey[..3]}***"
             : "***";
 
-        // The reset wrote the new hash onto this document (CosmosMergedApiKeyHashStore), so the copy read above is
-        // stale: writing it back would restore the old hash, keep the old key working and refuse the new one.
-        var current = await repository.Container.TryReadItemAsync(
+        // Only the masked key: the copy read above is stale (the new hash, a concurrent renewal), and a patch never
+        // brings back a machine deleted meanwhile. Only the reset writes this field, so no ETag.
+        using var response = await repository.Container.PatchItemStreamAsync(
             appId,
             partitionKey,
-            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
-        machineAccess = (current ?? machineAccess) with { AccessKey = maskedKey };
-        await repository.Container.UpsertItemAsync(machineAccess, partitionKey);
+            [PatchOperation.Set($"/{nameof(MachineAccessEntity.AccessKey)}", maskedKey)]);
 
-        var result = machineAccess.ToMachineAccess();
-        return result with { AccessKey = accessKey };
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new NotFoundException(deletedMessage);
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        // The stored record after the reset, with whatever landed meanwhile. A delete that already removed the new
+        // hash leaves a key that never works, so the reset is not answered as a success.
+        var stored = response.Content.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions)!;
+
+        if (machineAccess.HashedSecret is not null && stored.HashedSecret is null)
+        {
+            throw new NotFoundException(deletedMessage);
+        }
+
+        return stored.ToMachineAccess() with { AccessKey = accessKey };
     }
 
     public async Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)

@@ -197,6 +197,30 @@ public class PolicyAwareScopesTests
             return Task.CompletedTask;
         }
 
+        // Compare-and-set, as the Cosmos store does.
+        public Task<bool> ReplaceAsync(
+            string organization,
+            string project,
+            string machineAccessId,
+            string currentHashedSecret,
+            string newHashedSecret)
+        {
+            var key = $"{organization}.{project}.{machineAccessId}";
+
+            if (!Entries.TryGetValue(key, out var entry))
+            {
+                throw new NotFoundException($"The machine access {machineAccessId} has not been found.");
+            }
+
+            if (!string.Equals(entry.HashedSecret, currentHashedSecret, StringComparison.Ordinal))
+            {
+                return Task.FromResult(false);
+            }
+
+            Entries[key] = entry with { HashedSecret = newHashedSecret };
+            return Task.FromResult(true);
+        }
+
         public Task<ApiKeyHashEntry?> GetAsync(string organization, string project, string machineAccessId)
         {
             return Task.FromResult(Entries.GetValueOrDefault($"{organization}.{project}.{machineAccessId}"));
