@@ -1,8 +1,8 @@
 # User Authentication
 
-Storyteller accepts user bearer tokens from one identity provider per deployment: **Microsoft Entra ID** or **WorkOS AuthKit**. The provider only proves who the caller is, and a user token needs one scope, `User.Impersonation`. What a user may do in organizations and projects is decided by Storyteller's own account roles in Cosmos.
+Storyteller accepts user bearer tokens from one identity provider per deployment: **Microsoft Entra ID**, **WorkOS AuthKit** or **Keycloak**. The provider only proves who the caller is, and a user token needs one scope, `User.Impersonation`. What a user may do in organizations and projects is decided by Storyteller's own account roles in Cosmos. An actor such as the [MCP server](mcp.md) acts for a user with a Storyteller user token, which it gets from the [user token exchange](#user-token-exchange).
 
-Machine credentials (structured `2s.` API keys, mTLS certificates and [workload identity federation](#machine-access-with-workload-identity-federation)) do not depend on the user provider. They work the same under either one. A federated machine has no secret: it exchanges a token of its own platform (GitHub Actions, Kubernetes, Vercel, Azure managed identity, AWS, Google Cloud) for a short-lived Storyteller token. Which kinds a project's machines may use is set by its [machine authentication policy](#machine-authentication-policy).
+Machine credentials (structured `2s.` API keys, mTLS certificates and [workload identity federation](#machine-access-with-workload-identity-federation)) do not depend on the user provider. They work the same under any of them. A federated machine has no secret: it exchanges a token of its own platform (GitHub Actions, Kubernetes, Vercel, Azure managed identity, AWS, Google Cloud) for a short-lived Storyteller token. Which kinds a project's machines may use is set by its [machine authentication policy](#machine-authentication-policy).
 
 ## Selecting the provider
 
@@ -10,9 +10,10 @@ Machine credentials (structured `2s.` API keys, mTLS certificates and [workload 
 
 | Value | Behaviour |
 |---|---|
-| missing or empty | Entra ID. Existing deployments keep working without a change. |
+| missing or empty | Entra ID, the default. |
 | `EntraId` | Entra ID. |
 | `AuthKit` | WorkOS AuthKit. |
+| `Keycloak` | Keycloak, one realm. |
 | anything else | The host fails to start. |
 
 The value is case-insensitive. Settings are validated at startup, so a missing required value stops the host instead of failing on the first request.
@@ -21,12 +22,11 @@ The value is case-insensitive. Settings are validated at startup, so a missing r
 
 | Key | Required | Notes |
 |---|---|---|
-| `Auth:TenantId` | yes | Tenant used for the OpenID metadata. |
+| `Auth:TenantId` | yes | Tenant used for the OpenID metadata; API routes do not pin it (see below). A GUID, or a verified domain, pins the subject tokens of the [user token exchange](#subject-tokens) to that tenant; `common` and `organizations` accept the token's own tenant. |
 | `Auth:ClientId` | yes | API application ID. Tokens must have the audience `api://{ClientId}` or `{ClientId}`. |
 | `Auth:AppRoles:<MachineScope>` | no | The app role ID of each machine scope, for example `Auth:AppRoles:AnnotationRead`, used by Entra ID machine access. See [Entra ID app registrations](#entra-id-app-registrations). |
-| `Auth:DelegatedClients:*:ClientId`, `Auth:DelegatedClients:*:TenantId` | no | Client apps whose delegated tokens act for the signed-in user, each in one tenant (GUIDs), for example the [MCP server](#signing-in-through-the-mcp-server). Empty by default. See below. |
 
-A token whose `azp` (v1: `appid`) is not `Auth:ClientId` is a machine with that id. A listed client is the exception: its token is a user's when it is delegated (a non-blank `scp` and no `idtyp=app`) and its `tid` is the listed tenant. The same app's app-only tokens and its tokens from another tenant stay machines. A listed `ClientId` may not be `Auth:ClientId`, and the list is refused under AuthKit. The GUIDs may be written in any form (`{…}`, without dashes, any case); they are compared as GUIDs.
+A token whose `azp` (v1: `appid`) is not `Auth:ClientId` is a machine with that id; the tokens of the API's own application are users. A user token must carry `tid` and `oid` as GUIDs, because they make its [account id](#account-ids); a user token without them gets `401`. The validator accepts the issuers of every tenant (`https://login.microsoftonline.com/…` and `https://sts.windows.net/…`) and does not pin `Auth:TenantId`, which is why the account id carries the tenant.
 
 ### AuthKit settings
 
@@ -37,7 +37,7 @@ A token whose `azp` (v1: `appid`) is not `Auth:ClientId` is a machine with that 
 | `Auth:AuthKit:JwksUri` | no | `{ApiBaseUrl}/sso/jwks/{ClientId}` | Must be HTTPS. |
 | `Auth:AuthKit:ApiBaseUrl` | no | `https://api.workos.com` | Used to build the default JWKS URL. Must be HTTPS. |
 | `Auth:AuthKit:Audience` | no, but set it in production | | When set, tokens must carry this `aud`. When empty, the audience is not checked. |
-| `Auth:AuthKit:DefaultUserScopes:*` | no | none | Scopes given to every signed-in user. Only `User.Impersonation` counts, see [Scopes for AuthKit users](#scopes-for-authkit-users). |
+| `Auth:AuthKit:DefaultUserScopes:*` | no | none | Scopes given to every signed-in user. Only `User.Impersonation` counts, see [Scopes for users](#scopes-for-users). |
 | `Auth:AuthKit:PermissionMap:<slug>` | no | none | Maps a WorkOS permission slug to exactly one Storyteller scope: `User.Impersonation` for users, or a [machine scope](#scopes-of-machines). |
 | `Auth:AuthKit:ApiKey` | no | | WorkOS management key (`sk_…`). Used to look up a user's email and name at account registration when the token lacks them, and to send invitation emails. Keep it in Key Vault, never in plain settings. |
 | `Auth:AuthKit:RequireVerifiedEmail` | no | `true` | Accepting an invitation needs a verified email. When the token has no `email_verified` claim, the email counts as verified only if this is `false`. |
@@ -53,6 +53,31 @@ Example `local.settings.json` values:
 "Auth:AuthKit:DefaultUserScopes:0": "User.Impersonation"
 ```
 
+### Keycloak settings
+
+The users of one Keycloak realm sign in under `Auth:Keycloak`. This section is not the root `Keycloak` section of [Keycloak confidential clients](#keycloak-confidential-clients), which names the server, the realm and the admin credentials Storyteller creates machine clients with. Both may name the same realm.
+
+| Key | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `Auth:Keycloak:Issuer` | yes | | The realm issuer, `{server}/realms/{realm}`. Must match the token's `iss`; only a trailing `/` may differ. The keys come from the realm's OpenID metadata. HTTPS, except for a loopback host (a local Keycloak). |
+| `Auth:Keycloak:Audience` | yes | | The `aud` a user token must carry. Keycloak's default `aud` is `account`, so add an audience mapper with this value to the clients people sign in with. |
+| `Auth:Keycloak:AllowedClientIds:*` | yes | none | The clients (`azp`) whose user tokens are accepted: at least one, and no blank entry. The audience alone is a weak gate in Keycloak: the audience-resolve mapper of the default `roles` scope adds a client to the `aud` of every client's token once the user holds a role of that client. |
+| `Auth:Keycloak:ClientId` | no | | The public client that sign-in clients use, returned by the [discovery endpoint](#discovery-endpoint). When set, it must be one of `AllowedClientIds`. |
+| `Auth:Keycloak:DefaultUserScopes:*` | no | none | Scopes given to every signed-in user. Only `User.Impersonation` counts, see [Scopes for users](#scopes-for-users). |
+| `Auth:Keycloak:RoleMap:<role>` | no | none | Maps a role of the token to the scopes it adds, `User.Impersonation` in practice. A realm role is keyed by its name, a client role as `{client}:{role}`, so a role of the same name in another client grants nothing. |
+
+Every failure is reported at startup at once. Example `local.settings.json` values:
+
+```json
+"Auth:Provider": "Keycloak",
+"Auth:Keycloak:Issuer": "https://keycloak.example.com/realms/storyteller",
+"Auth:Keycloak:Audience": "storyteller-api",
+"Auth:Keycloak:AllowedClientIds:0": "storyteller-ui",
+"Auth:Keycloak:DefaultUserScopes:0": "User.Impersonation"
+```
+
+`RoleMap` keys of client roles contain `:`. In JSON, write the key as an object key under `RoleMap`. In flat keys and environment variables, append it to the path, for example `Auth__Keycloak__RoleMap__storyteller-api__user` for the role `user` of the client `storyteller-api`.
+
 ## How AuthKit tokens are checked
 
 `BearerAuthenticationMiddleware` runs after the machine-credential middleware and hands `Authorization: Bearer` tokens to `AuthKitBearerTokenValidator`:
@@ -65,9 +90,39 @@ Example `local.settings.json` values:
 
 An invalid token gets **401**. If the JWKS cannot be fetched, the response is **503** with `Retry-After: 5`, so clients keep their token and retry.
 
-Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens) of federated machines are the exception: their signature, issuer, audience and lifetime are always checked. For users, Debug builds also skip the `User.Impersonation` check and the project role check, so they also serve requests without an identity, which become `System`. The view transfer routes are the exception: they answer `401` to a request without credentials in every build. The checks of machines (the machine document, the credential policy, the annotation restriction and the [scopes](#scopes-of-machines), stored and carried), including the per-call checks of federated machines, run in every build, and so does the refusal of machines on the routes for users only.
+Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens), of federated machines and of the [user token exchange](#user-token-exchange), are the exception: their signature, issuer, audience and lifetime are always checked, and so are the actor and the restrictions of a user token. A provider token issued to an actor of the exchange is refused in every build too (see [Storyteller user tokens](#storyteller-user-tokens)). For users, Debug builds also skip the `User.Impersonation` check and the project role check, so they also serve requests without an identity, which become `System`. The view transfer routes are the exception: they answer `401` to a request without credentials in every build. The checks of machines (the machine document, the credential policy, the annotation restriction and the [scopes](#scopes-of-machines), stored and carried), including the per-call checks of federated machines, run in every build, and so do the refusal of machines on the routes for users only and the [restrictions of actors](#restrictions-of-actors).
+
+## How Keycloak tokens are checked
+
+When `Auth:Provider` is `Keycloak`, `BearerAuthenticationMiddleware` hands `Authorization: Bearer` tokens to `KeycloakBearerTokenValidator` first:
+
+- Only a token whose `iss` is `Auth:Keycloak:Issuer` is checked; only a trailing `/` may differ. Tokens of other issuers fetch no keys, so an unreachable realm does not answer `503` to them.
+- The signature must be **RS256**, using a key from the realm's OpenID metadata. A token signed with an unknown key ID returns 401 and triggers a refresh of the metadata, so a rotated key is picked up by the next token.
+- `aud` must contain `Auth:Keycloak:Audience`.
+- `exp` is required, and `exp` and `nbf` are enforced with a 30-second clock skew.
+- The token must be a person's access token: it has a `sub`, it is not a service account's (no `client_id` or `clientId` claim, and no `preferred_username` that starts with `service-account-`), and its `typ`, when present, is `Bearer` (an ID token has `ID`).
+- `azp` must be one of `Auth:Keycloak:AllowedClientIds`.
+
+An invalid token gets **401**. If the metadata cannot be fetched, the response is **503** with `Retry-After: 5`. A token the user validator refuses goes to the machine validator of the issuer only when [Keycloak machine access](#keycloak-confidential-clients) is registered, and that validator accepts service-account tokens only, so a person's token is never a machine, whatever its `azp`.
 
 ## Claims seen by the API
+
+### Account ids
+
+Each provider names a person's account by its own stable id, the `Account.Id` of Storyteller. One function, `UserIdentity.GetAccountId`, decides it for every user call and for the [user token exchange](#user-token-exchange), and the API reads it as `sub`:
+
+| Provider | Account id | Why |
+| --- | --- | --- |
+| `EntraId` | `{tid}:{oid}`, two GUIDs in lower case | `oid` is the same for a person in every application of the tenant, while Entra's `sub` is pairwise per application. The tenant keeps tenants apart, because the API's Entra validator does not pin the tenant. |
+| `AuthKit` | `sub`, the WorkOS user ID (`user_…`) | The same in every client and issuer of the WorkOS environment. |
+| `Keycloak` | `sub` | The user ID of the realm, the same for every client. |
+
+- **Entra ID.** The validator replaces `sub` with `{tid}:{oid}` and keeps the token's pairwise `sub` as `entra_sub`; `tid` and `oid` are read under their raw or mapped claim names. A user token without a GUID `tid` and `oid` gets `401`. Under `DEV_AUTH` such a token keeps no `sub`, so it has no identity. `tid` is the tenant the person signed in to: a B2B guest who signs in through another tenant has a guest object there, and so another account id than through its home tenant.
+- **The start log.** Under Entra ID the host logs once at start: "Entra ID accounts are keyed by {tid}:{oid} of the user token. Accounts registered under another identity provider, or under the pairwise Entra sub, do not resolve."
+- **The registration guard.** Under Entra ID, account registration (`POST v1/access/account`) and the acceptance of an invitation, which creates the invitee's account when there is none, take the id only in the form `{guid}:{guid}`. Declining an invitation checks it too. Any other id answers `500` and creates no account.
+- **DbCreator.** DbCreator seeds the owner of the organization it creates under `baseAccount:id` (environment variable `baseAccount__id`; the Aspire host passes its `BaseAccount:Id` user secret on). Under Entra ID, set it to the owner's `{tid}:{oid}`; without it, DbCreator seeds its legacy owner id, a pairwise `sub` that no longer resolves. An id with `:` that is not two lower-case GUIDs stops DbCreator before it writes anything. Under AuthKit or Keycloak, it is the owner's `sub`.
+
+### AuthKit claims
 
 AuthKit claims are mapped to the Entra-style claims the endpoints already read.
 
@@ -83,19 +138,39 @@ Any `scp`, `roles` or `azp` claim in the token itself is dropped, so a JWT templ
 
 Account registration (`POST v1/access/account`) needs `preferred_username` and `name`. Token claims are used first. When either is missing and `Auth:AuthKit:ApiKey` is set, Storyteller reads the user from `GET /user_management/users/{sub}` and fills only the missing values: `email` becomes the user name, and `first_name last_name` (else `email`) becomes the name. The lookup happens only at registration, and a WorkOS error fails the request with 500. Without the key, the token must carry at least `email`; see the JWT template below. Entra ID has no lookup and still needs both claims in the token.
 
-## Scopes for AuthKit users
+### Keycloak claims
 
-A user needs one scope, `User.Impersonation`: it says that the token acts for a user. The user's role on the organization or project decides everything else, under either provider. Data scopes in a user token grant nothing, and secret rights come only from the role `ContributorWithSecrets` or higher. A token without `User.Impersonation` gets `401` with no body (Debug builds skip this check). The API only logs the reason, "The token does not act for a user: the scope User.Impersonation is missing.". The [scopes of machines](#scopes-of-machines) are for machines only.
+Keycloak claims are mapped the same way, from the token alone:
 
-Entra users get `User.Impersonation` as the delegated scope the CLI requests (see [Discovery endpoint](#discovery-endpoint)). AuthKit has no per-API delegated scopes, so pick one of these modes:
+| Claim | Source in the Keycloak token |
+| --- | --- |
+| `sub` | `sub`. This is the Storyteller account ID. |
+| `name` | `name`, else `given_name` + `family_name`, else `preferred_username`, else `email`. Blank values are skipped. |
+| `preferred_username` | `preferred_username`, else `email`. |
+| `scp` | `DefaultUserScopes` plus the `RoleMap` entries of the token's realm roles (`realm_access.roles`, by name) and client roles (`resource_access.{client}.roles`, as `{client}:{role}`), as one space-separated value. For a user only `User.Impersonation` counts. |
+| `azp`, `email`, `email_verified`, … | Passed through unchanged. |
 
-* **Default scope (recommended).** Give every user `User.Impersonation`, and let account roles decide, as with Entra:
+Any `scp`, `roles` or `…/scope` claim in the token itself is dropped, so a token mapper cannot grant scopes directly. Roles without a `RoleMap` entry (`default-roles-{realm}`, `offline_access`, `account:manage-account`, …) grant nothing, and role lookup is case-sensitive. Keycloak has no profile lookup, so registration needs `preferred_username` or `email` in the token (see [Registering a Keycloak user](#registering-a-keycloak-user)).
+
+Invitations under Keycloak are matched against the `email` claim only, never `preferred_username`, which a realm may let its users choose. The email counts as verified only when `email_verified` is `true`; a token without the claim counts as unverified, so its own invitations are not listed and cannot be accepted (see [Members and invitations](access.md)).
+
+## Scopes for users
+
+A user needs one scope, `User.Impersonation`: it says that the token acts for a user. The user's role on the organization or project decides everything else, under any provider. Data scopes in a user token grant nothing, and secret rights come only from the role `ContributorWithSecrets` or higher. A token without `User.Impersonation` gets `401` with no body (Debug builds skip this check). The API only logs the reason, "The token does not act for a user: the scope User.Impersonation is missing.". The [scopes of machines](#scopes-of-machines) are for machines only.
+
+Entra users get `User.Impersonation` as the delegated scope the CLI requests (see [Discovery endpoint](#discovery-endpoint)). AuthKit and Keycloak have no per-API delegated scopes, so pick one of these modes:
+
+* **Default scope (recommended).** Give every user `User.Impersonation`, and let account roles decide, as with Entra (under Keycloak, `Auth:Keycloak:DefaultUserScopes:0`):
 
   ```json
   "Auth:AuthKit:DefaultUserScopes:0": "User.Impersonation"
   ```
 
-* **Role-driven.** Leave `DefaultUserScopes` empty, define a WorkOS permission on the organization roles whose members use Storyteller, and map it to `User.Impersonation`, for example `"Auth:AuthKit:PermissionMap:storyteller:user": "User.Impersonation"`. Users need an organization membership with a role, or `permissions` is empty and the API answers `401`.
+* **Role-driven.** Leave `DefaultUserScopes` empty and map a role of the people who use Storyteller to `User.Impersonation`.
+  * AuthKit: define a WorkOS permission on the organization roles whose members use Storyteller, and map it, for example `"Auth:AuthKit:PermissionMap:storyteller:user": "User.Impersonation"`. Users need an organization membership with a role, or `permissions` is empty and the API answers `401`.
+  * Keycloak: map a realm role, or a client role as `{client}:{role}`, for example `"Auth:Keycloak:RoleMap:storyteller-user": "User.Impersonation"`. Users without a mapped role get `401`.
+
+A [Storyteller user token](#storyteller-user-tokens) needs neither: it carries the scopes the exchange granted, which always include `User.Impersonation`.
 
 A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or one of the 11 [machine scopes](#scopes-of-machines). When AuthKit machine access is on, the host checks the map at startup and does not start when a value is anything else (for example several scopes separated by spaces, or an unknown string), or when two slugs map the same machine scope. Several slugs may map `User.Impersonation`. Slugs may contain `:`. In JSON, write the slug as an object key under `PermissionMap`. In flat keys and environment variables, append it to the path (`Auth__AuthKit__PermissionMap__storyteller__annotation-read`). Linux app settings restrict which characters a name may contain, so check that your slugs can be written as setting names on your hosting plan.
 
@@ -121,16 +196,20 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
 
 ## Discovery endpoint
 
-`GET v1/auth/configuration` is anonymous and tells clients such as `sform` how to sign users in. It returns public values only. The management key, permission map and machine settings are never included. Property names follow the API's PascalCase convention.
+`GET v1/auth/configuration` is anonymous and tells clients such as `sform` how to sign users in. It returns public values only. The management key, permission map, role map, allowed clients, the actors of the user token exchange and machine settings are never included. Property names follow the API's PascalCase convention.
 
 ```json
 { "Provider": "EntraId", "ClientId": "303a7632-…", "TenantId": "common",
-  "Scopes": [ "api://303a7632-…/User.Impersonation" ] }
+  "Scopes": [ "api://303a7632-…/User.Impersonation" ], "TokenExchange": { "Enabled": false } }
 
-{ "Provider": "AuthKit", "ClientId": "client_01H…", "AuthKitDomain": "https://example.authkit.app" }
+{ "Provider": "AuthKit", "ClientId": "client_01H…", "AuthKitDomain": "https://example.authkit.app",
+  "TokenExchange": { "Enabled": true } }
+
+{ "Provider": "Keycloak", "ClientId": "storyteller-ui", "Issuer": "https://keycloak.example.com/realms/storyteller",
+  "TokenExchange": { "Enabled": true } }
 ```
 
-`AuthKitDomain` is left out when it is not configured. Send the request without an `Authorization` header: an invalid bearer token is rejected with 401 before any endpoint runs.
+`AuthKitDomain` is left out when it is not configured. Under Keycloak, `ClientId` is `Auth:Keycloak:ClientId`, or an empty string when it is not set, and `Issuer` is the realm, whose OpenID metadata names the sign-in endpoints. `TokenExchange.Enabled` tells whether the [user token exchange](#user-token-exchange) is on; which actors may use it is not published. Send the request without an `Authorization` header: an invalid bearer token is rejected with 401 before any endpoint runs.
 
 ## OpenAPI and Swagger UI
 
@@ -163,16 +242,17 @@ The `integrated` OAuth2 security scheme follows `Auth:Provider`:
 * **Entra ID:** the implicit and client-credentials flows against `login.microsoftonline.com`. The implicit flow offers one scope, `api://{ClientId}/User.Impersonation`; the client-credentials flow uses `api://{ClientId}/.default`.
 * **AuthKit with `AuthKitDomain`:** an authorization-code flow (`{AuthKitDomain}/oauth2/authorize`, `{AuthKitDomain}/oauth2/token`, scopes `openid profile email`) and a client-credentials flow (`{AuthKitDomain}/oauth2/token`). The flows need an OAuth application registered in WorkOS for Swagger UI.
 * **AuthKit without `AuthKitDomain`:** the OAuth2 scheme is removed, and only the manual bearer scheme is documented.
+* **Keycloak:** an authorization-code flow at the realm (`{Issuer}/protocol/openid-connect/auth`, and `{Issuer}/protocol/openid-connect/token` as the token and refresh URL, scopes `openid profile email`). There is no client-credentials flow, because machines may come from another provider. Without a usable `Auth:Keycloak:Issuer` the OAuth2 scheme is removed.
 
 Known limits of the AuthKit flows today:
 
-* Tokens from the AuthKit domain's OAuth endpoints are issued by the AuthKit domain and signed with `{AuthKitDomain}/oauth2/jwks`. The API accepts them only if `Issuer` and `JwksUri` point there, which in turn rejects device-flow tokens from `https://api.workos.com/`. The API cannot yet accept both token sources at once.
+* Tokens from the AuthKit domain's OAuth endpoints are issued by the AuthKit domain and signed with `{AuthKitDomain}/oauth2/jwks`. The API accepts them only if `Issuer` and `JwksUri` point there, which in turn rejects device-flow tokens from `https://api.workos.com/`. The API cannot yet accept both token sources at once as bearer tokens; the [user token exchange](#user-token-exchange) accepts the AuthKit domain's tokens next to them through `Auth:TokenExchange:AdditionalIssuers`.
 * The client-credentials flow works only for an M2M application Storyteller created (see [Machine access with client credentials](#machine-access-with-client-credentials)), in a project with the `ClientCredentials` policy.
 * OpenAPI 3.0 cannot mark a flow as PKCE, and this Swagger UI does not turn PKCE on. Use a confidential OAuth application and enter its client secret in Swagger UI.
 
 ## Signing in with sform
 
-`sform account` (aliases `access`, `login`) signs in with a device code under either provider: it prints an address and a code, waits while you confirm in a browser, then stores the session. `sform account --browser` also opens the address. Commands that call the API pick up the stored session and refresh it silently.
+`sform account` (aliases `access`, `login`) signs in with a device code under Entra ID or AuthKit: it prints an address and a code, waits while you confirm in a browser, then stores the session. `sform account --browser` also opens the address. Commands that call the API pick up the stored session and refresh it silently.
 
 ### Which provider sform uses
 
@@ -193,6 +273,25 @@ The `authentication` section of `app.config.json` decides, in this order:
 ```
 
 One `sform` build therefore follows whichever provider the server at `general.baseUrl` uses. Changing `general.baseUrl` discovers again. `sform account logout` signs out and also deletes `auth.discovery.json`, so the next sign-in asks the server again after a provider switch. A cached answer also keeps the scopes it lists until then, so sign out once when the server hands out other scopes. A [machine sign-in](#machine-sign-in-for-pipelines) uses neither the section nor the cache.
+
+`sform` has no Keycloak sign-in yet. Against a Keycloak deployment it stops with "Unknown sign-in provider 'Keycloak' in v1/auth/configuration. Use EntraId or AuthKit." A Keycloak user registers as in [Registering a Keycloak user](#registering-a-keycloak-user).
+
+### Registering a Keycloak user
+
+Until `sform` and the admin UI sign in under Keycloak, a person registers once by calling the API with an access token of the realm. The token must pass the [checks of API routes](#how-keycloak-tokens-are-checked):
+
+- **Client.** The token is issued to a client listed in `Auth:Keycloak:AllowedClientIds` (its `azp`).
+- **Audience.** Its `aud` contains `Auth:Keycloak:Audience`, which an audience mapper on that client adds. The API refuses a token whose `aud` also names an actor's `SubjectAudiences`, so the token a person signs in to the [MCP server](mcp.md) with cannot register.
+- **Scope.** The person gets `User.Impersonation` from `Auth:Keycloak:DefaultUserScopes` or from a `RoleMap` entry of one of their roles (see [Scopes for users](#scopes-for-users)).
+- **Claims.** The token carries `preferred_username` or `email`; the `profile` and `email` client scopes add them. The account's user name is `preferred_username`, else `email`. Its name is `name`, else `given_name` + `family_name`, else the user name (see [Keycloak claims](#keycloak-claims)).
+
+A token that fails any of these gets `401` with no body. Then:
+
+```bash
+curl -X POST "$API/v1/access/account" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{}'
+```
+
+`{}` creates an account without memberships. With `Organization` and `Project`, the call also creates them and makes the person their owner (see [Accounts](access.md#accounts)). A second call answers `400`.
 
 ### AuthKit sign-in
 
@@ -413,15 +512,332 @@ spec:
 
 ## Signing in through the MCP server
 
-The [MCP server](mcp.md) acts for the person signed in to an AI assistant. It validates the person's Entra ID token for its own app registration, then gets a token for the API on behalf of the person (the on-behalf-of flow) and calls the API with it. The inbound token is never forwarded.
+The [MCP server](mcp.md) acts for the person signed in to an AI assistant, under any of the three providers. The person signs in to the MCP server with the deployment's provider, and the MCP server validates that token for itself. It never forwards the token to the API: that would be the token passthrough the MCP authorization specification forbids, and the API refuses such a token (see [Storyteller user tokens](#storyteller-user-tokens)). Instead, the MCP server exchanges it at the API's [user token exchange](#user-token-exchange) for a short-lived Storyteller user token that names the person and the MCP server as its actor, and calls the API with that token.
 
-That token's `azp` is the MCP app, not `Auth:ClientId`, so the API treats it as a user only when `Auth:DelegatedClients` lists the MCP app and its tenant (see [Entra ID settings](#entra-id-settings)). From there it is a user token like any other: it needs `User.Impersonation`, the account is found by `sub`, the role decides, and the audit actor is the account.
+- The API treats the call as the person's: their account, their roles, `User.Impersonation`. The [audit actor](audit-stamps.md#the-actor) is the account, with its name and the actor id in `Via`: a change Ada makes through the MCP server records Ada, via `mcp`.
+- The person needs a Storyteller account first: a sign-in without an account is refused with "No Storyteller account exists for this sign-in. Register once with sform or the admin UI."
+- The API trusts the MCP server only as an actor of `Auth:TokenExchange:Actors`, and only with tokens issued to it: their `aud` must be one of the actor's `SubjectAudiences`. The MCP server logs the values to list once at start: "The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: …".
+- An actor gets `NoSecretReveal` unless it sets `AllowSecrets`, so by default the API refuses every secret read through the MCP server, whatever the person's role, and the MCP server hides its secret tools (see [Restrictions of actors](#restrictions-of-actors)).
+- `Mcp:Provider` names the same provider as `Auth:Provider`.
 
-- The MCP app is single-tenant and a confidential client only, so the on-behalf-of tokens of the server are the only delegated tokens it can get.
-- Grant the MCP app the delegated `User.Impersonation` of the API (admin consent), or pre-authorize it on the API registration.
-- Add the optional claim `idtyp` to the API's access tokens, so app-only tokens are recognized beyond the missing `scp`.
-- `Account.Id` is the `sub`, and Entra documents `sub` as pairwise per application: check once per tenant that the on-behalf-of token carries the person's `sub`, as [Identity](mcp.md#identity) describes.
-- AuthKit issues no token for the API on behalf of a user, so the MCP server signs in with Entra ID only.
+| Provider | The person signs in to the MCP server at | What the API needs |
+| --- | --- | --- |
+| `EntraId` | The MCP server's app registration in the tenant `Mcp:Authentication:TenantId` | Both audiences of the MCP server in the actor's `SubjectAudiences`, and an `Auth:TenantId` that admits its tenant; see below. |
+| `AuthKit` | The AuthKit domain | The AuthKit domain issues the tokens. Unless it is `Auth:AuthKit:Issuer`, list it in `Auth:TokenExchange:AdditionalIssuers` with the key set `{AuthKitDomain}/oauth2/jwks`. |
+| `Keycloak` | The realm `Auth:Keycloak:Issuer` | The MCP clients' tokens need an audience mapper that adds the audience the MCP server accepts. The actor's `AllowedClientIds`, not `Auth:Keycloak:AllowedClientIds`, decides which clients may sign in to it; empty, any client of the realm. |
+
+Under Entra ID:
+
+- The MCP server accepts tokens with its App ID URI (v1 tokens) or its client ID (v2 tokens) as `aud`, so the actor's `SubjectAudiences` list both.
+- `Auth:TenantId` must admit the MCP server's tenant: its GUID, a verified domain of it, or `common` or `organizations` (see [Subject tokens](#subject-tokens)).
+- The MCP server serves one tenant, so a B2B guest of that tenant reaches the account of its guest object there, `{tid}:{oid}` of that tenant (see [MCP Server](mcp.md#entra-id)).
+
+The settings of the MCP server, its sign-in per provider and its actor credential are described in [MCP Server](mcp.md).
+
+## User token exchange
+
+An **actor**, such as the [MCP server](mcp.md), exchanges a person's token of the deployment's identity provider for a short-lived **Storyteller user token** ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)). The token names the person (`sub`, the [account id](#account-ids)) and the actor (`act`). The API treats a call with it as the person's, acting through the actor: the person's role decides, the actor's [restrictions](#restrictions-of-actors) narrow it, and the audit names both.
+
+```
+person ──(1) signs in to the actor with the deployment's provider──▶ actor
+actor ──(2) subject_token (issued to the actor), client_id and the actor's proof──▶ POST v1/access/token
+                                                                                    │ the actor and its proof
+                                                                                    │ the subject token: the provider's rules, aud = one of the actor's SubjectAudiences
+                                                                                    │ the person's account
+actor ◀─(3) Storyteller user token (at+jwt, at most 15 min, act, restrictions)──────┘
+actor ──(4) Authorization: Bearer <storyteller user token>──▶ the API, as the person
+```
+
+An actor is not a machine: it has no project, role or scope of its own, and it can only act for a person. Its proof gets nothing without a person's token issued to it, and such a token gets nothing without the proof. Actors are deployment settings, so only operators add them. The exchange never creates accounts: the person registers once, with `sform`, the admin UI or `POST v1/access/account`.
+
+The exchange is off by default. To turn it on:
+
+1. Add the actor to `Auth:TokenExchange:Actors`, with its proof and the audiences of the tokens issued to it, and set `Auth:TokenExchange:Enabled` to `true` (see [Configuration of the exchange](#configuration-of-the-exchange)).
+2. Under AuthKit, list the issuer of the tokens people sign in to the actor with in `Auth:TokenExchange:AdditionalIssuers`, unless it is `Auth:AuthKit:Issuer`.
+3. For an actor that proves itself with a client assertion, set `MachineAuth:Federation:PublicBaseUrl`.
+4. Configure the actor. For the MCP server, see [MCP Server](mcp.md).
+
+The exchange shares the issuer, the audience and the signing key of Storyteller tokens with federated machines, and with them the [`MachineAuth:Federation` settings](#configuration). `Program.cs` registers it with `services.AddUserTokenExchange(context.Configuration)`, after `AddFederatedMachineAccess` and the user provider, which checks the subject tokens.
+
+### Actors and their proof
+
+An exchange names its actor with `client_id`, compared exactly (case-sensitive) with the actor's `Id`, and carries exactly one proof: the one the actor's settings name. Another proof is refused, even a valid one.
+
+**Workload identity** (`Authentication:WorkloadIdentity`). The actor sends `actor_token`, a token of its platform identity (an Azure managed identity, a Kubernetes service account, a GitHub Actions OIDC token), with `actor_token_type` `urn:ietf:params:oauth:token-type:jwt` or `…:access_token`. No secret is stored anywhere.
+
+- The token's `iss` must equal `WorkloadIdentity:Issuer` exactly. A token of another issuer fetches no keys.
+- The keys come from the issuer's discovery document (`{Issuer}/.well-known/openid-configuration`) or from `WorkloadIdentity:JwksUri`, under the URL and network rules of [trusted issuers](#trusted-issuers). The token needs a `kid`, and a signature with one of the algorithms of the machine exchange (RS256 to ES512, never `none` or HS*).
+- `aud` must contain `WorkloadIdentity:Audience`, and `sub` must equal `WorkloadIdentity:Subject`.
+- `exp` is required, with `ClockSkewSeconds`. It is the only limit on the lifetime, because managed identity tokens live about a day.
+
+For an Azure managed identity, the token's version follows the `requestedAccessTokenVersion` of the app registration it is requested for, and `Issuer` and `Audience` must be the pair of that version, exactly as the token carries them:
+
+| Version | `Issuer` | `Audience` |
+| --- | --- | --- |
+| 1 (the default) | `https://sts.windows.net/{tid}/`, with the trailing `/` | The App ID URI as requested, for example `api://storyteller-token-exchange` |
+| 2 | `https://login.microsoftonline.com/{tid}/v2.0` | The application's client ID, a GUID, never its App ID URI |
+
+A v2 issuer with an `Audience` that is not a GUID stops the host at start, because no token could match. With the v1 issuer, `JwksUri` may name `https://login.microsoftonline.com/{tid}/discovery/keys` instead of discovery. An `Audience` that belongs to another service stops the host too: `api://AzureADTokenExchange`, whose tokens sign in to every application that trusts the identity, and the other audiences of AWS, Kubernetes, Google, GitHub, Vercel and Azure services that [federation rules](#federation-rules) refuse, such as `sts.amazonaws.com` or `https://management.azure.com`. Use an audience only Storyteller accepts.
+
+**Client assertion** (`Authentication:ClientAssertion`). The actor signs an [RFC 7523](https://www.rfc-editor.org/rfc/rfc7523) `client_assertion` (`private_key_jwt`) and sends it with `client_assertion_type` `urn:ietf:params:oauth:client-assertion-type:jwt-bearer`.
+
+- The keys come only from `ClientAssertion:JwksUri`, under the same URL rules, for example `https://mcp.example.com/.well-known/jwks.json`, which the MCP server publishes.
+- `iss` and `sub` must be the actor id.
+- `aud` must be the token endpoint `{MachineAuth:Federation:PublicBaseUrl}/v1/access/token`, which the [metadata](#discovery-of-the-issuer) publishes, or `MachineAuth:Federation:Issuer`, byte for byte. So an actor with a client assertion needs `PublicBaseUrl`, or the host does not start. The MCP server signs for `{Storyteller:BaseUrl}/v1/access/token` unless `Mcp:Actor:ClientAssertionKey:Audience` names another, so its base URL must then equal `PublicBaseUrl` exactly.
+- `exp` is required, and the assertion lives at most 300 seconds (`exp - iat`, or the time left when it has no `iat`).
+- `jti` is required and accepted once. Each instance records it until the assertion expires, for up to 50,000 assertions; while the record is full, assertions are refused.
+
+**Client secret** (`Authentication:ClientSecretHash`). For local development only: the actor posts `client_secret` (`client_secret_post`), and the API compares its SHA-256 hash with `ClientSecretHash` in constant time. It is accepted only in the `Development` host environment: elsewhere the host does not start, and the exchange refuses the secret too.
+
+A refused actor answers `400 invalid_client` with "The actor is not known or its proof is not valid.", so an unknown actor and a bad proof look alike; the reason is logged. A request with no proof answers the same. A request without `client_id`, with two proofs, with a token type but not its token (or the reverse), or with an unsupported `actor_token_type` or `client_assertion_type` answers `invalid_request`. When the keys of the actor's issuer cannot be fetched, or its token names a `kid` the issuer has not published, the exchange answers `503`, as the [machine exchange](#trusted-issuers) does.
+
+### The user token endpoint
+
+`POST v1/access/token` is anonymous: the subject token and the actor's proof are the credentials. Send the request without `Authorization`: a bearer header is checked before any endpoint runs, and a request with any `Authorization` header is refused with `invalid_request`. The body is `application/x-www-form-urlencoded` (a `charset` parameter is allowed), at most 64 KiB, because it carries two JWTs.
+
+| Parameter | Rule |
+| --- | --- |
+| `grant_type` | Required: `urn:ietf:params:oauth:grant-type:token-exchange`. Anything else answers `unsupported_grant_type`. |
+| `subject_token` | Required: the person's token, issued to the actor, a JWT of at most `MaxSubjectTokenBytes` (16 KiB). |
+| `subject_token_type` | Required: `urn:ietf:params:oauth:token-type:access_token` or `…:jwt`; anything else answers `invalid_request`. |
+| `client_id` | Required: the actor's `Id`, also with a client assertion. |
+| `actor_token`, `actor_token_type` | The proof of a `WorkloadIdentity` actor: its platform token, of type `urn:ietf:params:oauth:token-type:jwt` or `…:access_token`. Each needs the other. |
+| `client_assertion`, `client_assertion_type` | The proof of a `ClientAssertion` actor, of type `urn:ietf:params:oauth:client-assertion-type:jwt-bearer`. Each needs the other. |
+| `client_secret` | The proof of a `ClientSecretHash` actor, in the `Development` environment only. |
+| `audience`, `resource` | Optional and repeatable. Every value must equal `MachineAuth:Federation:Audience`, otherwise `invalid_target`. They name the Storyteller token's audience, not the subject token's; leave them out. |
+| `scope` | Optional: scopes separated by single spaces. The token gets those of them that are among the actor's `Scopes`, and the others are dropped; without it, the token gets all of the actor's. The result must contain `User.Impersonation`, otherwise `invalid_scope`. |
+| `requested_token_type` | Optional: only `urn:ietf:params:oauth:token-type:access_token`; anything else answers `invalid_request`. |
+
+Any other parameter given twice answers `invalid_request`. A parameter with an empty value counts as absent.
+
+The checks run in this order, and only an authenticated actor gets its subject token verified:
+
+1. The request: no `Authorization` header, the content type, the body size, and no repeated parameter.
+2. The exchange must be on (`Auth:TokenExchange:Enabled`).
+3. The parameters: `grant_type`, `subject_token` and its type, `requested_token_type`, `audience` and `resource`, and the syntax of `scope`.
+4. The actor and its [proof](#actors-and-their-proof).
+5. The subject token: at most `MaxSubjectTokenBytes`, a valid user token of the deployment's provider ([Subject tokens](#subject-tokens)) whose `aud` is one of the actor's `SubjectAudiences`, issued to one of its `AllowedClientIds`, without `act`, and not expiring within 5 seconds.
+6. The account: the [account id](#account-ids) of the subject token must name an existing account. The exchange never creates one.
+7. The replay limit: at most `MaxExchangesPerSubjectTokenPerMinute` exchanges of the subject token by the actor. A sign-in without an account is not counted.
+8. The scope.
+9. A [Storyteller user token](#storyteller-user-tokens) is issued. An exchange writes nothing.
+
+Each refusal has a fixed `error_description`, and the reason is logged without tokens. Responses carry `Content-Type: application/json; charset=utf-8`, `Cache-Control: no-store` and `Pragma: no-cache`. Property names are the snake_case names of OAuth, and errors are OAuth error bodies, not `ErrorResponse`. `restrictions` is not an RFC 8693 member: it lists the restrictions the token carries, an empty array when there are none, so the actor can adapt (the MCP server hides its secret tools under `NoSecretReveal`).
+
+```json
+200 { "access_token": "eyJ…", "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+      "token_type": "Bearer", "expires_in": 600, "scope": "User.Impersonation", "restrictions": [ "NoSecretReveal" ] }
+400 { "error": "invalid_grant", "error_description": "No Storyteller account exists for this sign-in. Register once with sform or the admin UI." }
+503 { "error": "temporarily_unavailable", "error_description": "The keys to verify the request could not be retrieved." }
+```
+
+| Status | `error` | When |
+| --- | --- | --- |
+| `400` | `invalid_request` | A malformed request: an `Authorization` header, another content type, a body over 64 KiB, a parameter given twice, a missing `grant_type`, `subject_token`, `subject_token_type` or `client_id`, an unsupported `subject_token_type` or `requested_token_type`, or a malformed proof. The description names the problem, for example "The parameter subject_token is missing." |
+| `400` | `invalid_client` | "The actor is not known or its proof is not valid.": no actor has the `client_id`, the request carries no proof or another one than the actor's, or the proof fails its checks. |
+| `400` | `invalid_grant` | "The subject token is not accepted for this actor.": the subject token is over `MaxSubjectTokenBytes`, fails the [provider's rules](#subject-tokens), was not issued to the actor or to one of its clients, carries `act`, expires within 5 seconds, or reached the replay limit. "No Storyteller account exists for this sign-in. Register once with sform or the admin UI.": the person has no account. |
+| `400` | `unsupported_grant_type` | "The exchange of user tokens is not enabled.", while `Auth:TokenExchange:Enabled` is `false`; "Only the token exchange grant type is supported.", for another `grant_type`. |
+| `400` | `invalid_target` | "The audience or resource is not this API.": an `audience` or `resource` other than `MachineAuth:Federation:Audience`. |
+| `400` | `invalid_scope` | "The parameter scope is malformed.", checked before the actor; "The requested scope is not granted to the actor; it must include User.Impersonation.", when the granted scope would lack it. |
+| `503` | `temporarily_unavailable` | "The keys to verify the request could not be retrieved.": the keys of the actor's issuer or of the identity provider cannot be fetched, or the actor's token names a `kid` its issuer has not published. "The signing key of Storyteller tokens is not available.": no signing key can be loaded or created. With `Retry-After: 5`. |
+
+```bash
+API=https://api.example.com/api
+
+STORYTELLER_TOKEN=$(curl -sf "$API/v1/access/token" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+  -d client_id=mcp \
+  -d subject_token_type=urn:ietf:params:oauth:token-type:access_token \
+  --data-urlencode "subject_token=$PERSON_TOKEN" \
+  -d actor_token_type=urn:ietf:params:oauth:token-type:jwt \
+  --data-urlencode "actor_token=$WORKLOAD_TOKEN" | jq -r .access_token)
+
+curl "$API/v1/access/account" -H "Authorization: Bearer $STORYTELLER_TOKEN"
+```
+
+The generated SDK clients post the same form with `ExchangeUserTokenAsync` (C#) and `exchangeUserToken` (TypeScript); call them without a bearer token.
+
+**Limits.**
+
+- The body is at most 64 KiB, and the subject token, the actor token and the client assertion each at most `MaxSubjectTokenBytes`. At its maximum of 32 KiB, two tokens of that size no longer fit the body.
+- An issued token lives at most `TokenLifetimeMinutes` and never past the subject token's `exp`. There is no refresh token: the actor exchanges again with a fresh subject token.
+- The replay limit counts per actor and subject token (its `jti`, the `uti` of Entra ID, else a SHA-256 hash of the token), in a fixed one-minute window that starts with the first exchange, in memory per instance. Each instance records up to 50,000 subject tokens; while the record is full, every new subject token is refused with `invalid_grant`.
+
+### Subject tokens
+
+The subject token is a user token of the deployment's provider, checked by the provider's module with its own keys:
+
+| Provider | Issuer and keys | Rules |
+| --- | --- | --- |
+| `EntraId` | The v2 (`https://login.microsoftonline.com/{tid}/v2.0`) or v1 (`https://sts.windows.net/{tid}/`) issuer of the token's `tid`, for a tenant `Auth:TenantId` admits (see below), with the keys of the API's validator and one retry after a refresh for an unknown `kid`. | RS256. The clock skew is 5 minutes, as on API routes. A delegated token: a non-blank `scp` and no `idtyp` `app`. A GUID `tid` and `oid`. The client (`azp`, else `appid`) is compared ignoring case. |
+| `AuthKit` | `Auth:AuthKit:Issuer` with the API's key set, or an `Auth:TokenExchange:AdditionalIssuers` entry with the keys of its `JwksUri`; only a trailing `/` of the issuer may differ. | RS256, with a 30-second clock skew. `sub` is a WorkOS user ID (`user_…`). The client (`azp`, else `client_id`) is compared exactly. |
+| `Keycloak` | The realm `Auth:Keycloak:Issuer`, with its keys. | RS256, with a 30-second clock skew. A person's access token, as on [API routes](#how-keycloak-tokens-are-checked). The client is `azp`, compared exactly, and checked against the actor's `AllowedClientIds`, not `Auth:Keycloak:AllowedClientIds`: the person signed in to the actor. |
+
+Under Entra ID, `Auth:TenantId` decides which tenant a subject token may come from:
+
+- A GUID pins that tenant.
+- `common` accepts the token's own tenant. `organizations` does too, but refuses personal Microsoft accounts (the tenant `9188040d-6c67-4c5b-b112-36a304b66dad`).
+- Another name, such as a verified domain, is pinned to the tenant of its metadata issuer (`https://login.microsoftonline.com/{tenant GUID}/v2.0`). When that issuer names no tenant, every token is refused.
+
+For every provider, `aud` must be one of the actor's `SubjectAudiences`, `exp` is required, the token must not carry `act` (chained delegation is not exchanged), and its client must be one of the actor's `AllowedClientIds` when the list names any. AuthKit and Keycloak ask for a refresh of their keys on an unknown `kid` and refuse that token, as on API routes. When the provider's keys cannot be fetched, the exchange answers `503`.
+
+### Storyteller user tokens
+
+An issued user token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) access token signed with the key of the [machine tokens](#storyteller-tokens):
+
+| Part | Value |
+| --- | --- |
+| Header | `alg` `RS256`, `kid` of the signing key, `typ` `at+jwt`. |
+| `iss` | `MachineAuth:Federation:Issuer`. |
+| `aud` | `MachineAuth:Federation:Audience`. |
+| `sub` | The person's [account id](#account-ids). |
+| `token_use` | `user`. Machine tokens have no `token_use`. |
+| `scope` | The granted scopes, separated by spaces, always with `User.Impersonation`. |
+| `act` | `{ "sub": "<actor id>" }` ([RFC 8693 §4.1](https://www.rfc-editor.org/rfc/rfc8693#section-4.1)): delegation, not impersonation. Never nested. |
+| `client_id` | The actor id. |
+| `restrictions` | The actor's [restrictions](#restrictions-of-actors), an array of strings, empty when it has none. |
+| `auth_time` | When the person signed in, when the subject token says so. |
+| `iat`, `nbf`, `exp` | The time of the exchange, and at most `TokenLifetimeMinutes` (10) later, never after the subject token's `exp`. |
+| `jti` | A GUID. |
+
+The token carries no name or email: the API reads them from the account.
+
+**On API routes.** `BearerAuthenticationMiddleware` hands a token of `MachineAuth:Federation:Issuer` to the Storyteller validator alone, in every build, `DEV_AUTH` included. Besides the checks of every [Storyteller token](#storyteller-tokens), a user token needs:
+
+- a payload without two claims of one name;
+- `token_use` `user`, a string `sub` and `scope`, and no `organization`, `project` or `annotation_key`;
+- `act`, one object with a string `sub` and no nested `act`;
+- `Auth:TokenExchange:Enabled` on, and `act.sub` the `Id` of an actor of `Auth:TokenExchange:Actors`, compared exactly;
+- `restrictions`, an array of known restrictions. An unknown one refuses the token, because the API cannot enforce it.
+
+The middleware then reads the account once per call (a point read) and takes `name` and `preferred_username` from its `Name` and `UserName`; when the account no longer exists, the call gets `401`. The result is a user, not a machine: `sub` is the account id, and each scope becomes an `scp` claim. The actor and the restrictions are kept for the request from the validated token, never from claims. From there it is a user token like any other: it needs `User.Impersonation`, the role decides, and the routes for users only accept it. The [audit actor](audit-stamps.md#the-actor) is the account, with `Via` set to the actor id.
+
+**Tokens issued to an actor.** A provider token whose `aud` is one of an actor's `SubjectAudiences` was issued to the actor, for the exchange only. As a bearer token on API routes it gets `401`, in every build and whether the exchange is on or not, even when its provider accepts it. A token of an `AdditionalIssuers` entry never passes on API routes either.
+
+**Invitations.** Through an actor the person's email is never verified: `preferred_username` comes from the stored account, not from the provider. So `GET v1/access/invitations/mine` returns an empty list, and accepting or declining an invitation is refused with `403` (`EmailMismatch` or `EmailNotVerified`). People answer invitations with the provider's own sign-in.
+
+**Revocation.** Every call reads the account and checks the actor, so these changes reach tokens already issued:
+
+| Change | Takes effect |
+| --- | --- |
+| Deleting the account | At once: every call reads the account. |
+| Removing the actor from `Auth:TokenExchange:Actors`, or turning `Enabled` off | Its tokens get `401` once the API runs with the new settings: every call checks the actor. |
+| Adding a restriction to the actor, or turning `AllowSecrets` off | Once the API runs with the new settings: every call enforces the token's restrictions and those the actor has now. Removing a restriction or setting `AllowSecrets` reaches only tokens issued after. |
+
+Otherwise an issued token stays valid until it expires (`TokenLifetimeMinutes` at most, plus `ClockSkewSeconds`). There is no revocation list.
+
+### Restrictions of actors
+
+An actor's restrictions narrow what a person may do through it, whatever the person's role, in every build, `DEV_AUTH` included. The list is closed and holds one value, `NoSecretReveal`: a setting or a token that names another is refused.
+
+**`NoSecretReveal`** is the default of every actor; `AllowSecrets: true` removes it. A secret read through an assistant enters the model's context, the client's transcript and the model provider's logs, and prompt injection in content the model reads can ask for one. The API refusal holds whatever the model is persuaded to do.
+
+| Operation through the actor | Answer under `NoSecretReveal` |
+| --- | --- |
+| A reveal (`reveal=true`) of a key/value or of one of its versions, also of a public pair | `403 ActorRestricted`, before the pair is read |
+| A diff of secret versions | `403 ActorRestricted`; diffs of public values work |
+| An export of key/values with secrets | `403 ActorRestricted` |
+| A resolved configuration | Evaluated without secrets, with the header `X-2S-Secrets-Withheld: actor-restricted` on the `200` and the `304`, and an ETag of its own |
+| Creating or resetting a machine with a `Secrets.*` scope, and replacing its federation rules | `403 ActorRestricted`: its credentials would read secrets |
+| Replacing an existing [trusted issuer](#trusted-issuers) | `403 ActorRestricted`: new keys or pins would redirect the tokens of its machines. Creating a new issuer and deleting one are allowed. |
+| Writes of secrets (set, protect, import, delete) and deleting a machine | Allowed: they return no value |
+
+The refusal is `403` with `ErrorCode` `ActorRestricted` and "The token acts for the person through an actor that may not reveal secrets.". It comes after the role check, so a person without the role the operation needs (`ContributorWithSecrets` for a secret read) gets `403 AccessDenied`, as without the actor. Debug builds give every user the role, so they answer `ActorRestricted` there. The restriction leaves the rest of the person's rights alone: an Administrator acting through the actor still grants roles, invites people and deletes machines. See [Secret delivery](key-values.md#secret-delivery) for secret reads in general.
+
+### Configuration of the exchange
+
+The settings live under `Auth:TokenExchange` and are validated at startup, also while the exchange is off, so turning it on cannot surface old mistakes:
+
+| Key | Default | Notes |
+| --- | --- | --- |
+| `Enabled` | `false` | Off: `POST v1/access/token` answers `unsupported_grant_type`, and Storyteller user tokens get `401`. On: at least one actor is required. |
+| `Actors:*` | none | The actors, see below. |
+| `AdditionalIssuers:*:Issuer`, `AdditionalIssuers:*:JwksUri` | none | AuthKit only: further issuers of the deployment's WorkOS environment whose user tokens may be exchanged, such as the AuthKit domain that issues the tokens MCP clients sign in with, each with the HTTPS URL of its key set. Accepted for the exchange only, never as bearer tokens on API routes. Refused under Entra ID and Keycloak, when equal to `Auth:AuthKit:Issuer` (its tokens already pass on API routes), and when listed twice. |
+| `TokenLifetimeMinutes` | `10` | The longest lifetime of an issued token, 5 to 15. Never longer than the subject token's `exp`. |
+| `MaxExchangesPerSubjectTokenPerMinute` | `10` | The replay limit: exchanges of one subject token by one actor per minute and instance, 1 to 60. |
+
+An actor, `Auth:TokenExchange:Actors:{n}`:
+
+| Key | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `Id` | yes | | The `client_id` of its exchanges, and the `act.sub` and `client_id` of its tokens. At most 64 letters, digits, `-`, `.`, `_` or `~`, and unique ignoring case. It reaches audit stamps as `Via`. |
+| `Authentication:WorkloadIdentity:Issuer`, `:Subject`, `:Audience`, `:JwksUri` | one proof | | A [workload identity](#actors-and-their-proof). `Issuer`, `Subject` and `Audience` are required; `Issuer` and `JwksUri` (optional) are HTTPS URLs. |
+| `Authentication:ClientAssertion:JwksUri` | one proof | | A [client assertion](#actors-and-their-proof). An HTTPS URL; needs `MachineAuth:Federation:PublicBaseUrl`. |
+| `Authentication:ClientSecretHash` | one proof | | A [client secret](#actors-and-their-proof): the hex SHA-256 hash of the secret, 64 digits. `Development` only. |
+| `SubjectAudiences:*` | yes | | The audiences of the tokens issued to the actor: the subject token's `aud` must be one of them. At least one and none blank. None may be the API's own audience (`api://{Auth:ClientId}`, `{Auth:ClientId}`, `Auth:AuthKit:Audience` or `Auth:Keycloak:Audience`, compared ignoring case and a trailing `/`): a token issued for the API would become exchangeable, and the API would refuse its own users' tokens. |
+| `AllowedClientIds:*` | no | none | The clients the subject token may be issued to (`azp`, `appid` or `client_id`). Empty: any client. No blank entries. |
+| `Scopes:*` | no | `User.Impersonation` | The most an issued token carries. Storyteller scopes only, and it must contain `User.Impersonation`. |
+| `Restrictions:*` | no | none | [Restrictions](#restrictions-of-actors) on top of the default. Known values only. |
+| `AllowSecrets` | no | `false` | `true` removes `NoSecretReveal` from the defaults. Refused together with `NoSecretReveal` in `Restrictions`. |
+
+Exactly one proof must be set. Actors may share a `SubjectAudiences` entry, one per workload identity of a resource, only with the same restrictions and scopes (as `Restrictions`, `AllowSecrets` and `Scopes` give them); otherwise a token issued for the restricted actor could be exchanged by the other. The replay limit counts per actor.
+
+```jsonc
+"Auth": {
+  "TokenExchange": {
+    "Enabled": true,
+    "Actors": [
+      {
+        "Id": "mcp",
+        "Authentication": {
+          // the MCP server's managed identity, with v1 tokens for the app registration api://storyteller-token-exchange
+          "WorkloadIdentity": {
+            "Issuer": "https://sts.windows.net/{tid}/",
+            "Subject": "{object id of the managed identity}",
+            "Audience": "api://storyteller-token-exchange"
+          }
+        },
+        "SubjectAudiences": [ "https://mcp.example.com/mcp" ],  // the values the MCP server logs at start
+        "AllowSecrets": false                                    // NoSecretReveal
+      }
+    ]
+  }
+}
+```
+
+In `local.settings.json` and the app settings, the keys are flat, for example `Auth:TokenExchange:Actors:0:SubjectAudiences:0` (`Auth__TokenExchange__Actors__0__SubjectAudiences__0`).
+
+### Discovery of the issuer
+
+Two anonymous routes under the API base describe the Storyteller issuer, for the actors and anyone who verifies Storyteller tokens:
+
+| Route | Content | `Cache-Control` |
+| --- | --- | --- |
+| `GET /api/.well-known/oauth-authorization-server` | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) metadata of the issuer | `public, max-age=300` with `MachineAuth:Federation:PublicBaseUrl`; `no-store` without it, because its URLs then come from the request's host |
+| `GET /api/.well-known/jwks.json` | The JWK Set of the signing keys | `public, max-age=300`; `no-cache` while no key is stored |
+
+```json
+GET /api/.well-known/oauth-authorization-server
+{ "issuer": "https://storyteller.example.com",
+  "token_endpoint": "https://api.example.com/api/v1/access/token",
+  "jwks_uri": "https://api.example.com/api/.well-known/jwks.json",
+  "response_types_supported": [],
+  "grant_types_supported": [ "urn:ietf:params:oauth:grant-type:token-exchange" ],
+  "token_endpoint_auth_methods_supported": [ "private_key_jwt" ],
+  "token_endpoint_auth_signing_alg_values_supported": [ "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512" ] }
+
+GET /api/.well-known/jwks.json
+{ "keys": [ { "kty": "RSA", "kid": "…", "use": "sig", "alg": "RS256", "n": "…", "e": "AQAB" } ] }
+```
+
+- `issuer` is `MachineAuth:Federation:Issuer`. RFC 8414 clients need an `https` issuer, and the default `urn:storyteller:{MachineAuth:TrustDomain}` is not one: set an `https` URL before such clients rely on the metadata. Changing the issuer rejects the Storyteller tokens already issued, machine tokens included.
+- The document is served under the API base, not at the location RFC 8414 derives from the issuer, so give clients its URL.
+- `token_endpoint` and `jwks_uri` start with `PublicBaseUrl`, else with the request's scheme and host plus `/api`, never with `X-Forwarded-Host`.
+- `token_endpoint_auth_methods_supported` adds `client_secret_post` in the `Development` environment only.
+- The metadata is served while the exchange is off too; `v1/auth/configuration` tells whether it is on.
+- The JWK Set holds the keys the API accepts: the one stored key, never a next one, because the key rotates only by the [emergency procedure](#security-notes). The route never creates a key and reads the store no more often than token validation does. While no key is stored, `keys` is empty. When the store cannot be read and no key is loaded, it answers `503` with no body, `Cache-Control: no-store` and `Retry-After: 5`.
+
+The SDKs read both with `GetAuthorizationServerMetadataAsync` and `GetJsonWebKeySetAsync` (C#), and with `getAuthorizationServerMetadata` and `getJsonWebKeySet` (TypeScript).
+
+### Security of the exchange
+
+- **Audience binding.** The subject token's `aud` must be one of the actor's `SubjectAudiences`, so a token a person gave another application cannot be exchanged by this actor. The other way round, a token issued to an actor is refused as a bearer token on API routes, so the actor's tokens never reach the API as they are.
+- **Actor proof.** The proof and a subject token issued to the actor are both needed. A workload identity and a client assertion keep no secret in the API's settings. Keys come only from the actor's settings, never from a URL a token names, through the same fetch as the keys of trusted issuers: no proxy, no redirect, and public addresses only unless `AllowPrivateNetworks` is set (see [Security notes](#security-notes)).
+- **Short lives and replay.** An issued token lives at most 15 minutes and never past the subject token's `exp`. The replay limit bounds how often a stolen subject token is exchanged per instance and minute, and a client assertion is accepted once per instance.
+- **No leaks in refusals.** A refused actor or subject token gets one fixed text; the reasons go to the logs, never with tokens. An unknown actor and a bad proof answer alike.
+- **Who adds trust.** Actors and additional issuers are deployment settings, so only operators add them. Projects keep their own [trusted issuers](#trusted-issuers), for machines only, and Storyteller's own issuer cannot be one of them.
+- **Restrictions** run in every build, and tightening an actor reaches the tokens already issued (see **Revocation** in [Storyteller user tokens](#storyteller-user-tokens)).
+- **What `NoSecretReveal` leaves open.** A person who may write secrets can, through the actor, still learn whether a guessed value equals the stored one: an import, also as a dry run, reports such an item as `Unchanged`.
 
 ## Machine authentication policy
 
@@ -584,7 +1000,7 @@ The scope string is the value of the Entra ID app role (an `App.` prefix is allo
    "Auth:AuthKit:PermissionMap:storyteller:keyvalue-manage": "KeyValue.Manage"
    ```
 
-   The host checks the map at startup (see [Scopes for AuthKit users](#scopes-for-authkit-users)): a value that is not exactly one scope string, or two slugs for the same scope, stop it. A new M2M application gets exactly the permission of each of its scopes. When a requested scope has no permission, creation fails with 400 before WorkOS is called, for example "No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scope Secrets.Write.". The description of the application names the scopes, for example `organization=acme|project=billing|scopes=AnnotationRead,ConfigurationRead`.
+   The host checks the map at startup (see [Scopes for users](#scopes-for-users)): a value that is not exactly one scope string, or two slugs for the same scope, stop it. A new M2M application gets exactly the permission of each of its scopes. When a requested scope has no permission, creation fails with 400 before WorkOS is called, for example "No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scope Secrets.Write.". The description of the application names the scopes, for example `organization=acme|project=billing|scopes=AnnotationRead,ConfigurationRead`.
 3. Set `Auth:AuthKit:ClientId`, `Auth:AuthKit:AuthKitDomain`, `Auth:AuthKit:MachineOrganizationId` and `Auth:AuthKit:ApiKey` (from Key Vault). `Program.cs` registers AuthKit machine access when the domain and the organization are set. The host then refuses to start without the other two. AuthKit users are not required.
 
 Tokens come from `{AuthKitDomain}/oauth2/token` and are checked as follows:
@@ -626,7 +1042,10 @@ The machine ID is the `clientId` (`42.sform.…`). Tokens come from `{ServerUrl}
 
 * `iss` is `{ServerUrl}/realms/{Realm}`, and the keys come from the realm's OpenID metadata (HTTP is allowed only for a local server).
 * `aud` contains `Audience`.
+* The token is a service account's: it has a `client_id` (or `clientId`) claim, or a `preferred_username` that starts with `service-account-`. Client-credentials tokens always are. A person's token of the realm is never a machine, whatever its `azp`.
 * `azp` is the machine.
+
+When users sign in with Keycloak too (`Auth:Provider` `Keycloak`), the user validator is asked first; see [How Keycloak tokens are checked](#how-keycloak-tokens-are-checked).
 
 Reset regenerates the client secret.
 
@@ -716,7 +1135,7 @@ The list of views names both read scopes, for example "This operation needs one 
 | Delete (`DELETE …/access/machines/{id}`), which stops whatever runs with the machine's scopes | `Contributor` | `ContributorWithSecrets` | `Administrator` |
 | Get, list | `Contributor` | `Contributor` | `Contributor` |
 
-Create checks the requested scopes together with the read scopes it adds. Reset, the rules `PUT` and the delete read the stored machine first, in one point read; a machine that does not exist gets the usual answer of the route (the delete `404`). A role below the one needed answers `403 AccessDenied` with "No Administrator access to 'acme.billing'." or "No ContributorWithSecrets access to 'acme.billing'.". These are role checks of users, so Debug builds (`DEV_AUTH`) skip them.
+Create checks the requested scopes together with the read scopes it adds. Reset, the rules `PUT` and the delete read the stored machine first, in one point read; a machine that does not exist gets the usual answer of the route (the delete `404`). A role below the one needed answers `403 AccessDenied` with "No Administrator access to 'acme.billing'." or "No ContributorWithSecrets access to 'acme.billing'.". These are role checks of users, so Debug builds (`DEV_AUTH`) skip them. Through an actor under `NoSecretReveal`, create, reset and the rules `PUT` of a machine with a `Secrets.*` scope answer `403 ActorRestricted` after the role check, in every build; the delete does not (see [Restrictions of actors](#restrictions-of-actors)).
 
 **Typical machines.** The admin UI offers these as presets in **New machine**. A preset fills in the scopes, which can then be changed; nothing about presets is sent or stored. `sform account machine create` gives the runtime reader by default and the CI writer with `-w`.
 
@@ -835,7 +1254,7 @@ sform account machine create --issuer github --audience https://api.example.com/
 | `PUT v1/{organization}/{project}/access/machines/{id}/federation-rules` | `Contributor`; `ContributorWithSecrets` for a machine with a secrets scope, `Administrator` for one with a management scope | `FederationRule[]` → `200 MachineAccess`; `400`, `404`, `409` (the machine changed concurrently twice) |
 | `POST v1/{organization}/{project}/access/token` | anonymous | [The token endpoint](#the-token-endpoint) |
 
-The management routes are for users only, like the machine routes: they need `User.Impersonation` and the role on `{organization}.{project}`, and a machine gets `403` there in every build. Contributors read issuers to write rules, but only Administrators decide which issuers the project trusts.
+The management routes are for users only, like the machine routes: they need `User.Impersonation` and the role on `{organization}.{project}`, and a machine gets `403` there in every build. Contributors read issuers to write rules, but only Administrators decide which issuers the project trusts. Replacing an existing trusted issuer through an actor under `NoSecretReveal` answers `403 ActorRestricted` after the role check (see [Restrictions of actors](#restrictions-of-actors)).
 
 Both `PUT`s take a JSON body. An empty body or `null` is validated as an issuer without `Issuer` (`"The issuer is required."`) or as no rules (`"A Federated machine needs at least one federation rule."`), and a body that is not an issuer or a list of rules answers `400` `InvalidFederation` as well.
 
@@ -861,6 +1280,7 @@ Both `PUT`s take a JSON body. An empty body or `null` is validated as an issuer 
 * `PUT` on an existing name may change everything but `Issuer` (`400`, `"The issuer of a trusted issuer cannot change; create a new one."`), because its rules were written for that issuer.
 * Creating a name that rules of machines still reference (left behind by a delete) answers `409`, naming up to 10 of those machines, so a re-created name never silently revives rules written for another issuer.
 * Deleting a trusted issuer is allowed while rules reference it: it is the kill switch. Those rules stop matching within the 60-second cache of the issuer list.
+* Storyteller itself is never a trusted issuer. An `Issuer` equal to `MachineAuth:Federation:Issuer` (case and one trailing `/` ignored) answers `400` `InvalidFederation` with "The issuer … is Storyteller itself; its tokens cannot be exchanged for machine tokens.", and the token endpoint refuses Storyteller tokens as platform tokens, also through an issuer stored before this check. So a user token of the [user token exchange](#user-token-exchange) never becomes a machine token without its actor's restrictions, and a machine token of one project never a machine of another.
 * Keys are cached per issuer and its settings, so an edited issuer starts with fresh keys. They are fetched again after `MetadataRefreshMinutes` (60). A token naming an unknown `kid` makes Storyteller fetch again at once when the keys are older than a minute; within that minute, or when the `kid` is still unknown right after the fetch, the exchange answers 503, because the issuer may still be publishing a rotated key. With `Jwks` there is nothing to fetch, and an unknown `kid` is refused. A token without a `kid` is refused with every key source, without a fetch. Concurrent requests share one fetch, and a failed fetch answers the next requests with 503 for 5 seconds.
 
 Storyteller keeps the issuers in the organization container, partition `{project}.federation`, one document per issuer with the name as id. The list is cached for 60 seconds per instance and dropped on a write by the same instance.
@@ -978,7 +1398,7 @@ Reuse the Storyteller token until shortly before `expires_in` runs out, then exc
 
 ### Storyteller tokens
 
-A Storyteller token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) access token signed by Storyteller:
+A Storyteller token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) access token signed by Storyteller. There are two kinds, signed with the same key and checked by the same validator: the **machine tokens** of `Federated` machines, described here, and the **user tokens** of the [user token exchange](#user-token-exchange), described in [Storyteller user tokens](#storyteller-user-tokens). A user token has `token_use` `user`; a machine token has no `token_use`. A machine token:
 
 | Part | Value |
 |---|---|
@@ -993,15 +1413,15 @@ A Storyteller token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) acc
 | `annotation_key` | The machine's `AnnotationKey`, when it has one. |
 | `federation_issuer`, `federation_subject` | The trusted issuer name and the platform `sub`, for audit and logs. |
 
-`BearerAuthenticationMiddleware` reads the unverified `iss` first. A Storyteller token goes only to the Storyteller validator, never to the user provider, and `DEV_AUTH` does not skip it. The validator requires `typ` `at+jwt` or `application/at+jwt`, RS256, the `kid` of the stored signing key, the exact issuer and audience, and a valid lifetime within `ClockSkewSeconds`. The API then sees `sub` and `azp` (the machine id), one `roles` claim per scope and `annotationKey`, as for an API key. The access check of every call point-reads the machine instead of only checking that it exists, and requires:
+`BearerAuthenticationMiddleware` reads the unverified `iss` first. A Storyteller token goes only to the Storyteller validator, never to the user provider, and `DEV_AUTH` does not skip it. For both kinds the validator requires `typ` `at+jwt` or `application/at+jwt`, RS256, the `kid` of the stored signing key, the exact issuer and audience, and a valid lifetime within `ClockSkewSeconds`; a `token_use` other than `user` is refused. A machine token must carry a string `sub`, `organization`, `project` and `scope`, and no `act`. The API then sees `sub` and `azp` (the machine id), one `roles` claim per scope and `annotationKey`, as for an API key. The access check of every call point-reads the machine instead of only checking that it exists, and requires:
 
 * the token's `organization` and `project` equal to the route's (case-insensitive);
 * the machine in the route's project, with the stored kind `Federated`;
 * the project still enabling `Federated`.
 
-So a Storyteller token cannot act as an API key machine or outlive its machine, even when it was signed with a stolen key. Any failure is 401 with an empty body. No `WWW-Authenticate` header is sent, as for every other token. Each operation then needs its [scopes](#scopes-of-machines) stored on the machine and carried by the token. A scope the token carries but the machine does not store grants nothing, so the token cannot exceed its machine's scopes either, and a token that asked for a subset gets `403 AccessDenied` outside it. A token that carries `User.Impersonation` still gets `403` on every route for users only.
+So a machine token cannot act as an API key machine or outlive its machine, even when it was signed with a stolen key. Any failure is 401 with an empty body. No `WWW-Authenticate` header is sent, as for every other token. Each operation then needs its [scopes](#scopes-of-machines) stored on the machine and carried by the token. A scope the token carries but the machine does not store grants nothing, so the token cannot exceed its machine's scopes either, and a token that asked for a subset gets `403 AccessDenied` outside it. A machine token that carries `User.Impersonation` still gets `403` on every route for users only.
 
-The deployment signs with one RSA 2048 key, stored in the core container, partition `signing-keys`, id `tsk.1`, its `kid` being the RFC 7638 thumbprint. With `SigningKeyAutoBootstrap` the first exchange creates it; concurrent instances settle on one key through a create conflict. An instance signs with the stored key for 10 minutes before it reads the store again. If the store then has no key and `SigningKeyAutoBootstrap` is off, or holds a key that is not RS256, the exchange answers 503 instead of signing with the old key, and the next exchange reads the store again. A store that cannot be read keeps the loaded key in use. Validation never creates a key. A validating instance reads the store again after 10 minutes too, and at most once per 30 seconds for an unknown `kid` or while no key is stored; in between, such tokens are refused without I/O.
+The deployment signs both kinds with one RSA 2048 key, stored in the core container, partition `signing-keys`, id `tsk.1`, its `kid` being the RFC 7638 thumbprint, and publishes its public part at [`/api/.well-known/jwks.json`](#discovery-of-the-issuer). With `SigningKeyAutoBootstrap` the first exchange creates it; concurrent instances settle on one key through a create conflict. An instance signs with the stored key for 10 minutes before it reads the store again. If the store then has no key and `SigningKeyAutoBootstrap` is off, or holds a key that is not RS256, the exchange answers 503 instead of signing with the old key, and the next exchange reads the store again. A store that cannot be read keeps the loaded key in use. Validation never creates a key. A validating instance reads the store again after 10 minutes too, and at most once per 30 seconds for an unknown `kid` or while no key is stored; in between, such tokens are refused without I/O.
 
 ### Revocation timing
 
@@ -1012,7 +1432,7 @@ The deployment signs with one RSA 2048 key, stored in the core container, partit
 | Deleting or editing a trusted issuer | New exchanges, within the 60-second cache of the issuer list on the other instances. |
 | Replacing the rules | New exchanges. |
 
-Storyteller tokens already issued stay valid until they expire (`TokenLifetimeMinutes` plus `ClockSkewSeconds`), unless the machine is deleted or `Federated` is disabled. There is no revocation list and no replay store.
+Machine tokens already issued stay valid until they expire (`TokenLifetimeMinutes` plus `ClockSkewSeconds`), unless the machine is deleted or `Federated` is disabled. There is no revocation list and no replay store. User tokens have [their own rules](#storyteller-user-tokens).
 
 ### Configuration
 
@@ -1022,12 +1442,12 @@ The settings live under `MachineAuth:Federation` and are validated at startup:
 
 | Key | Default | Notes |
 |---|---|---|
-| `Issuer` | `urn:storyteller:{MachineAuth:TrustDomain}` | `iss` of Storyteller tokens. Changing it rejects the tokens already issued. |
-| `Audience` | `urn:storyteller:{MachineAuth:TrustDomain}:api` | `aud` of Storyteller tokens, and the only accepted `audience` or `resource` of an exchange. |
-| `PublicBaseUrl` | none | The public base URL of the API (`https://host/api`), absolute http(s) without query or fragment. `TokenEndpoint` is built from it. Without it, from the scheme and host of the request URL, never from `X-Forwarded-Host`. Set it when the API is reached through another host name. |
-| `TokenLifetimeMinutes` | `15` | Lifetime of a Storyteller token, 5 to 60. |
-| `ClockSkewSeconds` | `30` | Skew for platform and Storyteller tokens, 0 to 120. |
-| `MaxSubjectTokenBytes` | `16384` | Larger platform tokens are refused before parsing. 1,024 to 32,768. |
+| `Issuer` | `urn:storyteller:{MachineAuth:TrustDomain}` | `iss` of Storyteller tokens, machine and user, and the `issuer` of the [metadata](#discovery-of-the-issuer); RFC 8414 clients need an `https` URL. Changing it rejects the tokens already issued. |
+| `Audience` | `urn:storyteller:{MachineAuth:TrustDomain}:api` | `aud` of Storyteller tokens, and the only accepted `audience` or `resource` of both exchanges. |
+| `PublicBaseUrl` | none | The public base URL of the API (`https://host/api`), absolute http(s) without query or fragment. `TokenEndpoint`, the URLs of the metadata and the token endpoint a client assertion of the [user token exchange](#actors-and-their-proof) may name are built from it. Without it, from the scheme and host of the request URL, never from `X-Forwarded-Host`, and a client assertion may name only `Issuer`. Set it when the API is reached through another host name, and always for `ClientAssertion` actors, which need it to start. |
+| `TokenLifetimeMinutes` | `15` | Lifetime of a machine token, 5 to 60. User tokens follow `Auth:TokenExchange:TokenLifetimeMinutes`. |
+| `ClockSkewSeconds` | `30` | Skew for platform, actor and Storyteller tokens, 0 to 120. |
+| `MaxSubjectTokenBytes` | `16384` | Larger platform tokens are refused before parsing, and so are larger subject tokens, actor tokens and client assertions of the user token exchange. 1,024 to 32,768. |
 | `MetadataRefreshMinutes` | `60` | Age after which discovery documents and key sets are fetched again, 1 to 1,440. |
 | `SigningKeyAutoBootstrap` | `true` | Create the signing key on the first exchange when none is stored. When `false` and no key is stored, exchanges answer 503. |
 | `AllowPrivateNetworks` | `false` | Lifts the `https`, port 443, DNS host and public address limits of issuer URLs. Development and tests only. |
@@ -1039,9 +1459,10 @@ The settings live under `MachineAuth:Federation` and are validated at startup:
 * **Multi-audience tokens.** A token whose `aud` lists several relying parties is refused: any of them could replay it.
 * **Opaque refusals.** Every refused exchange looks the same to the caller (`400 invalid_request`), so it does not reveal projects, machines, scopes or rules. The `503` of a `Discovery` or `JwksUri` issuer is the exception. A key fetch failure answers `503` only once the project, its policy, the trusted issuer, a `Federated` machine with that id and a rule for that issuer have all matched, and a `kid` the issuer has not published only once the rule's audience has matched too. A caller who knows a machine id can therefore send tokens with a made-up `kid` and no valid signature, and learn whether the project trusts an issuer and which audience a rule uses. Such probes also make Storyteller fetch the issuer's keys again, at most once a minute per trusted issuer. A `Jwks` issuer has no such `503`. Machine ids are not secret: they appear in workflow files as `client_id`.
 * **Private networks.** Storyteller fetches discovery documents and key sets from URLs an Administrator enters. The fetch uses no proxy, follows no redirect, times out after 10 seconds (for the whole response, body included) and reads at most 512 KiB. It resolves the host and connects only to an address that the IANA special-purpose address registries mark globally reachable, so no loopback, private, CGNAT (`100.64.0.0/10`), link-local (including `169.254.169.254`), multicast, `fc00::/7` or `fe80::/10` address. IPv4 embedded in IPv6 (mapped, compatible, NAT64, 6to4, Teredo) is checked as IPv4, and other IPv6 addresses must be global unicast (`2000::/3`). It connects to the address it checked, so DNS rebinding cannot redirect it. `AllowPrivateNetworks` lifts all of this; never set it in production.
-* **The signing key in Cosmos.** The key is stored unprotected in the core container, like the machine CA. Whoever can read that container can mint Storyteller tokens. The per-call checks keep such tokens within existing `Federated` machines of projects that enable the kind, and within those machines' scopes; they cannot act as an API key, certificate or client-credentials machine. **Emergency rotation:** delete the document `tsk.1` (partition `signing-keys`) from the core container. Once each instance's next read of the store succeeds, about 10 minutes later, it stops signing with and accepting the old key, and the next exchange creates a new one (with `SigningKeyAutoBootstrap`; without it, exchanges answer 503 until a new key is stored); restarting the Function App makes it immediate. An instance that cannot read the store keeps the key it has loaded, so during a Cosmos read outage deleting `tsk.1` alone does not revoke the old key. When revocation comes first, restart the Function App right away: until Cosmos recovers, the restarted instances can neither issue nor validate Storyteller tokens. Workloads exchange again after their next 401.
+* **The signing key in Cosmos.** The key is stored unprotected in the core container, like the machine CA. Whoever can read that container can mint Storyteller tokens of both kinds. The per-call checks keep machine tokens within existing `Federated` machines of projects that enable the kind, and within those machines' scopes; they cannot act as an API key, certificate or client-credentials machine. User tokens are wider: while the [user token exchange](#user-token-exchange) is on, a minted user token acts for **any existing account**, with that account's roles, through any configured actor. Only the actor's current restrictions, which the API enforces whatever the token says, and the account's existence bound it. Treat read access to the core container like access to every account. **Emergency rotation:** delete the document `tsk.1` (partition `signing-keys`) from the core container. Once each instance's next read of the store succeeds, about 10 minutes later, it stops signing with and accepting the old key, and the next exchange creates a new one (with `SigningKeyAutoBootstrap`; without it, exchanges answer 503 until a new key is stored); restarting the Function App makes it immediate. An instance that cannot read the store keeps the key it has loaded, so during a Cosmos read outage deleting `tsk.1` alone does not revoke the old key. When revocation comes first, restart the Function App right away: until Cosmos recovers, the restarted instances can neither issue nor validate Storyteller tokens. Workloads exchange again after their next 401.
 * **Long-lived managed identity tokens.** An Azure managed identity token is cached by the platform for about 24 hours, so its issuer needs `MaxTokenLifetimeSeconds` 86,400, and a leaked token can be exchanged for that long. There is no replay store: managed identity, Vercel and Kubernetes tokens are reused by design, and single use would break them. Keep the subject exact and the machine's scopes small: give it only the scopes its jobs need, management scopes included, and let the jobs that need fewer leave the others out of `scope`.
 * **Secret delivery.** A federated machine never presents a certificate, so [secret delivery](key-values.md#secret-delivery) treats it as a token caller: under `RequireMtlsForSecretDelivery` (the default) it gets no secret values, whatever its scopes.
+* **Storyteller's own tokens.** Storyteller's issuer cannot be a trusted issuer, and the token endpoint refuses Storyteller tokens as platform tokens, so neither a user token of the exchange nor a machine token of another project becomes a machine token here.
 * **Who writes rules.** Contributors create machines of runtime scopes without secrets, so they also write the rules of those federated machines. Creating, resetting or giving new rules to a machine with a `Secrets.*` scope needs `ContributorWithSecrets`, and to one with a management scope `Administrator` (see [Scopes of machines](#scopes-of-machines)), so a Contributor cannot point their tokens at another workload. Administrators bound what all rules can admit with the issuers they trust and their `RequiredClaims`.
 
 ### Setting up a platform
@@ -1270,15 +1691,20 @@ The two status codes mean different things, so a client knows whether signing in
 
 | Status | Meaning | Body |
 | --- | --- | --- |
-| `401` | The credentials are missing, invalid or expired, or a user token does not carry `User.Impersonation` (Debug builds skip this check). Machine credentials that fail their checks also get 401: a machine the project does not know or whose kind it does not enable, an API key or a certificate whose record has no scopes, and a Storyteller token whose machine is gone or no longer `Federated`, or whose project is not the route's. | none |
+| `401` | The credentials are missing, invalid or expired, or a user token does not carry `User.Impersonation` (Debug builds skip this check). | none |
+| `401` | A user token that the provider's validator refuses under the Storyteller rules: an Entra ID token without a GUID `tid` and `oid` (see [Account ids](#account-ids)), or a Keycloak token of a client outside `Auth:Keycloak:AllowedClientIds` (see [How Keycloak tokens are checked](#how-keycloak-tokens-are-checked)). | none |
+| `401` | A provider token issued to an actor of the user token exchange: its `aud` is one of an actor's `SubjectAudiences`. This applies in every build, even when its provider accepts the token (see [Storyteller user tokens](#storyteller-user-tokens)). | none |
+| `401` | Machine credentials that fail their checks: a machine the project does not know or whose kind it does not enable, an API key or a certificate whose record has no scopes, or a Storyteller machine token whose machine is gone or no longer `Federated`, or whose project is not the route's. | none |
+| `401` | A [Storyteller user token](#storyteller-user-tokens) whose account is gone, whose actor is no longer configured, or which names an unknown restriction, and every Storyteller user token while the exchange is off. | none |
 | `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
+| `403` | The user acts through an actor whose [restrictions](#restrictions-of-actors) forbid the operation, in any build; the role check comes first. "The token acts for the person through an actor that may not reveal secrets." | `ErrorResponse` with `ErrorCode` `ActorRestricted` |
 | `403` | A machine called a route for users only, in any build and whatever its credentials carry: "Only users may call this operation; machines cannot.", or the route's own message (see [Scopes of machines](#scopes-of-machines)). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 | `403` | A machine restricted to an annotation addressed another annotation, or an operation of the whole project (see [Annotation restriction of machines](#annotation-restriction-of-machines)). | `ErrorResponse` with `ErrorCode` `AnnotationRestricted` |
 | `403` | A machine called an operation without one of its scopes: the machine was not created with it ("This operation needs the scope Schema.Write, which the machine was not created with."), or its credentials do not carry it ("…, which the credentials of the machine do not carry."). See [Scopes of machines](#scopes-of-machines). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 
 **Scopes describe machines, roles describe people.** A user role check runs on every project endpoint (`CheckAccessToProjectAsync`, `CheckAccessToAnnotationAsync`, `CheckAccessToAnnotationsAsync` and `CheckAccessToProjectMetadataAsync`) and inside the access-management operations. Users need no data scope there, only `User.Impersonation`. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so do reading the machine authentication policy, reading trusted issuers and replacing federation rules. Secret values and secret writes need `ContributorWithSecrets`, and so do creating a machine with a secrets scope, resetting one, replacing its federation rules and deleting it. Shared certificates, access points, setting the machine authentication policy and writing trusted issuers need `Administrator`, and so do creating a machine with a management scope, resetting one, replacing its federation rules and deleting it, and the export and the import of a view, with the reads of their jobs ([export-import.md](export-import.md#access)). Granting or revoking `Owner` needs `Owner`.
 
-Machines have no role. Each operation a machine may call needs its [scopes](#scopes-of-machines): a read its read scope, a write its write scope, and a bulk or structural operation also its management scope. That is `Configuration.Transfer` for the export and import of a view (with the read scopes of the included kinds, or the scopes of their direct writes) or of key/values, `Schema.Write` for schema writes and the import of schemas, `Template.Write` for template writes and the import of templates, `Annotation.Manage` for the bulk create, soft delete and restore of annotations and their import, and `KeyValue.Manage` for the protect and bulk restore of key/values. Debug builds (`DEV_AUTH`) skip the `User.Impersonation` check and the project role check of users. The checks of machines (their document, the credential policy, the annotation restriction and the scopes) and the refusal of machines on the routes for users only run in every build.
+Machines have no role. Each operation a machine may call needs its [scopes](#scopes-of-machines): a read its read scope, a write its write scope, and a bulk or structural operation also its management scope. That is `Configuration.Transfer` for the export and import of a view (with the read scopes of the included kinds, or the scopes of their direct writes) or of key/values, `Schema.Write` for schema writes and the import of schemas, `Template.Write` for template writes and the import of templates, `Annotation.Manage` for the bulk create, soft delete and restore of annotations and their import, and `KeyValue.Manage` for the protect and bulk restore of key/values. Debug builds (`DEV_AUTH`) skip the `User.Impersonation` check and the project role check of users. The checks of machines (their document, the credential policy, the annotation restriction and the scopes), the refusal of machines on the routes for users only and the restrictions of actors run in every build.
 
 Other access-management errors use the same `ErrorResponse` shape, without exception details:
 
@@ -1290,6 +1716,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `400` | none | A machine of a kind the project does not enable or the deployment does not configure, a scope that does not exist, a list of scopes without a runtime scope, a scope that the identity provider cannot carry (no AuthKit permission, no Entra ID app role, or no service principal of the API application in the Entra ID machine tenant), or a reset of a `Federated` or a `Certificate` machine. |
 | `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), a `PUT` changes the `Issuer` of a trusted issuer, or the body of a federation `PUT` is not a trusted issuer or a list of federation rules. |
 | `400` | `MachineNotFederated` | Federation rules for a machine of another kind. |
+| `403` | `ActorRestricted` | Through an actor under `NoSecretReveal`, an operation that gives out credentials that read secrets (see [Restrictions of actors](#restrictions-of-actors)). |
 | `404` | `NotFound` | The target account, the access point or the machine access does not exist, or the machine was deleted during its reset. `GET` and `DELETE` of a machine or a trusted issuer that does not exist answer `404` without a body. |
 | `409` | `AccountExists`, `AccessPointExists` | The account or project already exists. |
 | `409` | `FederatedIssuerInUse` | Creating a trusted issuer whose name rules of machines still reference. |
@@ -1300,7 +1727,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 
 Grant only raises a role. To lower one, revoke the current role and grant the new one, or set the exact role through the members endpoint. Members, invitations and the description of a project, with their own error codes, are described in [Access points](access.md).
 
-The token endpoint of federated machines is anonymous and answers OAuth errors (`400` and `503`) instead of `ErrorResponse`; see [The token endpoint](#the-token-endpoint).
+The token endpoints of federated machines and of the user token exchange are anonymous and answer OAuth errors (`400` and `503`) instead of `ErrorResponse`; see [The token endpoint](#the-token-endpoint) and [The user token endpoint](#the-user-token-endpoint).
 
 ## CORS for browser clients
 
@@ -1312,14 +1739,16 @@ az functionapp cors add --name <function-app> --resource-group <group> --allowed
 
 ## Switching an existing deployment
 
-`Account.Id` is the provider's `sub`. Entra object IDs and WorkOS user IDs are unrelated, so **changing `Auth:Provider` on a deployment that already has accounts orphans them**. Access maps, ownership and the [audit actors](audit-stamps.md#the-actor) (`Account` with the `sub` as its id) on annotations, configurations and key/value pairs stop resolving. AuthKit can federate to Microsoft sign-in, but the `sub` still changes. A migration tool is not available yet.
+`Account.Id` is the [account id of the provider](#account-ids): `{tid}:{oid}` under Entra ID, the WorkOS user ID under AuthKit, and the realm's `sub` under Keycloak. They are unrelated, so **changing `Auth:Provider` on a deployment that already has accounts orphans them**. Access maps, ownership and the [audit actors](audit-stamps.md#the-actor) (`Account` with the account id as its id) on annotations, configurations and key/value pairs stop resolving. AuthKit can federate to Microsoft sign-in, but the id still changes. Under Entra ID the host notes the rule once at start ("Entra ID accounts are keyed by {tid}:{oid} of the user token. Accounts registered under another identity provider, or under the pairwise Entra sub, do not resolve."), so the reason shows in the logs. The Entra ID account id changes in this version as well: accounts were keyed by the pairwise `sub` before and are keyed by `{tid}:{oid}` now, so an Entra ID deployment that already has accounts orphans them on upgrade, even without a change of `Auth:Provider`. Nothing migrates them. Each person registers again (`POST v1/access/account`) and is given their roles again, and DbCreator, run again with `baseAccount:id` set to the owner's `{tid}:{oid}`, seeds the owner of its organization again; it overwrites the access maps of that organization and its default project with the owner alone. No deployment had Entra ID accounts when the id changed. A deployment has one provider at a time, and accounts are not linked across providers. A migration tool is not available yet.
 
 ## Not available yet
 
-* User tokens issued by the AuthKit domain (Swagger UI sign-in) are not accepted alongside device-flow tokens. M2M tokens from the AuthKit domain are. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
-* The [MCP server](mcp.md) works with Entra ID only; AuthKit has no on-behalf-of or token exchange for the API.
+* User tokens issued by the AuthKit domain (Swagger UI and MCP sign-in) are not accepted as bearer tokens alongside device-flow tokens. The [user token exchange](#user-token-exchange) accepts them through `Auth:TokenExchange:AdditionalIssuers`, and M2M tokens from the AuthKit domain are accepted. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
+* One deployment has one user identity provider, and accounts are not linked between providers.
+* `sform` cannot sign in under Keycloak (the API side is in place), and the admin UI signs in through AuthKit only. A Keycloak user registers with `POST v1/access/account` (see [Registering a Keycloak user](#registering-a-keycloak-user)).
+* The user token exchange issues no refresh tokens, exchanges no token that already names an actor (no chained actors), and has no actors per project. Storyteller offers no dynamic client registration of its own.
 * A combination of an mTLS certificate and client credentials (`CertificateAndClientCredentials`) is not available.
 * The scopes of an existing machine cannot be edited. Create a new machine and delete the old one (see [Scopes of machines](#scopes-of-machines)).
-* The Storyteller signing key cannot be rotated except by the [emergency procedure](#security-notes), and it cannot live in Key Vault. Storyteller publishes no JWKS or RFC 8414 metadata for its tokens.
-* The token endpoint has no replay protection and no rate limit. Rules know only exact values and a separator-anchored subject prefix; there are no glob, regex or CEL conditions.
+* The Storyteller signing key cannot be rotated except by the [emergency procedure](#security-notes), and it cannot live in Key Vault. So the [JWKS](#discovery-of-the-issuer) publishes one key and never a next one.
+* The token endpoint of federated machines has no replay protection and no rate limit. Rules know only exact values and a separator-anchored subject prefix; there are no glob, regex or CEL conditions. The replay limit of the user token exchange and its record of client assertions are kept in memory per instance.
 * 401 responses carry no `WWW-Authenticate` header.

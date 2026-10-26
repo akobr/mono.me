@@ -58,7 +58,7 @@ The description is stored on the project's access point document (`apt.{organiza
 
 ## Roles
 
-Scopes describe machines, roles describe people. A user is authorized by the role on the access point only: the token must act for a user (the scope `User.Impersonation`, else `401` with no body; the reason is only logged), and data scopes in a user token grant nothing. Debug builds (`DEV_AUTH`) skip these checks of users; the checks of machines run in every build. A machine has no role: its scopes decide, as described below the table.
+Scopes describe machines, roles describe people. A user is authorized by the role on the access point only: the token must act for a user (the scope `User.Impersonation`, else `401` with no body; the reason is only logged), and data scopes in a user token grant nothing. Debug builds (`DEV_AUTH`) skip these checks of users; the checks of machines and the [restrictions of actors](#actors) run in every build. A machine has no role: its scopes decide, as described below the table.
 
 `None < Reader < Contributor < ContributorWithSecrets < Administrator < Owner`
 
@@ -71,14 +71,14 @@ Scopes describe machines, roles describe people. A user is authorized by the rol
 | Delete, restore, and re-create annotations | `Contributor` on the project; machines `Annotation.Write` and `Annotation.Manage`. A machine re-creates a single key (`PUT …/annotations/{key}`) with `Annotation.Write` alone |
 | Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
 | Export a view, import into a view, and read those jobs | `Administrator` on the project for users, without data scopes. Machines have no role and need `Configuration.Transfer` and the scopes of every included kind: to export, `Annotation.Read` for annotations and `Configuration.Read` for the other kinds; to import, the scopes of the direct writes: `Annotation.Write` and `Annotation.Manage` for annotations, `Configuration.Write` and `Schema.Write` for schemas, `Configuration.Write` and `Template.Write` for templates, `Configuration.Write` for configurations; a machine restricted to an annotation gets `403` `AnnotationRestricted` (see [export-import.md](export-import.md#access)) |
-| Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, and no scope gives it to a user; machines `Secrets.Read`, under the mTLS rule of the project (see [key-values.md](key-values.md#secret-delivery)) |
+| Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, and no scope gives it to a user; machines `Secrets.Read`, under the mTLS rule of the project (see [key-values.md](key-values.md#secret-delivery)). Never through an actor under `NoSecretReveal` (see [Actors](#actors)) |
 | Write key/value secrets: set, delete, restore, protect, import with secrets | `ContributorWithSecrets` on the project; machines `Secrets.Write`, under the mTLS rule of the project. A restore answers no `403` for a secret: it reports the key as `Forbidden` |
 | Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project, users only: machine credentials get `403` |
 | Set the [description of a project](#projects) | `Administrator` on the project, users only: machine credentials get `403` |
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 
-The [MCP server](mcp.md) acts with the role of the signed-in person: its calls carry a delegated token of that person, so an assistant never does more than the person may do, and the audit names the person. The server offers a part of the API only (see [its limits](mcp.md#limits)).
+The [MCP server](mcp.md) acts with the role of the signed-in person: its calls carry a Storyteller user token of that person, whose `act` names the server as the actor. The role decides as on a direct call, so an assistant never does more than the person may do, and the audit names the person, with the server's actor id in `Via` (see [Audit Stamps](audit-stamps.md#the-actor)). The actor's restrictions apply on top of the role (see [Actors](#actors)). The server offers a part of the API only (see [its limits](mcp.md#limits)).
 
 The API reads schemas, templates, deleted annotations and what the comparison of views needs (the views, the configurations and their diffs) with `Reader`. The admin UI locks its **Modeling** page, where they are, below `Contributor`; that lock is a choice of the admin UI. Its **Export & Import** tab is locked below `Administrator`, as the API requires (see [export-import.md](export-import.md#administration-ui)).
 
@@ -89,11 +89,29 @@ Machines have no role; their [scopes](authentication.md#scopes-of-machines) deci
 
 A read needs `X.Read`, a write `X.Write`, and a management operation its runtime scope and its management scope. Creating a machine with `Annotation.Write`, `Configuration.Write` or `Secrets.Write` adds the matching `X.Read`. A scope counts only when it is stored on the machine and carried by its credentials; otherwise the operation answers `403 AccessDenied` with a message that names the scope, in every build. Routes for users only refuse every machine with `403 AccessDenied`, whatever its credentials carry.
 
-The creator of a machine can use its credentials, so a user gives a machine no more than the user may do. Creating a machine, resetting it, replacing its federation rules or deleting it needs `Contributor`, `ContributorWithSecrets` when the machine has a `Secrets.*` scope, and `Administrator` when it has a management scope: a delete stops whatever runs with the scopes. These are role checks of users, so Debug builds skip them.
+The creator of a machine can use its credentials, so a user gives a machine no more than the user may do. Creating a machine, resetting it, replacing its federation rules or deleting it needs `Contributor`, `ContributorWithSecrets` when the machine has a `Secrets.*` scope, and `Administrator` when it has a management scope: a delete stops whatever runs with the scopes. These are role checks of users, so Debug builds skip them. Through an actor under `NoSecretReveal` they are refused for a machine with a `Secrets.*` scope, except the delete, in every build (see [Actors](#actors)).
 
 A machine created with an `AnnotationKey` reaches only that annotation and its descendants, and gets `403` `AnnotationRestricted` for other annotations and for operations of the whole project (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)).
 
 Every access point keeps at least one `Owner`. The last owner can't be demoted, removed, or leave (`409`, `LastOwner`).
+
+## Actors
+
+An actor is a service that calls the API for a person, such as the [MCP server](mcp.md). Only the deployment's configuration makes a service an actor (`Auth:TokenExchange:Actors`, see [Configuration of the exchange](authentication.md#configuration-of-the-exchange)); an actor has no project or role of its own. It exchanges the person's sign-in for a Storyteller user token (`POST v1/access/token`), whose `sub` is the person's account id and whose `act` names the actor, for example `mcp`. The API treats that token as the person:
+
+- The person's role on the access point decides, as on a direct call. The token carries `User.Impersonation`, and Debug builds (`DEV_AUTH`) skip the role checks as for any user.
+- The audit names the person and records the actor as `Via` (see [Audit stamps](audit-stamps.md#the-actor)).
+- The actor's restrictions apply on top of the role, in every build, `DEV_AUTH` included. The API enforces the restrictions in the token together with those the actor has now, so a restriction added to an actor reaches tokens already issued once the API runs with the new settings.
+
+The list of restrictions is closed, and has one entry, `NoSecretReveal`. Every actor has it unless its configuration sets `AllowSecrets: true`. A secret read through an assistant would enter the model's context, the client's transcript and the model provider, so `NoSecretReveal` takes the reading of secret values away from the person, also from a `ContributorWithSecrets`, an `Administrator` or an `Owner`:
+
+- A reveal of a key/value pair or of one of its versions, a diff of secret versions and an export with secrets answer `403 ActorRestricted`. A reveal is refused before the pair is read, also for a public pair (see [Secret delivery](key-values.md#secret-delivery)).
+- A resolved configuration is evaluated without secrets and carries the header `X-2S-Secrets-Withheld: actor-restricted` (see [inheritance.md](inheritance.md#headers)).
+- Creating a machine with a `Secrets.*` scope, resetting such a machine and replacing its federation rules answer `403 ActorRestricted`, because the credentials or tokens of the machine read secrets. Deleting such a machine is allowed.
+- Replacing an existing [trusted issuer](authentication.md#trusted-issuers) answers `403 ActorRestricted`, because new keys or pins would hand the tokens of the machines its rules name to another workload. Creating a trusted issuer and deleting one are allowed.
+- Writing secrets is not affected, because a write returns no value: the person's role decides a set, delete, restore, protect or import of secrets, as on a direct call.
+
+The restriction takes away only what the role gives. A user whose role gives no secret reads, such as a `Reader`, gets `403 AccessDenied` through the actor, as on a direct call, and the role checks of machines and trusted issuers come before the restriction. Debug builds give every user the secret rights and skip those role checks, so there the answer is `ActorRestricted`. Invitations and the roles of members stay open to an `Administrator` through an actor: they give a role to a person and put no secret into the model's context.
 
 ## Members
 
@@ -125,18 +143,22 @@ An invitation offers a role on an access point to an email address. It is a Stor
 
 **Accepting.** The invitee signs in first, so an account may not exist yet. Acceptance:
 
-1. compares the email of the token (`preferred_username`, then `email`, `unique_name`, `upn`) with the invitation, ignoring case (`403`, `EmailMismatch`);
-2. requires a verified email (`403`, `EmailNotVerified`): the token's `email_verified` claim decides when present. Without it, AuthKit tokens count as verified only when `Auth:AuthKit:RequireVerifiedEmail` is `false`; Entra ID tokens count as verified;
+1. compares the email of the token (`preferred_username`, then `email`, `unique_name`, `upn`; under Keycloak only `email`, because `preferred_username` is a user name the realm may let its users choose) with the invitation, ignoring case (`403`, `EmailMismatch`);
+2. requires a verified email (`403`, `EmailNotVerified`): the token's `email_verified` claim decides when present. Without it, AuthKit tokens count as verified only when `Auth:AuthKit:RequireVerifiedEmail` is `false`; Entra ID tokens count as verified; Keycloak tokens do not;
 3. creates the account without memberships when it does not exist, with the name and email from the token;
 4. joins the access point with the offered role, or keeps a higher role the account already has. The inviter's current role is not checked again: the invitation was authorized when it was created.
 
 Accepting the same invitation twice returns the account without changes.
 
-**Email delivery.** With `Auth:Provider = AuthKit` and `Auth:AuthKit:ApiKey`, Storyteller creates a WorkOS application invitation (`POST /user_management/invitations`, no organization), and WorkOS sends the email. Its link signs the invitee up even when AuthKit sign-up is disabled. A WorkOS application invitation can be accepted with any email address, which is why Storyteller always compares the email of its own invitation with the signed-in user. Resending revokes the WorkOS invitation and sends a new one, because WorkOS resends keep the old expiry. Revoking or declining also revokes the WorkOS invitation. A failed send is logged and the invitation is kept with `IsEmailSent = false`; share the admin UI link instead. Entra ID deployments and AuthKit without a management key never send emails.
+A call through an [actor](#actors) never counts as email-verified, whatever the token says: `GET v1/access/invitations/mine` answers an empty list, and accepting or declining answers `403` (`EmailMismatch` or `EmailNotVerified`). The invitee answers an invitation after signing in with the identity provider, not through an actor.
+
+**Email delivery.** With `Auth:Provider = AuthKit` and `Auth:AuthKit:ApiKey`, Storyteller creates a WorkOS application invitation (`POST /user_management/invitations`, no organization), and WorkOS sends the email. Its link signs the invitee up even when AuthKit sign-up is disabled. A WorkOS application invitation can be accepted with any email address, which is why Storyteller always compares the email of its own invitation with the signed-in user. Resending revokes the WorkOS invitation and sends a new one, because WorkOS resends keep the old expiry. Revoking or declining also revokes the WorkOS invitation. A failed send is logged and the invitation is kept with `IsEmailSent = false`; share the admin UI link instead. Entra ID and Keycloak deployments, and AuthKit without a management key, never send emails.
 
 ## Accounts
 
 `POST v1/access/account` creates the caller's account. With `Organization` and `Project` it also creates them and makes the caller their owner. Without both (`{}`, or both `null`), it creates an account with no memberships, for a user who joins through invitations. Giving only one of them is rejected with `400`. `ProjectDescription` is the [description](#projects) of the new project; the account and the organization get none, and a description that is not blank without `Organization` and `Project` is rejected with `400` (`A project description needs an organization and a project.`). The body is required: an empty body or `null` is rejected with `400` too (`The account is missing.`).
+
+The account id comes from the caller's token under the deployment's provider: the lower-case `{tid}:{oid}` under Entra ID, and `sub` under AuthKit and Keycloak (see [Account ids](authentication.md#account-ids)). An invitation acceptance that creates the account uses the same id. A Storyteller user token of an [actor](#actors) names an account that already exists: the exchange never creates one.
 
 ## Error codes
 
@@ -148,7 +170,8 @@ A route that takes a JSON body does not require a `Content-Type`, and answers `4
 | --- | --- | --- |
 | `400` | `InvalidName` | A new organization, project, or view name breaks the [name rules](#names). |
 | `403` | `AccessDenied` | The caller's role on the access point is too low, a machine lacks a scope of the operation, or a machine calls an operation for users only (such as registering, describing or discovering views, a permanent delete, setting the description of a project or listing projects). |
-| `403` | `EmailMismatch`, `EmailNotVerified` | Accepting or declining with another or an unverified email. |
+| `403` | `ActorRestricted` | The token acts for the person through an [actor](#actors) whose restrictions forbid the operation (under `NoSecretReveal`: reading secret values, or giving out what reads them). |
+| `403` | `EmailMismatch`, `EmailNotVerified` | Accepting or declining with another or an unverified email, or through an actor. |
 | `404` | `NotFound` | The access point, account, or invitation does not exist. |
 | `404` | `MemberNotFound` | The account is not a member of the access point. |
 | `409` | `LastOwner`, `SelfRoleChange` | Member rules above. |
