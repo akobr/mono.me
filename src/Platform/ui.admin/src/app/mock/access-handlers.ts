@@ -17,6 +17,7 @@ import type {
 import { MachineScope, roleRank } from '@42for.net/2splatform.sdk'
 import { mockDirectory, type MockDb } from './db'
 import {
+  certificateResetNotSupportedMessage,
   issuerError,
   issuerImmutableMessage,
   maxIssuersPerProject,
@@ -37,6 +38,7 @@ const random = (length: number) =>
     .join('')
     .toUpperCase()
 const fakeSecret = () => btoa(String.fromCharCode(...Array.from({ length: 48 }, () => Math.floor(Math.random() * 256))))
+const fakeApiKey = () => `st_${random(40).toLowerCase()}`
 
 function members(db: MockDb, key: string): AccessPointMember[] {
   return Object.entries(db.accessPoints[key]?.AccessMap ?? {}).map(([accountId, role]) => ({
@@ -207,7 +209,7 @@ function withCredentials(
     ...machine,
     CredentialKind: kind,
     UsesSharedCertificate: sharedCertificate || undefined,
-    AccessKey: kind === 'ApiKey' || kind === 'CertificateAndApiKey' ? `st_${random(40).toLowerCase()}` : undefined,
+    AccessKey: kind === 'ApiKey' || kind === 'CertificateAndApiKey' ? fakeApiKey() : undefined,
     Certificate: certificate ? fakeSecret() : undefined,
     CertificatePassword: certificate ? random(16) : undefined,
     CertificateThumbprint: certificate ? random(40) : undefined,
@@ -558,21 +560,27 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (denied || index < 0) {
         return denied ?? errorResponse(404, 'Not found.', 'NotFound')
       }
+      const stored = list[index]!
       // A new secret gives out the machine's scopes, so the reset needs the role they need.
-      const notAllowed = requireRoleForScopes(db, key, list[index]!.Scopes)
+      const notAllowed = requireRoleForScopes(db, key, stored.Scopes)
       if (notAllowed) {
         return notAllowed
       }
-      if (list[index]!.CredentialKind === 'Federated') {
+      // A reset follows the kind the machine was created with, as the API does.
+      const kind = stored.CredentialKind ?? 'ApiKey'
+      if (kind === 'Federated') {
         return errorResponse(400, resetNotSupportedMessage)
       }
-      // A reset follows the kind the machine was created with, as the API does.
-      const machine = withCredentials(
-        list[index]!,
-        list[index]!.CredentialKind ?? 'ApiKey',
-        undefined,
-        !!list[index]!.UsesSharedCertificate,
-      )
+      // A certificate is renewed, not reset (424-82).
+      if (kind === 'Certificate') {
+        return errorResponse(400, certificateResetNotSupportedMessage)
+      }
+      // A CertificateAndApiKey machine gets only a new API key: its certificate, its own or a shared one, keeps working
+      // and the stored record keeps its thumbprint, lifetime, expiry and renewal (424-82).
+      const machine =
+        kind === 'CertificateAndApiKey'
+          ? { ...stripSecrets(stored), AccessKey: fakeApiKey() }
+          : withCredentials(stored, kind)
       list[index] = stripSecrets(machine)
       return HttpResponse.json(machine)
     }),

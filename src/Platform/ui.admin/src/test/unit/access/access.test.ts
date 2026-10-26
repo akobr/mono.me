@@ -335,6 +335,10 @@ describe('machine scopes against the mock API', () => {
       CredentialKind: 'Federated',
       FederationRules: [rule],
     })
+    const secretsKey = await createMachineAccess('acme', 'billing', {
+      Scopes: ['ConfigurationRead', 'SecretsRead'],
+      CredentialKind: 'ApiKey',
+    })
     const denied = (role: string) => ({
       status: 403,
       errorCode: 'AccessDenied',
@@ -346,8 +350,11 @@ describe('machine scopes against the mock API', () => {
     await expect(setMachineFederationRules('acme', 'billing', federated.Id!, [rule])).rejects.toMatchObject(
       denied('Administrator'),
     )
-    // The seeded mach-billing-sync reads secrets.
+    // The seeded mach-billing-sync reads secrets: the role is checked before its kind.
     await expect(resetMachineAccess('acme', 'billing', 'mach-billing-sync')).rejects.toMatchObject(
+      denied('ContributorWithSecrets'),
+    )
+    await expect(resetMachineAccess('acme', 'billing', secretsKey.Id!)).rejects.toMatchObject(
       denied('ContributorWithSecrets'),
     )
     await expect(setMachineFederationRules('acme', 'billing', withSecrets.Id!, [rule])).rejects.toMatchObject(
@@ -360,7 +367,9 @@ describe('machine scopes against the mock API', () => {
     })
 
     setRole('ContributorWithSecrets')
-    expect((await resetMachineAccess('acme', 'billing', 'mach-billing-sync')).Certificate).toBeDefined()
+    expect((await resetMachineAccess('acme', 'billing', secretsKey.Id!)).AccessKey).toBeDefined()
+    // Past the role, the seeded Certificate machine has no secret to reset (424-82).
+    await expect(resetMachineAccess('acme', 'billing', 'mach-billing-sync')).rejects.toMatchObject({ status: 400 })
     await expect(setMachineFederationRules('acme', 'billing', withSecrets.Id!, [rule])).resolves.toMatchObject({
       Scopes: ['ConfigurationRead', 'SecretsRead'],
     })
@@ -465,8 +474,60 @@ describe('machine authentication policy against the mock API', () => {
     expect(machine.CertificateLifetimeDays).toBeUndefined()
 
     const reset = await resetMachineAccess('acme', 'billing', machine.Id!)
+    expect(reset.AccessKey).toBeDefined()
+    expect(reset.AccessKey).not.toBe(machine.AccessKey)
     expect(reset.Certificate).toBeUndefined()
     expect(reset.UsesSharedCertificate).toBe(true)
+  })
+
+  it('refuses the reset of a Certificate machine, which is renewed, and leaves it as it was (424-82)', async () => {
+    // The seed is stored first: until then every read makes it anew, with other times.
+    saveDb(loadDb())
+    const stored = () => loadDb().machines?.['acme.billing']?.find((entry) => entry.Id === 'mach-billing-sync')
+    const before = stored()
+    expect(before?.CredentialKind).toBe('Certificate')
+
+    await expect(resetMachineAccess('acme', 'billing', 'mach-billing-sync')).rejects.toMatchObject({
+      status: 400,
+      message:
+        'A Certificate machine has no secret to reset. Its certificate is renewed in the renewal window; to replace it, create a new machine and delete this one.',
+    })
+    expect(stored()).toEqual(before)
+  })
+
+  it('resets only the API key of a CertificateAndApiKey machine, which keeps its own certificate (424-82)', async () => {
+    await setMachineAuthentication('acme.billing', { EnabledCredentialKinds: ['ApiKey', 'CertificateAndApiKey'] })
+    const machine = await createMachineAccess('acme', 'billing', {
+      Scopes: ['AnnotationRead'],
+      CredentialKind: 'CertificateAndApiKey',
+      CertificateLifetimeDays: 30,
+    })
+    expect(machine.Certificate).toBeDefined()
+    expect(machine.CertificateThumbprint).toBeDefined()
+    const stored = () => loadDb().machines?.['acme.billing']?.find((entry) => entry.Id === machine.Id)
+    // Renewed earlier: the reset keeps that time, as it keeps the certificate.
+    const renewedAt = '2026-08-01T00:00:00.000Z'
+    const db = loadDb()
+    db.machines!['acme.billing']!.find((entry) => entry.Id === machine.Id)!.LastRenewalAt = renewedAt
+    saveDb(db)
+    const certificate = {
+      CredentialKind: 'CertificateAndApiKey',
+      CertificateThumbprint: machine.CertificateThumbprint,
+      CertificateLifetimeDays: 30,
+      CertificateNotAfter: machine.CertificateNotAfter,
+      LastRenewalAt: renewedAt,
+    }
+
+    const reset = await resetMachineAccess('acme', 'billing', machine.Id!)
+    expect(reset.AccessKey).toBeDefined()
+    expect(reset.AccessKey).not.toBe(machine.AccessKey)
+    expect(reset).toMatchObject({ ...certificate, Scopes: ['AnnotationRead'] })
+    expect(reset.UsesSharedCertificate).toBeFalsy()
+    expect(reset.Certificate).toBeUndefined()
+    expect(reset.CertificatePassword).toBeUndefined()
+    // The stored machine keeps the certificate and holds no secret.
+    expect(stored()).toMatchObject(certificate)
+    expect(stored()?.AccessKey).toBeUndefined()
   })
 
   it('rejects a default kind that is not enabled, and a policy without kinds', async () => {
@@ -814,6 +875,57 @@ describe('OneTimeSecretDialog', () => {
     expect(text).toContain('Uses a shared certificate')
     expect(text).toContain('API key')
     expect(text).not.toContain('Download .pfx')
+    expect(text).toContain('a reset issues new ones')
+    view.host.unmount()
+  })
+
+  it('does not promise a reset for a Certificate machine, which has none', async () => {
+    const view = mountInApp(OneTimeSecretDialog, {
+      secret: {
+        title: 'Created',
+        credentialKind: 'Certificate',
+        certificate: btoa('pfx-bytes'),
+        certificatePassword: 'pw',
+      },
+      onClose: () => {},
+    })
+    await settle()
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('to replace the certificate, create a new machine')
+    expect(text).not.toContain('a reset issues')
+    view.host.unmount()
+  })
+
+  it('tells that a reset of a CertificateAndApiKey machine issues a new API key but not its certificate', async () => {
+    const view = mountInApp(OneTimeSecretDialog, {
+      secret: {
+        title: 'Created',
+        credentialKind: 'CertificateAndApiKey',
+        apiKey: 'st_secret',
+        certificate: btoa('pfx-bytes'),
+        certificatePassword: 'pw',
+      },
+      onClose: () => {},
+    })
+    await settle()
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('a reset issues a new API key but not a new certificate')
+    expect(text).not.toContain('a reset issues new ones')
+    view.host.unmount()
+  })
+
+  it('tells that a shared certificate is replaced by issuing another one', async () => {
+    const view = mountInApp(OneTimeSecretDialog, {
+      secret: { title: 'Shared certificate issued', certificate: btoa('pfx-bytes'), certificatePassword: 'pw' },
+      onClose: () => {},
+    })
+    await settle()
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('to replace the certificate, issue another one')
+    expect(text).not.toContain('a reset issues')
     view.host.unmount()
   })
 

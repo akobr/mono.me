@@ -37,6 +37,20 @@ watch(
 
 const open = computed(() => !!props.secret)
 const clientCredentials = computed(() => props.secret?.credentialKind === 'ClientCredentials')
+// A reset never issues a certificate again (424-82): a Certificate machine has no Reset, a CertificateAndApiKey reset
+// replaces only the API key, and a shared certificate (no kind) is replaced by issuing another one.
+const discardHint = computed(() => {
+  const secret = props.secret
+  if (!secret?.certificate) {
+    return 'Closing this dialog discards them; a reset issues new ones.'
+  }
+  if (!secret.credentialKind) {
+    return 'Closing this dialog discards them; to replace the certificate, issue another one.'
+  }
+  return secret.apiKey
+    ? 'Closing this dialog discards them; a reset issues a new API key but not a new certificate: to replace the certificate, create a new machine.'
+    : 'Closing this dialog discards them; to replace the certificate, create a new machine.'
+})
 
 function downloadPfx() {
   if (!props.secret?.certificate) {
@@ -99,7 +113,7 @@ function close() {
           variant="subtle"
           icon="i-lucide-key-round"
           title="Shown only once"
-          description="Closing this dialog discards them; a reset issues new ones."
+          :description="discardHint"
         />
 
         <div v-if="secret.id" class="text-sm">

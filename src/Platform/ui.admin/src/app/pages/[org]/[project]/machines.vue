@@ -29,10 +29,11 @@ import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 // default certificate lifetime of new machines (424-14). Administrators also see the shared certificates (424-35) and
 // the trusted issuers of Federated machines (424-46) below the machines; Contributors don't, the API answers 403 to the
 // certificates and only Administrators change issuers. A Federated machine has no secret: creating one shows how a
-// workload exchanges its platform token (FederatedSetupDialog), and it has no Reset. Neither has a machine whose scopes
-// need a higher role than the user's (management scopes an Administrator, secrets scopes ContributorWithSecrets), as
-// the API refuses the reset (424-79); such a machine has no Delete either, as the API refuses that too: a delete stops
-// whatever runs with its scopes.
+// workload exchanges its platform token (FederatedSetupDialog), and it has no Reset. Neither has a Certificate machine,
+// whose certificate is renewed, not reset (424-82); a reset of a CertificateAndApiKey machine replaces only its API key.
+// Nor has a machine whose scopes need a higher role than the user's (management scopes an Administrator, secrets scopes
+// ContributorWithSecrets), as the API refuses the reset (424-79); such a machine has no Delete either, as the API
+// refuses that too: a delete stops whatever runs with its scopes.
 const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
@@ -210,8 +211,9 @@ useHashScroll(
                   <td class="px-3 py-2"><RelativeTime :value="machine.LastRenewalAt" /></td>
                   <td class="px-3 py-2 text-end">
                     <span v-if="canManage" class="flex justify-end gap-1">
-                      <!-- A Federated machine has no secret to reset; its rules change on its detail. A reset and a
-                        delete need the role the scopes of the machine need (424-79). -->
+                      <!-- A Federated machine has no secret to reset (its rules change on its detail), nor has a
+                        Certificate machine (its certificate is renewed, 424-82). A reset and a delete need the role
+                        the scopes of the machine need (424-79). -->
                       <UButton
                         v-if="hasSecret(machine.CredentialKind) && role.can(requiredRoleFor(machine))"
                         label="Reset"
@@ -250,7 +252,7 @@ useHashScroll(
       <ConfirmDialog
         :open="!!resetting"
         :title="`Reset ${resetting?.Id}?`"
-        description="Existing credentials of this machine stop working at once. New ones are shown once."
+        description="The current secret of this machine stops working at once; a certificate keeps working. The new secret is shown once."
         confirm-label="Reset credentials"
         color="warning"
         :loading="busy"

@@ -10,6 +10,9 @@ export const tooManyIssuersMessage = `A project has at most ${maxIssuersPerProje
 export const rulesOnOtherKindMessage = 'Only Federated machines have federation rules.'
 export const resetNotSupportedMessage =
   'A Federated machine has no secret to reset. Change its federation rules instead.'
+// The same refusal for a Certificate machine (PolicyAwareMachineAccessService, 424-82).
+export const certificateResetNotSupportedMessage =
+  'A Certificate machine has no secret to reset. Its certificate is renewed in the renewal window; to replace it, create a new machine and delete this one.'
 
 const namePattern = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
 const claimNamePattern = /^[A-Za-z0-9_.:-]{1,128}$/
