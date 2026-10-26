@@ -81,7 +81,9 @@ describe('federation helpers', () => {
     expect(isFederated('Federated')).toBe(true)
     expect(isFederated('ApiKey')).toBe(false)
     expect(hasSecret('Federated')).toBe(false)
-    for (const kind of ['ApiKey', 'Certificate', 'CertificateAndApiKey', 'ClientCredentials'] as const) {
+    // A certificate is renewed, not reset (424-82); a CertificateAndApiKey machine resets its API key.
+    expect(hasSecret('Certificate')).toBe(false)
+    for (const kind of ['ApiKey', 'CertificateAndApiKey', 'ClientCredentials'] as const) {
       expect(hasSecret(kind)).toBe(true)
     }
     // A machine stored without a kind is an API key machine.

@@ -145,10 +145,11 @@ export const credentialKindLabel = (kind?: MachineCredentialKind | null) =>
   credentialKindLabels[kind ?? 'ApiKey'] ?? kind
 
 /**
- * Whether machines of this kind get credentials that the API shows once and a reset replaces: every kind but Federated,
- * which has no secret (424-46).
+ * Whether machines of this kind hold a secret that a reset replaces and the API shows once: every kind but Federated,
+ * which has no secret (424-46), and Certificate, whose certificate is renewed, not reset (424-82). A reset of a
+ * CertificateAndApiKey machine replaces only its API key.
  */
-export const hasSecret = (kind?: MachineCredentialKind | null) => kind !== 'Federated'
+export const hasSecret = (kind?: MachineCredentialKind | null) => kind !== 'Federated' && kind !== 'Certificate'
 
 /**
  * The role that gives these scopes, or the credentials of this machine: its creation, a reset and new federation rules

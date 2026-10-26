@@ -309,6 +309,30 @@ test('a Contributor neither resets, deletes nor edits the rules of a machine wit
   await expect(managed).toHaveCount(1)
 })
 
+// A reset replaces only the secret of a machine (424-82): a Certificate machine has none, its certificate is renewed.
+test('a reset replaces the secret of a machine, and a Certificate machine has no Reset', async ({ page }) => {
+  await openApp(page, '/acme/billing/machines')
+  const certificate = page.getByRole('row').filter({ hasText: 'mach-billing-sync' })
+  await expect(certificate).toContainText('Certificate')
+  await expect(certificate.getByRole('button', { name: 'Reset' })).toHaveCount(0)
+  await expect(certificate.getByRole('button', { name: 'Delete mach-billing-sync' })).toBeVisible()
+
+  const worker = page.getByRole('row').filter({ hasText: 'mach-invoicing-worker' })
+  await worker.getByRole('button', { name: 'Reset' }).click()
+  const confirm = page.getByRole('dialog', { name: 'Reset mach-invoicing-worker?' })
+  await expect(confirm).toHaveAccessibleDescription(
+    'The current secret of this machine stops working at once; a certificate keeps working. The new secret is shown once.',
+  )
+  await confirm.getByRole('button', { name: 'Reset credentials' }).click()
+
+  const secret = page.getByRole('dialog', { name: 'New credentials' })
+  await expect(secret.getByText('API key', { exact: true })).toBeVisible()
+  await expect(secret.getByRole('button', { name: 'Download .pfx' })).toHaveCount(0)
+  await secret.getByRole('checkbox', { name: 'I have stored these credentials' }).check()
+  await secret.getByRole('button', { name: 'Done' }).click()
+  await expect(secret).toBeHidden()
+})
+
 // Workload identity federation (424-46): Administrators trust issuers on the Machines page, Contributors create
 // Federated machines with rules; such a machine has no secret and no Reset.
 test('an Administrator adds a trusted issuer from a template', async ({ page }) => {
