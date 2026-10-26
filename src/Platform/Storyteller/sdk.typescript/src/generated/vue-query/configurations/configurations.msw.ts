@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.9.54.7833
  */
 import { faker } from "@faker-js/faker";
 
@@ -190,6 +190,10 @@ export const getGetConfigurationCompositionResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -288,6 +292,10 @@ export const getGetConfigurationsResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -340,6 +348,10 @@ export const getGetConfigurationResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -399,6 +411,10 @@ export const getSetConfigurationResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -452,6 +468,10 @@ export const getPatchConfigurationResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -511,6 +531,10 @@ export const getGetResolvedConfigurationResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -565,6 +589,10 @@ export const getGetConfigurationVersionsResponseMock =
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -604,6 +632,10 @@ export const getGetConfigurationVersionResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),

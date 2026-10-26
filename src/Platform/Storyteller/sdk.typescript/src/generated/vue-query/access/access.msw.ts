@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.9.54.7833
  */
 import { faker } from "@faker-js/faker";
 
@@ -16,6 +16,7 @@ import type {
   AccessPointMember,
   Account,
   AuthConfiguration,
+  AuthorizationServerMetadata,
   CertificateRenewalResult,
   FederatedIssuer,
   Invitation,
@@ -23,7 +24,9 @@ import type {
   MachineAuthenticationPolicy,
   MachineTokenResponse,
   ProjectSummary,
+  PublicJsonWebKeySet,
   SharedCertificate,
+  UserTokenResponse,
 } from "../../model";
 
 export const getGetAccountResponseMock = (
@@ -842,6 +845,61 @@ export const getGetAuthConfigurationResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
+  Issuer: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  TokenExchange: faker.helpers.arrayElement([
+    {
+      Enabled: faker.helpers.arrayElement([
+        faker.datatype.boolean(),
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getGetAuthorizationServerMetadataResponseMock = (
+  overrideResponse: Partial<Extract<AuthorizationServerMetadata, object>> = {},
+): AuthorizationServerMetadata => ({
+  issuer: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  token_endpoint: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  jwks_uri: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  response_types_supported: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+  grant_types_supported: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+  token_endpoint_auth_methods_supported: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+  token_endpoint_auth_signing_alg_values_supported: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+  ...overrideResponse,
+});
+
+export const getGetJsonWebKeySetResponseMock = (
+  overrideResponse: Partial<Extract<PublicJsonWebKeySet, object>> = {},
+): PublicJsonWebKeySet => ({
+  keys: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => ({
+    kty: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    kid: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    use: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    alg: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    n: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    e: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  })),
   ...overrideResponse,
 });
 
@@ -1656,6 +1714,21 @@ export const getSetMemberRoleResponseMock = (
   ...overrideResponse,
 });
 
+export const getExchangeUserTokenResponseMock = (
+  overrideResponse: Partial<Extract<UserTokenResponse, object>> = {},
+): UserTokenResponse => ({
+  access_token: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  issued_token_type: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  token_type: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  expires_in: faker.number.int(),
+  scope: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  restrictions: Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+  ...overrideResponse,
+});
+
 export const getGetAccountMockHandler = (
   overrideResponse?:
     | Account
@@ -2078,6 +2151,54 @@ export const getGetAuthConfigurationMockHandler = (
             ? await overrideResponse(info)
             : overrideResponse
           : getGetAuthConfigurationResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getGetAuthorizationServerMetadataMockHandler = (
+  overrideResponse?:
+    | AuthorizationServerMetadata
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<AuthorizationServerMetadata> | AuthorizationServerMetadata),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/.well-known/oauth-authorization-server",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetAuthorizationServerMetadataResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getGetJsonWebKeySetMockHandler = (
+  overrideResponse?:
+    | PublicJsonWebKeySet
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<PublicJsonWebKeySet> | PublicJsonWebKeySet),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/.well-known/jwks.json",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetJsonWebKeySetResponseMock(),
         { status: 200 },
       );
     },
@@ -2555,6 +2676,30 @@ export const getRemoveMemberMockHandler = (
     options,
   );
 };
+
+export const getExchangeUserTokenMockHandler = (
+  overrideResponse?:
+    | UserTokenResponse
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<UserTokenResponse> | UserTokenResponse),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/access/token",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getExchangeUserTokenResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
 export const getAccessMock = () => [
   getGetAccountMockHandler(),
   getCreateAccountMockHandler(),
@@ -2574,6 +2719,8 @@ export const getAccessMock = () => [
   getGetMachineAuthenticationMockHandler(),
   getSetMachineAuthenticationMockHandler(),
   getGetAuthConfigurationMockHandler(),
+  getGetAuthorizationServerMetadataMockHandler(),
+  getGetJsonWebKeySetMockHandler(),
   getRenewMachineCertificateMockHandler(),
   getGetSharedCertificatesMockHandler(),
   getIssueSharedCertificateMockHandler(),
@@ -2594,4 +2741,5 @@ export const getAccessMock = () => [
   getGetMembersMockHandler(),
   getSetMemberRoleMockHandler(),
   getRemoveMemberMockHandler(),
+  getExchangeUserTokenMockHandler(),
 ];

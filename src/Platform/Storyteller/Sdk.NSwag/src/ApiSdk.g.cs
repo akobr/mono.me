@@ -247,7 +247,7 @@ namespace _42.Platform.Storyteller.Sdk
         System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body, System.Threading.CancellationToken cancellationToken);
 
         /// <remarks>
-        /// Anonymous. Tells clients which identity provider signs users in and with which public settings.
+        /// Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
         /// </remarks>
         /// <returns>The user identity provider of this deployment.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -255,11 +255,41 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// Anonymous. Tells clients which identity provider signs users in and with which public settings.
+        /// Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
         /// </remarks>
         /// <returns>The user identity provider of this deployment.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync(System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
+        /// </remarks>
+        /// <returns>The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync();
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
+        /// </remarks>
+        /// <returns>The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync(System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
+        /// </remarks>
+        /// <returns>The public keys (Cache-Control: public, max-age=300; no-cache while there is none).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync();
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
+        /// </remarks>
+        /// <returns>The public keys (Cache-Control: public, max-age=300; no-cache while there is none).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync(System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -591,7 +621,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
         /// </remarks>
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
         /// <returns>The member with the new role.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -602,7 +632,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
         /// </remarks>
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
         /// <returns>The member with the new role.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -612,7 +642,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
         /// </remarks>
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <returns>The member was removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId);
@@ -622,10 +652,27 @@ namespace _42.Platform.Storyteller.Sdk
         /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
         /// </remarks>
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <returns>The member was removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
+        /// </remarks>
+        /// <param name="body">The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
+        /// <returns>The Storyteller user token and the actor's restrictions (Cache-Control: no-store).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
+        /// </remarks>
+        /// <param name="body">The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
+        /// <returns>The Storyteller user token and the actor's restrictions (Cache-Control: no-store).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body, System.Threading.CancellationToken cancellationToken);
 
     }
 
@@ -1939,7 +1986,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -2188,7 +2235,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -2306,7 +2353,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -2687,7 +2734,7 @@ namespace _42.Platform.Storyteller.Sdk
         }
 
         /// <remarks>
-        /// Anonymous. Tells clients which identity provider signs users in and with which public settings.
+        /// Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
         /// </remarks>
         /// <returns>The user identity provider of this deployment.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -2698,7 +2745,7 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// Anonymous. Tells clients which identity provider signs users in and with which public settings.
+        /// Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
         /// </remarks>
         /// <returns>The user identity provider of this deployment.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -2759,6 +2806,200 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
+        /// </remarks>
+        /// <returns>The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync()
+        {
+            return GetAuthorizationServerMetadataAsync(System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
+        /// </remarks>
+        /// <returns>The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: ".well-known/oauth-authorization-server"
+                    urlBuilder_.Append(".well-known/oauth-authorization-server");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AuthorizationServerMetadata>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
+        /// </remarks>
+        /// <returns>The public keys (Cache-Control: public, max-age=300; no-cache while there is none).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync()
+        {
+            return GetJsonWebKeySetAsync(System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
+        /// </remarks>
+        /// <returns>The public keys (Cache-Control: public, max-age=300; no-cache while there is none).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: ".well-known/jwks.json"
+                    urlBuilder_.Append(".well-known/jwks.json");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<PublicJsonWebKeySet>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 503)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The signing key could not be read right now; Retry-After says when to try again.", status_, responseText_, headers_, null);
                         }
                         else
                         {
@@ -3905,7 +4146,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -5180,7 +5421,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
         /// </remarks>
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
         /// <returns>The member with the new role.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -5194,7 +5435,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
         /// </remarks>
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
         /// <returns>The member with the new role.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -5339,7 +5580,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
         /// </remarks>
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <returns>The member was removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId)
@@ -5352,7 +5593,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
         /// </remarks>
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <returns>The member was removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken)
@@ -5451,6 +5692,130 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
+        /// </remarks>
+        /// <param name="body">The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
+        /// <returns>The Storyteller user token and the actor's restrictions (Cache-Control: no-store).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body)
+        {
+            return ExchangeUserTokenAsync(body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
+        /// </remarks>
+        /// <param name="body">The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
+        /// <returns>The Storyteller user token and the actor's restrictions (Cache-Control: no-store).</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var dictionary_ = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(json_, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.FormUrlEncodedContent(dictionary_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/token"
+                    urlBuilder_.Append("v1/access/token");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<UserTokenResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<OAuthErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<OAuthErrorResponse>("invalid_request, invalid_client (an unknown actor or a bad proof), invalid_grant (a refused subject token, the replay limit, or no Storyteller account for the person), unsupported_grant_type (also while the exchange is off), invalid_target or invalid_scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 503)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<OAuthErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<OAuthErrorResponse>("temporarily_unavailable: the keys to verify the request or the signing key are not available right now; Retry-After says when to try again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -19042,7 +19407,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -20273,7 +20638,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -20466,7 +20831,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -20655,7 +21020,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -20822,7 +21187,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scopes Configuration.Read and Configuration.Transfer, and Secrets.Read to export secrets (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scopes Configuration.Read and Configuration.Transfer, and Secrets.Read to export secrets (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 424)
@@ -25224,6 +25589,9 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Name { get; set; }
 
+        [Newtonsoft.Json.JsonProperty("Via", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Via { get; set; }
+
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
@@ -25274,6 +25642,55 @@ namespace _42.Platform.Storyteller.Sdk
 
         [Newtonsoft.Json.JsonProperty("AuthKitDomain", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string AuthKitDomain { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Issuer", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Issuer { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("TokenExchange", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public TokenExchangeConfiguration TokenExchange { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AuthorizationServerMetadata
+    {
+
+        [Newtonsoft.Json.JsonProperty("issuer", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Issuer { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("token_endpoint", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Token_endpoint { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("jwks_uri", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Jwks_uri { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("response_types_supported", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> Response_types_supported { get; set; } = new System.Collections.ObjectModel.Collection<string>();
+
+        [Newtonsoft.Json.JsonProperty("grant_types_supported", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> Grant_types_supported { get; set; } = new System.Collections.ObjectModel.Collection<string>();
+
+        [Newtonsoft.Json.JsonProperty("token_endpoint_auth_methods_supported", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> Token_endpoint_auth_methods_supported { get; set; } = new System.Collections.ObjectModel.Collection<string>();
+
+        [Newtonsoft.Json.JsonProperty("token_endpoint_auth_signing_alg_values_supported", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> Token_endpoint_auth_signing_alg_values_supported { get; set; } = new System.Collections.ObjectModel.Collection<string>();
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -27376,6 +27793,64 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class PublicJsonWebKey
+    {
+
+        [Newtonsoft.Json.JsonProperty("kty", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Kty { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("kid", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Kid { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("use", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Use { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("alg", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Alg { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("n", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string N { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("e", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string E { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class PublicJsonWebKeySet
+    {
+
+        [Newtonsoft.Json.JsonProperty("keys", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<PublicJsonWebKey> Keys { get; set; } = new System.Collections.ObjectModel.Collection<PublicJsonWebKey>();
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class Responsibility : Annotation
     {
 
@@ -27572,6 +28047,24 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TokenExchangeConfiguration
+    {
+
+        [Newtonsoft.Json.JsonProperty("Enabled", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool Enabled { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class Unit : Annotation
     {
 
@@ -27643,6 +28136,102 @@ namespace _42.Platform.Storyteller.Sdk
 
         [Newtonsoft.Json.JsonProperty("ContextNames", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.ICollection<string> ContextNames { get; set; }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class UserTokenRequest
+    {
+
+        [Newtonsoft.Json.JsonProperty("grant_type", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Grant_type { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("subject_token", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Subject_token { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("subject_token_type", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Subject_token_type { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("actor_token", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Actor_token { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("actor_token_type", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Actor_token_type { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("client_assertion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Client_assertion { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("client_assertion_type", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Client_assertion_type { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("client_id", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Client_id { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("client_secret", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Client_secret { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("audience", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Audience { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("resource", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Resource { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("scope", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Scope { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("requested_token_type", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Requested_token_type { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class UserTokenResponse
+    {
+
+        [Newtonsoft.Json.JsonProperty("access_token", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Access_token { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("issued_token_type", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Issued_token_type { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("token_type", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Token_type { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("expires_in", Required = Newtonsoft.Json.Required.Always)]
+        public int Expires_in { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("scope", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Scope { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("restrictions", Required = Newtonsoft.Json.Required.Always)]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.ICollection<string> Restrictions { get; set; } = new System.Collections.ObjectModel.Collection<string>();
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
 
     }
 

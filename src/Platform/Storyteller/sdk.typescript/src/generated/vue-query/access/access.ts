@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.9.54.7833
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -29,6 +29,7 @@ import type {
   Account,
   AccountCreate,
   AuthConfiguration,
+  AuthorizationServerMetadata,
   CertificateRenewalResult,
   ErrorResponse,
   FederatedIssuer,
@@ -44,8 +45,11 @@ import type {
   OAuthErrorResponse,
   Permission,
   ProjectSummary,
+  PublicJsonWebKeySet,
   SharedCertificate,
   SharedCertificateCreate,
+  UserTokenRequest,
+  UserTokenResponse,
 } from "../../model";
 
 import { storytellerFetch } from "../../../lib/fetcher";
@@ -1838,7 +1842,7 @@ export const getGetAuthConfigurationUrl = () => {
 };
 
 /**
- * Anonymous. Tells clients which identity provider signs users in and with which public settings.
+ * Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
  */
 export const getAuthConfiguration = async (
   options?: Parameters<typeof storytellerFetch>[1],
@@ -1905,6 +1909,180 @@ export function useGetAuthConfiguration<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getGetAuthConfigurationQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getGetAuthorizationServerMetadataUrl = () => {
+  return `/.well-known/oauth-authorization-server`;
+};
+
+/**
+ * Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
+ */
+export const getAuthorizationServerMetadata = async (
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AuthorizationServerMetadata> => {
+  return storytellerFetch<AuthorizationServerMetadata>(
+    getGetAuthorizationServerMetadataUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAuthorizationServerMetadataQueryKey = () => {
+  return [".well-known", "oauth-authorization-server"] as const;
+};
+
+export const getGetAuthorizationServerMetadataQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAuthorizationServerMetadata>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<
+      Awaited<ReturnType<typeof getAuthorizationServerMetadata>>,
+      TError,
+      TData
+    >
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetAuthorizationServerMetadataQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAuthorizationServerMetadata>>
+  > = ({ signal }) =>
+    getAuthorizationServerMetadata({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthorizationServerMetadata>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetAuthorizationServerMetadataQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAuthorizationServerMetadata>>
+>;
+export type GetAuthorizationServerMetadataQueryError = ErrorType<ErrorResponse>;
+
+export function useGetAuthorizationServerMetadata<
+  TData = Awaited<ReturnType<typeof getAuthorizationServerMetadata>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getAuthorizationServerMetadata>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetAuthorizationServerMetadataQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getGetJsonWebKeySetUrl = () => {
+  return `/.well-known/jwks.json`;
+};
+
+/**
+ * Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
+ */
+export const getJsonWebKeySet = async (
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<PublicJsonWebKeySet> => {
+  return storytellerFetch<PublicJsonWebKeySet>(getGetJsonWebKeySetUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetJsonWebKeySetQueryKey = () => {
+  return [".well-known", "jwks.json"] as const;
+};
+
+export const getGetJsonWebKeySetQueryOptions = <
+  TData = Awaited<ReturnType<typeof getJsonWebKeySet>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getJsonWebKeySet>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetJsonWebKeySetQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getJsonWebKeySet>>
+  > = ({ signal }) => getJsonWebKeySet({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getJsonWebKeySet>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetJsonWebKeySetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getJsonWebKeySet>>
+>;
+export type GetJsonWebKeySetQueryError = ErrorType<ErrorResponse | void>;
+
+export function useGetJsonWebKeySet<
+  TData = Awaited<ReturnType<typeof getJsonWebKeySet>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getJsonWebKeySet>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetJsonWebKeySetQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
     TData,
@@ -4110,4 +4288,193 @@ export const useRemoveMember = <
   TContext
 > => {
   return useMutation(getRemoveMemberMutationOptions(options), queryClient);
+};
+export const getExchangeUserTokenUrl = () => {
+  return `/v1/access/token`;
+};
+
+/**
+ * Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
+ */
+export const exchangeUserToken = async (
+  userTokenRequest: UserTokenRequest,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<UserTokenResponse> => {
+  const formUrlEncoded = new URLSearchParams();
+  formUrlEncoded.append(`grant_type`, userTokenRequest.grant_type);
+  formUrlEncoded.append(`subject_token`, userTokenRequest.subject_token);
+  formUrlEncoded.append(
+    `subject_token_type`,
+    userTokenRequest.subject_token_type,
+  );
+  if (
+    userTokenRequest.actor_token !== undefined &&
+    userTokenRequest.actor_token !== null
+  ) {
+    formUrlEncoded.append(`actor_token`, userTokenRequest.actor_token);
+  }
+  if (
+    userTokenRequest.actor_token_type !== undefined &&
+    userTokenRequest.actor_token_type !== null
+  ) {
+    formUrlEncoded.append(
+      `actor_token_type`,
+      userTokenRequest.actor_token_type,
+    );
+  }
+  if (
+    userTokenRequest.client_assertion !== undefined &&
+    userTokenRequest.client_assertion !== null
+  ) {
+    formUrlEncoded.append(
+      `client_assertion`,
+      userTokenRequest.client_assertion,
+    );
+  }
+  if (
+    userTokenRequest.client_assertion_type !== undefined &&
+    userTokenRequest.client_assertion_type !== null
+  ) {
+    formUrlEncoded.append(
+      `client_assertion_type`,
+      userTokenRequest.client_assertion_type,
+    );
+  }
+  formUrlEncoded.append(`client_id`, userTokenRequest.client_id);
+  if (
+    userTokenRequest.client_secret !== undefined &&
+    userTokenRequest.client_secret !== null
+  ) {
+    formUrlEncoded.append(`client_secret`, userTokenRequest.client_secret);
+  }
+  if (
+    userTokenRequest.audience !== undefined &&
+    userTokenRequest.audience !== null
+  ) {
+    formUrlEncoded.append(`audience`, userTokenRequest.audience);
+  }
+  if (
+    userTokenRequest.resource !== undefined &&
+    userTokenRequest.resource !== null
+  ) {
+    formUrlEncoded.append(`resource`, userTokenRequest.resource);
+  }
+  if (userTokenRequest.scope !== undefined && userTokenRequest.scope !== null) {
+    formUrlEncoded.append(`scope`, userTokenRequest.scope);
+  }
+  if (
+    userTokenRequest.requested_token_type !== undefined &&
+    userTokenRequest.requested_token_type !== null
+  ) {
+    formUrlEncoded.append(
+      `requested_token_type`,
+      userTokenRequest.requested_token_type,
+    );
+  }
+
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<UserTokenResponse>(getExchangeUserTokenUrl(), {
+    ...options,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...getHeaders(options?.headers),
+    },
+    body: formUrlEncoded,
+  });
+};
+
+export const getExchangeUserTokenMutationKey = () =>
+  ["exchangeUserToken"] as const;
+
+export const getExchangeUserTokenMutationOptions = <
+  TError = ErrorType<OAuthErrorResponse | ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof exchangeUserToken>>,
+    TError,
+    ExchangeUserTokenMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof exchangeUserToken>>,
+  TError,
+  ExchangeUserTokenMutationVariables,
+  TContext
+> => {
+  const mutationKey = getExchangeUserTokenMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof exchangeUserToken>>,
+    ExchangeUserTokenMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return exchangeUserToken(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExchangeUserTokenMutationResult = NonNullable<
+  Awaited<ReturnType<typeof exchangeUserToken>>
+>;
+export type ExchangeUserTokenMutationBody = BodyType<UserTokenRequest>;
+export type ExchangeUserTokenMutationError = ErrorType<
+  OAuthErrorResponse | ErrorResponse
+>;
+export type ExchangeUserTokenMutationVariables = {
+  data: BodyType<UserTokenRequest>;
+};
+
+export const useExchangeUserToken = <
+  TError = ErrorType<OAuthErrorResponse | ErrorResponse>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof exchangeUserToken>>,
+      TError,
+      ExchangeUserTokenMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof exchangeUserToken>>,
+  TError,
+  ExchangeUserTokenMutationVariables,
+  TContext
+> => {
+  return useMutation(getExchangeUserTokenMutationOptions(options), queryClient);
 };

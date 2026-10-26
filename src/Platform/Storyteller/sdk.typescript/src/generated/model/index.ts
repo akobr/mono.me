@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.9.54.7833
  */
 
 export * from "./accessPoint";
@@ -54,6 +54,7 @@ export * from "./auditActor";
 export * from "./auditActorKind";
 export * from "./auditStamp";
 export * from "./authConfiguration";
+export * from "./authorizationServerMetadata";
 export * from "./bindingCatalog";
 export * from "./bindingExample";
 export * from "./bindingFunctionDescriptor";
@@ -216,6 +217,8 @@ export * from "./permissionRole";
 export * from "./projectSummary";
 export * from "./projectSummaryRole";
 export * from "./protectionKeyInfo";
+export * from "./publicJsonWebKey";
+export * from "./publicJsonWebKeySet";
 export * from "./responsibility";
 export * from "./responsibilityAnnotationType";
 export * from "./rewrapStatus";
@@ -238,12 +241,15 @@ export * from "./sharedCertificateCreate";
 export * from "./startViewImportParams";
 export * from "./subject";
 export * from "./subjectAnnotationType";
+export * from "./tokenExchangeConfiguration";
 export * from "./unit";
 export * from "./unitAnnotationType";
 export * from "./unitOfExecution";
 export * from "./unitOfExecutionAnnotationType";
 export * from "./usage";
 export * from "./usageAnnotationType";
+export * from "./userTokenRequest";
+export * from "./userTokenResponse";
 export * from "./view";
 export * from "./viewArchiveContent";
 export * from "./viewCreate";

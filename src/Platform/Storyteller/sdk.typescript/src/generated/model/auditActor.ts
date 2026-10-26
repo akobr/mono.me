@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.9.54.7833
  */
 import type { AuditActorKind } from "./auditActorKind";
 
@@ -11,4 +11,5 @@ export interface AuditActor {
   Kind?: AuditActorKind;
   Id?: string;
   Name?: string;
+  Via?: string;
 }

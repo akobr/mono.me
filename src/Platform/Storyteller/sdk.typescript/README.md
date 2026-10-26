@@ -217,3 +217,7 @@ try {
 ```
 
 Both helpers post the form with plain `fetch` (or the `fetch` option), without `Authorization` and without following redirects. The generated `exchangeMachineToken` posts the same form, but through the configured fetcher: it adds `Authorization` whenever `getAccessToken` returns a token, which the endpoint refuses with `invalid_request`, and as `getAccessToken` it would call itself. The trusted issuers and rules are managed with the generated `getFederatedIssuers`, `getFederatedIssuer`, `setFederatedIssuer`, `deleteFederatedIssuer` and `setMachineFederationRules` (and their composables, Zod schemas and MSW handlers), with a user token.
+
+## User token exchange
+
+The generated `exchangeUserToken` posts the RFC 8693 exchange of an actor, such as the MCP server, to `POST /v1/access/token`: the person's token for the actor (`subject_token`), the actor's id (`client_id`) and its proof (`actor_token`, `client_assertion`, or `client_secret` in Development) give a short-lived Storyteller user token that names the person and the actor, with the actor's `restrictions`. Like `exchangeMachineToken`, it goes through the configured fetcher, which adds `Authorization` whenever `getAccessToken` returns a token, and the endpoint refuses that with `invalid_request`. Call it only while `getAccessToken` returns nothing, with `{ redirect: 'error' }` as its options (the subject token is in the body), or post the form with plain `fetch`. `getAuthorizationServerMetadata` (RFC 8414) and `getJsonWebKeySet` read the issuer's metadata and signing keys anonymously.

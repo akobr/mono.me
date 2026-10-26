@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.9.54.7833
  */
 import { faker } from "@faker-js/faker";
 
@@ -193,6 +193,10 @@ export const getGetKeyValuePolicyResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -251,6 +255,10 @@ export const getGetKeyValuePolicyResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -431,6 +439,10 @@ export const getSetKeyValuePolicyResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -489,6 +501,10 @@ export const getSetKeyValuePolicyResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -687,6 +703,10 @@ export const getVerifyByokResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -745,6 +765,10 @@ export const getVerifyByokResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -925,6 +949,10 @@ export const getRotateKeyValueKeyResponseMock = (
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
+              Via: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
             },
             undefined,
           ]),
@@ -983,6 +1011,10 @@ export const getRotateKeyValueKeyResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1050,6 +1082,10 @@ export const getGetRecipientsResponseMock = (): ClientEncryptionRecipient[] =>
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
+            Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
           },
           undefined,
         ]),
@@ -1105,6 +1141,10 @@ export const getAddRecipientResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1167,6 +1207,10 @@ export const getUpdateRecipientResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -1226,6 +1270,10 @@ export const getGetKeyValuesResponseMock = (
                 undefined,
               ]),
               Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Via: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
@@ -1310,6 +1358,10 @@ export const getGetKeyValueResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -1334,6 +1386,10 @@ export const getGetKeyValueResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1362,6 +1418,10 @@ export const getGetKeyValueResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1434,6 +1494,10 @@ export const getSetKeyValueResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -1458,6 +1522,10 @@ export const getSetKeyValueResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1486,6 +1554,10 @@ export const getSetKeyValueResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1641,6 +1713,10 @@ export const getGetKeyValueVersionsResponseMock = (): KeyValueVersion[] =>
               faker.string.alpha({ length: { min: 10, max: 20 } }),
               undefined,
             ]),
+            Via: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
           },
           undefined,
         ]),
@@ -1713,6 +1789,10 @@ export const getGetKeyValueVersionResponseMock = (
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
         },
         undefined,
       ]),
@@ -1737,6 +1817,10 @@ export const getGetKeyValueVersionResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -1765,6 +1849,10 @@ export const getGetKeyValueVersionResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),
@@ -2088,6 +2176,10 @@ export const getGetKeyValueAuditResponseMock = (
             undefined,
           ]),
           Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
             faker.string.alpha({ length: { min: 10, max: 20 } }),
             undefined,
           ]),

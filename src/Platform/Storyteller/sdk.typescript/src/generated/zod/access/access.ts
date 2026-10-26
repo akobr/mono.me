@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.9.54.7833
  */
 import * as zod from "zod";
 
@@ -788,7 +788,7 @@ export const SetMachineAuthenticationResponse = zod.object({
 });
 
 /**
- * Anonymous. Tells clients which identity provider signs users in and with which public settings.
+ * Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
  */
 export const GetAuthConfigurationResponse = zod.object({
   Provider: zod.string().optional(),
@@ -796,6 +796,41 @@ export const GetAuthConfigurationResponse = zod.object({
   TenantId: zod.string().optional(),
   Scopes: zod.array(zod.string()).optional(),
   AuthKitDomain: zod.string().optional(),
+  Issuer: zod.string().optional(),
+  TokenExchange: zod
+    .object({
+      Enabled: zod.boolean().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
+ */
+export const GetAuthorizationServerMetadataResponse = zod.object({
+  issuer: zod.string(),
+  token_endpoint: zod.string(),
+  jwks_uri: zod.string(),
+  response_types_supported: zod.array(zod.string()),
+  grant_types_supported: zod.array(zod.string()),
+  token_endpoint_auth_methods_supported: zod.array(zod.string()),
+  token_endpoint_auth_signing_alg_values_supported: zod.array(zod.string()),
+});
+
+/**
+ * Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
+ */
+export const GetJsonWebKeySetResponse = zod.object({
+  keys: zod.array(
+    zod.object({
+      kty: zod.string(),
+      kid: zod.string(),
+      use: zod.string(),
+      alg: zod.string(),
+      n: zod.string(),
+      e: zod.string(),
+    }),
+  ),
 });
 
 export const RenewMachineCertificateParams = zod.object({
@@ -1399,7 +1434,9 @@ export const SetMemberRoleParams = zod.object({
     ),
   accountId: zod
     .string()
-    .describe("The id of the account (the identity provider's subject)."),
+    .describe(
+      "The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.",
+    ),
 });
 
 export const setMemberRoleBodyRoleDefault = `None`;
@@ -1446,7 +1483,37 @@ export const RemoveMemberParams = zod.object({
     ),
   accountId: zod
     .string()
-    .describe("The id of the account (the identity provider's subject)."),
+    .describe(
+      "The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.",
+    ),
 });
 
 export const RemoveMemberResponse = zod.void();
+
+/**
+ * Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
+ */
+export const ExchangeUserTokenBody = zod.object({
+  grant_type: zod.string(),
+  subject_token: zod.string(),
+  subject_token_type: zod.string(),
+  actor_token: zod.string().nullish(),
+  actor_token_type: zod.string().nullish(),
+  client_assertion: zod.string().nullish(),
+  client_assertion_type: zod.string().nullish(),
+  client_id: zod.string(),
+  client_secret: zod.string().nullish(),
+  audience: zod.string().nullish(),
+  resource: zod.string().nullish(),
+  scope: zod.string().nullish(),
+  requested_token_type: zod.string().nullish(),
+});
+
+export const ExchangeUserTokenResponse = zod.object({
+  access_token: zod.string(),
+  issued_token_type: zod.string(),
+  token_type: zod.string(),
+  expires_in: zod.int(),
+  scope: zod.string(),
+  restrictions: zod.array(zod.string()),
+});

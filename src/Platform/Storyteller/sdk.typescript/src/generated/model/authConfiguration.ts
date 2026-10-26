@@ -3,8 +3,9 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.50.40497
+ * OpenAPI spec version: 0.9.54.7833
  */
+import type { TokenExchangeConfiguration } from "./tokenExchangeConfiguration";
 
 export interface AuthConfiguration {
   Provider?: string;
@@ -12,4 +13,6 @@ export interface AuthConfiguration {
   TenantId?: string;
   Scopes?: string[];
   AuthKitDomain?: string;
+  Issuer?: string;
+  TokenExchange?: TokenExchangeConfiguration;
 }
