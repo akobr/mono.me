@@ -12,7 +12,11 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
+<<<<<<<< HEAD:src/Platform/Storyteller/Sdk.NSwag/open.api.v0.10.0.json
     "version": "0.10.0.13575"
+========
+    "version": "0.9.54.7833"
+>>>>>>>> 5c6ac0f4 (chore(platform): regenerate the SDKs from OpenAPI 0.9.54):src/Platform/Storyteller/Sdk.NSwag/open.api.v0.9.54.json
   },
   "servers": [
     {
@@ -759,7 +763,7 @@
             }
           },
           "403": {
-            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
               "application/json": {
                 "schema": {
@@ -923,7 +927,7 @@
             }
           },
           "403": {
-            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
               "application/json": {
                 "schema": {
@@ -994,7 +998,7 @@
         ],
         "responses": {
           "403": {
-            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3834,7 +3838,7 @@
         "tags": [
           "Access"
         ],
-        "description": "Anonymous. Tells clients which identity provider signs users in and with which public settings.",
+        "description": "Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.",
         "operationId": "GetAuthConfiguration",
         "responses": {
           "200": {
@@ -3856,6 +3860,71 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.",
+        "operationId": "GetAuthorizationServerMetadata",
+        "responses": {
+          "200": {
+            "description": "The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizationServerMetadata"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.",
+        "operationId": "GetJsonWebKeySet",
+        "responses": {
+          "200": {
+            "description": "The public keys (Cache-Control: public, max-age=300; no-cache while there is none).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJsonWebKeySet"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The signing key could not be read right now; Retry-After says when to try again."
           }
         }
       }
@@ -9404,7 +9473,7 @@
             }
           },
           "403": {
-            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).",
             "content": {
               "application/json": {
                 "schema": {
@@ -11299,7 +11368,7 @@
             }
           },
           "403": {
-            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).",
+            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -12284,7 +12353,7 @@
             }
           },
           "403": {
-            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).",
+            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -12451,7 +12520,7 @@
             }
           },
           "403": {
-            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).",
+            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -12618,7 +12687,7 @@
             }
           },
           "403": {
-            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).",
+            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read, and Secrets.Read for secret values (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -12752,7 +12821,7 @@
             }
           },
           "403": {
-            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scopes Configuration.Read and Configuration.Transfer, and Secrets.Read to export secrets (AccessDenied).",
+            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), the token acts for the user through an actor that may not reveal secrets (ErrorCode ActorRestricted), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine needs the scopes Configuration.Read and Configuration.Transfer, and Secrets.Read to export secrets (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -13332,7 +13401,7 @@
           {
             "name": "accountId",
             "in": "path",
-            "description": "The id of the account (the identity provider's subject).",
+            "description": "The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.",
             "required": true,
             "schema": {
               "type": "string"
@@ -13445,7 +13514,7 @@
           {
             "name": "accountId",
             "in": "path",
-            "description": "The id of the account (the identity provider's subject).",
+            "description": "The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.",
             "required": true,
             "schema": {
               "type": "string"
@@ -14671,6 +14740,68 @@
             "apiKey": [ ]
           }
         ]
+      }
+    },
+    "/v1/access/token": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.",
+        "operationId": "ExchangeUserToken",
+        "requestBody": {
+          "description": "The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/UserTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The Storyteller user token and the actor's restrictions (Cache-Control: no-store).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_request, invalid_client (an unknown actor or a bad proof), invalid_grant (a refused subject token, the replay limit, or no Storyteller account for the person), unsupported_grant_type (also while the exchange is off), invalid_target or invalid_scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "temporarily_unavailable: the keys to verify the request or the signing key are not available right now; Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/{organization}/{project}/views": {
@@ -16308,6 +16439,9 @@
           },
           "Name": {
             "type": "string"
+          },
+          "Via": {
+            "type": "string"
           }
         }
       },
@@ -16343,6 +16477,59 @@
           },
           "AuthKitDomain": {
             "type": "string"
+          },
+          "Issuer": {
+            "type": "string"
+          },
+          "TokenExchange": {
+            "$ref": "#/components/schemas/TokenExchangeConfiguration"
+          }
+        }
+      },
+      "AuthorizationServerMetadata": {
+        "required": [
+          "issuer",
+          "token_endpoint",
+          "jwks_uri",
+          "response_types_supported",
+          "grant_types_supported",
+          "token_endpoint_auth_methods_supported",
+          "token_endpoint_auth_signing_alg_values_supported"
+        ],
+        "type": "object",
+        "properties": {
+          "issuer": {
+            "type": "string"
+          },
+          "token_endpoint": {
+            "type": "string"
+          },
+          "jwks_uri": {
+            "type": "string"
+          },
+          "response_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "grant_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "token_endpoint_auth_methods_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "token_endpoint_auth_signing_alg_values_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -18280,6 +18467,51 @@
           }
         }
       },
+      "PublicJsonWebKey": {
+        "required": [
+          "kty",
+          "kid",
+          "use",
+          "alg",
+          "n",
+          "e"
+        ],
+        "type": "object",
+        "properties": {
+          "kty": {
+            "type": "string"
+          },
+          "kid": {
+            "type": "string"
+          },
+          "use": {
+            "type": "string"
+          },
+          "alg": {
+            "type": "string"
+          },
+          "n": {
+            "type": "string"
+          },
+          "e": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicJsonWebKeySet": {
+        "required": [
+          "keys"
+        ],
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicJsonWebKey"
+            }
+          }
+        }
+      },
       "Responsibility": {
         "required": [
           "UnitNames"
@@ -18468,6 +18700,14 @@
           }
         ]
       },
+      "TokenExchangeConfiguration": {
+        "type": "object",
+        "properties": {
+          "Enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "Unit": {
         "required": [
           "ResponsibilityKey",
@@ -18591,6 +18831,100 @@
             }
           }
         ]
+      },
+      "UserTokenRequest": {
+        "required": [
+          "grant_type",
+          "subject_token",
+          "subject_token_type",
+          "client_id"
+        ],
+        "type": "object",
+        "properties": {
+          "grant_type": {
+            "type": "string"
+          },
+          "subject_token": {
+            "type": "string"
+          },
+          "subject_token_type": {
+            "type": "string"
+          },
+          "actor_token": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor_token_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "client_assertion": {
+            "type": "string",
+            "nullable": true
+          },
+          "client_assertion_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_secret": {
+            "type": "string",
+            "nullable": true
+          },
+          "audience": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "type": "string",
+            "nullable": true
+          },
+          "requested_token_type": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "UserTokenResponse": {
+        "required": [
+          "access_token",
+          "issued_token_type",
+          "token_type",
+          "expires_in",
+          "scope",
+          "restrictions"
+        ],
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "issued_token_type": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "restrictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "View": {
         "type": "object",
