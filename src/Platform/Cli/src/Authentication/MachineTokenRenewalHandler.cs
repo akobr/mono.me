@@ -37,7 +37,7 @@ public sealed class MachineTokenRenewalHandler : DelegatingHandler
 
         try
         {
-            // No cancellation, like the token factory: the attempt timeouts of the token requests end a hanging one.
+            // No cancellation, like the token factory: the machine sign-in ends a token request after 100 seconds.
             token = await _machine.RenewAccessTokenAsync(rejectedToken, CancellationToken.None);
         }
         catch

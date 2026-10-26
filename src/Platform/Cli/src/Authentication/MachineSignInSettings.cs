@@ -20,6 +20,7 @@ public sealed class MachineSignInSettings
         Exception? credentialFailure,
         string? endpoint,
         string endpointVariable,
+        bool isApiUrlSet,
         StorytellerAuthenticationException? endpointFailure)
     {
         CredentialVariables = credentialVariables;
@@ -30,7 +31,7 @@ public sealed class MachineSignInSettings
         _endpointFailure = endpointFailure;
 
         IEnumerable<string> deprecated = credential?.DeprecatedNames ?? credentialVariables.Where(StorytellerVariables.Deprecated.ContainsKey);
-        DeprecatedVariables = (endpoint is not null && endpointVariable == StorytellerVariables.API_URL ? deprecated.Prepend(StorytellerVariables.API_URL) : deprecated)
+        DeprecatedVariables = (isApiUrlSet ? deprecated.Prepend(StorytellerVariables.API_URL) : deprecated)
             .ToList()
             .AsReadOnly();
     }
@@ -53,7 +54,8 @@ public sealed class MachineSignInSettings
     // The names of the credential variables that are set, as named, never their values.
     public IReadOnlyList<string> CredentialVariables { get; }
 
-    // The deprecated names in use: of the credential, and STORYTELLER_API_URL when it gave the endpoint.
+    // The deprecated names that are set: of the credential, and STORYTELLER_API_URL, even next to STORYTELLER_ENDPOINT, as
+    // the SDK reports a deprecated credential name next to its canonical one.
     public IReadOnlyList<string> DeprecatedVariables { get; }
 
     public static MachineSignInSettings FromEnvironment(Func<string, string?> getVariable)
@@ -93,7 +95,9 @@ public sealed class MachineSignInSettings
             }
         }
 
-        return new MachineSignInSettings(credentialVariables, credential, credentialFailure, endpoint, endpointVariable, endpointFailure)
+        var isApiUrlSet = new StorytellerVariableReader(getVariable).Read(StorytellerVariables.API_URL) is not null;
+
+        return new MachineSignInSettings(credentialVariables, credential, credentialFailure, endpoint, endpointVariable, isApiUrlSet, endpointFailure)
         {
             Project = project,
             View = view,
