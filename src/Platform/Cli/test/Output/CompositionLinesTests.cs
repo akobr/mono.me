@@ -151,7 +151,7 @@ public class CompositionLinesTests
             """);
         var client = new ConfigurationsApiClient(new HttpClient(http), new SdkConfiguration { BaseUrl = "http://localhost:7071/api" });
 
-        var composition = await client.GetConfigurationCompositionAsync("org1", "proj1", "default", "sbt.northwind");
+        var composition = await client.GetConfigurationCompositionAsync("org1", "proj1", "default", "sbt.northwind", null);
         var lines = CompositionLines.Of(composition.Content.ShouldBeOfType<JObject>(), composition.Origins);
 
         lines[1].ShouldBe(("  \"renewal\": \"2026-10-20T12:00:00.1230000+02:00\",", "/renewal", 1));

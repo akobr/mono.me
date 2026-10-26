@@ -71,12 +71,14 @@ public class ConfigGetCommand : BaseContextCommand
                     Context.OrganizationName,
                     Context.ProjectName,
                     Context.ViewName,
-                    AnnotationKey)
+                    AnnotationKey,
+                    if_None_Match: null)
                 : await _configurationApi.GetConfigurationAsync(
                     Context.OrganizationName,
                     Context.ProjectName,
                     Context.ViewName,
-                    AnnotationKey);
+                    AnnotationKey,
+                    if_None_Match: null);
 
             Console.WriteJson(data);
 

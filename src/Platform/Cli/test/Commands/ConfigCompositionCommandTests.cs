@@ -37,7 +37,7 @@ public class ConfigCompositionCommandTests
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _api.Verify(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key), Times.Once);
+        _api.Verify(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key, null), Times.Once);
         _api.VerifyNoOtherCalls();
     }
 
@@ -101,7 +101,7 @@ public class ConfigCompositionCommandTests
     [Fact]
     public async Task Composition_NotFound_SaysSoAndIsWrongInput()
     {
-        _api.Setup(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key))
+        _api.Setup(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key, null))
             .ThrowsAsync(AnnotationCommandFixture.Error(404, "AnnotationDeleted", "The annotation is deleted."));
 
         var exitCode = await Execute();
@@ -115,7 +115,7 @@ public class ConfigCompositionCommandTests
     public async Task Composition_OfARestrictedMachine_PrintsTheServersMessageAndCode()
     {
         const string message = "The machine is restricted to the annotation exe.northwind.invoicing.prod and cannot read the whole project.";
-        _api.Setup(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key))
+        _api.Setup(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key, null))
             .ThrowsAsync(AnnotationCommandFixture.Error(403, "AnnotationRestricted", message));
 
         var exitCode = await Execute();
@@ -127,7 +127,7 @@ public class ConfigCompositionCommandTests
     [Fact]
     public async Task Composition_Unauthorized_IsLeftToProgram()
     {
-        _api.Setup(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key))
+        _api.Setup(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key, null))
             .ThrowsAsync(AnnotationCommandFixture.Error(401));
 
         await Should.ThrowAsync<ApiException>(() => Execute());
@@ -328,7 +328,7 @@ public class ConfigCompositionCommandTests
 
     private void SetupComposition(ConfigurationComposition composition)
     {
-        _api.Setup(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key)).ReturnsAsync(composition);
+        _api.Setup(api => api.GetConfigurationCompositionAsync("org1", "proj1", "default", Key, null)).ReturnsAsync(composition);
     }
 
     private Task<int> Execute(string key = Key, IFileSystem? fileSystem = null, string? exportFilePath = null)

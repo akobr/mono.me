@@ -143,8 +143,8 @@ public class ConditionalReadsTests
         string[] segments = ["acme corp", "bill/ing", "de fault%", "sbt.a+b?c#d&e"];
 
         _ = resolved
-            ? await client.GetResolvedConfigurationAsync(segments[0], segments[1], segments[2], segments[3])
-            : await client.GetConfigurationAsync(segments[0], segments[1], segments[2], segments[3]);
+            ? await client.GetResolvedConfigurationAsync(segments[0], segments[1], segments[2], segments[3], null)
+            : await client.GetConfigurationAsync(segments[0], segments[1], segments[2], segments[3], null);
         await ReadAsync(client, resolved, segments[0], segments[1], segments[2], segments[3], null);
 
         var requests = _http.Requests;
@@ -161,8 +161,8 @@ public class ConditionalReadsTests
         var client = CreateClient();
 
         var expected = await Should.ThrowAsync<ApiException>(() => resolved
-            ? client.GetResolvedConfigurationAsync("acme", "billing", "default", "sbt.northwind")
-            : client.GetConfigurationAsync("acme", "billing", "default", "sbt.northwind"));
+            ? client.GetResolvedConfigurationAsync("acme", "billing", "default", "sbt.northwind", null)
+            : client.GetConfigurationAsync("acme", "billing", "default", "sbt.northwind", null));
         var actual = await Should.ThrowAsync<ApiException>(() => ReadAsync(client, resolved, "acme", "billing", "default", "sbt.northwind", WeakTag));
 
         actual.GetType().ShouldBe(expected.GetType());
