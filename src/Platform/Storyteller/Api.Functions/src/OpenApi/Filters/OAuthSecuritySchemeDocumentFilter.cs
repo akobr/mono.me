@@ -5,9 +5,9 @@ namespace _42.Platform.Storyteller.Api.OpenApi.Filters;
 
 /// <summary>
 /// Removes the <c>integrated</c> OAuth2 scheme when <see cref="OAuthFlows"/> has no real flow
-/// (AuthKit without an AuthKit domain), so the document lists only the bearer scheme. In that case
-/// <see cref="OAuthFlows"/> carries a marked stand-in flow, because the extension cannot build an
-/// OAuth2 requirement without one.
+/// (AuthKit without an AuthKit domain, Keycloak without a realm issuer), so the document lists
+/// only the bearer scheme. In that case <see cref="OAuthFlows"/> carries a marked stand-in flow,
+/// because the extension cannot build an OAuth2 requirement without one.
 /// </summary>
 public class OAuthSecuritySchemeDocumentFilter : IDocumentFilter
 {

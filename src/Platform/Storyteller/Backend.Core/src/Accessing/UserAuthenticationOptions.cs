@@ -17,4 +17,6 @@ public class UserAuthenticationOptions
     public List<DelegatedClientOptions> DelegatedClients { get; set; } = [];
 
     public AuthKitOptions AuthKit { get; set; } = new();
+
+    public KeycloakUserOptions Keycloak { get; set; } = new();
 }

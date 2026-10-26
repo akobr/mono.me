@@ -26,4 +26,17 @@ public static class EntryPoint
         services.AddSingleton<IMachineTokenValidator, KeycloakMachineTokenValidator>();
         return services;
     }
+
+    // Keycloak users of the realm Auth:Keycloak:Issuer, for Auth:Provider Keycloak (Auth:Keycloak, checked at startup).
+    // Independent of the Keycloak section of machine access, which may name the same realm.
+    public static IServiceCollection AddKeycloakUserAuthentication(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddUserAuthenticationOptions(configuration);
+        services.TryAddSingleton<KeycloakClaimNormalizer>();
+        services.AddSingleton<IBearerClaimsNormalizer>(provider => provider.GetRequiredService<KeycloakClaimNormalizer>());
+        services.AddSingleton<IBearerTokenValidator, KeycloakBearerTokenValidator>();
+        return services;
+    }
 }

@@ -12,7 +12,8 @@ namespace _42.Platform.Storyteller.Api.OpenApi;
 // so the Auth settings are read from the environment the Functions host exposes.
 public class OAuthFlows : OpenApiOAuthSecurityFlows
 {
-    // Marks the stand-in flow used without an AuthKit domain; OAuthSecuritySchemeDocumentFilter removes it.
+    // Marks the stand-in flow used without an AuthKit domain or a Keycloak realm;
+    // OAuthSecuritySchemeDocumentFilter removes it.
     public const string PlaceholderExtension = "x-storyteller-placeholder";
 
     private const string AUTHORIZATION_URL = "https://login.microsoftonline.com/{0}/oauth2/v2.0/authorize";
@@ -33,6 +34,12 @@ public class OAuthFlows : OpenApiOAuthSecurityFlows
             return;
         }
 
+        if (string.Equals(section["Provider"], nameof(IdentityProviderKind.Keycloak), StringComparison.OrdinalIgnoreCase))
+        {
+            ConfigureKeycloak(section.GetSection("Keycloak")["Issuer"]);
+            return;
+        }
+
         ConfigureEntraId(section["TenantId"], section["ClientId"]);
     }
 
@@ -46,14 +53,7 @@ public class OAuthFlows : OpenApiOAuthSecurityFlows
     {
         if (string.IsNullOrWhiteSpace(authKitDomain))
         {
-            // Without a domain there is no flow to describe. The extension still needs one, because it
-            // builds each operation's requirement before document filters run and throws "Flow MUST be
-            // provided" otherwise. This stand-in never reaches the published document.
-            ClientCredentials = new OpenApiOAuthFlow
-            {
-                TokenUrl = new Uri("https://placeholder.invalid/oauth2/token"),
-                Extensions = { [PlaceholderExtension] = new OpenApiBoolean(true) },
-            };
+            ConfigurePlaceholder();
             return;
         }
 
@@ -77,6 +77,47 @@ public class OAuthFlows : OpenApiOAuthSecurityFlows
         ClientCredentials = new OpenApiOAuthFlow
         {
             TokenUrl = tokenUrl,
+        };
+    }
+
+    // Keycloak users sign in at the realm (the authorization code flow with PKCE). Machines may come from another
+    // provider, so no client credentials flow is described.
+    private void ConfigureKeycloak(string? issuer)
+    {
+        var realm = issuer?.Trim().TrimEnd('/');
+
+        if (!Uri.TryCreate(realm, UriKind.Absolute, out var realmUri)
+            || (realmUri.Scheme != Uri.UriSchemeHttps && realmUri.Scheme != Uri.UriSchemeHttp))
+        {
+            ConfigurePlaceholder();
+            return;
+        }
+
+        var tokenUrl = new Uri($"{realm}/protocol/openid-connect/token");
+
+        AuthorizationCode = new OpenApiOAuthFlow
+        {
+            AuthorizationUrl = new Uri($"{realm}/protocol/openid-connect/auth"),
+            TokenUrl = tokenUrl,
+            RefreshUrl = tokenUrl,
+            Scopes =
+            {
+                { "openid", "Signs the user in" },
+                { "profile", "Reads the user's name" },
+                { "email", "Reads the user's email address" },
+            },
+        };
+    }
+
+    // Without an AuthKit domain or a Keycloak realm there is no flow to describe. The extension still needs one,
+    // because it builds each operation's requirement before document filters run and throws "Flow MUST be provided"
+    // otherwise. This stand-in never reaches the published document.
+    private void ConfigurePlaceholder()
+    {
+        ClientCredentials = new OpenApiOAuthFlow
+        {
+            TokenUrl = new Uri("https://placeholder.invalid/oauth2/token"),
+            Extensions = { [PlaceholderExtension] = new OpenApiBoolean(true) },
         };
     }
 

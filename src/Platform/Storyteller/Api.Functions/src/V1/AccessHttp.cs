@@ -26,6 +26,7 @@ public class AccessHttp
     private readonly IUserProfileResolver? _profileResolver;
     private readonly MachineAuthenticationOptions _machineOptions;
     private readonly FederationOptions _federationOptions;
+    private readonly UserAuthenticationOptions _authOptions;
     private readonly JsonSerializerOptions _bodyJsonOptions;
     private readonly ILogger<AccessHttp> _logger;
 
@@ -37,7 +38,8 @@ public class AccessHttp
         IMachineAuthenticationPolicyStore? policyStore = null,
         IUserProfileResolver? profileResolver = null,
         IOptions<MachineAuthenticationOptions>? machineOptions = null,
-        IOptions<FederationOptions>? federationOptions = null)
+        IOptions<FederationOptions>? federationOptions = null,
+        IOptions<UserAuthenticationOptions>? authOptions = null)
     {
         _accessService = accessService;
         _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
@@ -47,6 +49,7 @@ public class AccessHttp
         _profileResolver = profileResolver;
         _machineOptions = machineOptions?.Value ?? new MachineAuthenticationOptions();
         _federationOptions = federationOptions?.Value ?? new FederationOptions();
+        _authOptions = authOptions?.Value ?? new UserAuthenticationOptions();
     }
 
     [Function(nameof(GetAccount))]
@@ -87,7 +90,7 @@ public class AccessHttp
         HttpRequestData request)
     {
         request.EnsureUser();
-        var accountId = request.GetIdentityUniqueId();
+        var accountId = request.GetRegistrationAccountId(_authOptions.Provider);
         _logger.LogWarning("POST api/access/account call with accountId: {accountId}", accountId);
         var account = await _accessService.GetAccountAsync(accountId);
 

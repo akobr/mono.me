@@ -13,6 +13,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 public class InvitationsHttpTests
 {
+    private const string EntraAccountId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d:3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d";
+
     [Theory]
     [InlineData("true", IdentityProviderKind.AuthKit, true, true)]
     [InlineData("True", IdentityProviderKind.EntraId, true, true)]
@@ -21,6 +23,10 @@ public class InvitationsHttpTests
     [InlineData(null, IdentityProviderKind.AuthKit, true, false)]
     [InlineData(null, IdentityProviderKind.AuthKit, false, true)]
     [InlineData(null, IdentityProviderKind.EntraId, true, true)]
+    [InlineData("true", IdentityProviderKind.Keycloak, true, true)]
+    [InlineData("false", IdentityProviderKind.Keycloak, false, false)]
+    [InlineData(null, IdentityProviderKind.Keycloak, true, false)]
+    [InlineData(null, IdentityProviderKind.Keycloak, false, false)]
     public void IsEmailVerified_FollowsTheClaimThenTheProvider(string? claim, IdentityProviderKind provider, bool requireVerified, bool expected)
     {
         var claims = new List<Claim> { new("sub", "user_01") };
@@ -43,7 +49,7 @@ public class InvitationsHttpTests
     public async Task Accept_PassesTheTokenIdentityToTheService()
     {
         var service = new RecordingInvitations();
-        var http = CreateHttp(service);
+        var http = CreateHttp(service, IdentityProviderKind.AuthKit);
         var request = Request(
         [
             new("sub", "user_01"),
@@ -63,12 +69,99 @@ public class InvitationsHttpTests
     public async Task Accept_TokenWithoutNames_StillReachesTheService()
     {
         var service = new RecordingInvitations();
-        var http = CreateHttp(service);
+        var http = CreateHttp(service, IdentityProviderKind.AuthKit);
 
         await http.AcceptInvitation(Request([new("sub", "user_01"), new("email", "ada@example.com")]), "inv-1");
 
         service.LastInvitee!.Email.ShouldBe("ada@example.com");
         service.LastInvitee.Name.ShouldBeNull();
+    }
+
+    // Accepting creates the account when the invitee has none: under Entra ID it is {tid}:{oid}, as at registration.
+    [Fact]
+    public async Task Accept_EntraId_PassesTheTenantAndObjectIdAsTheAccountId()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+
+        var result = await http.AcceptInvitation(Request([new("sub", EntraAccountId), new("email", "ada@example.com")]), "inv-1");
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<Account>().Id.ShouldBe(EntraAccountId);
+        service.LastInvitee!.AccountId.ShouldBe(EntraAccountId);
+    }
+
+    // Any other id under Entra ID is a programming error, refused before the service is asked.
+    [Theory]
+    [InlineData("user_01")]
+    [InlineData("8A7B6C5D-4E3F-4A1B-8C9D-0E1F2A3B4C5D:3F2C6A8E-6C1D-4A59-9A47-0A2F4F4C1B2D")]
+    public async Task AcceptAndDecline_EntraIdWithAnotherId_AreAProgrammingError(string accountId)
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+
+        await Should.ThrowAsync<InvalidOperationException>(() => http.AcceptInvitation(Request([new("sub", accountId), new("email", "ada@example.com")]), "inv-1"));
+        await Should.ThrowAsync<InvalidOperationException>(() => http.DeclineInvitation(Request([new("sub", accountId), new("email", "ada@example.com")]), "inv-1"));
+
+        service.Calls.ShouldBeEmpty();
+        service.LastInvitee.ShouldBeNull();
+    }
+
+    // Keycloak's email_verified speaks for the email claim; preferred_username is a username the user may have chosen.
+    [Fact]
+    public async Task Accept_Keycloak_MatchesTheEmailClaimRatherThanTheUserName()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service, IdentityProviderKind.Keycloak);
+
+        await http.AcceptInvitation(
+            Request(
+            [
+                new("sub", "5f1c2b3a-9d8e-4f70-8a6b-1c2d3e4f5a6b"),
+                new("preferred_username", "victim@example.com"),
+                new("email", "ada@example.com"),
+                new("email_verified", "true"),
+            ]),
+            "inv-1");
+
+        service.LastInvitee!.AccountId.ShouldBe("5f1c2b3a-9d8e-4f70-8a6b-1c2d3e4f5a6b");
+        service.LastInvitee.Email.ShouldBe("ada@example.com");
+        service.LastInvitee.IsEmailVerified.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Accept_KeycloakWithoutEmailVerified_IsNotVerified()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service, IdentityProviderKind.Keycloak);
+
+        await http.AcceptInvitation(Request([new("sub", "kc-user"), new("email", "ada@example.com")]), "inv-1");
+
+        service.LastInvitee!.IsEmailVerified.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Mine_Keycloak_QueriesTheVerifiedEmailClaimOnly(bool withEmail)
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service, IdentityProviderKind.Keycloak);
+        var claims = new List<Claim>
+        {
+            new("sub", "kc-user"),
+            new("preferred_username", "victim@example.com"),
+            new("email_verified", "true"),
+        };
+
+        if (withEmail)
+        {
+            claims.Add(new Claim("email", "ada@example.com"));
+        }
+
+        await http.GetMyInvitations(Request(claims));
+
+        string[] expected = withEmail ? ["mine:ada@example.com"] : [];
+        service.Calls.ShouldBe(expected);
     }
 
     [Fact]
@@ -195,9 +288,9 @@ public class InvitationsHttpTests
         service.LastInvitee.ShouldBeNull();
     }
 
-    private static InvitationsHttp CreateHttp(RecordingInvitations service)
+    private static InvitationsHttp CreateHttp(RecordingInvitations service, IdentityProviderKind provider = IdentityProviderKind.EntraId)
     {
-        return new InvitationsHttp(service, Options.Create(new UserAuthenticationOptions()), FunctionTestDoubles.ApiJsonOptions);
+        return new InvitationsHttp(service, Options.Create(new UserAuthenticationOptions { Provider = provider }), FunctionTestDoubles.ApiJsonOptions);
     }
 
     // A request with the claims; a body goes as JSON, with its content type unless contentType is false.

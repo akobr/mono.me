@@ -326,6 +326,20 @@ public static class HttpRequestDataExtensions
         return GetRequiredClaim(@this, "sub", ClaimTypes.NameIdentifier).Trim();
     }
 
+    // The id an account is created under. Under Entra ID the provider module writes sub as {tid}:{oid} (UserIdentity);
+    // any other id there is a programming error (500), and no account is created with it.
+    public static string GetRegistrationAccountId(this HttpRequestData @this, IdentityProviderKind provider)
+    {
+        var accountId = @this.GetIdentityUniqueId();
+
+        if (provider == IdentityProviderKind.EntraId && !UserIdentity.IsEntraAccountId(accountId))
+        {
+            throw new InvalidOperationException("An Entra ID account is created under {tid}:{oid} only, and the identity of the request has another form.");
+        }
+
+        return accountId;
+    }
+
     public static bool IsApplicationIdentity(this HttpRequestData @this)
     {
         return TryGetApplicationIdentity(@this, out _);

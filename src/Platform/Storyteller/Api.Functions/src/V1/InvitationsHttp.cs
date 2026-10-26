@@ -21,6 +21,7 @@ namespace _42.Platform.Storyteller.Api.V1;
 public class InvitationsHttp
 {
     private const string EmailVerifiedClaimType = "email_verified";
+    private const string KeycloakEmailClaimType = "email";
 
     private static readonly string[] EmailClaimTypes = ["preferred_username", "email", "unique_name", ClaimTypes.Upn];
 
@@ -167,7 +168,7 @@ public class InvitationsHttp
     {
         request.EnsureUser();
         // An unverified email is treated as absent, the same rule as accepting or declining.
-        var email = IsEmailVerified(request, _authOptions) ? request.GetClaim(EmailClaimTypes) : null;
+        var email = IsEmailVerified(request, _authOptions) ? GetInviteeEmail(request, _authOptions) : null;
         IReadOnlyList<Invitation> invitations = email is null
             ? []
             : await _invitations.GetPendingInvitationsAsync(email);
@@ -217,7 +218,8 @@ public class InvitationsHttp
     }
 
     // email_verified decides when the token carries it. Without it, AuthKit tokens count as verified only
-    // when RequireVerifiedEmail is off; Entra ID has no such claim and its directory names are trusted.
+    // when RequireVerifiedEmail is off, and Keycloak tokens never (the email scope adds the claim); Entra ID
+    // has no such claim and its directory names are trusted.
     internal static bool IsEmailVerified(HttpRequestData request, UserAuthenticationOptions options)
     {
         var claim = request.GetClaim(EmailVerifiedClaimType);
@@ -227,11 +229,27 @@ public class InvitationsHttp
             return bool.TryParse(claim, out var verified) && verified;
         }
 
-        return options.Provider != IdentityProviderKind.AuthKit || !options.AuthKit.RequireVerifiedEmail;
+        return options.Provider switch
+        {
+            IdentityProviderKind.EntraId => true,
+            IdentityProviderKind.AuthKit => !options.AuthKit.RequireVerifiedEmail,
+            _ => false,
+        };
     }
 
+    // The email an invitation is matched against. Keycloak's email_verified speaks for the email claim only, while
+    // preferred_username is a username that the realm may let its users choose.
+    internal static string? GetInviteeEmail(HttpRequestData request, UserAuthenticationOptions options)
+    {
+        return options.Provider == IdentityProviderKind.Keycloak
+            ? request.GetClaim(KeycloakEmailClaimType)
+            : request.GetClaim(EmailClaimTypes);
+    }
+
+    // Accepting creates the invitee's account when there is none, so the id is the one a registration uses.
     private async Task<InvitationIdentity> ResolveInviteeAsync(HttpRequestData request)
     {
+        var accountId = request.GetRegistrationAccountId(_authOptions.Provider);
         string? userName = null;
         string? name = null;
 
@@ -245,8 +263,8 @@ public class InvitationsHttp
         }
 
         return new InvitationIdentity(
-            request.GetIdentityUniqueId(),
-            request.GetClaim(EmailClaimTypes),
+            accountId,
+            GetInviteeEmail(request, _authOptions),
             IsEmailVerified(request, _authOptions),
             userName,
             name);

@@ -8,6 +8,7 @@ using _42.Platform.Storyteller.Api.Security;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
@@ -15,6 +16,10 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 [Collection(nameof(BearerValidationMode))]
 public class BearerAuthenticationMiddlewareTests
 {
+    private const string EntraTenantId = "8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d";
+    private const string EntraObjectId = "3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d";
+    private const string EntraAccountId = $"{EntraTenantId}:{EntraObjectId}";
+
     private readonly RecordingMiddleware _middleware = new();
 
     [Fact]
@@ -221,13 +226,57 @@ public class BearerAuthenticationMiddlewareTests
             {
                 ClientId = "API-CLIENT",
             });
-            var (context, _) = FunctionTestDoubles.CreateRequest(
+            var (context, request) = FunctionTestDoubles.CreateRequest(
                 services,
-                Bearer(UnsignedJwt("""{"sub":"user-1","azp":"api-client"}""")));
+                Bearer(UnsignedJwt($$"""{"sub":"user-1","azp":"api-client","tid":"{{EntraTenantId}}","oid":"{{EntraObjectId}}"}""")));
 
             await InvokeAsync(context);
 
             context.Items.ContainsKey(FunctionContextItemKeys.MachineIdentity).ShouldBeFalse();
+            request.GetIdentityUniqueId().ShouldBe(EntraAccountId);
+        });
+    }
+
+    // Decoded Entra claims are keyed as validated ones: sub becomes {tid}:{oid} in lower case, and the pairwise sub
+    // stays as entra_sub.
+    [Fact]
+    public async Task Invoke_DebugDecode_EntraUser_IsKeyedByTenantAndObjectId()
+    {
+        await WithModeAsync(decodeWithoutValidation: true, async () =>
+        {
+            var validator = new RecordingBearerTokenValidator();
+            using var services = FunctionTestDoubles.CreateServices(validator);
+            var (context, request) = FunctionTestDoubles.CreateRequest(
+                services,
+                Bearer(UnsignedJwt($$"""{"sub":"user-1","tid":"{{EntraTenantId.ToUpperInvariant()}}","oid":"{{EntraObjectId.ToUpperInvariant()}}","name":"Ada"}""")));
+
+            var called = await InvokeAsync(context);
+
+            called.ShouldBeTrue();
+            validator.Calls.ShouldBe(0);
+            request.GetIdentityUniqueId().ShouldBe(EntraAccountId);
+            request.GetClaim(UserIdentity.EntraSubjectClaimType).ShouldBe("user-1");
+            request.GetAuditActor().ShouldBe(AuditActor.Account(EntraAccountId, "Ada"));
+        });
+    }
+
+    // Without tid and oid there is no account: the claims keep no sub, and every handler that needs the account is 401.
+    [Theory]
+    [InlineData("""{"sub":"user-1","name":"Ada"}""")]
+    [InlineData("""{"sub":"user-1","tid":"8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d"}""")]
+    [InlineData("""{"sub":"user-1","oid":"3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d"}""")]
+    public async Task Invoke_DebugDecode_EntraUserWithoutTenantOrObjectId_HasNoAccountId(string payload)
+    {
+        await WithModeAsync(decodeWithoutValidation: true, async () =>
+        {
+            var validator = new RecordingBearerTokenValidator();
+            using var services = FunctionTestDoubles.CreateServices(validator);
+            var (context, request) = FunctionTestDoubles.CreateRequest(services, Bearer(UnsignedJwt(payload)));
+
+            await InvokeAsync(context);
+
+            context.Items.ContainsKey(FunctionContextItemKeys.MachineIdentity).ShouldBeFalse();
+            Should.Throw<SecurityTokenException>(() => request.GetIdentityUniqueId());
         });
     }
 
@@ -244,7 +293,7 @@ public class BearerAuthenticationMiddlewareTests
             });
             var (context, _) = FunctionTestDoubles.CreateRequest(
                 services,
-                Bearer(UnsignedJwt("""{"sub":"user-1","azp":"6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11","tid":"8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d","scp":"User.Impersonation"}""")));
+                Bearer(UnsignedJwt("""{"sub":"user-1","azp":"6c0f1a2e-1f43-4b0e-9a4d-2f5e8f0c9b11","tid":"8a7b6c5d-4e3f-4a1b-8c9d-0e1f2a3b4c5d","oid":"3f2c6a8e-6c1d-4a59-9a47-0a2f4f4c1b2d","scp":"User.Impersonation"}""")));
 
             var called = await InvokeAsync(context);
 

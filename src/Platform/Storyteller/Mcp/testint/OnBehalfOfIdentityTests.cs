@@ -9,13 +9,13 @@ using Xunit.Abstractions;
 
 namespace _42.Platform.Storyteller.Mcp.IntegrationTests;
 
-// The API finds accounts by sub, and Entra documents sub as pairwise per application. This test tells whether, in a
-// tenant, the on-behalf-of token of the MCP server carries the same sub as the person's sform token: if not, the MCP
-// server cannot act for existing accounts there (docs/Platform/Storyteller/mcp.md, "Identity").
+// The API keys Entra accounts by {tid}:{oid} (UserIdentity.GetAccountId), not by sub, which Entra documents as pairwise
+// per application. This test tells whether, in a tenant, the on-behalf-of token of the MCP server names the same
+// account as the person's sform token: the same tid and oid. The subs are only printed, they may differ.
 public class OnBehalfOfIdentityTests(ITestOutputHelper output)
 {
     [Fact]
-    public async Task OnBehalfOfToken_CarriesTheSubjectOfTheSformToken()
+    public async Task OnBehalfOfToken_NamesTheAccountOfTheSformToken()
     {
         var settings = EntraTestSettings.TryRead();
 
@@ -47,8 +47,11 @@ public class OnBehalfOfIdentityTests(ITestOutputHelper output)
         output.WriteLine($"OBO:   sub={Claim(onBehalfOf, "sub")} oid={Claim(onBehalfOf, "oid")} tid={Claim(onBehalfOf, "tid")} azp={Claim(onBehalfOf, "azp")}");
         output.WriteLine($"sform: sub={Claim(sform, "sub")} oid={Claim(sform, "oid")} tid={Claim(sform, "tid")} azp={Claim(sform, "azp")}");
 
+        // Two tokens that both lack a claim would compare equal, while the API answers 401 to a token without tid or oid.
+        Claim(onBehalfOf, "tid").ShouldNotBeNull("The on-behalf-of token has no tid: the API cannot name the account.");
+        Claim(onBehalfOf, "tid").ShouldBe(Claim(sform, "tid"), "The two tokens are not of the same tenant.");
+        Claim(onBehalfOf, "oid").ShouldNotBeNull("The on-behalf-of token has no oid: the API cannot name the account.");
         Claim(onBehalfOf, "oid").ShouldBe(Claim(sform, "oid"), "The two tokens are not of the same person.");
-        Claim(onBehalfOf, "sub").ShouldBe(Claim(sform, "sub"), "The sub differs: the MCP server cannot find the person's account.");
     }
 
     private static string? Claim(JwtSecurityToken token, string type)

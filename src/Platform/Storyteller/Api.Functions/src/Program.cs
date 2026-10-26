@@ -125,6 +125,11 @@ var host = new HostBuilder()
         {
             services.AddAuthKitUserAuthentication(context.Configuration);
         }
+        else if (authProvider.Equals(nameof(IdentityProviderKind.Keycloak), StringComparison.OrdinalIgnoreCase))
+        {
+            // Users of the realm Auth:Keycloak:Issuer; Keycloak machines (the Keycloak section) are added below or not.
+            services.AddKeycloakUserAuthentication(context.Configuration);
+        }
         else
         {
             throw new InvalidOperationException($"Auth:Provider '{authProvider}' is not a known identity provider.");
