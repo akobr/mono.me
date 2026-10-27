@@ -46,7 +46,7 @@ The action has no release tags yet: pin a commit of this repository. A workflow 
 ## Steps
 
 1. **Check the inputs.** `key` and `cli-version` are required, `cli-version` is an exact version (no range, no path), `export-env` and `allow-unprefixed` are `true` or `false`, and `export-env`, `output-file` or both are set. Otherwise the step fails with a message that names the input, before anything is installed. An `env-prefix` that neither `export-env` nor an `env` file uses is a warning.
-2. **Look for .NET 10.** When `dotnet --list-runtimes` lists `Microsoft.NETCore.App 10.`, the runner keeps its .NET, and `sform` gets its root as `DOTNET_ROOT` when the job has none. Otherwise `actions/setup-dotnet@v6` installs `10.0.x`.
+2. **Look for .NET 10.** When `dotnet --list-sdks` lists an SDK `10.`, the runner keeps its .NET, and `sform` gets its root as `DOTNET_ROOT` when the job has none. Otherwise `actions/setup-dotnet@v6` installs `10.0.x`. The check is on the SDK, not the runtime: an older SDK cannot install a `net10.0` tool and a runtime alone installs nothing, while an SDK 10 brings the runtime `sform` runs on.
 3. **Install sform.** `dotnet tool install 42.Platform.Cli --version <cli-version> --tool-path "$RUNNER_TEMP/storyteller-action/sform-<cli-version>"`, with `--add-source <cli-source>` when it is set and never `--prerelease`. It runs in `$RUNNER_TEMP`, so the `nuget.config` and `global.json` of the repository are not read. A later use of the action in the job with the same version finds the tool in that folder.
 4. **Read the configuration.** One run of `sform story config <key> --resolved --mask <mask>`, with `--github-env` when `export-env` is true, `--export <output-file> --format <format> --content-only` when `output-file` is set, and `--env-prefix` and `--allow-unprefixed`. One resolved and one effective read give the variables, the masks and the file. `sform` writes the `::add-mask::` commands first, then `GITHUB_ENV`, then the file, and a summary to standard error: the names of the variables and the number of masked values, never a value.
 
@@ -107,7 +107,7 @@ A workflow of this repository checks out the repository itself (`fetch-depth: 0`
 
 ## .NET on the runner
 
-`actions/setup-dotnet` runs only when the runner has no .NET 10, and then it changes `DOTNET_ROOT` and `PATH` for the rest of the job: the later steps run the .NET it installed. A job that needs another .NET sets it up itself, before the action or after it.
+`actions/setup-dotnet` runs only when the runner has no .NET 10 SDK (a runner with only the .NET 10 runtime, or with an older SDK, gets it too), and then it changes `DOTNET_ROOT` and `PATH` for the rest of the job: the later steps run the .NET it installed. A job that needs another .NET sets it up itself, before the action or after it.
 
 ## Checks
 
