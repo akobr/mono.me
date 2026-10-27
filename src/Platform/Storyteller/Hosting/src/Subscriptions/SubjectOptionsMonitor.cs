@@ -5,9 +5,11 @@ using Microsoft.Extensions.Options;
 namespace _42.Platform.Storyteller.Sdk.Hosting.Subscriptions;
 
 // IOptionsMonitor<TOptions> for options bound per subject: the framework's OptionsMonitor<TOptions> over the same
-// factory, change token sources and cache, and one change notification per applied document. On Added and Changed of
-// a subject it drops the subject's options from the cache and raises OnChange with (Get(subject), subject); on Removed
-// it drops them and raises nothing, as Get(subject) would fail validation. Other subjects keep their cached instance.
+// factory, change token sources and cache, and one change notification per applied document. On Added, Changed and
+// Removed of a subject it drops the subject's options from the cache before a watcher or a waiter of the subscriptions
+// can see the change, so whoever saw it and calls Get(subject) gets options bound to it. After that, on Added and
+// Changed, it raises OnChange with (Get(subject), subject); on Removed it raises nothing, as Get(subject) would fail
+// validation. Other subjects keep their cached instance.
 internal sealed class SubjectOptionsMonitor<TOptions> : IOptionsMonitor<TOptions>, IDisposable
     where TOptions : class
 {
@@ -34,7 +36,7 @@ internal sealed class SubjectOptionsMonitor<TOptions> : IOptionsMonitor<TOptions
         _inner = new OptionsMonitor<TOptions>(factory, sources, cache);
         _cache = cache;
         _logger = logger;
-        _listening = subscriptions.Listen(OnSubscriptionChanged);
+        _listening = subscriptions.Listen(OnSubscriptionInvalidated, OnSubscriptionChanged);
     }
 
     public TOptions CurrentValue => _inner.CurrentValue;
@@ -66,11 +68,16 @@ internal sealed class SubjectOptionsMonitor<TOptions> : IOptionsMonitor<TOptions
         _inner.Dispose();
     }
 
-    // On the loop of the subscriptions, after the view changed, so Get(subject) binds the new document.
+    // Under the lock of the subscriptions, after the view changed and before anyone can see the change.
+    private void OnSubscriptionInvalidated(StorytellerSubscriptionChange change)
+    {
+        _cache.TryRemove(change.Subscription.Subject);
+    }
+
+    // On the loop of the subscriptions, after the watchers and the waiters heard of the change.
     private void OnSubscriptionChanged(StorytellerSubscriptionChange change)
     {
         var subject = change.Subscription.Subject;
-        _cache.TryRemove(subject);
 
         if (change.Kind == StorytellerChangeKind.Removed)
         {

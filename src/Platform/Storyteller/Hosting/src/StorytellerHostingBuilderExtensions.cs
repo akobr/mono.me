@@ -32,8 +32,11 @@ public static class StorytellerHostingBuilderExtensions
     // IOptionsMonitor<TOptions>.Get(subject) and IOptionsSnapshot<TOptions>.Get(subject) bind the document of that
     // subject's subscription, or its section, with ConfigurationBinder; IOptionsMonitor<TOptions>.OnChange is raised for
     // the subject on every Added and Changed. Any other name than the default one fails validation, so a worker never
-    // runs a tenant on default options by mistake; values shared by all subjects come from ConfigureAll<TOptions>, and
-    // Configure<TOptions>(…) applies to the default name only. Needs AddSubscriptions, in any order: without it the
+    // runs a tenant on default options by mistake; Configure<TOptions>(…) applies to the default name only. Values
+    // shared by all subjects come from ConfigureAll<TOptions>, and as for any configure action of the options, the
+    // order of registration decides: the documents bind where this call registers them, so ConfigureAll<TOptions>
+    // before it gives defaults that the documents override, ConfigureAll<TOptions> after it overrides the documents,
+    // and PostConfigureAll<TOptions> runs after them in any order. Needs AddSubscriptions, in any order: without it the
     // first resolution of the options throws InvalidOperationException. Once per options type.
     public static IStorytellerHostingBuilder AddSubjectOptions<TOptions>(this IStorytellerHostingBuilder builder, string? section = null)
         where TOptions : class

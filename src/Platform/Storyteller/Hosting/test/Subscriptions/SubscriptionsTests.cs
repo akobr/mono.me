@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using _42.Platform.Storyteller.Sdk.Configuring;
 using _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
@@ -454,6 +455,7 @@ public sealed class SubscriptionsTests : IDisposable
     {
         Subscribe("northwind");
         var harness = new SubscriptionsHarness(_fixture);
+        var documents = harness.Services.GetRequiredService<IStorytellerDocuments>();
         await harness.StartAndPollAsync();
         await using var watch = new WatchProbe(harness.Subscriptions);
         await watch.WaitForAsync(1);
@@ -464,6 +466,55 @@ public sealed class SubscriptionsTests : IDisposable
         Should.Throw<ObjectDisposedException>(() => harness.Service.Documents.GetEntryAsync(FullKey.Parse(Full(Execution("northwind"))), StorytellerReadMode.Resolved, CancellationToken.None));
         harness.Subscriptions.Find("northwind").ShouldNotBeNull().Document.Configuration["App:Name"].ShouldBe("northwind");
         (await ToListAsync(harness.Subscriptions.WatchAsync())).ShouldHaveSingleItem().Kind.ShouldBe(StorytellerChangeKind.Added);
+
+        // The documents of the subscriptions are their own: the application's still read, and their cache never held
+        // what the subscriptions read.
+        harness.Service.Documents.ShouldNotBeSameAs(documents);
+        (await documents.GetAsync(Full(Execution("northwind")))).Configuration["App:Name"].ShouldBe("northwind");
+        _configurations.Reads(Execution("northwind"))[^1].Headers.ShouldNotContainKey("If-None-Match");
+    }
+
+    [Fact]
+    public async Task ALoopThatBreaks_KeepsTheSubscriptions_ReportsItsFailureInTheStatus_AndEndsTheWatchersWithIt()
+    {
+        Subscribe("northwind");
+        BreakingSource? breaking = null;
+        await using var harness = new SubscriptionsHarness(_fixture, source: inner => breaking = new BreakingSource(inner));
+        await harness.StartAndPollAsync();
+        await using var watch = new WatchProbe(harness.Subscriptions);
+        await watch.WaitForAsync(1);
+
+        breaking!.Break();
+        _fixture.Time.Advance(SubscriptionsHarness.Interval);
+        await harness.Service.ExecuteTask!.WaitAsync(HostingFixture.Patience);
+
+        const string message = "The informer of the subscriptions of @acme.billing.default.rst.invoicing in the context prod stopped: it failed with InvalidOperationException.";
+        var failure = await Should.ThrowAsync<StorytellerConfigurationException>(() => watch.Completion.WaitAsync(HostingFixture.Patience));
+        failure.Message.ShouldBe(message);
+        failure.IsTransient.ShouldBeFalse();
+        var status = harness.Subscriptions.Status;
+        status.IsReady.ShouldBeTrue();
+        status.LastPollError.ShouldNotBeNull().Message.ShouldBe(message);
+        status.ConsecutivePollFailures.ShouldBe(1);
+        status.IsDegraded.ShouldBeTrue();
+        harness.Subscriptions.Find("northwind").ShouldNotBeNull().Document.Configuration["App:Name"].ShouldBe("northwind");
+        await harness.Subscriptions.WaitUntilReadyAsync().WaitAsync(HostingFixture.Patience);
+
+        // A watch that starts after it replays what is held and ends with the failure as well.
+        var late = new List<StorytellerSubscriptionChange>();
+        (await Should.ThrowAsync<StorytellerConfigurationException>(async () =>
+        {
+            await foreach (var change in harness.Subscriptions.WatchAsync())
+            {
+                late.Add(change);
+            }
+        })).Message.ShouldBe(message);
+        late.ShouldHaveSingleItem().Kind.ShouldBe(StorytellerChangeKind.Added);
+
+        _fixture.Logs.Entries.Where(entry => entry.Level == LogLevel.Error).ShouldHaveSingleItem().Message.ShouldBe(
+            "The informer of the subscriptions of @acme.billing.default.rst.invoicing in the context prod stopped: it failed with InvalidOperationException. The subscriptions keep what they held, the status reports the failure and the watchers end with it.");
+        _fixture.Logs.Entries.ShouldAllBe(entry => !entry.Message.Contains("S3cr3t"));
+        status.ToString().ShouldNotContain("S3cr3t");
     }
 
     [Fact]
@@ -516,15 +567,20 @@ public sealed class SubscriptionsTests : IDisposable
             Subscribe(subject);
         }
 
-        _catalog.Latency = TimeSpan.FromMilliseconds(20);
-        _configurations.Latency = TimeSpan.FromMilliseconds(20);
+        _catalog.HoldReads();
+        _configurations.Hold();
         await using var harness = new SubscriptionsHarness(_fixture, options => options.MaxConcurrentReads = 2);
 
-        await harness.StartAndPollAsync();
+        var polled = harness.StartAndPollAsync();
+
+        // The annotations of the informer, then the documents of the loop.
+        await OverlapAsync(() => _catalog.HeldReads, _catalog.ReleaseReads);
+        await OverlapAsync(() => _configurations.Held, _configurations.Release);
+        await polled;
 
         harness.Subscriptions.GetAll().Count.ShouldBe(10);
-        _configurations.MaxInFlight.ShouldBe(2);
         _catalog.MaxInFlight.ShouldBe(2);
+        _configurations.MaxInFlight.ShouldBe(2);
     }
 
     [Fact]
@@ -611,6 +667,25 @@ public sealed class SubscriptionsTests : IDisposable
     private static string Full(string annotationKey)
     {
         return FakeCatalog.Full(annotationKey);
+    }
+
+    // Waits until two answers are held, the limit of the test, gives more a moment to arrive, and releases them.
+    private static async Task OverlapAsync(Func<int> held, Action release)
+    {
+        var waiting = Stopwatch.StartNew();
+
+        while (held() < 2)
+        {
+            if (waiting.Elapsed > HostingFixture.Patience)
+            {
+                throw new TimeoutException($"{held()} reads arrived at once.");
+            }
+
+            await Task.Delay(5);
+        }
+
+        await Task.Delay(50);
+        release();
     }
 
     private static async Task<IReadOnlyList<T>> ToListAsync<T>(IAsyncEnumerable<T> items)

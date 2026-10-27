@@ -151,6 +151,70 @@ public sealed class SubjectOptionsTests : IDisposable
     }
 
     [Fact]
+    public async Task ConfigureAll_RegisteredBeforeAddSubjectOptions_GivesDefaults_AndAfterIt_OverridesTheDocuments()
+    {
+        Subscribe("northwind", port: 8080);
+        await using var harness = new SubscriptionsHarness(
+            _fixture,
+            services: services => services.ConfigureAll<AppOptions>(options =>
+            {
+                options.Port = 1;
+                options.Shared = "before";
+            }),
+            hosting: builder => builder.AddSubjectOptions<AppOptions>("App").Services
+                .ConfigureAll<AppOptions>(options => options.Name = "after")
+                .PostConfigureAll<AppOptions>(options => options.Shared += ", post"));
+        await harness.StartAndPollAsync();
+
+        var options = harness.Services.GetRequiredService<IOptionsMonitor<AppOptions>>().Get("northwind");
+
+        options.Port.ShouldBe(8080);
+        options.Shared.ShouldBe("before, post");
+        options.Name.ShouldBe("after");
+    }
+
+    [Fact]
+    public async Task AWatcherThatHearsAChange_GetsOptionsBoundToIt_BeforeTheMonitorsNotify()
+    {
+        Subscribe("northwind");
+        await using var harness = Harness();
+        await harness.StartAndPollAsync();
+
+        // The monitor of DbOptions listens first, and its listener holds the loop until the watcher asked for the
+        // AppOptions of what it heard, so a monitor that dropped them only when it notified would hand out the old ones:
+        // the options of northwind's first document, and the failure of contoso, which the framework's cache keeps.
+        var databases = harness.Services.GetRequiredService<IOptionsMonitor<DbOptions>>();
+        var apps = harness.Services.GetRequiredService<IOptionsMonitor<AppOptions>>();
+        apps.Get("northwind").Name.ShouldBe("northwind");
+        Should.Throw<OptionsValidationException>(() => apps.Get("contoso"));
+        using var asked = new SemaphoreSlim(0);
+        using var holding = databases.OnChange((_, _) => asked.Wait(HostingFixture.Patience));
+        var heard = new ConcurrentQueue<(StorytellerChangeKind Kind, string Subject, string? Name)>();
+        using var stop = new CancellationTokenSource();
+        var watching = Task.Run(async () =>
+        {
+            await foreach (var change in harness.Subscriptions.WatchAsync(stop.Token))
+            {
+                heard.Enqueue((change.Kind, change.Subscription.Subject, NameOf(apps, change.Subscription.Subject)));
+                asked.Release();
+            }
+        });
+        (await asked.WaitAsync(HostingFixture.Patience)).ShouldBeTrue();
+
+        _configurations.Put(Execution("northwind"), Content("renamed"));
+        Subscribe("contoso");
+        await harness.NextPollAsync();
+
+        heard.ShouldBe([
+            (StorytellerChangeKind.Added, "northwind", "northwind"),
+            (StorytellerChangeKind.Changed, "northwind", "renamed"),
+            (StorytellerChangeKind.Added, "contoso", "contoso"),
+        ]);
+        stop.Cancel();
+        await Should.ThrowAsync<OperationCanceledException>(() => watching.WaitAsync(HostingFixture.Patience));
+    }
+
+    [Fact]
     public async Task AValueThatDoesNotConvert_Fails_WithoutTheValue()
     {
         _catalog.Subscribe("northwind");
@@ -197,6 +261,19 @@ public sealed class SubjectOptionsTests : IDisposable
     private static string Content(string name, int port = 80)
     {
         return $$"""{ "App": { "Name": "{{name}}", "Port": {{port}} }, "Db": { "Host": "db.{{name}}" } }""";
+    }
+
+    // The name of the subject's AppOptions; null when they fail validation.
+    private static string? NameOf(IOptionsMonitor<AppOptions> monitor, string subject)
+    {
+        try
+        {
+            return monitor.Get(subject).Name;
+        }
+        catch (OptionsValidationException)
+        {
+            return null;
+        }
     }
 
     private SubscriptionsHarness Harness(Action<IServiceCollection>? services = null)
