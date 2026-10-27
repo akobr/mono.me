@@ -1,5 +1,9 @@
 using System;
+using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.UnitTests.Authentication;
 using _42.Platform.Storyteller.Sdk;
 using Newtonsoft.Json.Linq;
 using Shouldly;
@@ -100,6 +104,45 @@ public class AuditConsoleExtensionsTests
         ];
 
         AuditConsoleExtensions.FormatChanges(entry).ShouldBe("ValidFrom: 2026-10-11 12:00:00 +00:00 → 2026-10-11 12:00:30.25 +00:00");
+    }
+
+    [Fact]
+    public async Task InstantsFromTheApi_AreTimestamps_WhileDateLikeValuesStayStrings()
+    {
+        const string historyJson = """
+            {
+              "AnnotationKey": "exe.northwind.invoicing.prod",
+              "State": "Active",
+              "Entries": [
+                {
+                  "Id": "e1",
+                  "At": "2026-10-11T12:00:00+00:00",
+                  "Action": "Updated",
+                  "Actor": { "Kind": "Account", "Id": "user_1", "Name": "Ales Kobr" },
+                  "Fields": [
+                    { "Field": "Title", "Previous": "2026-10-11T12:00:00+00:00", "Value": "Invoicing" },
+                    { "Field": "ValidFrom", "Previous": "2026-10-11T12:00:00+00:00", "Value": "2026-10-11T12:00:30.25+00:00" },
+                    { "Field": "ExpiresAt", "Value": "2026-12-31T23:00:00+01:00" }
+                  ],
+                  "Values": [
+                    { "Key": "renewal", "Change": "Changed", "PreviousKind": "String", "Previous": "2026-10-01T00:00:00Z", "ValueKind": "String", "Value": "2026-11-01T00:00:00Z" }
+                  ]
+                }
+              ],
+              "IsTrimmed": false
+            }
+            """;
+        using var http = new ScriptedHttpHandler().Respond(HttpStatusCode.OK, historyJson);
+        using var httpClient = new HttpClient(http);
+        var client = new AnnotationsApiClient(httpClient, new SdkConfiguration { BaseUrl = "http://localhost:7071/api" });
+
+        var history = await client.GetAnnotationHistoryAsync("acme", "billing", "default", "exe.northwind.invoicing.prod");
+
+        AuditConsoleExtensions.FormatChanges(history.Entries.ShouldHaveSingleItem()).ShouldBe(
+            "Title: \"2026-10-11T12:00:00+00:00\" → \"Invoicing\"; "
+            + "ValidFrom: 2026-10-11 12:00:00 +00:00 → 2026-10-11 12:00:30.25 +00:00; "
+            + "ExpiresAt: null → 2026-12-31 23:00:00 +01:00; "
+            + "renewal: \"2026-10-01T00:00:00Z\" → \"2026-11-01T00:00:00Z\"");
     }
 
     [Theory]
