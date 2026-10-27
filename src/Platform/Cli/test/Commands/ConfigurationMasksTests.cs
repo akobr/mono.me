@@ -1,5 +1,6 @@
 using System.Linq;
 using _42.Platform.Cli.Commands.Configuration;
+using _42.Platform.Storyteller.ConfigurationFormats;
 using Newtonsoft.Json.Linq;
 using Shouldly;
 using Xunit;
@@ -56,6 +57,38 @@ public class ConfigurationMasksTests
 
         plan.Masked.Count.ShouldBe(3);
         plan.Data.ShouldBe(["same-value", "x\nsame-value", "x"]);
+    }
+
+    // The runner also hides the JSON escape of a mask, but properties escapes every character outside printable ASCII,
+    // yaml writes control characters with upper-case hex, and env keeps them raw between double quotes.
+    [Theory]
+    [InlineData("properties", "Pässwort-2026", "P\\u00E4sswort-2026")]
+    [InlineData("yaml", "ab\x001F-secret", "ab\\u001F-secret")]
+    [InlineData("env", "a\\b\x001F-secret", "a\\\\b\x001F-secret")]
+    public void Plan_WithAFile_MasksTheValueAsTheFileWritesIt(string format, string value, string written)
+    {
+        ConfigurationFormatNames.TryParse(format, out var parsed).ShouldBeTrue();
+
+        var plan = ConfigurationMasks.Plan(ConfigurationMasks.ReadValues(new JObject { ["password"] = value }), null, MaskMode.Bound, parsed);
+
+        plan.Data.ShouldBe([value, written]);
+        ConfigurationFormatter.Format(new JObject { ["password"] = value }, parsed).Text.ShouldContain(written);
+    }
+
+    // A file that writes each value as it is or as its JSON escape needs no other mask.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("flat")]
+    [InlineData("env")]
+    [InlineData("yaml")]
+    public void Plan_WithAFileThatWritesTheValueOrItsJsonEscape_AddsNoMask(string? format)
+    {
+        ConfigurationFormat? written = format is null ? null : ConfigurationFormatNames.TryParse(format, out var parsed) ? parsed : null;
+        var values = ConfigurationMasks.ReadValues(JObject.Parse("""{ "a": "Pässwort-2026", "b": "it's \"x\" a\\b\nline" }"""));
+
+        var plan = ConfigurationMasks.Plan(values, null, MaskMode.Bound, written);
+
+        plan.Data.ShouldBe(["Pässwort-2026", "it's \"x\" a\\b\nline", "it's \"x\" a\\b", "line"]);
     }
 
     [Fact]

@@ -877,6 +877,21 @@ public class ConfigGetCommandTests
         ShouldWriteOnlyThroughTheInnerConsole();
     }
 
+    // properties writes a non-ASCII character as an escape, which none of the runner's own encodings of a mask produces.
+    [Fact]
+    public async Task Mask_WithAPropertiesFile_MasksTheValueAsTheFileWritesIt()
+    {
+        SetupResolved(Envelope("""{ "db": { "password": "Pässwort-2026" } }"""));
+        SetupEffective(Envelope("""{ "db": { "password": "@(db.password, vault)" } }"""));
+
+        var exitCode = await Execute(Key, "-r", "--mask", "bound", "-f", "properties", "-e", "app.properties");
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _fileSystem.File.ReadAllText(P(@"C:\work\app.properties")).ShouldBe("db.password=P\\u00E4sswort-2026\n");
+        _out.ToString().ShouldBe("::add-mask::Pässwort-2026\n::add-mask::P\\u00E4sswort-2026\n");
+        ErrorLines().ShouldBe(["Masked 1 value(s) (bound).", "Wrote the configuration to app.properties."]);
+    }
+
     [Fact]
     public void Options_AreParsed()
     {
