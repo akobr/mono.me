@@ -8,7 +8,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
 
-// The two lists of a poll: their tokens and guards, over a script and over HTTP.
+// The two lists of a poll: their tokens and guards, over a script and over HTTP, and a stop while a read of the poll
+// fails.
 public sealed class ListTests : IDisposable
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
@@ -181,9 +182,66 @@ public sealed class ListTests : IDisposable
         exception.IsTransient.ShouldBe(isTransient);
     }
 
+    [Fact]
+    public async Task AStopWhileOneListPagesOn_AfterTheOtherFailed_EndsWithOperationCanceledException()
+    {
+        var usagesAsked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pages.Pages = (list, _) => list == AnnotationList.Executions
+            ? throw new StorytellerConfigurationException("The executions did not come.", "@acme.billing.default.rst.invoicing", 503, null, true)
+            : ScriptedPages.Page(null);
+        _pages.BeforePage = async (list, _, cancellationToken) =>
+        {
+            if (list == AnnotationList.Usages)
+            {
+                usagesAsked.TrySetResult();
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+        };
+        using var cancellation = new CancellationTokenSource();
+        var reading = ReadAllAsync(Source(Interval), cancellation.Token);
+
+        await usagesAsked.Task.WaitAsync(HostingFixture.Patience);
+        await cancellation.CancelAsync();
+
+        // Shouldly makes its own exception of a cancelled task; awaiting it throws the one the enumeration threw.
+        var exception = await Record.ExceptionAsync(() => reading);
+        exception.ShouldBeOfType<OperationCanceledException>().InnerException.ShouldBeOfType<StorytellerConfigurationException>().StatusCode.ShouldBe(503);
+    }
+
+    [Fact]
+    public async Task APointReadThatFailsAsTheStopComes_EndsWithOperationCanceledException()
+    {
+        using var cancellation = new CancellationTokenSource();
+        _pages.Pages = (list, _) => list == AnnotationList.Executions
+            ? ScriptedPages.Page(null, ScriptedPages.Item(FakeCatalog.ExecutionKey("northwind")))
+            : ScriptedPages.Page(null, ScriptedPages.Item(FakeCatalog.UsageKey("northwind")));
+        _pages.BeforeRead = key =>
+        {
+            if (key.Annotation.Type == AnnotationType.Execution)
+            {
+                cancellation.Cancel();
+                throw new StorytellerConfigurationException("The execution did not come.", key.ToString(), 503, null, true);
+            }
+        };
+
+        await Should.ThrowAsync<OperationCanceledException>(() => ReadAllAsync(Source(Interval), cancellation.Token));
+    }
+
     public void Dispose()
     {
         _fixture.Dispose();
+    }
+
+    private static async Task<IReadOnlyList<SubscriptionBatch>> ReadAllAsync(PollingSubscriptionSource source, CancellationToken cancellationToken)
+    {
+        var batches = new List<SubscriptionBatch>();
+
+        await foreach (var batch in source.ReadAsync(Scope(), cancellationToken))
+        {
+            batches.Add(batch);
+        }
+
+        return batches;
     }
 
     private static SubscriptionScope Scope()

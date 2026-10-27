@@ -174,17 +174,11 @@ public sealed class InformerTests : IDisposable
     public async Task ASubscriptionThatEnds_IsRemoved_WithTheAnnotationThatEndedIt_AndTheSnapshotsHeldBefore(bool byExecution, StorytellerRemovalReason reason)
     {
         var target = byExecution ? Execution("northwind") : Usage("northwind");
-        Action<JObject> expiresSoon = json => json["ExpiresAt"] = Now.AddSeconds(10).ToString("O");
-        _catalog.Subscribe(
-            "northwind",
-            execution: json =>
-            {
-                json["Title"] = "Before";
-                (byExecution && reason == StorytellerRemovalReason.Expired ? expiresSoon : null)?.Invoke(json);
-            },
-            usage: !byExecution && reason == StorytellerRemovalReason.Expired ? expiresSoon : null);
+        Action<JObject>? expiresSoon = reason == StorytellerRemovalReason.Expired ? json => json["ExpiresAt"] = Now.AddSeconds(10).ToString("O") : null;
+        _catalog.Subscribe("northwind", execution: byExecution ? expiresSoon : null, usage: byExecution ? null : expiresSoon);
         await using var probe = Watch();
-        (await probe.FirstPollAsync()).ShouldHaveSingleItem().Kind.ShouldBe(StorytellerChangeKind.Added);
+        var added = (await probe.FirstPollAsync()).ShouldHaveSingleItem();
+        added.Kind.ShouldBe(StorytellerChangeKind.Added);
 
         // Expired: the poll after ExpiresAt passed, without a write.
         switch (reason)
@@ -207,8 +201,10 @@ public sealed class InformerTests : IDisposable
 
         change.Kind.ShouldBe(StorytellerChangeKind.Removed);
         change.Removal.ShouldBe(new StorytellerRemoval(target, reason));
-        change.Execution.Title.ShouldBe("Before");
-        change.Usage.Key.ShouldBe(Full(Usage("northwind")));
+
+        // The confirmation reads both again; the snapshots must still be the ones held.
+        change.Execution.ShouldBeSameAs(added.Execution);
+        change.Usage.ShouldBeSameAs(added.Usage);
         _catalog.Reads(target)[^1].Uri.Query.ShouldBe("?includeInactive=true&includeDeleted=true");
         (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
     }
@@ -258,21 +254,78 @@ public sealed class InformerTests : IDisposable
         (await probe.NextPollAsync(Interval)).ShouldHaveSingleItem().Kind.ShouldBe(StorytellerChangeKind.Added);
     }
 
+    // The other annotation of the subscription reads as active, so the answer of the failed read is needed.
+    [Theory]
+    [InlineData(true, HttpStatusCode.Forbidden, "definitive", "a machine restricted to an annotation reads that annotation and its descendants only")]
+    [InlineData(false, HttpStatusCode.Forbidden, "definitive", "a machine restricted to an annotation reads that annotation and its descendants only")]
+    [InlineData(false, HttpStatusCode.ServiceUnavailable, "transient", "failed (503)")]
+    public async Task AFailedConfirmation_KeepsTheSubscription_UntilAReadTells(bool ofTheExecution, HttpStatusCode status, string failureClass, string error)
+    {
+        var ended = ofTheExecution ? Execution("northwind") : Usage("northwind");
+        _catalog.Subscribe("northwind");
+        await using var probe = Watch();
+        await probe.FirstPollAsync();
+
+        _catalog.Update(ended, json => json["IsDisabled"] = true);
+        _catalog.Fail(ended, status, status == HttpStatusCode.Forbidden ? TestAnnotations.RestrictedJson : null);
+        (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
+        var warning = Warnings().ShouldHaveSingleItem().Message;
+        warning.ShouldStartWith($"Reading {Full(ended)} for the subscription {Full(Execution("northwind"))} failed ({failureClass}); the subscription stays as it was");
+        warning.ShouldContain(error);
+
+        _catalog.Heal();
+        (await probe.NextPollAsync(Interval)).ShouldHaveSingleItem().Removal.ShouldBe(
+            new StorytellerRemoval(ended, StorytellerRemovalReason.Disabled));
+    }
+
     [Fact]
-    public async Task AFailedConfirmation_KeepsTheSubscription_UntilAReadTells()
+    public async Task AnEndedExecution_RemovesTheSubscription_ThoughTheReadOfItsUsageFails()
     {
         _catalog.Subscribe("northwind");
         await using var probe = Watch();
         await probe.FirstPollAsync();
 
         _catalog.Update(Execution("northwind"), json => json["IsDisabled"] = true);
-        _catalog.Fail(Execution("northwind"), HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
-        (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
-        Warnings().ShouldHaveSingleItem().Message.ShouldContain("a machine restricted to an annotation reads that annotation and its descendants only");
+        _catalog.Fail(Usage("northwind"), HttpStatusCode.ServiceUnavailable);
 
-        _catalog.Heal();
         (await probe.NextPollAsync(Interval)).ShouldHaveSingleItem().Removal.ShouldBe(
             new StorytellerRemoval(Execution("northwind"), StorytellerRemovalReason.Disabled));
+        _catalog.Reads(Usage("northwind")).Count.ShouldBe(2);
+        Warnings().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ACandidateGoneSinceTheList_IsNotAdded_AndLogsNoWarning()
+    {
+        _catalog.Subscribe("northwind");
+        _catalog.Fail(Usage("northwind"), HttpStatusCode.NotFound);
+        await using var probe = Watch();
+
+        (await probe.FirstPollAsync()).ShouldBeEmpty();
+        Warnings().ShouldBeEmpty();
+        _fixture.Logs.Entries.ShouldContain(entry => entry.Level == LogLevel.Debug
+            && entry.Message == $"{Full(Usage("northwind"))} of the subscription {Full(Execution("northwind"))} is gone since it was listed; the next poll diffs it again.");
+
+        _catalog.Heal();
+        (await probe.NextPollAsync(Interval)).ShouldHaveSingleItem().Kind.ShouldBe(StorytellerChangeKind.Added);
+    }
+
+    [Fact]
+    public async Task AChangedAnnotationGoneSinceTheList_RaisesNothing_AndLogsNoWarning()
+    {
+        _catalog.Subscribe("northwind");
+        await using var probe = Watch();
+        await probe.FirstPollAsync();
+
+        _catalog.Update(Execution("northwind"), json => json["Title"] = "After");
+        _catalog.Fail(Execution("northwind"), HttpStatusCode.NotFound);
+        (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
+        Warnings().ShouldBeEmpty();
+
+        _catalog.Heal();
+        var change = (await probe.NextPollAsync(Interval)).ShouldHaveSingleItem();
+        change.Kind.ShouldBe(StorytellerChangeKind.Changed);
+        change.Execution.Title.ShouldBe("After");
     }
 
     [Fact]
@@ -344,34 +397,37 @@ public sealed class InformerTests : IDisposable
     [Fact]
     public async Task TheChangesOfAPoll_AreRemovedFirst_ThenChanged_ThenAdded_EachByKey()
     {
-        foreach (var subject in new[] { "a2", "a1", "c2", "c1" })
+        // The lists answer in descending key order, and b1 is held before a1, so only a sort puts each kind in key order.
+        foreach (var subject in new[] { "b1", "c1", "c2" })
         {
             _catalog.Subscribe(subject);
         }
 
         await using var probe = Watch();
-        (await probe.FirstPollAsync()).Count.ShouldBe(4);
+        (await probe.FirstPollAsync()).Count.ShouldBe(3);
+        _catalog.Subscribe("a1");
+        (await probe.NextPollAsync(Interval)).ShouldHaveSingleItem().Execution.SubjectName.ShouldBe("a1");
 
         _catalog.Subscribe("z2");
         _catalog.Update(Execution("c2"), json => json["Title"] = "Changed");
-        _catalog.Purge(Execution("a2"));
+        _catalog.Purge(Execution("a1"));
         _catalog.Subscribe("z1");
         _catalog.Update(Usage("c1"), json => json["Title"] = "Changed");
-        _catalog.Purge(Usage("a1"));
+        _catalog.Purge(Usage("b1"));
 
         var changes = await probe.NextPollAsync(Interval);
 
         changes.Select(change => (change.Kind, change.Execution.SubjectName)).ShouldBe(
         [
             (StorytellerChangeKind.Removed, "a1"),
-            (StorytellerChangeKind.Removed, "a2"),
+            (StorytellerChangeKind.Removed, "b1"),
             (StorytellerChangeKind.Changed, "c1"),
             (StorytellerChangeKind.Changed, "c2"),
             (StorytellerChangeKind.Added, "z1"),
             (StorytellerChangeKind.Added, "z2"),
         ]);
-        changes[0].Removal.ShouldBe(new StorytellerRemoval(Usage("a1"), StorytellerRemovalReason.Missing));
-        changes[1].Removal.ShouldBe(new StorytellerRemoval(Execution("a2"), StorytellerRemovalReason.Missing));
+        changes[0].Removal.ShouldBe(new StorytellerRemoval(Execution("a1"), StorytellerRemovalReason.Missing));
+        changes[1].Removal.ShouldBe(new StorytellerRemoval(Usage("b1"), StorytellerRemovalReason.Missing));
     }
 
     [Fact]
@@ -440,17 +496,22 @@ public sealed class InformerTests : IDisposable
         (await ToListAsync(watch)).ShouldHaveSingleItem().Kind.ShouldBe(StorytellerChangeKind.Added);
     }
 
+    // Without an interval, the default of 30 s.
     [Theory]
     [InlineData(0.0, 26_999, 27_000)]
     [InlineData(0.999999, 32_998, 33_000)]
     public async Task TheNextPoll_ComesAfterTheJitteredInterval(double random, int beforeMilliseconds, int afterMilliseconds)
     {
         _catalog.Subscribe("northwind");
-        await using var probe = Watch(options => options.NextRandom = () => random);
+        await using var probe = new PollProbe<StorytellerExecutionChange>(
+            Catalog(options => options.NextRandom = () => random).WatchExecutionsAsync(FakeCatalog.Responsibility, FakeCatalog.Context),
+            _fixture.Time);
         await probe.FirstPollAsync();
+        var timers = (_fixture.Time.Created, _fixture.Time.Active);
 
+        // The fake clock fires a due timer within Advance, and the delay disposes its timer when it fires.
         _fixture.Time.Advance(TimeSpan.FromMilliseconds(beforeMilliseconds));
-        await Task.Delay(50);
+        (_fixture.Time.Created, _fixture.Time.Active).ShouldBe(timers);
         _catalog.Lists("executions").Count.ShouldBe(1);
 
         await probe.NextPollAsync(TimeSpan.FromMilliseconds(afterMilliseconds - beforeMilliseconds));
@@ -586,10 +647,10 @@ public sealed class InformerTests : IDisposable
         return _fixture.BuildServices(configure).GetRequiredService<ISubscriptionCatalog>();
     }
 
-    private PollProbe<StorytellerExecutionChange> Watch(Action<StorytellerConfigurationOptions>? configure = null)
+    private PollProbe<StorytellerExecutionChange> Watch()
     {
         return new PollProbe<StorytellerExecutionChange>(
-            Catalog(configure).WatchExecutionsAsync(FakeCatalog.Responsibility, FakeCatalog.Context, Interval),
+            Catalog().WatchExecutionsAsync(FakeCatalog.Responsibility, FakeCatalog.Context, Interval),
             _fixture.Time);
     }
 

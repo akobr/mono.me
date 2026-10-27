@@ -7,10 +7,10 @@ using Newtonsoft.Json.Linq;
 namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
 
 // The annotations of the fixture's view as the API holds them, for the informer. The descendants routes of a
-// responsibility list its active executions or usages by key, in pages of PageSize with base64 tokens, with lossy
-// values ("list:" and the stored JSON); point reads honour includeInactive and includeDeleted. Put and Update stamp
-// Modified, as the API's writes do. Answers on the fixture's handler before its routes; the server's clock is the
-// fixture's.
+// responsibility list its active executions or usages by key in descending order (pages have no order, so the informer
+// must sort what it emits), in pages of PageSize with base64 tokens, with lossy values ("list:" and the stored JSON);
+// point reads honour includeInactive and includeDeleted. Put and Update stamp Modified, as the API's writes do. Answers
+// on the fixture's handler before its routes; the server's clock is the fixture's.
 internal sealed class FakeCatalog
 {
     public const string Responsibility = "invoicing";
@@ -291,7 +291,7 @@ internal sealed class FakeCatalog
                 && item.Key.ResponsibilityName == responsibility.Name
                 && item.Json["Deletion"] is null
                 && IsActive(item.Json))
-            .OrderBy(item => item.Key.ToString(), StringComparer.Ordinal)
+            .OrderByDescending(item => item.Key.ToString(), StringComparer.Ordinal)
             .Select(item => ListItem(item.Json))
             .ToList();
 
