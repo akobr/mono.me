@@ -27,15 +27,19 @@ public sealed class RegistrationTests : IDisposable
     }
 
     [Fact]
-    public void TheKey_IsOptionalAtRegistration()
+    public async Task TheKey_IsOptionalAtRegistration_WhoAmINeedsIt_AndFullKeysAreReadWithoutIt()
     {
+        var fullKey = $"{HostingFixture.Scope}.{HostingFixture.ExecutionKey}";
         _fixture.Environment.Remove("STORYTELLER_KEY");
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey);
+        _fixture.RouteConfiguration(HostingFixture.ExecutionKey);
 
         using var provider = _fixture.BuildServices();
 
-        provider.GetRequiredService<IExecutionContext>().ShouldNotBeNull();
-        provider.GetRequiredService<ISubscriptionCatalog>().ShouldNotBeNull();
-        provider.GetRequiredService<IStorytellerDocuments>().ShouldNotBeNull();
+        var whoAmI = await Should.ThrowAsync<StorytellerConfigurationException>(() => provider.GetRequiredService<IExecutionContext>().GetAsync());
+        whoAmI.Message.ShouldContain("STORYTELLER_KEY");
+        (await provider.GetRequiredService<ISubscriptionCatalog>().GetExecutionAsync(fullKey)).ShouldNotBeNull().Key.ShouldBe(fullKey);
+        (await provider.GetRequiredService<IStorytellerDocuments>().GetAsync(fullKey)).Key.ShouldBe(fullKey);
     }
 
     [Fact]

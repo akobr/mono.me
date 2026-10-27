@@ -18,6 +18,6 @@ public enum StorytellerSubscriptionStatus
     Deleted,
 
     // Everything that was read is active, but the credential may not read the usage (a machine restricted to its
-    // execution).
+    // execution), or the execution of a unit of execution (a machine restricted to that unit).
     Unknown,
 }

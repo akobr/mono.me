@@ -3,6 +3,7 @@ using _42.Platform.Storyteller.Sdk.Configuring;
 using _42.Platform.Storyteller.Sdk.Hosting.Executions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Executions;
 
@@ -12,6 +13,7 @@ public sealed class ExecutionContextTests : IDisposable
     private const string Responsibility = "rst.invoicing";
     private const string Usage = "usg.northwind.invoicing";
     private const string Context = "cnt.northwind.prod";
+    private const string UnitOfExecution = "uxe.northwind.invoicing.prod.daily";
     private const string LogCategory = "_42.Platform.Storyteller.Sdk.Hosting.ExecutionContext";
 
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(5);
@@ -49,9 +51,7 @@ public sealed class ExecutionContextTests : IDisposable
     [Fact]
     public async Task AUnitOfExecutionKey_FillsItsExecution()
     {
-        const string key = "uxe.northwind.invoicing.prod.daily";
-        _fixture.Environment["STORYTELLER_KEY"] = Full(key);
-        _fixture.RouteExecution(key);
+        RouteUnitOfExecution();
 
         var context = await WhoAmI().GetAsync();
 
@@ -314,7 +314,7 @@ public sealed class ExecutionContextTests : IDisposable
         _fixture.RouteExecution();
         var whoAmI = WhoAmI();
         var first = await whoAmI.GetAsync();
-        _fixture.RouteAnnotation(Usage, json => json["Labels"] = new Newtonsoft.Json.Linq.JArray("gold"));
+        _fixture.RouteAnnotation(Usage, json => json["Labels"] = new JArray("gold"));
 
         var refreshed = await whoAmI.RefreshAsync();
 
@@ -412,6 +412,36 @@ public sealed class ExecutionContextTests : IDisposable
     }
 
     [Fact]
+    public async Task AUnitOfExecution_WithAnUnreadableExecution_IsUnknown_WhileTheRestIsActive()
+    {
+        RouteUnitOfExecution();
+        _fixture.RouteStatus(HostingFixture.ExecutionKey, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+
+        var context = await WhoAmI().GetAsync();
+
+        context.Execution.ShouldBeNull();
+        context.Usage.ShouldNotBeNull();
+        context.Unreadable.ShouldBe([Full(HostingFixture.ExecutionKey)]);
+        context.GetSubscriptionStatus(_fixture.Time.GetUtcNow()).ShouldBe(StorytellerSubscriptionStatus.Unknown);
+    }
+
+    [Theory]
+    [InlineData("IsDisabled", true, StorytellerSubscriptionStatus.Disabled)]
+    [InlineData("ExpiresAt", "2026-10-01T00:00:00Z", StorytellerSubscriptionStatus.Expired)]
+    [InlineData("ValidFrom", "2026-11-01T00:00:00Z", StorytellerSubscriptionStatus.Scheduled)]
+    public async Task AUnitOfExecution_FollowsItsExecution(string member, object value, StorytellerSubscriptionStatus status)
+    {
+        RouteUnitOfExecution();
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, json => json[member] = JToken.FromObject(value));
+
+        var context = await WhoAmI().GetAsync();
+
+        context.Annotation.GetStatus(_fixture.Time.GetUtcNow()).ShouldBe(AnnotationStatus.Active);
+        context.Usage.ShouldNotBeNull().GetStatus(_fixture.Time.GetUtcNow()).ShouldBe(AnnotationStatus.Active);
+        context.GetSubscriptionStatus(_fixture.Time.GetUtcNow()).ShouldBe(status);
+    }
+
+    [Fact]
     public async Task ADeletedKey_IsAnAnswer_WithTheStatusDeleted()
     {
         _fixture.RouteExecution();
@@ -436,6 +466,13 @@ public sealed class ExecutionContextTests : IDisposable
     private static Task Background(IExecutionContext whoAmI)
     {
         return ((ExecutionContextService)whoAmI).BackgroundRead.WaitAsync(HostingFixture.Patience);
+    }
+
+    // The key of a unit of execution and its six ancestors, all active.
+    private void RouteUnitOfExecution()
+    {
+        _fixture.Environment["STORYTELLER_KEY"] = Full(UnitOfExecution);
+        _fixture.RouteExecution(UnitOfExecution);
     }
 
     // A machine restricted to its execution: every ancestor answers 403 AnnotationRestricted.

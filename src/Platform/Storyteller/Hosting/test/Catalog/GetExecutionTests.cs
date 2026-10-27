@@ -77,13 +77,16 @@ public sealed class GetExecutionTests : IDisposable
     }
 
     [Fact]
-    public async Task AnAnnotationKey_WithoutTheOptionsKey_IsRefused()
+    public async Task AnAnnotationKey_WithoutTheOptionsKey_ThrowsNamingTheVariableAndTheOption()
     {
         _fixture.Environment.Remove("STORYTELLER_KEY");
 
-        var exception = await Should.ThrowAsync<ArgumentException>(() => Catalog().GetExecutionAsync(Contoso));
+        var exception = await Should.ThrowAsync<StorytellerConfigurationException>(() => Catalog().GetExecutionAsync(Contoso));
 
         exception.Message.ShouldContain("STORYTELLER_KEY");
+        exception.Message.ShouldContain("StorytellerConfigurationOptions.Key");
+        exception.IsTransient.ShouldBeFalse();
+        _fixture.Http.Requests.ShouldBeEmpty();
     }
 
     [Fact]
@@ -96,22 +99,22 @@ public sealed class GetExecutionTests : IDisposable
     }
 
     [Theory]
-    [InlineData(HttpStatusCode.Forbidden, TestAnnotations.ErrorJson, "it needs Annotation.Read on the project", false)]
-    [InlineData(HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson, "a machine restricted to an annotation reads that annotation and its descendants only", false)]
-    [InlineData(HttpStatusCode.Unauthorized, null, "refused the credentials", false)]
-    [InlineData(HttpStatusCode.InternalServerError, TestAnnotations.ErrorJson, "failed", true)]
-    [InlineData(HttpStatusCode.OK, "<html>Sign in to the Wi-Fi</html>", "did not parse as an annotation", true)]
-    public async Task OtherFailures_ThrowWithTheCatalogsWords(HttpStatusCode status, string? body, string words, bool isTransient)
+    [InlineData(HttpStatusCode.Forbidden, TestAnnotations.ErrorJson, "The machine may not read {key}; it needs Annotation.Read on the project (403 AccessDenied): No. Ask the owner.", false)]
+    [InlineData(HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson, "The machine may not read {key}: a machine restricted to an annotation reads that annotation and its descendants only (403 AnnotationRestricted): Restricted.", false)]
+    [InlineData(HttpStatusCode.Unauthorized, null, "The platform refused the credentials of the read of {key}; set the variables of a machine the project knows, or a credential in code (401).", false)]
+    [InlineData(HttpStatusCode.InternalServerError, TestAnnotations.ErrorJson, "Reading {key} failed (500 AccessDenied): No. Ask the owner.", true)]
+    [InlineData(HttpStatusCode.OK, "<html>Sign in to the Wi-Fi</html>", "The answer to the read of {key} did not parse as an annotation (200): check that the endpoint is the Storyteller API base, /api included, and that nothing in between rewrites the response.", true)]
+    public async Task OtherFailures_ThrowWithTheCatalogsWords(HttpStatusCode status, string? body, string message, bool isTransient)
     {
+        var key = $"{HostingFixture.Scope}.{Contoso}";
         _fixture.RouteStatus(Contoso, status, body);
 
         var exception = await Should.ThrowAsync<StorytellerConfigurationException>(() => Catalog().GetExecutionAsync(Contoso));
 
-        exception.Key.ShouldBe($"{HostingFixture.Scope}.{Contoso}");
+        exception.Key.ShouldBe(key);
         exception.StatusCode.ShouldBe((int)status);
         exception.IsTransient.ShouldBe(isTransient);
-        exception.Message.ShouldContain(words);
-        exception.Message.ShouldNotContain("Wi-Fi");
+        exception.Message.ShouldBe(message.Replace("{key}", key, StringComparison.Ordinal));
     }
 
     [Fact]

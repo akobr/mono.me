@@ -14,6 +14,9 @@ public static class AuditConsoleExtensions
     // Fields whose audit records only that they changed, never a value.
     private static readonly HashSet<string> FlaggedFields = new(StringComparer.OrdinalIgnoreCase) { "Description", "UnitDefinition" };
 
+    // Fields whose audit records an instant. The SDK keeps date-like strings as stored, so they arrive as text.
+    private static readonly HashSet<string> InstantFields = new(StringComparer.OrdinalIgnoreCase) { "ValidFrom", "ExpiresAt" };
+
     /// <summary>
     /// Writes the history of an annotation as a table, the newest entry first.
     /// </summary>
@@ -137,7 +140,20 @@ public static class AuditConsoleExtensions
             return $"{field.Field} changed";
         }
 
+        if (InstantFields.Contains(field.Field))
+        {
+            return $"{field.Field}: {FormatValue(ToInstant(field.Previous), false)} → {FormatValue(ToInstant(field.Value), false)}";
+        }
+
         return $"{field.Field}: {FormatValue(field.Previous, field.IsPreviousTruncated)} → {FormatValue(field.Value, field.IsValueTruncated)}";
+    }
+
+    // The stored text of an instant, with its offset kept; one without an offset is UTC, as the platform stores instants.
+    private static object? ToInstant(object? value)
+    {
+        return value is string text && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var instant)
+            ? instant
+            : value;
     }
 
     private static string FormatValueChange(AnnotationValueChange change)

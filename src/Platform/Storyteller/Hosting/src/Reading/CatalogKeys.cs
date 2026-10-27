@@ -27,11 +27,11 @@ internal static class CatalogKeys
                 parameterName);
         }
 
+        // Without a scope the setting is missing, not the argument wrong: it throws as who am I does without a key.
         return scope is not null
             ? Normalize(FullKey.Create(annotationKey, scope))
-            : throw new ArgumentException(
-                $"'{text}' is an annotation key, and there is no default scope for it: pass a full key, or set {StorytellerVariables.KEY} or {nameof(StorytellerConfigurationOptions)}.{nameof(StorytellerConfigurationOptions.Key)}.",
-                parameterName);
+            : throw new StorytellerConfigurationException(
+                $"'{text}' is an annotation key, and there is no default scope for it: set {StorytellerVariables.KEY} or {nameof(StorytellerConfigurationOptions)}.{nameof(StorytellerConfigurationOptions.Key)}, or pass a full key.");
     }
 
     public static FullKey Normalize(FullKey key)
