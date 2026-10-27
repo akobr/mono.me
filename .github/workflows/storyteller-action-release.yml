@@ -99,6 +99,16 @@ jobs:
             exit 1
           fi
 
+          # The major tag moves to every release and the branch holds one line of releases, so a version must sort above
+          # the newest one: a lower one would move vX back, or put a newer major version under an older major tag.
+          released=$(remote_git ls-remote --tags --refs origin)
+          newest=$(printf '%s\n' "$released" | sed -nE 's|^[0-9a-f]+[[:space:]]+refs/tags/(v[0-9]+\.[0-9]+\.[0-9]+)$|\1|p' | sort -V | tail -n 1)
+
+          if [ -n "$newest" ] && [ "$(printf '%s\n' "$newest" "$tag" | sort -V | tail -n 1)" != "$tag" ]; then
+            echo "::error::$ACTION_REPOSITORY has the release $newest already; release a version above it."
+            exit 1
+          fi
+
           # An empty repository has no commit yet; its first release creates main.
           if git rev-parse --verify --quiet HEAD > /dev/null; then
             branch=$(git symbolic-ref --short HEAD)
