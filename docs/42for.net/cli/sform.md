@@ -123,7 +123,7 @@ sform account machine create --scope configuration-write -m schema-write,templat
 Without a scope it needs, the API answers `403` with a message that names the scope, such as "This operation needs the scope Annotation.Manage, which the machine was not created with.", and `sform` prints it. Machines created before these scopes existed have none: their API keys and certificates get `401`, their client credentials `403`, and a federated machine gets no token. A machine cannot be edited: create a new one with the scopes the job needs.
 
 ::: warning
-Commands print what they read or write, and the job log keeps everything a step prints. A step that prints a resolved configuration with secrets puts those values into the log. To use a configuration in a job, write it to a file with `--export`, or into the environment of the job with `--github-env`, which masks the values that bindings produced before it writes anything else; see [Read a configuration](#read-a-configuration).
+Commands print what they read or write, and the job log keeps everything a step prints. A step that prints a resolved configuration with secrets puts those values into the log, and `--export` alone still prints the whole model. To use a configuration in a job, write it to a file with `--export` and `--format` or `--content-only`, which then print nothing, with `--mask` to hide its values in the log of later steps; or put it into the environment of the job with `--github-env`, which masks the values that bindings produced before it writes anything else. See [Read a configuration](#read-a-configuration).
 :::
 
 ::: tip
@@ -149,7 +149,7 @@ sform story config <key> [-r|--resolved | --version <n>] [-f|--format json|flat|
 | `--content-only` | The content alone, as it is: the text of the format, or for `json` the content of the model, indented by two spaces (`{}` without content); nothing with `--export` | The same |
 | `--github-env` or `--mask` | Only the `::add-mask::` commands | The content in the format of `--format`; for `json`, the content of the model |
 
-- With `--format`, `--content-only`, `--github-env` or `--mask`, the content is written as UTF-8 without a byte order mark and with LF line ends, also to a Windows console. The `--export` file is then replaced without asking, and on Linux and macOS a file of a resolved configuration is readable and writable by its owner alone (mode `0600`).
+- With `--format flat`, `properties`, `env` or `yaml`, `--content-only`, `--github-env` or `--mask`, the content is written as UTF-8 without a byte order mark and with LF line ends, also to a Windows console. The `--export` file is then replaced without asking, and on Linux and macOS a file of a resolved configuration is readable and writable by its owner alone (mode `0600`). The model (no option, or `--format json` alone) is exported as before: `sform` asks before it replaces a file, and the file gets the default permissions.
 - With `--content-only`, `--github-env` or `--mask`, every message of the command goes to standard error, one line each, so standard output holds the content alone and can be piped or redirected. Parsing errors, sign-in failures, refusals of the API (`401`, `403`) and crashes are still printed to standard output; they end with a non-zero exit code, and the `--export` file is not written.
 - Windows PowerShell 5.1 re-encodes what `>` redirects, so use `--export` there. PowerShell 7 and the other shells keep the bytes.
 
@@ -164,10 +164,10 @@ A resolved configuration holds secret values only for a caller with the right to
 | Exit code | When |
 |---|---|
 | `0` | The configuration was printed or written |
-| `2` | Nothing was written: an invalid key, format, mask or prefix; options that do not go together (`--version` with `--resolved`, `--env-prefix` without `--format env` or `--github-env`, `--github-env` or `--mask` without `--resolved` or with `--version`, `--content-only` with `--github-env` or `--mask` but without `--export`, `--github-env` with neither `--env-prefix` nor `--allow-unprefixed`, `--allow-unprefixed` or `--allow-unresolved` without `--github-env` or `--mask`); `--github-env` outside a GitHub Actions job; a configuration or version that does not exist; a document the format cannot write; a binding that cannot be evaluated (`422`); and for `--github-env` and `--mask`, withheld secrets, unresolved bindings and refused variables |
-| `-1` | The command line does not parse: an unknown option, an option without its value, an option given twice, or `--version abc`. Shells on Linux and macOS show `255` |
+| `2` | Nothing was written: an invalid key, format, mask or prefix; options that do not go together (`--version` with `--resolved`, `--env-prefix` without `--format env` or `--github-env`, `--github-env` or `--mask` without `--resolved` or with `--version`, `--content-only` with `--github-env` or `--mask` but without `--export`, `--github-env` with neither `--env-prefix` nor `--allow-unprefixed`, `--allow-unprefixed` or `--allow-unresolved` without `--github-env` or `--mask`); `--github-env` outside a GitHub Actions job; a configuration or version that does not exist; a request the API rejects (`400`, `409`, `412`); a document the format cannot write; a binding that cannot be evaluated (`422`); and for `--github-env` and `--mask`, withheld secrets, unresolved bindings and refused variables. Also an `--export` file of the content or `GITHUB_ENV` that cannot be written: `--github-env` and `--mask` have printed the masks by then, and when the `--export` file fails, `GITHUB_ENV` was already appended |
+| `-1` | The command line does not parse: an unknown option, an option without its value, an option that takes a value given twice (`--format env --format yaml`), or `--version abc`. Shells on Linux and macOS show `255` |
 | `44` | The API refused the read (`401`, `403`) |
-| `1` | Another failure of the API, or a crash |
+| `1` | Another failure of the API (`500` and the other statuses), or a crash |
 
 ### Export to GitHub Actions
 
@@ -175,6 +175,7 @@ A resolved configuration holds secret values only for a caller with the right to
 
 ``` yaml
 # GitHub Actions: the later steps read APP_DB__HOST, APP_DB__PASSWORD, …
+# An API key gets secret values when the project sets --require-mtls false (see below)
 - run: sform story config exe.billing.prod -r --github-env --env-prefix APP_
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
