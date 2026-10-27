@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.Aspire.Hosting</AssemblyName>
+    <!-- Not _42.Platform.Storyteller.Aspire.Hosting: an Aspire segment would hide Aspire.Hosting.* inside the project. -->
+    <RootNamespace>_42.Platform.Storyteller.AspireHosting</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <IsPackable>true</IsPackable>
+    <Description>Aspire hosting integration for 2S Platform Storyteller: a Storyteller resource with its endpoint, view and machine credential, and WithReference, WithStorytellerKey and WithExecution that pass the STORYTELLER_* variables to the projects, executables and containers of an AppHost.</Description>
+    <PackageTags>$(PackageTags);platform;2S;storyteller;configuration;aspire;hosting</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="42.Platform.Storyteller.Aspire.Hosting.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The only reference: an AppHost does not depend on the SDK's version or pull in its dependencies. -->
+    <PackageReference Include="Aspire.Hosting" />
+  </ItemGroup>
+
+</Project>

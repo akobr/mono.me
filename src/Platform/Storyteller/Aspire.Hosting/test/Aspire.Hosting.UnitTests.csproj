@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.Aspire.Hosting.UnitTests</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.AspireHosting.UnitTests</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\Aspire.Hosting.csproj" />
+
+    <!-- For the comparisons only: the variable names with StorytellerVariables, the key rule with FullKey and the
+         endpoint rule with StorytellerUrlRule. The package itself references neither. -->
+    <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
+    <ProjectReference Include="..\..\Sdk.NSwag\src\Sdk.NSwag.csproj" />
+  </ItemGroup>
+
+</Project>
