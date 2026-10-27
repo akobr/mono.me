@@ -58,7 +58,8 @@ public static class StorytellerHostingServiceCollectionExtensions
 
         services.TryAddSingleton<ISubscriptionCatalog>(serviceProvider => new SubscriptionCatalog(
             settings,
-            serviceProvider.GetRequiredService<CatalogReader>()));
+            serviceProvider.GetRequiredService<CatalogReader>(),
+            serviceProvider.GetService<ILoggerFactory>()));
 
         // Over the same settings, so over the same credential; an application that registered its own keeps it.
         services.TryAddSingleton<IStorytellerDocuments>(

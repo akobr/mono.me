@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <IsPackable>true</IsPackable>
-    <Description>Hosting for 2S Platform Storyteller in .NET: who am I (the annotation of STORYTELLER_KEY and its ancestors) and the catalog of executions, over the settings, credentials and transport of the configuration provider.</Description>
+    <Description>Hosting for 2S Platform Storyteller in .NET: who am I (the annotation of STORYTELLER_KEY and its ancestors), the catalog of executions and the polling informer of the subscriptions of a responsibility, over the settings, credentials and transport of the configuration provider.</Description>
     <PackageTags>$(PackageTags);platform;2S;storyteller;configuration;hosting</PackageTags>
   </PropertyGroup>
 
