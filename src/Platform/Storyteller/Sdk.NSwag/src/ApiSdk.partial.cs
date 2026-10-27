@@ -40,6 +40,10 @@ public partial class AnnotationsApiClient
 
 public partial class ConfigurationsApiClient
 {
+    // The API writes configuration content of up to 128 levels, and a response holds it a few levels down (the
+    // composition read in a list of nodes); Newtonsoft's default of 64 levels would fail where ?format= succeeds.
+    private const int MaxDepth = 256;
+
     private ISdkConfiguration? _configuration;
 
     [ActivatorUtilitiesConstructor]
@@ -52,7 +56,10 @@ public partial class ConfigurationsApiClient
 
     // Configuration documents keep their date-like strings as stored; typed dates (AuditStamp.At) still parse.
     static partial void UpdateJsonSerializerSettings(JsonSerializerSettings settings)
-        => settings.DateParseHandling = DateParseHandling.None;
+    {
+        settings.DateParseHandling = DateParseHandling.None;
+        settings.MaxDepth = MaxDepth;
+    }
 
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);

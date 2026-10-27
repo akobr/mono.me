@@ -63,6 +63,29 @@ public class ConfigurationFormatReadTests
         }
     }
 
+    // Deeper than the 32 levels of the MVC writer and the 64 of Newtonsoft's reader: the envelope of a document that
+    // ?format= serves is written too, and a client that formats it from the envelope gets the same bytes.
+    [Theory]
+    [InlineData(40)]
+    [InlineData(100)]
+    public async Task ConfigurationReads_ADeepDocument_HasAnEnvelopeThatFormatsAsTheFormat(int depth)
+    {
+        var (http, _) = Create(() => Stored() with { Content = Nested(depth) });
+
+        foreach (var resolved in new[] { false, true })
+        {
+            var envelope = resolved
+                ? await http.GetConfigurationResolved(Machine(mtls: true), Org, Project, View, Key)
+                : await http.GetConfiguration(Read(), Org, Project, View, Key);
+            var formatted = resolved
+                ? await http.GetConfigurationResolved(WithFormat(Machine(mtls: true), "flat"), Org, Project, View, Key)
+                : await http.GetConfiguration(WithFormat(Read(), "flat"), Org, Project, View, Key);
+
+            var model = envelope.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<Configuration>();
+            formatted.ShouldBeOfType<ContentResult>().Content.ShouldBe(ClientFormatted(model, "flat").Text);
+        }
+    }
+
     // The server holds a date token and a decimal where a client reads a string and a double; the body is the client's.
     [Fact]
     public async Task GetConfiguration_Flat_WritesTheTokensOfTheServerAsAClientReadsThem()
@@ -466,16 +489,30 @@ public class ConfigurationFormatReadTests
         return ConfigurationFormatter.Format(envelope[nameof(Configuration.Content)], Parse(name));
     }
 
-    // JSON as the SDK reads it: date-like strings stay strings, and numbers are doubles.
+    // JSON as the SDK reads it: date-like strings stay strings, numbers are doubles, and up to 256 levels.
     private static JObject ReadAsTheSdk(string json)
     {
         using var reader = new JsonTextReader(new StringReader(json))
         {
             DateParseHandling = DateParseHandling.None,
             FloatParseHandling = FloatParseHandling.Double,
+            MaxDepth = 256,
         };
 
         return JObject.Load(reader);
+    }
+
+    // A value under depth levels of objects.
+    private static JObject Nested(int depth)
+    {
+        var content = new JObject { ["leaf"] = "v" };
+
+        for (var level = 1; level < depth; level++)
+        {
+            content = new JObject { ["n"] = content };
+        }
+
+        return content;
     }
 
     // Stored() with the tokens the server holds: Cosmos DB reads a date-like string as a date, and the binding converter
