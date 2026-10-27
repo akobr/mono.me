@@ -50,6 +50,7 @@
     <ProjectReference Include="..\..\Backend.AzureStorage\src\Backend.AzureStorage.csproj" />
     <ProjectReference Include="..\..\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
     <ProjectReference Include="..\..\Binding.Azure.KeyVault\src\Binding.Azure.KeyVault.csproj" />
+    <ProjectReference Include="..\..\ConfigurationFormats\src\ConfigurationFormats.csproj" />
     <ProjectReference Include="..\..\KeyValues.Azure.KeyVault\src\KeyValues.Azure.KeyVault.csproj" />
   </ItemGroup>
 

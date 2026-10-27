@@ -4,7 +4,8 @@ The package `42.Platform.Storyteller.Configuration` loads one Storyteller config
 
 The code is in:
 
-- `src/Platform/Storyteller/Configuration/src/`: the options and their environment (`Settings/`), the transport (`Transport/`), the reader (`Reading/`), the flattener (`Flattening/`), the last-known-good cache (`Caching/`), the engine with its refresh and rollback (`Engine/`), the container integration (`Container/`), the substitution of references (`References/`) and the documents on demand (`Documents/`);
+- `src/Platform/Storyteller/Configuration/src/`: the options and their environment (`Settings/`), the transport (`Transport/`), the reader (`Reading/`), the last-known-good cache (`Caching/`), the engine with its refresh and rollback (`Engine/`), the container integration (`Container/`), the substitution of references (`References/`) and the documents on demand (`Documents/`);
+- `src/Platform/Storyteller/ConfigurationFormats/src/`: the flattener (`DocumentFlattener`, `JsonPaths`), in a library of its own that the provider references;
 - `src/Platform/Storyteller/Configuration.KeyVault/src/`: `KeyVaultReferenceResolver`;
 - `src/Platform/Storyteller/Sdk.NSwag/src/`: the conditional reads (`ApiSdk.Conditional.cs`), the machine credentials (`Credentials/`) and the resilience pipeline (`Resilience/`), described in the [SDK readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md).
 
