@@ -1,10 +1,10 @@
 using System.Text;
 
-namespace _42.Platform.Storyteller.Sdk.Configuring.Flattening;
+namespace _42.Platform.Storyteller.ConfigurationFormats;
 
 // JSON paths for messages and test vectors, the same in every language: $ for the root, .name for a plain property
 // name, ['name'] for any other, [0] for an array item.
-internal static class JsonPaths
+public static class JsonPaths
 {
     public const string Root = "$";
 

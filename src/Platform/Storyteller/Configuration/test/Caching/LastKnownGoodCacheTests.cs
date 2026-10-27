@@ -1,8 +1,8 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Text;
+using _42.Platform.Storyteller.ConfigurationFormats;
 using _42.Platform.Storyteller.Sdk.Configuring.Caching;
-using _42.Platform.Storyteller.Sdk.Configuring.Flattening;
 using _42.Platform.Storyteller.Sdk.Configuring.Logging;
 using _42.Platform.Storyteller.Sdk.Configuring.Reading;
 using _42.Testing.System.IO.Abstractions;

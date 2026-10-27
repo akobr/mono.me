@@ -48,6 +48,7 @@
     <ProjectReference Include="..\..\Storyteller\Sdk.NSwag\src\Sdk.NSwag.csproj" />
     <ProjectReference Include="..\..\Storyteller\Abstractions.Access\src\Abstractions.Access.csproj" />
     <ProjectReference Include="..\..\Storyteller\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
+    <ProjectReference Include="..\..\Storyteller\ConfigurationFormats\src\ConfigurationFormats.csproj" />
   </ItemGroup>
 
   <ItemGroup>
