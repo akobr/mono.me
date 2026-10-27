@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.ConfigurationFormats</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.ConfigurationFormats</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <IsPackable>true</IsPackable>
+    <Description>The flattening rules of 2S Platform Storyteller configurations: reads the content of a configuration into its values and IConfiguration keys, with the validation every consumer shares.</Description>
+    <PackageTags>$(PackageTags);platform;2S;storyteller;configuration</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+</Project>

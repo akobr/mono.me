@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using _42.Platform.Storyteller.Sdk.Configuring.Flattening;
+using _42.Platform.Storyteller.ConfigurationFormats;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 

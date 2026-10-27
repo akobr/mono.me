@@ -1,4 +1,4 @@
-using _42.Platform.Storyteller.Sdk.Configuring.Flattening;
+using _42.Platform.Storyteller.ConfigurationFormats;
 using _42.Platform.Storyteller.Sdk.Configuring.Reading;
 using _42.Platform.Storyteller.Sdk.Configuring.References;
 using Newtonsoft.Json.Linq;

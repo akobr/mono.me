@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.ConfigurationFormats.UnitTests</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.ConfigurationFormats.UnitTests</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shared with the providers of other languages and kept where the docs name them, next to the provider's tests;
+         embedded so the tests read them without the file system. -->
+    <EmbeddedResource Include="..\..\Configuration\test\Vectors\*.json" LogicalName="Vectors.%(Filename)%(Extension)" Link="Vectors\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\ConfigurationFormats.csproj" />
+  </ItemGroup>
+
+</Project>

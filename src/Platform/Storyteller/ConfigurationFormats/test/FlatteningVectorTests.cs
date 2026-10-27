@@ -1,8 +1,7 @@
-using _42.Platform.Storyteller.Sdk.Configuring.Flattening;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace _42.Platform.Storyteller.Sdk.Configuring.UnitTests.Flattening;
+namespace _42.Platform.Storyteller.ConfigurationFormats.UnitTests;
 
 // Vectors/flattening.json, shared with the providers of other languages.
 public class FlatteningVectorTests
