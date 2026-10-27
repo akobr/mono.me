@@ -6,9 +6,9 @@ using Microsoft.Extensions.Http.Resilience;
 
 namespace _42.Platform.Storyteller.Sdk.Configuring.Transport;
 
-// The transport of the provider and of the document service, built by hand: the provider runs before the container
-// exists, and a client of AddStorytellerSdk would collide with the application's own ISdkConfiguration and get a second
-// resilience handler from Aspire's service defaults.
+// The transport of the provider, of the document service and of Hosting's catalog, built by hand: the provider runs
+// before the container exists, and a client of AddStorytellerSdk would collide with the application's own
+// ISdkConfiguration and get a second resilience handler from Aspire's service defaults.
 //
 //   StorytellerCredentialHandler        Authorization, one renewal on a 401
 //     └─ ResilienceHandler              retries of GET, circuit breaker, attempt timeout
@@ -20,7 +20,17 @@ internal static class TransportFactory
 
     private static readonly TimeSpan PooledConnectionLifetime = TimeSpan.FromMinutes(5);
 
+    // The configurations client over a client of its own.
     public static StorytellerTransport Create(StorytellerSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var httpClient = CreateHttpClient(settings);
+        return new StorytellerTransport(httpClient, new ConfigurationsApiClient(httpClient, CreateSdkConfiguration(settings)));
+    }
+
+    // The handlers of one transport. Every call builds a new pipeline, so every client has its own circuit breaker.
+    public static HttpClient CreateHttpClient(StorytellerSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -40,18 +50,24 @@ internal static class TransportFactory
         }
 
         // ReadTimeout and the caller's token bound a whole run; attempt timeouts bound a request.
-        var httpClient = new HttpClient(handler, disposeHandler: true) { Timeout = Timeout.InfiniteTimeSpan };
+        return new HttpClient(handler, disposeHandler: true) { Timeout = Timeout.InfiniteTimeSpan };
+    }
 
-        // AccessTokenFactory stays null: the credential handler sets Authorization, and PrepareRequest would set it too.
-        var client = new ConfigurationsApiClient(httpClient, new SdkConfiguration
+    // The SDK configuration of a client over CreateHttpClient. AccessTokenFactory stays null: the credential handler sets
+    // Authorization, and PrepareRequest would set it too.
+    public static ISdkConfiguration CreateSdkConfiguration(StorytellerSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var certificate = settings.Credential?.ClientCertificate;
+
+        return new SdkConfiguration
         {
             BaseUrl = settings.Endpoint.AbsoluteUri,
             AccessTokenFactory = null,
             ClientCertificate = certificate,
             ClientCertificateHeaderName = certificate is not null && StorytellerUrlRule.IsLocalHttp(settings.Endpoint) ? LocalCertificateHeaderName : null,
-        });
-
-        return new StorytellerTransport(httpClient, client);
+        };
     }
 
     internal static SocketsHttpHandler CreatePrimaryHandler(Action<SocketsHttpHandler>? configure, X509Certificate2? certificate)

@@ -100,6 +100,43 @@ internal sealed class StorytellerDocuments : IStorytellerDocuments, IDisposable
         _disposing.Dispose();
     }
 
+    // The shared entry of a key, for Hosting's subscriptions, which hand out documents over it and compare its Data with
+    // the one they hold. Revalidates and shares requests as GetAsync does.
+    internal Task<DocumentEntry> GetEntryAsync(FullKey key, StorytellerReadMode mode, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "Not a read mode.");
+        }
+
+        var identity = DocumentIdentity.Create(_settings.Endpoint, key, mode);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        return GetEntryAsync(identity, cancellationToken);
+    }
+
+    // Drops the entry of a key, and with it the only copy of its resolved secrets; the next read is a full one. A read in
+    // flight may store its entry again.
+    internal void Evict(FullKey key, StorytellerReadMode mode)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            _cache.Remove(DocumentIdentity.Create(_settings.Endpoint, key, mode));
+        }
+        catch (ObjectDisposedException)
+        {
+            // Disposed meanwhile: the cache is gone with its entries.
+        }
+    }
+
     // A task that nobody may wait for any more: a read abandoned at ReadTimeout, or a request whose callers cancelled.
     private static void Observe(Task task)
     {
@@ -145,11 +182,16 @@ internal sealed class StorytellerDocuments : IStorytellerDocuments, IDisposable
 
     private async Task<StorytellerDocument> GetSharedAsync(DocumentIdentity identity, CancellationToken cancellationToken)
     {
+        var entry = await GetEntryAsync(identity, cancellationToken).ConfigureAwait(false);
+        return new StorytellerDocument(entry);
+    }
+
+    private async Task<DocumentEntry> GetEntryAsync(DocumentIdentity identity, CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
         // The request belongs to every caller that shares it: a caller's token ends its own wait only.
-        var entry = await Share(identity).WaitAsync(cancellationToken).ConfigureAwait(false);
-        return new StorytellerDocument(entry);
+        return await Share(identity).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private Task<DocumentEntry> Share(DocumentIdentity identity)

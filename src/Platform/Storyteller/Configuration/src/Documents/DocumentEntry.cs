@@ -43,6 +43,26 @@ internal sealed class DocumentEntry
 
     public IReadOnlyList<string> Labels { get; }
 
+    // Whether two flattened documents hold the same keys and values; the provider's engine and Hosting's subscriptions
+    // tell a change from it. Keys compare ordinally: the dictionaries ignore case, but a renamed property must reach
+    // GetChildren() and binding.
+    public static bool HasSameData(IReadOnlyDictionary<string, string> left, IReadOnlyDictionary<string, string> right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        var keys = new HashSet<string>(right.Keys, StringComparer.Ordinal);
+
+        return left.All(pair => keys.Contains(pair.Key)
+            && right.TryGetValue(pair.Key, out var value)
+            && string.Equals(pair.Value, value, StringComparison.Ordinal));
+    }
+
     // The same document under the tag of a 304.
     public DocumentEntry WithETag(string? etag)
     {

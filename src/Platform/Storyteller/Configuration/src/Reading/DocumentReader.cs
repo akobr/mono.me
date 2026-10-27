@@ -1,9 +1,5 @@
-using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Polly.CircuitBreaker;
-using Polly.Timeout;
 
 namespace _42.Platform.Storyteller.Sdk.Configuring.Reading;
 
@@ -13,10 +9,6 @@ internal sealed class DocumentReader
 {
     // More paths than this are counted, not listed.
     private const int MaxListedPaths = 20;
-
-    // A proxy, a captive portal or an API that does not match the SDK. The SDK's message and the body are not quoted:
-    // the body of a resolved read may hold secrets.
-    private const string UnparsedAnswerFix = ": check that the endpoint is the Storyteller API base, /api included, and that nothing in between rewrites the response.";
 
     private readonly IConfigurationsApiClient _client;
     private readonly ILogger _logger;
@@ -53,7 +45,7 @@ internal sealed class DocumentReader
         }
         catch (Exception exception)
         {
-            return Classify(identity, exception);
+            return ReadFailures.Classify(exception, identity.Key, identity.Endpoint, Describe);
         }
 
         // The header depends on the caller's rights, not on the content: a document without secrets is withheld too.
@@ -99,118 +91,27 @@ internal sealed class DocumentReader
             listed);
     }
 
-    // 408, 424, 429 and 5xx other than 501 and 505 are worth another try; 501, 505 and the other 4xx get the same answer
-    // again, as in the SDK's resilience pipeline. A 2xx that did not parse came through something in between; a 3xx is
-    // a redirect, which is not followed.
+    // The classification lives in ReadFailures; kept here for the tests of the reader.
     internal static bool IsTransientStatus(int status)
     {
-        return status switch
-        {
-            408 or 424 or 429 => true,
-            501 or 505 => false,
-            >= 500 => true,
-            >= 200 and < 300 => true,
-            _ => false,
-        };
+        return ReadFailures.IsTransientStatus(status);
     }
 
-    private static ReadOutcome Classify(DocumentIdentity identity, Exception exception)
-    {
-        switch (exception)
-        {
-            case ApiException api:
-                return ClassifyStatus(identity, api);
-
-            case StorytellerAuthenticationException authentication:
-                var credentialMessage = $"The credential could not authorize the read of {identity.Key} ({authentication.Reason}): {authentication.Message}";
-                return authentication.IsTransient
-                    ? new ReadOutcome.Transient(null, null, credentialMessage, authentication)
-                    : new ReadOutcome.Definitive(null, null, credentialMessage, authentication);
-
-            case BrokenCircuitException:
-                return new ReadOutcome.Transient(
-                    null,
-                    null,
-                    $"Reading {identity.Key} was not attempted: the circuit to {identity.Endpoint} is open after repeated failures.",
-                    exception);
-
-            case TimeoutRejectedException timeout:
-                return new ReadOutcome.Transient(null, null, $"Reading {identity.Key} timed out after {timeout.Timeout}.", exception);
-
-            case HttpRequestException http:
-                return new ReadOutcome.Transient((int?)http.StatusCode, null, $"Reading {identity.Key} from {identity.Endpoint} failed: {http.Message}", exception);
-
-            // A connect timeout of the handler, which the caller did not request.
-            case OperationCanceledException:
-                return new ReadOutcome.Transient(null, null, $"Reading {identity.Key} from {identity.Endpoint} timed out.", exception);
-
-            // Unknown, as from a credential of the application: no verdict of the platform, so the cache and the poller
-            // carry on. Its message stays in the inner exception; it is not ours to vouch for.
-            default:
-                return new ReadOutcome.Transient(null, null, $"Reading {identity.Key} failed with {exception.GetType().Name}.", exception);
-        }
-    }
-
-    private static ReadOutcome ClassifyStatus(DocumentIdentity identity, ApiException exception)
-    {
-        var status = exception.StatusCode;
-        var error = (exception as ApiException<ErrorResponse>)?.Result ?? (status >= 400 ? TryReadError(exception.Response) : null);
-        var errorCode = string.IsNullOrWhiteSpace(error?.ErrorCode) ? null : error.ErrorCode;
-        var message = $"{Describe(identity, status, errorCode)} ({status}{(errorCode is null ? string.Empty : $" {errorCode}")}){(IsSuccessStatus(status) ? UnparsedAnswerFix : DescribeError(error))}";
-
-        return IsTransientStatus(status)
-            ? new ReadOutcome.Transient(status, errorCode, message, exception)
-            : new ReadOutcome.Definitive(status, errorCode, message, exception);
-    }
-
-    private static string Describe(DocumentIdentity identity, int status, string? errorCode)
+    // The words of an answer to a configuration read; ReadFailures adds the status, the error code and the platform's
+    // message and hint.
+    private static string Describe(string key, int status, string? errorCode)
     {
         return status switch
         {
-            404 when errorCode == "AnnotationDeleted" => $"The annotation of {identity.Key} is deleted",
-            400 => $"The platform does not accept the key {identity.Key}",
-            401 => $"The platform refused the credentials of the read of {identity.Key}; set the variables of a machine the project knows, or a credential in code",
-            403 => $"The machine may not read {identity.Key}; it needs Configuration.Read on the project, and an annotation-restricted machine reads its own annotation only",
-            404 => $"The configuration {identity.Key} does not exist",
-            422 => $"A binding in {identity.Key} cannot be evaluated",
-            >= 300 and < 400 => $"Reading {identity.Key} was redirected, which is not followed; set the endpoint to the final URL",
-            _ when IsSuccessStatus(status) => $"The answer to the read of {identity.Key} did not parse as a configuration",
-            _ => $"Reading {identity.Key} failed",
+            404 when errorCode == "AnnotationDeleted" => $"The annotation of {key} is deleted",
+            400 => $"The platform does not accept the key {key}",
+            401 => $"The platform refused the credentials of the read of {key}; set the variables of a machine the project knows, or a credential in code",
+            403 => $"The machine may not read {key}; it needs Configuration.Read on the project, and an annotation-restricted machine reads its own annotation only",
+            404 => $"The configuration {key} does not exist",
+            422 => $"A binding in {key} cannot be evaluated",
+            >= 300 and < 400 => $"Reading {key} was redirected, which is not followed; set the endpoint to the final URL",
+            _ when ReadFailures.IsSuccessStatus(status) => $"The answer to the read of {key} did not parse as a configuration",
+            _ => $"Reading {key} failed",
         };
-    }
-
-    private static bool IsSuccessStatus(int status)
-    {
-        return status is >= 200 and < 300;
-    }
-
-    // The statuses the OpenAPI document does not declare (424, 503, …) still carry an ErrorResponse; the generated
-    // client leaves it as text.
-    private static ErrorResponse? TryReadError(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body) || !body.TrimStart().StartsWith('{'))
-        {
-            return null;
-        }
-
-        try
-        {
-            return JsonConvert.DeserializeObject<ErrorResponse>(body);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    // The platform's ErrorResponse holds no secret.
-    private static string DescribeError(ErrorResponse? error)
-    {
-        var parts = new[] { error?.Message, error?.Hint }
-            .Where(part => !string.IsNullOrWhiteSpace(part))
-            .Select(part => part!.Trim().TrimEnd('.'))
-            .ToList();
-
-        return parts.Count == 0 ? "." : $": {string.Join(". ", parts)}.";
     }
 }

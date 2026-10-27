@@ -16,6 +16,10 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="42.Platform.Storyteller.Configuration.UnitTests" />
+
+    <!-- Hosting builds on the settings, transport, classification and documents of the provider; both ship one version. -->
+    <InternalsVisibleTo Include="42.Platform.Storyteller.Hosting" />
+    <InternalsVisibleTo Include="42.Platform.Storyteller.Hosting.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>
