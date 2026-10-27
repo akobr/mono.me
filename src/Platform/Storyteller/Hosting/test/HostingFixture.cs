@@ -3,7 +3,6 @@ using System.Net;
 using _42.Platform.Storyteller.Sdk.Configuring;
 using _42.Platform.Storyteller.Sdk.Resilience;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Time.Testing;
 
 namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests;
 
@@ -30,7 +29,8 @@ internal sealed class HostingFixture : IDisposable
 
     public StubHttpHandler Http { get; } = new();
 
-    public FakeTimeProvider Time { get; } = new(new DateTimeOffset(2026, 10, 27, 8, 0, 0, TimeSpan.Zero));
+    // Counts its timers, so a test advances it only after a poll armed the next one.
+    public CountingTimeProvider Time { get; } = new(new DateTimeOffset(2026, 10, 27, 8, 0, 0, TimeSpan.Zero));
 
     public RecordingLoggerFactory Logs { get; } = new();
 

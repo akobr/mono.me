@@ -11,7 +11,12 @@ internal sealed class CountingTimeProvider : FakeTimeProvider
     private int _maxActive;
 
     public CountingTimeProvider()
-        : base(new DateTimeOffset(2026, 10, 23, 8, 0, 0, TimeSpan.Zero))
+        : this(new DateTimeOffset(2026, 10, 23, 8, 0, 0, TimeSpan.Zero))
+    {
+    }
+
+    public CountingTimeProvider(DateTimeOffset start)
+        : base(start)
     {
     }
 
