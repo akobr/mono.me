@@ -17,7 +17,8 @@ A composite GitHub Action that reads the resolved configuration of an annotation
     cli-version: 0.8.115-alpha-gd665130ae2
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
-    STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+    STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx   # a certificate machine, see Credentials
+    STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
@@ -54,13 +55,55 @@ Inputs never reach a script through `${{ inputs.* }}`: every step gets them in `
 
 ## Credentials
 
-Credentials are not inputs. `sform` reads them from the environment of the job or of the step, as described in [Sign in from a pipeline](https://42for.net/cli/sform#sign-in-from-a-pipeline): `STORYTELLER_API_KEY`, client credentials, a certificate (`STORYTELLER_CLIENT_CERTIFICATE`, a `.pfx` file the workflow writes under `$RUNNER_TEMP` from a secret, and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD`), or a federated machine: `client-id` with `permissions: id-token: write`.
+Credentials are not inputs. `sform` reads them from the environment of the job or of the step, as described in [Sign in from a pipeline](https://42for.net/cli/sform#sign-in-from-a-pipeline): a certificate (`STORYTELLER_CLIENT_CERTIFICATE` and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD`), a federated machine (`client-id` with `permissions: id-token: write`), `STORYTELLER_API_KEY` or client credentials.
+
+For a configuration with secrets, a certificate machine over mTLS is the recommendation (see [Secrets need more than a credential](#secrets-need-more-than-a-credential)). The workflow writes its `.pfx` file from a secret under `$RUNNER_TEMP`:
+
+```yaml
+- run: printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/storyteller.pfx"
+  env:
+    CERTIFICATE: ${{ secrets.STORYTELLER_CERTIFICATE_BASE64 }}
+- uses: akobr/mono.me/src/Platform/GitHubAction@<commit>
+  with:
+    key: exe.northwind.invoicing.production
+    export-env: true
+    env-prefix: APP_
+    cli-version: 0.8.115-alpha-gd665130ae2
+  env:
+    STORYTELLER_ENDPOINT: https://storyteller.example.com/api
+    STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx
+    STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
+```
+
+A federated machine is possible too, and needs no stored secret. With `Secrets.Read`, it receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project, see below. This one has no `Secrets.Read` and reads a configuration without secret bindings:
+
+```yaml
+permissions:
+  id-token: write
+  contents: read
+steps:
+  - uses: akobr/mono.me/src/Platform/GitHubAction@<commit>
+    with:
+      key: exe.northwind.invoicing.production
+      project: acme.billing
+      endpoint: https://storyteller.example.com/api
+      client-id: 3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07
+      output-file: ${{ runner.temp }}/billing.env
+      cli-version: 0.8.115-alpha-gd665130ae2
+  - run: docker compose --env-file "$RUNNER_TEMP/billing.env" up --detach
+```
 
 ## Secrets need more than a credential
 
-- The machine needs `Secrets.Read` (`sform account machine create -r --scope secrets-read`).
-- Under the default policy of a project (`RequireMtlsForSecretDelivery`), only a certificate machine over mTLS receives secret values: the API must sit behind a front end that forwards the client certificate (`MachineAuth:IsCertificateHeaderFromClientAllowed`). An API-key, client-credentials or federated machine receives them only when an Administrator sets the policy to false (`sform story kv policy set --require-mtls false`).
-- Otherwise the API withholds the secrets (`X-2S-Secrets-Withheld`) or returns the expressions of the secret bindings, and the action fails with exit code `2` and writes nothing. A machine without `Secrets.Read` can read a configuration without secret bindings.
+The machine needs `Secrets.Read` (`sform account machine create -r --scope secrets-read`) and one of these sign-ins:
+
+- **Recommended: a certificate machine over mTLS.** It receives secret values under the default policy of a project, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The workflow writes the `.pfx` file from a secret under `$RUNNER_TEMP`. The API must sit behind a front end that forwards the client certificate (`MachineAuth:IsCertificateHeaderFromClientAllowed`).
+- **Possible: a federated machine** (GitHub OIDC). It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `client-id`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project (`sform story kv policy set --require-mtls false`).
+- **Possible: an API key or client credentials**, under the same change of the policy.
+
+The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values without mTLS, with an API key, client credentials or a federated token, not only the machine of the workflow.
+
+Without `Secrets.Read` or such a sign-in, the API withholds the secrets (`X-2S-Secrets-Withheld`) or returns the expressions of the secret bindings, and the action fails with exit code `2` and writes nothing. A machine without `Secrets.Read` can read a configuration without secret bindings.
 
 ## What later steps see
 
@@ -101,7 +144,8 @@ steps:
       cli-source: ${{ runner.temp }}/sform
     env:
       STORYTELLER_ENDPOINT: https://storyteller.example.com/api
-      STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+      STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx   # see Credentials
+      STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 ```
 
 A workflow of this repository checks out the repository itself (`fetch-depth: 0`), packs `src/Platform/Cli/src` and uses `./src/Platform/GitHubAction`.

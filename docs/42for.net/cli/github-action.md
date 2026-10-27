@@ -16,7 +16,8 @@ The Storyteller configuration action brings the resolved configuration of an ann
     cli-version: 0.8.115-alpha-gd665130ae2
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
-    STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+    STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx   # a certificate machine, see Sign-in
+    STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
@@ -55,7 +56,7 @@ The step fails with the exit code of `sform`, `2` when it refuses the configurat
 
 Credentials are not inputs: `sform` reads them from the environment of the job or of the step, as in [Sign in from a pipeline](/cli/sform#sign-in-from-a-pipeline). An API key or a certificate names its project; client credentials and federated machines need `project`, or `STORYTELLER_PROJECT` or `STORYTELLER_KEY` in the job.
 
-A certificate machine gets its `.pfx` file from a secret:
+For a configuration with secrets, a **certificate machine over mTLS** is the recommendation, see [Secrets need more than a credential](#secrets-need-more-than-a-credential). The job writes its `.pfx` file from a secret under `$RUNNER_TEMP`:
 
 ``` yaml
 - run: printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/storyteller.pfx"
@@ -73,7 +74,7 @@ A certificate machine gets its `.pfx` file from a secret:
     STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 ```
 
-A federated machine needs no secret. This one has no `Secrets.Read` and reads a configuration without secret bindings, into a file for the one step that needs it:
+A **federated machine** is possible too, and needs no stored secret. With `Secrets.Read`, it receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project, see below. This one has no `Secrets.Read` and reads a configuration without secret bindings, into a file for the one step that needs it:
 
 ``` yaml
 permissions:
@@ -93,11 +94,15 @@ steps:
 
 ## Secrets need more than a credential
 
-A configuration whose bindings read secrets reaches the job only when the machine may receive them:
+A configuration whose bindings read secrets reaches the job only when the machine may receive them. The machine needs `Secrets.Read` (`sform account machine create -r --scope secrets-read`) and one of these sign-ins:
 
-- The machine needs `Secrets.Read` (`sform account machine create -r --scope secrets-read`).
-- Under the default policy of a project, only a **certificate machine over mTLS** receives secret values, which needs an API behind a front end that forwards the client certificate. An **API key, client credentials or a federated machine** receives them only when an Administrator turns that policy off: `sform story kv policy set --require-mtls false` (`RequireMtlsForSecretDelivery` set to `false`).
-- Otherwise the API withholds the secrets or returns the expressions of the secret bindings, and the action stops with exit code `2` before it exports or writes anything.
+- **Recommended: a certificate machine over mTLS.** It receives secret values under the default policy of a project, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The job writes the `.pfx` file from a secret under `$RUNNER_TEMP`. It needs an API behind a front end that forwards the client certificate.
+- **Possible: a federated machine** (GitHub OIDC). It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `client-id`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project: `sform story kv policy set --require-mtls false`.
+- **Possible: an API key or client credentials**, under the same change of the policy.
+
+The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
+
+Without `Secrets.Read` or such a sign-in, the API withholds the secrets or returns the expressions of the secret bindings, and the action stops with exit code `2` before it exports or writes anything.
 
 ## What later steps see
 
@@ -146,7 +151,8 @@ steps:
       cli-source: ${{ runner.temp }}/sform
     env:
       STORYTELLER_ENDPOINT: https://storyteller.example.com/api
-      STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+      STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx   # see Sign-in
+      STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 ```
 
 ## .NET on the runner
