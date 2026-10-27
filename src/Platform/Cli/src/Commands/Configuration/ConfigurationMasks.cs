@@ -84,11 +84,12 @@ internal static class ConfigurationMasks
             masked.Add(value);
         }
 
-        return new MaskPlan(masked, tooShort, MaskData(masked, mode));
+        return new MaskPlan(masked, tooShort, MaskData(masked));
     }
 
-    // Each distinct value, and every line of a multi-line value, as the runner masks a single line of it otherwise.
-    private static IReadOnlyList<string> MaskData(IEnumerable<DocumentLeaf> masked, MaskMode mode)
+    // Each distinct value, and every line of a multi-line value, as the runner masks a single line of it otherwise. The
+    // lines are masked whatever their length: a short one is still a part of a secret.
+    private static IReadOnlyList<string> MaskData(IEnumerable<DocumentLeaf> masked)
     {
         var data = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -107,9 +108,7 @@ internal static class ConfigurationMasks
 
             foreach (var line in value.Value.Split(["\r\n", "\n", "\r"], StringSplitOptions.None))
             {
-                if (!string.IsNullOrWhiteSpace(line)
-                    && (mode == MaskMode.All || line.Length >= MinimumBoundLength)
-                    && seen.Add(line))
+                if (!string.IsNullOrWhiteSpace(line) && seen.Add(line))
                 {
                     data.Add(line);
                 }

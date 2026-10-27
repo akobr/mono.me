@@ -396,7 +396,7 @@ public class ConfigGetCommand : BaseContextCommand
             var effective = await ReadEffectiveAsync(key);
             unresolved = ConfigurationMasks.FindUnresolved(values, ConfigurationMasks.ByPath(ConfigurationMasks.ReadValues(ToToken(effective.Content))));
         }
-        catch (Exception exception) when (exception is ApiException or HttpRequestException or JsonException)
+        catch (Exception exception) when (exception is ApiException or HttpRequestException or JsonException or TaskCanceledException)
         {
             return;
         }
@@ -489,8 +489,9 @@ public class ConfigGetCommand : BaseContextCommand
             unknownEffective = $"the effective read failed with {exception.StatusCode}";
             notes.Add($"Unresolved bindings were not checked: {unknownEffective}.");
         }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException)
+        catch (Exception exception) when (exception is HttpRequestException or JsonException or TaskCanceledException)
         {
+            // The reads take no token, so a cancellation is the timeout of the HttpClient.
             unknownEffective = "the effective read failed";
             notes.Add($"Unresolved bindings were not checked: {unknownEffective}.");
         }
@@ -512,7 +513,7 @@ public class ConfigGetCommand : BaseContextCommand
         {
             try
             {
-                _fileSystem.File.AppendAllText(_gitHubActions.EnvironmentFile!, environmentText, PlainOutputExtensions.Utf8);
+                AppendToEnvironmentFile(_gitHubActions.EnvironmentFile!, environmentText);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -613,6 +614,26 @@ public class ConfigGetCommand : BaseContextCommand
             WriteMessage($"The configuration could not be written to '{path}': {exception.Message}");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
+    }
+
+    // In one write, after a line feed when the job left its last line open: the runner would read that line and the
+    // first NAME<<DELIMITER as one NAME=value, and the lines of the value as variables of their own.
+    private void AppendToEnvironmentFile(string path, string text)
+    {
+        var isLineOpen = false;
+
+        if (_fileSystem.File.Exists(path))
+        {
+            using var stream = _fileSystem.File.OpenRead(path);
+
+            if (stream.Length > 0)
+            {
+                stream.Seek(-1, SeekOrigin.End);
+                isLineOpen = stream.ReadByte() != '\n';
+            }
+        }
+
+        _fileSystem.File.AppendAllText(path, isLineOpen ? "\n" + text : text, PlainOutputExtensions.Utf8);
     }
 
     private sealed record ReadOptions(string Key, ConfigurationFormat? Format, MaskMode? Mask);
