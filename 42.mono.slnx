@@ -125,6 +125,8 @@
     <Project Path="src/Platform/Storyteller/Configuration.KeyVault/test/Configuration.KeyVault.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/ConfigurationFormats/src/ConfigurationFormats.csproj" />
     <Project Path="src/Platform/Storyteller/ConfigurationFormats/test/ConfigurationFormats.UnitTests.csproj" />
+    <Project Path="src/Platform/Storyteller/Hosting/src/Hosting.csproj" />
+    <Project Path="src/Platform/Storyteller/Hosting/test/Hosting.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/DbCreator/src/DbCreator.csproj" />
     <Project Path="src/Platform/Storyteller/KeyValues.Azure.KeyVault/src/KeyValues.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/KeyValues.ClientEncryption/src/KeyValues.ClientEncryption.csproj" />

@@ -1,4 +1,5 @@
 using _42.Platform.Storyteller.Sdk.Configuring.Caching;
+using _42.Platform.Storyteller.Sdk.Configuring.Documents;
 using _42.Platform.Storyteller.Sdk.Configuring.Logging;
 using _42.Platform.Storyteller.Sdk.Configuring.Reading;
 using _42.Platform.Storyteller.Sdk.Configuring.References;
@@ -409,21 +410,6 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
 
             types.Add(current.GetType().Name);
         }
-    }
-
-    // Keys compare ordinally: the dictionaries ignore case, but a renamed property must reach GetChildren() and binding.
-    private static bool HasSameData(IReadOnlyDictionary<string, string> left, IReadOnlyDictionary<string, string> right)
-    {
-        if (left.Count != right.Count)
-        {
-            return false;
-        }
-
-        var keys = new HashSet<string>(right.Keys, StringComparer.Ordinal);
-
-        return left.All(pair => keys.Contains(pair.Key)
-            && right.TryGetValue(pair.Key, out var value)
-            && string.Equals(pair.Value, value, StringComparison.Ordinal));
     }
 
     // A read that was abandoned at ReadTimeout may fail later; nobody waits for it any more.
@@ -1082,7 +1068,7 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                 snapshot = snapshot with { WritesCache = true };
 
                 // A new tag with the same keys and values, as after an unconditional poll: nothing to reload.
-                if (!isSwitch && HasSameData(snapshot.Data, previous.Data))
+                if (!isSwitch && DocumentEntry.HasSameData(snapshot.Data, previous.Data))
                 {
                     snapshot = snapshot with { Data = previous.Data };
                 }
@@ -1149,7 +1135,7 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
             // The values that did not bind are still the ones resolved: nothing to apply. The snapshot keeps its old
             // resolution time, so the next poll looks again, at the memory cache until those values expire, then at the
             // resolver.
-            if (previous.RejectedData is not { } rejectedData || !HasSameData(data, rejectedData))
+            if (previous.RejectedData is not { } rejectedData || !DocumentEntry.HasSameData(data, rejectedData))
             {
                 var draft = previous with
                 {
@@ -1157,7 +1143,7 @@ internal sealed class StorytellerConfigurationEngine : IStorytellerConfiguration
                     CacheControl = notModified.CacheControl,
                     Origin = origin,
                     Substitution = refreshed,
-                    Data = HasSameData(data, previous.Data) ? previous.Data : data,
+                    Data = DocumentEntry.HasSameData(data, previous.Data) ? previous.Data : data,
                     RejectedData = null,
                 };
 
