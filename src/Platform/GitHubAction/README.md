@@ -2,8 +2,10 @@
 
 A composite GitHub Action that reads the resolved configuration of an annotation from the 2S Platform and exports it into the environment of the job, into a file, or both. It installs [`sform`](https://42for.net/cli/sform) and runs `sform story config <key> --resolved` once, with `--github-env` or `--mask`, so the names, the masks, the heredocs and the refusals are those of `sform` and its tests ([Export to GitHub Actions](https://42for.net/cli/sform#export-to-github-actions)). The public page is [GitHub Action](https://42for.net/cli/github-action).
 
-- **Spec:** [Flat Output Formats for Configurations](../../../docs/Platform/Storyteller/specs/2026-10-27%20Flat%20Output%20Formats%20for%20Configurations.md), sections 8 and 9.
+- **Specs:** [Flat Output Formats for Configurations](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Flat%20Output%20Formats%20for%20Configurations.md), sections 8 and 9; [Publishing the GitHub Action and Secrets in CI](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Publishing%20the%20GitHub%20Action%20and%20Secrets%20in%20CI.md).
+- **Source:** [`src/Platform/GitHubAction`](https://github.com/akobr/mono.me/tree/main/src/Platform/GitHubAction) of the monorepo `akobr/mono.me`. Releases are copied into a repository of their own, see [Releasing](#releasing).
 - **Runners:** Linux, macOS and Windows; every step runs in `bash` (Git Bash on Windows).
+- **Licence:** MIT, in the file `LICENSE` next to this README.
 
 ## Use
 
@@ -22,7 +24,7 @@ A composite GitHub Action that reads the resolved configuration of an annotation
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
-The action has no release tags yet: pin a commit of this repository. A workflow of this repository uses `./src/Platform/GitHubAction` after `actions/checkout`. Until a `sform` with these options is on NuGet, the workflow packs it first, see [Until sform is published](#until-sform-is-published).
+The action is released into a repository of its own, listed on GitHub Marketplace, with a tag `vX.Y.Z` per release and a major tag `vX` that moves with them (see [Releasing](#releasing)). Once the first release is out, use it from there as `<owner>/<name>@v1`; the owner and the name of that repository are not decided yet. Until then, and for changes that are not released, pin a commit of the monorepo, `akobr/mono.me/src/Platform/GitHubAction@<commit>`, as the examples here do. A workflow of the monorepo uses `./src/Platform/GitHubAction` after `actions/checkout`. Until a `sform` with these options is on NuGet, the workflow packs it first, see [Until sform is published](#until-sform-is-published).
 
 ## Inputs
 
@@ -115,7 +117,7 @@ The names come from the configuration, so whoever edits the configuration could 
 
 ## Until sform is published
 
-`42.Platform.Cli` on nuget.org is older than these options. Until a release has them, the workflow packs `sform` from this repository and installs it through `cli-source`:
+`42.Platform.Cli` on nuget.org is older than these options. Until a release has them, the workflow packs `sform` from the monorepo and installs it through `cli-source`:
 
 ```yaml
 steps:
@@ -148,7 +150,7 @@ steps:
       STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 ```
 
-A workflow of this repository checks out the repository itself (`fetch-depth: 0`), packs `src/Platform/Cli/src` and uses `./src/Platform/GitHubAction`.
+A workflow of the monorepo checks out the monorepo itself (`fetch-depth: 0`), packs `src/Platform/Cli/src` and uses `./src/Platform/GitHubAction`.
 
 ## .NET on the runner
 
@@ -156,4 +158,23 @@ A workflow of this repository checks out the repository itself (`fetch-depth: 0`
 
 ## Checks
 
-There is no workflow for the action (spec section 9): nothing in GitHub builds or tests .NET yet, and there is no Storyteller instance for a smoke test. The logic that matters for security (names, masks, heredocs, refusals) is in `sform`, with its unit tests (`src/Platform/Cli/test`: `ConfigGetCommandTests`, `ConfigurationMasksTests`, `GitHubEnvironmentFileTests`). [The review of phase 5](../../../docs/Platform/Storyteller/specs/reviews/2026-10-27%20Phase%205%20of%20Flat%20Output%20Formats%20for%20Configurations.md) records the local checks: `action.yml` parses, and its scripts ran in bash against a packed `sform` and a stub API, with stub `RUNNER_TEMP`, `GITHUB_ENV` and `GITHUB_OUTPUT`; `actionlint` was not available.
+No workflow tests the action (section 9 of the first spec): nothing in GitHub builds or tests .NET yet, and there is no Storyteller instance for a smoke test. The one workflow of the action releases it, see [Releasing](#releasing). The logic that matters for security (names, masks, heredocs, refusals) is in `sform`, with its unit tests ([`src/Platform/Cli/test`](https://github.com/akobr/mono.me/tree/main/src/Platform/Cli/test): `ConfigGetCommandTests`, `ConfigurationMasksTests`, `GitHubEnvironmentFileTests`). [The review of phase 5](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/reviews/2026-10-27%20Phase%205%20of%20Flat%20Output%20Formats%20for%20Configurations.md) records the local checks: `action.yml` parses, and its scripts ran in bash against a packed `sform` and a stub API, with stub `RUNNER_TEMP`, `GITHUB_ENV` and `GITHUB_OUTPUT`; `actionlint` was not available.
+
+## Releasing
+
+For maintainers. The workflow [Storyteller action release](https://github.com/akobr/mono.me/blob/main/.github/workflows/storyteller-action-release.yml) of the monorepo copies the action into a repository of its own, which holds the action alone and which GitHub Marketplace lists. The spec is [Publishing the GitHub Action and Secrets in CI](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Publishing%20the%20GitHub%20Action%20and%20Secrets%20in%20CI.md).
+
+Once, before the first release:
+
+1. The owner creates that repository, public and empty, and accepts the GitHub Marketplace Developer Agreement; the account needs two-factor authentication.
+2. The repository variable `STORYTELLER_ACTION_REPOSITORY` of the monorepo names it, as `<owner>/<name>`.
+3. The repository secret `STORYTELLER_ACTION_TOKEN` of the monorepo holds a fine-grained personal access token whose resource owner is that owner, with access to that repository only and the permission Contents: Read and write. The token expires, so renew it before a release.
+
+Each release:
+
+1. Run **Storyteller action release** from `main` (Actions, Run workflow) with the input `version`, `X.Y.Z`, for example `1.0.0`. The workflow fails before it clones anything when it runs from another branch, when the version is not `X.Y.Z`, or when the variable or the secret is missing; the message names them. The token of the run only reads the monorepo.
+2. It clones the repository of the action (an empty one too, which gets the branch `main`), replaces everything but `.git` with `action.yml`, `README.md` and `LICENSE` of `src/Platform/GitHubAction`, and commits `Release vX.Y.Z` with the source commit of the monorepo in the body. No workflow file reaches that repository.
+3. It refuses a tag `vX.Y.Z` that exists, creates it, moves the major tag `vX` to it, and pushes the branch and the two tags in one atomic push. The token never appears in a URL or in the log: git gets it from a credential helper that reads the environment of the step.
+4. It creates a **draft** release `vX.Y.Z` whose notes link the source commit, and names it in the summary of the run. Open it in the repository of the action, check **Publish this Action to the GitHub Marketplace**, choose the categories at the first release, and publish it. The API cannot list an action on the Marketplace, so this step stays by hand.
+
+`v1` moves with every `1.x.y`, so `@v1` gets every compatible release, while `@v1.2.3` and a commit stay where they are. A change that breaks the inputs or the behaviour of the action is a new major version: `2.0.0` starts `v2` and leaves `v1` at the last `1.x.y`. Every release replaces the whole content of the repository of the action, so a change made there directly is gone with the next release. When the push succeeded but the draft release failed, a run with the same version is refused; create the release of the tag from the release form instead.
