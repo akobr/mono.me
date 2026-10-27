@@ -23,7 +23,7 @@ The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Inf
 - **The options and errors** are the provider's: `StorytellerConfigurationOptions`, `StorytellerConfigurationException`, `StorytellerReadMode` and `StorytellerDocument`, in `_42.Platform.Storyteller.Sdk.Configuring`.
 - **`AnnotationType` and `AnnotationStatus`** are in `_42.Platform.Storyteller`, from `Abstractions.Annotations`, which the package brings.
 - **`AuditStamp`.** `Created` and `Modified` are the SDK's `AuditStamp`, in `_42.Platform.Storyteller.Sdk`. `_42.Platform.Storyteller` has an `AuditStamp` too, so a file that imports both namespaces names it qualified: `_42.Platform.Storyteller.Sdk.AuditStamp`.
-- **One version.** Hosting builds on internals of `42.Platform.Storyteller.Configuration`. Use both packages in the same version.
+- **Configuration comes with Hosting.** Hosting builds on internals of `42.Platform.Storyteller.Configuration`, and depends on the Configuration package built from the same commit. The two do not share a version number: each version counts the commits that changed its own project, so a Hosting `0.10.6-alpha` can depend on a Configuration `0.10.2-alpha`. Let Hosting bring Configuration, and do not reference or update `42.Platform.Storyteller.Configuration` on its own to another version than the one Hosting depends on. The dependency is not pinned exactly yet, so NuGet accepts a newer Configuration under Hosting, which can fail at run time with `MissingMethodException` or `TypeLoadException`.
 
 ## A service of one subject
 
@@ -358,7 +358,7 @@ builder.Services.AddStoryteller()
 | `AddSubscriptions(context, configure)` | The one in the chain of the options' `Key`: its own (`rst.R`), or the one of its unit (`unt.R.U`), usage (`usg.S.R`), execution (`exe.S.R.C`) or unit of execution (`uxe.S.R.C.U`). A key without one (`sbt`, `cnt`) throws. |
 | `AddSubscriptions(responsibility, context, configure)` | The named one. A key whose chain names another responsibility throws. |
 
-- **At registration.** Both throw `StorytellerConfigurationException` without a key, for a responsibility that the key contradicts or does not name, and for an invalid option; `ArgumentException` for a name that is empty or has a `.`; and `InvalidOperationException` for a second call in the container, or on a collection without `services.AddStoryteller(…)`. One container holds the subscriptions of one responsibility in one context.
+- **At registration.** Both throw `StorytellerConfigurationException` without a key and for an invalid option. The context-only overload also throws it for a key whose chain names no responsibility, and the named overload for a key whose chain names another responsibility; a key without one (`sbt`, `cnt`) takes the named responsibility. Both throw `ArgumentException` for a name that is empty or has a `.`, and `InvalidOperationException` for a second call in the container, or on a collection without `services.AddStoryteller(…)`. One container holds the subscriptions of one responsibility in one context.
 - **The scope** is the organization, project and view of the key.
 
 ### Subscription options
@@ -437,9 +437,9 @@ The documents are read as [`IStorytellerDocuments`](configuration-provider.md#do
 | `LastPollSucceededAt` | When a poll last completed |
 | `LastPollError` | The failure of the latest poll; `null` when it succeeded. Also the failure of an informer that broke. |
 | `ConsecutivePollFailures` | Failed polls since the last one that succeeded |
-| `Subscriptions` | The subscriptions that have a good document |
-| `Pending` | The subscriptions without a first good document, each with its full key and last error |
-| `Failing` | The subscriptions whose latest read failed, while they keep their last good document |
+| `Subscriptions` | The number of subscriptions that have a good document |
+| `Pending` | The list of subscriptions without a first good document, each a `StorytellerPendingSubscription` with its full key and last error |
+| `Failing` | The number of subscriptions whose latest read failed, while they keep their last good document |
 | `IsDegraded` | The latest poll failed, or a subscription is pending or failing |
 
 `ToString()` prints the errors by their messages, which name keys and statuses only. A health check of ASP.NET Core over it:
@@ -519,7 +519,7 @@ The subscriptions' documents are not served by `IStorytellerDocuments`. Its `Get
 
 - **A runtime reader** of `sform account machine create` has `Annotation.Read` and `Configuration.Read`, so it runs who am I and the provider. A machine without `Annotation.Read` runs the provider, but who am I fails with `403` `AccessDenied`.
 - **A worker's machine.** `sform account machine create -a rst.invoicing` restricts a machine to the responsibility. It lists and reads the executions and usages of `rst.invoicing`, and their configurations. Add `--scope secrets-read` when the documents need their secrets.
-- **A machine restricted to its execution** gets who am I without ancestors and the status `Unknown`, and cannot run the informer: its lists answer `403` `AnnotationRestricted`.
+- **A machine restricted to its execution** gets who am I without ancestors and the status `Unknown`, and cannot run the informer. The informer's first read, of `rst.{responsibility}`, answers `403` `AnnotationRestricted`, so every poll fails with "The machine may not read …" before any list is requested. The failure is definitive: `WaitUntilReadyAsync`, and a start with `WaitUntilReadyOnStart`, throw it.
 
 See [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines) and [Scopes of machines](authentication.md#scopes-of-machines).
 

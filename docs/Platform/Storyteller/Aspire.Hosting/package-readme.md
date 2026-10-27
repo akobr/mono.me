@@ -27,7 +27,7 @@ builder.Build().Run();
 
 - The endpoint is a URL, a parameter, or an expression such as `$"{api.GetEndpoint("http")}/api"` for the local platform's `Api.Functions` project.
 - Secrets are parameters: `WithApiKey`, `WithClientCredentials`, and `WithClientCertificate` with its password. One credential per resource.
-- In run mode the other `STORYTELLER_*` names are written empty, so a variable in the AppHost's environment does not reach the process.
+- In run mode `WithReference` also writes `STORYTELLER_API_URL`, `STORYTELLER_KEY` and every credential name empty when nothing else sets them, so the AppHost's own values of these names do not reach the process. Other `STORYTELLER_*` names, such as the provider's `STORYTELLER_OPTIONAL` and `STORYTELLER_CACHE_DIR` or `sform`'s `STORYTELLER_PROJECT`, are still inherited from the AppHost's environment.
 - A container, and any process in publish mode, takes no client certificate and no `localhost` endpoint.
 - The resource has no connection string, and is not in the manifest. It references `Aspire.Hosting` 13.1.2 only, not the SDK.
 

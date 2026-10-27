@@ -50,7 +50,7 @@ STORYTELLER_API_KEY=2s.…                 the value of the parameter, masked in
 STORYTELLER_KEY=@house.main.default.exe.northwind.invoicing.production
 ```
 
-In run mode the other `STORYTELLER_*` names are there too, empty (see [`WithReference`](#withreference)).
+In run mode `STORYTELLER_API_URL` and the other credential names are there too, empty. Other `STORYTELLER_*` names in the AppHost's environment still reach the process (see [`WithReference`](#withreference)).
 
 ## The resource
 
@@ -108,7 +108,8 @@ var northwind = builder.AddStoryteller("storyteller-northwind", "https://api.2s.
 `WithReference(storyteller)` gives a project, an executable or a container, any `IResourceWithEnvironment`, the variables of the resource.
 
 - **What it writes.** `STORYTELLER_ENDPOINT`, and the variables of the credential that are set (see [Credentials](#credentials)). Parameters and expressions stay what they are, so Aspire resolves them at start, and a manifest holds their references.
-- **Masking in run mode.** DCP starts a project or an executable with the AppHost's environment, so a `STORYTELLER_*` left there, for `sform` say, would mix with the referenced machine. In run mode `WithReference` therefore writes every other name the SDK reads empty: `STORYTELLER_API_URL`, `STORYTELLER_KEY`, and every credential name, the deprecated ones and those not offered included. The C# SDK, and with it `sform`, reads an empty variable as unset. A value that another callback wrote, such as the key of `WithStorytellerKey` or a `WithEnvironment` of the application, is kept. A container, and any process in publish mode, inherits nothing, so nothing is masked there.
+- **Masking in run mode.** DCP starts a project or an executable with the AppHost's environment, so a machine's `STORYTELLER_*` left there, for `sform` say, would mix with the referenced machine. In run mode `WithReference` therefore writes the other names of the C# SDK's contract empty: `STORYTELLER_API_URL`, `STORYTELLER_KEY`, and every credential name, the deprecated ones and those not offered included. The C# SDK, and with it `sform`, reads an empty variable as unset. A value that another callback wrote, such as the key of `WithStorytellerKey` or a `WithEnvironment` of the application, is kept. A container, and any process in publish mode, inherits nothing, so nothing is masked there.
+- **Not masked.** The provider's settings (`STORYTELLER_MODE`, `STORYTELLER_REFRESH_INTERVAL`, `STORYTELLER_OPTIONAL`, `STORYTELLER_CACHE_DIR`) and `sform`'s target (`STORYTELLER_PROJECT`, `STORYTELLER_VIEW`) are not written, so a project or an executable still inherits them from the AppHost's environment. An inherited `STORYTELLER_OPTIONAL=true` lets the provider start without the platform when it is unreachable and nothing is cached, an inherited `STORYTELLER_CACHE_DIR` puts the provider's last-known-good copy into that directory, and an inherited `STORYTELLER_PROJECT` or `STORYTELLER_VIEW` is the target of `sform`. Unset them in the shell that runs the AppHost, or give the process its own value with `WithEnvironment`.
 - **The dashboard** draws the reference as a relationship.
 - **One reference.** A second `WithReference` to a Storyteller resource replaces the first: a process has one set of `STORYTELLER_*`.
 - **A process without a key.** `STORYTELLER_KEY` is masked too, so a process that reads its key from the AppHost's environment gets an empty one. Set the key with `WithStorytellerKey` or `WithExecution`.
