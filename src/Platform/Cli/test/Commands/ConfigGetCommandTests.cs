@@ -77,6 +77,27 @@ public class ConfigGetCommandTests
         { [Key, "-r", "--allow-unresolved", "--content-only", "-f", "env"], "--allow-unprefixed and --allow-unresolved apply to --github-env and --mask only." },
     };
 
+    // Each format of the effective, the resolved and a version read, with and without --content-only.
+    public static TheoryData<string[], string> Exports
+    {
+        get
+        {
+            var exports = new TheoryData<string[], string>();
+            string[][] reads = [[], ["-r"], ["--version", "2"]];
+
+            foreach (var read in reads)
+            {
+                foreach (var format in new[] { "flat", "properties", "env", "yaml" })
+                {
+                    exports.Add([.. read, "-f", format], format);
+                    exports.Add([.. read, "-f", format, "--content-only"], format);
+                }
+            }
+
+            return exports;
+        }
+    }
+
     [Fact]
     public async Task Default_DisplaysTheModel_AndWritesNothingToTheInnerConsole()
     {
@@ -223,21 +244,21 @@ public class ConfigGetCommandTests
     }
 
     [Theory]
-    [InlineData("yaml", "--content-only")]
-    [InlineData("yaml")]
-    [InlineData("properties")]
-    public async Task Export_WritesTheSameBytes_WithoutAByteOrderMark_AndNothingToTheOutput(params string[] options)
+    [MemberData(nameof(Exports))]
+    public async Task Export_WritesTheSameBytes_WithoutAByteOrderMark_AndNothingToTheOutput(string[] options, string format)
     {
+        SetupEffective(Envelope(Mixed));
         SetupResolved(Envelope(Mixed));
+        _api.Setup(api => api.GetConfigurationVersionAsync("org1", "proj1", "default", Key, 2)).ReturnsAsync(Envelope(Mixed, version: 2));
         _fileSystem.AddFile(P(@"C:\work\app.conf"), new MockFileData("old"));
 
-        var exitCode = await Execute([Key, "-r", "-e", "app.conf", "-f", .. options]);
+        var exitCode = await Execute([Key, "-e", "app.conf", .. options]);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _fileSystem.File.ReadAllBytes(P(@"C:\work\app.conf")).ShouldBe(Encoding.UTF8.GetBytes(Formatted(Mixed, options[0])));
+        _fileSystem.File.ReadAllBytes(P(@"C:\work\app.conf")).ShouldBe(Encoding.UTF8.GetBytes(Formatted(Mixed, format)));
         _out.ToString().ShouldBeEmpty();
         _error.ToString().ShouldBeEmpty();
-        _fixture.Console.Lines.ShouldBeEmpty();
+        ShouldWriteOnlyThroughTheInnerConsole();
     }
 
     [Fact]
