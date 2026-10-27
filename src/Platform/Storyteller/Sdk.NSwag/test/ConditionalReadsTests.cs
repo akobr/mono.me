@@ -232,6 +232,26 @@ public class ConditionalReadsTests
         response.Result.Modified.At.ShouldBe(new DateTimeOffset(2026, 10, 19, 8, 30, 0, TimeSpan.Zero));
     }
 
+    // The API writes content of up to 128 levels in the envelope, deeper than Newtonsoft's default of 64 levels.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeepContent_OfTheLevelsTheApiWrites_IsRead(bool resolved)
+    {
+        var content = new JObject { ["leaf"] = "v" };
+
+        for (var level = 1; level < 128; level++)
+        {
+            content = new JObject { ["n"] = content };
+        }
+
+        _http.Respond(HttpStatusCode.OK, new JObject { ["AnnotationKey"] = "sbt.northwind", ["Version"] = 3, ["Content"] = content }.ToString());
+
+        var response = await ReadAsync(CreateClient(), resolved, "acme", "billing", "default", "sbt.northwind", null);
+
+        JToken.DeepEquals(response.Result.ShouldNotBeNull().Content.ShouldBeOfType<JObject>(), content).ShouldBeTrue();
+    }
+
     [Fact]
     public async Task Cancellation_ReachesTheSend()
     {
