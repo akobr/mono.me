@@ -87,8 +87,9 @@ steps:
       dotnet-version: 10.0.x
   - id: sform
     shell: bash
+    working-directory: mono.me   # so its global.json chooses the SDK, not the one of the calling repository
     run: |
-      dotnet pack mono.me/src/Platform/Cli/src -o "$RUNNER_TEMP/sform"
+      dotnet pack src/Platform/Cli/src -o "$RUNNER_TEMP/sform"
       package=$(basename "$RUNNER_TEMP"/sform/42.Platform.Cli.*.nupkg .nupkg)
       echo "version=${package#42.Platform.Cli.}" >> "$GITHUB_OUTPUT"
   - uses: akobr/mono.me/src/Platform/GitHubAction@<commit>
