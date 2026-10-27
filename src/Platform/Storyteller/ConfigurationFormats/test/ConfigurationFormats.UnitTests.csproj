@@ -24,6 +24,9 @@
     <PackageReference Include="Shouldly" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+
+    <!-- Only to check that the YAML the library writes parses back; the library itself has no YAML dependency. -->
+    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,7 +5,7 @@ The package `42.Platform.Storyteller.Configuration` loads one Storyteller config
 The code is in:
 
 - `src/Platform/Storyteller/Configuration/src/`: the options and their environment (`Settings/`), the transport (`Transport/`), the reader (`Reading/`), the last-known-good cache (`Caching/`), the engine with its refresh and rollback (`Engine/`), the container integration (`Container/`), the substitution of references (`References/`) and the documents on demand (`Documents/`);
-- `src/Platform/Storyteller/ConfigurationFormats/src/`: the flattener (`DocumentFlattener`, `JsonPaths`), in a library of its own that the provider references;
+- `src/Platform/Storyteller/ConfigurationFormats/src/`: the flattener (`DocumentFlattener`, `JsonPaths`), in the shared library of the [configuration formats](configuration-formats.md) that the provider references;
 - `src/Platform/Storyteller/Configuration.KeyVault/src/`: `KeyVaultReferenceResolver`;
 - `src/Platform/Storyteller/Sdk.NSwag/src/`: the conditional reads (`ApiSdk.Conditional.cs`), the machine credentials (`Credentials/`) and the resilience pipeline (`Resilience/`), described in the [SDK readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md).
 
@@ -21,6 +21,7 @@ The design and its decisions are in [the spec](specs/2026-10-23%20Configuration%
 - `AddStoryteller` is in the namespace `Microsoft.Extensions.Configuration`, like every Microsoft and Azure configuration extension. `AddStorytellerConfiguration` and `AddStorytellerDocuments` are in `Microsoft.Extensions.DependencyInjection`. None of them needs a `using`.
 - The namespace is not `_42.Platform.Storyteller.Configuration`, because that is the `Configuration` model of `Abstractions.Annotations`.
 - The credentials come from the C# SDK, `42.Platform.Storyteller.Sdk.NSwag`, in the namespace `_42.Platform.Storyteller.Sdk.Credentials`.
+- The flattening rules come from `42.Platform.Storyteller.ConfigurationFormats`, a dependency of the provider, in the namespace `_42.Platform.Storyteller.ConfigurationFormats` (see [Configuration formats](configuration-formats.md)).
 - The Key Vault package does not reference `Azure.Identity`. The application passes a `TokenCredential`, for example `DefaultAzureCredential` from that package.
 
 ## A minimal Program.cs
@@ -187,7 +188,7 @@ Every failure is a `StorytellerConfigurationException` with `Key`, `StatusCode`,
 
 ## Flattening
 
-The `Content` object of the configuration becomes `IConfiguration` keys:
+The `Content` object of the configuration becomes `IConfiguration` keys through `DocumentFlattener.Flatten` of the shared library `42.Platform.Storyteller.ConfigurationFormats`, the same rules that the `flat` format and the other [configuration formats](configuration-formats.md) apply:
 
 - Properties join with `:`, and array items with their index: `db:hosts:0`.
 - A string is its value. A number or a boolean is its JSON text: `true`, `5432`, `0.5`.
@@ -200,7 +201,7 @@ A document is invalid, and never applied, when:
 - a property name is empty or contains `:`;
 - two keys differ only in case, because `IConfiguration` compares keys case-insensitively.
 
-The error names the JSON path, for example `$.db['a:b']`, and never a value. `Configuration/test/Vectors/flattening.json` pins every rule in a shape that a provider in another language can reuse.
+The error names the JSON path, for example `$.db['a:b']`, and never a value. A bracketed name in a path has `\` and `'` escaped with a backslash and its control characters written as `\n`, `\r`, `\t` or `\uXXXX`, so a crafted name cannot break a log line or an error message. Every path in the provider's warnings and errors, of unbound bindings and secret references too, is written the same way. `Configuration/test/Vectors/flattening.json` pins every rule in a shape that a provider in another language can reuse; the library's tests run it.
 
 The SDK reads numbers as `double`, so `1.50` arrives as `1.5`. Binding to `decimal` or `double` is not affected.
 

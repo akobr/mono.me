@@ -10,8 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <IsPackable>true</IsPackable>
-    <Description>The flattening rules of 2S Platform Storyteller configurations: reads the content of a configuration into its values and IConfiguration keys, with the validation every consumer shares.</Description>
-    <PackageTags>$(PackageTags);platform;2S;storyteller;configuration</PackageTags>
+    <Description>Renders 2S Platform Storyteller configurations as flat JSON (IConfiguration keys), Spring Boot properties, .env files and YAML, with the flattening rules and the validation of the .NET configuration provider.</Description>
+    <PackageTags>$(PackageTags);platform;2S;storyteller;configuration;properties;dotenv;yaml</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

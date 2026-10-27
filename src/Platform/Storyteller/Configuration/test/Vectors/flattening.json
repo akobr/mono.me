@@ -1,5 +1,5 @@
 {
-  "description": "How the Content object of a Storyteller configuration becomes configuration keys. Each vector has a name, the document (the Content object) and either the keys it flattens to or the error that makes it invalid. Keys compare by their exact text; IConfiguration then compares them case-insensitively. Numbers are read as double-precision floats. Error paths: $ is the root, .name a property whose name is letters, digits, _ and - (starting with a letter or _), ['name'] any other property (with \\ and ' escaped), [0] an array item.",
+  "description": "How the Content object of a Storyteller configuration becomes configuration keys. Each vector has a name, the document (the Content object) and either the keys it flattens to or the error that makes it invalid. Keys compare by their exact text; IConfiguration then compares them case-insensitively. Numbers are read as double-precision floats. Error paths: $ is the root, .name a property whose name is letters, digits, _ and - (starting with a letter or _), ['name'] any other property (with \\ and ' escaped by a backslash, and control characters written as \\n, \\r, \\t or \\uXXXX with upper-case hex digits, so a path never holds a line break), [0] an array item.",
   "vectors": [
     {
       "name": "study example",
@@ -199,6 +199,13 @@
         "it's": { "a:b": 1 }
       },
       "error": { "rule": "colon-in-name", "path": "$['it\\'s']['a:b']" }
+    },
+    {
+      "name": "control characters are escaped in paths",
+      "document": {
+        "x\n::warning::y": "z"
+      },
+      "error": { "rule": "colon-in-name", "path": "$['x\\n::warning::y']" }
     },
     {
       "name": "the document must be an object",
