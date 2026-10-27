@@ -177,7 +177,7 @@ A resolved configuration holds secret values only for a caller with the right to
 
 ### Export to GitHub Actions
 
-`--github-env` exports a resolved configuration into the environment of a GitHub Actions job: every value becomes a variable with its `env` name in `GITHUB_ENV`, which the runner reads after the step. Like the other new options of [Read a configuration](#read-a-configuration), they need a `sform` packed from the repository until a release has them. The [GitHub Action](/cli/github-action) installs `sform` and runs this command in one step, and shows how to pack it.
+`--github-env` exports a resolved configuration into the environment of a GitHub Actions job: every value becomes a variable with its `env` name in `GITHUB_ENV`, which the runner reads after the step. Its options, like the others of [Read a configuration](#read-a-configuration), need a `sform` packed from the repository until a release has them. The [GitHub Action](/cli/github-action) installs `sform` and runs this command in one step, and shows how to pack it.
 
 ``` yaml
 # GitHub Actions: the later steps read APP_DB__HOST, APP_DB__PASSWORD, …
