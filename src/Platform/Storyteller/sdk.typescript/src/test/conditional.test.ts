@@ -3,11 +3,14 @@ import * as sdk from '../index'
 import {
   configureStoryteller,
   getConfigurationConditional,
+  getConfigurationFormattedConditional,
   getResolvedConfigurationConditional,
+  getResolvedConfigurationFormattedConditional,
   isAborted,
   isNotFound,
   StorytellerError,
   type Configuration,
+  type ConfigurationFormat,
   type StorytellerConfig,
 } from '../index'
 
@@ -37,6 +40,9 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 
 const notModified = (headers: Record<string, string> = {}) => new Response(null, { status: 304, headers })
 
+const text = (body: string, contentType: string, headers: Record<string, string> = {}) =>
+  new Response(body, { status: 200, headers: { 'content-type': contentType, ...headers } })
+
 function configure(overrides: Partial<StorytellerConfig> & Pick<StorytellerConfig, 'fetch'>) {
   configureStoryteller({ baseUrl: 'https://api.example.com/api/', ...overrides })
 }
@@ -53,6 +59,14 @@ const configuration: Configuration = {
 
 const readFailure = (read: typeof getConfigurationConditional) =>
   read('acme', 'billing', 'default', 'exe.billing.api.prod', { ifNoneMatch: tag }).then(
+    () => {
+      throw new Error('The read did not fail.')
+    },
+    (caught: unknown) => caught as StorytellerError,
+  )
+
+const readFormattedFailure = (format: ConfigurationFormat) =>
+  getResolvedConfigurationFormattedConditional('acme', 'billing', 'default', 'exe.billing.api.prod', format).then(
     () => {
       throw new Error('The read did not fail.')
     },
@@ -247,7 +261,105 @@ describe('conditional reads', () => {
   it('exports the helpers from the package root, but not the internal request', () => {
     expect(sdk.getConfigurationConditional).toBeTypeOf('function')
     expect(sdk.getResolvedConfigurationConditional).toBeTypeOf('function')
+    expect(sdk.getConfigurationFormattedConditional).toBeTypeOf('function')
+    expect(sdk.getResolvedConfigurationFormattedConditional).toBeTypeOf('function')
     expect(sdk).not.toHaveProperty('storytellerRequest')
     expect(sdk).not.toHaveProperty('readBody')
+  })
+})
+
+describe('formatted conditional reads', () => {
+  const env = 'DB__HOST=db.local\nDB__PORT=5432\n'
+  const key = 'exe.billing.api.prod'
+
+  it('reads the text of a 200 with its ETag, then answers notModified on a 304 for the same tag', async () => {
+    const headers = { etag: 'W/"e.env"', 'cache-control': 'private, no-cache' }
+    const { fetch, calls } = fakeFetch(text(env, 'text/plain; charset=utf-8', headers), notModified(headers))
+    configure({ fetch })
+
+    const first = await getConfigurationFormattedConditional('acme', 'billing', 'default', key, 'env')
+    const second = await getConfigurationFormattedConditional('acme', 'billing', 'default', key, 'env', { ifNoneMatch: first.etag })
+
+    expect(first).toEqual({ status: 200, notModified: false, etag: headers.etag, value: env, cacheControl: headers['cache-control'] })
+    expect(second).toEqual({ status: 304, notModified: true, etag: headers.etag, cacheControl: headers['cache-control'] })
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://api.example.com/api/v1/acme/billing/default/configuration/exe.billing.api.prod?format=env',
+      'https://api.example.com/api/v1/acme/billing/default/configuration/exe.billing.api.prod?format=env',
+    ])
+    expect(sentHeaders(calls[0]).has('If-None-Match')).toBe(false)
+    expect(sentHeaders(calls[1]).get('If-None-Match')).toBe(headers.etag)
+  })
+
+  it('reads the resolved configuration with no-store and withheld secrets', async () => {
+    const headers = { etag: 'W/"r.yaml"', 'cache-control': 'no-store', 'x-2s-secrets-withheld': 'mtls-required' }
+    const yaml = 'db:\n  host: "db.local"\n  port: 5432\n'
+    const { fetch, calls } = fakeFetch(text(yaml, 'application/yaml; charset=utf-8', headers))
+    configure({ fetch })
+
+    const result = await getResolvedConfigurationFormattedConditional('acme', 'billing', 'default', key, 'yaml', { ifNoneMatch: tag })
+
+    expect(calls[0]?.url).toBe('https://api.example.com/api/v1/acme/billing/default/configuration/exe.billing.api.prod/resolved?format=yaml')
+    expect(sentHeaders(calls[0]).get('If-None-Match')).toBe(tag)
+    expect(result).toEqual({ status: 200, notModified: false, value: yaml, etag: headers.etag, cacheControl: 'no-store', secretsWithheld: 'mtls-required' })
+  })
+
+  it('builds the URL of the generated read with an encoded format and key', async () => {
+    const { fetch, calls } = fakeFetch(text('', 'text/plain'), text('', 'text/plain'))
+    configure({ fetch })
+
+    await getConfigurationFormattedConditional('acme', 'billing', 'default', 'sbt.a+b?c#d', 'properties')
+    // a value outside the type reaches the API as it is, encoded, and gets its 400
+    await getResolvedConfigurationFormattedConditional('acme', 'billing', 'default', key, 'a b&c' as ConfigurationFormat)
+
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://api.example.com/api/v1/acme/billing/default/configuration/sbt.a%2Bb%3Fc%23d?format=properties',
+      'https://api.example.com/api/v1/acme/billing/default/configuration/exe.billing.api.prod/resolved?format=a%20b%26c',
+    ])
+  })
+
+  it('returns the JSON of flat as text, an empty body as an empty string, and UTF-8 as it was sent', async () => {
+    const flat = '{\n  "db:host": "db.local",\n  "db:port": "5432"\n}\n'
+    const yaml = 'db:\n  host: "caf\u00e9 \u{1F600}"\n'
+    const { fetch } = fakeFetch(
+      text(flat, 'application/json; charset=utf-8'),
+      text('', 'text/plain; charset=utf-8'),
+      text(yaml, 'application/yaml; charset=utf-8'),
+    )
+    configure({ fetch })
+
+    const asText = await getConfigurationFormattedConditional('acme', 'billing', 'default', key, 'flat')
+    const empty = await getConfigurationFormattedConditional('acme', 'billing', 'default', key, 'env')
+    const unicode = await getConfigurationFormattedConditional('acme', 'billing', 'default', key, 'yaml')
+
+    // the JSON text, not an object: flat keys are not a Configuration
+    expect(asText.value).toBe(flat)
+    expect(empty).toEqual({ status: 200, notModified: false, value: '' })
+    expect(unicode.value).toBe(yaml)
+  })
+
+  it('maps a 422 of a format to StorytellerError with its errorCode, and every other status as the envelope read', async () => {
+    const { fetch } = fakeFetch(
+      json(
+        {
+          Message: 'Names that differ only in case at $.Db.',
+          ErrorCode: 'format.case-collision',
+          Details: { Format: 'env', Rule: 'case-collision', Path: '$.Db' },
+        },
+        422,
+      ),
+      json({ Message: "The query parameter 'format' must be json, flat, properties, env or yaml.", ErrorCode: 'InvalidQuery' }, 400),
+      new Response('', { status: 404, statusText: 'Not Found' }),
+    )
+    configure({ fetch })
+
+    const collision = await readFormattedFailure('env')
+    const invalid = await readFormattedFailure('toml' as ConfigurationFormat)
+    const missing = await readFormattedFailure('yaml')
+
+    expect(collision).toBeInstanceOf(StorytellerError)
+    expect(collision).toMatchObject({ status: 422, errorCode: 'format.case-collision', message: 'Names that differ only in case at $.Db.' })
+    expect(collision.body).toMatchObject({ Details: { Rule: 'case-collision', Path: '$.Db' } })
+    expect(invalid).toMatchObject({ status: 400, errorCode: 'InvalidQuery' })
+    expect(isNotFound(missing)).toBe(true)
   })
 })

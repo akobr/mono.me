@@ -23,6 +23,12 @@ export type ConditionalReadOptions = RequestInit & {
   ifNoneMatch?: string
 }
 
+/**
+ * The formats of ?format=: the Content alone, without the envelope. flat is a JSON object of IConfiguration keys and
+ * string values, properties Spring Boot properties, env a .env file, yaml YAML. Each format has its own ETag.
+ */
+export type ConfigurationFormat = 'flat' | 'properties' | 'env' | 'yaml'
+
 /** The effective configuration, or notModified when ifNoneMatch still matches. */
 export function getConfigurationConditional(
   organization: string,
@@ -31,7 +37,7 @@ export function getConfigurationConditional(
   key: string,
   options?: ConditionalReadOptions,
 ): Promise<ConditionalResult<Configuration>> {
-  return readConditional<Configuration>(getGetConfigurationUrl(organization, project, view, key), options)
+  return readConditional(getGetConfigurationUrl(organization, project, view, key), readConfiguration, options)
 }
 
 /** The resolved configuration, or notModified when ifNoneMatch still matches. */
@@ -42,10 +48,40 @@ export function getResolvedConfigurationConditional(
   key: string,
   options?: ConditionalReadOptions,
 ): Promise<ConditionalResult<Configuration>> {
-  return readConditional<Configuration>(getGetResolvedConfigurationUrl(organization, project, view, key), options)
+  return readConditional(getGetResolvedConfigurationUrl(organization, project, view, key), readConfiguration, options)
 }
 
-async function readConditional<T>(url: string, options: ConditionalReadOptions = {}): Promise<ConditionalResult<T>> {
+/** The effective configuration in a format, as text (flat too), or notModified when ifNoneMatch still matches. */
+export function getConfigurationFormattedConditional(
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  format: ConfigurationFormat,
+  options?: ConditionalReadOptions,
+): Promise<ConditionalResult<string>> {
+  const url = `${getGetConfigurationUrl(organization, project, view, key)}?format=${encodeURIComponent(format)}`
+  return readConditional(url, readText, options)
+}
+
+/** The resolved configuration in a format, as text (flat too), or notModified when ifNoneMatch still matches. */
+export function getResolvedConfigurationFormattedConditional(
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  format: ConfigurationFormat,
+  options?: ConditionalReadOptions,
+): Promise<ConditionalResult<string>> {
+  const url = `${getGetResolvedConfigurationUrl(organization, project, view, key)}?format=${encodeURIComponent(format)}`
+  return readConditional(url, readText, options)
+}
+
+async function readConditional<T>(
+  url: string,
+  readValue: (response: Response) => Promise<T>,
+  options: ConditionalReadOptions = {},
+): Promise<ConditionalResult<T>> {
   const { ifNoneMatch, ...init } = options
   const headers = new Headers(init.headers)
 
@@ -69,11 +105,16 @@ async function readConditional<T>(url: string, options: ConditionalReadOptions =
     return { status: 304, notModified: true, ...read }
   }
 
-  const body = await readBody(response)
-
+  // Errors are JSON whatever was asked for, so a 422 of a format keeps its errorCode.
   if (!response.ok) {
-    throw StorytellerError.fromResponse(response.status, response.statusText, body)
+    throw StorytellerError.fromResponse(response.status, response.statusText, await readBody(response))
   }
+
+  return { status: 200, notModified: false, value: await readValue(response), ...read }
+}
+
+async function readConfiguration(response: Response): Promise<Configuration> {
+  const body = await readBody(response)
 
   // A configuration is a JSON object; anything else is not the API's answer.
   if (body === null || typeof body !== 'object' || Array.isArray(body) || body instanceof Blob) {
@@ -84,5 +125,10 @@ async function readConditional<T>(url: string, options: ConditionalReadOptions =
     })
   }
 
-  return { status: 200, notModified: false, value: body as T, ...read }
+  return body as Configuration
+}
+
+// A formatted body is text whatever its media type, the JSON of flat included; an empty one (no values) is ''.
+function readText(response: Response): Promise<string> {
+  return response.text()
 }
