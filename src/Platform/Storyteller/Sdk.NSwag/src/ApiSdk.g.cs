@@ -10013,10 +10013,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model.</returns>
+        /// <returns>The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string if_None_Match);
+        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10026,10 +10027,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model.</returns>
+        /// <returns>The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -10097,10 +10099,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model with resolved substitutions.</returns>
+        /// <returns>The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string if_None_Match);
+        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10110,10 +10113,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model with resolved substitutions.</returns>
+        /// <returns>The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -10727,12 +10731,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model.</returns>
+        /// <returns>The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string if_None_Match)
+        public virtual System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match)
         {
-            return GetConfigurationAsync(organization, project, view, key, if_None_Match, System.Threading.CancellationToken.None);
+            return GetConfigurationAsync(organization, project, view, key, format, if_None_Match, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -10743,10 +10748,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model.</returns>
+        /// <returns>The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -10783,6 +10789,12 @@ namespace _42.Platform.Storyteller.Sdk
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -10857,6 +10869,16 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("The configuration doesn\'t exist, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 422)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The configuration cannot be written in the requested format (ErrorCode format.<rule>: format.not-an-object, format.empty-name, format.colon-in-name, format.case-collision, format.bracket-in-name, format.array-gap or format.invalid-env-name). Details hold the Format, the Rule and the JSON Path; the message names the path, never a value.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -11406,12 +11428,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model with resolved substitutions.</returns>
+        /// <returns>The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string if_None_Match)
+        public virtual System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match)
         {
-            return GetResolvedConfigurationAsync(organization, project, view, key, if_None_Match, System.Threading.CancellationToken.None);
+            return GetResolvedConfigurationAsync(organization, project, view, key, format, if_None_Match, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -11422,10 +11445,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model with resolved substitutions.</returns>
+        /// <returns>The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -11463,6 +11487,12 @@ namespace _42.Platform.Storyteller.Sdk
                     urlBuilder_.Append("/configuration/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/resolved");
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -11546,7 +11576,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("A binding in the configuration cannot be evaluated or exceeds an evaluation limit. ErrorCode is binding.evaluation or binding.limit.<kind>.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("A binding in the configuration cannot be evaluated or exceeds an evaluation limit (ErrorCode binding.evaluation or binding.limit.<kind>), or the resolved configuration cannot be written in the requested format (ErrorCode format.<rule>, with Details as on the effective read).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)

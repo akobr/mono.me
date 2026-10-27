@@ -19,22 +19,59 @@ public partial interface IConfigurationsApiClient
     // GET v1/{organization}/{project}/{view}/configuration/{key}/resolved with If-None-Match.
     Task<ConditionalResponse<Configuration>> GetResolvedConfigurationConditionalAsync(
         string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default);
+
+    // GET v1/{organization}/{project}/{view}/configuration/{key}?format={format} with If-None-Match: the Content alone as
+    // flat, properties, env or yaml, as text.
+    Task<ConditionalResponse<string>> GetConfigurationFormattedConditionalAsync(
+        string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default);
+
+    // GET v1/{organization}/{project}/{view}/configuration/{key}/resolved?format={format} with If-None-Match.
+    Task<ConditionalResponse<string>> GetResolvedConfigurationFormattedConditionalAsync(
+        string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default);
 }
 
-// Hand-written twins of GetConfigurationAsync and GetResolvedConfigurationAsync of ApiSdk.g.cs: the same route, hooks
-// and exceptions, but a 304 returns, and the headers of the answer are kept. Keep them in step with a regeneration.
+// Hand-written twins of GetConfigurationAsync and GetResolvedConfigurationAsync of ApiSdk.g.cs: the same route, query,
+// hooks and exceptions, but a 304 returns, and the headers of the answer are kept. Keep them in step with a regeneration.
 public partial class ConfigurationsApiClient
 {
+    private const string JsonMediaType = "application/json";
+
+    // The media type each format answers with, sent as Accept. The server goes by the query alone, so any other value (json,
+    // or one it answers with a 400) asks for anything.
+    private static readonly Dictionary<string, string> FormatMediaTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["flat"] = JsonMediaType,
+        ["properties"] = "text/plain",
+        ["env"] = "text/plain",
+        ["yaml"] = "application/yaml",
+    };
+
     public virtual Task<ConditionalResponse<Configuration>> GetConfigurationConditionalAsync(
         string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default)
     {
-        return SendConditionalAsync(organization, project, view, key, false, ifNoneMatch, cancellationToken);
+        return SendConditionalAsync(organization, project, view, key, false, null, JsonMediaType, ReadConfigurationAsync, ifNoneMatch, cancellationToken);
     }
 
     public virtual Task<ConditionalResponse<Configuration>> GetResolvedConfigurationConditionalAsync(
         string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default)
     {
-        return SendConditionalAsync(organization, project, view, key, true, ifNoneMatch, cancellationToken);
+        return SendConditionalAsync(organization, project, view, key, true, null, JsonMediaType, ReadConfigurationAsync, ifNoneMatch, cancellationToken);
+    }
+
+    public virtual async Task<ConditionalResponse<string>> GetConfigurationFormattedConditionalAsync(
+        string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+
+        return await SendConditionalAsync(organization, project, view, key, false, format, GetFormatMediaType(format), ReadTextAsync, ifNoneMatch, cancellationToken).ConfigureAwait(false);
+    }
+
+    public virtual async Task<ConditionalResponse<string>> GetResolvedConfigurationFormattedConditionalAsync(
+        string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+
+        return await SendConditionalAsync(organization, project, view, key, true, format, GetFormatMediaType(format), ReadTextAsync, ifNoneMatch, cancellationToken).ConfigureAwait(false);
     }
 
     // The raw values, read before anything parses them: Cache-Control would come back reordered.
@@ -55,8 +92,42 @@ public partial class ConfigurationsApiClient
         return headers;
     }
 
-    private async Task<ConditionalResponse<Configuration>> SendConditionalAsync(
-        string organization, string project, string view, string key, bool resolved, string? ifNoneMatch, CancellationToken cancellationToken)
+    private static string GetFormatMediaType(string format)
+    {
+        return FormatMediaTypes.TryGetValue(format, out var mediaType) ? mediaType : "*/*";
+    }
+
+    // A formatted body is text whatever its media type, flat included; an empty body, an env without values, is "".
+    private static Task<string> ReadTextAsync(
+        HttpResponseMessage response, IReadOnlyDictionary<string, IEnumerable<string>> headers, CancellationToken cancellationToken)
+    {
+        return ReadAsStringAsync(response.Content, cancellationToken);
+    }
+
+    private async Task<Configuration> ReadConfigurationAsync(
+        HttpResponseMessage response, IReadOnlyDictionary<string, IEnumerable<string>> headers, CancellationToken cancellationToken)
+    {
+        var objectResponse = await ReadObjectResponseAsync<Configuration>(response, headers, cancellationToken).ConfigureAwait(false);
+        if (objectResponse.Object == null)
+        {
+            throw new ApiException("Response was null which was not expected.", (int)response.StatusCode, objectResponse.Text, headers, null);
+        }
+
+        return objectResponse.Object;
+    }
+
+    private async Task<ConditionalResponse<TResult>> SendConditionalAsync<TResult>(
+        string organization,
+        string project,
+        string view,
+        string key,
+        bool resolved,
+        string? format,
+        string accept,
+        Func<HttpResponseMessage, IReadOnlyDictionary<string, IEnumerable<string>>, CancellationToken, Task<TResult>> readResult,
+        string? ifNoneMatch,
+        CancellationToken cancellationToken)
+        where TResult : class
     {
         ArgumentNullException.ThrowIfNull(organization);
         ArgumentNullException.ThrowIfNull(project);
@@ -67,7 +138,7 @@ public partial class ConfigurationsApiClient
 
         using var request = new HttpRequestMessage();
         request.Method = HttpMethod.Get;
-        request.Headers.Accept.Add(MediaTypeWithQualityHeaderValue.Parse("application/json"));
+        request.Headers.Accept.Add(MediaTypeWithQualityHeaderValue.Parse(accept));
 
         // As the caller got it: a weak tag must not be reformatted.
         if (!string.IsNullOrEmpty(ifNoneMatch))
@@ -95,6 +166,15 @@ public partial class ConfigurationsApiClient
             urlBuilder.Append("/resolved");
         }
 
+        // The query as the generated methods build it: without a format, the '?' is taken back.
+        urlBuilder.Append('?');
+        if (format != null)
+        {
+            urlBuilder.Append(Uri.EscapeDataString("format")).Append('=').Append(Uri.EscapeDataString(ConvertToString(format, CultureInfo.InvariantCulture))).Append('&');
+        }
+
+        urlBuilder.Length--;
+
         PrepareRequest(client, request, urlBuilder);
 
         var url = urlBuilder.ToString();
@@ -111,18 +191,13 @@ public partial class ConfigurationsApiClient
 
         if (status == 200)
         {
-            var objectResponse = await ReadObjectResponseAsync<Configuration>(response, headers, cancellationToken).ConfigureAwait(false);
-            if (objectResponse.Object == null)
-            {
-                throw new ApiException("Response was null which was not expected.", status, objectResponse.Text, headers, null);
-            }
-
-            return new ConditionalResponse<Configuration>(status, objectResponse.Object, headers);
+            var result = await readResult(response, headers, cancellationToken).ConfigureAwait(false);
+            return new ConditionalResponse<TResult>(status, result, headers);
         }
 
         if (status == 304)
         {
-            return new ConditionalResponse<Configuration>(status, null, headers);
+            return new ConditionalResponse<TResult>(status, null, headers);
         }
 
         if (status == 400)
@@ -146,10 +221,13 @@ public partial class ConfigurationsApiClient
             throw await ReadErrorAsync(response, headers, "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).", cancellationToken).ConfigureAwait(false);
         }
 
-        // Only the resolved read declares 422; for the effective read it is unexpected, as in the generated method.
-        if (status == 422 && resolved)
+        // Each read describes its own 422; the generated methods copy the description into the message.
+        if (status == 422)
         {
-            throw await ReadErrorAsync(response, headers, "A binding in the configuration cannot be evaluated or exceeds an evaluation limit. ErrorCode is binding.evaluation or binding.limit.<kind>.", cancellationToken).ConfigureAwait(false);
+            var message = resolved
+                ? "A binding in the configuration cannot be evaluated or exceeds an evaluation limit (ErrorCode binding.evaluation or binding.limit.<kind>), or the resolved configuration cannot be written in the requested format (ErrorCode format.<rule>, with Details as on the effective read)."
+                : "The configuration cannot be written in the requested format (ErrorCode format.<rule>: format.not-an-object, format.empty-name, format.colon-in-name, format.case-collision, format.bracket-in-name, format.array-gap or format.invalid-env-name). Details hold the Format, the Rule and the JSON Path; the message names the path, never a value.";
+            throw await ReadErrorAsync(response, headers, message, cancellationToken).ConfigureAwait(false);
         }
 
         if (status == 500)

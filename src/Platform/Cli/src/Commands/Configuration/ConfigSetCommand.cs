@@ -108,6 +108,7 @@ public class ConfigSetCommand : BaseContextCommand
                     Context.ProjectName,
                     Context.ViewName,
                     AnnotationKey,
+                    format: null,
                     if_None_Match: null);
             }
         }

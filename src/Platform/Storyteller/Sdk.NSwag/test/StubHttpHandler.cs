@@ -25,11 +25,17 @@ internal sealed class StubHttpHandler : HttpMessageHandler
 
     public static HttpResponseMessage Response(HttpStatusCode status, string? json = null, params (string Name, string Value)[] headers)
     {
+        return Response(status, json, "application/json", headers);
+    }
+
+    // A body of another media type, sent as UTF-8 with its charset, like the text formats of a configuration.
+    public static HttpResponseMessage Response(HttpStatusCode status, string? body, string mediaType, params (string Name, string Value)[] headers)
+    {
         var response = new HttpResponseMessage(status);
 
-        if (json is not null)
+        if (body is not null)
         {
-            response.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            response.Content = new StringContent(body, Encoding.UTF8, mediaType);
         }
 
         foreach (var (name, value) in headers)
@@ -43,6 +49,11 @@ internal sealed class StubHttpHandler : HttpMessageHandler
     public StubHttpHandler Respond(HttpStatusCode status, string? json = null, params (string Name, string Value)[] headers)
     {
         return Respond((_, _) => Task.FromResult(Response(status, json, headers)));
+    }
+
+    public StubHttpHandler Respond(HttpStatusCode status, string? body, string mediaType, params (string Name, string Value)[] headers)
+    {
+        return Respond((_, _) => Task.FromResult(Response(status, body, mediaType, headers)));
     }
 
     public StubHttpHandler Respond(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond)

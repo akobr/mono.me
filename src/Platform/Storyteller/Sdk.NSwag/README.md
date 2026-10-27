@@ -19,7 +19,7 @@ Use the version that generated `src/ApiSdk.g.cs` (its header names it); another 
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.10.0.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
+nswag openapi2csclient /input:open.api.v0.10.2.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
 ```
 
 The OpenAPI document comes from the API test `OpenApiExportTests`: it renders the document with the same engine the Functions host uses, so no running host is needed.
@@ -31,7 +31,7 @@ dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTest
 
 Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (`npm run generate`), then add the new `{controller}ApiClient` to `src/ApiSdk.partial.cs` and `src/ServicesCollectionExtensions.cs`.
 
-`src/ApiSdk.Conditional.cs` is hand-written: it copies the route, the hooks and the exceptions of `GetConfigurationAsync` and `GetResolvedConfigurationAsync`. After a regeneration, compare it with the two generated methods, and keep the members it uses: `ConvertToString`, `ReadObjectResponseAsync`, `ReadAsStringAsync`, the `PrepareRequest` and `ProcessResponse` hooks, and the messages of the exceptions.
+`src/ApiSdk.Conditional.cs` is hand-written: it copies the route, the `format` query, the hooks and the exceptions of `GetConfigurationAsync` and `GetResolvedConfigurationAsync`. After a regeneration, compare it with the two generated methods, and keep the members it uses: `ConvertToString`, `ReadObjectResponseAsync`, `ReadAsStringAsync`, the `PrepareRequest` and `ProcessResponse` hooks, and the messages of the exceptions, which differ per read for a `422`.
 
 ## Conditional reads
 
@@ -49,12 +49,32 @@ etag = response.ETag;             // W/"r.…", sent back as it is
 ```
 
 * `ifNoneMatch` is sent unchanged as `If-None-Match`; `null` or an empty string sends none.
-* A `304` returns with `IsNotModified` and no `Result`; it does not throw. Every other status throws what `GetConfigurationAsync` and `GetResolvedConfigurationAsync` throw for it, with the same messages: `ApiException<ErrorResponse>` for a `400`, `403`, `404` with a body, `422` (resolved only) or `500`, and a plain `ApiException` for a `401`, a `404` without a body (a missing configuration) and anything else.
+* A `304` returns with `IsNotModified` and no `Result`; it does not throw. Every other status throws what `GetConfigurationAsync` and `GetResolvedConfigurationAsync` throw for it, with the same messages: `ApiException<ErrorResponse>` for a `400`, `403`, `404` with a body, `422` or `500`, and a plain `ApiException` for a `401`, a `404` without a body (a missing configuration) and anything else. A `422` is a format error (`format.<rule>`) on both reads, and on the resolved read also a binding that fails (`binding.evaluation`, `binding.limit.<kind>`).
 * `ConditionalResponse<T>` keeps the headers of a `200` and a `304`: `ETag` (raw, weak prefix included), `CacheControl` (raw), `IsNoStore`, `SecretsWithheld` (`X-2S-Secrets-Withheld`: `mtls-required` for a machine with `Secrets.Read` but no certificate), and all `Headers`, with case-insensitive names. `Cache-Control` and `X-2S-Secrets-Withheld` depend on the caller's rights, not on the document: a caller that may read secrets gets `no-store` on every resolved read.
 * Date-like strings of `Content` stay strings, as in the other reads of the client.
 * The client keeps no state of a read; one instance serves concurrent calls.
 
-The generated `GetConfigurationAsync`, `GetResolvedConfigurationAsync` and `GetConfigurationCompositionAsync` take `if_None_Match` after `key`, since the document declares the header (pass `null` for none), but they still throw an `ApiException` with status `304` when they get one, and they return the body without the response headers. That is why the twins are hand-written: NSwag throws on every documented status that is not a success and has no body, and `/WrapResponses` would expose the headers of a `200` but not turn a `304` into a result.
+The generated `GetConfigurationAsync` and `GetResolvedConfigurationAsync` take `format` and then `if_None_Match` after `key`, and `GetConfigurationCompositionAsync` takes `if_None_Match` after `key`, since the document declares them (pass `null` for both, for the envelope without a tag). They still throw an `ApiException` with status `304` when they get one, and they return the body without the response headers. They cannot read a formatted body either: NSwag keeps `Task<Configuration>` and `Accept: application/json` when the `200` also lists other media types, and the `[JsonExtensionData]` of `Configuration` would take the keys of `flat` silently into `AdditionalProperties`. That is why the twins are hand-written: NSwag throws on every documented status that is not a success and has no body, and `/WrapResponses` would expose the headers of a `200` but not turn a `304` into a result.
+
+### Formatted reads
+
+`GetConfigurationFormattedConditionalAsync` and `GetResolvedConfigurationFormattedConditionalAsync` read the same configuration with `?format=flat`, `properties`, `env` or `yaml`: the `Content` alone, without the envelope, as `ConditionalResponse<string>` ([the formats](../../../../docs/Platform/Storyteller/configuration-formats.md)).
+
+```csharp
+var response = await configurations.GetResolvedConfigurationFormattedConditionalAsync("acme", "billing", "default", "sbt.northwind", "env", etag);
+
+if (!response.IsNotModified)
+{
+    env = response.Result;   // the Content as a .env file: DB__HOST=db.local, one line per variable
+}
+
+etag = response.ETag;     // the tag of env, not of the envelope or another format
+```
+
+* `format` is required, like the route arguments, and is sent as written; the server accepts any casing and answers an unknown value with a `400` (`InvalidQuery`); `json` would answer the envelope as text, which the twins above read. The query is built as the generated methods build it.
+* `Accept` follows the format, from a map of the SDK (`flat` → `application/json`, `properties` and `env` → `text/plain`, `yaml` → `application/yaml`, any other value `*/*`); the server goes by the query alone. The SDK does not reference the formats library.
+* `Result` of a `200` is the body as text, whatever its media type: the JSON object of `flat` is not parsed, and an empty body, the `env` or `properties` of a document without values, is `""`. A `304` has no `Result`.
+* The headers, the exceptions and their messages are those of the envelope twins. Each format has its own `ETag`; send a tag back only to the format it came from.
 
 ## Credentials
 
