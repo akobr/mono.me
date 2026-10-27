@@ -71,6 +71,17 @@ jobs:
         with:
           persist-credentials: false
 
+      # The README becomes the page of the action on GitHub Marketplace, so its examples use the repository of the
+      # action and the major tag of this release.
+      - name: Check the README
+        run: |
+          major="v${VERSION%%.*}"
+
+          if ! grep -qwF -- "$ACTION_REPOSITORY@$major" src/Platform/GitHubAction/README.md; then
+            echo "::error::src/Platform/GitHubAction/README.md does not use $ACTION_REPOSITORY@$major yet; switch its examples to it on main before the release."
+            exit 1
+          fi
+
       # The token reaches git through a credential helper that reads it from the environment of git: it is never in a
       # URL, an argument, a file or the log. Only the three files of the action reach that repository, no workflow.
       - name: Commit and tag the release
