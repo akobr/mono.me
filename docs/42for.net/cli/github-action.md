@@ -74,7 +74,7 @@ For a configuration with secrets, a **certificate machine over mTLS** is the rec
     STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 ```
 
-A **federated machine** is possible too, and needs no stored secret. With `Secrets.Read`, it receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project, see below. This one has no `Secrets.Read` and reads a configuration without secret bindings, into a file for the one step that needs it:
+A **federated machine** is possible too, and needs no stored secret. With `Secrets.Read`, it receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project, see below. This one has no `Secrets.Read` and reads the configuration of a sandbox, which has no secret bindings, into a file for the one step that needs it:
 
 ``` yaml
 permissions:
@@ -83,7 +83,7 @@ permissions:
 steps:
   - uses: akobr/mono.me/src/Platform/GitHubAction@<commit>
     with:
-      key: exe.northwind.invoicing.production
+      key: exe.northwind.invoicing.sandbox
       project: acme.billing
       endpoint: https://storyteller.example.com/api
       client-id: 3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07
