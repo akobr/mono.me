@@ -339,20 +339,29 @@ Token valid until 2026-10-18T14:15:00.0000000+00:00.
 10. `sform account` takes the expiry from the JWT `exp`, and says when it is unknown.
 11. The messages about the variables are the SDK's, for example "Storyteller credential variables of different kinds are set: …".
 
+A `Certificate` machine over mTLS is the recommendation for a job that receives secrets (see **Secrets in CI** below). The job writes the `.pfx` file from a secret under `$RUNNER_TEMP`:
+
 ```yaml
-# GitHub Actions
+# GitHub Actions, Certificate machine: the recommendation for secrets
+- run: printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/storyteller.pfx"
+  env:
+    CERTIFICATE: ${{ secrets.STORYTELLER_CERTIFICATE_BASE64 }}
 - run: dotnet tool install 42.Platform.Cli --global --prerelease
 - run: sform account
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
-    STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+    STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx
+    STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 - run: sform story config set sbt.northwind -i configuration/northwind.json
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
-    STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+    STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx
+    STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 ```
 
-A `Federated` machine in GitHub Actions needs no secret and no file. Its rule's audience is `https://api.example.com/api/v1/acme/billing/access/token`, the `TokenEndpoint` of the machine:
+An API key or client credentials go into `env:` the same way, as `STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}`, or as `STORYTELLER_CLIENT_ID` and `STORYTELLER_CLIENT_SECRET`.
+
+A `Federated` machine in GitHub Actions needs no secret and no file; it receives secret values only when its project turns the mTLS policy off (see **Secrets in CI** below). Its rule's audience is `https://api.example.com/api/v1/acme/billing/access/token`, the `TokenEndpoint` of the machine:
 
 ```yaml
 # GitHub Actions, Federated machine
@@ -386,7 +395,15 @@ A step can also read a configuration into the job. `sform story config <key> -r 
 
 `--github-env` and the other options of reading a configuration are newer than the `sform` on NuGet, which `--prerelease` installs in the jobs above and which ends this step as an unrecognized option. Until a release has them, install a `sform` packed from the repository, as [Until sform is published](https://42for.net/cli/github-action#until-sform-is-published) shows.
 
-A `Federated` machine, like an API key or client credentials, has no certificate. When it has `Secrets.Read`, the API withholds secret values from it under the default project policy and answers every resolved read with `X-2S-Secrets-Withheld: mtls-required`, whatever the configuration holds (see [Secret delivery](key-values.md#secret-delivery)). `--github-env` then stops with exit code `2` and writes nothing, and so it does for the expressions of secret bindings that a machine without `Secrets.Read` gets. Such a job uses a machine without `Secrets.Read` and reads a configuration without secret bindings, or its machine has `Secrets.Read` and its project sets `RequireMtlsForSecretDelivery` to `false` (`sform story kv policy set --require-mtls false`).
+**Secrets in CI.** A job that receives secret values, such as a resolved configuration with secret bindings, needs a machine with `Secrets.Read` and one of these sign-ins:
+
+* **Recommended: a `Certificate` machine over mTLS**, as in the first example. It receives secret values under the default project policy, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The job writes the `.pfx` file from a secret under `$RUNNER_TEMP`. The API must sit behind a front end that forwards the client certificate (`MachineAuth:IsCertificateHeaderFromClientAllowed`, see **Certificates** above).
+* **Possible: a `Federated` machine** (GitHub OIDC), as in the second example. It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `STORYTELLER_CLIENT_ID`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project (`sform story kv policy set --require-mtls false`).
+* **Possible: an API key or client credentials**, under the same change of the policy.
+
+The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
+
+A `Federated` machine, like an API key or client credentials, has no certificate. When it has `Secrets.Read` and the project keeps the default policy, the API withholds secret values from it and answers every resolved read with `X-2S-Secrets-Withheld: mtls-required`, whatever the configuration holds (see [Secret delivery](key-values.md#secret-delivery)). `--github-env` then stops with exit code `2` and writes nothing, and so it does for the expressions of secret bindings that a machine without `Secrets.Read` gets. A federated job in a project that keeps the policy on therefore uses a machine without `Secrets.Read` and reads a configuration without secret bindings.
 
 The [GitHub Action](https://42for.net/cli/github-action) (`src/Platform/GitHubAction`, see its [README](../../../src/Platform/GitHubAction/README.md)) installs an exact `sform` and runs this read in one step. It takes no credential as an input: `sform` reads the `STORYTELLER_*` variables of the job, and a `Federated` machine may name its id in the `client-id` input instead of `STORYTELLER_CLIENT_ID`. The same secret-delivery rules apply.
 
@@ -1037,7 +1054,7 @@ The settings live under `MachineAuth:Federation` and are validated at startup:
 * **Private networks.** Storyteller fetches discovery documents and key sets from URLs an Administrator enters. The fetch uses no proxy, follows no redirect, times out after 10 seconds (for the whole response, body included) and reads at most 512 KiB. It resolves the host and connects only to an address that the IANA special-purpose address registries mark globally reachable, so no loopback, private, CGNAT (`100.64.0.0/10`), link-local (including `169.254.169.254`), multicast, `fc00::/7` or `fe80::/10` address. IPv4 embedded in IPv6 (mapped, compatible, NAT64, 6to4, Teredo) is checked as IPv4, and other IPv6 addresses must be global unicast (`2000::/3`). It connects to the address it checked, so DNS rebinding cannot redirect it. `AllowPrivateNetworks` lifts all of this; never set it in production.
 * **The signing key in Cosmos.** The key is stored unprotected in the core container, like the machine CA. Whoever can read that container can mint Storyteller tokens. The per-call checks keep such tokens within existing `Federated` machines of projects that enable the kind, and within those machines' scopes; they cannot act as an API key, certificate or client-credentials machine. **Emergency rotation:** delete the document `tsk.1` (partition `signing-keys`) from the core container. Once each instance's next read of the store succeeds, about 10 minutes later, it stops signing with and accepting the old key, and the next exchange creates a new one (with `SigningKeyAutoBootstrap`; without it, exchanges answer 503 until a new key is stored); restarting the Function App makes it immediate. An instance that cannot read the store keeps the key it has loaded, so during a Cosmos read outage deleting `tsk.1` alone does not revoke the old key. When revocation comes first, restart the Function App right away: until Cosmos recovers, the restarted instances can neither issue nor validate Storyteller tokens. Workloads exchange again after their next 401.
 * **Long-lived managed identity tokens.** An Azure managed identity token is cached by the platform for about 24 hours, so its issuer needs `MaxTokenLifetimeSeconds` 86,400, and a leaked token can be exchanged for that long. There is no replay store: managed identity, Vercel and Kubernetes tokens are reused by design, and single use would break them. Keep the subject exact and the machine's scopes small: give it only the scopes its jobs need, management scopes included, and let the jobs that need fewer leave the others out of `scope`.
-* **Secret delivery.** A federated machine never presents a certificate, so [secret delivery](key-values.md#secret-delivery) treats it as a token caller: under `RequireMtlsForSecretDelivery` (the default) it gets no secret values, whatever its scopes.
+* **Secret delivery.** A federated machine never presents a certificate, so [secret delivery](key-values.md#secret-delivery) treats it as a token caller: under `RequireMtlsForSecretDelivery` (the default) it gets no secret values, whatever its scopes. Turning the policy off for its project lets every machine of the project with `Secrets.Read` receive them without mTLS, not only the federated one; a CI job that receives secrets best uses a `Certificate` machine (see **Secrets in CI** in [Machine sign-in for pipelines](#machine-sign-in-for-pipelines)).
 * **Who writes rules.** Contributors create machines of runtime scopes without secrets, so they also write the rules of those federated machines. Creating, resetting or giving new rules to a machine with a `Secrets.*` scope needs `ContributorWithSecrets`, and to one with a management scope `Administrator` (see [Scopes of machines](#scopes-of-machines)), so a Contributor cannot point their tokens at another workload. Administrators bound what all rules can admit with the issuers they trust and their `RequiredClaims`.
 
 ### Setting up a platform

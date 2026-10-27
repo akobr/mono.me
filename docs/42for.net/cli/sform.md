@@ -31,6 +31,8 @@ In a CI/CD pipeline or a GitHub Action nobody can type a code, so `sform` signs 
 | Federated | `STORYTELLER_CLIENT_ID`, the machine id, and `STORYTELLER_TOKEN_FILE`, a file with a token of your platform; in a GitHub Actions job with `permissions: id-token: write`, the machine id alone |
 | Any bearer token | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID`, a file the token is read from before every request |
 
+A job that receives secret values, such as a resolved configuration with secret bindings, best uses a certificate machine over mTLS. A federated machine, an API key and client credentials receive them only when an Administrator turns the mTLS policy of the project off, which then holds for every machine of the project, see **Secrets need more than a credential** under [Export to GitHub Actions](#export-to-github-actions).
+
 Every machine also needs `STORYTELLER_ENDPOINT`, the address of the API, `/api` included. An API key or a certificate already names its project. For the other kinds, set `STORYTELLER_PROJECT=<organization>.<project>`, set `STORYTELLER_KEY` to a full key of the project, or pass `-p` to each command. `STORYTELLER_KEY` is the key the configuration provider reads, `@<organization>.<project>.<view>.<annotation key>`: `sform` works on its project and, unless `-v` or `STORYTELLER_VIEW` names a view, in its view; `-p` or `STORYTELLER_PROJECT` naming another project replaces both.
 
 The older names still work, but are deprecated, and `sform account` names them: `STORYTELLER_API_URL` (now `STORYTELLER_ENDPOINT`), `STORYTELLER_CERTIFICATE_FILE` and `STORYTELLER_CERTIFICATE_PASSWORD` (now `STORYTELLER_CLIENT_CERTIFICATE` and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD`), and `STORYTELLER_SUBJECT_TOKEN_FILE` (now `STORYTELLER_TOKEN_FILE` with `STORYTELLER_CLIENT_ID`). A new and an old name with different values stop the job.
@@ -181,11 +183,15 @@ A resolved configuration holds secret values only for a caller with the right to
 
 ``` yaml
 # GitHub Actions: the later steps read APP_DB__HOST, APP_DB__PASSWORD, …
-# An API key gets secret values when the project sets --require-mtls false (see below)
+# A certificate machine over mTLS, the recommendation for secrets (see below)
+- run: printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/storyteller.pfx"
+  env:
+    CERTIFICATE: ${{ secrets.STORYTELLER_CERTIFICATE_BASE64 }}
 - run: sform story config exe.northwind.invoicing.production -r --github-env --env-prefix APP_
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
-    STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+    STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx
+    STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
@@ -211,7 +217,15 @@ In one run, with one resolved and one effective read, `sform`:
 
 `bound` is a heuristic. It also masks the public values that bindings produced; it cannot recognise a secret stored as a plain value in a configuration (use `--mask all`, or keep secrets as secret key/values or vault references); and it masks a secret that a binding put into a longer string only as that whole string.
 
-**Secrets need more than a credential.** The machine needs `Secrets.Read` (`sform account machine create -r --scope secrets-read`). Under the default policy of a project, only a certificate machine that calls over mTLS receives secret values; for an API key, client credentials or a federated machine, an Administrator sets `sform story kv policy set --require-mtls false`. Otherwise the export stops with exit code `2` on the withheld secrets, or on the expressions of the bindings that were not resolved; `--allow-unresolved` exports such expressions as they are.
+**Secrets need more than a credential.** The machine needs `Secrets.Read` (`sform account machine create -r --scope secrets-read`) and one of these sign-ins:
+
+- **Recommended: a certificate machine over mTLS**, as in the example above. It receives secret values under the default policy of a project, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The job writes the `.pfx` file from a secret under `$RUNNER_TEMP`. It needs an API behind a front end that forwards the client certificate.
+- **Possible: a federated machine** (GitHub OIDC), as in [Sign in from a pipeline](#sign-in-from-a-pipeline). It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `STORYTELLER_CLIENT_ID`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project: `sform story kv policy set --require-mtls false`.
+- **Possible: an API key or client credentials**, under the same change of the policy.
+
+The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
+
+Without `Secrets.Read` or such a sign-in, the export stops with exit code `2` on the withheld secrets, or on the expressions of the bindings that were not resolved; `--allow-unresolved` exports such expressions as they are.
 
 `--mask` without `--github-env` writes only the masks and the `--export` file, for a job that keeps the configuration in a file for the one step that needs it:
 
