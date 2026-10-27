@@ -397,13 +397,26 @@ A step can also read a configuration into the job. `sform story config <key> -r 
 
 **Secrets in CI.** A job that receives secret values, such as a resolved configuration with secret bindings, needs a machine with `Secrets.Read` and one of these sign-ins:
 
-* **Recommended: a `Certificate` machine over mTLS**, as in the first example. It receives secret values under the default project policy, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The job writes the `.pfx` file from a secret under `$RUNNER_TEMP`. The API must sit behind a front end that forwards the client certificate (`MachineAuth:IsCertificateHeaderFromClientAllowed`, see **Certificates** above).
+* **Recommended: a `Certificate` machine over mTLS**, as in the first example. It receives secret values under the default project policy, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The job writes the `.pfx` file from a secret under `$RUNNER_TEMP`. The API must sit behind a front end that forwards the client certificate (`MachineAuth:IsCertificateHeaderFromClientAllowed`, see **Certificates** above). **A `Certificate` machine for CI** below shows the setup.
 * **Possible: a `Federated` machine** (GitHub OIDC), as in the second example. It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `STORYTELLER_CLIENT_ID`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project (`sform story kv policy set --require-mtls false`).
 * **Possible: an API key or client credentials**, under the same change of the policy.
 
 The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values, and every machine with `Secrets.Write` write secrets, without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
 
 A `Federated` machine, like an API key or client credentials, has no certificate. When it has `Secrets.Read` and the project keeps the default policy, the API withholds secret values from it and answers every resolved read with `X-2S-Secrets-Withheld: mtls-required`, whatever the configuration holds (see [Secret delivery](key-values.md#secret-delivery)). `--github-env` then stops with exit code `2` and writes nothing, and so it does for the expressions of secret bindings that a machine without `Secrets.Read` gets. A federated job in a project that keeps the policy on therefore uses a machine without `Secrets.Read` and reads a configuration without secret bindings.
+
+**A `Certificate` machine for CI.** `machine create` without `-k` creates the default kind of the project, and a project that never stored a [machine authentication policy](#machine-authentication-policy) enables only `MachineAuth:DefaultCredentialKind`, `ApiKey` by default. So an Administrator enables `Certificate` first. `machine-auth -k` sets the whole policy: it names the kinds the project enables already, the default kind first, then `certificate`, and `-l` when the project has a certificate lifetime of its own. A user with `ContributorWithSecrets` then creates the machine with `-k certificate`. `machine create` prints the password of the certificate once; the repository keeps it as the secret `STORYTELLER_CERTIFICATE_PASSWORD`, and the file, in base64 on one line, as `STORYTELLER_CERTIFICATE_BASE64`:
+
+```bash
+sform account machine machine-auth                              # the enabled kinds, the default kind and the lifetime
+sform account machine machine-auth -k api-key -k certificate    # the kinds it printed, and certificate
+sform account machine create -r --scope secrets-read -k certificate -o storyteller.pfx
+base64 -w0 storyteller.pfx | gh secret set STORYTELLER_CERTIFICATE_BASE64
+gh secret set STORYTELLER_CERTIFICATE_PASSWORD                  # paste the password that machine create printed
+rm storyteller.pfx
+```
+
+The certificate expires after the lifetime of the machine: the `-l` of `machine create`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. Before then, the two secrets need a new certificate and its password.
 
 The [GitHub Action](https://42for.net/cli/github-action) (`src/Platform/GitHubAction`, see its [README](../../../src/Platform/GitHubAction/README.md)) installs an exact `sform` and runs this read in one step. It takes no credential as an input: `sform` reads the `STORYTELLER_*` variables of the job, and a `Federated` machine may name its id in the `client-id` input instead of `STORYTELLER_CLIENT_ID`. The same secret-delivery rules apply.
 

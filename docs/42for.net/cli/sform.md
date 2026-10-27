@@ -219,13 +219,26 @@ In one run, with one resolved and one effective read, `sform`:
 
 **Secrets need more than a credential.** The machine needs `Secrets.Read` (`sform account machine create -r --scope secrets-read`) and one of these sign-ins:
 
-- **Recommended: a certificate machine over mTLS**, as in the example above. It receives secret values under the default policy of a project, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The job writes the `.pfx` file from a secret under `$RUNNER_TEMP`. It needs an API behind a front end that forwards the client certificate.
+- **Recommended: a certificate machine over mTLS**, as in the example above. It receives secret values under the default policy of a project, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The job writes the `.pfx` file from a secret under `$RUNNER_TEMP`. It needs an API behind a front end that forwards the client certificate. **Set up a certificate machine** below shows the steps.
 - **Possible: a federated machine** (GitHub OIDC), as in [Sign in from a pipeline](#sign-in-from-a-pipeline). It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `STORYTELLER_CLIENT_ID`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project: `sform story kv policy set --require-mtls false`.
 - **Possible: an API key or client credentials**, under the same change of the policy.
 
 The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values, and every machine with `Secrets.Write` write secrets, without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
 
 Without `Secrets.Read` or such a sign-in, the export stops with exit code `2` on the withheld secrets, or on the expressions of the bindings that were not resolved; `--allow-unresolved` exports such expressions as they are.
+
+**Set up a certificate machine.** `sform account machine create` without `-k` creates the default kind of the project, which is an API key unless an Administrator changed it. So a certificate machine takes `-k certificate`, and an Administrator enables the kind for the project first: `sform account machine machine-auth` prints the policy, and with `-k` it sets the whole policy, so name the kinds it printed, the default kind first, add `-k certificate`, and add `-l` when the project has a certificate lifetime of its own. A user with the `ContributorWithSecrets` role then creates the machine. `machine create` prints the password of the certificate once. The repository keeps the password as the secret `STORYTELLER_CERTIFICATE_PASSWORD`, and the file, in base64 on one line, as `STORYTELLER_CERTIFICATE_BASE64`:
+
+``` bash
+sform account machine machine-auth                              # the enabled kinds, the default kind and the lifetime
+sform account machine machine-auth -k api-key -k certificate    # the kinds it printed, and certificate
+sform account machine create -r --scope secrets-read -k certificate -o storyteller.pfx
+base64 -w0 storyteller.pfx | gh secret set STORYTELLER_CERTIFICATE_BASE64
+gh secret set STORYTELLER_CERTIFICATE_PASSWORD                  # paste the password that machine create printed
+rm storyteller.pfx
+```
+
+The certificate expires after the certificate lifetime of the project, or after the days that `-l` of `machine create` gives. Before then, the two secrets need a new certificate and its password.
 
 `--mask` without `--github-env` writes only the masks and the `--export` file, for a job that keeps the configuration in a file for the one step that needs it:
 
