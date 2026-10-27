@@ -1,0 +1,353 @@
+{
+  "description": "The exact text of every format of a Storyteller configuration. Each vector has a name, the document (the Content object), the format (flat, properties, env or yaml) and either the exact text, written as UTF-8 without a byte order mark, or the error that makes the document invalid in that format. Every line ends with LF and keys keep the document order. The keys and values of properties and env are in flattening.properties.json and flattening.env.json; this file pins quoting and escaping. Numbers are read as double-precision floats.",
+  "vectors": [
+    {
+      "name": "the study example as flat",
+      "document": { "db": { "hosts": [ "a", "b" ], "port": 5432 }, "features": [ "vat" ] },
+      "format": "flat",
+      "text": "{\n  \"db:hosts:0\": \"a\",\n  \"db:hosts:1\": \"b\",\n  \"db:port\": \"5432\",\n  \"features:0\": \"vat\"\n}\n"
+    },
+    {
+      "name": "the study example as properties",
+      "document": { "db": { "hosts": [ "a", "b" ], "port": 5432 }, "features": [ "vat" ] },
+      "format": "properties",
+      "text": "db.hosts[0]=a\ndb.hosts[1]=b\ndb.port=5432\nfeatures[0]=vat\n"
+    },
+    {
+      "name": "the study example as env",
+      "document": { "db": { "hosts": [ "a", "b" ], "port": 5432 }, "features": [ "vat" ] },
+      "format": "env",
+      "text": "DB__HOSTS__0=a\nDB__HOSTS__1=b\nDB__PORT=5432\nFEATURES__0=vat\n"
+    },
+    {
+      "name": "the study example as yaml",
+      "document": { "db": { "hosts": [ "a", "b" ], "port": 5432 }, "features": [ "vat" ] },
+      "format": "yaml",
+      "text": "db:\n  hosts:\n    - \"a\"\n    - \"b\"\n  port: 5432\nfeatures:\n  - \"vat\"\n"
+    },
+    {
+      "name": "an empty document as flat",
+      "document": {},
+      "format": "flat",
+      "text": "{}\n"
+    },
+    {
+      "name": "an empty document as properties",
+      "document": {},
+      "format": "properties",
+      "text": ""
+    },
+    {
+      "name": "an empty document as env",
+      "document": {},
+      "format": "env",
+      "text": ""
+    },
+    {
+      "name": "an empty document as yaml",
+      "document": {},
+      "format": "yaml",
+      "text": "{}\n"
+    },
+    {
+      "name": "quotes and backslashes as flat",
+      "document": { "quote": "say \"hi\"", "apostrophe": "it's", "dir": "C:\\temp" },
+      "format": "flat",
+      "text": "{\n  \"quote\": \"say \\\"hi\\\"\",\n  \"apostrophe\": \"it's\",\n  \"dir\": \"C:\\\\temp\"\n}\n"
+    },
+    {
+      "name": "quotes and backslashes as properties",
+      "document": { "quote": "say \"hi\"", "apostrophe": "it's", "dir": "C:\\temp" },
+      "format": "properties",
+      "text": "quote=say \"hi\"\napostrophe=it's\ndir=C:\\\\temp\n"
+    },
+    {
+      "name": "quotes and backslashes as env",
+      "document": { "quote": "say \"hi\"", "apostrophe": "it's", "dir": "C:\\temp" },
+      "format": "env",
+      "text": "QUOTE='say \"hi\"'\nAPOSTROPHE=\"it's\"\nDIR=\"C:\\\\temp\"\n"
+    },
+    {
+      "name": "quotes and backslashes as yaml",
+      "document": { "quote": "say \"hi\"", "apostrophe": "it's", "dir": "C:\\temp" },
+      "format": "yaml",
+      "text": "quote: \"say \\\"hi\\\"\"\napostrophe: \"it's\"\ndir: \"C:\\\\temp\"\n"
+    },
+    {
+      "name": "line breaks and control characters as flat",
+      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u007f\u0085\u2028" },
+      "format": "flat",
+      "text": "{\n  \"lines\": \"a\\nb\\r\\nc\\td\",\n  \"control\": \"\\u0001\u007f\\u0085\\u2028\"\n}\n"
+    },
+    {
+      "name": "line breaks and control characters as properties",
+      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u007f\u0085\u2028" },
+      "format": "properties",
+      "text": "lines=a\\nb\\r\\nc\\td\ncontrol=\\u0001\\u007F\\u0085\\u2028\n"
+    },
+    {
+      "name": "line breaks and control characters as env",
+      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u007f\u0085\u2028" },
+      "format": "env",
+      "text": "LINES=\"a\\nb\\r\\nc\\td\"\nCONTROL='\u0001\u007f\u0085\u2028'\n"
+    },
+    {
+      "name": "line breaks and control characters as yaml",
+      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u007f\u0085\u2028" },
+      "format": "yaml",
+      "text": "lines: \"a\\nb\\r\\nc\\td\"\ncontrol: \"\\u0001\\u007F\\u0085\\u2028\"\n"
+    },
+    {
+      "name": "non-ASCII characters as flat",
+      "document": { "unicode": "Žluť", "emoji": "\ud83d\ude00", "bom": "\ufeff" },
+      "format": "flat",
+      "text": "{\n  \"unicode\": \"Žluť\",\n  \"emoji\": \"\ud83d\ude00\",\n  \"bom\": \"\ufeff\"\n}\n"
+    },
+    {
+      "name": "non-ASCII characters as properties",
+      "document": { "unicode": "Žluť", "emoji": "\ud83d\ude00", "bom": "\ufeff" },
+      "format": "properties",
+      "text": "unicode=\\u017Dlu\\u0165\nemoji=\\uD83D\\uDE00\nbom=\\uFEFF\n"
+    },
+    {
+      "name": "non-ASCII characters as env",
+      "document": { "unicode": "Žluť", "emoji": "\ud83d\ude00", "bom": "\ufeff" },
+      "format": "env",
+      "text": "UNICODE='Žluť'\nEMOJI='\ud83d\ude00'\nBOM='\ufeff'\n"
+    },
+    {
+      "name": "non-ASCII characters as yaml",
+      "document": { "unicode": "Žluť", "emoji": "\ud83d\ude00", "bom": "\ufeff" },
+      "format": "yaml",
+      "text": "unicode: \"Žluť\"\nemoji: \"\ud83d\ude00\"\nbom: \"\\uFEFF\"\n"
+    },
+    {
+      "name": "an unpaired surrogate becomes U+FFFD as flat",
+      "document": { "lone": "\ud800x" },
+      "format": "flat",
+      "text": "{\n  \"lone\": \"\ufffdx\"\n}\n"
+    },
+    {
+      "name": "an unpaired surrogate becomes U+FFFD as properties",
+      "document": { "lone": "\ud800x" },
+      "format": "properties",
+      "text": "lone=\\uFFFDx\n"
+    },
+    {
+      "name": "an unpaired surrogate becomes U+FFFD as env",
+      "document": { "lone": "\ud800x" },
+      "format": "env",
+      "text": "LONE='\ufffdx'\n"
+    },
+    {
+      "name": "an unpaired surrogate becomes U+FFFD as yaml",
+      "document": { "lone": "\ud800x" },
+      "format": "yaml",
+      "text": "lone: \"\ufffdx\"\n"
+    },
+    {
+      "name": "leading and trailing spaces and an empty string as flat",
+      "document": { "leading": " padded", "trailing": "padded ", "empty": "" },
+      "format": "flat",
+      "text": "{\n  \"leading\": \" padded\",\n  \"trailing\": \"padded \",\n  \"empty\": \"\"\n}\n"
+    },
+    {
+      "name": "leading and trailing spaces and an empty string as properties",
+      "document": { "leading": " padded", "trailing": "padded ", "empty": "" },
+      "format": "properties",
+      "text": "leading=\\ padded\ntrailing=padded \nempty=\n"
+    },
+    {
+      "name": "leading and trailing spaces and an empty string as env",
+      "document": { "leading": " padded", "trailing": "padded ", "empty": "" },
+      "format": "env",
+      "text": "LEADING=' padded'\nTRAILING='padded '\nEMPTY=\n"
+    },
+    {
+      "name": "leading and trailing spaces and an empty string as yaml",
+      "document": { "leading": " padded", "trailing": "padded ", "empty": "" },
+      "format": "yaml",
+      "text": "leading: \" padded\"\ntrailing: \"padded \"\nempty: \"\"\n"
+    },
+    {
+      "name": "names with =, #, !, a space, a dot and @ as flat",
+      "document": { "a=b": "1", "c#d": "2", "!e": "3", "f g": "4", "h.i": "5", "@j": "6" },
+      "format": "flat",
+      "text": "{\n  \"a=b\": \"1\",\n  \"c#d\": \"2\",\n  \"!e\": \"3\",\n  \"f g\": \"4\",\n  \"h.i\": \"5\",\n  \"@j\": \"6\"\n}\n"
+    },
+    {
+      "name": "names with =, #, !, a space, a dot and @ as properties",
+      "document": { "a=b": "1", "c#d": "2", "!e": "3", "f g": "4", "h.i": "5", "@j": "6" },
+      "format": "properties",
+      "text": "[a\\=b]=1\n[c\\#d]=2\n[\\!e]=3\n[f\\ g]=4\n[h.i]=5\n[@j]=6\n"
+    },
+    {
+      "name": "names with =, #, !, a space, a dot and @ as env",
+      "document": { "a=b": "1", "c#d": "2", "!e": "3", "f g": "4", "h.i": "5", "@j": "6" },
+      "format": "env",
+      "error": { "rule": "invalid-env-name", "path": "$['a=b']" }
+    },
+    {
+      "name": "names with =, #, !, a space, a dot and @ as yaml",
+      "document": { "a=b": "1", "c#d": "2", "!e": "3", "f g": "4", "h.i": "5", "@j": "6" },
+      "format": "yaml",
+      "text": "\"a=b\": \"1\"\n\"c#d\": \"2\"\n\"!e\": \"3\"\n\"f g\": \"4\"\n\"h.i\": \"5\"\n\"@j\": \"6\"\n"
+    },
+    {
+      "name": "names with quotes, a backslash, a tab and non-ASCII as flat",
+      "document": { "it's": { "\"q\"": 1 }, "back\\slash": 2, "tab\there": 3, "čas": 4 },
+      "format": "flat",
+      "text": "{\n  \"it's:\\\"q\\\"\": \"1\",\n  \"back\\\\slash\": \"2\",\n  \"tab\\there\": \"3\",\n  \"čas\": \"4\"\n}\n"
+    },
+    {
+      "name": "names with quotes, a backslash, a tab and non-ASCII as properties",
+      "document": { "it's": { "\"q\"": 1 }, "back\\slash": 2, "tab\there": 3, "čas": 4 },
+      "format": "properties",
+      "text": "[it's].[\"q\"]=1\n[back\\\\slash]=2\n[tab\\there]=3\n[\\u010Das]=4\n"
+    },
+    {
+      "name": "names with quotes, a backslash, a tab and non-ASCII as env",
+      "document": { "it's": { "\"q\"": 1 }, "back\\slash": 2, "tab\there": 3, "čas": 4 },
+      "format": "env",
+      "error": { "rule": "invalid-env-name", "path": "$['it\\'s']" }
+    },
+    {
+      "name": "names with quotes, a backslash, a tab and non-ASCII as yaml",
+      "document": { "it's": { "\"q\"": 1 }, "back\\slash": 2, "tab\there": 3, "čas": 4 },
+      "format": "yaml",
+      "text": "\"it's\":\n  \"\\\"q\\\"\": 1\n\"back\\\\slash\": 2\n\"tab\\there\": 3\n\"čas\": 4\n"
+    },
+    {
+      "name": "yaml strings that look like other types stay strings",
+      "document": { "boolean": "True", "number": "05432", "date": "2026-10-20", "binding": "@db.host", "empty": "", "null": "null", "tilde": "~", "float": "1e3", "yes": "yes" },
+      "format": "yaml",
+      "text": "boolean: \"True\"\nnumber: \"05432\"\ndate: \"2026-10-20\"\nbinding: \"@db.host\"\nempty: \"\"\n\"null\": \"null\"\ntilde: \"~\"\nfloat: \"1e3\"\n\"yes\": \"yes\"\n"
+    },
+    {
+      "name": "yaml keys that a reader takes for a boolean or null are quoted",
+      "document": { "On": 1, "Y": 2, "no": 3, "False": 4, "Null": 5, "onion": 6, "_x": 7, "a-b": 8, "1st": 9 },
+      "format": "yaml",
+      "text": "\"On\": 1\n\"Y\": 2\n\"no\": 3\n\"False\": 4\n\"Null\": 5\nonion: 6\n_x: 7\na-b: 8\n\"1st\": 9\n"
+    },
+    {
+      "name": "numbers and booleans as flat",
+      "document": { "port": 5432, "ratio": 0.5, "big": 1E+20, "negative": -7, "enabled": true, "disabled": false },
+      "format": "flat",
+      "text": "{\n  \"port\": \"5432\",\n  \"ratio\": \"0.5\",\n  \"big\": \"1E+20\",\n  \"negative\": \"-7\",\n  \"enabled\": \"true\",\n  \"disabled\": \"false\"\n}\n"
+    },
+    {
+      "name": "numbers and booleans as properties",
+      "document": { "port": 5432, "ratio": 0.5, "big": 1E+20, "negative": -7, "enabled": true, "disabled": false },
+      "format": "properties",
+      "text": "port=5432\nratio=0.5\nbig=1E+20\nnegative=-7\nenabled=true\ndisabled=false\n"
+    },
+    {
+      "name": "numbers and booleans as env",
+      "document": { "port": 5432, "ratio": 0.5, "big": 1E+20, "negative": -7, "enabled": true, "disabled": false },
+      "format": "env",
+      "text": "PORT=5432\nRATIO=0.5\nBIG=1E+20\nNEGATIVE=-7\nENABLED=true\nDISABLED=false\n"
+    },
+    {
+      "name": "numbers and booleans are plain in yaml",
+      "document": { "port": 5432, "ratio": 0.5, "big": 1E+20, "negative": -7, "enabled": true, "disabled": false },
+      "format": "yaml",
+      "text": "port: 5432\nratio: 0.5\nbig: 1E+20\nnegative: -7\nenabled: true\ndisabled: false\n"
+    },
+    {
+      "name": "gaps and trailing items without a value as flat",
+      "document": { "list": [ "a", null, "c", null ], "empty": [ null, {} ], "objects": [ {}, { "x": 1 } ] },
+      "format": "flat",
+      "text": "{\n  \"list:0\": \"a\",\n  \"list:2\": \"c\",\n  \"objects:1:x\": \"1\"\n}\n"
+    },
+    {
+      "name": "gaps and trailing items without a value as properties",
+      "document": { "list": [ "a", null, "c", null ], "empty": [ null, {} ], "objects": [ {}, { "x": 1 } ] },
+      "format": "properties",
+      "error": { "rule": "array-gap", "path": "$.list[1]" }
+    },
+    {
+      "name": "gaps and trailing items without a value as env",
+      "document": { "list": [ "a", null, "c", null ], "empty": [ null, {} ], "objects": [ {}, { "x": 1 } ] },
+      "format": "env",
+      "text": "LIST__0=a\nLIST__2=c\nOBJECTS__1__X=1\n"
+    },
+    {
+      "name": "a gap in a yaml array is null and a trailing item is left out",
+      "document": { "list": [ "a", null, "c", null ], "empty": [ null, {} ], "objects": [ {}, { "x": 1 } ] },
+      "format": "yaml",
+      "text": "list:\n  - \"a\"\n  - null\n  - \"c\"\nobjects:\n  - null\n  - x: 1\n"
+    },
+    {
+      "name": "nested arrays and objects in arrays as flat",
+      "document": { "matrix": [ [ 1, 2 ], [ 3, [ 4, 5 ] ] ], "items": [ { "name": "w", "tags": [ "t" ] }, { "name": "v" } ] },
+      "format": "flat",
+      "text": "{\n  \"matrix:0:0\": \"1\",\n  \"matrix:0:1\": \"2\",\n  \"matrix:1:0\": \"3\",\n  \"matrix:1:1:0\": \"4\",\n  \"matrix:1:1:1\": \"5\",\n  \"items:0:name\": \"w\",\n  \"items:0:tags:0\": \"t\",\n  \"items:1:name\": \"v\"\n}\n"
+    },
+    {
+      "name": "nested arrays and objects in arrays as properties",
+      "document": { "matrix": [ [ 1, 2 ], [ 3, [ 4, 5 ] ] ], "items": [ { "name": "w", "tags": [ "t" ] }, { "name": "v" } ] },
+      "format": "properties",
+      "text": "matrix[0][0]=1\nmatrix[0][1]=2\nmatrix[1][0]=3\nmatrix[1][1][0]=4\nmatrix[1][1][1]=5\nitems[0].name=w\nitems[0].tags[0]=t\nitems[1].name=v\n"
+    },
+    {
+      "name": "nested arrays and objects in arrays as env",
+      "document": { "matrix": [ [ 1, 2 ], [ 3, [ 4, 5 ] ] ], "items": [ { "name": "w", "tags": [ "t" ] }, { "name": "v" } ] },
+      "format": "env",
+      "text": "MATRIX__0__0=1\nMATRIX__0__1=2\nMATRIX__1__0=3\nMATRIX__1__1__0=4\nMATRIX__1__1__1=5\nITEMS__0__NAME=w\nITEMS__0__TAGS__0=t\nITEMS__1__NAME=v\n"
+    },
+    {
+      "name": "nested arrays and objects in arrays as yaml",
+      "document": { "matrix": [ [ 1, 2 ], [ 3, [ 4, 5 ] ] ], "items": [ { "name": "w", "tags": [ "t" ] }, { "name": "v" } ] },
+      "format": "yaml",
+      "text": "matrix:\n  - - 1\n    - 2\n  - - 3\n    - - 4\n      - 5\nitems:\n  - name: \"w\"\n    tags:\n      - \"t\"\n  - name: \"v\"\n"
+    },
+    {
+      "name": "a yaml key longer than 1024 characters is an explicit key",
+      "document": { "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk": { "a": 1 }, "list": [ { "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk": "v", "b": 2 } ] },
+      "format": "yaml",
+      "text": "? kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\n:\n  a: 1\nlist:\n  - ? kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk\n    : \"v\"\n    b: 2\n"
+    },
+    {
+      "name": "@ expressions as flat",
+      "document": { "db": { "password": "@kv(\"db-password\")", "host": "@db.host" } },
+      "format": "flat",
+      "text": "{\n  \"db:password\": \"@kv(\\\"db-password\\\")\",\n  \"db:host\": \"@db.host\"\n}\n"
+    },
+    {
+      "name": "@ expressions as properties",
+      "document": { "db": { "password": "@kv(\"db-password\")", "host": "@db.host" } },
+      "format": "properties",
+      "text": "db.password=@kv(\"db-password\")\ndb.host=@db.host\n"
+    },
+    {
+      "name": "@ expressions as env",
+      "document": { "db": { "password": "@kv(\"db-password\")", "host": "@db.host" } },
+      "format": "env",
+      "text": "DB__PASSWORD='@kv(\"db-password\")'\nDB__HOST=@db.host\n"
+    },
+    {
+      "name": "@ expressions as yaml",
+      "document": { "db": { "password": "@kv(\"db-password\")", "host": "@db.host" } },
+      "format": "yaml",
+      "text": "db:\n  password: \"@kv(\\\"db-password\\\")\"\n  host: \"@db.host\"\n"
+    },
+    {
+      "name": "env values are bare, single-quoted or double-quoted",
+      "document": { "bare": "db.local:5432/x,y@z%+-_", "url": "https://db.local/x?y=1", "dollar": "pa$$", "hash": "a#b", "both": "it's \"x\"", "backslash": "a\\b", "crlf": "a\r\nb" },
+      "format": "env",
+      "text": "BARE=db.local:5432/x,y@z%+-_\nURL='https://db.local/x?y=1'\nDOLLAR='pa$$'\nHASH='a#b'\nBOTH=\"it's \\\"x\\\"\"\nBACKSLASH=\"a\\\\b\"\nCRLF=\"a\\r\\nb\"\n"
+    },
+    {
+      "name": "every format applies the base rules: flat",
+      "document": { "Db": { "Host": "a" }, "db": { "host": "b" } },
+      "format": "flat",
+      "error": { "rule": "case-collision", "path": "$.db.host" }
+    },
+    {
+      "name": "every format applies the base rules: yaml",
+      "document": { "Db": { "Host": "a" }, "db": { "host": "b" } },
+      "format": "yaml",
+      "error": { "rule": "case-collision", "path": "$.db.host" }
+    }
+  ]
+}
