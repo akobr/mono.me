@@ -90,6 +90,44 @@ public sealed class ResourceTests
         host.Builder.Resources.ShouldBeEmpty();
     }
 
+    // A non-constant interpolated string binds to the handler overload, even when its holes are plain strings; it is
+    // still a literal URL.
+    [Fact]
+    public void AnInterpolatedEndpoint_OfPlainStrings_ThatTheSdkRefuses_FailsAtTheCall()
+    {
+        var host = TestAppHost.Run();
+        var name = "storyteller.example.com";
+
+        var exception = Should.Throw<ArgumentException>(() => host.Builder.AddStoryteller("storyteller", $"http://{name}:7071/api"));
+
+        exception.ParamName.ShouldBe("endpoint");
+        exception.Message.ShouldNotContain("example.com");
+        host.Builder.Resources.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ALiteralExpression_ThatTheSdkRefuses_FailsAtTheCall()
+    {
+        var host = TestAppHost.Run();
+        var name = "storyteller.example.com";
+
+        Should.Throw<ArgumentException>(() => host.Builder.AddStoryteller("storyteller", ReferenceExpression.Create($"http://{name}/api")))
+            .ParamName.ShouldBe("endpoint");
+        host.Builder.Resources.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AnInterpolatedEndpoint_OfPlainStrings_ThatTheSdkAllows_IsTaken()
+    {
+        var host = TestAppHost.Run();
+        var name = "storyteller.example.com";
+
+        var storyteller = host.Builder.AddStoryteller("storyteller", $"https://{name}/api");
+
+        storyteller.Resource.Endpoint.ValueProviders.ShouldBeEmpty();
+        storyteller.Resource.Endpoint.ValueExpression.ShouldBe("https://storyteller.example.com/api");
+    }
+
     [Theory]
     [InlineData("https://storyteller.example.com/api")]
     [InlineData("http://localhost:7071/api")]

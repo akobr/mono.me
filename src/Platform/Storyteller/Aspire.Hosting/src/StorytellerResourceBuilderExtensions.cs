@@ -8,13 +8,12 @@ public static class StorytellerResourceBuilderExtensions
 {
     private const string ResourceType = "Storyteller";
 
-    // A Storyteller API at a literal URL, checked with the SDK's rule: an absolute https URL without user info, a query
-    // or a fragment, or http to localhost or a loopback address. The process checks again.
+    // A Storyteller API at a literal URL, checked with the SDK's rule by the expression overload: an absolute https URL
+    // without user info, a query or a fragment, or http to localhost or a loopback address. The process checks again.
     public static IResourceBuilder<StorytellerResource> AddStoryteller(this IDistributedApplicationBuilder builder, string name, string endpoint)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(endpoint);
-        EndpointRule.Require(endpoint, nameof(endpoint));
 
         return builder.AddStoryteller(name, ReferenceExpression.Create($"{endpoint}"));
     }
@@ -35,9 +34,19 @@ public static class StorytellerResourceBuilderExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(endpoint);
 
+        var resource = new StorytellerResource(name, endpoint);
+
+        // An expression without parameters or endpoint references is a literal URL, checked as the string overload's
+        // is. It comes from the string overload, from ReferenceExpression.Create, or from the handler overload: a
+        // non-constant interpolated string binds to the handler even when its holes are plain strings.
+        if (resource.IsEndpointLiteral)
+        {
+            EndpointRule.Require(endpoint.ValueExpression, nameof(endpoint));
+        }
+
         // Running from the start, so WaitFor(storyteller) proceeds; the dashboard shows the URL, or the expression's
         // text for a parameter or an endpoint reference, never a resolved parameter.
-        return builder.AddResource(new StorytellerResource(name, endpoint))
+        return builder.AddResource(resource)
             .ExcludeFromManifest()
             .WithInitialState(new CustomResourceSnapshot
             {
@@ -96,7 +105,8 @@ public static class StorytellerResourceBuilderExtensions
     }
 
     // STORYTELLER_CLIENT_CERTIFICATE, and STORYTELLER_CLIENT_CERTIFICATE_PASSWORD with a password. The path is made
-    // absolute against the AppHost directory now, as a process started elsewhere would not find a relative one.
+    // absolute against the AppHost directory now, as a process started elsewhere would not find a relative one. A file
+    // of the AppHost's machine, so for projects and executables in run mode only (WithReference refuses the rest).
     public static IResourceBuilder<StorytellerResource> WithClientCertificate(this IResourceBuilder<StorytellerResource> builder, string path, IResourceBuilder<ParameterResource>? password = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -107,7 +117,8 @@ public static class StorytellerResourceBuilderExtensions
     }
 
     // The STORYTELLER_* variables of the resource, for a project, an executable or a container: STORYTELLER_ENDPOINT and
-    // the credential's, the contract every SDK and sform read. A second call replaces the first: one set per process.
+    // the credential's, the contract every SDK and sform read. A second call replaces the first: one set per process,
+    // and in run mode the other names are masked over what a project or an executable inherits from the AppHost.
     public static IResourceBuilder<TDestination> WithReference<TDestination>(this IResourceBuilder<TDestination> builder, IResourceBuilder<StorytellerResource> storyteller)
         where TDestination : IResourceWithEnvironment
     {
@@ -116,7 +127,7 @@ public static class StorytellerResourceBuilderExtensions
 
         var destination = builder.Resource;
         var resource = storyteller.Resource;
-        RequireNoCertificateInContainer(destination, resource);
+        RequireReachable(destination, resource, builder.ApplicationBuilder.ExecutionContext);
 
         var previous = destination.Annotations.OfType<StorytellerReferenceAnnotation>().LastOrDefault();
 
@@ -179,13 +190,15 @@ public static class StorytellerResourceBuilderExtensions
         return builder.WithStorytellerKey($"exe.{subject}.{responsibility}.{context}");
     }
 
+    // In run mode DCP starts a project or an executable with the AppHost's environment, so the names the resource does
+    // not set are masked; a container and a published process inherit nothing.
     private static void WriteReference(EnvironmentCallbackContext context, IResource destination)
     {
         var resource = destination.Annotations.OfType<StorytellerReferenceAnnotation>().Last().Resource;
 
         // A certificate added after WithReference.
-        RequireNoCertificateInContainer(destination, resource);
-        resource.WriteVariables(context.EnvironmentVariables);
+        RequireReachable(destination, resource, context.ExecutionContext);
+        resource.WriteVariables(context.EnvironmentVariables, maskUnset: context.ExecutionContext.IsRunMode && destination is not ContainerResource);
     }
 
     // Throws from the callback, so Aspire fails the start of that resource and names it.
@@ -210,13 +223,30 @@ public static class StorytellerResourceBuilderExtensions
         context.EnvironmentVariables[StorytellerVariableNames.KEY] = $"@{organization}.{project}.{view}.{key}";
     }
 
-    // A certificate path on the host does not exist in a container.
-    private static void RequireNoCertificateInContainer(IResource destination, StorytellerResource resource)
+    // A value of the AppHost's machine, a certificate path or a literal loopback endpoint, means nothing to a container,
+    // nor in publish mode to any destination, as a deployed process runs elsewhere. The endpoint is known at the call; a
+    // certificate may be added after it, so the callback checks again. Messages name resources, never the values.
+    private static void RequireReachable(IResource destination, StorytellerResource resource, DistributedApplicationExecutionContext executionContext)
     {
-        if (destination is ContainerResource && resource.CertificatePath is not null)
+        var isContainer = destination is ContainerResource;
+
+        if (!isContainer && !executionContext.IsPublishMode)
         {
-            throw new InvalidOperationException(
-                $"The Storyteller resource '{resource.Name}' has a client certificate, a path on the AppHost's machine that the container '{destination.Name}' does not have. Reference a Storyteller resource with an API key or client credentials from a container.");
+            return;
+        }
+
+        if (resource.CertificatePath is not null)
+        {
+            throw new InvalidOperationException(isContainer
+                ? $"The Storyteller resource '{resource.Name}' has a client certificate, a path on the AppHost's machine that the container '{destination.Name}' does not have. Reference a Storyteller resource with an API key or client credentials from a container."
+                : $"The Storyteller resource '{resource.Name}' has a client certificate, a path on the AppHost's machine that '{destination.Name}' does not have once it is deployed. Add the certificate in run mode only (builder.ExecutionContext.IsRunMode), and give a deployed process an API key or client credentials.");
+        }
+
+        if (resource.IsEndpointLoopback)
+        {
+            throw new InvalidOperationException(isContainer
+                ? $"The endpoint of the Storyteller resource '{resource.Name}' is localhost or a loopback address, which the container '{destination.Name}' takes for itself. Give a container an https endpoint it reaches, for example from a parameter: the SDK takes http only to a loopback address."
+                : $"The endpoint of the Storyteller resource '{resource.Name}' is localhost or a loopback address, which '{destination.Name}' takes for itself once it is deployed. Give a deployed process the endpoint it reaches, for example from a parameter.");
         }
     }
 

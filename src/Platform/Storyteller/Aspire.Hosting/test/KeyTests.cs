@@ -12,7 +12,7 @@ public sealed class KeyTests
         var host = TestAppHost.Run();
         var project = host.AddProject().WithStorytellerKey("@acme.billing.default.exe.northwind.invoicing.dev");
 
-        (await host.ReadVariablesAsync(project.Resource)).ShouldBe(new Dictionary<string, string?>
+        (await host.ReadVariablesAsync(project.Resource)).ShouldBeVariables(new Dictionary<string, string?>
         {
             ["STORYTELLER_KEY"] = "@acme.billing.default.exe.northwind.invoicing.dev",
         });
@@ -35,7 +35,7 @@ public sealed class KeyTests
         var storyteller = host.Builder.AddStoryteller("storyteller", Endpoint).WithView("acme", "billing", "staging");
         var project = host.AddProject().WithReference(storyteller).WithStorytellerKey("rst.invoicing");
 
-        (await host.ReadVariablesAsync(project.Resource)).ShouldBe(new Dictionary<string, string?>
+        (await host.ReadVariablesAsync(project.Resource)).ShouldBeVariables(new Dictionary<string, string?>
         {
             ["STORYTELLER_ENDPOINT"] = Endpoint,
             ["STORYTELLER_KEY"] = "@acme.billing.staging.rst.invoicing",
@@ -72,10 +72,42 @@ public sealed class KeyTests
             .WithExecution("northwind", "invoicing", "dev")
             .WithStorytellerKey("@acme.billing.default.sbt.northwind");
 
-        (await host.ReadVariablesAsync(project.Resource)).ShouldBe(new Dictionary<string, string?>
+        (await host.ReadVariablesAsync(project.Resource)).ShouldBeVariables(new Dictionary<string, string?>
         {
             ["STORYTELLER_KEY"] = "@acme.billing.default.sbt.northwind",
         });
+    }
+
+    // A key in the AppHost's environment would reach a referencing project, so WithReference masks it in run mode.
+    [Fact]
+    public async Task AReferenceWithoutAKey_WritesTheKeyEmpty()
+    {
+        var host = TestAppHost.Run();
+        var storyteller = host.Builder.AddStoryteller("storyteller", Endpoint);
+        var project = host.AddProject().WithReference(storyteller);
+
+        (await host.ReadAllVariablesAsync(project.Resource))["STORYTELLER_KEY"].ShouldBe(string.Empty);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TheKey_IsNotMaskedByTheReference_InEitherOrder(bool isKeyFirst)
+    {
+        var host = TestAppHost.Run();
+        var storyteller = host.Builder.AddStoryteller("storyteller", Endpoint).WithView("acme", "billing");
+        var project = host.AddProject();
+
+        if (isKeyFirst)
+        {
+            project.WithExecution("northwind", "invoicing", "dev").WithReference(storyteller);
+        }
+        else
+        {
+            project.WithReference(storyteller).WithExecution("northwind", "invoicing", "dev");
+        }
+
+        (await host.ReadAllVariablesAsync(project.Resource))["STORYTELLER_KEY"].ShouldBe("@acme.billing.default.exe.northwind.invoicing.dev");
     }
 
     [Fact]

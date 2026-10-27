@@ -27,6 +27,13 @@ internal static class EndpointRule
         }
     }
 
+    // localhost or a loopback address: the AppHost's machine to a process that runs there, but the container itself to
+    // a container, and the deployed process itself once published.
+    public static bool IsLoopback(string value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.IsLoopback;
+    }
+
     private static bool IsLocalHttp(Uri uri)
     {
         return uri.Scheme == Uri.UriSchemeHttp

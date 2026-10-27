@@ -59,16 +59,24 @@ internal sealed class TestAppHost
         return Builder.AddContainer(name, "python", "3.13");
     }
 
-    // The STORYTELLER_* and ConnectionStrings__* variables only, as Aspire adds OTEL_* and others. Always bounded: a
-    // value that never resolves (an endpoint that is not allocated without DCP) waits.
+    // The variables that have a value. Every SDK reads an empty one as unset, and WithReference writes the names a
+    // project or an executable would inherit from the AppHost empty in run mode; ReadAllVariablesAsync keeps them.
     public async Task<IReadOnlyDictionary<string, string?>> ReadVariablesAsync(IResource resource)
+    {
+        return Sorted((await ReadAllVariablesAsync(resource)).Where(variable => !string.IsNullOrEmpty(variable.Value)));
+    }
+
+    // The STORYTELLER_* and ConnectionStrings__* variables only, as Aspire adds OTEL_* and others; ordered by name, as
+    // the order Aspire gathers them in is not the contract. Always bounded: a value that never resolves (an endpoint
+    // that is not allocated without DCP) waits.
+    public async Task<IReadOnlyDictionary<string, string?>> ReadAllVariablesAsync(IResource resource)
     {
         var result = await BuildAsync(resource);
 
         result.Exception.ShouldBeNull();
-        return result.EnvironmentVariables
+        return Sorted(result.EnvironmentVariables
             .Where(variable => variable.Key.StartsWith("STORYTELLER_", StringComparison.Ordinal) || variable.Key.StartsWith("ConnectionStrings__", StringComparison.Ordinal))
-            .ToDictionary(variable => variable.Key, variable => (string?)variable.Value, StringComparer.Ordinal);
+            .Select(variable => KeyValuePair.Create(variable.Key, (string?)variable.Value)));
     }
 
     public async Task<IExecutionConfigurationResult> BuildAsync(IResource resource)
@@ -78,5 +86,10 @@ internal sealed class TestAppHost
         return await ExecutionConfigurationBuilder.Create(resource)
             .WithEnvironmentVariablesConfig()
             .BuildAsync(Builder.ExecutionContext, NullLogger.Instance, timeout.Token);
+    }
+
+    private static SortedDictionary<string, string?> Sorted(IEnumerable<KeyValuePair<string, string?>> variables)
+    {
+        return new SortedDictionary<string, string?>(variables.ToDictionary(StringComparer.Ordinal), StringComparer.Ordinal);
     }
 }

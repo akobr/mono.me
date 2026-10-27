@@ -13,6 +13,8 @@ public sealed class StorytellerResource : Resource
         : base(name)
     {
         Endpoint = endpoint;
+        IsEndpointLiteral = endpoint.ValueProviders.Count == 0;
+        IsEndpointLoopback = IsEndpointLiteral && EndpointRule.IsLoopback(endpoint.ValueExpression);
     }
 
     public ReferenceExpression Endpoint { get; }
@@ -23,6 +25,12 @@ public sealed class StorytellerResource : Resource
     public string? Project { get; private set; }
 
     public string? View { get; private set; }
+
+    // An expression without parameters or endpoint references is a literal URL, whichever overload built it.
+    internal bool IsEndpointLiteral { get; }
+
+    // A literal URL to localhost or a loopback address, which only a process on the AppHost's machine reaches.
+    internal bool IsEndpointLoopback { get; }
 
     // Secrets are parameters only, so they never sit in the AppHost's code; Aspire resolves them at start and the
     // dashboard masks them.
@@ -74,7 +82,12 @@ public sealed class StorytellerResource : Resource
 
     // The variables of WithReference: the endpoint and those of the credential that is set. Parameters and expressions
     // stay what they are, so Aspire resolves them at start and a manifest holds their references.
-    internal void WriteVariables(IDictionary<string, object> variables)
+    //
+    // With maskUnset, every other name the SDK reads is written empty, which every SDK reads as unset: DCP starts a
+    // project or an executable with the AppHost's environment, and a STORYTELLER_* left there (for sform, say) would mix
+    // with this machine's credential. A name another callback already wrote keeps its value, so the key of
+    // WithStorytellerKey stays whichever was called first.
+    internal void WriteVariables(IDictionary<string, object> variables, bool maskUnset)
     {
         variables[StorytellerVariableNames.ENDPOINT] = Endpoint;
         Write(variables, StorytellerVariableNames.API_KEY, ApiKey);
@@ -84,6 +97,16 @@ public sealed class StorytellerResource : Resource
         Write(variables, StorytellerVariableNames.TOKEN_SCOPE, TokenScope);
         Write(variables, StorytellerVariableNames.CLIENT_CERTIFICATE, CertificatePath);
         Write(variables, StorytellerVariableNames.CLIENT_CERTIFICATE_PASSWORD, CertificatePassword);
+
+        if (!maskUnset)
+        {
+            return;
+        }
+
+        foreach (var name in StorytellerVariableNames.Identity)
+        {
+            variables.TryAdd(name, string.Empty);
+        }
     }
 
     private static void Write(IDictionary<string, object> variables, string name, object? value)
