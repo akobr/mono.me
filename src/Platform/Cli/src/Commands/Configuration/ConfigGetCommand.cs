@@ -54,7 +54,7 @@ public class ConfigGetCommand : BaseContextCommand
     [Argument(0, Description = "An annotation key to get the configuration for.")]
     public string AnnotationKey { get; set; } = string.Empty;
 
-    [Option("-e|--export", CommandOptionType.SingleValue, Description = "Specify a file where the retrieved configuration will be saved: the whole model, or with --format, --content-only, --github-env or --mask the content alone, and nothing else is printed.")]
+    [Option("-e|--export", CommandOptionType.SingleValue, Description = "Specify a file where the retrieved configuration will be saved: the whole model, or the content alone with --format flat, properties, env or yaml, --content-only, --github-env or --mask, which then print no content.")]
     public string? ExportFilePath { get; set; }
 
     public bool IsExportRequested => !string.IsNullOrWhiteSpace(ExportFilePath);
@@ -367,7 +367,8 @@ public class ConfigGetCommand : BaseContextCommand
         }
         else if (payload.Length == 0)
         {
-            Console.WriteLine("The configuration has no values.".ThemedLowlight(Console.Theme));
+            // As raw as the text: Alba needs a console, which a redirected run in CI does not have.
+            Console.WriteRaw("\nThe configuration has no values.\n");
         }
         else
         {
