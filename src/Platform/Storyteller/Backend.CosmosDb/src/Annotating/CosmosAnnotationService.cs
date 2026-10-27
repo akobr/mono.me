@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -737,7 +738,20 @@ public partial class CosmosAnnotationService : IAnnotationService
             return;
         }
 
-        var results = await feed.ReadNextAsync();
+        FeedResponse<TEntity> results;
+
+        try
+        {
+            results = await feed.ReadNextAsync();
+        }
+        catch (CosmosException exception) when (cosmosToken is not null && exception.StatusCode == HttpStatusCode.BadRequest)
+        {
+            // the token decoded, but its Cosmos DB part is not one of this query: the client sent a bad token, the
+            // store did not fail. The Cosmos DB message quotes the token and carries diagnostics, so none of it goes
+            // into the answer.
+            throw new InvalidInputException("The continuation token is not valid; list again without it.", ErrorCodes.InvalidQuery);
+        }
+
         var mapped = results
             .Where(entity => descendantsOf is null || (AnnotationKey.TryParse(entity.AnnotationKey, out var key) && key.IsDescendantOf(descendantsOf)))
             .Where(entity => model.Request.IncludeInactive

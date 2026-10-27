@@ -2,7 +2,7 @@
 
 using System;
 using System.Text;
-using Shouldly;
+using FluentAssertions;
 using Xunit;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
@@ -18,10 +18,10 @@ public class ContinuationTokenTests
     {
         var text = new ContinuationToken("Execution", CosmosToken).ToString();
 
-        ContinuationToken.TryParse(text, out var parsed).ShouldBeTrue();
-        parsed!.Type.ShouldBe("Execution");
-        parsed.CosmosToken.ShouldBe(CosmosToken);
-        parsed.IsFirstPage.ShouldBeFalse();
+        ContinuationToken.TryParse(text, out var parsed).Should().BeTrue();
+        parsed!.Type.Should().Be("Execution");
+        parsed.CosmosToken.Should().Be(CosmosToken);
+        parsed.IsFirstPage.Should().BeFalse();
     }
 
     [Fact]
@@ -29,7 +29,7 @@ public class ContinuationTokenTests
     {
         var text = new ContinuationToken("Usage", "abc").ToString();
 
-        text.ShouldBe(Convert.ToBase64String(Encoding.UTF8.GetBytes("Usage|abc")));
+        text.Should().Be(Convert.ToBase64String(Encoding.UTF8.GetBytes("Usage|abc")));
     }
 
     [Fact]
@@ -37,9 +37,9 @@ public class ContinuationTokenTests
     {
         var text = ContinuationToken.CreateFirstPage("Context").ToString();
 
-        ContinuationToken.TryParse(text, out var parsed).ShouldBeTrue();
-        parsed!.Type.ShouldBe("Context");
-        parsed.IsFirstPage.ShouldBeTrue();
+        ContinuationToken.TryParse(text, out var parsed).Should().BeTrue();
+        parsed!.Type.Should().Be("Context");
+        parsed.IsFirstPage.Should().BeTrue();
     }
 
     [Fact]
@@ -47,9 +47,9 @@ public class ContinuationTokenTests
     {
         var text = new ContinuationToken("Subject", "left|middle|right").ToString();
 
-        ContinuationToken.TryParse(text, out var parsed).ShouldBeTrue();
-        parsed!.Type.ShouldBe("Subject");
-        parsed.CosmosToken.ShouldBe("left|middle|right");
+        ContinuationToken.TryParse(text, out var parsed).Should().BeTrue();
+        parsed!.Type.Should().Be("Subject");
+        parsed.CosmosToken.Should().Be("left|middle|right");
     }
 
     [Fact]
@@ -57,9 +57,9 @@ public class ContinuationTokenTests
     {
         var text = Convert.ToBase64String(Encoding.UTF8.GetBytes("Unit|"));
 
-        ContinuationToken.TryParse(text, out var parsed).ShouldBeTrue();
-        parsed!.Type.ShouldBe("Unit");
-        parsed.IsFirstPage.ShouldBeTrue();
+        ContinuationToken.TryParse(text, out var parsed).Should().BeTrue();
+        parsed!.Type.Should().Be("Unit");
+        parsed.IsFirstPage.Should().BeTrue();
     }
 
     [Theory]
@@ -71,8 +71,8 @@ public class ContinuationTokenTests
     [InlineData("Execution|+RID:~a2ZpAJ5iGQkDAAAAAAAAAA==#RT:1")]
     public void GarbageAndTheOldUnencodedForm_DoNotParse(string? text)
     {
-        ContinuationToken.TryParse(text, out var parsed).ShouldBeFalse();
-        parsed.ShouldBeNull();
+        ContinuationToken.TryParse(text, out var parsed).Should().BeFalse();
+        parsed.Should().BeNull();
     }
 
     [Fact]
@@ -80,6 +80,6 @@ public class ContinuationTokenTests
     {
         var text = Convert.ToBase64String(Encoding.UTF8.GetBytes("Execution"));
 
-        ContinuationToken.TryParse(text, out _).ShouldBeFalse();
+        ContinuationToken.TryParse(text, out _).Should().BeFalse();
     }
 }
