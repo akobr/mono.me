@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Text;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.ConditionalReads;
@@ -8,6 +9,7 @@ using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.ConfigurationFormats;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.KeyValues.Policy;
 using Microsoft.AspNetCore.Http;
@@ -28,6 +30,12 @@ public partial class ConfigurationHttp
 {
     // the d tags of one If-None-Match whose manifests a resolved read looks up
     private const int MaxManifestCandidates = 4;
+
+    // ?format=json is the envelope, as the documented default of the diff's format
+    private const string EnvelopeFormat = "json";
+
+    private static readonly string InvalidFormatMessage =
+        $"The query parameter '{Definitions.Parameters.Format}' must be {EnvelopeFormat}, {string.Join(", ", ConfigurationFormatNames.Names.SkipLast(1))} or {ConfigurationFormatNames.Names[^1]}.";
 
     private readonly IConfigurationService _configuration;
     private readonly IAnnotationService _annotations;
@@ -94,10 +102,12 @@ public partial class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ConfigurationFormat)]
     [OpenApiParameter(Definitions.Parameters.IfNoneMatch, In = ParameterLocation.Header, Required = false, Type = typeof(string), Description = Definitions.Descriptions.IfNoneMatch)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), CustomHeaderType = typeof(ConfigurationReadResponseHeaders), Description = "The configuration model.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), CustomHeaderType = typeof(ConfigurationReadResponseHeaders), Description = "The configuration model. " + Definitions.Descriptions.ConfigurationFormatBody)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotModified, CustomHeaderType = typeof(ConfigurationReadResponseHeaders), Description = Definitions.Descriptions.ResponseNotModified)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithBody(HttpStatusCode.UnprocessableEntity, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationFormatInvalid)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationNotFound)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationRead)]
@@ -117,6 +127,7 @@ public partial class ConfigurationHttp
             return badRequestResult;
         }
 
+        var format = ParseFormat(request);
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         var configurationModel = await _configuration.GetRawConfigurationAsync(fullKey);
 
@@ -125,8 +136,20 @@ public partial class ConfigurationHttp
             return await NotFoundAsync(fullKey);
         }
 
+        // formatted before any header is written and before the tags are compared, so a document the format cannot
+        // represent is a bare 422, also for If-None-Match: *
+        FormattedConfiguration? body = null;
+
+        if (format is { } requested && !TryFormat(fullKey, configurationModel, requested, out body, out var unprocessableResult))
+        {
+            return unprocessableResult;
+        }
+
         request.MarkNoCache();
-        return request.OkOrNotModified(configurationModel, ConfigurationEntityTags.ForEffective(fullKey, configurationModel));
+        var entityTag = ConfigurationEntityTags.ForEffective(fullKey, configurationModel, ConfigurationEntityTags.RepresentationOf(format));
+        return body is null
+            ? request.OkOrNotModified(configurationModel, entityTag)
+            : request.OkOrNotModified(body, entityTag);
     }
 
     [Function(nameof(GetConfigurationResolved))]
@@ -137,11 +160,12 @@ public partial class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ConfigurationFormat)]
     [OpenApiParameter(Definitions.Parameters.IfNoneMatch, In = ParameterLocation.Header, Required = false, Type = typeof(string), Description = Definitions.Descriptions.IfNoneMatch)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), CustomHeaderType = typeof(ResolvedConfigurationReadResponseHeaders), Description = "The configuration model with resolved substitutions.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), CustomHeaderType = typeof(ResolvedConfigurationReadResponseHeaders), Description = "The configuration model with resolved substitutions. " + Definitions.Descriptions.ConfigurationFormatBody)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotModified, CustomHeaderType = typeof(ResolvedConfigurationReadResponseHeaders), Description = Definitions.Descriptions.ResponseNotModified)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.UnprocessableEntity, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A binding in the configuration cannot be evaluated or exceeds an evaluation limit. ErrorCode is binding.evaluation or binding.limit.<kind>.")]
+    [OpenApiResponseWithBody(HttpStatusCode.UnprocessableEntity, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseResolvedConfigurationInvalid)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationNotFound)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationRead)]
@@ -161,6 +185,8 @@ public partial class ConfigurationHttp
             return badRequestResult;
         }
 
+        var format = ParseFormat(request);
+
         // secrets go to machines only over mTLS when the project says so; a withheld read says why in a header
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
@@ -172,20 +198,24 @@ public partial class ConfigurationHttp
         }
 
         // the effective inputs, tagged before anything is evaluated: without bindings the effective document is the
-        // resolved one and is answered without evaluating; with bindings the tag is an input of the d tag
-        var effectiveTag = ConfigurationEntityTags.ForResolved(fullKey, configurationModel, rights);
+        // resolved one and is answered without evaluating; with bindings the tag is an input of the d tag. The format is
+        // one of the inputs, so the manifests of two formats never meet.
+        var representation = ConfigurationEntityTags.RepresentationOf(format);
+        var effectiveTag = ConfigurationEntityTags.ForResolved(fullKey, configurationModel, rights, representation);
         var entityTag = effectiveTag;
+        var manifests = request.GetDependencyManifests();
+        var caller = DependencyManifests.CallerOf(rights);
+        DependencyManifest? manifest = null;
 
         if (_configuration.HasBindings(configurationModel))
         {
-            var manifests = request.GetDependencyManifests();
-            var caller = DependencyManifests.CallerOf(rights);
             var runtime = manifests?.GetRuntimeVersion() ?? BindingRuntimeVersion.Of(catalog: null);
             var unchanged = await FindUnchangedManifestAsync(request, fullKey, effectiveTag, runtime, caller, manifests);
 
             if (unchanged is not null)
             {
-                // nothing is evaluated, looked up, decrypted, metered or audited: the client holds the body already
+                // nothing is evaluated, formatted, looked up, decrypted, metered or audited: the client holds the body
+                // already, and a manifest is recorded only after its body was formatted
                 SetResolvedHeaders(request, rights);
                 request.SetResponseHeader(HeaderNames.ETag, unchanged.ToString());
                 return new StatusCodeResult(StatusCodes.Status304NotModified);
@@ -198,18 +228,34 @@ public partial class ConfigurationHttp
             {
                 // the body can change while the inputs do not (the clock, a binding that does not record), so only its own digest names it
                 _logger.LogDebug("The resolved read of {Configuration} is tagged by its body: {Reason}", fullKey, dependencies.VolatileReason);
-                entityTag = ConfigurationEntityTags.ForResolvedBindings(fullKey, configurationModel, rights, request.GetEntityTagKey());
+                entityTag = ConfigurationEntityTags.ForResolvedBindings(fullKey, configurationModel, rights, request.GetEntityTagKey(), representation);
             }
             else
             {
                 var recorded = dependencies.ToList();
                 entityTag = ConfigurationEntityTags.ForDependencies(effectiveTag, runtime, recorded);
-                manifests?.Set(caller, new DependencyManifest(entityTag, effectiveTag, runtime, recorded));
+                manifest = new DependencyManifest(entityTag, effectiveTag, runtime, recorded);
             }
         }
 
+        // a document the format cannot represent is a bare 422 without a manifest, so after a resolve it is resolved,
+        // metered and audited again on every request
+        FormattedConfiguration? body = null;
+
+        if (format is { } requested && !TryFormat(fullKey, configurationModel, requested, out body, out var unprocessableResult))
+        {
+            return unprocessableResult;
+        }
+
+        if (manifest is not null)
+        {
+            manifests?.Set(caller, manifest);
+        }
+
         SetResolvedHeaders(request, rights);
-        return request.OkOrNotModified(configurationModel, entityTag);
+        return body is null
+            ? request.OkOrNotModified(configurationModel, entityTag)
+            : request.OkOrNotModified(body, entityTag);
     }
 
     [Function(nameof(SetConfiguration))]
@@ -650,6 +696,54 @@ public partial class ConfigurationHttp
         _logger.LogWarning("Invalid request; unknown annotation key '{annotationKey}'", annotationKey);
         badRequestResult = new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {annotationKey}"));
         return false;
+    }
+
+    // ?format= of the effective and resolved reads: null for the envelope (absent, empty or json, as elsewhere in the API),
+    // a format by its exact name in any ASCII casing, otherwise 400 InvalidQuery, also for a repeat, which Query joins
+    // with commas.
+    private static ConfigurationFormat? ParseFormat(HttpRequestData request)
+    {
+        var raw = request.Query[Definitions.Parameters.Format];
+
+        if (string.IsNullOrEmpty(raw) || Ascii.EqualsIgnoreCase(raw, EnvelopeFormat))
+        {
+            return null;
+        }
+
+        return ConfigurationFormatNames.TryParse(raw, out var format)
+            ? format
+            : throw new InvalidInputException(InvalidFormatMessage, ErrorCodes.InvalidQuery);
+    }
+
+    // The complete body of the format, or the 422 of a document the format cannot represent: format.<rule> with the rule
+    // and the JSON path, never a value.
+    private bool TryFormat(
+        FullKey key,
+        Configuration configuration,
+        ConfigurationFormat format,
+        [MaybeNullWhen(false)] out FormattedConfiguration body,
+        [MaybeNullWhen(true)] out IActionResult unprocessableResult)
+    {
+        try
+        {
+            body = ConfigurationFormatter.Format(configuration.Content, format);
+            unprocessableResult = null;
+            return true;
+        }
+        catch (InvalidDocumentException exception)
+        {
+            _logger.LogWarning("The configuration {Configuration} cannot be written as {Format}: {Rule} at {Path}", key, format.GetName(), exception.Rule, exception.Path);
+            body = null;
+            unprocessableResult = new ObjectResult(new ErrorResponse(exception.Message)
+            {
+                ErrorCode = $"format.{exception.Rule}",
+                Details = new { Format = format.GetName(), Rule = exception.Rule, Path = exception.Path },
+            })
+            {
+                StatusCode = StatusCodes.Status422UnprocessableEntity,
+            };
+            return false;
+        }
     }
 
     // A read that found nothing: a deleted annotation answers 404 with ErrorCode AnnotationDeleted, so clients can tell

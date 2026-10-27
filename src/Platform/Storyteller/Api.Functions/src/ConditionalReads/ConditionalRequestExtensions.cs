@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.ConfigurationFormats;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -26,6 +27,16 @@ public static class ConditionalRequestExtensions
         return @this.MatchesIfNoneMatch(entityTag)
             ? new StatusCodeResult(StatusCodes.Status304NotModified)
             : new OkObjectResult(value);
+    }
+
+    // A formatted configuration (?format=) as it is, not as JSON; its media type is the only source of the Content-Type.
+    public static IActionResult OkOrNotModified(this HttpRequestData @this, FormattedConfiguration body, EntityTagHeaderValue entityTag)
+    {
+        @this.SetResponseHeader(HeaderNames.ETag, entityTag.ToString());
+
+        return @this.MatchesIfNoneMatch(entityTag)
+            ? new StatusCodeResult(StatusCodes.Status304NotModified)
+            : new ContentResult { Content = body.Text, ContentType = body.MediaType, StatusCode = StatusCodes.Status200OK };
     }
 
     // Every If-None-Match line and list item counts. A header that is not a strict list of entity tags is ignored.

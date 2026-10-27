@@ -523,6 +523,12 @@ public static class Definitions
         public const string CacheControlConfigurationRead = "private, no-cache: shared caches do not store the response, and a client revalidates its copy before each use.";
         public const string CacheControlResolvedRead = "no-store when the caller may read secrets, otherwise private, no-cache.";
         public const string SecretsWithheld = "mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; the secrets then stay unbound, as their @ expressions. Absent otherwise.";
+
+        // ?format= of the effective and resolved reads (configuration-formats.md, API).
+        public const string ConfigurationFormat = "The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).";
+        public const string ConfigurationFormatBody = "With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.";
+        public const string ResponseConfigurationFormatInvalid = "The configuration cannot be written in the requested format (ErrorCode format.<rule>: format.not-an-object, format.empty-name, format.colon-in-name, format.case-collision, format.bracket-in-name, format.array-gap or format.invalid-env-name). Details hold the Format, the Rule and the JSON Path; the message names the path, never a value.";
+        public const string ResponseResolvedConfigurationInvalid = "A binding in the configuration cannot be evaluated or exceeds an evaluation limit (ErrorCode binding.evaluation or binding.limit.<kind>), or the resolved configuration cannot be written in the requested format (ErrorCode format.<rule>, with Details as on the effective read).";
         public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";
         public const string DiffFormat = "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.";
         public const string KeyValueKey = "The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.";
@@ -580,6 +586,7 @@ public static class Definitions
     {
         public const string Json = "application/json";
         public const string PlainText = "text/plain";
+        public const string Yaml = "application/yaml";
         public const string Zip = "application/zip";
         public const string FormUrlEncoded = "application/x-www-form-urlencoded";
     }
