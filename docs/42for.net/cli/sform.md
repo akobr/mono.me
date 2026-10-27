@@ -136,6 +136,10 @@ The details, such as the token URL rules, the certificate header for a local API
 
 `sform story config <key>` prints the configuration of an annotation: its whole model, with the version and the audit stamp, as coloured JSON. `-r` reads the resolved configuration, with its bindings evaluated, and `--version <n>` the stored content of a version.
 
+::: warning
+`--format`, `--content-only`, `--env-prefix`, `--github-env`, `--mask`, `--allow-unprefixed` and `--allow-unresolved` are newer than the `sform` on NuGet, which ends such a command as an unrecognized option. Until a release has them, install a `sform` packed from the repository, as [Until sform is published](/cli/github-action#until-sform-is-published) shows.
+:::
+
 ``` text
 sform story config <key> [-r|--resolved | --version <n>] [-f|--format json|flat|properties|env|yaml]
                          [--content-only] [-e|--export <file>] [--env-prefix <PREFIX>]
@@ -173,7 +177,7 @@ A resolved configuration holds secret values only for a caller with the right to
 
 ### Export to GitHub Actions
 
-`--github-env` exports a resolved configuration into the environment of a GitHub Actions job: every value becomes a variable with its `env` name in `GITHUB_ENV`, which the runner reads after the step. The options of this section are newer than the `sform` on NuGet; until a release has them, install a `sform` packed from the repository. The [GitHub Action](/cli/github-action) installs `sform` and runs this command in one step, and shows how to pack it.
+`--github-env` exports a resolved configuration into the environment of a GitHub Actions job: every value becomes a variable with its `env` name in `GITHUB_ENV`, which the runner reads after the step. Like the other new options of [Read a configuration](#read-a-configuration), they need a `sform` packed from the repository until a release has them. The [GitHub Action](/cli/github-action) installs `sform` and runs this command in one step, and shows how to pack it.
 
 ``` yaml
 # GitHub Actions: the later steps read APP_DB__HOST, APP_DB__PASSWORD, …
