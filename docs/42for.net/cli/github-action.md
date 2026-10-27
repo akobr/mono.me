@@ -45,7 +45,7 @@ Set `export-env`, `output-file` or both; without either, the action fails before
 ## What the action does
 
 1. It checks the inputs.
-2. When the runner has no .NET 10, it runs `actions/setup-dotnet@v6` (see [.NET on the runner](#net-on-the-runner)).
+2. When the runner has no .NET 10 SDK, it runs `actions/setup-dotnet@v6` (see [.NET on the runner](#net-on-the-runner)).
 3. It installs the `cli-version` of `sform` into a folder of its own under `$RUNNER_TEMP`, from nuget.org and `cli-source`, without reading the `nuget.config` of your repository. A second use of the action in the job reuses that folder.
 4. It runs `sform` once, with one resolved and one effective read: `sform` writes the `::add-mask::` commands first, then the variables to `GITHUB_ENV` with `export-env`, then `output-file`, and a summary with the names of the variables and the number of masked values, never a value.
 
@@ -150,4 +150,4 @@ steps:
 
 ## .NET on the runner
 
-`sform` runs on .NET 10. When the runner has it, the action uses it and changes nothing. When it does not, the action runs `actions/setup-dotnet@v6` with `10.0.x`, which changes `DOTNET_ROOT` and `PATH` **for the rest of the job**: the later steps run the .NET it installed. A job that needs another .NET sets it up itself, after the action or before it with .NET 10 included.
+`sform` is a .NET 10 tool: installing it needs the .NET 10 SDK, which also brings the runtime it runs on. When the runner has that SDK, the action uses it and changes nothing. When it does not, also when it has only the .NET 10 runtime or an older SDK, the action runs `actions/setup-dotnet@v6` with `10.0.x`, which changes `DOTNET_ROOT` and `PATH` **for the rest of the job**: the later steps run the .NET it installed. A job that needs another .NET sets it up itself, after the action or before it with .NET 10 included.

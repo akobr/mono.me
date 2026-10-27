@@ -106,17 +106,18 @@ runs:
 
         [ "$failed" = false ]
 
-    # sform runs on .NET 10. A runner that has it keeps its own .NET; the root is where the tool finds it.
+    # sform is a net10.0 tool: an older SDK cannot install it, and a runtime alone installs nothing. An SDK 10 also
+    # brings the runtime it runs on, so a runner that has one keeps its own .NET; the root is where the tool finds it.
     - name: Look for .NET 10
       id: dotnet
       shell: bash
       run: |
-        runtime=$(dotnet --list-runtimes 2>/dev/null | grep '^Microsoft\.NETCore\.App 10\.' | tail -n 1 || true)
+        sdk=$(dotnet --list-sdks 2>/dev/null | grep '^10\.' | tail -n 1 || true)
 
-        if [ -n "$runtime" ]; then
-          root=${runtime#*\[}
+        if [ -n "$sdk" ]; then
+          root=${sdk#*\[}
           root=${root%]*}
-          echo "root=${root%?shared?Microsoft.NETCore.App}" >> "$GITHUB_OUTPUT"
+          echo "root=${root%?sdk}" >> "$GITHUB_OUTPUT"
         fi
 
     # Changes DOTNET_ROOT and PATH for the rest of the job, which the README says.
