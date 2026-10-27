@@ -53,6 +53,10 @@ public partial class CosmosAnnotationService : IAnnotationService
         Restore,
     }
 
+    // The most items a page of an annotation list reads per type, and the count after which a page ends at a type
+    // boundary. A test sets a small one to page through a few items.
+    internal int PageSize { get; init; } = CosmosConstants.MaxItemCountPerPage;
+
     public async Task<bool> ExistAnnotationAsync(FullKey fullKey)
     {
         var node = await Store(fullKey.OrganizationName).LoadAsync(fullKey, withConfiguration: false, withAudit: false);
@@ -631,9 +635,12 @@ public partial class CosmosAnnotationService : IAnnotationService
             return;
         }
 
+        // the token belongs to this type only, so the types after it start at their first page; the first-page
+        // sentinel is not a Cosmos DB token
+        var cosmosToken = model.InputContinuationToken is { IsFirstPage: false } input ? input.CosmosToken : null;
         model.InputContinuationToken = null;
 
-        if (model.TotalCount >= CosmosConstants.MaxItemCountPerPage)
+        if (model.TotalCount >= PageSize)
         {
             model.OutputContinuationToken = ContinuationToken.CreateFirstPage(annotationTypeName);
             return;
@@ -669,11 +676,11 @@ public partial class CosmosAnnotationService : IAnnotationService
 
         var repository = _repositoryProvider.GetOrganizationContainer(model.Request.Organization);
         var queryable = repository.Container.GetItemLinqQueryable<TEntity>(
-            continuationToken: model.InputContinuationToken?.CosmosToken,
+            continuationToken: cosmosToken,
             requestOptions: new QueryRequestOptions
             {
                 PartitionKey = partitionKey,
-                MaxItemCount = CosmosConstants.MaxItemCountPerPage,
+                MaxItemCount = PageSize,
             });
 
         var matches = queryable
