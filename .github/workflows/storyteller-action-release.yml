@@ -1,0 +1,142 @@
+name: Storyteller action release
+run-name: Release the Storyteller configuration action v${{ inputs.version }}
+
+# Releases src/Platform/GitHubAction into the repository of its own that GitHub Marketplace lists: one commit with
+# action.yml, README.md and LICENSE, the tag vX.Y.Z, the major tag vX moved to it, and a draft release, which the owner
+# publishes to the Marketplace from the release form. Spec: docs/Platform/Storyteller/specs/2026-10-27 Publishing the
+# GitHub Action and Secrets in CI.md, section 3.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, X.Y.Z, for example 1.0.0
+        required: true
+        type: string
+
+concurrency:
+  group: storyteller-action-release
+  cancel-in-progress: false
+
+# The token of this run only reads this repository; the repository of the action is written with the secret
+# STORYTELLER_ACTION_TOKEN, a fine-grained token with contents write on that repository only.
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Release the action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Inputs and variables reach the scripts only through env:, never as ${{ }} in a script.
+    env:
+      VERSION: ${{ inputs.version }}
+      ACTION_REPOSITORY: ${{ vars.STORYTELLER_ACTION_REPOSITORY }}
+    steps:
+      # Before anything is cloned, so a wrong run fails in seconds. Messages name the variable and the secret, never
+      # their values.
+      - name: Check the run
+        env:
+          ACTION_TOKEN: ${{ secrets.STORYTELLER_ACTION_TOKEN }}
+        run: |
+          failed=false
+          fail() { echo "::error::$1"; failed=true; }
+
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            fail "The action is released from main only; run the workflow from main."
+          fi
+
+          if ! [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            fail "The input version must be X.Y.Z, for example 1.0.0, without a v and without a suffix."
+          fi
+
+          if [ -z "$ACTION_REPOSITORY" ]; then
+            fail "Set the repository variable STORYTELLER_ACTION_REPOSITORY to <owner>/<name> of the repository the action is released into."
+          elif ! [[ "$ACTION_REPOSITORY" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ ]]; then
+            fail "The repository variable STORYTELLER_ACTION_REPOSITORY must be <owner>/<name>."
+          elif [ "${ACTION_REPOSITORY,,}" = "${GITHUB_REPOSITORY,,}" ]; then
+            fail "The repository variable STORYTELLER_ACTION_REPOSITORY must name the repository of the action, not this one."
+          fi
+
+          if [ -z "$ACTION_TOKEN" ]; then
+            fail "Set the repository secret STORYTELLER_ACTION_TOKEN to a fine-grained token with contents write on the repository STORYTELLER_ACTION_REPOSITORY names, and on no other."
+          fi
+
+          [ "$failed" = false ]
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The token reaches git through a credential helper that reads it from the environment of git: it is never in a
+      # URL, an argument, a file or the log. Only the three files of the action reach that repository, no workflow.
+      - name: Commit and tag the release
+        env:
+          ACTION_TOKEN: ${{ secrets.STORYTELLER_ACTION_TOKEN }}
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          tag="v$VERSION"
+          major="v${VERSION%%.*}"
+          action_dir="$GITHUB_WORKSPACE/src/Platform/GitHubAction"
+          repository_dir="$RUNNER_TEMP/storyteller-action-repository"
+          helper='!f() { test "$1" = get || return 0; echo username=x-access-token; echo "password=$ACTION_TOKEN"; }; f'
+
+          # The empty helper drops every helper the runner has configured, so only this one answers.
+          remote_git() { git -c credential.helper= -c "credential.helper=$helper" "$@"; }
+
+          rm -rf "$repository_dir"
+          remote_git clone --quiet "$GITHUB_SERVER_URL/$ACTION_REPOSITORY.git" "$repository_dir"
+          cd "$repository_dir"
+
+          # An assignment, so a failing ls-remote fails the step instead of reading as no tag.
+          existing=$(remote_git ls-remote --tags origin "refs/tags/$tag")
+
+          if [ -n "$existing" ]; then
+            echo "::error::$ACTION_REPOSITORY has the tag $tag already; a released version is never replaced, release the next one."
+            exit 1
+          fi
+
+          # An empty repository has no commit yet; its first release creates main.
+          if git rev-parse --verify --quiet HEAD > /dev/null; then
+            branch=$(git symbolic-ref --short HEAD)
+          else
+            branch=main
+            git symbolic-ref HEAD "refs/heads/$branch"
+          fi
+
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp "$action_dir/action.yml" "$action_dir/README.md" "$action_dir/LICENSE" .
+          git add --all
+
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit --quiet --allow-empty -m "Release $tag" \
+            -m "Source: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA (src/Platform/GitHubAction)"
+          git tag -a "$tag" -m "Release $tag"
+          git tag --force -a "$major" -m "Release $tag"
+
+          # One atomic push: the branch, the new tag and the moved major tag arrive together or not at all, and an
+          # existing tag vX.Y.Z or a branch that moved meanwhile refuses all three.
+          remote_git push --quiet --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$tag" "+refs/tags/$major"
+          echo "Pushed $tag to $branch of $ACTION_REPOSITORY and moved $major to it."
+
+      # A draft: the owner publishes it to GitHub Marketplace from the release form, which the API cannot do.
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.STORYTELLER_ACTION_TOKEN }}
+        run: |
+          tag="v$VERSION"
+          major="v${VERSION%%.*}"
+          source_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA"
+          notes="Released from $GITHUB_REPOSITORY at [${GITHUB_SHA:0:12}]($source_url), src/Platform/GitHubAction."
+          notes+=$'\n\n'"Use $ACTION_REPOSITORY@$major for the newest ${major}.x.y release, or $ACTION_REPOSITORY@$tag for this one."
+
+          url=$(gh release create "$tag" --repo "$ACTION_REPOSITORY" --draft --verify-tag --title "$tag" --notes "$notes")
+
+          {
+            echo "Draft release $tag of $ACTION_REPOSITORY: $url"
+            echo
+            echo "Publish it from the release form with **Publish this Action to the GitHub Marketplace**."
+          } >> "$GITHUB_STEP_SUMMARY"

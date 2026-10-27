@@ -1,6 +1,11 @@
 name: Storyteller configuration
-description: Read the resolved configuration of an annotation from the 2S Platform with sform, mask the values bindings produced, and export it to the job environment or a file.
+# Under 125 characters, which the release form of GitHub Marketplace asks of a description.
+description: Read a resolved configuration from the 2S Platform, mask the values bindings produced, and export it to the job or a file.
 author: Ales Kobr
+# The icon and colour of the action on GitHub Marketplace; icon is a Feather icon name GitHub supports.
+branding:
+  icon: sliders
+  color: purple
 
 # A thin wrapper of `sform story config <key> --resolved --github-env | --mask`: the names, the masks, the heredocs and
 # the refusals are sform's, with its tests. Credentials are not inputs; sform reads them from the job (STORYTELLER_*).
