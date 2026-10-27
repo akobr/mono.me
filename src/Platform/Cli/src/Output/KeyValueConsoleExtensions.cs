@@ -13,6 +13,8 @@ namespace _42.Platform.Cli.Output;
 // Tables and messages of the key/value commands. Secret values are never printed by a listing.
 public static class KeyValueConsoleExtensions
 {
+    internal const string MtlsRequiredHint = "This project delivers secrets to machines only over mTLS: call with a machine certificate, or sign in as a user with the ContributorWithSecrets role.";
+
     public static void WriteKeyValues(this IExtendedConsole @this, KeyValuesResponse response, bool includeValues, bool showDeleted, DateTimeOffset now)
     {
         var items = response.Items ?? [];
@@ -243,9 +245,15 @@ public static class KeyValueConsoleExtensions
 
         if (string.Equals(errorCode, "MtlsRequired", StringComparison.Ordinal))
         {
-            @this.WriteLine("This project delivers secrets to machines only over mTLS: call with a machine certificate, or sign in as a user with the ContributorWithSecrets role.");
+            @this.WriteLine(MtlsRequiredHint);
         }
 
+        return ExitCodeOf(status);
+    }
+
+    // The exit code of a failed API call, the same whatever writes the message.
+    internal static int ExitCodeOf(HttpStatusCode status)
+    {
         return status switch
         {
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => ExitCodes.WARNING_UNAUTHORIZED_ACCESS,

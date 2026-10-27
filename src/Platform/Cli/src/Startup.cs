@@ -5,6 +5,7 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.GitHubActions;
 using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller.Sdk.Credentials;
@@ -51,6 +52,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
             services.AddHttpClient();
             ConfigureMachineSignIn(services);
+            services.AddSingleton(GitHubActionsSettings.FromEnvironment(System.Environment.GetEnvironmentVariable));
             services.AddSingleton<ITokenStore, ProtectedTokenStore>();
             services.AddSingleton<IAuthenticationConfigurationResolver, AuthenticationConfigurationResolver>();
             services.AddSingleton<IAuthenticationService, AuthenticationServiceSelector>();

@@ -55,11 +55,12 @@ public class Program
         return exitCode;
     }
 
-    private static async Task<int> RunAsync(string[] args)
+    // The run, and what its failures print and end with.
+    internal static async Task<int> RunAsync(Func<Task<int>> run, string[] args)
     {
         try
         {
-            return await Host.RunCommandLineApplicationAsync();
+            return await run();
         }
         catch (UnrecognizedCommandParsingException parsingException)
         {
@@ -73,6 +74,20 @@ public class Program
                 parsingException.Command.Name,
                 args,
                 parsingException.NearestMatches.ToList())));
+            return ExitCodes.ERROR_INPUT_PARSING;
+        }
+        catch (CommandParsingException parsingException)
+        {
+            // A missing or an invalid option value, or a single value given twice: the input is wrong, not the tool.
+            CurrentRun.Exception = parsingException;
+            CurrentRun.Command = CommandPath.Of(parsingException.Command);
+            Console.WriteLine(parsingException.Message, Color.DarkGray);
+            Console.WriteLine($"  What happened, {ParsingErrorResponseMessages.GetRandom()}?", Color.DarkGray);
+
+            // Neither the arguments nor the message, which quotes a value: it may be a value of a key/value pair.
+            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
+                "Invalid input at {command}",
+                parsingException.Command.Name)));
             return ExitCodes.ERROR_INPUT_PARSING;
         }
         catch (UnauthorizedAccessException exception)
@@ -137,11 +152,6 @@ public class Program
         {
             CurrentRun.Exception = exception;
 
-            if (exception is CommandParsingException parsingException)
-            {
-                CurrentRun.Command = CommandPath.Of(parsingException.Command);
-            }
-
             // TODO: [P2] Hot fix for bug https://github.com/natemcmaster/CommandLineUtils/issues/541
             if (exception.GetType() == typeof(InvalidOperationException)
                 && string.Equals(
@@ -168,6 +178,11 @@ public class Program
             await Task.Run(() => LogWithSentry(() => _logger?.LogError(exception, "Unhandled exception occurred at input: {args}", new object[] { args })));
             return ExitCodes.ERROR_CRASH;
         }
+    }
+
+    private static Task<int> RunAsync(string[] args)
+    {
+        return RunAsync(() => Host.RunCommandLineApplicationAsync(), args);
     }
 
     private static bool InitializeHost(string[] args)
