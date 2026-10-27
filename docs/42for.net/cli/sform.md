@@ -42,13 +42,19 @@ A federated machine has no secret. `sform` exchanges the platform token for a sh
 `STORYTELLER_CLIENT_ID` decides what `STORYTELLER_TOKEN_FILE` holds: without it, a token the API accepts, sent as it is; with it, a token of your platform, which `sform` exchanges. Earlier versions of `sform` refused the two together, so check that a job with a bearer token file has no `STORYTELLER_CLIENT_ID` left over. They also ended with exit code `3` where a refused token request now ends with `44`, and they made one token request where `sform` now retries transient failures.
 
 ``` yaml
-# GitHub Actions
+# GitHub Actions, certificate machine: the recommendation for secrets
+- run: printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/storyteller.pfx"
+  env:
+    CERTIFICATE: ${{ secrets.STORYTELLER_CERTIFICATE_BASE64 }}
 - run: dotnet tool install 42.Platform.Cli --global --prerelease
 - run: sform story config set sbt.northwind -i configuration/northwind.json
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
-    STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+    STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx
+    STORYTELLER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.STORYTELLER_CERTIFICATE_PASSWORD }}
 ```
+
+An API key or client credentials go into `env:` the same way, from secrets of the repository: `STORYTELLER_API_KEY`, or the variables of client credentials in the table above.
 
 ``` yaml
 # GitHub Actions job, federated machine: no secret, no file
