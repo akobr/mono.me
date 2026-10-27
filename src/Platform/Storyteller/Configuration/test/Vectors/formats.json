@@ -75,27 +75,27 @@
     },
     {
       "name": "line breaks and control characters as flat",
-      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u007f\u0085\u2028" },
+      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u001b\u007f\u0085\u2028" },
       "format": "flat",
-      "text": "{\n  \"lines\": \"a\\nb\\r\\nc\\td\",\n  \"control\": \"\\u0001\u007f\\u0085\\u2028\"\n}\n"
+      "text": "{\n  \"lines\": \"a\\nb\\r\\nc\\td\",\n  \"control\": \"\\u0001\\u001b\u007f\\u0085\\u2028\"\n}\n"
     },
     {
       "name": "line breaks and control characters as properties",
-      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u007f\u0085\u2028" },
+      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u001b\u007f\u0085\u2028" },
       "format": "properties",
-      "text": "lines=a\\nb\\r\\nc\\td\ncontrol=\\u0001\\u007F\\u0085\\u2028\n"
+      "text": "lines=a\\nb\\r\\nc\\td\ncontrol=\\u0001\\u001B\\u007F\\u0085\\u2028\n"
     },
     {
       "name": "line breaks and control characters as env",
-      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u007f\u0085\u2028" },
+      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u001b\u007f\u0085\u2028" },
       "format": "env",
-      "text": "LINES=\"a\\nb\\r\\nc\\td\"\nCONTROL='\u0001\u007f\u0085\u2028'\n"
+      "text": "LINES=\"a\\nb\\r\\nc\\td\"\nCONTROL='\u0001\u001b\u007f\u0085\u2028'\n"
     },
     {
       "name": "line breaks and control characters as yaml",
-      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u007f\u0085\u2028" },
+      "document": { "lines": "a\nb\r\nc\td", "control": "\u0001\u001b\u007f\u0085\u2028" },
       "format": "yaml",
-      "text": "lines: \"a\\nb\\r\\nc\\td\"\ncontrol: \"\\u0001\\u007F\\u0085\\u2028\"\n"
+      "text": "lines: \"a\\nb\\r\\nc\\td\"\ncontrol: \"\\u0001\\u001B\\u007F\\u0085\\u2028\"\n"
     },
     {
       "name": "non-ASCII characters as flat",
