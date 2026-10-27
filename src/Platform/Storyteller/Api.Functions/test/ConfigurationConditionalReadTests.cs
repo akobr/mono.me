@@ -25,13 +25,13 @@ using Newtonsoft.Json.Linq;
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // ETag and If-None-Match on the effective and resolved configuration reads; ConfigurationCompositionHttpTests has the
-// composition read's.
+// composition read's. ConfigurationFormatReadTests shares the internal fixture for ?format=.
 public class ConfigurationConditionalReadTests
 {
-    private const string Org = "acme";
-    private const string Project = "billing";
-    private const string View = "default";
-    private const string Key = "unt.invoicing.sender";
+    internal const string Org = "acme";
+    internal const string Project = "billing";
+    internal const string View = "default";
+    internal const string Key = "unt.invoicing.sender";
 
     // The item key of the ASP.NET Core integration, where FunctionContext.GetHttpContext() looks.
     private const string HttpContextItem = "HttpRequestContext";
@@ -844,12 +844,13 @@ public class ConfigurationConditionalReadTests
     }
 
     // The contract of a conditional read in the document: the optional If-None-Match header, and on the 200 and the 304
-    // the tag and the caching; the resolved read also says when the mTLS policy withheld the secrets.
+    // the tag and the caching; the resolved read also says when the mTLS policy withheld the secrets. The effective and
+    // resolved reads take the format before it (ConfigurationFormatReadTests).
     [Theory]
-    [InlineData(Definitions.RouteIds.Configuration.GetConfiguration, false)]
-    [InlineData(Definitions.RouteIds.Configuration.GetResolvedConfiguration, true)]
-    [InlineData(Definitions.RouteIds.Configuration.GetConfigurationComposition, false)]
-    public async Task Document_ConfigurationReads_DeclareTheConditionalReadContract(string operationId, bool isResolved)
+    [InlineData(Definitions.RouteIds.Configuration.GetConfiguration, false, new[] { Definitions.Parameters.Organization, Definitions.Parameters.Project, Definitions.Parameters.View, Definitions.Parameters.Key, Definitions.Parameters.Format, Definitions.Parameters.IfNoneMatch })]
+    [InlineData(Definitions.RouteIds.Configuration.GetResolvedConfiguration, true, new[] { Definitions.Parameters.Organization, Definitions.Parameters.Project, Definitions.Parameters.View, Definitions.Parameters.Key, Definitions.Parameters.Format, Definitions.Parameters.IfNoneMatch })]
+    [InlineData(Definitions.RouteIds.Configuration.GetConfigurationComposition, false, new[] { Definitions.Parameters.Organization, Definitions.Parameters.Project, Definitions.Parameters.View, Definitions.Parameters.Key, Definitions.Parameters.IfNoneMatch })]
+    public async Task Document_ConfigurationReads_DeclareTheConditionalReadContract(string operationId, bool isResolved, string[] parameterNames)
     {
         var json = await OpenApiExportTests.RenderAsync();
         using var document = JsonDocument.Parse(json);
@@ -859,10 +860,9 @@ public class ConfigurationConditionalReadTests
             .Select(entry => entry.Value)
             .Single(entry => entry.GetProperty("operationId").GetString() == operationId);
 
-        // after the four path parameters, so a generated client takes it last
+        // after the four path parameters and the format, so a generated client takes it last
         var parameters = operation.GetProperty("parameters").EnumerateArray().ToList();
-        parameters.Select(parameter => parameter.GetProperty("name").GetString()).ShouldBe(
-            [Definitions.Parameters.Organization, Definitions.Parameters.Project, Definitions.Parameters.View, Definitions.Parameters.Key, Definitions.Parameters.IfNoneMatch]);
+        parameters.Select(parameter => parameter.GetProperty("name").GetString()).ShouldBe(parameterNames);
         parameters.Take(4).Select(parameter => parameter.GetProperty("in").GetString()).ShouldAllBe(location => location == "path");
         var ifNoneMatch = parameters[^1];
         ifNoneMatch.GetProperty("in").GetString().ShouldBe("header");
@@ -901,7 +901,7 @@ public class ConfigurationConditionalReadTests
     }
 
     // A resolve that records one input, db.host in the version of ConfigurationProxy.Marker. role: the role of every user.
-    private static (ConfigurationHttp Http, ConfigurationProxy Configurations) Create(
+    internal static (ConfigurationHttp Http, ConfigurationProxy Configurations) Create(
         Func<Configuration?> stored,
         Func<Configuration, bool, Configuration>? resolve = null,
         AccountRole role = AccountRole.Reader)
@@ -910,7 +910,7 @@ public class ConfigurationConditionalReadTests
     }
 
     // record: what a resolve does with the collector it is given, after a scope carried it; null: it ignores the collector.
-    private static (ConfigurationHttp Http, ConfigurationProxy Configurations) Create(
+    internal static (ConfigurationHttp Http, ConfigurationProxy Configurations) Create(
         Func<Configuration?> stored,
         Func<Configuration, bool, Configuration>? resolve,
         Action<ConfigurationProxy, BindingDependencies>? record,
@@ -931,25 +931,25 @@ public class ConfigurationConditionalReadTests
     }
 
     // A resolve whose inputs are volatile, like one that runs JSON-e.
-    private static void Volatile(ConfigurationProxy proxy, BindingDependencies dependencies)
+    internal static void Volatile(ConfigurationProxy proxy, BindingDependencies dependencies)
     {
         dependencies.MarkVolatile("JSON-e can read the clock.");
     }
 
     // The services of one process with its manifests.
-    private static ServiceProvider Manifests()
+    internal static ServiceProvider Manifests()
     {
         return new ServiceCollection().AddConditionalReads(new ConfigurationBuilder().Build()).BuildServiceProvider();
     }
 
-    private static DependencyManifest Manifest(params string[] markers)
+    internal static DependencyManifest Manifest(params string[] markers)
     {
         var effective = ConfigurationEntityTags.ForResolved(FullKeyOfTheRead, Stored(), Rights(canReadSecrets: true, withheld: false));
         IReadOnlyList<BindingDependency> dependencies = markers.Select((marker, index) => new BindingDependency(BindingDependencyKinds.KeyValue, View, $"key{index}", marker)).ToList();
         return new DependencyManifest(ConfigurationEntityTags.ForDependencies(effective, "runtime", dependencies), effective, "runtime", dependencies);
     }
 
-    private static Func<Configuration, bool, Configuration> Resolve(string host)
+    internal static Func<Configuration, bool, Configuration> Resolve(string host)
     {
         return (configuration, _) =>
         {
@@ -958,14 +958,14 @@ public class ConfigurationConditionalReadTests
         };
     }
 
-    private static async Task<string> TagOfAsync(ConfigurationHttp http)
+    internal static async Task<string> TagOfAsync(ConfigurationHttp http)
     {
         var request = Read();
         await http.GetConfiguration(request, Org, Project, View, Key);
         return Headers(request).ETag.ToString();
     }
 
-    private static async Task<string> ResolvedTagAsync(ConfigurationHttp http, string? entityTagKey)
+    internal static async Task<string> ResolvedTagAsync(ConfigurationHttp http, string? entityTagKey)
     {
         var request = Machine(mtls: true);
         var services = new ServiceCollection();
@@ -982,14 +982,14 @@ public class ConfigurationConditionalReadTests
     }
 
     // A user: the effective read needs no secret rights.
-    private static TestHttpRequestData Read(string? ifNoneMatch = null)
+    internal static TestHttpRequestData Read(string? ifNoneMatch = null)
     {
         return WithHttpContext(KeyValueRequests.User(), ifNoneMatch);
     }
 
     // Secret rights come from machines, because a DEV_AUTH build skips the role check that gives users secret rights:
     // with a certificate the machine reads secrets, without one they are withheld (the project requires mTLS).
-    private static TestHttpRequestData Machine(bool mtls, string? ifNoneMatch = null, IServiceProvider? provider = null)
+    internal static TestHttpRequestData Machine(bool mtls, string? ifNoneMatch = null, IServiceProvider? provider = null)
     {
         return WithHttpContext(KeyValueRequests.Machine(mtls), ifNoneMatch, provider);
     }
@@ -1002,7 +1002,7 @@ public class ConfigurationConditionalReadTests
     }
 
     // provider: the services of the process, e.g. its manifests; the request keeps an empty provider without it.
-    private static TestHttpRequestData WithHttpContext(TestHttpRequestData request, string? ifNoneMatch, IServiceProvider? provider = null)
+    internal static TestHttpRequestData WithHttpContext(TestHttpRequestData request, string? ifNoneMatch, IServiceProvider? provider = null)
     {
         request.FunctionContext.Items[HttpContextItem] = new DefaultHttpContext();
 
@@ -1019,19 +1019,19 @@ public class ConfigurationConditionalReadTests
         return request;
     }
 
-    private static IHeaderDictionary Headers(TestHttpRequestData request)
+    internal static IHeaderDictionary Headers(TestHttpRequestData request)
     {
         return ((HttpContext)request.FunctionContext.Items[HttpContextItem]).Response.Headers;
     }
 
     // withheld: by the mTLS rule; withheldByActor: by an actor under NoSecretReveal, which leaves the write right.
-    private static SecretRights Rights(bool canReadSecrets, bool withheld, bool withheldByActor = false)
+    internal static SecretRights Rights(bool canReadSecrets, bool withheld, bool withheldByActor = false)
     {
         var caller = new KeyValueCaller(AuditActor.System, canReadSecrets, canReadSecrets || withheldByActor);
         return new SecretRights(caller, IsReadWithheldByMtls: withheld, IsWriteWithheldByMtls: withheld) { IsReadWithheldByActor = withheldByActor };
     }
 
-    private static Configuration Stored(ulong version = 3, string? hash = "0badc0de", string sender = "billing@example.com", DateTimeOffset? modified = null)
+    internal static Configuration Stored(ulong version = 3, string? hash = "0badc0de", string sender = "billing@example.com", DateTimeOffset? modified = null)
     {
         return new Configuration
         {

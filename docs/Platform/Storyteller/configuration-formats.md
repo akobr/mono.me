@@ -1,6 +1,6 @@
 # Configuration Formats
 
-A configuration is one JSON document, but most consumers take flat keys: .NET `IConfiguration` (`db:hosts:0`), Spring Boot (`db.hosts[0]`), environment variables and `.env` files (`DB__HOSTS__0`), Helm values (YAML). The library `42.Platform.Storyteller.ConfigurationFormats` renders the `Content` object of a configuration in four flat formats, `flat`, `properties`, `env` and `yaml`, with one set of rules. The [.NET configuration provider](configuration-provider.md) takes its `IConfiguration` keys from the same library, so the `flat` keys are exactly the keys the provider applies, and every format renders the same values.
+A configuration is one JSON document, but most consumers take flat keys: .NET `IConfiguration` (`db:hosts:0`), Spring Boot (`db.hosts[0]`), environment variables and `.env` files (`DB__HOSTS__0`), Helm values (YAML). The library `42.Platform.Storyteller.ConfigurationFormats` renders the `Content` object of a configuration in four flat formats, `flat`, `properties`, `env` and `yaml`, with one set of rules. The [.NET configuration provider](configuration-provider.md) takes its `IConfiguration` keys from the same library, so the `flat` keys are exactly the keys the provider applies, and every format renders the same values. The API serves the four formats on the effective and the resolved read with `?format=` (see [The API](#the-api)).
 
 The code is in `src/Platform/Storyteller/ConfigurationFormats/src/`: the flattener and its rules (`DocumentFlattener`, `DocumentRules`, `JsonPaths`, `InvalidDocumentException`), the formatter (`ConfigurationFormatter`, `ConfigurationFormatNames`) and one renderer per format (`Rendering/`). The design and its decisions are in [the spec](specs/2026-10-27%20Flat%20Output%20Formats%20for%20Configurations.md).
 
@@ -30,6 +30,39 @@ await File.WriteAllTextAsync(".env", body.Text, new UTF8Encoding(false));
 - The namespace is not `…Storyteller.Configuration` or `…Storyteller.Formatting`: the first is the `Configuration` model of `Abstractions.Annotations`, and a namespace `Formatting` directly under `_42.Platform.Storyteller` would hide Newtonsoft's `Formatting` from all code in `_42.Platform.Storyteller.*`.
 - The only dependency is `Newtonsoft.Json`. The YAML writer is part of the library; no YAML parser reaches the applications of the provider.
 - `ToString()` of the results prints names, paths and lengths, never a value.
+
+## The API
+
+The effective and the resolved read of a configuration take the format as a query parameter:
+
+```text
+GET /v1/{organization}/{project}/{view}/configuration/{key}?format=env
+GET /v1/{organization}/{project}/{view}/configuration/{key}/resolved?format=yaml
+```
+
+| `format` | Answer |
+| --- | --- |
+| Absent, empty (`?format=`) or `json`, in any casing | The `Configuration` model, exactly as without the parameter: the same body, tags, headers and manifests |
+| `flat`, `properties`, `env` or `yaml`, in any casing | `Content` alone in that format, without the envelope (no `Version`, `Hash` or `Modified`), with the media type of the format |
+| Anything else, also a repeated parameter (`?format=flat&format=yaml`) or a list (`?format=flat,yaml`) | `400` with `ErrorCode` `InvalidQuery`: "The query parameter 'format' must be json, flat, properties, env or yaml." |
+
+- **The body** is the text of `ConfigurationFormatter.Format` over the effective or the resolved `Content`: the same bytes a client gets when it formats the `Content` of the envelope with the library (see [One reading of the document](#one-reading-of-the-document)). `flat` is `application/json`; read it as a JSON object of strings, not as a `Configuration`.
+- **Only the query decides.** `Accept` is not considered, so a response needs no `Vary`. The composition read and the read of a version take no `format`.
+- **Format errors** are `422 Unprocessable Content` with an `ErrorResponse`. `ErrorCode` is `format.<rule>` (`format.not-an-object`, `format.empty-name`, `format.colon-in-name`, `format.case-collision`, `format.bracket-in-name`, `format.array-gap` or `format.invalid-env-name`), `Message` names the JSON path, never a value, and `Details` hold `Format`, `Rule` and `Path`:
+
+  ```json
+  {
+    "Message": "The name of the property at $.db['pass word'] cannot be part of an environment variable name: use ASCII letters, digits, '.' and '-' with single '_' between them, and start the names of the root with a letter.",
+    "ErrorCode": "format.invalid-env-name",
+    "Details": { "Format": "env", "Rule": "invalid-env-name", "Path": "$.db['pass word']" }
+  }
+  ```
+
+  A 422 carries no `ETag`, `Cache-Control` or `X-2S-Secrets-Withheld`. The document is formatted before the tags are compared, so `If-None-Match: *` on a document the format cannot represent is a 422, not a 304. The resolved read also answers 422 for a binding that cannot be evaluated (`binding.evaluation`, `binding.limit.<kind>`, see [binding.md](binding.md#errors)).
+- **Bindings.** An effective document with object bindings or JSON-e is refused by `env` for the `$` of `$binding` or `$if`, and its `@` expressions are written as strings in every format. Read the resolved document to export a configuration.
+- **Tags.** Every format has its own `ETag`. The tag hashes the canonical name of the format and `ConfigurationFormatter.Version` (`env/1`) after the inputs of the envelope's tag, so `?format=ENV` and `?format=env` share a tag, the tag of one format never answers another with 304, and a release that changes the bytes of a format changes its tags at once. The tags of the envelope are the same as before the formats. See [the tags](inheritance.md#the-tags).
+- **Manifests.** The `r` tag of a formatted resolved read is per format, and the `d` tag hashes it, so each format a caller polls holds its own [dependency manifest](inheritance.md#the-dependency-manifest), within `ConditionalReads:ManifestCacheSizeLimit`. A 304 from a manifest is answered without evaluating or formatting; a manifest is recorded only after its body was formatted, and the formatter is deterministic for a given `Version`.
+- **Billing and audit.** A format error after a resolve is a resolved read like any other: it records `reads.binding` and `reveals` and counts in the hourly `BindingRead`. A 422 carries no tag and records no manifest, so a poller that repeats it is evaluated, metered and audited on every request. Fix the document, or read another format.
 
 ## The formats
 
@@ -173,5 +206,6 @@ Four files in `src/Platform/Storyteller/Configuration/test/Vectors/` pin the rul
 - **Shells** cannot reference `env` names with `.` or `-`, and expand `$` in double-quoted values; verbatim readers keep the quotes of quoted values.
 - **YAML 1.1 readers** read `1E+20` as a string, and Spring binds a gap as an empty string.
 - **A format change is a version change.** `ConfigurationFormatter.Version` changes whenever the bytes of any format change, so that anything derived from the bytes, such as a cache tag, changes with them.
+- **A format error is not cached.** A 422 of `?format=` carries no tag, so after a resolve each repeat is evaluated, metered and audited again (see [The API](#the-api)).
 - **The key length of YAML** is counted in UTF-16 code units, so a key with characters outside the Basic Multilingual Plane may be written as an explicit key a little before YAML's limit.
 - **Depth.** `Canonicalize` reads without Newtonsoft's default limit of 64 levels, so a document formats wherever it is held; a client that reads the envelope with the default limit fails on a deeper document.

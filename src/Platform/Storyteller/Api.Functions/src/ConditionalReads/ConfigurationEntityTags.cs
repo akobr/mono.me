@@ -6,6 +6,7 @@ using System.Text;
 
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.ConfigurationFormats;
 
 using Microsoft.Net.Http.Headers;
 
@@ -27,6 +28,8 @@ namespace _42.Platform.Storyteller.Api.ConditionalReads;
 // Modified is left out of e, r, b and d: past version 0 it changes only with Version, and a configuration without an item
 // stamps every read. c keeps the stamps of the sources: a stored document's changes only with its version, and a Missing
 // source has none.
+// A formatted read (?format=) hashes its representation after Content, so each format has its own e, r and b tags, and
+// through the r tag its own d tags and manifests. The envelope hashes no representation, so its tags stay as they were.
 public static class ConfigurationEntityTags
 {
     public const string EffectivePrefix = "e";
@@ -41,22 +44,30 @@ public static class ConfigurationEntityTags
 
     private const int DigestBytes = 16;
 
-    public static EntityTagHeaderValue ForEffective(FullKey key, Configuration configuration)
+    // representation: RepresentationOf the format of the read, null for the envelope.
+    public static EntityTagHeaderValue ForEffective(FullKey key, Configuration configuration, string? representation = null)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        return Create(hash, EffectivePrefix, key, rights: null, configuration);
+        return Create(hash, EffectivePrefix, key, rights: null, configuration, representation);
     }
 
-    public static EntityTagHeaderValue ForResolved(FullKey key, Configuration configuration, SecretRights rights)
+    public static EntityTagHeaderValue ForResolved(FullKey key, Configuration configuration, SecretRights rights, string? representation = null)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        return Create(hash, ResolvedPrefix, key, rights, configuration);
+        return Create(hash, ResolvedPrefix, key, rights, configuration, representation);
     }
 
-    public static EntityTagHeaderValue ForResolvedBindings(FullKey key, Configuration resolved, SecretRights rights, byte[] secret)
+    public static EntityTagHeaderValue ForResolvedBindings(FullKey key, Configuration resolved, SecretRights rights, byte[] secret, string? representation = null)
     {
         using var hash = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA256, secret);
-        return Create(hash, BoundPrefix, key, rights, resolved);
+        return Create(hash, BoundPrefix, key, rights, resolved, representation);
+    }
+
+    // The canonical name and the formatter's version, never the raw query value: ?format=ENV and ?format=env share a tag,
+    // and a change of the formatted bytes changes every formatted tag, so no stale 304 follows a deploy. Null for the envelope.
+    public static string? RepresentationOf(ConfigurationFormat? format)
+    {
+        return format is { } formatted ? $"{formatted.GetName()}/{ConfigurationFormatter.Version}" : null;
     }
 
     // effective is the r tag of the read, taken before the resolve; dependencies come sorted from BindingDependencies.ToList.
@@ -105,7 +116,7 @@ public static class ConfigurationEntityTags
             : "p";
     }
 
-    private static EntityTagHeaderValue Create(IncrementalHash hash, string prefix, FullKey key, SecretRights? rights, Configuration configuration)
+    private static EntityTagHeaderValue Create(IncrementalHash hash, string prefix, FullKey key, SecretRights? rights, Configuration configuration, string? representation)
     {
         Append(hash, prefix);
         Append(hash, key.ToString());
@@ -113,6 +124,13 @@ public static class ConfigurationEntityTags
         Append(hash, configuration.Version.ToString(CultureInfo.InvariantCulture));
         Append(hash, configuration.Hash);
         Append(hash, configuration.Content.ToString(Formatting.None));
+
+        // not Append(null), whose -1 length would change every tag of the envelope
+        if (representation is not null)
+        {
+            Append(hash, representation);
+        }
+
         return Finish(hash, prefix);
     }
 
