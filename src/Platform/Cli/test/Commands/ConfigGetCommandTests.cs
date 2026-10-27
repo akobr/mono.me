@@ -198,6 +198,20 @@ public class ConfigGetCommandTests
         _error.ToString().ShouldBeEmpty();
     }
 
+    // Alba needs a console, which a run in CI does not have; the note is as plain as the text.
+    [Fact]
+    public async Task Format_OfAConfigurationWithoutValues_SaysSo_WithoutTheConsoleRenderer()
+    {
+        SetupEffective(Envelope("{}"));
+
+        var exitCode = await Execute(Key, "-f", "env");
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _out.ToString().ShouldBe("\nThe configuration has no values.\n");
+        _error.ToString().ShouldBeEmpty();
+        ShouldWriteOnlyThroughTheInnerConsole();
+    }
+
     [Fact]
     public async Task Format_WithEnvPrefix_PrefixesEveryName()
     {
