@@ -99,13 +99,32 @@ steps:
 
 The machine needs `Secrets.Read` (`sform account machine create -r --scope secrets-read`) and one of these sign-ins:
 
-- **Recommended: a certificate machine over mTLS.** It receives secret values under the default policy of a project, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The workflow writes the `.pfx` file from a secret under `$RUNNER_TEMP`. The API must sit behind a front end that forwards the client certificate (`MachineAuth:IsCertificateHeaderFromClientAllowed`).
+- **Recommended: a certificate machine over mTLS.** It receives secret values under the default policy of a project, so the project keeps `RequireMtlsForSecretDelivery` on and every machine without a certificate still gets no secret value. The workflow writes the `.pfx` file from a secret under `$RUNNER_TEMP`. The API must sit behind a front end that forwards the client certificate (`MachineAuth:IsCertificateHeaderFromClientAllowed`). See [Set up a certificate machine](#set-up-a-certificate-machine).
 - **Possible: a federated machine** (GitHub OIDC). It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `client-id`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project (`sform story kv policy set --require-mtls false`).
 - **Possible: an API key or client credentials**, under the same change of the policy.
 
 The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values, and every machine with `Secrets.Write` write secrets, without mTLS, with an API key, client credentials or a federated token, not only the machine of the workflow.
 
 Without `Secrets.Read` or such a sign-in, the API withholds the secrets (`X-2S-Secrets-Withheld`) or returns the expressions of the secret bindings, and the action fails with exit code `2` and writes nothing. A machine without `Secrets.Read` can read a configuration without secret bindings.
+
+### Set up a certificate machine
+
+`sform account machine create` without `-k` creates the default kind of the project, which is `ApiKey` unless an Administrator changed it (`MachineAuth:DefaultCredentialKind` for a project without a stored policy). So a certificate machine takes `-k certificate`, and the project enables the kind first. Once:
+
+1. An Administrator enables `Certificate` for the project. `sform account machine machine-auth` prints the policy. With `-k` it sets the whole policy, so name the kinds it printed, the default kind first, add `-k certificate`, and add `-l` when the project has a certificate lifetime of its own.
+2. A user with the `ContributorWithSecrets` role creates the machine with `Secrets.Read` and writes its certificate to a file. `machine create` prints the password of the certificate once.
+3. The repository gets two secrets: `STORYTELLER_CERTIFICATE_BASE64`, the file in base64 on one line, and `STORYTELLER_CERTIFICATE_PASSWORD`, the password. Then delete the file.
+
+```bash
+sform account machine machine-auth                              # the enabled kinds, the default kind and the lifetime
+sform account machine machine-auth -k api-key -k certificate    # the kinds it printed, and certificate
+sform account machine create -r --scope secrets-read -k certificate -o storyteller.pfx
+base64 -w0 storyteller.pfx | gh secret set STORYTELLER_CERTIFICATE_BASE64
+gh secret set STORYTELLER_CERTIFICATE_PASSWORD                  # paste the password that machine create printed
+rm storyteller.pfx
+```
+
+The certificate expires after the certificate lifetime of the project, or after the days that `-l` of `machine create` gives. Before then, the two secrets need a new certificate and its password.
 
 ## What later steps see
 
