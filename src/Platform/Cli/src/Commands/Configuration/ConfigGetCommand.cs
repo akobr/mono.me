@@ -594,7 +594,7 @@ public class ConfigGetCommand : BaseContextCommand
     }
 
     // UTF-8 without a byte order mark, and without a prompt. On Unix, a file of resolved content, which may hold secrets,
-    // is the user's alone before anything is written to it.
+    // is the user's alone from the moment it exists: a new file with mode 0600 replaces the one at the path.
     private int WriteExportFile(string text)
     {
         var path = ExportFilePath!;
@@ -603,11 +603,13 @@ public class ConfigGetCommand : BaseContextCommand
         {
             if (IsResolvedRetrievalRequested && !OperatingSystem.IsWindows())
             {
-                _fileSystem.File.WriteAllText(path, string.Empty);
-                _fileSystem.File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                OwnerOnlyFile.WriteAllText(_fileSystem, path, text);
+            }
+            else
+            {
+                _fileSystem.File.WriteAllText(path, text, PlainOutputExtensions.Utf8);
             }
 
-            _fileSystem.File.WriteAllText(path, text, PlainOutputExtensions.Utf8);
             return ExitCodes.SUCCESS;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
