@@ -486,7 +486,7 @@ A step can also read a configuration into the job. `sform story config <key> -r 
       - run: ./deploy.sh   # reads APP_DB__HOST, APP_DB__PASSWORD, …
 ```
 
-A `Federated` machine, like an API key or client credentials, has no certificate, so the API withholds secret values from it under the default project policy and answers with `X-2S-Secrets-Withheld: mtls-required` (see [Secret delivery](key-values.md#secret-delivery)). `--github-env` then stops with exit code `2` and writes nothing, and so it does for the expressions of secret bindings that a machine without `Secrets.Read` gets. Such a job reads a configuration without secrets, or its machine has `Secrets.Read` and its project sets `RequireMtlsForSecretDelivery` to `false` (`sform story kv policy set --require-mtls false`).
+A `Federated` machine, like an API key or client credentials, has no certificate. When it has `Secrets.Read`, the API withholds secret values from it under the default project policy and answers every resolved read with `X-2S-Secrets-Withheld: mtls-required`, whatever the configuration holds (see [Secret delivery](key-values.md#secret-delivery)). `--github-env` then stops with exit code `2` and writes nothing, and so it does for the expressions of secret bindings that a machine without `Secrets.Read` gets. Such a job uses a machine without `Secrets.Read` and reads a configuration without secret bindings, or its machine has `Secrets.Read` and its project sets `RequireMtlsForSecretDelivery` to `false` (`sform story kv policy set --require-mtls false`).
 
 In Kubernetes, the pod projects a service account token whose `audience` is the same `TokenEndpoint`, and names its file:
 
