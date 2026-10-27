@@ -1,6 +1,6 @@
 # Configuration Provider for .NET
 
-The package `42.Platform.Storyteller.Configuration` loads one Storyteller configuration into the `IConfiguration` of a .NET application. It reads the configuration by its full key, polls it with `If-None-Match`, keeps the applied snapshot in memory and, when `CacheDirectory` is set, a last-known-good copy on disk, switches the active key at runtime, and, in `Resolved` mode with a `ReferenceResolver` configured, resolves secret references locally, with the application's own identity. The same package gives jobs a service that reads any configuration on demand. `42.Platform.Storyteller.Configuration.KeyVault` adds a resolver for Azure Key Vault.
+The package `42.Platform.Storyteller.Configuration` loads one Storyteller configuration into the `IConfiguration` of a .NET application. It reads the configuration by its full key, polls it with `If-None-Match`, keeps the applied snapshot in memory and, when `CacheDirectory` is set, a last-known-good copy on disk, switches the active key at runtime, and, in `Resolved` mode with a `ReferenceResolver` configured, resolves secret references locally, with the application's own identity. The same package gives jobs a service that reads any configuration on demand. `42.Platform.Storyteller.Configuration.KeyVault` adds a resolver for Azure Key Vault. Who am I, the catalog and the subscriptions of a responsibility are in [Hosting for .NET](hosting.md), and an Aspire AppHost passes the variables with [the Aspire integration](aspire.md).
 
 The code is in:
 
@@ -598,6 +598,7 @@ public sealed class NightlyExport
 - **Options.** `Endpoint`, `Key`, `Mode`, `Credential`, `ReferenceResolver`, `SecretRefreshInterval`, `ReadTimeout`, `Resilience`, `LoggerFactory` (the container's when unset), `TimeProvider`, `FileSystem` (for credential files) and `ConfigurePrimaryHandler` apply. `RefreshInterval`, `Optional`, `CacheDirectory`, `CacheProtector` and `Placement` are ignored, from code and from the environment, even when their variables hold invalid values.
 - **Registration.** The options are read and validated when `AddStorytellerDocuments` is called, and throw `StorytellerConfigurationException`. The first registration wins. An application that uses the provider too passes the same `configure` delegate to both.
 - **`Key`** is optional. When set, its organization, project and view are the default scope of annotation keys.
+- **Hosting.** `services.AddStoryteller(configure)` of [Hosting](hosting.md#registration) registers `IStorytellerDocuments` too, over its own settings, unless it is registered already. The subscriptions of a worker keep their documents in a document service of their own, not in `IStorytellerDocuments` (see [Which to use](hosting.md#which-to-use)).
 - **A federated credential** exchanges its token at the token endpoint of the project its own options name (`FederatedTokenOptions.Organization` and `Project`), or else of the project of `Key`. A federated credential that names no project, such as one from the environment, makes every read fail without `Key`, with a definitive error that names `STORYTELLER_KEY`, and no request is sent.
 
 | `IStorytellerDocuments` | Does |
@@ -638,4 +639,6 @@ public sealed class NightlyExport
 - **Temporary roots must be disposed.** A root that is never disposed keeps its source polling.
 - **A reload from elsewhere can hide a rejection.** A change token delivers a change raised during its callback once that callback returns. When the application calls `IConfigurationRoot.Reload()`, or another provider of the same root reloads, while a Storyteller document is notified, that document's rebind error can surface in the other reload, and the document is kept instead of rolled back.
 - **A switch lasts for the process.** A restart starts from the configured key.
-- **No start without a key.** A job without a fixed key uses `IStorytellerDocuments`.
+- **No start without a key.** A job without a fixed key uses `IStorytellerDocuments`, and finds an execution with `ISubscriptionCatalog.GetExecutionAsync` of [Hosting](hosting.md#the-catalog).
+- **One subject per source.** A worker that serves every subject of a responsibility keeps their documents and binds options per subject with the subscriptions of [Hosting](hosting.md#subscriptions).
+- **No feature flag bridge.** A `feature_management` section of the document reaches `IConfiguration` like any other; there is no FeatureManagement or OpenFeature provider (see [Feature flags](hosting.md#feature-flags)).

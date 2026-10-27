@@ -76,6 +76,10 @@ The flagship **2S Platform** — a serverless annotation/metadata platform.
 - `Binding.Abstractions/` / `Binding.Core/` / `Binding.Azure.KeyVault/` — configuration bindings
 - `Api.Functions/` — Azure Functions HTTP API (isolated worker model)
 - `Api.Web/` — ASP.NET Core Web API
+- `Configuration/` — configuration provider for .NET (`42.Platform.Storyteller.Configuration`): loads a configuration into `IConfiguration`, and `IStorytellerDocuments` reads any configuration on demand
+- `Configuration.KeyVault/` — Azure Key Vault resolver of the provider's secret references
+- `Hosting/` — hosting for .NET (`42.Platform.Storyteller.Hosting`): who am I (`IExecutionContext`), `ISubscriptionCatalog` with the polling informer, and `IStorytellerSubscriptions` with the documents and named options of every subscription
+- `Aspire.Hosting/` — Aspire hosting integration (`42.Platform.Storyteller.Aspire.Hosting`): a Storyteller resource whose `WithReference` passes the `STORYTELLER_*` variables to projects, executables and containers
 - `DbCreator/` — CosmosDB schema creation tool
 - `Mcp/` — MCP server over the API for AI assistants (Streamable HTTP; signs people in with the deployment's provider (Entra ID, AuthKit or Keycloak) and exchanges their token for a Storyteller user token through the API's RFC 8693 token exchange (`POST v1/access/token`) as an actor; docs in `docs/Platform/Storyteller/mcp.md`)
 
