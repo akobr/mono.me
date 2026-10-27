@@ -223,7 +223,7 @@ In one run, with one resolved and one effective read, `sform`:
 - **Possible: a federated machine** (GitHub OIDC), as in [Sign in from a pipeline](#sign-in-from-a-pipeline). It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `STORYTELLER_CLIENT_ID`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project: `sform story kv policy set --require-mtls false`.
 - **Possible: an API key or client credentials**, under the same change of the policy.
 
-The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
+The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values, and every machine with `Secrets.Write` write secrets, without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
 
 Without `Secrets.Read` or such a sign-in, the export stops with exit code `2` on the withheld secrets, or on the expressions of the bindings that were not resolved; `--allow-unresolved` exports such expressions as they are.
 

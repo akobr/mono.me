@@ -100,7 +100,7 @@ A configuration whose bindings read secrets reaches the job only when the machin
 - **Possible: a federated machine** (GitHub OIDC). It needs no stored secret, only `permissions: id-token: write` and the machine id, a GUID, in `client-id`. It receives secret values only when an Administrator sets `RequireMtlsForSecretDelivery` to `false` for the project: `sform story kv policy set --require-mtls false`.
 - **Possible: an API key or client credentials**, under the same change of the policy.
 
-The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
+The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values, and every machine with `Secrets.Write` write secrets, without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
 
 Without `Secrets.Read` or such a sign-in, the API withholds the secrets or returns the expressions of the secret bindings, and the action stops with exit code `2` before it exports or writes anything.
 
