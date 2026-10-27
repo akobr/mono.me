@@ -99,13 +99,21 @@ public static class PlainOutputExtensions
     }
 
     // Control characters, U+2028 and U+2029 become spaces, so a message stays one line and cannot start a workflow
-    // command of GitHub Actions.
+    // command of GitHub Actions on a line of its own. # becomes \u0023, as in a path, so a message cannot hold the
+    // ##[command] of the runner's older syntax either, which the runner finds anywhere in a line; a message of an older
+    // API, whose paths keep #, is covered too.
     internal static string ToPlainLine(string message)
     {
         var builder = new StringBuilder(message.Length);
 
         foreach (var character in message)
         {
+            if (character == '#')
+            {
+                builder.Append("\\u0023");
+                continue;
+            }
+
             builder.Append(char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character);
         }
 

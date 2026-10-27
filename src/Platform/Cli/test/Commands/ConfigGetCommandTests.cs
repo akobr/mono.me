@@ -77,6 +77,16 @@ public class ConfigGetCommandTests
         { [Key, "-r", "--allow-unresolved", "--content-only", "-f", "env"], "--allow-unprefixed and --allow-unresolved apply to --github-env and --mask only." },
     };
 
+    // A name that holds a command of the runner's older syntax, in each message that names a path: an invalid document,
+    // a bound value too short to mask, and an unresolved binding as the warning of a read and the note of an export.
+    public static TheoryData<string, string?, string[]> CommandNames => new()
+    {
+        { """{ "##[set-output name=target;]prod y": "s3cr3t-value" }""", null, ["-f", "env", "--content-only"] },
+        { """{ "##[set-output name=target;]prod": "abc" }""", """{ "##[set-output name=target;]prod": "@(x, vault)" }""", ["--mask", "bound", "-e", "app.yaml", "-f", "yaml", "--content-only"] },
+        { """{ "##[error title=Deploy approved]x": "@(x, vault)" }""", """{ "##[error title=Deploy approved]x": "@(x, vault)" }""", ["-f", "yaml", "--content-only"] },
+        { """{ "##[error title=Deploy approved]x": "@(x, vault)" }""", """{ "##[error title=Deploy approved]x": "@(x, vault)" }""", ["--mask", "bound", "--allow-unresolved", "-e", "app.yaml", "-f", "yaml", "--content-only"] },
+    };
+
     // Each format of the effective, the resolved and a version read, with and without --content-only.
     public static TheoryData<string[], string> Exports
     {
@@ -354,6 +364,38 @@ public class ConfigGetCommandTests
         _error.ToString().ShouldBe("The binding at $.db.password cannot be evaluated.\nError code: binding.evaluation\n");
         _out.ToString().ShouldBeEmpty();
         ShouldWriteOnlyThroughTheInnerConsole();
+    }
+
+    // The runner of GitHub Actions reads ##[command] anywhere in a line of a step's output, the error output too: a name
+    // of the configuration never reaches it, in whichever message names its path.
+    [Theory]
+    [MemberData(nameof(CommandNames))]
+    public async Task ANameOfTheConfiguration_NeverStartsAWorkflowCommandOnTheErrorOutput(string resolved, string? effective, string[] options)
+    {
+        SetupResolved(Envelope(resolved));
+
+        if (effective is not null)
+        {
+            SetupEffective(Envelope(effective));
+        }
+
+        await Execute([Key, "-r", .. options]);
+
+        _error.ToString().ShouldContain("$['\\u0023\\u0023[");
+        _error.ToString().ShouldNotContain("#");
+    }
+
+    // A message of an API whose paths keep #.
+    [Fact]
+    public async Task AMessageOfTheApi_NeverStartsAWorkflowCommandOnTheErrorOutput()
+    {
+        _api.Setup(api => api.GetResolvedConfigurationConditionalAsync("org1", "proj1", "default", Key, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(AnnotationCommandFixture.Error(422, "binding.evaluation", "The binding at $['##[set-output name=target;]prod'] cannot be evaluated."));
+
+        var exitCode = await Execute(Key, "-r", "-f", "env", "--content-only");
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _error.ToString().ShouldBe("The binding at $['\\u0023\\u0023[set-output name=target;]prod'] cannot be evaluated.\nError code: binding.evaluation\n");
     }
 
     [Fact]

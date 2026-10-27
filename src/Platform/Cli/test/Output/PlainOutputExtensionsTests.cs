@@ -35,6 +35,17 @@ public class PlainOutputExtensionsTests
         _out.ToString().ShouldBeEmpty();
     }
 
+    // The runner reads ##[command] anywhere in a line of the error output; an ignorable character between the two #
+    // does not stop its culture-sensitive search, so no # is left at all.
+    [Fact]
+    public void WriteErrorLine_EscapesEveryHash()
+    {
+        _console.Object.WriteErrorLine("at $['##[set-output name=target;]prod'] and #\u200B#[error]x");
+
+        _error.ToString().ShouldBe("at $['\\u0023\\u0023[set-output name=target;]prod'] and \\u0023\u200B\\u0023[error]x\n");
+        _error.ToString().ShouldNotContain("#");
+    }
+
     [Fact]
     public void WriteRaw_WritesTheTextAsItIs()
     {

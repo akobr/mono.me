@@ -33,6 +33,19 @@ public class JsonPathsTests
         escaped.ShouldAllBe(character => !char.IsControl(character));
     }
 
+    // The runner of GitHub Actions reads ##[command] anywhere in a line of a step's output, the error output too.
+    [Theory]
+    [InlineData("C#", "$['C\\u0023']")]
+    [InlineData("##[set-output name=target;]prod", "$['\\u0023\\u0023[set-output name=target;]prod']")]
+    [InlineData("#\u200B#[error]x", "$['\\u0023\u200B\\u0023[error]x']")]
+    public void AHash_IsEscaped_SoAPathNeverStartsACommandOfTheOlderSyntax(string name, string path)
+    {
+        var escaped = JsonPaths.Property(JsonPaths.Root, name);
+
+        escaped.ShouldBe(path);
+        escaped.ShouldNotContain("#");
+    }
+
     // Only C0 and DEL are escaped: a port that escaped every Unicode control would write other paths than the vectors.
     [Theory]
     [InlineData("a\u0085b")]
@@ -58,6 +71,17 @@ public class JsonPathsTests
 
         exception.Path.ShouldBe("$['x\\n::warning::y']");
         exception.Message.ShouldNotContain("\n");
+        exception.Message.ShouldNotContain("s3cret");
+    }
+
+    [Fact]
+    public void AnInvalidDocument_NamesAPathWithoutACommandOfTheOlderSyntax()
+    {
+        var exception = Should.Throw<InvalidDocumentException>(
+            () => DocumentFlattener.Flatten(new JObject { ["##[set-output name=target;]prod:x"] = "s3cret" }));
+
+        exception.Path.ShouldBe("$['\\u0023\\u0023[set-output name=target;]prod:x']");
+        exception.Message.ShouldNotContain("#");
         exception.Message.ShouldNotContain("s3cret");
     }
 }
