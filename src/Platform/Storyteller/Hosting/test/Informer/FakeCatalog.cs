@@ -10,7 +10,8 @@ namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
 // responsibility list its active executions or usages by key in descending order (pages have no order, so the informer
 // must sort what it emits), in pages of PageSize with base64 tokens, with lossy values ("list:" and the stored JSON);
 // point reads honour includeInactive and includeDeleted. Put and Update stamp Modified, as the API's writes do. Answers
-// on the fixture's handler before its routes; the server's clock is the fixture's.
+// on the fixture's handler before its routes; the server's clock is the fixture's. Counts the answers in flight, and
+// holds the point reads of executions and usages on request.
 internal sealed class FakeCatalog
 {
     public const string Responsibility = "invoicing";
@@ -25,9 +26,11 @@ internal sealed class FakeCatalog
     private readonly ConcurrentDictionary<string, JObject> _annotations = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Func<HttpResponseMessage>> _failures = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, bool> _unlisted = new(StringComparer.Ordinal);
+    private TaskCompletionSource? _gate;
     private int _writes;
     private int _inFlight;
     private int _maxInFlight;
+    private int _held;
 
     public FakeCatalog(HostingFixture fixture)
     {
@@ -44,6 +47,9 @@ internal sealed class FakeCatalog
 
     // The most answers in flight at once.
     public int MaxInFlight => Volatile.Read(ref _maxInFlight);
+
+    // The point reads that wait for ReleaseReads().
+    public int HeldReads => Volatile.Read(ref _held);
 
     public static string ExecutionKey(string subject, string context = Context)
     {
@@ -105,6 +111,18 @@ internal sealed class FakeCatalog
         }
 
         _annotations[annotationKey] = json;
+    }
+
+    // Point reads of executions and usages wait from now until ReleaseReads(), so they overlap for as long as a test
+    // needs; the read of the responsibility and the lists, which run alone or in pairs, do not.
+    public void HoldReads()
+    {
+        Volatile.Write(ref _gate, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+    }
+
+    public void ReleaseReads()
+    {
+        Volatile.Read(ref _gate)?.TrySetResult();
     }
 
     // Gone, as after a purge: a point read answers 404 without a body.
@@ -240,6 +258,21 @@ internal sealed class FakeCatalog
             }
 
             var slash = target.IndexOf('/', StringComparison.Ordinal);
+
+            if (slash < 0 && target != ResponsibilityKey && Volatile.Read(ref _gate) is { } gate)
+            {
+                Interlocked.Increment(ref _held);
+
+                try
+                {
+                    await gate.Task.WaitAsync(cancellationToken);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _held);
+                }
+            }
+
             return slash < 0 ? Read(target, query) : List(target[..slash], target[(slash + 1)..], query);
         }
         finally

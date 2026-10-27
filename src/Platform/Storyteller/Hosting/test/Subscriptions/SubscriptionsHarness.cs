@@ -1,5 +1,9 @@
 using System.Diagnostics;
 using _42.Platform.Storyteller.Sdk.Configuring;
+using _42.Platform.Storyteller.Sdk.Hosting.Catalog;
+using _42.Platform.Storyteller.Sdk.Hosting.Container;
+using _42.Platform.Storyteller.Sdk.Hosting.Informer;
+using _42.Platform.Storyteller.Sdk.Hosting.Reading;
 using _42.Platform.Storyteller.Sdk.Hosting.Subscriptions;
 using _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,13 +20,15 @@ internal sealed class SubscriptionsHarness : IAsyncDisposable
 
     private readonly HostingFixture _fixture;
 
-    // hosting: more calls on the builder, after AddSubscriptions.
+    // hosting: more calls on the builder, after AddSubscriptions. source: a source over the polling one, for a service
+    // of its own built as the registration builds it; the registered one is then left alone.
     public SubscriptionsHarness(
         HostingFixture fixture,
         Action<StorytellerSubscriptionOptions>? configure = null,
         Action<IStorytellerHostingBuilder>? hosting = null,
         Action<StorytellerConfigurationOptions>? options = null,
-        Action<IServiceCollection>? services = null)
+        Action<IServiceCollection>? services = null,
+        Func<ISubscriptionChangeSource, ISubscriptionChangeSource>? source = null)
     {
         _fixture = fixture;
         var collection = new ServiceCollection();
@@ -32,7 +38,23 @@ internal sealed class SubscriptionsHarness : IAsyncDisposable
             .AddSubscriptions(FakeCatalog.Responsibility, FakeCatalog.Context, configure);
         hosting?.Invoke(builder);
         Services = fixture.Track(collection.BuildServiceProvider());
-        Service = Services.GetRequiredService<SubscriptionsService>();
+
+        if (source is null)
+        {
+            Service = Services.GetRequiredService<SubscriptionsService>();
+            return;
+        }
+
+        var settings = Services.GetRequiredService<HostingSettings>().Settings;
+        var subscription = SubscriptionSettings.Create(settings, FakeCatalog.Responsibility, FakeCatalog.Context, configure);
+        var polling = new PollingSubscriptionSource(
+            Services.GetRequiredService<CatalogReader>(),
+            subscription.PollInterval,
+            subscription.MaxConcurrentReads,
+            settings.TimeProvider,
+            settings.NextRandom,
+            fixture.Logs.CreateLogger(SubscriptionCatalog.InformerLogCategory));
+        Service = fixture.Track(new SubscriptionsService(subscription, settings, source(polling), null));
     }
 
     public ServiceProvider Services { get; }

@@ -6,7 +6,7 @@ namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Subscriptions;
 
 // The resolved configurations of the fixture's view as the API answers them: a document per annotation key with its
 // tag, a 304 when the request sends that tag, and failures by key. Answers on the fixture's handler before what was
-// there; counts the answers in flight.
+// there; counts the answers in flight, and holds them on request.
 internal sealed class FakeConfigurations
 {
     private const string ConfigurationPath = "/api/v1/acme/billing/default/configuration/";
@@ -15,9 +15,11 @@ internal sealed class FakeConfigurations
     private readonly HostingFixture _fixture;
     private readonly ConcurrentDictionary<string, Stored> _documents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Func<HttpResponseMessage>> _failures = new(StringComparer.Ordinal);
+    private TaskCompletionSource? _gate;
     private int _tags;
     private int _inFlight;
     private int _maxInFlight;
+    private int _held;
 
     public FakeConfigurations(HostingFixture fixture)
     {
@@ -26,11 +28,22 @@ internal sealed class FakeConfigurations
         fixture.Http.Otherwise = (request, cancellationToken) => Answer(request, cancellationToken) ?? answer(request, cancellationToken);
     }
 
-    // A real delay per answer, so that reads overlap.
-    public TimeSpan Latency { get; set; }
-
     // The most answers in flight at once.
     public int MaxInFlight => Volatile.Read(ref _maxInFlight);
+
+    // The answers that wait for Release().
+    public int Held => Volatile.Read(ref _held);
+
+    // Answers wait from now until Release(), so the reads overlap for as long as a test needs.
+    public void Hold()
+    {
+        Volatile.Write(ref _gate, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+    }
+
+    public void Release()
+    {
+        Volatile.Read(ref _gate)?.TrySetResult();
+    }
 
     // The document of the key under a new tag. content: the JSON of its content; labels and values: of the
     // configuration, which the flattened data does not hold.
@@ -109,9 +122,18 @@ internal sealed class FakeConfigurations
 
         try
         {
-            if (Latency > TimeSpan.Zero)
+            if (Volatile.Read(ref _gate) is { } gate)
             {
-                await Task.Delay(Latency, cancellationToken);
+                Interlocked.Increment(ref _held);
+
+                try
+                {
+                    await gate.Task.WaitAsync(cancellationToken);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _held);
+                }
             }
 
             if (_failures.TryGetValue(annotationKey, out var failure))

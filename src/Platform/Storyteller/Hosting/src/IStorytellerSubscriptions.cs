@@ -29,6 +29,7 @@ public interface IStorytellerSubscriptions
 
     // Added for every current subscription first, then the changes as they happen: Removed, Changed and Added after
     // each poll, each by key, every one with its document. Several watchers may run at once. Ends when the informer
-    // stops, and with OperationCanceledException when the token is cancelled.
+    // stops, with OperationCanceledException when the token is cancelled, and with the informer's
+    // StorytellerConfigurationException when it broke, which it logs as an error.
     IAsyncEnumerable<StorytellerSubscriptionChange> WatchAsync(CancellationToken cancellationToken = default);
 }

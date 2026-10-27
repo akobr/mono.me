@@ -12,7 +12,8 @@ public sealed record StorytellerSubscriptionsStatus
 
     public DateTimeOffset? LastPollSucceededAt { get; init; }
 
-    // The failure of the latest poll; null when it succeeded.
+    // The failure of the latest poll; null when it succeeded. Also the failure of an informer that broke, after which no
+    // poll follows.
     public StorytellerConfigurationException? LastPollError { get; init; }
 
     // Failed polls since the last one that succeeded.

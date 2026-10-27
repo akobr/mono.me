@@ -33,7 +33,7 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
     private readonly ILogger _logger;
     private readonly Lock _lock = new();
     private readonly List<Channel<StorytellerSubscriptionChange>> _watchers = [];
-    private readonly List<Action<StorytellerSubscriptionChange>> _listeners = [];
+    private readonly List<Listener> _listeners = [];
 
     // What the loop holds, by the full key of the execution; only the loop touches it.
     private readonly Dictionary<string, Tracked> _tracked = new(StringComparer.Ordinal);
@@ -45,6 +45,10 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
     private TaskCompletionSource _progress = NewSignal();
     private bool _hasEnded;
     private StorytellerConfigurationException? _endFailure;
+
+    // The failure the watchers end with: only that of a loop that broke, as a stop and a zero interval end them
+    // without one.
+    private StorytellerConfigurationException? _watchFailure;
 
     // The loop's own record of its polls.
     private bool _isReady;
@@ -151,7 +155,7 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
 
             if (_hasEnded)
             {
-                channel.Writer.TryComplete();
+                channel.Writer.TryComplete(_watchFailure is { } failure ? Copy(failure) : null);
             }
             else
             {
@@ -241,23 +245,31 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
         End(null);
     }
 
-    // The named options listen to the published changes; listener: called on the loop, after the view changed, once
-    // per change.
-    internal IDisposable Listen(Action<StorytellerSubscriptionChange> listener)
+    // The named options listen to the published changes, once per change. invalidate: called under the lock the loop
+    // publishes under, after the view changed and before the watchers and the waiters can see the change, so the
+    // options they get next are bound to it; it must be quick and must not call back. notify: called on the loop after
+    // the lock.
+    internal IDisposable Listen(Action<StorytellerSubscriptionChange> invalidate, Action<StorytellerSubscriptionChange> notify)
     {
-        ArgumentNullException.ThrowIfNull(listener);
+        ArgumentNullException.ThrowIfNull(invalidate);
+        ArgumentNullException.ThrowIfNull(notify);
+
+        var listener = new Listener(this, invalidate, notify);
 
         lock (_lock)
         {
             _listeners.Add(listener);
         }
 
-        return new Listening(this, listener);
+        return listener;
     }
 
+    // A loop that breaks is not rethrown: the subscriptions keep serving what they held, as for a failed poll, and the
+    // status and the watchers report the failure, so a health check sees it.
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         StorytellerConfigurationException? endFailure = null;
+        var isBroken = false;
 
         try
         {
@@ -279,7 +291,7 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
             // Not a failure of a read, which the source and the loop take as answers: a bug. Its message is not ours to
             // vouch for, so it stays in the inner exception.
             _logger.LogError(
-                "The informer of the subscriptions of {Scope} stopped: it failed with {Type}. The subscriptions keep what they held.",
+                "The informer of the subscriptions of {Scope} stopped: it failed with {Type}. The subscriptions keep what they held, the status reports the failure and the watchers end with it.",
                 _subscription.Scope.ToString(),
                 exception.GetType().Name);
             endFailure = new StorytellerConfigurationException(
@@ -289,10 +301,11 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
                 null,
                 false,
                 exception);
+            isBroken = true;
         }
         finally
         {
-            End(endFailure);
+            End(endFailure, isBroken);
         }
     }
 
@@ -513,7 +526,9 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
             failure.Message);
     }
 
-    // A new view and status, then the events: to the watchers under the lock, to the named options after it, in order.
+    // A new view and status, then the events, in order. Under the lock: the named options drop what the changes made
+    // stale, then the watchers and the waiters hear of them, so whoever saw a change and asks for its options gets them
+    // bound to it. After the lock: the named options notify.
     private void Publish(IReadOnlyList<StorytellerSubscriptionChange> changes)
     {
         var all = _tracked.Values
@@ -539,12 +554,21 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
             Failing = _tracked.Values.Count(tracked => tracked.Entry is not null && tracked.LastError is not null),
         };
 
-        Action<StorytellerSubscriptionChange>[] listeners;
+        Listener[] listeners;
 
         lock (_lock)
         {
             Volatile.Write(ref _view, view);
             Volatile.Write(ref _status, status);
+            listeners = [.. _listeners];
+
+            foreach (var change in changes)
+            {
+                foreach (var listener in listeners)
+                {
+                    Notify(listener.Invalidate, change);
+                }
+            }
 
             foreach (var change in changes)
             {
@@ -554,7 +578,6 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
                 }
             }
 
-            listeners = [.. _listeners];
             Signal();
         }
 
@@ -562,7 +585,7 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
         {
             foreach (var listener in listeners)
             {
-                Notify(listener, change);
+                Notify(listener.Notify, change);
             }
         }
     }
@@ -584,9 +607,11 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
         }
     }
 
-    // The first end wins: a stop, the one poll of a zero interval, or a loop that failed. The watchers end, and the
-    // waiters that are not ready get the failure, or a cancellation.
-    private void End(StorytellerConfigurationException? failure)
+    // The first end wins: a stop, the one poll of a zero interval, or a loop that broke. The watchers end, and the
+    // waiters that are not ready get the failure, or a cancellation. isBroken: the loop broke; the status reports its
+    // failure as that of the latest poll, so it is degraded, and the watchers end with it, so they cannot take it for
+    // a stop. What is held stays, as for a failed poll.
+    private void End(StorytellerConfigurationException? failure, bool isBroken = false)
     {
         lock (_lock)
         {
@@ -598,9 +623,20 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
             _hasEnded = true;
             _endFailure = failure;
 
+            if (isBroken && failure is not null)
+            {
+                _watchFailure = failure;
+                Volatile.Write(ref _status, _status with
+                {
+                    LastPollError = failure,
+                    ConsecutivePollFailures = _status.ConsecutivePollFailures + 1,
+                });
+            }
+
+            // A copy per watcher, as for the waiters.
             foreach (var watcher in _watchers)
             {
-                watcher.Writer.TryComplete();
+                watcher.Writer.TryComplete(_watchFailure is { } watchFailure ? Copy(watchFailure) : null);
             }
 
             _watchers.Clear();
@@ -616,7 +652,7 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
         progress.TrySetResult();
     }
 
-    private void StopListening(Action<StorytellerSubscriptionChange> listener)
+    private void StopListening(Listener listener)
     {
         lock (_lock)
         {
@@ -681,20 +717,25 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
         }
     }
 
-    private sealed class Listening : IDisposable
+    // One registration of Listen; a class, so two with the same delegates stay apart.
+    private sealed class Listener : IDisposable
     {
         private readonly SubscriptionsService _owner;
-        private readonly Action<StorytellerSubscriptionChange> _listener;
 
-        public Listening(SubscriptionsService owner, Action<StorytellerSubscriptionChange> listener)
+        public Listener(SubscriptionsService owner, Action<StorytellerSubscriptionChange> invalidate, Action<StorytellerSubscriptionChange> notify)
         {
             _owner = owner;
-            _listener = listener;
+            Invalidate = invalidate;
+            Notify = notify;
         }
+
+        public Action<StorytellerSubscriptionChange> Invalidate { get; }
+
+        public Action<StorytellerSubscriptionChange> Notify { get; }
 
         public void Dispose()
         {
-            _owner.StopListening(_listener);
+            _owner.StopListening(this);
         }
     }
 }
