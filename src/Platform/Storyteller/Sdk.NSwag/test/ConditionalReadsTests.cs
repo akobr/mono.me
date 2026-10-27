@@ -20,6 +20,16 @@ public class ConditionalReadsTests
 
     private const string ErrorJson = """{ "Message": "No.", "Hint": "Ask.", "ErrorCode": "AccessDenied" }""";
 
+    private const string FormatErrorJson = """
+        {
+          "Message": "Names that differ only in case at $.Db.",
+          "ErrorCode": "format.case-collision",
+          "Details": { "Format": "env", "Rule": "case-collision", "Path": "$.Db" }
+        }
+        """;
+
+    private const string EnvBody = "DB__HOST=db.local\nDB__PORT=5432\n";
+
     private readonly StubHttpHandler _http = new();
 
     public static TheoryData<bool, int, string?> Failures()
@@ -143,8 +153,8 @@ public class ConditionalReadsTests
         string[] segments = ["acme corp", "bill/ing", "de fault%", "sbt.a+b?c#d&e"];
 
         _ = resolved
-            ? await client.GetResolvedConfigurationAsync(segments[0], segments[1], segments[2], segments[3], null)
-            : await client.GetConfigurationAsync(segments[0], segments[1], segments[2], segments[3], null);
+            ? await client.GetResolvedConfigurationAsync(segments[0], segments[1], segments[2], segments[3], null, null)
+            : await client.GetConfigurationAsync(segments[0], segments[1], segments[2], segments[3], null, null);
         await ReadAsync(client, resolved, segments[0], segments[1], segments[2], segments[3], null);
 
         var requests = _http.Requests;
@@ -161,23 +171,31 @@ public class ConditionalReadsTests
         var client = CreateClient();
 
         var expected = await Should.ThrowAsync<ApiException>(() => resolved
-            ? client.GetResolvedConfigurationAsync("acme", "billing", "default", "sbt.northwind", null)
-            : client.GetConfigurationAsync("acme", "billing", "default", "sbt.northwind", null));
+            ? client.GetResolvedConfigurationAsync("acme", "billing", "default", "sbt.northwind", null, null)
+            : client.GetConfigurationAsync("acme", "billing", "default", "sbt.northwind", null, null));
         var actual = await Should.ThrowAsync<ApiException>(() => ReadAsync(client, resolved, "acme", "billing", "default", "sbt.northwind", WeakTag));
 
-        actual.GetType().ShouldBe(expected.GetType());
-        actual.StatusCode.ShouldBe(status);
-        actual.Message.ShouldBe(expected.Message);
-        actual.Response.ShouldBe(expected.Response);
-
-        if (expected is ApiException<ErrorResponse> typed)
-        {
-            ((ApiException<ErrorResponse>)actual).Result.ErrorCode.ShouldBe(typed.Result.ErrorCode);
-        }
+        ShouldBeLike(actual, expected, status);
     }
 
     [Theory]
-    [InlineData(false, 422, false)]
+    [MemberData(nameof(Failures))]
+    public async Task FormattedFailures_ThrowWhatTheGeneratedMethodsThrow(bool resolved, int status, string? body)
+    {
+        _http.Respond((HttpStatusCode)status, body);
+        _http.Respond((HttpStatusCode)status, body);
+        var client = CreateClient();
+
+        var expected = await Should.ThrowAsync<ApiException>(() => resolved
+            ? client.GetResolvedConfigurationAsync("acme", "billing", "default", "sbt.northwind", "env", null)
+            : client.GetConfigurationAsync("acme", "billing", "default", "sbt.northwind", "env", null));
+        var actual = await Should.ThrowAsync<ApiException>(() => ReadFormattedAsync(client, resolved, "acme", "billing", "default", "sbt.northwind", "env", WeakTag));
+
+        ShouldBeLike(actual, expected, status);
+    }
+
+    [Theory]
+    [InlineData(false, 422, true)]
     [InlineData(true, 422, true)]
     [InlineData(false, 404, true)]
     public async Task ErrorBodies_AreTypedWhereTheGeneratedMethodTypesThem(bool resolved, int status, bool typed)
@@ -262,12 +280,187 @@ public class ConditionalReadsTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TheEnvelopeRead_SendsNoFormatAndAcceptsJson(bool resolved)
+    {
+        _http.Respond(HttpStatusCode.OK, DocumentJson);
+
+        await ReadAsync(CreateClient(), resolved, "acme", "billing", "default", "sbt.northwind", null);
+
+        var request = _http.Requests.ShouldHaveSingleItem();
+        request.Uri.Query.ShouldBeEmpty();
+        request.Headers["Accept"].ShouldBe("application/json");
+    }
+
+    [Theory]
+    [InlineData(false, "/api/v1/acme/billing/default/configuration/sbt.northwind")]
+    [InlineData(true, "/api/v1/acme/billing/default/configuration/sbt.northwind/resolved")]
+    public async Task AFormatted200ThenA304_SendsTheTagBackAndReturnsTheText(bool resolved, string path)
+    {
+        _http.Respond(HttpStatusCode.OK, EnvBody, "text/plain", ("ETag", WeakTag), ("Cache-Control", "private, no-cache"));
+        _http.Respond(HttpStatusCode.NotModified, null, ("ETag", WeakTag), ("Cache-Control", "private, no-cache"));
+        var client = CreateClient();
+
+        var first = await ReadFormattedAsync(client, resolved, "acme", "billing", "default", "sbt.northwind", "env", null);
+        var second = await ReadFormattedAsync(client, resolved, "acme", "billing", "default", "sbt.northwind", "env", first.ETag);
+
+        first.StatusCode.ShouldBe(200);
+        first.IsNotModified.ShouldBeFalse();
+        first.Result.ShouldBe(EnvBody);
+        first.ETag.ShouldBe(WeakTag);
+        first.Headers["Content-Type"].ShouldBe(["text/plain; charset=utf-8"]);
+        second.StatusCode.ShouldBe(304);
+        second.IsNotModified.ShouldBeTrue();
+        second.Result.ShouldBeNull();
+        second.ETag.ShouldBe(WeakTag);
+
+        var requests = _http.Requests;
+        requests.Count.ShouldBe(2);
+        requests.ShouldAllBe(request => request.Uri.AbsolutePath == path && request.Uri.Query == "?format=env" && request.Method == HttpMethod.Get);
+        requests[0].Headers.ContainsKey("If-None-Match").ShouldBeFalse();
+        requests[1].Headers["If-None-Match"].ShouldBe(WeakTag);
+    }
+
+    [Theory]
+    [InlineData(false, "flat")]
+    [InlineData(true, "ENV")]
+    [InlineData(false, "a b&c=d/e+f")]
+    [InlineData(true, "")]
+    public async Task TheFormattedUrl_IsTheGeneratedOne(bool resolved, string format)
+    {
+        _http.Respond(HttpStatusCode.OK, DocumentJson);
+        _http.Respond(HttpStatusCode.OK, EnvBody, "text/plain");
+        var client = CreateClient();
+        string[] segments = ["acme corp", "bill/ing", "de fault%", "sbt.a+b?c#d&e"];
+
+        _ = resolved
+            ? await client.GetResolvedConfigurationAsync(segments[0], segments[1], segments[2], segments[3], format, null)
+            : await client.GetConfigurationAsync(segments[0], segments[1], segments[2], segments[3], format, null);
+        await ReadFormattedAsync(client, resolved, segments[0], segments[1], segments[2], segments[3], format, null);
+
+        var requests = _http.Requests;
+        requests[1].Uri.OriginalString.ShouldBe(requests[0].Uri.OriginalString);
+        requests[1].Uri.Query.ShouldBe("?format=" + Uri.EscapeDataString(format));
+    }
+
+    [Theory]
+    [InlineData("flat", "application/json")]
+    [InlineData("properties", "text/plain")]
+    [InlineData("Env", "text/plain")]
+    [InlineData("YAML", "application/yaml")]
+    [InlineData("json", "*/*")]
+    [InlineData("toml", "*/*")]
+    public async Task AFormattedRead_AcceptsTheMediaTypeOfItsFormat(string format, string accept)
+    {
+        _http.Respond(HttpStatusCode.OK, EnvBody, "text/plain");
+
+        await CreateClient().GetConfigurationFormattedConditionalAsync("acme", "billing", "default", "sbt.northwind", format, null);
+
+        _http.Requests.ShouldHaveSingleItem().Headers["Accept"].ShouldBe(accept);
+    }
+
+    [Theory]
+    [InlineData("flat", "application/json", "{\n  \"db:host\": \"db.local\",\n  \"db:port\": \"5432\"\n}\n")]
+    [InlineData("properties", "text/plain", "db.host=caf\\u00E9\ndb.port=5432\n")]
+    [InlineData("yaml", "application/yaml", "db:\n  host: \"café \U0001F600\"\n  port: 5432\n")]
+    public async Task AFormattedBody_IsTheTextAsSent(string format, string mediaType, string body)
+    {
+        _http.Respond(HttpStatusCode.OK, body, mediaType);
+
+        var response = await CreateClient().GetResolvedConfigurationFormattedConditionalAsync("acme", "billing", "default", "sbt.northwind", format, null);
+
+        // flat as well: the JSON text, not a Configuration that would swallow the keys
+        response.Result.ShouldBe(body);
+    }
+
+    [Fact]
+    public async Task AnEmptyFormattedBody_IsAnEmptyString()
+    {
+        _http.Respond(HttpStatusCode.OK, string.Empty, "text/plain", ("ETag", WeakTag));
+        _http.Respond(HttpStatusCode.OK);
+        var client = CreateClient();
+
+        var empty = await client.GetConfigurationFormattedConditionalAsync("acme", "billing", "default", "sbt.northwind", "env", null);
+        var none = await client.GetConfigurationFormattedConditionalAsync("acme", "billing", "default", "sbt.northwind", "env", null);
+
+        empty.Result.ShouldBe(string.Empty);
+        empty.ETag.ShouldBe(WeakTag);
+        none.Result.ShouldBe(string.Empty);
+        none.IsNotModified.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.OK)]
+    [InlineData(HttpStatusCode.NotModified)]
+    public async Task FormattedCacheHeaders_AreReadOnA200AndA304(HttpStatusCode status)
+    {
+        _http.Respond(status, status == HttpStatusCode.OK ? EnvBody : null, "text/plain", ("ETag", WeakTag), ("Cache-Control", "no-store"), ("X-2S-Secrets-Withheld", "mtls-required"));
+
+        var response = await CreateClient().GetResolvedConfigurationFormattedConditionalAsync("acme", "billing", "default", "sbt.northwind", "env", WeakTag);
+
+        response.ETag.ShouldBe(WeakTag);
+        response.CacheControl.ShouldBe("no-store");
+        response.IsNoStore.ShouldBeTrue();
+        response.SecretsWithheld.ShouldBe("mtls-required");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AFormatError_IsTypedWithItsCodeAndDetails(bool resolved)
+    {
+        _http.Respond(HttpStatusCode.UnprocessableEntity, FormatErrorJson);
+
+        var exception = await Should.ThrowAsync<ApiException<ErrorResponse>>(() =>
+            ReadFormattedAsync(CreateClient(), resolved, "acme", "billing", "default", "sbt.northwind", "env", null));
+
+        exception.StatusCode.ShouldBe(422);
+        exception.Message.ShouldStartWith(resolved ? "A binding in the configuration cannot be evaluated" : "The configuration cannot be written in the requested format");
+        exception.Result.ErrorCode.ShouldBe("format.case-collision");
+        exception.Result.Details.ShouldBeOfType<JObject>()["Rule"]!.Value<string>().ShouldBe("case-collision");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AFormattedRead_RequiresAFormat(bool resolved)
+    {
+        var exception = await Should.ThrowAsync<ArgumentNullException>(() =>
+            ReadFormattedAsync(CreateClient(), resolved, "acme", "billing", "default", "sbt.northwind", null!, null));
+
+        exception.ParamName.ShouldBe("format");
+        _http.Requests.ShouldBeEmpty();
+    }
+
     private static Task<ConditionalResponse<Configuration>> ReadAsync(
         IConfigurationsApiClient client, bool resolved, string organization, string project, string view, string key, string? ifNoneMatch)
     {
         return resolved
             ? client.GetResolvedConfigurationConditionalAsync(organization, project, view, key, ifNoneMatch)
             : client.GetConfigurationConditionalAsync(organization, project, view, key, ifNoneMatch);
+    }
+
+    private static Task<ConditionalResponse<string>> ReadFormattedAsync(
+        IConfigurationsApiClient client, bool resolved, string organization, string project, string view, string key, string format, string? ifNoneMatch)
+    {
+        return resolved
+            ? client.GetResolvedConfigurationFormattedConditionalAsync(organization, project, view, key, format, ifNoneMatch)
+            : client.GetConfigurationFormattedConditionalAsync(organization, project, view, key, format, ifNoneMatch);
+    }
+
+    private static void ShouldBeLike(ApiException actual, ApiException expected, int status)
+    {
+        actual.GetType().ShouldBe(expected.GetType());
+        actual.StatusCode.ShouldBe(status);
+        actual.Message.ShouldBe(expected.Message);
+        actual.Response.ShouldBe(expected.Response);
+
+        if (expected is ApiException<ErrorResponse> typed)
+        {
+            ((ApiException<ErrorResponse>)actual).Result.ErrorCode.ShouldBe(typed.Result.ErrorCode);
+        }
     }
 
     private ConfigurationsApiClient CreateClient()

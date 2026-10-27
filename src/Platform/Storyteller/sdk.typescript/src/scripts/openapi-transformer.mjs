@@ -10,9 +10,16 @@
 // Values of annotations and configurations are IReadOnlyDictionary<string, object> in C#, so each value can be any
 // JSON (a number, a string, an array). The document says "additionalProperties: { type: object }", which would make
 // the generated Zod schemas reject primitive values; the transformer widens them to any JSON value.
+//
+// The effective and the resolved configuration read take ?format=flat|properties|env|yaml, which answers the Content alone
+// as text/plain, application/yaml or a JSON object of strings. Orval would add a params argument before options and turn
+// the return type into Configuration | string, so the transformer removes the parameter and the other media types of the
+// 200: the generated functions, hooks, schemas and mocks keep the envelope, and lib/conditional.ts reads the formats.
 
 const jsonPatchContentType = 'application/json-patch+json'
 const deprecatedOperations = new Set(['GrantUserAccess', 'RevokeUserAccess'])
+const formattedOperations = new Set(['GetConfiguration', 'GetResolvedConfiguration'])
+const jsonContentType = 'application/json'
 
 const jsonPatchOperation = {
   type: 'object',
@@ -52,8 +59,25 @@ export default function transform(document) {
       if (deprecatedOperations.has(operation?.operationId)) {
         operation.deprecated = true
       }
+
+      if (formattedOperations.has(operation?.operationId)) {
+        keepEnvelope(operation)
+      }
     }
   }
 
   return document
+}
+
+// Only the Configuration of application/json stays: no format parameter, and no text bodies of the 200.
+function keepEnvelope(operation) {
+  operation.parameters = operation.parameters?.filter((parameter) => !(parameter?.in === 'query' && parameter?.name === 'format'))
+
+  const content = operation.responses?.['200']?.content
+
+  for (const contentType of Object.keys(content ?? {})) {
+    if (contentType !== jsonContentType) {
+      delete content[contentType]
+    }
+  }
 }

@@ -84,6 +84,7 @@ Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer
 - The `application/json-patch+json` bodies of `PatchConfiguration` and `PatchTemplate` are documented as `object`; the transformer replaces them with a required array of `JsonPatchOperation` (`op`, `path`, `from`, `value`).
 - `Values` of annotations and configurations is `IReadOnlyDictionary<string, object>` in C#, documented as a map of objects; the transformer widens it to a map of any JSON value, so the Zod schemas accept numbers and strings.
 - `GrantUserAccess` and `RevokeUserAccess` are marked deprecated (the members endpoints replace them in browser clients).
+- `GetConfiguration` and `GetResolvedConfiguration` lose the `format` query parameter and the `text/plain` and `application/yaml` bodies of their `200`. With them, Orval would add a `params` argument before `options` and return `Configuration | string`; without them, the generated functions, composables, Zod schemas and mocks keep the `Configuration` envelope, and the formats are read with the [formatted helpers](#formatted-reads). This one is a choice of the SDK, not a gap of the document, and it stays.
 
 Remove a correction once the API documents it itself.
 
@@ -249,7 +250,7 @@ if (!result.notModified) {
 
 A timeout of `AbortSignal.timeout` rejects with a `TimeoutError`, not an `AbortError`, so it surfaces like a network failure: `StorytellerError` with `status: 0`, the "not reachable" message and `aborted: false`. A poller treats it as transient and tries again with the same tag.
 
-`ifNoneMatch` overrides an `If-None-Match` in `options.headers`; an empty `ifNoneMatch` removes it, and an `undefined` one leaves it as it is. An error status throws `StorytellerError`, as the fetcher does (an empty `404` for a missing configuration, `422` for a binding that fails).
+`ifNoneMatch` overrides an `If-None-Match` in `options.headers`; an empty `ifNoneMatch` removes it, and an `undefined` one leaves it as it is. An error status throws `StorytellerError`, as the fetcher does (an empty `404` for a missing configuration; a `422` with the `errorCode` `binding.evaluation` or `binding.limit.<kind>` for a binding of the resolved read that fails, or `format.<rule>` for a [format](#formatted-reads) that cannot write the document).
 
 Limits in a browser:
 
@@ -258,6 +259,26 @@ Limits in a browser:
 - Without `ifNoneMatch`, the browser's own HTTP cache may still revalidate with a stored `ETag` and hand script a `200`.
 
 The helpers are therefore for Node and for same-origin callers (a reverse proxy, a dev server proxy).
+
+### Formatted reads
+
+`getConfigurationFormattedConditional` and `getResolvedConfigurationFormattedConditional` take a `ConfigurationFormat` (`'flat' | 'properties' | 'env' | 'yaml'`) after the key and read `?format=`: the `Content` alone, without the envelope, as a `ConditionalResult<string>` (`docs/Platform/Storyteller/configuration-formats.md`). The URL is the generated one with `?format=` and the encoded format; the options, the headers and the errors are those of the envelope helpers.
+
+```ts
+import { getResolvedConfigurationFormattedConditional } from '@42for.net/2splatform.sdk'
+
+const result = await getResolvedConfigurationFormattedConditional('acme', 'billing', 'default', 'exe.billing.api.prod', 'env', {
+  ifNoneMatch: envTag,                   // the tag of env: each format has its own
+})
+
+if (!result.notModified) {
+  envTag = result.etag
+  dotenv = result.value                  // 'DB__HOST=db.local\nDB__PORT=5432\n'
+}
+```
+
+- `value` is the body as text, whatever its media type: the JSON object of `flat` stays text (parse it as a map of strings, not as a `Configuration`), and an empty body is `''`.
+- A document the format cannot write is a `422` with the `errorCode` `format.<rule>` (`format.case-collision`, `format.invalid-env-name`, …); the rule and the JSON path are in `body.Details`, and the message names the path, never a value.
 
 ## User token exchange
 

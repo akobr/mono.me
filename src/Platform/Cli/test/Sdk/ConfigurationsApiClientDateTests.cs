@@ -76,7 +76,7 @@ public class ConfigurationsApiClientDateTests
             }
             """);
 
-        var configuration = await CreateClient().GetConfigurationAsync("org1", "proj1", "default", "sbt.northwind", null);
+        var configuration = await CreateClient().GetConfigurationAsync("org1", "proj1", "default", "sbt.northwind", null, null);
 
         ShouldKeepTheStrings(configuration.Content.ShouldBeOfType<JObject>());
         configuration.Modified.At.ShouldBe(ModifiedAt);
