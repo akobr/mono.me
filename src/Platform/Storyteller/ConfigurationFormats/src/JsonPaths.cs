@@ -21,7 +21,7 @@ public static class JsonPaths
         return $"{parent}[{index}]";
     }
 
-    // Letters, digits, _ and -, starting with a letter or _.
+    // ASCII letters, digits, _ and -, starting with an ASCII letter or _.
     private static bool IsPlain(string name)
     {
         if (name.Length == 0 || !(char.IsAsciiLetter(name[0]) || name[0] == '_'))
@@ -40,8 +40,9 @@ public static class JsonPaths
         return true;
     }
 
-    // \ and ' with a backslash, and control characters as \n, \r, \t or \uXXXX, so a crafted name cannot put a line
-    // break, and with it a GitHub workflow command, into a message, a log line or stderr.
+    // \ and ' with a backslash, and C0 control characters and DEL as \n, \r, \t or \uXXXX, so a crafted name cannot put
+    // a CR or an LF, and with it a GitHub workflow command, into a message, a log line or stderr. C1 controls, U+2028
+    // and U+2029 are kept, as the vectors pin for every language.
     private static string Escape(string name)
     {
         var builder = new StringBuilder(name.Length);

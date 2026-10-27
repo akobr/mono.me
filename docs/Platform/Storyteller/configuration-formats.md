@@ -89,7 +89,7 @@ A document is checked in three steps, each over the whole document, and the firs
 - **No null.** A `null` property, an empty object and an empty array make no key, in every format. The one exception is a gap in a `yaml` array, written `null` so that every other item keeps its index.
 - **Names** keep their casing; `env` upper-cases them.
 - **No partial output.** The formatter builds the complete text before it returns. On an error it throws and returns nothing.
-- **Errors** name the rule and the JSON path, never a value: `$` is the root, `.name` a name of letters, digits, `_` and `-` that starts with a letter or `_`, `['name']` any other name, `[0]` an array item. In a bracketed name, `\` and `'` are escaped with a backslash and control characters are written as `\n`, `\r`, `\t` or `\uXXXX`, so a crafted name cannot put a line break, and with it a GitHub workflow command, into a message, a log line or an error output.
+- **Errors** name the rule and the JSON path, never a value: `$` is the root, `.name` a name of ASCII letters, digits, `_` and `-` that starts with an ASCII letter or `_`, `['name']` any other name, `[0]` an array item. In a bracketed name, `\` and `'` are escaped with a backslash, and the C0 control characters (U+0000 to U+001F) and DEL are written as `\n`, `\r`, `\t` or `\uXXXX` with upper-case hex digits; every other character, C1 controls and U+2028 and U+2029 included, is kept. A path therefore never holds a CR or an LF, so a crafted name cannot start a new line, and with it a GitHub workflow command, in a message, a log line or an error output.
 
 ## One reading of the document
 

@@ -201,7 +201,7 @@ A document is invalid, and never applied, when:
 - a property name is empty or contains `:`;
 - two keys differ only in case, because `IConfiguration` compares keys case-insensitively.
 
-The error names the JSON path, for example `$.db['a:b']`, and never a value. A bracketed name in a path has `\` and `'` escaped with a backslash and its control characters written as `\n`, `\r`, `\t` or `\uXXXX`, so a crafted name cannot break a log line or an error message. Every path in the provider's warnings and errors, of unbound bindings and secret references too, is written the same way. `Configuration/test/Vectors/flattening.json` pins every rule in a shape that a provider in another language can reuse; the library's tests run it.
+The error names the JSON path, for example `$.db['a:b']`, and never a value. A bracketed name in a path has `\` and `'` escaped with a backslash and its C0 control characters (U+0000 to U+001F) and DEL written as `\n`, `\r`, `\t` or `\uXXXX`; every other character, C1 controls and U+2028 and U+2029 included, is kept. A path therefore never holds a CR or an LF, so a crafted name cannot start a new line in a log or an error message. Every path in the provider's warnings and errors, of unbound bindings and secret references too, is written the same way. `Configuration/test/Vectors/flattening.json` pins every rule in a shape that a provider in another language can reuse; the library's tests run it.
 
 The SDK reads numbers as `double`, so `1.50` arrives as `1.5`. Binding to `decimal` or `double` is not affected.
 
