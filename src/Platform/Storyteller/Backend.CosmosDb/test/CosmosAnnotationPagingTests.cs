@@ -5,9 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
+using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Shouldly;
 using Xunit;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
@@ -54,8 +54,8 @@ public class CosmosAnnotationPagingTests(Startup startup)
         request.DescendantsOf = AnnotationKey.Parse("rst.pg-r");
         var list = await ReadAllAsync(request);
 
-        list.Keys.Order(StringComparer.Ordinal).ShouldBe(executions);
-        list.Pages.ShouldBeGreaterThanOrEqualTo(3);
+        list.Keys.Order(StringComparer.Ordinal).Should().Equal(executions);
+        list.Pages.Should().BeGreaterThanOrEqualTo(3);
     }
 
     [Theory]
@@ -75,26 +75,20 @@ public class CosmosAnnotationPagingTests(Startup startup)
         var expected = byResponsibility
             ? executions
             : executions.Append("exe.pg-s1.pg-other.pg-c").Order(StringComparer.Ordinal).ToList();
-        list.Keys.Order(StringComparer.Ordinal).ShouldBe(expected);
-        list.Pages.ShouldBeGreaterThanOrEqualTo(3);
+        list.Keys.Order(StringComparer.Ordinal).Should().Equal(expected);
+        list.Pages.Should().BeGreaterThanOrEqualTo(3);
     }
 
     [Fact]
     public async Task TheListOfEveryType_PagesAcrossTypeBoundaries_AndReturnsEveryAnnotationOnce()
     {
         var project = NewProject();
-
-        // one responsibility, subject and usage, and three contexts and executions: nine annotations of five types
-        foreach (var context in new[] { "pg-c1", "pg-c2", "pg-c3" })
-        {
-            await CreateAsync(project, $"exe.pg-s.pg-r.{context}");
-        }
+        await CreateContextsAsync(project);
 
         var request = Request(project, Enum.GetValues<AnnotationType>());
         var list = await ReadAllAsync(request);
 
-        list.Keys.Order(StringComparer.Ordinal).ShouldBe(new[]
-        {
+        list.Keys.Order(StringComparer.Ordinal).Should().Equal(
             "cnt.pg-s.pg-c1",
             "cnt.pg-s.pg-c2",
             "cnt.pg-s.pg-c3",
@@ -103,9 +97,43 @@ public class CosmosAnnotationPagingTests(Startup startup)
             "exe.pg-s.pg-r.pg-c3",
             "rst.pg-r",
             "sbt.pg-s",
-            "usg.pg-s.pg-r",
-        });
-        list.TokenTypes.Distinct().Count().ShouldBeGreaterThan(1, "pages end in more than one type");
+            "usg.pg-s.pg-r");
+        list.TokenTypes.Distinct().Count().Should().BeGreaterThan(1, "pages end in more than one type");
+    }
+
+    [Fact]
+    public async Task TheTokenOfATypeBoundary_StartsTheListAtTheFirstPageOfItsType()
+    {
+        var project = NewProject();
+        await CreateContextsAsync(project);
+
+        // the token a page ends with when it fills up before a type starts; it carries no Cosmos DB token, so the
+        // contexts start at their first page and the types before them are skipped
+        var request = Request(project, Enum.GetValues<AnnotationType>());
+        request.ContinuationToken = ContinuationToken.CreateFirstPage(nameof(AnnotationType.Context)).ToString();
+        var list = await ReadAllAsync(request);
+
+        list.Keys.Order(StringComparer.Ordinal).Should().Equal(
+            "cnt.pg-s.pg-c1",
+            "cnt.pg-s.pg-c2",
+            "cnt.pg-s.pg-c3",
+            "exe.pg-s.pg-r.pg-c1",
+            "exe.pg-s.pg-r.pg-c2",
+            "exe.pg-s.pg-r.pg-c3");
+    }
+
+    [Fact]
+    public async Task ATokenWhoseCosmosPartIsNotACosmosToken_IsInvalidQuery()
+    {
+        var project = NewProject();
+        await CreateExecutionsAsync(project, "pg-r", 3);
+
+        // decodes as a token of the executions, but Cosmos DB cannot read its own part
+        var request = Request(project, AnnotationType.Execution);
+        request.ContinuationToken = new ContinuationToken(nameof(AnnotationType.Execution), "not a cosmos token").ToString();
+        var act = () => Paged.GetAnnotationsAsync(request);
+
+        (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidQuery);
     }
 
     private static string NewProject() => $"pag-{Guid.NewGuid():N}"[..16];
@@ -137,6 +165,16 @@ public class CosmosAnnotationPagingTests(Startup startup)
         return keys;
     }
 
+    // An execution in each of three contexts, with its ancestors: one responsibility, subject and usage, and three
+    // contexts and executions, nine annotations of five types.
+    private async Task CreateContextsAsync(string project)
+    {
+        foreach (var context in new[] { "pg-c1", "pg-c2", "pg-c3" })
+        {
+            await CreateAsync(project, $"exe.pg-s.pg-r.{context}");
+        }
+    }
+
     private Task CreateAsync(string project, string key, Func<Annotation, Annotation>? change = null)
     {
         var model = AnnotationFactory.CreateDefault(AnnotationKey.Parse(key), project, View);
@@ -154,7 +192,7 @@ public class CosmosAnnotationPagingTests(Startup startup)
         do
         {
             pages++;
-            pages.ShouldBeLessThanOrEqualTo(MaxPages, "the list does not end");
+            pages.Should().BeLessThanOrEqualTo(MaxPages, "the list ends");
 
             var page = await service.GetAnnotationsAsync(request);
             keys.AddRange(page.Annotations.Select(annotation => annotation.AnnotationKey));
@@ -162,7 +200,7 @@ public class CosmosAnnotationPagingTests(Startup startup)
 
             if (page.ContinuationToken is not null)
             {
-                ContinuationToken.TryParse(page.ContinuationToken, out var token).ShouldBeTrue();
+                ContinuationToken.TryParse(page.ContinuationToken, out var token).Should().BeTrue();
                 tokenTypes.Add(token!.Type);
             }
         }

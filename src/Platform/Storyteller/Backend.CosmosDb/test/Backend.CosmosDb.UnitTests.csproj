@@ -14,7 +14,6 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Moq" />
     <PackageReference Include="Polly" />
-    <PackageReference Include="Shouldly" />
     <PackageReference Include="Testcontainers.CosmosDb" />
     <PackageReference Include="Testcontainers.LowkeyVault" />
     <PackageReference Include="xunit" />
