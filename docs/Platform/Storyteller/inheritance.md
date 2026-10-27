@@ -330,6 +330,8 @@ A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, ov
 | Bindings whose inputs were recorded | The first read resolves and records the inputs (key/value pairs, annotations) with their storage markers. The body is tagged `d`, and the manifest is kept. A later read that sends the tag revalidates the markers in one ReadMany. | Everything but the configuration point read, the access checks and the ReadMany: no lookup, decryption, usage meter, audit entry or evaluation |
 | Volatile bindings | `ResolveConfigurationAsync` evaluates it on every read, and the resolved body is tagged `b`. | The transfer only |
 
+With `?format=`, the read formats the document before it compares the tag, so a 304 without bindings or with volatile bindings still formats it, and so does a 304 of the effective read; a 304 from a manifest does not.
+
 ### The dependency manifest
 
 A resolve gets a `BindingDependencies` collector on its `BindingScope`. Every binding on the way records what it reads: `(kind, source, key, marker)`, see [binding.md](binding.md#dependency-manifests).
