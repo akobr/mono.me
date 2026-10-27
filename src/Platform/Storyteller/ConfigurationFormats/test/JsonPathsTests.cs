@@ -12,6 +12,7 @@ public class JsonPathsTests
     [InlineData("", "$['']")]
     [InlineData("it's", "$['it\\'s']")]
     [InlineData("C:\\x", "$['C:\\\\x']")]
+    [InlineData("\u010Das", "$['\u010Das']")]
     public void AName_IsPlainOrBracketed(string name, string path)
     {
         JsonPaths.Property(JsonPaths.Root, name).ShouldBe(path);
@@ -30,6 +31,17 @@ public class JsonPathsTests
 
         escaped.ShouldBe(path);
         escaped.ShouldAllBe(character => !char.IsControl(character));
+    }
+
+    // Only C0 and DEL are escaped: a port that escaped every Unicode control would write other paths than the vectors.
+    [Theory]
+    [InlineData("a\u0085b")]
+    [InlineData("a\u009Bb")]
+    [InlineData("a\u2028b")]
+    [InlineData("a\u2029b")]
+    public void AC1ControlOrAUnicodeSeparator_IsKept_AsTheVectorsPin(string name)
+    {
+        JsonPaths.Property(JsonPaths.Root, name).ShouldBe($"$['{name}']");
     }
 
     [Fact]
