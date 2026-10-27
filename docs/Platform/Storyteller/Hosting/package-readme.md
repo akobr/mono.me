@@ -45,7 +45,7 @@ builder.Services.AddStoryteller()
 - The settings are the provider's: `STORYTELLER_ENDPOINT`, `STORYTELLER_KEY` and the variables of the machine's credential, or the same options in code.
 - Who am I and the catalog need `Annotation.Read`; the subscriptions also need `Configuration.Read`, and `Secrets.Read` for secrets. The informer needs an unrestricted machine, or one restricted to the responsibility.
 - The subscriptions poll, every 30 seconds by default, and keep the last good document of a subject when a read fails.
-- Use it in the same version as `42.Platform.Storyteller.Configuration`.
+- It uses internals of `42.Platform.Storyteller.Configuration`, and depends on the Configuration package built from the same commit, which has its own version number. Let Hosting bring it: do not reference or update `42.Platform.Storyteller.Configuration` on its own to another version. The dependency is not pinned exactly yet, so NuGet would accept a newer one, which can fail at run time.
 
 ## Documentation
 
