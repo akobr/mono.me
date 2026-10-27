@@ -1,6 +1,8 @@
 using _42.Platform.Storyteller.Sdk.Configuring;
 using _42.Platform.Storyteller.Sdk.Configuring.Container;
 using _42.Platform.Storyteller.Sdk.Configuring.Documents;
+using _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
+using _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Subscriptions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -139,8 +141,223 @@ public sealed class RegistrationTests : IDisposable
             .Message.ShouldContain("STORYTELLER_KEY");
     }
 
+    [Theory]
+    [InlineData("rst.invoicing")]
+    [InlineData("unt.invoicing.pdf")]
+    [InlineData("usg.northwind.invoicing")]
+    [InlineData("exe.northwind.invoicing.prod")]
+    [InlineData("uxe.northwind.invoicing.prod.pdf")]
+    public void AddSubscriptions_TakesTheResponsibility_FromTheChainOfTheKey(string annotationKey)
+    {
+        _fixture.Environment["STORYTELLER_KEY"] = $"{HostingFixture.Scope}.{annotationKey}";
+        var services = new ServiceCollection();
+
+        services.AddStoryteller(_fixture.Configure()).AddSubscriptions("prod");
+
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+        var subscriptions = provider.GetRequiredService<IStorytellerSubscriptions>();
+        subscriptions.Responsibility.ShouldBe("invoicing");
+        subscriptions.Context.ShouldBe("prod");
+    }
+
+    [Theory]
+    [InlineData("sbt.northwind")]
+    [InlineData("cnt.northwind.prod")]
+    public void AddSubscriptions_WithoutAResponsibility_ThrowsForAKeyWithoutOne(string annotationKey)
+    {
+        _fixture.Environment["STORYTELLER_KEY"] = $"{HostingFixture.Scope}.{annotationKey}";
+        var builder = new ServiceCollection().AddStoryteller(_fixture.Configure());
+
+        var exception = Should.Throw<StorytellerConfigurationException>(() => builder.AddSubscriptions("prod"));
+
+        exception.Message.ShouldStartWith($"The key {HostingFixture.Scope}.{annotationKey} names no responsibility to take the subscriptions of: set STORYTELLER_KEY");
+        exception.Key.ShouldBe($"{HostingFixture.Scope}.{annotationKey}");
+        builder.Services.ShouldNotContain(descriptor => descriptor.ServiceType == typeof(IStorytellerSubscriptions));
+    }
+
+    [Fact]
+    public void AddSubscriptions_WithAResponsibility_TakesOnlyTheViewFromAKeyWithoutOne()
+    {
+        _fixture.Environment["STORYTELLER_KEY"] = $"{HostingFixture.Scope}.sbt.northwind";
+        var services = new ServiceCollection();
+
+        services.AddStoryteller(_fixture.Configure()).AddSubscriptions("invoicing", "prod");
+
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+        provider.GetRequiredService<IStorytellerSubscriptions>().Responsibility.ShouldBe("invoicing");
+    }
+
+    [Fact]
+    public void AddSubscriptions_WithTheResponsibilityOfTheKey_IsAccepted()
+    {
+        var services = new ServiceCollection();
+
+        services.AddStoryteller(_fixture.Configure()).AddSubscriptions("invoicing", "dev");
+
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+        var subscriptions = provider.GetRequiredService<IStorytellerSubscriptions>();
+        subscriptions.Responsibility.ShouldBe("invoicing");
+        subscriptions.Context.ShouldBe("dev");
+    }
+
+    [Fact]
+    public void AddSubscriptions_WithAResponsibilityThatContradictsTheKey_Throws()
+    {
+        var builder = new ServiceCollection().AddStoryteller(_fixture.Configure());
+
+        var exception = Should.Throw<StorytellerConfigurationException>(() => builder.AddSubscriptions("shipping", "prod"));
+
+        exception.Message.ShouldBe(
+            $"AddSubscriptions names the responsibility shipping, but the key {HostingFixture.Scope}.{HostingFixture.ExecutionKey} belongs to the responsibility invoicing: a process watches the subscriptions of its own responsibility. Name invoicing, or set STORYTELLER_KEY to a key of shipping.");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AddSubscriptions_WithoutAKey_Throws_NamingTheVariableAndTheOption(bool withResponsibility)
+    {
+        _fixture.Environment.Remove("STORYTELLER_KEY");
+        var builder = new ServiceCollection().AddStoryteller(_fixture.Configure());
+
+        var exception = Should.Throw<StorytellerConfigurationException>(() => withResponsibility
+            ? builder.AddSubscriptions("invoicing", "prod")
+            : builder.AddSubscriptions("prod"));
+
+        exception.Message.ShouldContain("STORYTELLER_KEY");
+        exception.Message.ShouldContain("StorytellerConfigurationOptions.Key");
+    }
+
+    [Theory]
+    [InlineData("", "prod", "responsibility")]
+    [InlineData("in.voicing", "prod", "responsibility")]
+    [InlineData("invoicing", " ", "context")]
+    [InlineData("invoicing", "pr.od", "context")]
+    public void AddSubscriptions_RefusesANameThatIsNotOneSegment(string responsibility, string context, string parameter)
+    {
+        var builder = new ServiceCollection().AddStoryteller(_fixture.Configure());
+
+        Should.Throw<ArgumentException>(() => builder.AddSubscriptions(responsibility, context)).ParamName.ShouldBe(parameter);
+    }
+
+    [Fact]
+    public void AddSubscriptions_Twice_Throws()
+    {
+        var builder = new ServiceCollection().AddStoryteller(_fixture.Configure()).AddSubscriptions("prod");
+
+        Should.Throw<InvalidOperationException>(() => builder.AddSubscriptions("invoicing", "dev"))
+            .Message.ShouldContain("AddSubscriptions was called before");
+    }
+
+    [Fact]
+    public void AddSubscriptions_RegistersOneServiceForTheSubscriptionsAndTheHost()
+    {
+        var services = new ServiceCollection();
+        services.AddStoryteller(_fixture.Configure()).AddSubscriptions("prod");
+
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+
+        var subscriptions = provider.GetRequiredService<IStorytellerSubscriptions>();
+        var hosted = services.Where(descriptor => descriptor.ServiceType == typeof(IHostedService) && descriptor.ImplementationFactory is not null).ShouldHaveSingleItem();
+        hosted.ImplementationFactory!(provider).ShouldBeSameAs(subscriptions);
+        services.Count(descriptor => descriptor.ServiceType == typeof(IStorytellerSubscriptions)).ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData(nameof(StorytellerSubscriptionOptions.PollInterval), -1)]
+    [InlineData(nameof(StorytellerSubscriptionOptions.PollInterval), 500)]
+    [InlineData(nameof(StorytellerSubscriptionOptions.PollInterval), 46 * 24 * 3600 * 1000L)]
+    [InlineData(nameof(StorytellerSubscriptionOptions.MaxConcurrentReads), 0)]
+    [InlineData(nameof(StorytellerSubscriptionOptions.MaxConcurrentReads), 65)]
+    [InlineData(nameof(StorytellerSubscriptionOptions.StartTimeout), 0)]
+    [InlineData(nameof(StorytellerSubscriptionOptions.Mode), 7)]
+    public void AddSubscriptions_ValidatesItsOptions(string property, long value)
+    {
+        var builder = new ServiceCollection().AddStoryteller(_fixture.Configure());
+
+        var exception = Should.Throw<StorytellerConfigurationException>(() => builder.AddSubscriptions("prod", options =>
+        {
+            switch (property)
+            {
+                case nameof(options.PollInterval):
+                    options.PollInterval = TimeSpan.FromMilliseconds(value);
+                    break;
+                case nameof(options.MaxConcurrentReads):
+                    options.MaxConcurrentReads = (int)value;
+                    break;
+                case nameof(options.StartTimeout):
+                    options.StartTimeout = TimeSpan.FromMilliseconds(value);
+                    break;
+                default:
+                    options.Mode = (StorytellerReadMode)value;
+                    break;
+            }
+        }));
+
+        exception.Message.ShouldStartWith($"StorytellerSubscriptionOptions.{property} ");
+        builder.Services.ShouldNotContain(descriptor => descriptor.ServiceType == typeof(IStorytellerSubscriptions));
+    }
+
+    [Fact]
+    public void AddSubjectOptions_WithoutAddSubscriptions_ThrowsAtTheFirstResolution_NamingTheMissingCall()
+    {
+        var services = new ServiceCollection();
+        services.AddStoryteller(_fixture.Configure()).AddSubjectOptions<TenantOptions>();
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+
+        Should.Throw<InvalidOperationException>(() => provider.GetRequiredService<IOptionsMonitor<TenantOptions>>())
+            .Message.ShouldBe(
+                "AddSubjectOptions<TenantOptions>() binds the documents of the subscriptions, and there are none: call AddSubscriptions(context) or AddSubscriptions(responsibility, context) on the builder of services.AddStoryteller(…) as well.");
+    }
+
+    [Fact]
+    public void AddSubjectOptions_BeforeAddSubscriptions_IsFine_ButTwiceForATypeThrows()
+    {
+        var services = new ServiceCollection();
+        var builder = services.AddStoryteller(_fixture.Configure()).AddSubjectOptions<TenantOptions>().AddSubscriptions("prod");
+
+        Should.Throw<InvalidOperationException>(() => builder.AddSubjectOptions<TenantOptions>("App"));
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+        provider.GetRequiredService<IOptionsMonitor<TenantOptions>>().GetType().Name.ShouldStartWith("SubjectOptionsMonitor");
+    }
+
+    [Fact]
+    public void AddSubjectOptions_LeavesTheMonitorsOfOtherTypesToTheFramework()
+    {
+        var services = new ServiceCollection();
+        services.AddStoryteller(_fixture.Configure()).AddSubscriptions("prod").AddSubjectOptions<TenantOptions>();
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+
+        provider.GetRequiredService<IOptionsMonitor<StorytellerExecutionContextOptions>>().ShouldBeOfType<OptionsMonitor<StorytellerExecutionContextOptions>>();
+    }
+
+    [Fact]
+    public async Task WhoAmI_TheCatalog_TheDocumentsAndTheSubscriptions_ShareOneBoundCredential()
+    {
+        var credential = TestCredential.Bearer("token-1");
+        var catalog = new FakeCatalog(_fixture);
+        catalog.Subscribe("northwind");
+        catalog.Put("sbt.northwind");
+        catalog.Put("cnt.northwind.prod");
+        _fixture.RouteConfiguration(HostingFixture.ExecutionKey);
+        await using var harness = new SubscriptionsHarness(_fixture, options: options => options.Credential = credential);
+
+        await harness.Services.GetRequiredService<IExecutionContext>().GetAsync();
+        await harness.Services.GetRequiredService<ISubscriptionCatalog>().GetExecutionAsync(HostingFixture.ExecutionKey);
+        await harness.Services.GetRequiredService<IStorytellerDocuments>().GetAsync(HostingFixture.ExecutionKey);
+        await harness.StartAndPollAsync();
+
+        harness.Subscriptions.Find("northwind").ShouldNotBeNull();
+        credential.Bindings.ShouldHaveSingleItem();
+        _fixture.Http.Requests.ShouldAllBe(request => request.Authorization == "Bearer token-1");
+    }
+
     public void Dispose()
     {
         _fixture.Dispose();
+    }
+
+    public sealed class TenantOptions
+    {
+        public string? Name { get; set; }
     }
 }
