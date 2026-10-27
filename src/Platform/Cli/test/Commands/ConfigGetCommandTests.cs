@@ -502,6 +502,34 @@ public class ConfigGetCommandTests
         _fileSystem.File.ReadAllBytes(GitHubEnv).ShouldBe(Encoding.UTF8.GetBytes("EARLIER=1\n" + Heredocs(FirstDelimiter, ("NAME", "Žluťoučký kůň"))));
     }
 
+    // The runner would read EARLIER=1APP_NOTE<<… as one variable, and the line of the value as another, unprefixed.
+    [Fact]
+    public async Task GitHubEnv_StartsOnALineOfItsOwn_WhenTheJobLeftTheLastLineOpen()
+    {
+        _fileSystem.File.WriteAllText(GitHubEnv, "EARLIER=1");
+        SetupResolved(Envelope("""{ "note": "LD_PRELOAD=/tmp/evil.so" }"""));
+        SetupEffective(Envelope("""{ "note": "LD_PRELOAD=/tmp/evil.so" }"""));
+
+        var exitCode = await Execute(Key, "-r", "--github-env", "--env-prefix", "APP_");
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _fileSystem.File.ReadAllText(GitHubEnv).ShouldBe("EARLIER=1\n" + Heredocs(FirstDelimiter, ("APP_NOTE", "LD_PRELOAD=/tmp/evil.so")));
+    }
+
+    // The runner creates the file; a file that sform creates gets no byte order mark either.
+    [Fact]
+    public async Task GitHubEnv_ThatDoesNotExistYet_IsWrittenWithoutAByteOrderMark()
+    {
+        _fileSystem.File.Delete(GitHubEnv);
+        SetupResolved(Envelope("""{ "name": "Žluťoučký kůň" }"""));
+        SetupEffective(Envelope("""{ "name": "Žluťoučký kůň" }"""));
+
+        var exitCode = await Execute(Key, "-r", "--github-env", "--allow-unprefixed");
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _fileSystem.File.ReadAllBytes(GitHubEnv).ShouldBe(Encoding.UTF8.GetBytes(Heredocs(FirstDelimiter, ("NAME", "Žluťoučký kůň"))));
+    }
+
     [Fact]
     public async Task GitHubEnv_WithMaskAll_MasksEveryStringAndNumber_ButNoBoolean()
     {
@@ -689,6 +717,25 @@ public class ConfigGetCommandTests
     }
 
     [Fact]
+    public async Task GitHubEnv_WhenTheEffectiveReadTimesOut_MasksEveryStringAndNumber()
+    {
+        SetupResolved(Envelope(Resolved));
+        _api.Setup(api => api.GetConfigurationConditionalAsync("org1", "proj1", "default", Key, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout of 100 seconds elapsing.", new TimeoutException()));
+
+        var exitCode = await Execute(Key, "-r", "--github-env", "--env-prefix", "APP_");
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _out.ToString().ShouldBe("::add-mask::db.local\n::add-mask::s3cr3t-value\n::add-mask::5432\n");
+        ErrorLines().Take(2).ShouldBe(
+        [
+            "Unresolved bindings were not checked: the effective read failed.",
+            "Every string and number is masked: the effective read failed.",
+        ]);
+        _fileSystem.File.ReadAllText(GitHubEnv).ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public async Task GitHubEnv_WhenTheEffectiveConfigurationIsGone_IsWrongInput()
     {
         SetupResolved(Envelope(Resolved));
@@ -714,10 +761,11 @@ public class ConfigGetCommandTests
         _fileSystem.File.ReadAllText(GitHubEnv).ShouldBeEmpty();
     }
 
+    // A line shorter than four characters is a part of the secret all the same.
     [Theory]
-    [InlineData("bound", "::add-mask::-----BEGIN KEY-----%0AMIIBabc%0Aend\n::add-mask::-----BEGIN KEY-----\n::add-mask::MIIBabc\n")]
-    [InlineData("all", "::add-mask::-----BEGIN KEY-----%0AMIIBabc%0Aend\n::add-mask::-----BEGIN KEY-----\n::add-mask::MIIBabc\n::add-mask::end\n")]
-    public async Task GitHubEnv_MasksAMultiLineValue_AndEachOfItsLines(string mask, string masks)
+    [InlineData("bound")]
+    [InlineData("all")]
+    public async Task GitHubEnv_MasksAMultiLineValue_AndEachOfItsLines_WhateverTheirLength(string mask)
     {
         SetupResolved(Envelope("""{ "key": "-----BEGIN KEY-----\nMIIBabc\nend" }"""));
         SetupEffective(Envelope("""{ "key": "@(signing.key, vault)" }"""));
@@ -725,7 +773,7 @@ public class ConfigGetCommandTests
         var exitCode = await Execute(Key, "-r", "--github-env", "--env-prefix", "APP_", "--mask", mask);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _out.ToString().ShouldBe(masks);
+        _out.ToString().ShouldBe("::add-mask::-----BEGIN KEY-----%0AMIIBabc%0Aend\n::add-mask::-----BEGIN KEY-----\n::add-mask::MIIBabc\n::add-mask::end\n");
         _fileSystem.File.ReadAllText(GitHubEnv).ShouldBe(Heredocs(FirstDelimiter, ("APP_KEY", "-----BEGIN KEY-----\nMIIBabc\nend")));
         _error.ToString().ShouldNotContain("MIIBabc");
     }

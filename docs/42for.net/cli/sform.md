@@ -186,7 +186,7 @@ In one run, with one resolved and one effective read, `sform`:
 
 1. checks the variables, and writes nothing when a name or a value is refused (see below);
 2. writes the `::add-mask::` commands to standard output, before any value reaches `GITHUB_ENV` or a file;
-3. appends every variable to `GITHUB_ENV` as `NAME<<ghadelimiter_…`, the value, and the delimiter, with one random delimiter that no value contains, so a value with quotes or line breaks arrives as it is;
+3. appends every variable to `GITHUB_ENV` as `NAME<<ghadelimiter_…`, the value, and the delimiter, with one random delimiter that no value contains, so a value with quotes or line breaks arrives as it is; when an earlier command left the last line of the file without its line break, `sform` ends that line first;
 4. writes the `--export` file, when it is given;
 5. writes a summary to standard error: the names of the variables, how many values it masked, and the names it did not mask because they are shorter than four characters.
 
@@ -200,7 +200,7 @@ In one run, with one resolved and one effective read, `sform`:
 
 `sform` also refuses a value with the character U+0000, a variable longer than 32,767 characters as `NAME=value` (the limit of Windows), and variables of more than 512 KiB together.
 
-**Masking.** `--mask bound`, the default, masks the values that bindings produced. The resolved read does not say which values are secret, so `sform` compares it with the effective configuration: a string or a number is masked when its path has no value in the effective configuration, or another one. When the two reads return different versions, or the effective read fails, every string and number is masked, and the summary says why. Booleans and empty or blank values are never masked. Under `bound`, a value shorter than four characters is not masked either, as masking `1` or `on` would hide those characters everywhere in the log; the summary names it. `--mask all` masks every string and number, whatever its length. A value with line breaks gets one mask for the whole value and one for each line, under `bound` for each line of four characters or more.
+**Masking.** `--mask bound`, the default, masks the values that bindings produced. The resolved read does not say which values are secret, so `sform` compares it with the effective configuration: a string or a number is masked when its path has no value in the effective configuration, or another one. When the two reads return different versions, or the effective read fails, every string and number is masked, and the summary says why. Booleans and empty or blank values are never masked. Under `bound`, a value shorter than four characters is not masked either, as masking `1` or `on` would hide those characters everywhere in the log; the summary names it. `--mask all` masks every string and number, whatever its length. A value with line breaks gets one mask for the whole value and one for each of its lines, whatever their length.
 
 `bound` is a heuristic. It also masks the public values that bindings produced; it cannot recognise a secret stored as a plain value in a configuration (use `--mask all`, or keep secrets as secret key/values or vault references); and it masks a secret that a binding put into a longer string only as that whole string.
 
