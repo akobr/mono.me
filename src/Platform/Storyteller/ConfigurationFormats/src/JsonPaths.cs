@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace _42.Platform.Storyteller.ConfigurationFormats;
@@ -39,18 +40,40 @@ public static class JsonPaths
         return true;
     }
 
+    // \ and ' with a backslash, and control characters as \n, \r, \t or \uXXXX, so a crafted name cannot put a line
+    // break, and with it a GitHub workflow command, into a message, a log line or stderr.
     private static string Escape(string name)
     {
         var builder = new StringBuilder(name.Length);
 
         foreach (var character in name)
         {
-            if (character is '\\' or '\'')
+            switch (character)
             {
-                builder.Append('\\');
-            }
+                case '\\' or '\'':
+                    builder.Append('\\').Append(character);
+                    break;
 
-            builder.Append(character);
+                case '\n':
+                    builder.Append("\\n");
+                    break;
+
+                case '\r':
+                    builder.Append("\\r");
+                    break;
+
+                case '\t':
+                    builder.Append("\\t");
+                    break;
+
+                case < ' ' or '\u007F':
+                    builder.Append("\\u").Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
+                    break;
+
+                default:
+                    builder.Append(character);
+                    break;
+            }
         }
 
         return builder.ToString();

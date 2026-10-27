@@ -1,0 +1,318 @@
+{
+  "description": "How the Content object of a Storyteller configuration becomes the keys of a Spring Boot .properties file (format properties). Each vector has a name, the document (the Content object) and either the keys with their values or the error that makes it invalid. Keys are the logical keys a reader returns, before the escaping of the file: the first name, then .name per property and [0] per array item; a name with any other character than ASCII letters, digits, - and _ is written in the bracket form [name] (.[name] after the first step). Values are the raw text, as in flattening.json. The base rules of flattening.json apply first, then bracket-in-name over every property name, then array-gap; the first error is reported. Error paths are those of flattening.json. Numbers are read as double-precision floats. formats.json pins the escaping of the file.",
+  "vectors": [
+    {
+      "name": "study example",
+      "document": {
+        "db": {
+          "host": "db.internal",
+          "port": 5432,
+          "hosts": [ "db-1", "db-2" ],
+          "ssl": true
+        },
+        "features": {
+          "beta": false,
+          "ratio": 0.5
+        },
+        "Logging": {
+          "LogLevel": {
+            "Default": "Information"
+          }
+        },
+        "name": "billing"
+      },
+      "keys": {
+        "db.host": "db.internal",
+        "db.port": "5432",
+        "db.hosts[0]": "db-1",
+        "db.hosts[1]": "db-2",
+        "db.ssl": "true",
+        "features.beta": "false",
+        "features.ratio": "0.5",
+        "Logging.LogLevel.Default": "Information",
+        "name": "billing"
+      }
+    },
+    {
+      "name": "an empty document has no keys",
+      "document": {},
+      "keys": {}
+    },
+    {
+      "name": "strings stay as written",
+      "document": {
+        "empty": "",
+        "padded": " padded ",
+        "date": "2026-10-20T12:00:00.1230000+02:00",
+        "binding": "@kv(\"db-password\")",
+        "booleanText": "True",
+        "numberText": "05432",
+        "unicode": "Žluťoučký kůň"
+      },
+      "keys": {
+        "empty": "",
+        "padded": " padded ",
+        "date": "2026-10-20T12:00:00.1230000+02:00",
+        "binding": "@kv(\"db-password\")",
+        "booleanText": "True",
+        "numberText": "05432",
+        "unicode": "Žluťoučký kůň"
+      }
+    },
+    {
+      "name": "numbers are their JSON text",
+      "document": {
+        "integer": 5432,
+        "negative": -7,
+        "zero": 0,
+        "fraction": 0.5,
+        "negativeFraction": -0.25,
+        "trailingZero": 1.50
+      },
+      "keys": {
+        "integer": "5432",
+        "negative": "-7",
+        "zero": "0",
+        "fraction": "0.5",
+        "negativeFraction": "-0.25",
+        "trailingZero": "1.5"
+      }
+    },
+    {
+      "name": "booleans are lower case",
+      "document": {
+        "on": true,
+        "off": false
+      },
+      "keys": {
+        "on": "true",
+        "off": "false"
+      }
+    },
+    {
+      "name": "null makes no key",
+      "document": {
+        "a": null,
+        "b": { "c": null },
+        "d": [ null ]
+      },
+      "keys": {}
+    },
+    {
+      "name": "empty objects and arrays make no key",
+      "document": {
+        "a": {},
+        "b": [],
+        "c": { "d": {}, "e": [ [] ] }
+      },
+      "keys": {}
+    },
+    {
+      "name": "array items keep their index, also after a null",
+      "document": {
+        "list": [ "x", null, "z", { "name": "w" }, [ "nested" ] ]
+      },
+      "error": { "rule": "array-gap", "path": "$.list[1]" }
+    },
+    {
+      "name": "names keep their casing and their dots, spaces and dashes",
+      "document": {
+        "Db": { "ConnectionString": "Server=db" },
+        "a.b": "1",
+        "c d": "2",
+        "e-f": "3"
+      },
+      "keys": {
+        "Db.ConnectionString": "Server=db",
+        "[a.b]": "1",
+        "[c d]": "2",
+        "e-f": "3"
+      }
+    },
+    {
+      "name": "sections whose names differ only in case merge",
+      "document": {
+        "Db": { "Host": "a" },
+        "db": { "port": 1 }
+      },
+      "keys": {
+        "Db.Host": "a",
+        "db.port": "1"
+      }
+    },
+    {
+      "name": "a value and a section may share a name",
+      "document": {
+        "a": "x",
+        "A": { "b": "y" }
+      },
+      "keys": {
+        "a": "x",
+        "A.b": "y"
+      }
+    },
+    {
+      "name": "a colon in a name is invalid",
+      "document": {
+        "db": { "a:b": "x" }
+      },
+      "error": { "rule": "colon-in-name", "path": "$.db['a:b']" }
+    },
+    {
+      "name": "a colon in the name of a null is invalid too",
+      "document": {
+        "a:b": null
+      },
+      "error": { "rule": "colon-in-name", "path": "$['a:b']" }
+    },
+    {
+      "name": "an empty name is invalid",
+      "document": {
+        "db": { "": "x" }
+      },
+      "error": { "rule": "empty-name", "path": "$.db['']" }
+    },
+    {
+      "name": "keys that differ only in case are invalid",
+      "document": {
+        "Db": { "Host": "a" },
+        "db": { "host": "b" }
+      },
+      "error": { "rule": "case-collision", "path": "$.db.host" }
+    },
+    {
+      "name": "an array item and a property that differ only in case are invalid",
+      "document": {
+        "list": [ "x" ],
+        "LIST": { "0": "y" }
+      },
+      "error": { "rule": "case-collision", "path": "$.LIST['0']" }
+    },
+    {
+      "name": "names with quotes are escaped in paths",
+      "document": {
+        "it's": { "a:b": 1 }
+      },
+      "error": { "rule": "colon-in-name", "path": "$['it\\'s']['a:b']" }
+    },
+    {
+      "name": "control characters are escaped in paths",
+      "document": {
+        "x\n::warning::y": "z"
+      },
+      "error": { "rule": "colon-in-name", "path": "$['x\\n::warning::y']" }
+    },
+    {
+      "name": "the document must be an object",
+      "document": [ "a", "b" ],
+      "error": { "rule": "not-an-object", "path": "$" }
+    },
+    {
+      "name": "names with dots, spaces and @ are written in the bracket form",
+      "document": {
+        "Logging": { "LogLevel": { "Microsoft.AspNetCore": "Warning" } },
+        "c d": "1",
+        "x": { "@at": "y" },
+        "servers": [ { "host name": "a" } ]
+      },
+      "keys": {
+        "Logging.LogLevel.[Microsoft.AspNetCore]": "Warning",
+        "[c d]": "1",
+        "x.[@at]": "y",
+        "servers[0].[host name]": "a"
+      }
+    },
+    {
+      "name": "a [ in a name is invalid",
+      "document": {
+        "a[0]": "x"
+      },
+      "error": { "rule": "bracket-in-name", "path": "$['a[0]']" }
+    },
+    {
+      "name": "a ] in a name is invalid",
+      "document": {
+        "db": { "b]": "x" }
+      },
+      "error": { "rule": "bracket-in-name", "path": "$.db['b]']" }
+    },
+    {
+      "name": "a bracket in the name of a container without a value is invalid too",
+      "document": {
+        "x": { "a[0]": {} }
+      },
+      "error": { "rule": "bracket-in-name", "path": "$.x['a[0]']" }
+    },
+    {
+      "name": "a property named 0 is a name, an array item an index",
+      "document": {
+        "map": { "0": "a" },
+        "list": [ "b" ]
+      },
+      "keys": {
+        "map.0": "a",
+        "list[0]": "b"
+      }
+    },
+    {
+      "name": "a gap in an array is invalid",
+      "document": {
+        "list": [ "a", null, "c" ]
+      },
+      "error": { "rule": "array-gap", "path": "$.list[1]" }
+    },
+    {
+      "name": "an item without any value is a gap too",
+      "document": {
+        "list": [ {}, { "a": null }, "c" ]
+      },
+      "error": { "rule": "array-gap", "path": "$.list[0]" }
+    },
+    {
+      "name": "trailing items without a value are left out",
+      "document": {
+        "list": [ "a", null, {}, [] ],
+        "empty": [ null ]
+      },
+      "keys": {
+        "list[0]": "a"
+      }
+    },
+    {
+      "name": "the first gap in document order is reported",
+      "document": {
+        "a": [ [ null, 1 ], null, 2 ]
+      },
+      "error": { "rule": "array-gap", "path": "$.a[0][0]" }
+    },
+    {
+      "name": "nested arrays keep their indexes",
+      "document": {
+        "matrix": [ [ 1, 2 ], [ 3 ] ],
+        "items": [ { "name": "w", "tags": [ "t" ] } ]
+      },
+      "keys": {
+        "matrix[0][0]": "1",
+        "matrix[0][1]": "2",
+        "matrix[1][0]": "3",
+        "items[0].name": "w",
+        "items[0].tags[0]": "t"
+      }
+    },
+    {
+      "name": "the name rule comes before the value rule",
+      "document": {
+        "list": [ null, "b" ],
+        "a]": "x"
+      },
+      "error": { "rule": "bracket-in-name", "path": "$['a]']" }
+    },
+    {
+      "name": "the base rules come before the name rule",
+      "document": {
+        "a]": { "b:c": 1 }
+      },
+      "error": { "rule": "colon-in-name", "path": "$['a]']['b:c']" }
+    }
+  ]
+}
