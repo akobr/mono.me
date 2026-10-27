@@ -56,7 +56,19 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var batch = await PollAsync(poll, cancellationToken).ConfigureAwait(false);
+            SubscriptionBatch batch;
+
+            try
+            {
+                batch = await PollAsync(poll, cancellationToken).ConfigureAwait(false);
+            }
+            catch (StorytellerConfigurationException exception) when (cancellationToken.IsCancellationRequested)
+            {
+                // A read may fail while another one of the poll still runs, and the poll throws only after all of them
+                // ended. A stop in that time ends the enumeration as a stop, not with the failure.
+                throw new OperationCanceledException("The poll of the subscriptions was cancelled.", exception, cancellationToken);
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
 
             yield return batch;
@@ -139,7 +151,8 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
             var executionList = ReadListAsync(poll, AnnotationList.Executions, cancellationToken);
             var usageList = ReadListAsync(poll, AnnotationList.Usages, cancellationToken);
 
-            // Both end before a failure is thrown, so none is left unobserved.
+            // Both end before a failure is thrown, so none is left unobserved. A failure seen after a stop escapes the
+            // filter below, and ReadAsync turns it into the stop.
             await Task.WhenAll(executionList, usageList).ConfigureAwait(false);
             executions = await executionList.ConfigureAwait(false);
             usages = await usageList.ConfigureAwait(false);

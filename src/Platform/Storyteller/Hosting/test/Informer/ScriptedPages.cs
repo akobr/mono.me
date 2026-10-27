@@ -4,7 +4,7 @@ using Newtonsoft.Json.Linq;
 namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
 
 // The informer's reads without HTTP: list pages from a script by list and token, and point reads that find every key
-// active. Records the tokens each list was asked for.
+// active. Records the tokens each list was asked for. Hooks run before an answer, to hold it or to fail it.
 internal sealed class ScriptedPages : IAnnotationPages
 {
     private readonly List<(AnnotationList List, string? Token)> _pages = [];
@@ -13,6 +13,12 @@ internal sealed class ScriptedPages : IAnnotationPages
 
     // The page of a list at a token (null: the first); throws as a failed page does.
     public Func<AnnotationList, string?, AnnotationPage> Pages { get; set; } = (_, _) => new AnnotationPage([], null);
+
+    // Awaited before a page is answered, with the read's token; null: none.
+    public Func<AnnotationList, string?, CancellationToken, Task>? BeforePage { get; set; }
+
+    // Run before a point read is answered; throws as a failed read does. Null: none.
+    public Action<FullKey>? BeforeRead { get; set; }
 
     public IReadOnlyList<(AnnotationList List, string? Token)> PageReads
     {
@@ -55,14 +61,19 @@ internal sealed class ScriptedPages : IAnnotationPages
         return JObject.Parse(json).ToObject<Annotation>()!;
     }
 
-    public Task<AnnotationPage> ReadPageAsync(FullKey responsibility, AnnotationList list, string? continuationToken, CancellationToken cancellationToken)
+    public async Task<AnnotationPage> ReadPageAsync(FullKey responsibility, AnnotationList list, string? continuationToken, CancellationToken cancellationToken)
     {
         lock (_lock)
         {
             _pages.Add((list, continuationToken));
         }
 
-        return Task.FromResult(Pages(list, continuationToken));
+        if (BeforePage is { } before)
+        {
+            await before(list, continuationToken, cancellationToken);
+        }
+
+        return Pages(list, continuationToken);
     }
 
     public Task<StorytellerAnnotation> ReadAnnotationAsync(FullKey key, bool includeDeleted, CancellationToken cancellationToken)
@@ -72,6 +83,7 @@ internal sealed class ScriptedPages : IAnnotationPages
             _reads.Add(key.Annotation.ToString());
         }
 
+        BeforeRead?.Invoke(key);
         var annotation = JObject.Parse(TestAnnotations.Json(key.Annotation.ToString())).ToObject<Annotation>()!;
         return Task.FromResult(AnnotationMapper.Map(key, annotation));
     }
