@@ -154,9 +154,9 @@ sform story config <key> [-r|--resolved | --version <n>] [-f|--format json|flat|
 - Windows PowerShell 5.1 re-encodes what `>` redirects, so use `--export` there. PowerShell 7 and the other shells keep the bytes.
 
 ``` powershell
-sform story config exe.billing.prod -r -f env --content-only > billing.env
-sform story config exe.billing.prod -r -f yaml -e values.yaml
-sform story config exe.billing.prod --version 3 -f properties --content-only
+sform story config exe.northwind.invoicing.production -r -f env --content-only > billing.env
+sform story config exe.northwind.invoicing.production -r -f yaml -e values.yaml
+sform story config exe.northwind.invoicing.production --version 3 -f properties --content-only
 ```
 
 A resolved configuration holds secret values only for a caller with the right to read secrets: a user with the `ContributorWithSecrets` role, or a machine with `Secrets.Read`, which by default must call with its certificate over mTLS. When the API withholds the secrets (`X-2S-Secrets-Withheld: mtls-required`), the values of secret bindings are their expressions, and `sform` warns about it. A machine without `Secrets.Read` gets the expressions without that header: when a resolved value starts with `@`, `sform` also reads the effective configuration, and warns about every value that is still the expression the effective configuration has at the same path. Warnings and errors name paths, never a value.
@@ -171,12 +171,12 @@ A resolved configuration holds secret values only for a caller with the right to
 
 ### Export to GitHub Actions
 
-`--github-env` exports a resolved configuration into the environment of a GitHub Actions job: every value becomes a variable with its `env` name in `GITHUB_ENV`, which the runner reads after the step. The options of this section are newer than the `sform` on NuGet; until a release has them, install a `sform` packed from the repository.
+`--github-env` exports a resolved configuration into the environment of a GitHub Actions job: every value becomes a variable with its `env` name in `GITHUB_ENV`, which the runner reads after the step. The options of this section are newer than the `sform` on NuGet; until a release has them, install a `sform` packed from the repository. The [GitHub Action](/cli/github-action) installs `sform` and runs this command in one step, and shows how to pack it.
 
 ``` yaml
 # GitHub Actions: the later steps read APP_DB__HOST, APP_DB__PASSWORD, …
 # An API key gets secret values when the project sets --require-mtls false (see below)
-- run: sform story config exe.billing.prod -r --github-env --env-prefix APP_
+- run: sform story config exe.northwind.invoicing.production -r --github-env --env-prefix APP_
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
     STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
@@ -210,7 +210,7 @@ In one run, with one resolved and one effective read, `sform`:
 `--mask` without `--github-env` writes only the masks and the `--export` file, for a job that keeps the configuration in a file for the one step that needs it:
 
 ``` yaml
-- run: sform story config exe.billing.prod -r --mask bound -f env -e "$RUNNER_TEMP/billing.env"
+- run: sform story config exe.northwind.invoicing.production -r --mask bound -f env -e "$RUNNER_TEMP/billing.env"
 - run: docker compose --env-file "$RUNNER_TEMP/billing.env" up --detach
 ```
 

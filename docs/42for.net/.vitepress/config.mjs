@@ -125,6 +125,7 @@ export default withMermaid({
         items: [
           { text: 'mrepo', link: '/cli/mrepo' },
           { text: 'sform', link: '/cli/sform' },
+          { text: 'GitHub Action', link: '/cli/github-action' },
         ]
       }/*,
       {

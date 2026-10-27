@@ -1,0 +1,205 @@
+name: Storyteller configuration
+description: Read the resolved configuration of an annotation from the 2S Platform with sform, mask the values bindings produced, and export it to the job environment or a file.
+author: Ales Kobr
+
+# A thin wrapper of `sform story config <key> --resolved --github-env | --mask`: the names, the masks, the heredocs and
+# the refusals are sform's, with its tests. Credentials are not inputs; sform reads them from the job (STORYTELLER_*).
+inputs:
+  key:
+    description: The annotation key of the configuration, for example exe.northwind.invoicing.production.
+    required: true
+  project:
+    description: <organization>.<project>, passed as STORYTELLER_PROJECT. Empty keeps the job's STORYTELLER_PROJECT, STORYTELLER_KEY or the project of the credential.
+    required: false
+    default: ''
+  view:
+    description: The view, passed as STORYTELLER_VIEW. Empty keeps the job's STORYTELLER_VIEW or the view of STORYTELLER_KEY.
+    required: false
+    default: ''
+  endpoint:
+    description: The address of the API, /api included, passed as STORYTELLER_ENDPOINT. Empty keeps the job's STORYTELLER_ENDPOINT.
+    required: false
+    default: ''
+  client-id:
+    description: The machine id, passed as STORYTELLER_CLIENT_ID. A GUID in a job with permissions id-token write signs in with the GitHub OIDC token of the job.
+    required: false
+    default: ''
+  export-env:
+    description: true to export the resolved configuration into the job environment (GITHUB_ENV), every value a variable with its env name.
+    required: false
+    default: 'false'
+  env-prefix:
+    description: A prefix for every variable name, for example APP_. Required with export-env unless allow-unprefixed is true; also used for output-file when format is env.
+    required: false
+    default: ''
+  allow-unprefixed:
+    description: true to let export-env write the names of the configuration without a prefix.
+    required: false
+    default: 'false'
+  mask:
+    description: bound masks the values bindings produced, all masks every string and number.
+    required: false
+    default: bound
+  output-file:
+    description: Also write the resolved configuration to this file, best under $RUNNER_TEMP. A relative path is relative to the workspace.
+    required: false
+    default: ''
+  format:
+    description: The format of output-file, env, flat, properties, yaml or json.
+    required: false
+    default: env
+  cli-version:
+    description: The exact version of the 42.Platform.Cli tool (sform) to install, for example 0.8.115-alpha-gd665130ae2.
+    required: true
+  cli-source:
+    description: An additional NuGet source of the tool, for example the folder a workflow packed sform into; a URL or an absolute path.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    # Before anything is installed, so a wrong use fails in seconds. Messages name the inputs, never their values.
+    - name: Check the inputs
+      shell: bash
+      env:
+        SA_KEY: ${{ inputs.key }}
+        SA_EXPORT_ENV: ${{ inputs.export-env }}
+        SA_ALLOW_UNPREFIXED: ${{ inputs.allow-unprefixed }}
+        SA_ENV_PREFIX: ${{ inputs.env-prefix }}
+        SA_OUTPUT_FILE: ${{ inputs.output-file }}
+        SA_FORMAT: ${{ inputs.format }}
+        SA_CLI_VERSION: ${{ inputs.cli-version }}
+      run: |
+        failed=false
+        fail() { echo "::error::$1"; failed=true; }
+        is_bool() { case "$1" in true|True|TRUE|false|False|FALSE|'') return 0 ;; *) return 1 ;; esac; }
+        is_true() { case "$1" in true|True|TRUE) return 0 ;; *) return 1 ;; esac; }
+
+        if [ -z "$SA_KEY" ]; then
+          fail "The input key is required: the annotation key of the configuration."
+        elif [ "${SA_KEY#-}" != "$SA_KEY" ]; then
+          fail "The input key must be an annotation key; it cannot start with '-'."
+        fi
+
+        # An exact version, never a range or a path: it also names the folder the tool is installed into.
+        if [ -z "$SA_CLI_VERSION" ]; then
+          fail "The input cli-version is required: the exact version of 42.Platform.Cli to install."
+        elif ! [[ "$SA_CLI_VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+          fail "The input cli-version must be an exact version of 42.Platform.Cli, for example 0.8.115-alpha-gd665130ae2."
+        fi
+
+        is_bool "$SA_EXPORT_ENV" || fail "The input export-env must be true or false."
+        is_bool "$SA_ALLOW_UNPREFIXED" || fail "The input allow-unprefixed must be true or false."
+
+        if ! is_true "$SA_EXPORT_ENV" && [ -z "$SA_OUTPUT_FILE" ]; then
+          fail "Set export-env to true, output-file, or both: the action exports the resolved configuration into the job environment or a file."
+        fi
+
+        if [ -n "$SA_ENV_PREFIX" ] && ! is_true "$SA_EXPORT_ENV"; then
+          case "$SA_FORMAT" in
+            [Ee][Nn][Vv]) ;;
+            *) echo "::warning::The input env-prefix applies to export-env and to output-file in the env format; it is not used." ;;
+          esac
+        fi
+
+        [ "$failed" = false ]
+
+    # sform runs on .NET 10. A runner that has it keeps its own .NET; the root is where the tool finds it.
+    - name: Look for .NET 10
+      id: dotnet
+      shell: bash
+      run: |
+        runtime=$(dotnet --list-runtimes 2>/dev/null | grep '^Microsoft\.NETCore\.App 10\.' | tail -n 1 || true)
+
+        if [ -n "$runtime" ]; then
+          root=${runtime#*\[}
+          root=${root%]*}
+          echo "root=${root%?shared?Microsoft.NETCore.App}" >> "$GITHUB_OUTPUT"
+        fi
+
+    # Changes DOTNET_ROOT and PATH for the rest of the job, which the README says.
+    - name: Set up .NET 10
+      if: steps.dotnet.outputs.root == ''
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+
+    # Into a folder of its own and from the runner's temp folder, so the caller's nuget.config is not read. A second use
+    # of the action in the job finds the tool there.
+    - name: Install sform
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      env:
+        SA_CLI_VERSION: ${{ inputs.cli-version }}
+        SA_CLI_SOURCE: ${{ inputs.cli-source }}
+      run: |
+        tool_path="$RUNNER_TEMP/storyteller-action/sform-$SA_CLI_VERSION"
+
+        if [ -f "$tool_path/sform" ] || [ -f "$tool_path/sform.exe" ]; then
+          echo "sform $SA_CLI_VERSION is installed in $tool_path."
+          exit 0
+        fi
+
+        args=(tool install 42.Platform.Cli --version "$SA_CLI_VERSION" --tool-path "$tool_path")
+
+        if [ -n "$SA_CLI_SOURCE" ]; then
+          args+=(--add-source "$SA_CLI_SOURCE")
+        fi
+
+        dotnet "${args[@]}"
+
+    # One run, so the variables, the masks and the file come from one resolved and one effective read.
+    - name: Read the configuration
+      shell: bash
+      env:
+        SA_KEY: ${{ inputs.key }}
+        SA_PROJECT: ${{ inputs.project }}
+        SA_VIEW: ${{ inputs.view }}
+        SA_ENDPOINT: ${{ inputs.endpoint }}
+        SA_CLIENT_ID: ${{ inputs.client-id }}
+        SA_EXPORT_ENV: ${{ inputs.export-env }}
+        SA_ENV_PREFIX: ${{ inputs.env-prefix }}
+        SA_ALLOW_UNPREFIXED: ${{ inputs.allow-unprefixed }}
+        SA_MASK: ${{ inputs.mask }}
+        SA_OUTPUT_FILE: ${{ inputs.output-file }}
+        SA_FORMAT: ${{ inputs.format }}
+        SA_CLI_VERSION: ${{ inputs.cli-version }}
+        SA_DOTNET_ROOT: ${{ steps.dotnet.outputs.root }}
+      run: |
+        is_true() { case "$1" in true|True|TRUE) return 0 ;; *) return 1 ;; esac; }
+
+        # Only inputs that are set, so an empty input keeps the job's own variable.
+        if [ -n "$SA_PROJECT" ]; then export STORYTELLER_PROJECT="$SA_PROJECT"; fi
+        if [ -n "$SA_VIEW" ]; then export STORYTELLER_VIEW="$SA_VIEW"; fi
+        if [ -n "$SA_ENDPOINT" ]; then export STORYTELLER_ENDPOINT="$SA_ENDPOINT"; fi
+        if [ -n "$SA_CLIENT_ID" ]; then export STORYTELLER_CLIENT_ID="$SA_CLIENT_ID"; fi
+
+        # A tool in a folder of its own finds .NET through DOTNET_ROOT, which setup-dotnet sets and a runner image may not.
+        if [ -z "${DOTNET_ROOT:-}" ] && [ -n "$SA_DOTNET_ROOT" ]; then export DOTNET_ROOT="$SA_DOTNET_ROOT"; fi
+
+        args=(story config "$SA_KEY" --resolved --mask "${SA_MASK:-bound}")
+        format=${SA_FORMAT:-env}
+
+        if is_true "$SA_EXPORT_ENV"; then
+          args+=(--github-env)
+
+          if is_true "$SA_ALLOW_UNPREFIXED"; then
+            args+=(--allow-unprefixed)
+          fi
+        fi
+
+        # sform refuses --env-prefix without --github-env or --format env.
+        if [ -n "$SA_ENV_PREFIX" ]; then
+          if is_true "$SA_EXPORT_ENV"; then
+            args+=(--env-prefix "$SA_ENV_PREFIX")
+          elif [ -n "$SA_OUTPUT_FILE" ]; then
+            case "$format" in [Ee][Nn][Vv]) args+=(--env-prefix "$SA_ENV_PREFIX") ;; esac
+          fi
+        fi
+
+        if [ -n "$SA_OUTPUT_FILE" ]; then
+          args+=(--export "$SA_OUTPUT_FILE" --format "$format" --content-only)
+        fi
+
+        "$RUNNER_TEMP/storyteller-action/sform-$SA_CLI_VERSION/sform" "${args[@]}"
