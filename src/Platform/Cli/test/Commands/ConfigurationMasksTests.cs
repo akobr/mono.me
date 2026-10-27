@@ -41,6 +41,15 @@ public class ConfigurationMasksTests
     }
 
     [Fact]
+    public void Plan_UnderBound_MasksEveryLineOfAMultiLineValue_WhateverItsLength()
+    {
+        var plan = ConfigurationMasks.Plan(ConfigurationMasks.ReadValues(JObject.Parse("""{ "key": "MIIEowIBAAKCAQEA\nAb=\n\n" }""")), null, MaskMode.Bound);
+
+        plan.Data.ShouldBe(["MIIEowIBAAKCAQEA\nAb=\n\n", "MIIEowIBAAKCAQEA", "Ab="]);
+        plan.TooShort.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Plan_MasksEveryDistinctValueOnce()
     {
         var plan = ConfigurationMasks.Plan(ConfigurationMasks.ReadValues(JObject.Parse("""{ "a": "same-value", "b": "same-value", "c": "x\nsame-value" }""")), null, MaskMode.All);
