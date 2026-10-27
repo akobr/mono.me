@@ -96,8 +96,9 @@ runs:
           fail "Set export-env to true, output-file, or both: the action exports the resolved configuration into the job environment or a file."
         fi
 
+        # An empty format is env, as in the read step, which passes the prefix for it.
         if [ -n "$SA_ENV_PREFIX" ] && ! is_true "$SA_EXPORT_ENV"; then
-          case "$SA_FORMAT" in
+          case "${SA_FORMAT:-env}" in
             [Ee][Nn][Vv]) ;;
             *) echo "::warning::The input env-prefix applies to export-env and to output-file in the env format; it is not used." ;;
           esac
