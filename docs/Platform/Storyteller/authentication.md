@@ -479,6 +479,15 @@ jobs:
 
 A job whose application reads its configuration with the provider can set `STORYTELLER_KEY: "@acme.billing.production.sbt.northwind"` instead of `STORYTELLER_PROJECT` (quoted, because YAML reserves `@`). `sform` then works on `acme.billing` with the `production` view, and the provider reads that key.
 
+A step can also read a configuration into the job. `sform story config <key> -r --github-env --env-prefix APP_` reads the resolved and the effective configuration, writes `::add-mask::` for the values that bindings produced, and only then appends the resolved values to `GITHUB_ENV`, where every later step finds them (see [Read a configuration](https://42for.net/cli/sform#read-a-configuration)):
+
+```yaml
+      - run: sform story config exe.billing.prod -r --github-env --env-prefix APP_
+      - run: ./deploy.sh   # reads APP_DB__HOST, APP_DB__PASSWORD, …
+```
+
+A `Federated` machine, like an API key or client credentials, has no certificate, so the API withholds secret values from it under the default project policy and answers with `X-2S-Secrets-Withheld: mtls-required` (see [Secret delivery](key-values.md#secret-delivery)). `--github-env` then stops with exit code `2` and writes nothing, and so it does for the expressions of secret bindings that a machine without `Secrets.Read` gets. Such a job reads a configuration without secrets, or its machine has `Secrets.Read` and its project sets `RequireMtlsForSecretDelivery` to `false` (`sform story kv policy set --require-mtls false`).
+
 In Kubernetes, the pod projects a service account token whose `audience` is the same `TokenEndpoint`, and names its file:
 
 ```yaml
