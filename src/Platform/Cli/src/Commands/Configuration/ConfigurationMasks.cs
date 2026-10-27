@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using _42.Platform.Storyteller.ConfigurationFormats;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Cli.Commands.Configuration;
@@ -46,8 +47,9 @@ internal static class ConfigurationMasks
             .ToList();
     }
 
-    // effective: null when it is unknown, and every string and number counts as produced by resolution.
-    public static MaskPlan Plan(IReadOnlyList<DocumentLeaf> resolved, IReadOnlyDictionary<string, string>? effective, MaskMode mode)
+    // effective: null when it is unknown, and every string and number counts as produced by resolution. written: the
+    // format of the --export file of the same run, whose escaped values are masked too.
+    public static MaskPlan Plan(IReadOnlyList<DocumentLeaf> resolved, IReadOnlyDictionary<string, string>? effective, MaskMode mode, ConfigurationFormat? written = null)
     {
         var masked = new List<DocumentLeaf>();
         var tooShort = new List<DocumentLeaf>();
@@ -84,12 +86,13 @@ internal static class ConfigurationMasks
             masked.Add(value);
         }
 
-        return new MaskPlan(masked, tooShort, MaskData(masked));
+        return new MaskPlan(masked, tooShort, MaskData(masked, written));
     }
 
     // Each distinct value, and every line of a multi-line value, as the runner masks a single line of it otherwise. The
-    // lines are masked whatever their length: a short one is still a part of a secret.
-    private static IReadOnlyList<string> MaskData(IEnumerable<DocumentLeaf> masked)
+    // lines are masked whatever their length: a short one is still a part of a secret. With a file in properties, env or
+    // yaml, also the value as that file writes it, where the runner would not find it.
+    private static IReadOnlyList<string> MaskData(IEnumerable<DocumentLeaf> masked, ConfigurationFormat? written)
     {
         var data = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -99,6 +102,11 @@ internal static class ConfigurationMasks
             if (seen.Add(value.Value))
             {
                 data.Add(value.Value);
+            }
+
+            if (written is { } format && WrittenValue(value.Value, format) is { } writtenValue && seen.Add(writtenValue))
+            {
+                data.Add(writtenValue);
             }
 
             if (value.Value.AsSpan().IndexOfAny('\r', '\n') < 0)
@@ -116,5 +124,28 @@ internal static class ConfigurationMasks
         }
 
         return data;
+    }
+
+    // The runner hides a masked value also in a few encodings of it, its JSON escape among them, which is how flat and
+    // the JSON content write it. properties writes every character outside printable ASCII as \uXXXX (U+00E4 as
+    // \u00E4), yaml its control characters with upper-case hex, and env keeps them raw between double quotes, which
+    // escape a backslash. Null when the file writes the value or its JSON escape.
+    private static string? WrittenValue(string value, ConfigurationFormat format)
+    {
+        if (format is not (ConfigurationFormat.Properties or ConfigurationFormat.Env or ConfigurationFormat.Yaml))
+        {
+            return null;
+        }
+
+        // "v=" and the value in properties, "V=" in env, "v: " in yaml, and a line end.
+        var line = ConfigurationFormatter.Format(new JObject { ["v"] = value }, format).Text;
+        var text = line[(format == ConfigurationFormat.Yaml ? 3 : 2)..^1];
+
+        if (text.Length >= 2 && text[0] is '"' or '\'' && text[^1] == text[0])
+        {
+            text = text[1..^1];
+        }
+
+        return text == value || text == JsonConvert.ToString(value)[1..^1] ? null : text;
     }
 }

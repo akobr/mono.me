@@ -504,7 +504,7 @@ public class ConfigGetCommand : BaseContextCommand
             notes.Add($"Every string and number is masked: {unknownEffective}.");
         }
 
-        var plan = ConfigurationMasks.Plan(values, effective, mode);
+        var plan = ConfigurationMasks.Plan(values, effective, mode, payload is null ? null : options.Format);
         var environmentText = GitHubEnvironmentFile.Build(variables, _gitHubActions.NewDelimiter);
 
         // From here on a value may reach GITHUB_ENV, a file, or the log of a later step.
