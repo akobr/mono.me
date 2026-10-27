@@ -40,8 +40,9 @@ public static class JsonPaths
         return true;
     }
 
-    // \ and ' with a backslash, and C0 control characters and DEL as \n, \r, \t or \uXXXX, so a crafted name cannot put
-    // a CR or an LF, and with it a GitHub workflow command, into a message, a log line or stderr. C1 controls, U+2028
+    // \ and ' with a backslash, C0 control characters and DEL as \n, \r, \t or \uXXXX, and # as \u0023. A crafted name
+    // then cannot start a GitHub workflow command in a message, a log line or stderr: neither a new line for ::command::
+    // nor the ##[command] of the runner's older syntax, which the runner finds anywhere in a line. C1 controls, U+2028
     // and U+2029 are kept, as the vectors pin for every language.
     private static string Escape(string name)
     {
@@ -67,7 +68,7 @@ public static class JsonPaths
                     builder.Append("\\t");
                     break;
 
-                case < ' ' or '\u007F':
+                case < ' ' or '\u007F' or '#':
                     builder.Append("\\u").Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
                     break;
 

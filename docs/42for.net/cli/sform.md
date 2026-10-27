@@ -124,6 +124,8 @@ Without a scope it needs, the API answers `403` with a message that names the sc
 
 ::: warning
 Commands print what they read or write, and the job log keeps everything a step prints. A step that prints a resolved configuration with secrets puts those values into the log, and `--export` alone still prints the whole model. To use a configuration in a job, write it to a file with `--export` and `--format` or `--content-only`, which then print nothing, with `--mask` to hide its values in the log of later steps; or put it into the environment of the job with `--github-env`, which masks the values that bindings produced before it writes anything else. See [Read a configuration](#read-a-configuration).
+
+The runner also reads `##[command]` anywhere in a line that a step prints as a workflow command, so a printed configuration can set outputs or annotations of the step through its names and values. The messages of `sform` write every `#` as `\u0023`.
 :::
 
 ::: tip

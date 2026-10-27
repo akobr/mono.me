@@ -1,5 +1,5 @@
 {
-  "description": "How the Content object of a Storyteller configuration becomes configuration keys. Each vector has a name, the document (the Content object) and either the keys it flattens to or the error that makes it invalid. Keys compare by their exact text; IConfiguration then compares them case-insensitively. Numbers are read as double-precision floats. Error paths: $ is the root, .name a property whose name is ASCII letters, digits, _ and - (starting with an ASCII letter or _), ['name'] any other property (with \\ and ' escaped by a backslash, and the C0 control characters U+0000 to U+001F and DEL written as \\n, \\r, \\t or \\uXXXX with upper-case hex digits; every other character, C1 controls and U+2028 and U+2029 included, is kept, so a path never holds a CR or an LF), [0] an array item.",
+  "description": "How the Content object of a Storyteller configuration becomes configuration keys. Each vector has a name, the document (the Content object) and either the keys it flattens to or the error that makes it invalid. Keys compare by their exact text; IConfiguration then compares them case-insensitively. Numbers are read as double-precision floats. Error paths: $ is the root, .name a property whose name is ASCII letters, digits, _ and - (starting with an ASCII letter or _), ['name'] any other property (with \\ and ' escaped by a backslash, the C0 control characters U+0000 to U+001F and DEL written as \\n, \\r, \\t or \\uXXXX with upper-case hex digits, and # written as \\u0023; every other character, C1 controls and U+2028 and U+2029 included, is kept, so a path never holds a CR, an LF or a #), [0] an array item.",
   "vectors": [
     {
       "name": "study example",
@@ -206,6 +206,13 @@
         "x\n::warning::y": "z"
       },
       "error": { "rule": "colon-in-name", "path": "$['x\\n::warning::y']" }
+    },
+    {
+      "name": "a hash is escaped in paths",
+      "document": {
+        "##[warning]x:y": "z"
+      },
+      "error": { "rule": "colon-in-name", "path": "$['\\u0023\\u0023[warning]x:y']" }
     },
     {
       "name": "the document must be an object",
