@@ -128,14 +128,15 @@ public class KeycloakBearerTokenValidator : IBearerTokenValidator
     }
 
     // A person of the realm: a sub (a lightweight token, or one without the basic client scope, has none), not a
-    // service account, and an access token (an ID token says typ ID). Whose client may send it is a separate gate.
+    // service account, and an access token: typ Bearer, which Keycloak puts on every access token (an ID token says ID, and
+    // a token without typ is refused). Whose client may send it is a separate gate.
     internal static bool IsPersonToken(IReadOnlyList<Claim> claims)
     {
         var tokenType = FindValue(claims, "typ");
 
         return !string.IsNullOrWhiteSpace(FindValue(claims, "sub"))
             && !KeycloakClaimNormalizer.IsServiceAccount(claims)
-            && (tokenType is null || string.Equals(tokenType, AccessTokenType, StringComparison.OrdinalIgnoreCase));
+            && string.Equals(tokenType, AccessTokenType, StringComparison.OrdinalIgnoreCase);
     }
 
     // Unverified; only decides whether this validator checks the token. Null when unreadable.

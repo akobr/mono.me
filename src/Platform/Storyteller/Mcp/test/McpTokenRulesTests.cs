@@ -126,10 +126,11 @@ public class McpTokenRulesTests
         McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("typ", "Bearer"), ("azp", TestTokens.KeycloakClientId)), Keycloak).ShouldBeNull();
     }
 
+    // Keycloak puts typ Bearer on every access token, so a token without typ is refused.
     [Fact]
-    public void Check_KeycloakWithoutATokenType_Passes()
+    public void Check_KeycloakWithoutATokenType_Fails()
     {
-        McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("azp", TestTokens.KeycloakClientId)), Keycloak).ShouldBeNull();
+        McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("azp", TestTokens.KeycloakClientId)), Keycloak).ShouldBe("The token is not an access token.");
     }
 
     [Theory]
@@ -139,7 +140,7 @@ public class McpTokenRulesTests
     [InlineData("preferred_username", "Service-Account-mcp-client")]
     public void Check_KeycloakServiceAccount_Fails(string claim, string value)
     {
-        McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("azp", TestTokens.KeycloakClientId), (claim, value)), Keycloak)
+        McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("typ", "Bearer"), ("azp", TestTokens.KeycloakClientId), (claim, value)), Keycloak)
             .ShouldBe(McpTokenRules.NotAUserMessage);
     }
 
@@ -161,14 +162,14 @@ public class McpTokenRulesTests
     [Fact]
     public void Check_KeycloakClientNotAllowed_Fails()
     {
-        McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("azp", TestTokens.OtherKeycloakClientId)), Keycloak)
+        McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("typ", "Bearer"), ("azp", TestTokens.OtherKeycloakClientId)), Keycloak)
             .ShouldBe(McpTokenRules.ClientNotAcceptedMessage);
     }
 
     [Fact]
     public void Check_KeycloakWithoutListedClients_AcceptsAnyClient()
     {
-        McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("azp", TestTokens.OtherKeycloakClientId)), KeycloakAnyClient).ShouldBeNull();
+        McpTokenRules.Check(Principal(("sub", TestTokens.KeycloakUserId), ("typ", "Bearer"), ("azp", TestTokens.OtherKeycloakClientId)), KeycloakAnyClient).ShouldBeNull();
     }
 
     // The API's exchange refuses a subject token that expires within 5 seconds; inbound, 10 seconds are needed.
