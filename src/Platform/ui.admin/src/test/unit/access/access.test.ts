@@ -875,7 +875,7 @@ describe('OneTimeSecretDialog', () => {
     expect(text).toContain('Uses a shared certificate')
     expect(text).toContain('API key')
     expect(text).not.toContain('Download .pfx')
-    expect(text).toContain('a reset issues new ones')
+    expect(text).toContain('a reset issues a new API key, and the certificate stays valid')
     view.host.unmount()
   })
 

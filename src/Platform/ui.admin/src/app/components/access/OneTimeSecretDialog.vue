@@ -42,7 +42,10 @@ const clientCredentials = computed(() => props.secret?.credentialKind === 'Clien
 const discardHint = computed(() => {
   const secret = props.secret
   if (!secret?.certificate) {
-    return 'Closing this dialog discards them; a reset issues new ones.'
+    // A CertificateAndApiKey reset response, or a machine on a shared certificate: only the API key is shown.
+    return secret?.credentialKind === 'CertificateAndApiKey'
+      ? 'Closing this dialog discards them; a reset issues a new API key, and the certificate stays valid.'
+      : 'Closing this dialog discards them; a reset issues new ones.'
   }
   if (!secret.credentialKind) {
     return 'Closing this dialog discards them; to replace the certificate, issue another one.'
