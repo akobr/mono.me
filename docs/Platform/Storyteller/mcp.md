@@ -60,7 +60,7 @@ When the AuthKit domain is not the API's `Auth:AuthKit:Issuer` (by default `http
 The API trusts the server only by its configuration: `Auth:TokenExchange:Enabled` set to `true`, and an entry of `Auth:TokenExchange:Actors` whose `Id` is `Mcp:Actor:Id`. For the MCP server:
 
 - `SubjectAudiences` lists every audience the server accepts: `Mcp:Authentication:Audience` (by default `Mcp:ResourceUrl`), and under Entra ID also `Mcp:Authentication:ClientId`, which v2 tokens carry. A missing one makes the API refuse those sign-ins with `invalid_grant`. The server logs the list once at start, under Entra ID for example `The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: <MCP app client id>, https://mcp.example.com/mcp.`
-- `AllowedClientIds` is optional and limits the MCP client apps (`azp`, `appid` or `client_id` of the person's token).
+- `AllowedClientIds` is optional and limits the MCP client apps (`azp`, `appid` or `client_id` of the person's token). Empty, the API warns once at start that it accepts any client's token for the actor's `SubjectAudiences`.
 - `Scopes` defaults to `User.Impersonation`, which it must contain.
 - Every actor gets `NoSecretReveal` unless `AllowSecrets` is `true` (see [Tools that return secrets](#tools-that-return-secrets)). `Restrictions` adds more restrictions on top of it (`NoSecretReveal` is the only one so far), and an empty list does not remove it. The API refuses to start when `AllowSecrets` is `true` and `Restrictions` names `NoSecretReveal`. See [Configuration of the exchange](authentication.md#configuration-of-the-exchange).
 - `Authentication` names one credential, the counterpart of the server's `Mcp:Actor` (see [Credentials of the actor](#credentials-of-the-actor)).
