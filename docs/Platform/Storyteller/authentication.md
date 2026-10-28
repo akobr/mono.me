@@ -651,7 +651,7 @@ The token carries no name or email: the API reads them from the account.
 - `Auth:TokenExchange:Enabled` on, and `act.sub` the `Id` of an actor of `Auth:TokenExchange:Actors`, compared exactly;
 - `restrictions`, an array of known restrictions. An unknown one refuses the token, because the API cannot enforce it.
 
-The middleware then reads the account once per call (a point read) and takes `name` and `preferred_username` from its `Name` and `UserName`; when the account no longer exists, the call gets `401`. The result is a user, not a machine: `sub` is the account id, and each scope becomes an `scp` claim. The actor and the restrictions are kept for the request from the validated token, never from claims. From there it is a user token like any other: it needs `User.Impersonation`, the role decides, and the routes for users only accept it. The [audit actor](audit-stamps.md#the-actor) is the account, with `Via` set to the actor id.
+The middleware then reads the account once per call (a point read) and takes `name` and `preferred_username` from its `Name` and `UserName`; when the account no longer exists, the call gets `401`. The result is a user, not a machine: `sub` is the account id, and each scope of the token that the actor's `Scopes` still hold becomes an `scp` claim; the others are dropped. The actor and the restrictions are kept for the request from the validated token, never from claims. From there it is a user token like any other: it needs `User.Impersonation`, the role decides, and the routes for users only accept it. The [audit actor](audit-stamps.md#the-actor) is the account, with `Via` set to the actor id.
 
 **Tokens issued to an actor.** A provider token whose `aud` is one of an actor's `SubjectAudiences` was issued to the actor, for the exchange only. As a bearer token on API routes it gets `401`, in every build and whether the exchange is on or not, even when its provider accepts it. A token of an `AdditionalIssuers` entry never passes on API routes either.
 
@@ -664,6 +664,7 @@ The middleware then reads the account once per call (a point read) and takes `na
 | Deleting the account | At once: every call reads the account. |
 | Removing the actor from `Auth:TokenExchange:Actors`, or turning `Enabled` off | Its tokens get `401` once the API runs with the new settings: every call checks the actor. |
 | Adding a restriction to the actor, or turning `AllowSecrets` off | Once the API runs with the new settings: every call enforces the token's restrictions and those the actor has now. Removing a restriction or setting `AllowSecrets` reaches only tokens issued after. |
+| Removing a scope from the actor's `Scopes` | Once the API runs with the new settings: every call keeps only the token's scopes that the actor has now. Without `User.Impersonation` the token no longer acts for the person, and the routes answer `401`. Adding a scope reaches only tokens issued after. |
 
 Otherwise an issued token stays valid until it expires (`TokenLifetimeMinutes` at most, plus `ClockSkewSeconds`). There is no revocation list.
 
