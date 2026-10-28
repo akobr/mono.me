@@ -40,7 +40,7 @@
       ]
     },
     "error": {
-      "description": "The first error in document order: its rule and the JSON path it names.",
+      "description": "The first error: the base rules over the whole document, then the target's name rule, then its value rule, each in document order. Its rule and the JSON path it names.",
       "type": "object",
       "additionalProperties": false,
       "required": [ "rule", "path" ],

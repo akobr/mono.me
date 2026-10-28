@@ -137,7 +137,7 @@ That is the document a client sees in the envelope. The server holds date tokens
 The `IConfiguration` keys and values as a JSON object of strings, indented by two spaces, followed by one LF. An empty document is `{}`.
 
 - Escaping is Newtonsoft's default: `\"`, `\\`, `\b`, `\t`, `\n`, `\f`, `\r`, every other C0 character as `\u00xx` (lower-case hex), and U+0085, U+2028 and U+2029; DEL, the other C1 characters and everything else are written raw.
-- It passes `flattening.json`: the library's tests parse the body of every vector and compare its keys, or the error.
+- It passes `flattening/flat.json` of the [conformance suite](conformance.md): the library's tests parse the body of every vector and compare its keys in order, or the error.
 
 ## `properties`
 
