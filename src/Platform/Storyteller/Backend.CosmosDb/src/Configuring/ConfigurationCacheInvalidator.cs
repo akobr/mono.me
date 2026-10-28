@@ -100,11 +100,13 @@ internal static class ConfigurationCacheInvalidator
         }
     }
 
+    // A code without a level goes after every known level. Throwing would come after the write committed and leave its
+    // invalidation pending for every later request.
     private static int GetLevel(string typeCode)
     {
         return Levels.TryGetValue(typeCode, out var level)
             ? level
-            : throw new ArgumentOutOfRangeException(nameof(typeCode), typeCode, "Unknown annotation type code.");
+            : int.MaxValue;
     }
 
     private static async Task CollectAsync(IContainerRepository repository, InvalidationTarget target, Dictionary<string, List<string>> groups)
