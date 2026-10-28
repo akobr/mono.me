@@ -193,14 +193,14 @@ features:
 
 ## Test vectors
 
-Four files in `src/Platform/Storyteller/Configuration/test/Vectors/` pin the rules in a shape that an implementation in another language can reuse. Each has a `description` and `vectors`, every vector a `name` and a `document`, the `Content` object. The library's tests (`ConfigurationFormats/test`) embed and run all of them, read as the SDK reads a body (date-like strings stay strings, numbers are doubles).
+Four files of the [conformance suite](conformance.md), in `src/Platform/Storyteller/conformance/`, pin the rules in a shape that an implementation in another language can reuse. Each has a `$schema` and a `description` and `vectors`, every vector a `name` and a `document`, the `Content` object; a flattening file also names its `target`. The library's tests (`ConfigurationFormats/test`) embed and run all of them, read as the SDK reads a body (date-like strings stay strings, numbers are doubles).
 
-| File | Vectors | Each vector has |
-| --- | --- | --- |
-| `flattening.json` | The `IConfiguration` keys of the provider and of `flat` | `keys`, or `error` with `rule` and `path` |
-| `flattening.properties.json` | Every document of `flattening.json` and more, as `properties` keys | `keys` as a reader returns them (`[c d]`, not `[c\ d]`) and the raw values, or `error` |
-| `flattening.env.json` | Every document of `flattening.json` and more, as `env` variables | `keys`, the names with their raw values, or `error` |
-| `formats.json` | The exact text of every format: escaping, quoting, gaps, long keys, `@` expressions | `format` and `text`, or `error` |
+| File | Target | Vectors | Each vector has |
+| --- | --- | --- | --- |
+| `flattening/flat.json` | `flat` | The `IConfiguration` keys of the provider and of `flat` | `keys`, or `error` with `rule` and `path` |
+| `flattening/properties.json` | `properties` | Every document of `flat.json` and more, as `properties` keys | `keys` as a reader returns them (`[c d]`, not `[c\ d]`) and the raw values, or `error` |
+| `flattening/env.json` | `env` | Every document of `flat.json` and more, as `env` variables | `keys`, the names with their raw values, or `error` |
+| `formats.json` | | The exact text of every format: escaping, quoting, gaps, long keys, `@` expressions | `format` and `text`, or `error` |
 
 ## Limits
 

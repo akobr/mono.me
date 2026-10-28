@@ -1,5 +1,7 @@
 {
-  "description": "How the Content object of a Storyteller configuration becomes the keys of a Spring Boot .properties file (format properties). Each vector has a name, the document (the Content object) and either the keys with their values or the error that makes it invalid. Keys are the logical keys a reader returns, before the escaping of the file: the first name, then .name per property and [0] per array item; a name with any other character than ASCII letters, digits, - and _ is written in the bracket form [name] (.[name] after the first step). Values are the raw text, as in flattening.json. The base rules of flattening.json apply first, then bracket-in-name over every property name, then array-gap; the first error is reported. Error paths are those of flattening.json. Numbers are read as double-precision floats. formats.json pins the escaping of the file.",
+  "$schema": "../schema/flattening.schema.json",
+  "target": "properties",
+  "description": "How the Content object of a Storyteller configuration becomes the keys of a Spring Boot .properties file (format properties). Each vector has a name, the document (the Content object) and either the keys with their values or the error that makes it invalid. Keys are the logical keys a reader returns, before the escaping of the file: the first name, then .name per property and [0] per array item; a name with any other character than ASCII letters, digits, - and _ is written in the bracket form [name] (.[name] after the first step). Values are the raw text, as in flattening/flat.json. The base rules of flattening/flat.json apply first, then bracket-in-name over every property name, then array-gap; the first error is reported. Error paths are those of flattening/flat.json. Numbers are read as double-precision floats. formats.json pins the escaping of the file.",
   "vectors": [
     {
       "name": "study example",
@@ -76,6 +78,35 @@
         "fraction": "0.5",
         "negativeFraction": "-0.25",
         "trailingZero": "1.5"
+      }
+    },
+    {
+      "name": "numbers that are not safe integers are their double text",
+      "document": {
+        "large": 1E+20,
+        "huge": 1.7976931348623157E+308,
+        "tiny": 5E-324,
+        "small": 1.5E-07,
+        "tenThousandth": 0.0001,
+        "hundredThousandth": 0.00001,
+        "fraction": 123456.789,
+        "longFraction": 1000000000000000.5,
+        "sum": 0.30000000000000004,
+        "maxSafe": 9007199254740991,
+        "minSafe": -9007199254740991
+      },
+      "keys": {
+        "large": "1E+20",
+        "huge": "1.7976931348623157E+308",
+        "tiny": "5E-324",
+        "small": "1.5E-07",
+        "tenThousandth": "0.0001",
+        "hundredThousandth": "1E-05",
+        "fraction": "123456.789",
+        "longFraction": "1000000000000000.5",
+        "sum": "0.30000000000000004",
+        "maxSafe": "9007199254740991",
+        "minSafe": "-9007199254740991"
       }
     },
     {

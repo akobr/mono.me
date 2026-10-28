@@ -1,5 +1,6 @@
 {
-  "description": "The exact text of every format of a Storyteller configuration. Each vector has a name, the document (the Content object), the format (flat, properties, env or yaml) and either the exact text, written as UTF-8 without a byte order mark, or the error that makes the document invalid in that format. Every line ends with LF and keys keep the document order. The keys and values of properties and env are in flattening.properties.json and flattening.env.json; this file pins quoting and escaping. Error paths are those of flattening.json. Numbers are read as double-precision floats.",
+  "$schema": "./schema/formats.schema.json",
+  "description": "The exact text of every format of a Storyteller configuration. Each vector has a name, the document (the Content object), the format (flat, properties, env or yaml) and either the exact text, written as UTF-8 without a byte order mark, or the error that makes the document invalid in that format. Every line ends with LF and keys keep the document order. The keys and values of properties and env are in flattening/properties.json and flattening/env.json; this file pins quoting and escaping. Error paths are those of flattening/flat.json. Numbers are read as double-precision floats.",
   "vectors": [
     {
       "name": "the study example as flat",

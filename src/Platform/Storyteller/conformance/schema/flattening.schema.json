@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Storyteller flattening vectors",
+  "description": "A file of kind flattening: how the Content object of a configuration becomes the keys of one target, or the error that makes it invalid for that target.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [ "target", "description", "vectors" ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "target": {
+      "description": "flat: the ':' keys of IConfiguration. properties: Spring Boot keys, '.' and [i]. env: environment variable names, upper-case and joined with '__'. The names of the API's ?format=.",
+      "type": "string",
+      "enum": [ "flat", "properties", "env" ]
+    },
+    "description": { "type": "string", "minLength": 1 },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/vector" }
+    }
+  },
+  "definitions": {
+    "vector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "name", "document" ],
+      "properties": {
+        "name": { "description": "Unique within the file.", "type": "string", "minLength": 1 },
+        "document": { "description": "The Content object of a configuration; any JSON value for the not-an-object vectors." },
+        "keys": {
+          "description": "Every key with its raw text, compared by exact text; the order is the document order.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "error": { "$ref": "#/definitions/error" }
+      },
+      "oneOf": [
+        { "required": [ "keys" ] },
+        { "required": [ "error" ] }
+      ]
+    },
+    "error": {
+      "description": "The first error in document order: its rule and the JSON path it names.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "rule", "path" ],
+      "properties": {
+        "rule": { "$ref": "#/definitions/rule" },
+        "path": { "type": "string", "pattern": "^\\$" }
+      }
+    },
+    "rule": {
+      "type": "string",
+      "enum": [ "not-an-object", "empty-name", "colon-in-name", "case-collision", "bracket-in-name", "array-gap", "invalid-env-name" ]
+    }
+  }
+}
