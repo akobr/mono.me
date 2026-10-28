@@ -22,8 +22,8 @@ public sealed class McpActorKey : IDisposable
 
     public const int MinimumKeySize = 2048;
 
-    // Sent at once and used once; the API accepts at most five minutes.
-    public static readonly TimeSpan ClientAssertionLifetime = TimeSpan.FromMinutes(2);
+    // Sent at once and used once; the API accepts at most 60 seconds, and 55 keeps a rounded iat or exp within them.
+    public static readonly TimeSpan ClientAssertionLifetime = TimeSpan.FromSeconds(55);
 
     // A failed read is tried again this much later at the earliest; ActorKeyEndpoints sends it as Retry-After.
     public static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);

@@ -204,10 +204,12 @@ public sealed class ActorAuthenticatorTests : IDisposable
     }
 
     [Theory]
-    [InlineData(300, true)]
-    [InlineData(301, false)]
+    [InlineData(55, true)]
+    [InlineData(60, true)]
+    [InlineData(61, false)]
+    [InlineData(300, false)]
     [InlineData(3600, false)]
-    public async Task ClientAssertion_LivesAtMostFiveMinutes(int lifetime, bool accepted)
+    public async Task ClientAssertion_LivesAtMostOneMinute(int lifetime, bool accepted)
     {
         UseClientAssertion();
         var payload = AssertionPayload();
@@ -219,10 +221,11 @@ public sealed class ActorAuthenticatorTests : IDisposable
 
     // Without iat, the time left counts, with the clock skew.
     [Theory]
-    [InlineData(300, true)]
-    [InlineData(330, true)]
-    [InlineData(331, false)]
-    public async Task ClientAssertion_WithoutIat_ExpiresWithinFiveMinutes(int expiresIn, bool accepted)
+    [InlineData(60, true)]
+    [InlineData(90, true)]
+    [InlineData(91, false)]
+    [InlineData(300, false)]
+    public async Task ClientAssertion_WithoutIat_ExpiresWithinOneMinute(int expiresIn, bool accepted)
     {
         UseClientAssertion();
         var payload = AssertionPayload();
@@ -249,7 +252,7 @@ public sealed class ActorAuthenticatorTests : IDisposable
     {
         UseClientAssertion();
         var payload = AssertionPayload();
-        payload["iat"] = Now() - 300;
+        payload["iat"] = Now() - 100;
         payload["exp"] = Now() - 60;
 
         ShouldBeNotAccepted(await _authenticator.AuthenticateAsync(WithAssertion(_actorKey.Sign(payload))));
@@ -490,7 +493,7 @@ public sealed class ActorAuthenticatorTests : IDisposable
             ["aud"] = audience,
             ["jti"] = Guid.NewGuid().ToString("D"),
             ["iat"] = now,
-            ["exp"] = now + 120,
+            ["exp"] = now + 55,
         };
     }
 }

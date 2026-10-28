@@ -274,7 +274,7 @@ public sealed class TokenExchangeProviderTests : IDisposable
         assertion.Audiences.ShouldBe([ExchangeFixture.TokenEndpoint]);
         assertion.IssuedAt.ShouldBe(fixture.Clock.Now.UtcDateTime);
         assertion.ValidTo.ShouldBe(fixture.Clock.Now.UtcDateTime + McpActorKey.ClientAssertionLifetime);
-        (assertion.ValidTo - assertion.IssuedAt).ShouldBeLessThanOrEqualTo(TimeSpan.FromMinutes(5));
+        (assertion.ValidTo - assertion.IssuedAt).ShouldBeLessThan(TimeSpan.FromSeconds(60), "the API accepts at most 60 seconds");
 
         // A new jti for every assertion: the API refuses one it has seen.
         var otherAssertion = new JsonWebToken(requests[1].Field("client_assertion"));
