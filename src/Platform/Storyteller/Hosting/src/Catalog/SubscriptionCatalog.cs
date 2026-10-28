@@ -64,14 +64,15 @@ internal sealed class SubscriptionCatalog : ISubscriptionCatalog
         }
     }
 
-    // The arguments are checked at the call, not at the first MoveNextAsync.
+    // The arguments are checked at the call, not at the first MoveNextAsync. The interval follows the rule of the
+    // subscriptions' PollInterval, as both drive the same informer.
     public IAsyncEnumerable<StorytellerExecutionChange> WatchExecutionsAsync(string responsibility, string context, TimeSpan? pollInterval = null, CancellationToken cancellationToken = default)
     {
         var interval = pollInterval ?? DefaultPollInterval;
 
-        if (interval < TimeSpan.Zero)
+        if (!PollingSubscriptionSource.IsValidPollInterval(interval))
         {
-            throw new ArgumentOutOfRangeException(nameof(pollInterval), interval, "The poll interval must be zero, for one poll, or positive.");
+            throw new ArgumentOutOfRangeException(nameof(pollInterval), interval, $"The poll interval must be {PollingSubscriptionSource.PollIntervalRule}.");
         }
 
         var scope = SubscriptionScope.Create(_settings.Key, responsibility, context);

@@ -1,7 +1,8 @@
 namespace _42.Platform.Storyteller.Sdk.Hosting.Reading;
 
 // The one mapper of what a point read answered to a snapshot. The type and the names come from the key that was read,
-// the rest from the body; values and audit stamps are copied, so the SDK's mutable objects stay behind.
+// the rest from the body. The snapshot's initializers copy labels, values and audit stamps, so the SDK's mutable objects
+// stay behind.
 internal static class AnnotationMapper
 {
     // key: as read, the type code lower-cased.
@@ -19,13 +20,13 @@ internal static class AnnotationMapper
             Name = annotationKey.Name,
             Title = annotation.Title,
             Description = annotation.Description,
-            Labels = Copy(annotation.Labels),
-            Values = StorytellerAnnotation.CopyValues(annotation.Values),
+            Labels = [.. annotation.Labels ?? []],
+            Values = (annotation.Values ?? new Dictionary<string, object>()).ToDictionary(pair => pair.Key, pair => (object?)pair.Value, StringComparer.Ordinal),
             IsDisabled = annotation.IsDisabled == true,
             ValidFrom = annotation.ValidFrom,
             ExpiresAt = annotation.ExpiresAt,
-            Created = StorytellerAnnotation.CopyStamp(annotation.Created),
-            Modified = StorytellerAnnotation.CopyStamp(annotation.Modified),
+            Created = annotation.Created,
+            Modified = annotation.Modified,
             DeletedAt = annotation.Deletion?.DeletedAt,
         };
 
@@ -35,12 +36,7 @@ internal static class AnnotationMapper
                 annotationKey.SubjectName,
                 annotationKey.ResponsibilityName,
                 annotationKey.ContextName,
-                Copy((annotation as Execution)?.UnitNames))
+                StorytellerAnnotation.CopyNames((annotation as Execution)?.UnitNames))
             : snapshot;
-    }
-
-    private static IReadOnlyList<string> Copy(IEnumerable<string>? items)
-    {
-        return Array.AsReadOnly(items?.ToArray() ?? []);
     }
 }

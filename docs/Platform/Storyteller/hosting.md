@@ -272,6 +272,7 @@ The catalog hands out immutable snapshots of what the API answered: `Storyteller
 - **Point reads only.** Snapshots come from reads of one annotation, never from the items of a list, whose `Values` lose array items, the trailing zeros of decimals and the offsets of date-like strings.
 - **Copies.** A snapshot is shared by every caller, so what a caller could change (`Values`, `Created`, `Modified`) is a copy per access.
 - **`ToString()`** prints the key and the type, never values.
+- **Test doubles.** `StorytellerAnnotation`, `StorytellerExecution` and `StorytellerExecutionContext` have public constructors and `init` members, so a test can build them for a fake `ISubscriptionCatalog` or `IExecutionContext`, a usage with its `Labels` and `Values` included. What an initializer sets is copied (`Labels`, `Values`, `Created`, `Modified`, `UnitNames`, `Ancestors`, `Unreadable`), so a later change of the objects it was given does not reach the snapshot. A `StorytellerSubscription` has no public constructor: its document belongs to the subscriptions, and `StorytellerDocument` has none either.
 
 ## The catalog
 
@@ -317,7 +318,7 @@ The execution is checked before the usage.
 
 - **The scope.** The organization, project and view come from the options' `Key`, which may be any full key of the view, for example `@house.main.default.rst.invoicing` for a worker. Without a `Key`, the call throws `StorytellerConfigurationException` naming `STORYTELLER_KEY`.
 - **Names.** `responsibility` and `context` are names, one key segment each, compared ordinally. An empty name, or one with a `.`, throws `ArgumentException`. The arguments are checked at the call, not at the first `MoveNextAsync`.
-- **The interval.** `pollInterval` is 30 s when `null`, with a jitter of ±10 % (`interval × (0.9 + 0.2 × r)`) on the options' `TimeProvider`, counted from the end of a poll. `TimeSpan.Zero` polls once, and a negative interval throws `ArgumentOutOfRangeException`. The provider's `RefreshInterval` is not used: a worker may poll its tenants less often than its own document.
+- **The interval.** `pollInterval` is 30 s when `null`, with a jitter of ±10 % (`interval × (0.9 + 0.2 × r)`) on the options' `TimeProvider`, counted from the end of a poll. `TimeSpan.Zero` polls once; any other interval is 1 s to 45 days, the rule of the subscriptions' [`PollInterval`](#subscription-options), so milliseconds passed for seconds do not poll in a tight loop. An interval outside it throws `ArgumentOutOfRangeException` at the call. The provider's `RefreshInterval` is not used: a worker may poll its tenants less often than its own document.
 - **Each enumeration** runs its own loop and holds its own subscriptions, so it starts with `Added` for every subscription of its first complete poll.
 - **Cancellation** ends the enumeration with `OperationCanceledException`.
 

@@ -18,6 +18,15 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
     // A list that pages on past this is a platform that answers its first page again.
     internal const int MaxPages = 1000;
 
+    // What a poll interval must be, for the messages of the informer and of the subscriptions' options.
+    internal const string PollIntervalRule = "zero, for one poll, or 1 second to 45 days";
+
+    // The interval of the informer and of the subscriptions, as the provider's RefreshInterval: at least 1 s, so a slip
+    // of milliseconds for seconds does not poll in a tight loop, and at most 45 days, with the jitter of up to 10 % the
+    // longest delay a system timer takes.
+    internal static readonly TimeSpan MinimumPollInterval = TimeSpan.FromSeconds(1);
+    internal static readonly TimeSpan MaximumPollInterval = TimeSpan.FromDays(45);
+
     // The contexts a warning names at most.
     private const int MaxNamedContexts = 10;
 
@@ -28,11 +37,16 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
     private readonly Func<double> _nextRandom;
     private readonly ILogger _logger;
 
-    // nextRandom: uniform in [0, 1), for the jitter.
+    // pollInterval: zero, or MinimumPollInterval to MaximumPollInterval. nextRandom: uniform in [0, 1), for the jitter.
     public PollingSubscriptionSource(IAnnotationPages pages, TimeSpan pollInterval, int maxConcurrentReads, TimeProvider timeProvider, Func<double> nextRandom, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(pages);
-        ArgumentOutOfRangeException.ThrowIfLessThan(pollInterval, TimeSpan.Zero);
+
+        if (!IsValidPollInterval(pollInterval))
+        {
+            throw new ArgumentOutOfRangeException(nameof(pollInterval), pollInterval, $"The poll interval must be {PollIntervalRule}.");
+        }
+
         ArgumentOutOfRangeException.ThrowIfLessThan(maxConcurrentReads, 1);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(nextRandom);
@@ -81,6 +95,12 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
             var delay = StorytellerConfigurationEngine.ComputeDelay(_pollInterval, _nextRandom());
             await Task.Delay(delay, _timeProvider, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    // The rule of the informer and of the subscriptions' options: PollIntervalRule.
+    internal static bool IsValidPollInterval(TimeSpan interval)
+    {
+        return interval == TimeSpan.Zero || (interval >= MinimumPollInterval && interval <= MaximumPollInterval);
     }
 
     private static bool IsActive(StorytellerAnnotation annotation, DateTimeOffset now)

@@ -273,8 +273,8 @@ internal sealed class ExecutionContextService : IExecutionContext, IDisposable
         {
             Key = key.ToString(),
             Annotation = annotation,
-            Ancestors = ancestors.AsReadOnly(),
-            Unreadable = unreadable.AsReadOnly(),
+            Ancestors = ancestors,
+            Unreadable = unreadable,
             ReadAt = readAt,
         };
     }
