@@ -16,8 +16,9 @@ public sealed class ActorAuthenticator : IDisposable
 {
     public const string ClientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
-    // RFC 7523 section 3: a client assertion lives a short time and is used once.
-    public const int MaxClientAssertionLifetimeSeconds = 300;
+    // RFC 7523 section 3: a client assertion lives a short time and is used once. One minute keeps the window short in
+    // which an assertion recorded on one instance could be replayed on another.
+    public const int MaxClientAssertionLifetimeSeconds = 60;
 
     // The deployment scope the actors' keys are cached under, with the actor id as the project. No organization name
     // has a '~', so it never meets a project's trusted issuers.
@@ -208,7 +209,7 @@ public sealed class ActorAuthenticator : IDisposable
     }
 
     // RFC 7523 section 3: iss and sub are the actor id, aud names this token endpoint or the Storyteller issuer, exp
-    // within five minutes, and a jti that was not used before. The keys are only those of ClientAssertion:JwksUri.
+    // within one minute, and a jti that was not used before. The keys are only those of ClientAssertion:JwksUri.
     private async Task<ActorAuthenticationResult> VerifyClientAssertionAsync(
         TokenExchangeActorOptions actor,
         ActorClientAssertionOptions settings,

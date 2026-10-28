@@ -525,7 +525,7 @@ A v2 issuer with an `Audience` that is not a GUID stops the host at start, becau
 - The keys come only from `ClientAssertion:JwksUri`, under the same URL rules, for example `https://mcp.example.com/.well-known/jwks.json`, which the MCP server publishes.
 - `iss` and `sub` must be the actor id.
 - `aud` must be the token endpoint `{MachineAuth:Federation:PublicBaseUrl}/v1/access/token`, which the [metadata](#discovery-of-the-issuer) publishes, or `MachineAuth:Federation:Issuer`, byte for byte. So an actor with a client assertion needs `PublicBaseUrl`, or the host does not start. The MCP server signs for `{Storyteller:BaseUrl}/v1/access/token` unless `Mcp:Actor:ClientAssertionKey:Audience` names another, so its base URL must then equal `PublicBaseUrl` exactly.
-- `exp` is required, and the assertion lives at most 300 seconds (`exp - iat`, or the time left when it has no `iat`).
+- `exp` is required, and the assertion lives at most 60 seconds (`exp - iat`, or the time left when it has no `iat`). The short life bounds the time in which an assertion that one instance recorded could be replayed on another.
 - `jti` is required and accepted once. Each instance records it until the assertion expires, for up to 50,000 assertions; while the record is full, assertions are refused.
 
 **Client secret** (`Authentication:ClientSecretHash`). For local development only: the actor posts `client_secret` (`client_secret_post`), and the API compares its SHA-256 hash with `ClientSecretHash` in constant time. It is accepted only in the `Development` host environment: elsewhere the host does not start, and the exchange refuses the secret too.
