@@ -5,9 +5,13 @@ namespace _42.Platform.Storyteller.Sdk.Hosting;
 
 // Who am I: the annotation of the key and those of its ancestors that were read, as of ReadAt. A key of any type: an
 // execution (a service of one subject), a unit of execution (a job), or a responsibility (a worker that discovers its
-// subjects through the catalog).
+// subjects through the catalog). Immutable: Ancestors and Unreadable are copied from an initializer, so an application
+// can build one for a test double of who am I and change its own collections afterwards.
 public sealed class StorytellerExecutionContext
 {
+    private readonly IReadOnlyDictionary<AnnotationType, StorytellerAnnotation> _ancestors = ReadOnlyDictionary<AnnotationType, StorytellerAnnotation>.Empty;
+    private readonly IReadOnlyList<string> _unreadable = [];
+
     public StorytellerExecutionContext()
     {
     }
@@ -18,8 +22,8 @@ public sealed class StorytellerExecutionContext
     {
         Key = source.Key;
         Annotation = source.Annotation;
-        Ancestors = source.Ancestors;
-        Unreadable = source.Unreadable;
+        _ancestors = source._ancestors;
+        _unreadable = source._unreadable;
         ReadAt = source.ReadAt;
     }
 
@@ -30,12 +34,20 @@ public sealed class StorytellerExecutionContext
     public required StorytellerAnnotation Annotation { get; init; }
 
     // The ancestors that were read, by their type. One that the credential may not read is in Unreadable; one deleted
-    // after the key was read is in neither.
-    public IReadOnlyDictionary<AnnotationType, StorytellerAnnotation> Ancestors { get; init; } = ReadOnlyDictionary<AnnotationType, StorytellerAnnotation>.Empty;
+    // after the key was read is in neither. Never null.
+    public IReadOnlyDictionary<AnnotationType, StorytellerAnnotation> Ancestors
+    {
+        get => _ancestors;
+        init => _ancestors = new Dictionary<AnnotationType, StorytellerAnnotation>(value ?? ReadOnlyDictionary<AnnotationType, StorytellerAnnotation>.Empty).AsReadOnly();
+    }
 
     // The full keys of the ancestors the credential may not read (AnnotationRestricted): a machine restricted to its
-    // annotation reads that annotation and its descendants only.
-    public IReadOnlyList<string> Unreadable { get; init; } = [];
+    // annotation reads that annotation and its descendants only. Never null.
+    public IReadOnlyList<string> Unreadable
+    {
+        get => _unreadable;
+        init => _unreadable = StorytellerAnnotation.CopyNames(value);
+    }
 
     public required DateTimeOffset ReadAt { get; init; }
 

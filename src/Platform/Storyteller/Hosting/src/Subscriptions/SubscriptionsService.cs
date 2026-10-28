@@ -704,14 +704,7 @@ internal sealed class SubscriptionsService : BackgroundService, IStorytellerSubs
         // A new snapshot of what is held; only with an entry.
         public StorytellerSubscription NewSnapshot()
         {
-            Published = new StorytellerSubscription(Entry!)
-            {
-                Execution = Execution,
-                Usage = Usage,
-                LastError = LastError,
-                LastErrorAt = LastErrorAt,
-                LastSucceededAt = LastSucceededAt!.Value,
-            };
+            Published = new StorytellerSubscription(Entry!, Execution, Usage, LastSucceededAt!.Value, LastError, LastErrorAt);
 
             return Published;
         }

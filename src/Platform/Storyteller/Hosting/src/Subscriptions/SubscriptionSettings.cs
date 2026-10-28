@@ -12,10 +12,6 @@ internal sealed class SubscriptionSettings
     private const string OptionsName = nameof(StorytellerSubscriptionOptions);
     private const int MaxReads = 64;
 
-    // As the provider's RefreshInterval: with the jitter of up to 10 %, the longest delay a system timer takes.
-    private static readonly TimeSpan MinimumPollInterval = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan MaximumPollInterval = TimeSpan.FromDays(45);
-
     public required SubscriptionScope Scope { get; init; }
 
     // Zero polls once.
@@ -58,9 +54,10 @@ internal sealed class SubscriptionSettings
             throw Invalid($"{OptionsName}.{nameof(options.Mode)} is not a read mode.", keyText);
         }
 
-        if (options.PollInterval != TimeSpan.Zero && (options.PollInterval < MinimumPollInterval || options.PollInterval > MaximumPollInterval))
+        // The rule of WatchExecutionsAsync, as both drive the same informer.
+        if (!PollingSubscriptionSource.IsValidPollInterval(options.PollInterval))
         {
-            throw Invalid($"{OptionsName}.{nameof(options.PollInterval)} must be zero, for one poll, or 1 second to 45 days.", keyText);
+            throw Invalid($"{OptionsName}.{nameof(options.PollInterval)} must be {PollingSubscriptionSource.PollIntervalRule}.", keyText);
         }
 
         if (options.MaxConcurrentReads is < 1 or > MaxReads)

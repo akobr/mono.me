@@ -7,7 +7,9 @@ namespace _42.Platform.Storyteller.Sdk.Hosting;
 
 // An annotation as the catalog read it, from a point read: list items carry lossy values. Its status is evaluated against
 // a time, as it changes when ValidFrom or ExpiresAt passes. A snapshot is shared by every caller, so what a caller could
-// change (Values, Created, Modified) is a copy per access. ToString() leaves the values out.
+// change (Values, Created, Modified) is a copy per access, and what an initializer sets (Labels, Values, Created,
+// Modified) is copied, so an application can build one for a test double of the catalog or of who am I and change its
+// own objects afterwards. ToString() leaves the values out.
 public class StorytellerAnnotation
 {
     // Without the application's JsonConvert.DefaultSettings.
@@ -15,6 +17,7 @@ public class StorytellerAnnotation
 
     private static readonly IReadOnlyDictionary<string, object?> NoValues = ReadOnlyDictionary<string, object?>.Empty;
 
+    private readonly IReadOnlyList<string> _labels = [];
     private readonly IReadOnlyDictionary<string, object?> _values = NoValues;
     private readonly AuditStamp? _created;
     private readonly AuditStamp? _modified;
@@ -35,11 +38,11 @@ public class StorytellerAnnotation
         Name = source.Name;
         Title = source.Title;
         Description = source.Description;
-        Labels = source.Labels;
         IsDisabled = source.IsDisabled;
         ValidFrom = source.ValidFrom;
         ExpiresAt = source.ExpiresAt;
         DeletedAt = source.DeletedAt;
+        _labels = source._labels;
         _values = source._values;
         _created = source._created;
         _modified = source._modified;
@@ -61,14 +64,19 @@ public class StorytellerAnnotation
 
     public string? Description { get; init; }
 
-    public IReadOnlyList<string> Labels { get; internal init; } = [];
+    // Never null; a copy of what an initializer sets.
+    public IReadOnlyList<string> Labels
+    {
+        get => _labels;
+        init => _labels = CopyNames(value);
+    }
 
-    // What the SDK read: strings (date-like ones included), numbers, booleans, nulls and JSON tokens. A deep copy per
-    // access.
+    // What the SDK read: strings (date-like ones included), numbers, booleans, nulls and JSON tokens. Never null; a deep
+    // copy of what an initializer sets, and a deep copy per access.
     public IReadOnlyDictionary<string, object?> Values
     {
         get => CopyValues(_values);
-        internal init => _values = value ?? NoValues;
+        init => _values = CopyValues(value);
     }
 
     public bool IsDisabled { get; init; }
@@ -77,17 +85,17 @@ public class StorytellerAnnotation
 
     public DateTimeOffset? ExpiresAt { get; init; }
 
-    // The SDK's AuditStamp; a copy per access.
+    // The SDK's AuditStamp; a copy of what an initializer sets, and a copy per access.
     public AuditStamp? Created
     {
         get => CopyStamp(_created);
-        internal init => _created = value;
+        init => _created = CopyStamp(value);
     }
 
     public AuditStamp? Modified
     {
         get => CopyStamp(_modified);
-        internal init => _modified = value;
+        init => _modified = CopyStamp(value);
     }
 
     // Set only on a deleted annotation, which only who am I reads.
@@ -109,6 +117,12 @@ public class StorytellerAnnotation
     internal virtual StorytellerAnnotation WithDeletedAt(DateTimeOffset deletedAt)
     {
         return new StorytellerAnnotation(this) { DeletedAt = deletedAt };
+    }
+
+    // Names, such as labels or the units of an execution: a read-only copy; empty for null.
+    internal static IReadOnlyList<string> CopyNames(IEnumerable<string>? names)
+    {
+        return Array.AsReadOnly(names?.ToArray() ?? []);
     }
 
     // JSON tokens are mutable; strings, numbers and booleans are not.

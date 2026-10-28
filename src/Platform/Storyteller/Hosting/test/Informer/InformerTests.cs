@@ -577,11 +577,30 @@ public sealed class InformerTests : IDisposable
         _fixture.Http.Requests.ShouldBeEmpty();
     }
 
-    [Fact]
-    public void ANegativeInterval_IsRefusedAtTheCall()
+    // The rule of the subscriptions' PollInterval: zero, or 1 s to 45 days, so milliseconds passed for seconds do not
+    // poll in a tight loop.
+    [Theory]
+    [InlineData(-1_000)]
+    [InlineData(1)]
+    [InlineData(999)]
+    [InlineData(46 * 24 * 3600 * 1000L)]
+    public void AnIntervalOutsideTheRule_IsRefusedAtTheCall(long milliseconds)
     {
-        Should.Throw<ArgumentOutOfRangeException>(() => Catalog().WatchExecutionsAsync(FakeCatalog.Responsibility, FakeCatalog.Context, TimeSpan.FromSeconds(-1)))
-            .ParamName.ShouldBe("pollInterval");
+        var exception = Should.Throw<ArgumentOutOfRangeException>(
+            () => Catalog().WatchExecutionsAsync(FakeCatalog.Responsibility, FakeCatalog.Context, TimeSpan.FromMilliseconds(milliseconds)));
+
+        exception.ParamName.ShouldBe("pollInterval");
+        exception.Message.ShouldStartWith("The poll interval must be zero, for one poll, or 1 second to 45 days.");
+        _fixture.Http.Requests.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1_000)]
+    [InlineData(45 * 24 * 3600 * 1000L)]
+    public void AnIntervalWithinTheRule_IsTaken(long milliseconds)
+    {
+        Should.NotThrow(() => Catalog().WatchExecutionsAsync(FakeCatalog.Responsibility, FakeCatalog.Context, TimeSpan.FromMilliseconds(milliseconds)));
     }
 
     [Fact]

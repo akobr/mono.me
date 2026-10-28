@@ -172,6 +172,122 @@ public sealed class SnapshotTests : IDisposable
         annotation.GetStatus(DateTimeOffset.Parse("2026-10-27T08:00:00Z")).ShouldBe(AnnotationStatus.Disabled);
     }
 
+    // Applications build snapshots for test doubles of the catalog and of who am I; the test project sees the internals,
+    // so the accessors are checked by reflection.
+    [Theory]
+    [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.Labels))]
+    [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.Values))]
+    [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.Created))]
+    [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.Modified))]
+    [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.DeletedAt))]
+    [InlineData(typeof(StorytellerExecution), nameof(StorytellerExecution.UnitNames))]
+    [InlineData(typeof(StorytellerExecutionContext), nameof(StorytellerExecutionContext.Ancestors))]
+    [InlineData(typeof(StorytellerExecutionContext), nameof(StorytellerExecutionContext.Unreadable))]
+    public void TheMembersOfASnapshot_AreInitializableByApplications(Type type, string property)
+    {
+        type.GetConstructor(Type.EmptyTypes).ShouldNotBeNull().IsPublic.ShouldBeTrue();
+        type.GetProperty(property).ShouldNotBeNull().SetMethod.ShouldNotBeNull().IsPublic.ShouldBeTrue();
+    }
+
+    // Only the subscriptions build one, as only they hold documents.
+    [Fact]
+    public void ASubscription_IsNotConstructibleByApplications_AndHasNoSetters()
+    {
+        typeof(StorytellerSubscription).GetConstructors().ShouldBeEmpty();
+        typeof(StorytellerSubscription).GetProperties().ShouldAllBe(property => property.SetMethod == null);
+    }
+
+    [Fact]
+    public void ASnapshotThatAnApplicationBuilt_CopiesWhatItWasGiven()
+    {
+        var labels = new List<string> { "gold" };
+        var plan = new JObject { ["name"] = "pro" };
+        var values = new Dictionary<string, object?> { ["plan"] = plan, ["seats"] = 25 };
+        var created = new AuditStamp { At = DateTimeOffset.Parse("2026-09-01T08:00:00+02:00"), By = new AuditActor { Kind = AuditActorKind.Account, Id = "user_0" } };
+        var units = new List<string> { "daily" };
+        var usage = new StorytellerAnnotation
+        {
+            Key = $"{HostingFixture.Scope}.usg.northwind.invoicing",
+            AnnotationKey = "usg.northwind.invoicing",
+            Type = AnnotationType.Usage,
+            Name = "invoicing",
+            Labels = labels,
+            Values = values,
+            Created = created,
+        };
+        var execution = new StorytellerExecution
+        {
+            Key = $"{HostingFixture.Scope}.{HostingFixture.ExecutionKey}",
+            AnnotationKey = HostingFixture.ExecutionKey,
+            Type = AnnotationType.Execution,
+            Name = "prod",
+            SubjectName = "northwind",
+            ResponsibilityName = "invoicing",
+            ContextName = "prod",
+            UnitNames = units,
+        };
+        var ancestors = new Dictionary<AnnotationType, StorytellerAnnotation> { [AnnotationType.Usage] = usage };
+        var unreadable = new List<string> { $"{HostingFixture.Scope}.sbt.northwind" };
+        var context = new StorytellerExecutionContext
+        {
+            Key = execution.Key,
+            Annotation = execution,
+            Ancestors = ancestors,
+            Unreadable = unreadable,
+            ReadAt = DateTimeOffset.Parse("2026-10-28T08:00:00Z"),
+        };
+
+        labels.Add("changed");
+        plan["name"] = "changed";
+        values["seats"] = 1;
+        created.By.Id = "changed";
+        units.Add("changed");
+        ancestors.Clear();
+        unreadable.Clear();
+
+        usage.Labels.ShouldBe(["gold"]);
+        usage.Values["plan"].ShouldBeOfType<JObject>()["name"]!.Value<string>().ShouldBe("pro");
+        usage.Values["seats"].ShouldBe(25);
+        usage.Created.ShouldNotBeNull().By.Id.ShouldBe("user_0");
+        execution.UnitNames.ShouldBe(["daily"]);
+        context.Usage.ShouldBeSameAs(usage);
+        context.Unreadable.ShouldBe([$"{HostingFixture.Scope}.sbt.northwind"]);
+        context.GetSubscriptionStatus(context.ReadAt).ShouldBe(StorytellerSubscriptionStatus.Active);
+        Should.Throw<NotSupportedException>(() => ((IList<string>)usage.Labels).Add("changed"));
+    }
+
+    [Fact]
+    public void ASnapshotInitializedWithNull_HasEmptyCollections()
+    {
+        var execution = new StorytellerExecution
+        {
+            Key = $"{HostingFixture.Scope}.{HostingFixture.ExecutionKey}",
+            AnnotationKey = HostingFixture.ExecutionKey,
+            Type = AnnotationType.Execution,
+            Name = "prod",
+            SubjectName = "northwind",
+            ResponsibilityName = "invoicing",
+            ContextName = "prod",
+            Labels = null!,
+            Values = null!,
+            UnitNames = null!,
+        };
+        var context = new StorytellerExecutionContext
+        {
+            Key = execution.Key,
+            Annotation = execution,
+            Ancestors = null!,
+            Unreadable = null!,
+            ReadAt = DateTimeOffset.Parse("2026-10-28T08:00:00Z"),
+        };
+
+        execution.Labels.ShouldBeEmpty();
+        execution.Values.ShouldBeEmpty();
+        execution.UnitNames.ShouldBeEmpty();
+        context.Ancestors.ShouldBeEmpty();
+        context.Unreadable.ShouldBeEmpty();
+    }
+
     public void Dispose()
     {
         _fixture.Dispose();
