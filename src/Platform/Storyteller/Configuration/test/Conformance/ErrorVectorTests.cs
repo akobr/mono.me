@@ -62,13 +62,20 @@ public sealed class ErrorVectorTests : IDisposable
             options.Mode = mode;
             options.RefreshInterval = TimeSpan.Zero;
         });
+        var keys = VectorResponses.KeysOf(root);
+        var requests = _fixture.Http.Requests.Count;
         _fixture.Http.Otherwise = VectorResponses.Respond(vector["response"]!);
 
         (await engine.TryRefreshAsync().WaitAsync(EngineFixture.Patience)).ShouldBeFalse();
 
         engine.Status.LastError.ShouldNotBeNull().ShouldBeFailure(vector["error"]!);
-        root["App:Name"].ShouldBe("one");
-        _fixture.Http.Requests[^1].ShouldGoToTheModePath(mode);
+        VectorResponses.KeysOf(root).ShouldBe(keys, ignoreOrder: true);
+        _fixture.Http.Requests.Skip(requests).ShouldNotBeEmpty();
+
+        foreach (var request in _fixture.Http.Requests.Skip(requests))
+        {
+            request.ShouldGoToTheModePath(mode);
+        }
     }
 
     public void Dispose()
