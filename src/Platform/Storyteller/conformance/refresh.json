@@ -1,0 +1,203 @@
+{
+  "$schema": "./schema/refresh.schema.json",
+  "description": "How a provider refreshes a configuration it has applied. A scenario starts from the answer to the startup read, then runs one refresh per step (TryRefreshAsync in .NET); a step's response answers every request of its run, and a timeout step is a read that gets no answer within the provider's read timeout, which the runner sets short. After each run the provider has exactly the expected keys (target flat, by exact text), has raised the expected number of change notifications since the start (cumulative; one per applied document that changes a key or a value, none for a new tag with the same keys and values), and has sent the expected tag in If-None-Match, the tag of the applied document. A failed run keeps the previous document and its tag, and reports its failure as errors.json maps it; withheld secrets (X-2S-Secrets-Withheld on a resolved read, on a 200 or a 304) are a definitive failure with the status of the answer, and an invalid document one without a status; neither has an error code. A 200 body is the Configuration envelope of the API.",
+  "key": "@acme.billing.default.sbt.northwind",
+  "scenarios": [
+    {
+      "name": "a change is applied with one notification",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 4, "Content": { "App": { "Name": "two", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d4" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "two", "App:Port": "80" }, "notifications": 1, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        }
+      ]
+    },
+    {
+      "name": "a 304 keeps the document without a notification",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 304, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        },
+        {
+          "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 4, "Content": { "App": { "Name": "two", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d4" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "two", "App:Port": "80" }, "notifications": 1, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        }
+      ]
+    },
+    {
+      "name": "the same content under a new tag makes no notification, and the new tag is sent next",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 4, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d4" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        },
+        {
+          "response": { "status": 304, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000002\"" }
+        }
+      ]
+    },
+    {
+      "name": "a 503 keeps the document, is transient, and the next run recovers",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 503 },
+          "expect": { "refreshed": false, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"", "error": { "status": 503, "errorCode": null, "transient": true } }
+        },
+        {
+          "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 4, "Content": { "App": { "Name": "two", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d4" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "two", "App:Port": "80" }, "notifications": 1, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        }
+      ]
+    },
+    {
+      "name": "a timeout keeps the document, is transient, and the next run recovers",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "timeout": true,
+          "expect": { "refreshed": false, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"", "error": { "status": null, "errorCode": null, "transient": true } }
+        },
+        {
+          "response": { "status": 304, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        }
+      ]
+    },
+    {
+      "name": "a 401 keeps the document, is definitive, and the next run recovers",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 401 },
+          "expect": { "refreshed": false, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"", "error": { "status": 401, "errorCode": null, "transient": false } }
+        },
+        {
+          "response": { "status": 304, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        }
+      ]
+    },
+    {
+      "name": "a 404 AnnotationDeleted keeps the document and is definitive",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 404, "json": { "Message": "The annotation is deleted.", "ErrorCode": "AnnotationDeleted" } },
+          "expect": { "refreshed": false, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"", "error": { "status": 404, "errorCode": "AnnotationDeleted", "transient": false } }
+        }
+      ]
+    },
+    {
+      "name": "a 422 binding.evaluation keeps the document and is definitive",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 422, "json": { "Message": "A binding in the configuration cannot be evaluated.", "ErrorCode": "binding.evaluation" } },
+          "expect": { "refreshed": false, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"", "error": { "status": 422, "errorCode": "binding.evaluation", "transient": false } }
+        }
+      ]
+    },
+    {
+      "name": "withheld secrets on a 200 fail loudly, keep the document, and store no tag",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache", "X-2S-Secrets-Withheld": "mtls-required" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 4, "Content": { "App": { "Name": "two", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d4" } },
+          "expect": { "refreshed": false, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"", "error": { "status": 200, "errorCode": null, "transient": false } }
+        },
+        {
+          "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 4, "Content": { "App": { "Name": "two", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d4" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "two", "App:Port": "80" }, "notifications": 1, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        }
+      ]
+    },
+    {
+      "name": "withheld secrets on a 304 fail loudly and keep the document",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 304, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache", "X-2S-Secrets-Withheld": "mtls-required" } },
+          "expect": { "refreshed": false, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"", "error": { "status": 304, "errorCode": null, "transient": false } }
+        }
+      ]
+    },
+    {
+      "name": "an effective read does not check withheld secrets",
+      "read": "effective",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache", "X-2S-Secrets-Withheld": "mtls-required" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 4, "Content": { "App": { "Name": "two", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d4" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "two", "App:Port": "80" }, "notifications": 1, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        }
+      ]
+    },
+    {
+      "name": "an invalid document keeps the previous one, is definitive, and stores no tag",
+      "read": "resolved",
+      "start": {
+        "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 3, "Content": { "App": { "Name": "one", "Port": 80 } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d3" } },
+        "keys": { "App:Name": "one", "App:Port": "80" }
+      },
+      "steps": [
+        {
+          "response": { "status": 200, "headers": { "ETag": "W/\"r.0000000000000000000002\"", "Cache-Control": "private, no-cache" }, "json": { "AnnotationKey": "sbt.northwind", "Version": 4, "Content": { "App": { "a:b": "x" } }, "Modified": { "At": "2026-10-19T08:30:00Z", "By": { "Kind": "Account", "Id": "user_1" } }, "Hash": "a1b2c3d4" } },
+          "expect": { "refreshed": false, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"", "error": { "status": null, "errorCode": null, "transient": false } }
+        },
+        {
+          "response": { "status": 304, "headers": { "ETag": "W/\"r.0000000000000000000001\"", "Cache-Control": "private, no-cache" } },
+          "expect": { "refreshed": true, "keys": { "App:Name": "one", "App:Port": "80" }, "notifications": 0, "ifNoneMatch": "W/\"r.0000000000000000000001\"" }
+        }
+      ]
+    }
+  ]
+}

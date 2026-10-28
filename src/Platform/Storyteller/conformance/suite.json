@@ -7,6 +7,8 @@
     { "path": "flattening/flat.json", "kind": "flattening" },
     { "path": "flattening/properties.json", "kind": "flattening" },
     { "path": "flattening/env.json", "kind": "flattening" },
-    { "path": "formats.json", "kind": "formats" }
+    { "path": "formats.json", "kind": "formats" },
+    { "path": "errors.json", "kind": "errors" },
+    { "path": "refresh.json", "kind": "refresh" }
   ]
 }
