@@ -196,7 +196,7 @@ public class CosmosKeyValueService : IKeyValueService
             if (!existing.IsDeleted
                 && targetProtection == existing.Content.Protection
                 && string.Equals(write.ContentType, existing.Content.ContentType, StringComparison.Ordinal)
-                && await IsSameValueAsync(place, existing, write.Value))
+                && await IsSameValueAsync(place, existing, write.Value, caller))
             {
                 return existing.ToKeyValue(write.Value, now);
             }
@@ -453,7 +453,7 @@ public class CosmosKeyValueService : IKeyValueService
         {
             var normalizedKey = KeyValueRules.Normalize(item.Key);
             existingByKey.TryGetValue(normalizedKey, out var existing);
-            var action = await PlanImportItemAsync(place, item, existing, errors);
+            var action = await PlanImportItemAsync(place, item, existing, caller, errors);
             plan.Add(new ImportPlanItem(item, normalizedKey, existing, action));
         }
 
@@ -732,11 +732,18 @@ public class CosmosKeyValueService : IKeyValueService
         return await _protector.UnprotectAsync(place.Identity(KeyValueRules.Normalize(key), version), content);
     }
 
-    private async Task<bool> IsSameValueAsync(Place place, KeyValueEntity existing, string value)
+    // A caller who may not read secrets (no role, or an actor under NoSecretReveal) never learns whether a guess equals
+    // the stored secret: the secret counts as changed, so a set writes a new version and an import reports Update.
+    private async Task<bool> IsSameValueAsync(Place place, KeyValueEntity existing, string value, KeyValueCaller caller)
     {
         if (!existing.Content.Protection.IsSecret())
         {
             return string.Equals(existing.Content.Value, value, StringComparison.Ordinal);
+        }
+
+        if (!caller.CanReadSecrets)
+        {
+            return false;
         }
 
         var current = await _protector.UnprotectAsync(place.Identity(existing), existing.Content);
@@ -1237,7 +1244,7 @@ public class CosmosKeyValueService : IKeyValueService
         return errors;
     }
 
-    private async Task<KeyValueImportAction> PlanImportItemAsync(Place place, KeyValueDocumentItem item, KeyValueEntity? existing, List<KeyValueImportItemResult> errors)
+    private async Task<KeyValueImportAction> PlanImportItemAsync(Place place, KeyValueDocumentItem item, KeyValueEntity? existing, KeyValueCaller caller, List<KeyValueImportItemResult> errors)
     {
         if (existing is null)
         {
@@ -1269,7 +1276,7 @@ public class CosmosKeyValueService : IKeyValueService
 
         var same = item.Protection == existing.Content.Protection
             && string.Equals(item.ContentType, existing.Content.ContentType, StringComparison.Ordinal)
-            && await IsSameValueAsync(place, existing, item.Value);
+            && await IsSameValueAsync(place, existing, item.Value, caller);
 
         return same ? KeyValueImportAction.Unchanged : KeyValueImportAction.Update;
     }
