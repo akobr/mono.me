@@ -80,10 +80,11 @@ public class FlatteningVectorTests
 
         var body = SdkJson.Parse(ConfigurationFormatter.Format(document, ConfigurationFormat.Flat).Text).ShouldBeOfType<JObject>();
 
+        // In document order, which the body keeps and the vectors pin for every runtime.
         body.Properties().ShouldAllBe(property => property.Value.Type == JTokenType.String);
         body.Properties()
-            .ToDictionary(property => property.Name, property => property.Value.Value<string>()!, StringComparer.Ordinal)
-            .ShouldBe(ExpectedKeys(vector), ignoreOrder: true);
+            .Select(property => (property.Name, property.Value.Value<string>()!))
+            .ShouldBe(vector["keys"].ShouldBeOfType<JObject>().Properties().Select(property => (property.Name, property.Value.Value<string>()!)));
     }
 
     private static Dictionary<string, string> ExpectedKeys(JObject vector)

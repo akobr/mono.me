@@ -14,6 +14,10 @@ public class SuiteTests
     // 2^53 - 1: the largest integer that a JavaScript number holds exactly.
     private const long MaxSafeInteger = 9007199254740991;
 
+    // The kinds the .NET reference runs: flattening and formats in ConfigurationFormats/test, errors and refresh here. A
+    // kind the suite adds fails until the reference runs it.
+    private static readonly string[] RunKinds = ["flattening", "formats", "errors", "refresh"];
+
     // The study's rules of 3.3 that every target pins by name: numbers and booleans as JSON text, no null, empty
     // containers make no key.
     private static readonly string[] RuleVectors =
@@ -64,14 +68,23 @@ public class SuiteTests
     [Fact]
     public void EveryKind_HasASchema()
     {
-        var kinds = ConformanceFiles.Read($"{ConformanceFiles.SchemaFolder}suite.schema.json")
-            .SelectToken("properties.files.items.properties.kind.enum")!
-            .Values<string>()
+        var kinds = SchemaKinds()
             .Select(kind => $"{ConformanceFiles.SchemaFolder}{kind}.schema.json")
             .Append($"{ConformanceFiles.SchemaFolder}suite.schema.json");
 
         ConformanceFiles.Embedded.Where(path => path.StartsWith(ConformanceFiles.SchemaFolder, StringComparison.Ordinal))
             .ShouldBe(kinds, ignoreOrder: true);
+    }
+
+    [Fact]
+    public void EveryKind_IsRunByTheReference()
+    {
+        SchemaKinds().ShouldBe(RunKinds, ignoreOrder: true);
+
+        foreach (var (path, kind) in ConformanceFiles.Listed())
+        {
+            RunKinds.ShouldContain(kind, $"{path} has the kind {kind}, which the .NET reference does not run.");
+        }
     }
 
     [Theory]
@@ -144,9 +157,11 @@ public class SuiteTests
         var vectors = ConformanceFiles.Load(path);
         var rules = vectors.Values.Select(vector => vector.SelectToken("error.rule")?.Value<string>()).ToHashSet();
 
+        // Key vectors: each rule keeps a valid document's values out or writes them as text.
         foreach (var name in RuleVectors)
         {
             vectors.ShouldContainKey(name);
+            vectors[name]["keys"].ShouldNotBeNull(name);
         }
 
         rules.ShouldContain(DocumentRules.CaseCollision);
@@ -190,6 +205,15 @@ public class SuiteTests
     {
         using var reader = new JsonTextReader(new StringReader(json)) { FloatParseHandling = FloatParseHandling.Double };
         return JToken.ReadFrom(reader);
+    }
+
+    // The kinds suite.schema.json allows.
+    private static IEnumerable<string> SchemaKinds()
+    {
+        return ConformanceFiles.Read($"{ConformanceFiles.SchemaFolder}suite.schema.json")
+            .SelectToken("properties.files.items.properties.kind.enum")!
+            .Values<string>()
+            .Select(kind => kind!);
     }
 
     private static async Task ShouldMatchAsync(string path, string kind)

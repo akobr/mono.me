@@ -73,9 +73,15 @@ public sealed class RefreshScenarioTests : IDisposable
             VectorResponses.KeysOf(root).ShouldBe(VectorResponses.ExpectedKeys(expect["keys"]!), ignoreOrder: true, because);
             Volatile.Read(ref notifications).ShouldBe(expect.Value<int>("notifications"), because);
 
-            var request = _fixture.Http.Requests.Skip(requests).ShouldHaveSingleItem(because);
-            request.ShouldGoToTheModePath(mode);
-            request.Headers.GetValueOrDefault("If-None-Match").ShouldBe(expect.Value<string?>("ifNoneMatch"), because);
+            // Every request of the run, also a retry, sends the tag.
+            var stepRequests = _fixture.Http.Requests.Skip(requests).ToList();
+            stepRequests.ShouldNotBeEmpty(because);
+
+            foreach (var request in stepRequests)
+            {
+                request.ShouldGoToTheModePath(mode);
+                request.Headers.GetValueOrDefault("If-None-Match").ShouldBe(expect.Value<string?>("ifNoneMatch"), because);
+            }
 
             if (expect["error"] is { } error)
             {
