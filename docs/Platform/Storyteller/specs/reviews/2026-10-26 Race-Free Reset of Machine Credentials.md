@@ -137,6 +137,21 @@ Refuted: the mock's `ApiKey` and `ClientCredentials` resets still go through `wi
   - `npm run test:e2e` passed 368, with 8 existing skips.
   - `npm run test:visual:docker` passed 64 with the committed baselines.
 
+### Follow-up from the PR review
+
+These changes come from the review of PR #134 (2026-10-28):
+
+1. **Reads instead of writes after the hash.**
+   - The reset patches the masked key only when it changes: for a client secret, or for an old record. An API key keeps its `2s.***`, so the reset reads the record back instead.
+   - A failed write after the hash replace could answer `5xx` for a key that already works; that can no longer happen for an API key.
+   - The renewal test now renews before the read-back. It asserts that nothing is patched after the hash.
+2. **Retries.** `ReplaceAsync` tries up to 3 times on `412`, then answers `409`. The patches set `EnableContentResponseOnWrite` explicitly.
+3. **OpenAPI.** `PutMachine` declares `400`, `404` and `409`. The SDKs pick them up at their next regeneration.
+4. **`StoreAsync`.** Its comments say that it creates a missing machine only on create.
+5. **The one-time dialog.** When it shows only an API key for a `CertificateAndApiKey` machine, it says that the certificate stays valid.
+
+Verification: `Access.Certificates/testint` 70/70 (container), `Access.Certificates/test` 114/114, and the admin UI access tests 38/38.
+
 ### Left for later
 
 The "Left for later" list of the [424-57 review](2026-10-20%20Split%20Machine%20Scopes%20into%20Runtime%20and%20Management%20Scopes.md) and the out-of-scope list of the [424-79 review](2026-10-21%20Replace%20Machine%20Scope%20Presets%20with%20a%20Flat%20Scope%20Set.md) change as follows:
