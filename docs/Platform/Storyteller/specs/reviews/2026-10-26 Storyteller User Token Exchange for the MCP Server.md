@@ -18,6 +18,8 @@ The work branch `feat/424-106` starts from `feat/424-84` at `a19c0a39`. It goes 
 | `03671fb2` | Phase 4, feat(platform): sign in to the MCP server with any provider through the token exchange |
 | `d8f99902` | fix(platform): close the gaps found in the review of the user token exchange |
 | `f6b38cb3` | docs(platform): document the user token exchange |
+| `998e9c31`, `11a9d8f1`, `cf58cfff` | docs: this review, `CLAUDE.md`, and the emulator results |
+| `4ca074f3` to `9bd86711` | the second review round (2026-10-28), see [Second review round](#second-review-round-2026-10-28) |
 
 ## What Was Done
 
@@ -260,6 +262,23 @@ The last run is on `d8f99902`. In brackets: the count before this branch.
 | `ui.admin` with the packed SDK | lint OK, 1427 passed, build OK |
 | `dotnet build src/Platform` | 1 error, in `Supervisor/Abstraction/test` (net6.0, pre-existing, see Left for later) |
 
+After the second review round, on `9bd86711` (the last code commit; this review changes only documentation), Debug unless noted, with the Windows Cosmos DB emulator and Docker running:
+
+| Project | Result |
+| --- | --- |
+| `Backend.Core/test` | 1035 passed (was 1031) |
+| `Access.AzureAd/test` | 140 passed |
+| `Access.AuthKit/test` | 180 passed |
+| `Access.Keycloak/test` | 138 passed (was 136) |
+| `Access.Federation/test` | 472 passed (was 456) |
+| `Api.Functions/test`, Debug (`DEV_AUTH`) | 2475 passed (was 2453) |
+| `Api.Functions/test`, Release | 2475 passed (was 2453) |
+| `Mcp/test` | 725 passed (was 724) |
+| `Backend.CosmosDb/test`, the whole emulator suite | 509 passed (was 508) |
+| `Cli/test` | 793 passed |
+
+The TypeScript SDK, `ui.admin`, `Mcp/testint` and the builds of the first table did not run again: the round changed only the SDK's README among them.
+
 The emulator suite ran later, on `998e9c31`, against the Windows Cosmos DB emulator, the four new `Via` round-trips included. In its first run, `KeyValueEndToEndTests.Secret_WrittenWithTheVaultKey_RoundTripsThroughCosmos` failed because Docker was not running for its Lowkey Vault container; it passed in a rerun with Docker on `11a9d8f1`, which changes only `CLAUDE.md`.
 
 The TypeScript SDK and `ui.admin` ran with the SDK commit; nothing in them changed afterwards. The Mcp projects build without compiler or StyleCop warnings. In the other touched projects, the warnings are on lines this branch did not change.
@@ -306,6 +325,34 @@ Not run:
 
   The fix also refuses foreign workload audiences in the API, a follow-up from Phase 4.
 - **The documentation** was reviewed for accuracy against the code, consistency and style before its commit. 27 findings were confirmed, and all are fixed in `f6b38cb3`.
+- **A second review round** on 2026-10-28 found twelve items; each was checked against the code first, and all were still open. See the next section.
+
+### Second review round (2026-10-28)
+
+One commit per item, each with `Refs: 424-106`:
+
+| Commit | Item | Decision |
+| --- | --- | --- |
+| `4ca074f3` | 1. `NoSecretReveal` and role grants | Through an actor under `NoSecretReveal`, granting `ContributorWithSecrets`, `Administrator` or `Owner` answers `403 ActorRestricted` on `POST v1/access/grant`, the member role `PUT` and a new invitation, in every build; `Reader` and `Contributor` stay allowed, and so do revokes and removals. `AccessHttp.EnsureActorMayGrantRole` throws `KeyValueErrors.ActorRestricted()`, as the machine guard does. **Deviation**: unlike the machine guard, it runs before the role check, because the role is checked inside the access and invitation services; a person without the role gets `ActorRestricted` through the actor instead of `AccessDenied`. The three `403` descriptions now use `ResponseForbiddenRoleGrant`, as `d8f99902` did for the machine routes; the SDKs are not regenerated. |
+| `bbfa46cd` | 2. Equality oracle | `CosmosKeyValueService.IsSameValueAsync` takes the caller: for a secret and a caller without `CanReadSecrets` (no role, or an actor under `NoSecretReveal`) it answers "changed" without decrypting. `SetAsync` then writes a new version, and the import plan, also a dry run, reports `Update`. Public values keep the comparison, and a caller who reads secrets keeps it for secrets. Covered by an emulator test only: the comparison is private to the Cosmos service, and no unit test reaches it without Cosmos. |
+| `7a8dfaff` | 3. Scopes of user tokens | `StorytellerTokenValidator.ValidateUser` emits `scp` only for the token's scopes that the actor's current `GetScopes()` holds (split, deduplicated, intersected), like the union of restrictions. A token that loses `User.Impersonation` simply carries fewer scopes, and the routes answer it `401`. |
+| `cf3e072e` | 4. Client assertion lifetime | `ActorAuthenticator.MaxClientAssertionLifetimeSeconds` is 60 (was 300), and `McpActorKey.ClientAssertionLifetime` 55 s (was 2 minutes), so a rounded `iat` or `exp` stays within the limit. The remaining risk is in Left for later. |
+| `2e0c992d` | 5. Workload identity max age | `Auth:TokenExchange:MaxActorTokenAgeMinutes`, default 1440, valid 5 to 1440. `IssuerTokenPolicy` gains `MaxAgeSeconds` (`now - iat`, with the clock skew), separate from `MaxLifetimeSeconds` (`exp - iat`). Workload identity tokens of Azure, GitHub, Kubernetes and Google carry `iat`, so `RequireIssuedAt` is on and a token without `iat` is refused. |
+| `5e36c1f5` | 6. Actors without `AllowedClientIds` | `TokenExchangeActorNotice`, a hosted service registered by `AddUserTokenExchange` in the idiom of `EntraIdAccountIdNotice`, logs one warning per such actor at start, naming it and its `SubjectAudiences`. **Deviation**: only while `Auth:TokenExchange:Enabled` is on; a disabled exchange accepts no token. |
+| `01b65f5d` | 7. Unknown requested scopes | `UserTokenExchangeService` keeps narrowing and logs the dropped scope names at `Information`, once per exchange, before the `User.Impersonation` check. The `scope` syntax check lets only scope characters through. |
+| `0557ace6` | 8. Keycloak `typ` | `KeycloakBearerTokenValidator.IsPersonToken` (API bearer tokens and, through it, `KeycloakUserSubjectTokenValidator`) and `McpTokenRules.CheckKeycloak` require `typ` `Bearer`; a missing `typ` is refused. The comparison stays case-insensitive. |
+| `9fb61a9d` | 9. MCP restrictions default | `StorytellerTokenExchangeProvider` reads a missing `restrictions` member as `NoSecretReveal`; an empty array stays unrestricted, and a malformed member still makes the answer unreadable. |
+| `57ec66e1` | 10. `mcp.md`, AuthKit | Checked against the WorkOS documentation ([MCP](https://workos.com/docs/authkit/mcp), [access token claims](https://workos.com/docs/authkit/connect/token-claims)): dynamically registered and CIMD clients get the OpenID Connect scopes plus an environment-wide default set that WorkOS support configures, Connect tokens carry no `permissions` claim, and scopes do not follow roles. **Deviation**: the page does not say that giving the permission to roles authorizes people, because WorkOS says it does not reach these tokens; it says the server checks only the scope and the API decides what a person may do. The audience part documents the resource indicator and making the MCP resource URL the default one. |
+| `9bd86711` | 11. TypeScript SDK README | `getAuthorizationServerMetadata` and `getJsonWebKeySet` go through the configured fetcher, which may attach a bearer token. |
+| this commit | 12. This section, the notes below, the test results, and the migration table of the MCP settings in `mcp.md` | Documentation only. |
+
+Docs that changed with the fixes: `access.md` and `authentication.md` (role grants, the equality oracle, the scope narrowing, the assertion lifetime, `MaxActorTokenAgeMinutes`, the start warning, dropped scopes, Keycloak `typ`), `key-values.md` (sets and imports by a caller without secret reads), and `mcp.md`.
+
+**Notes on earlier decisions**, recorded on request:
+
+- **No migration of Entra accounts.** Re-keying Entra accounts to `{tid}:{oid}` needs none, because no Entra ID deployment has stored accounts. Accounts keyed by the pairwise `sub` would not resolve; should one exist, its owner registers again.
+- **Keycloak is a user provider now.** The spec's Problem section still says "Keycloak is not supported at all". The spec stays as written; that line describes the state before this branch.
+- **The replay limit stays after the account lookup** (deviation 7). A person without an account always gets the registration hint and is not counted, so retries of an unregistered person never turn the hint into the generic `invalid_grant`. The cost is one point read of the account per exchange that the limit would have refused, and only for an exchange whose actor proved itself and whose subject token already passed the provider's validation and the actor's audience and client checks.
 
 ### Deviations from the spec
 
@@ -345,14 +392,15 @@ Recorded during planning, unchanged:
 
 - **The API's Entra bearer validator** accepts any Entra issuer and does not pin `RS256`.
 - **`sform` refuses `Provider: Keycloak`** with "Unknown sign-in provider". Keycloak sign-in in `sform` is out of scope.
-- **An equality oracle under `NoSecretReveal`**: an actor with write rights can still test a guessed value through unchanged writes and import dry runs.
+- ~~**An equality oracle under `NoSecretReveal`**~~: closed in `bbfa46cd`; a caller without secret reads never has a secret compared.
 - **`Api.Web` builds its own audit actor** from `sub` (`AnnotationsController.GetAuditActor`), without `Via`.
 
 Found on the way:
 
 - **Clients do not show `Via`.** `sform` (`AuditConsoleExtensions.FormatActor`) and the admin UI (`AuditActorLink.vue`) ignore it, and `sform` has no special output for `ActorRestricted` as it has for `MtlsRequired`.
 - **`X-2S-Secrets-Withheld` is not declared in OpenAPI**, for either value.
-- **The next SDK regeneration** picks up the changed `403` description of `SetFederatedIssuer` from `d8f99902`. It is a description only, so the shape of the API is unchanged.
+- **The next SDK regeneration** picks up the changed `403` descriptions of `SetFederatedIssuer` from `d8f99902`, and of `GrantUserAccess`, `SetMemberRole` and `CreateInvitation` from `4ca074f3`. They are descriptions only, so the shape of the API is unchanged.
+- **Client assertion replay across instances.** The `jti` of a client assertion is recorded per instance, in memory. An assertion captured in transit can be replayed once on each other instance while it lives: at most 60 s now (`cf3e072e`), with the clock skew. A shared `jti` record (for example in Cosmos DB or a distributed cache) would close it; the exchange is HTTPS-only and the assertion goes only to the API, so this needs a captured request.
 - **Signing-key rotation**, and a next key in the JWKS.
 - **Real AuthKit and Keycloak token shapes, to confirm in staging**: whether AuthKit MCP tokens carry the resource URL as `aud` and the scope in `scope` or `permissions`, the issuer of the AuthKit domain's OpenID metadata, and the audience mapper a Keycloak realm needs.
 - **Key rotation at AuthKit and Keycloak.** Their validators request a key refresh on an unknown `kid` but do not retry, so the first token after a rotation is refused. Entra retries once.
@@ -373,12 +421,13 @@ Not done in this change:
 
 - **Merge order**: this pull request into `feat/424-84`, then PR #131 into `main`.
 - **`Directory.Packages.props`** loses `Microsoft.Identity.Web.TokenCache` and `System.Security.Cryptography.Pkcs`, which nothing else referenced directly. `Mcp.csproj` references `Azure.Identity` and `TestableIO.System.IO.Abstractions.Wrappers`.
-- **MCP settings**: `Mcp:EntraId:*` and `Storyteller:Scopes` are replaced by `Mcp:Authentication:*` and `Mcp:Actor:*`. `Storyteller` keeps only `BaseUrl`.
+- **MCP settings**: `Mcp:EntraId:*` and `Storyteller:Scopes` are replaced by `Mcp:Authentication:*` and `Mcp:Actor:*`. `Storyteller` keeps only `BaseUrl`. The old keys are ignored rather than refused, so move them: the tenant, client, audience, scope and allowed clients go to `Mcp:Authentication:*`, the MCP app's credentials are dropped for one `Mcp:Actor` credential registered in the API's `Auth:TokenExchange:Actors`, and `Storyteller:Scopes` is dropped for the actor's `Scopes`. `mcp.md` has the table (Settings of the server).
 - **API settings**:
   - `Auth:DelegatedClients` is removed; a leftover key is ignored.
   - The MCP server works only with `Auth:TokenExchange:Enabled` and an actor for it.
   - An https `MachineAuth:Federation:Issuer` is needed for RFC 8414 clients, and `PublicBaseUrl` for `ClientAssertion` actors.
   - `Auth:Keycloak:AllowedClientIds` is required under Keycloak.
+  - Keycloak person tokens need `typ` `Bearer` (`0557ace6`), and a workload identity `actor_token` needs `iat` and an age within `Auth:TokenExchange:MaxActorTokenAgeMinutes` (`2e0c992d`). Client assertions live at most 60 s (`cf3e072e`); an actor other than this MCP server must sign them that short.
   - An actor with an Entra v2 issuer and an App ID URI audience, or with a foreign workload audience, now fails at start. Neither could ever have exchanged a token.
 - **Accounts under Entra** are keyed by `{tid}:{oid}`. Existing local databases need DbCreator's `baseAccount:id` and a re-run, and accounts registered under the pairwise `sub` do not resolve. No deployment has Entra accounts yet.
 - **To verify after deployment**:
