@@ -607,13 +607,17 @@ public class CosmosAccessService : IAccessService
             ? $"{accessKey[..3]}***"
             : "***";
 
-        // Only the masked key: the copy read above is stale (the new hash, a concurrent renewal), and a patch never
-        // brings back a machine deleted meanwhile. Only the reset writes this field, so no ETag.
-        using var response = await repository.Container.PatchItemStreamAsync(
-            appId,
-            partitionKey,
-            [PatchOperation.Set($"/{nameof(MachineAccessEntity.AccessKey)}", maskedKey)],
-            new PatchItemRequestOptions { EnableContentResponseOnWrite = true });
+        // The copy read above is stale (the new hash, a concurrent renewal), so the record comes back fresh. An API key
+        // keeps its mask (2s.***), so nothing is written after the hash: a failed write here would answer 5xx for a
+        // key that already works. Only a changed mask (a client secret, an old record) is patched, without an ETag, as
+        // only the reset writes this field. Neither a read nor a patch brings back a machine deleted meanwhile.
+        using var response = string.Equals(machineAccess.AccessKey, maskedKey, StringComparison.Ordinal)
+            ? await repository.Container.ReadItemStreamAsync(appId, partitionKey)
+            : await repository.Container.PatchItemStreamAsync(
+                appId,
+                partitionKey,
+                [PatchOperation.Set($"/{nameof(MachineAccessEntity.AccessKey)}", maskedKey)],
+                new PatchItemRequestOptions { EnableContentResponseOnWrite = true });
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {

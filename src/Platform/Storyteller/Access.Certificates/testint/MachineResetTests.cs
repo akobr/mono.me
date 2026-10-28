@@ -15,7 +15,7 @@ namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 
 /// <summary>
 /// The reset of a machine against real storage. It changes only the secret. A concurrent writer runs at fixed points:
-/// before the router, before the hash replace, after the router, before the masked-key write, and inside the hash
+/// before the router, before the hash replace, after the router, before the read-back of the record, and inside the hash
 /// store between its read and its patch. A delete there, finished or with only the hash cleared, answers 404, brings
 /// no document back and leaves no working key. A renewal there is kept. A reset that finds another reset's hash
 /// answers 409 and keeps the other one.
@@ -264,25 +264,33 @@ public class MachineResetTests(CosmosFixture fixture)
     // After every read of the access service, right before its write. A write of a copy read earlier (a re-read and
     // an upsert, say) would put the old certificate back; the strict container refuses any write but a patch.
     [Fact]
-    public async Task Reset_RenewedBeforeTheMaskedKeyWrite_KeepsTheRenewal()
+    public async Task Reset_RenewedBeforeTheReadBack_KeepsTheRenewal_AndWritesNothingAfterTheHash()
     {
         var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel());
         string? renewedThumbprint = null;
         JsonObject? renewed = null;
+        var reads = 0;
         var statuses = new List<HttpStatusCode>();
         var repositoryProvider = CreateInterleavingProvider(
-            FirstOnly(async () =>
+            () => Task.CompletedTask,
+            statuses,
+            async () =>
             {
-                renewedThumbprint = await RenewAsync(machine);
-                renewed = await ReadDocumentAsync(machine.Id);
-            }),
-            statuses);
+                // The first read is the reset's own; the second reads the record back after the hash replace.
+                if (++reads == 2)
+                {
+                    renewedThumbprint = await RenewAsync(machine);
+                    renewed = await ReadDocumentAsync(machine.Id);
+                }
+            });
 
         // The real router, so the real hash store over the real container; only the access service is wrapped.
         var accessService = CreateAccessService(fixture.Services.GetRequiredService<IMachineAccessService>(), repositoryProvider);
         var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
 
-        statuses.ShouldBe([HttpStatusCode.OK]);
+        // The mask of an API key does not change, so the reset writes nothing after the hash.
+        statuses.ShouldBeEmpty();
+        reads.ShouldBe(2);
         ChangedProperties(renewed!, (await ReadDocumentAsync(machine.Id))!).ShouldBeEmpty();
         await ShouldKeepTheRenewalAsync(machine, renewedThumbprint!, reset);
     }
@@ -604,14 +612,21 @@ public class MachineResetTests(CosmosFixture fixture)
 
     // The organization's real container behind a strict wrapper: reads go through, a patch runs the step first and
     // records the status it got. Any other call (an upsert, a replace) fails the test.
-    private IContainerRepositoryProvider CreateInterleavingProvider(Func<Task> beforePatch, List<HttpStatusCode> patchStatuses)
+    private IContainerRepositoryProvider CreateInterleavingProvider(Func<Task> beforePatch, List<HttpStatusCode> patchStatuses, Func<Task>? beforeRead = null)
     {
         var real = Container;
         var container = new Mock<Container>(MockBehavior.Strict);
         container
             .Setup(c => c.ReadItemStreamAsync(It.IsAny<string>(), It.IsAny<PartitionKey>(), It.IsAny<ItemRequestOptions>(), It.IsAny<CancellationToken>()))
-            .Returns((string id, PartitionKey partitionKey, ItemRequestOptions options, CancellationToken cancellation) =>
-                real.ReadItemStreamAsync(id, partitionKey, options, cancellation));
+            .Returns(async (string id, PartitionKey partitionKey, ItemRequestOptions options, CancellationToken cancellation) =>
+            {
+                if (beforeRead is not null)
+                {
+                    await beforeRead();
+                }
+
+                return await real.ReadItemStreamAsync(id, partitionKey, options, cancellation);
+            });
         container
             .Setup(c => c.PatchItemStreamAsync(It.IsAny<string>(), It.IsAny<PartitionKey>(), It.IsAny<IReadOnlyList<PatchOperation>>(), It.IsAny<PatchItemRequestOptions>(), It.IsAny<CancellationToken>()))
             .Returns(async (string id, PartitionKey partitionKey, IReadOnlyList<PatchOperation> operations, PatchItemRequestOptions options, CancellationToken cancellation) =>
