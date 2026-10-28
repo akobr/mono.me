@@ -349,7 +349,7 @@ While the server's actor has `NoSecretReveal`, the default, the API refuses `cre
 
 ### Tools that return secrets
 
-With `Mcp:SecretTools:Enabled` set to `true`, three more tools are registered. The server offers them only while the API lets its actor read secrets: the answer of the token exchange lists the actor's `restrictions`, and under `NoSecretReveal`, the default of every actor, `tools/list` leaves them out. So offering them needs both the setting and `AllowSecrets: true` on the API's actor. None of them is read-only, so clients that confirm writes confirm them too:
+With `Mcp:SecretTools:Enabled` set to `true`, three more tools are registered. The server offers them only while the API lets its actor read secrets: the answer of the token exchange lists the actor's `restrictions`, and under `NoSecretReveal`, the default of every actor, `tools/list` leaves them out. An answer without `restrictions` counts as `NoSecretReveal`, so the server fails closed; an empty array means no restrictions. So offering them needs both the setting and `AllowSecrets: true` on the API's actor. None of them is read-only, so clients that confirm writes confirm them too:
 
 | Tool | What it does |
 | --- | --- |
