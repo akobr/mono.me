@@ -504,6 +504,49 @@ public class CosmosKeyValueServiceTests(Startup startup)
         await readerImport.Should().ThrowAsync<AccessDeniedException>("the import writes a secret");
     }
 
+    // A caller who writes secrets but may not read them (an actor under NoSecretReveal) learns nothing from a guess: a set
+    // of the stored value writes a new version, and an import, also a dry run, reports Update. Public values keep the
+    // comparison, and a caller who reads secrets keeps it for secrets too.
+    [Fact]
+    public async Task SetAndImport_OfTheStoredSecret_ByACallerWhoMayNotReadSecrets_AreUpdates()
+    {
+        var project = NewProject("guess");
+        var writer = new KeyValueCaller(AuditActor.Account("writer"), CanReadSecrets: false, CanWriteSecrets: true);
+        await KeyValues.SetAsync(Org, project, View, "db.password", Secret("hunter2"), Admin);
+        await KeyValues.SetAsync(Org, project, View, "db.host", Public("sql-1"), Admin);
+
+        var document = new KeyValueDocument
+        {
+            Items =
+            [
+                new() { Key = "db.password", Protection = KeyValueProtection.Standard, Value = "hunter2" },
+                new() { Key = "db.host", Protection = KeyValueProtection.Public, Value = "sql-1" },
+            ],
+        };
+
+        var dryRun = await KeyValues.ImportAsync(Org, project, View, document, new KeyValueImportOptions { DryRun = true }, writer);
+        dryRun.Items.Select(item => (item.Key, item.Action)).Should().Equal(
+            ("db.password", KeyValueImportAction.Update),
+            ("db.host", KeyValueImportAction.Unchanged));
+
+        var adminDryRun = await KeyValues.ImportAsync(Org, project, View, document, new KeyValueImportOptions { DryRun = true }, Admin);
+        adminDryRun.Items.Should().OnlyContain(item => item.Action == KeyValueImportAction.Unchanged, "a caller who reads secrets compares them");
+
+        var sameSecret = await KeyValues.SetAsync(Org, project, View, "db.password", Secret("hunter2"), writer);
+        var samePublic = await KeyValues.SetAsync(Org, project, View, "db.host", Public("sql-1"), writer);
+        sameSecret.Version.Should().Be(2, "the secret is not compared for a caller who may not read it");
+        samePublic.Version.Should().Be(1, "public values keep the comparison");
+
+        var imported = await KeyValues.ImportAsync(Org, project, View, document, new KeyValueImportOptions(), writer);
+        imported.Items.Select(item => (item.Key, item.Action, item.Version)).Should().Equal(
+            ("db.password", KeyValueImportAction.Update, (ulong?)3),
+            ("db.host", KeyValueImportAction.Unchanged, (ulong?)1));
+
+        var adminSet = await KeyValues.SetAsync(Org, project, View, "db.password", Secret("hunter2"), Admin);
+        adminSet.Version.Should().Be(3, "a caller who reads secrets does not write the same value again");
+        (await KeyValues.GetAsync(Org, project, View, "db.password", new KeyValueReadOptions { Reveal = true }, Admin))!.Value.Should().Be("hunter2");
+    }
+
     [Fact]
     public async Task Import_ReplaceDeletesTheRestUnderThePrefix()
     {
