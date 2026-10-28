@@ -241,6 +241,31 @@
       "error": { "rule": "colon-in-name", "path": "$['\\u0023\\u0023[warning]x:y']" }
     },
     {
+      "name": "a dotless i and an I are different names",
+      "document": { "I": 1, "ı": 2 },
+      "keys": { "I": "1", "[ı]": "2" }
+    },
+    {
+      "name": "a long s and an s are different names",
+      "document": { "s": 1, "ſ": 2 },
+      "keys": { "s": "1", "[ſ]": "2" }
+    },
+    {
+      "name": "letters beyond the Basic Multilingual Plane that differ only in case collide",
+      "document": { "𐐀": 1, "𐐨": 2 },
+      "error": { "rule": "case-collision", "path": "$['𐐨']" }
+    },
+    {
+      "name": "Greek letters with ypogegrammeni that differ only in case collide",
+      "document": { "ᾳ": 1, "ᾼ": 2 },
+      "error": { "rule": "case-collision", "path": "$['ᾼ']" }
+    },
+    {
+      "name": "an unpaired surrogate becomes U+FFFD",
+      "document": { "note": "x\ud800y" },
+      "keys": { "note": "x\ufffdy" }
+    },
+    {
       "name": "the document must be an object",
       "document": [ "a", "b" ],
       "error": { "rule": "not-an-object", "path": "$" }

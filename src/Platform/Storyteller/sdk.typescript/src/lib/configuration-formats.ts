@@ -36,7 +36,8 @@ export class InvalidDocumentError extends Error {
  * The keys of a configuration's Content for a target, with their raw values, in document order: `db:hosts:0` (flat),
  * `db.hosts[0]` (properties) or `DB__HOSTS__0` (env). A string is its value, a number or a boolean its JSON text as .NET
  * writes it; null and empty containers make no key. Throws InvalidDocumentError for a document the target cannot hold.
- * content is JSON data, as JSON.parse returns it; null and undefined have no keys.
+ * content is JSON data, as JSON.parse returns it; null and undefined have no keys. For properties and env an unpaired
+ * surrogate becomes U+FFFD first, as in their text; flat keeps it, as the .NET provider does.
  */
 export function flattenConfiguration(content: unknown, target: ConfigurationTarget = 'flat'): Record<string, string> {
   const keys = Object.create(null) as Record<string, string>
@@ -85,16 +86,18 @@ interface Entry {
 }
 
 // The base rules of every target, then the name and value rules of the target, each over the whole document; the
-// first error throws.
+// first error throws. properties and env read the canonical document, as ConfigurationFormatter does; flat reads the
+// document as it is, as DocumentFlattener.Flatten does.
 function toEntries(content: unknown, target: ConfigurationTarget): Entry[] {
-  const leaves = readLeaves(content)
+  const document = target === 'flat' ? content : canonicalize(content)
+  const leaves = readLeaves(document)
 
   switch (target) {
     case 'flat':
       return leaves.map(leaf => ({ key: toFlatKey(leaf.segments), value: leaf.value }))
 
     case 'properties':
-      checkNames(content, (name, path) => {
+      checkNames(document, (name, path) => {
         if (name.includes('[') || name.includes(']')) {
           throw new InvalidDocumentError(
             'bracket-in-name',
@@ -104,14 +107,14 @@ function toEntries(content: unknown, target: ConfigurationTarget): Entry[] {
         }
       })
 
-      if (isPlainObject(content)) {
-        checkGaps(content, rootPath)
+      if (isPlainObject(document)) {
+        checkGaps(document, rootPath)
       }
 
       return leaves.map(leaf => ({ key: toPropertiesKey(leaf.segments), value: leaf.value }))
 
     case 'env':
-      checkNames(content, (name, path, isRoot) => {
+      checkNames(document, (name, path, isRoot) => {
         if (!isValidEnvName(name, isRoot)) {
           throw new InvalidDocumentError(
             'invalid-env-name',
@@ -264,13 +267,29 @@ function toNumberText(value: number): string {
   return `${sign}${digits.slice(0, position)}.${digits.slice(position)}`
 }
 
-// As .NET's OrdinalIgnoreCase: each UTF-16 unit upper-cased when that gives one unit, so ß stays ß.
+// Code points whose case .NET 10's OrdinalIgnoreCase keeps although toUpperCase maps them: the dotless i and the long s,
+// and the pairs of Unicode 16, which its table does not have.
+const keptCase = new Set([0x0131, 0x017f, 0x0264, 0x019b, 0x1c89, 0x1c8a, 0xa7cb, 0xa7cc, 0xa7cd, 0xa7da, 0xa7db, 0xa7dc])
+
+// As .NET's OrdinalIgnoreCase, the simple upper-case mapping of each code point: toUpperCase when that gives one code
+// point, so ß stays ß and the letters beyond the Basic Multilingual Plane fold too; the Greek letters with ypogegrammeni,
+// whose full mapping has two code points, map to their title-case forms.
 function foldCase(key: string): string {
   let folded = ''
 
-  for (const unit of key.split('')) {
-    const upper = unit.toUpperCase()
-    folded += upper.length === 1 ? upper : unit
+  for (const character of key) {
+    const code = character.codePointAt(0)!
+
+    if (keptCase.has(code)) {
+      folded += character
+    } else if ((code >= 0x1f80 && code <= 0x1f87) || (code >= 0x1f90 && code <= 0x1f97) || (code >= 0x1fa0 && code <= 0x1fa7)) {
+      folded += String.fromCodePoint(code + 8)
+    } else if (code === 0x1fb3 || code === 0x1fc3 || code === 0x1ff3) {
+      folded += String.fromCodePoint(code + 9)
+    } else {
+      const upper = character.toUpperCase()
+      folded += [...upper].length === 1 ? upper : character
+    }
   }
 
   return folded
@@ -303,7 +322,7 @@ function describeType(value: unknown): string {
 const plainName = /^[A-Za-z_][A-Za-z0-9_-]*$/
 
 // .name for a plain name, ['name'] for any other: \ and ' escaped, C0 controls and DEL as \n, \r, \t or \uXXXX, and #
-// as #, so a path never holds a line break or a #.
+// as \u0023, so a path never holds a line break or a #.
 function toPropertyPath(parent: string, name: string): string {
   if (plainName.test(name)) {
     return `${parent}.${name}`
