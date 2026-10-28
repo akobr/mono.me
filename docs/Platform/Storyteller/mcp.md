@@ -53,7 +53,7 @@ When the AuthKit domain is not the API's `Auth:AuthKit:Issuer` (by default `http
 - **Audience mapper.** Keycloak puts the server's URL into `aud` only through an Audience mapper: add one whose included custom audience is `Mcp:Authentication:Audience` (by default `Mcp:ResourceUrl`), added to access tokens.
 - **Client scope.** Create a client scope named like `Mcp:Authentication:Scope` (by default `Mcp.Access`), included in the token scope, and put the mapper into it. Make it an optional client scope of the realm, so only the tokens of clients that ask for it carry the server's audience. The server finds the scope in `scope` or `scp`.
 - **Clients.** MCP clients register themselves through the realm's dynamic client registration, within the realm's client registration policies; or create a client for each. `Mcp:Authentication:AllowedClientIds` is optional: empty accepts any client, a list is compared with `azp`.
-- The server reads the realm's keys through `{Issuer}/.well-known/openid-configuration` (over plain HTTP in Development only) and accepts a person's access token: a `sub`, no `client_id` or `clientId` claim and no `preferred_username` that starts with `service-account-`, so service accounts are refused, and `typ` `Bearer` when present, so ID tokens are refused.
+- The server reads the realm's keys through `{Issuer}/.well-known/openid-configuration` (over plain HTTP in Development only) and accepts a person's access token: a `sub`, no `client_id` or `clientId` claim and no `preferred_username` that starts with `service-account-`, so service accounts are refused, and `typ` `Bearer`, so ID tokens and tokens without `typ` are refused.
 
 ## Registering the actor in the API
 

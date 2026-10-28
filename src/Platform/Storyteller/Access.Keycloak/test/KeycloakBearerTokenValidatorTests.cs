@@ -101,6 +101,17 @@ public sealed class KeycloakBearerTokenValidatorTests : IDisposable
         (await validator.ValidateAsync(Token(UserClaims(new Dictionary<string, object> { ["typ"] = tokenType })))).ShouldBeNull();
     }
 
+    // Keycloak puts typ Bearer on every access token, so a token without typ is no person's access token.
+    [Fact]
+    public async Task TokenWithoutTyp_IsNotAUser()
+    {
+        var validator = CreateValidator();
+        var claims = UserClaims();
+        claims.Remove("typ");
+
+        (await validator.ValidateAsync(Token(claims))).ShouldBeNull();
+    }
+
     [Fact]
     public async Task TokenWithoutSub_IsNotAUser()
     {
@@ -257,6 +268,7 @@ public sealed class KeycloakBearerTokenValidatorTests : IDisposable
         var claims = new Dictionary<string, object>
         {
             ["sub"] = UserId,
+            ["typ"] = "Bearer",
             ["azp"] = "sform",
             ["preferred_username"] = "ada",
             ["email"] = "ada@example.com",
