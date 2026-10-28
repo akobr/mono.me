@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Storyteller format vectors",
+  "description": "A file of kind formats: the exact text of a format of a configuration, written as UTF-8 without a byte order mark, or the error that makes the document invalid in that format.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [ "description", "vectors" ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "description": { "type": "string", "minLength": 1 },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/vector" }
+    }
+  },
+  "definitions": {
+    "vector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "name", "document", "format" ],
+      "properties": {
+        "name": { "description": "Unique within the file.", "type": "string", "minLength": 1 },
+        "document": { "description": "The Content object of a configuration." },
+        "format": { "type": "string", "enum": [ "flat", "properties", "env", "yaml" ] },
+        "text": { "description": "The exact text, with LF line ends.", "type": "string" },
+        "error": { "$ref": "#/definitions/error" }
+      },
+      "oneOf": [
+        { "required": [ "text" ] },
+        { "required": [ "error" ] }
+      ]
+    },
+    "error": {
+      "description": "The first error: its rule and the JSON path it names.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "rule", "path" ],
+      "properties": {
+        "rule": {
+          "type": "string",
+          "enum": [ "not-an-object", "empty-name", "colon-in-name", "case-collision", "bracket-in-name", "array-gap", "invalid-env-name" ]
+        },
+        "path": { "type": "string", "pattern": "^\\$" }
+      }
+    }
+  }
+}

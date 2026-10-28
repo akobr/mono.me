@@ -108,9 +108,9 @@ public class RoundTripTests
     {
         var documents = new Dictionary<string, JToken>(StringComparer.Ordinal);
 
-        foreach (var file in new[] { VectorFiles.Flattening, VectorFiles.Properties, VectorFiles.Env, VectorFiles.Formats })
+        foreach (var file in new[] { ConformanceFiles.Flat, ConformanceFiles.Properties, ConformanceFiles.Env, ConformanceFiles.Formats })
         {
-            foreach (var (name, vector) in VectorFiles.Load(file))
+            foreach (var (name, vector) in ConformanceFiles.Load(file))
             {
                 if (vector["document"] is JObject document && IsValidForYaml(document))
                 {

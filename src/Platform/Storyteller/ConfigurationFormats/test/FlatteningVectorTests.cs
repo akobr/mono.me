@@ -2,14 +2,32 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.ConfigurationFormats.UnitTests;
 
-// Vectors/flattening.json, shared with the providers of other languages.
+// conformance/flattening/flat.json, shared with the providers of other languages; FormatVectorTests runs the other
+// targets.
 public class FlatteningVectorTests
 {
-    private static IReadOnlyDictionary<string, JObject> Vectors => VectorFiles.Load(VectorFiles.Flattening);
+    private static IReadOnlyDictionary<string, JObject> Vectors => ConformanceFiles.Load(ConformanceFiles.Flat);
 
     public static TheoryData<string> Names()
     {
-        return VectorFiles.Names(VectorFiles.Flattening);
+        return ConformanceFiles.Names(ConformanceFiles.Flat);
+    }
+
+    // A target that this runner does not implement fails here rather than being skipped.
+    [Fact]
+    public void EveryFlatteningFile_HasATargetOfThisRunner()
+    {
+        var files = ConformanceFiles.OfKind("flattening");
+
+        foreach (var file in files)
+        {
+            var target = ConformanceFiles.Read(file).Value<string>("target")!;
+
+            ConformanceFiles.Targets.ShouldContainKey(target, $"{file} has the target {target}, which this runner does not implement.");
+            ConformanceFiles.Targets[target].ShouldBe(file);
+        }
+
+        files.ShouldBe(ConformanceFiles.Targets.Values, ignoreOrder: true);
     }
 
     [Fact]

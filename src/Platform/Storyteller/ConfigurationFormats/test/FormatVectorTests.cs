@@ -3,32 +3,32 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.ConfigurationFormats.UnitTests;
 
-// Vectors/flattening.properties.json, flattening.env.json and formats.json: the keys of properties and env read back
-// from the formatted text, and the exact text of every format.
+// conformance/flattening/properties.json, flattening/env.json and formats.json: the keys of properties and env read
+// back from the formatted text, and the exact text of every format.
 public class FormatVectorTests
 {
     public static TheoryData<string> PropertiesNames()
     {
-        return VectorFiles.Names(VectorFiles.Properties);
+        return ConformanceFiles.Names(ConformanceFiles.Properties);
     }
 
     public static TheoryData<string> EnvNames()
     {
-        return VectorFiles.Names(VectorFiles.Env);
+        return ConformanceFiles.Names(ConformanceFiles.Env);
     }
 
     public static TheoryData<string> FormatsNames()
     {
-        return VectorFiles.Names(VectorFiles.Formats);
+        return ConformanceFiles.Names(ConformanceFiles.Formats);
     }
 
     [Theory]
-    [InlineData(VectorFiles.Properties, "keys")]
-    [InlineData(VectorFiles.Env, "keys")]
-    [InlineData(VectorFiles.Formats, "text")]
+    [InlineData(ConformanceFiles.Properties, "keys")]
+    [InlineData(ConformanceFiles.Env, "keys")]
+    [InlineData(ConformanceFiles.Formats, "text")]
     public void TheFile_HasVectorsOfBothKinds(string file, string result)
     {
-        var vectors = VectorFiles.Load(file).Values;
+        var vectors = ConformanceFiles.Load(file).Values;
 
         vectors.ShouldContain(vector => vector[result] != null);
         vectors.ShouldContain(vector => vector["error"] != null);
@@ -37,13 +37,13 @@ public class FormatVectorTests
 
     // So that a document's flattening, properties and env outcomes can be read side by side.
     [Theory]
-    [InlineData(VectorFiles.Properties)]
-    [InlineData(VectorFiles.Env)]
+    [InlineData(ConformanceFiles.Properties)]
+    [InlineData(ConformanceFiles.Env)]
     public void TheFile_HasEveryDocumentOfTheFlatteningVectors(string file)
     {
-        var vectors = VectorFiles.Load(file);
+        var vectors = ConformanceFiles.Load(file);
 
-        foreach (var (name, vector) in VectorFiles.Load(VectorFiles.Flattening))
+        foreach (var (name, vector) in ConformanceFiles.Load(ConformanceFiles.Flat))
         {
             vectors.ShouldContainKey(name);
             JToken.DeepEquals(vectors[name]["document"], vector["document"]).ShouldBeTrue(name);
@@ -51,9 +51,15 @@ public class FormatVectorTests
     }
 
     [Fact]
+    public void TheSuite_HasOneFormatsFile()
+    {
+        ConformanceFiles.OfKind("formats").ShouldBe([ConformanceFiles.Formats]);
+    }
+
+    [Fact]
     public void TheFormatsFile_CoversEveryFormat()
     {
-        VectorFiles.Load(VectorFiles.Formats).Values
+        ConformanceFiles.Load(ConformanceFiles.Formats).Values
             .Select(vector => vector.Value<string>("format"))
             .Distinct()
             .ShouldBe(ConfigurationFormatNames.Names, ignoreOrder: true);
@@ -63,7 +69,7 @@ public class FormatVectorTests
     [MemberData(nameof(PropertiesNames))]
     public void PropertiesVector(string name)
     {
-        var vector = VectorFiles.Load(VectorFiles.Properties)[name];
+        var vector = ConformanceFiles.Load(ConformanceFiles.Properties)[name];
 
         if (ExpectError(vector, ConfigurationFormat.Properties))
         {
@@ -80,7 +86,7 @@ public class FormatVectorTests
     [MemberData(nameof(EnvNames))]
     public void EnvVector(string name)
     {
-        var vector = VectorFiles.Load(VectorFiles.Env)[name];
+        var vector = ConformanceFiles.Load(ConformanceFiles.Env)[name];
 
         if (ExpectError(vector, ConfigurationFormat.Env))
         {
@@ -101,7 +107,7 @@ public class FormatVectorTests
     [MemberData(nameof(FormatsNames))]
     public void FormatsVector(string name)
     {
-        var vector = VectorFiles.Load(VectorFiles.Formats)[name];
+        var vector = ConformanceFiles.Load(ConformanceFiles.Formats)[name];
         ConfigurationFormatNames.TryParse(vector.Value<string>("format"), out var format).ShouldBeTrue();
 
         if (ExpectError(vector, format))
