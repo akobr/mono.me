@@ -28,6 +28,9 @@ public partial class CosmosAnnotationService : IAnnotationService
     // waves of a batch plan (see BatchPlan): the relation arrays of other annotations are written last
     private const int RelationsWave = 10;
 
+    // the answer to a continuation token whose Cosmos DB part Cosmos DB rejects, for every list of annotations
+    private const string InvalidContinuationTokenMessage = "The continuation token is not valid; list again without it.";
+
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly AnnotationItemSerializer _serializer;
     private readonly AnnotationAuditStore _audit;
@@ -749,7 +752,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             // the token decoded, but its Cosmos DB part is not one of this query: the client sent a bad token, the
             // store did not fail. The Cosmos DB message quotes the token and carries diagnostics, so none of it goes
             // into the answer.
-            throw new InvalidInputException("The continuation token is not valid; list again without it.", ErrorCodes.InvalidQuery);
+            throw new InvalidInputException(InvalidContinuationTokenMessage, ErrorCodes.InvalidQuery);
         }
 
         var mapped = results

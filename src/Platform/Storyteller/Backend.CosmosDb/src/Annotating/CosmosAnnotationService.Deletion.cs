@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities.Annotations;
 using Microsoft.Azure.Cosmos;
@@ -61,7 +62,21 @@ public partial class CosmosAnnotationService
             .WithParameter("@view", view)
             .WithParameter("@deletionId", deletionId);
 
-        var (entities, nextToken) = await Store(organization).QueryPageAsync(query, continuationToken);
+        IReadOnlyList<AnnotationEntity> entities;
+        string? nextToken;
+
+        try
+        {
+            (entities, nextToken) = await Store(organization).QueryPageAsync(query, continuationToken);
+        }
+        catch (CosmosException exception) when (!string.IsNullOrWhiteSpace(continuationToken) && exception.StatusCode == HttpStatusCode.BadRequest)
+        {
+            // the token is the raw Cosmos DB token of this query, and Cosmos DB rejects it: the client sent a bad token,
+            // the store did not fail. The Cosmos DB message quotes the token, so none of it goes into the answer, as
+            // for the other lists of annotations.
+            throw new InvalidInputException(InvalidContinuationTokenMessage, ErrorCodes.InvalidQuery);
+        }
+
         var annotations = entities.Select(entity => entity.ToModel()).ToList();
 
         return new AnnotationsResponse

@@ -136,6 +136,21 @@ public class CosmosAnnotationPagingTests(Startup startup)
         (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidQuery);
     }
 
+    [Fact]
+    public async Task ADeletedListTokenThatCosmosRejects_IsInvalidQuery_WithoutTheCosmosMessage()
+    {
+        var project = NewProject();
+        await CreateAsync(project, "exe.pg-s.pg-r.pg-c");
+
+        // the deleted list passes its token to Cosmos DB as it is; a plain CosmosException would answer 500 with the
+        // Cosmos DB message, which quotes the token
+        var act = () => Annotations.GetDeletedAnnotationsAsync(Organization, project, View, continuationToken: "not-a-cosmos-token");
+
+        var exception = (await act.Should().ThrowAsync<InvalidInputException>()).Which;
+        exception.ErrorCode.Should().Be(ErrorCodes.InvalidQuery);
+        exception.Message.Should().Be("The continuation token is not valid; list again without it.");
+    }
+
     private static string NewProject() => $"pag-{Guid.NewGuid():N}"[..16];
 
     private static AnnotationsRequest Request(string project, params AnnotationType[] types)
