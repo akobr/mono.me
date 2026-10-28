@@ -568,7 +568,7 @@ An exchange names its actor with `client_id`, compared exactly (case-sensitive) 
 - The token's `iss` must equal `WorkloadIdentity:Issuer` exactly. A token of another issuer fetches no keys.
 - The keys come from the issuer's discovery document (`{Issuer}/.well-known/openid-configuration`) or from `WorkloadIdentity:JwksUri`, under the URL and network rules of [trusted issuers](#trusted-issuers). The token needs a `kid`, and a signature with one of the algorithms of the machine exchange (RS256 to ES512, never `none` or HS*).
 - `aud` must contain `WorkloadIdentity:Audience`, and `sub` must equal `WorkloadIdentity:Subject`.
-- `exp` is required, with `ClockSkewSeconds`. It is the only limit on the lifetime, because managed identity tokens live about a day.
+- `exp` and `iat` are required, with `ClockSkewSeconds`. The lifetime (`exp - iat`) is not limited, because managed identity tokens live about a day; the age is: a token issued more than `Auth:TokenExchange:MaxActorTokenAgeMinutes` ago (a day by default) is refused, whatever its `exp`.
 
 For an Azure managed identity, the token's version follows the `requestedAccessTokenVersion` of the app registration it is requested for, and `Issuer` and `Audience` must be the pair of that version, exactly as the token carries them:
 
@@ -757,6 +757,7 @@ The settings live under `Auth:TokenExchange` and are validated at startup, also 
 | `AdditionalIssuers:*:Issuer`, `AdditionalIssuers:*:JwksUri` | none | AuthKit only: further issuers of the deployment's WorkOS environment whose user tokens may be exchanged, such as the AuthKit domain that issues the tokens MCP clients sign in with, each with the HTTPS URL of its key set. Accepted for the exchange only, never as bearer tokens on API routes. Refused under Entra ID and Keycloak, when equal to `Auth:AuthKit:Issuer` (its tokens already pass on API routes), and when listed twice. |
 | `TokenLifetimeMinutes` | `10` | The longest lifetime of an issued token, 5 to 15. Never longer than the subject token's `exp`. |
 | `MaxExchangesPerSubjectTokenPerMinute` | `10` | The replay limit: exchanges of one subject token by one actor per minute and instance, 1 to 60. |
+| `MaxActorTokenAgeMinutes` | `1440` | The longest time since the `iat` of a [workload identity](#actors-and-their-proof) `actor_token`, 5 to 1,440 (a day). An older token, or one without `iat`, is refused, whatever its `exp`. |
 
 An actor, `Auth:TokenExchange:Actors:{n}`:
 

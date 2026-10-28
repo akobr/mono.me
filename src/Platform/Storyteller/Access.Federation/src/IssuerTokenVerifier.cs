@@ -163,6 +163,12 @@ internal sealed class IssuerTokenVerifier
             return "the token was issued in the future";
         }
 
+        // The age, not the lifetime: a long-lived token is refused once it was issued too long ago.
+        if (hasIssuedAt && policy.MaxAgeSeconds is { } maxAge && now - issuedAt > maxAge + clockSkewSeconds)
+        {
+            return $"the token was issued more than {maxAge} seconds ago";
+        }
+
         if (policy.MaxLifetimeSeconds is not { } maxLifetime)
         {
             return null;

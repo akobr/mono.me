@@ -30,6 +30,7 @@ public class TokenExchangeOptionsTests
         options.Actors.ShouldBeEmpty();
         options.TokenLifetimeMinutes.ShouldBe(10);
         options.MaxExchangesPerSubjectTokenPerMinute.ShouldBe(10);
+        options.MaxActorTokenAgeMinutes.ShouldBe(1440);
     }
 
     [Fact]
@@ -40,6 +41,7 @@ public class TokenExchangeOptionsTests
             [$"{Section}:Enabled"] = "true",
             [$"{Section}:TokenLifetimeMinutes"] = "15",
             [$"{Section}:MaxExchangesPerSubjectTokenPerMinute"] = "3",
+            [$"{Section}:MaxActorTokenAgeMinutes"] = "60",
             [$"{Section}:Actors:0:Id"] = "mcp",
             [$"{Section}:Actors:0:Authentication:WorkloadIdentity:Issuer"] = EntraV1Issuer,
             [$"{Section}:Actors:0:Authentication:WorkloadIdentity:Subject"] = "managed-identity-oid",
@@ -57,6 +59,7 @@ public class TokenExchangeOptionsTests
         options.Enabled.ShouldBeTrue();
         options.TokenLifetimeMinutes.ShouldBe(15);
         options.MaxExchangesPerSubjectTokenPerMinute.ShouldBe(3);
+        options.MaxActorTokenAgeMinutes.ShouldBe(60);
         options.Actors.Count.ShouldBe(2);
 
         var mcp = options.Actors[0];
@@ -185,6 +188,16 @@ public class TokenExchangeOptionsTests
     public void Validate_ExchangesPerSubjectToken_AreOneToSixtyAMinute(int exchanges, bool valid)
     {
         Validate(new TokenExchangeOptions { MaxExchangesPerSubjectTokenPerMinute = exchanges }).Succeeded.ShouldBe(valid);
+    }
+
+    [Theory]
+    [InlineData(4, false)]
+    [InlineData(5, true)]
+    [InlineData(1440, true)]
+    [InlineData(1441, false)]
+    public void Validate_ActorTokenAge_IsFiveMinutesToADay(int minutes, bool valid)
+    {
+        Validate(new TokenExchangeOptions { MaxActorTokenAgeMinutes = minutes }).Succeeded.ShouldBe(valid);
     }
 
     [Theory]
