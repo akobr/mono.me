@@ -28,7 +28,7 @@
             "type": "string",
             "pattern": "^[a-z0-9-]+(/[a-z0-9-]+)*\\.json$"
           },
-          "kind": { "type": "string", "enum": [ "flattening", "formats" ] }
+          "kind": { "type": "string", "enum": [ "flattening", "formats", "errors", "refresh" ] }
         }
       }
     }

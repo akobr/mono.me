@@ -106,6 +106,18 @@ public class SuiteTests
         schema.Validate(file).ShouldNotBeEmpty();
     }
 
+    // Each schema is self-contained, so the errors and the refresh schemas repeat the answer and the failure.
+    [Theory]
+    [InlineData("response")]
+    [InlineData("failure")]
+    public void TheSchemasOfErrorsAndRefresh_DefineTheSame(string definition)
+    {
+        var errors = ConformanceFiles.Read($"{ConformanceFiles.SchemaFolder}errors.schema.json")["definitions"]![definition];
+        var refresh = ConformanceFiles.Read($"{ConformanceFiles.SchemaFolder}refresh.schema.json")["definitions"]![definition];
+
+        JToken.DeepEquals(errors, refresh).ShouldBeTrue();
+    }
+
     [Theory]
     [MemberData(nameof(Files))]
     public void TheFile_NamesEveryItemOnce(string path)

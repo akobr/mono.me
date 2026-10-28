@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Storyteller refresh scenarios",
+  "description": "A file of kind refresh: a provider starts from one answer, then runs one refresh per step. Each step's response answers every request of its run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [ "description", "key", "scenarios" ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "description": { "type": "string", "minLength": 1 },
+    "key": {
+      "description": "The full key the runner reads, as STORYTELLER_KEY.",
+      "type": "string",
+      "pattern": "^@"
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/scenario" }
+    }
+  },
+  "definitions": {
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "name", "read", "start", "steps" ],
+      "properties": {
+        "name": { "description": "Unique within the file.", "type": "string", "minLength": 1 },
+        "read": {
+          "description": "effective reads …/configuration/{key}, resolved reads …/configuration/{key}/resolved.",
+          "type": "string",
+          "enum": [ "effective", "resolved" ]
+        },
+        "start": {
+          "description": "The answer to the startup read, and the flat keys the provider then has.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [ "response", "keys" ],
+          "properties": {
+            "response": { "$ref": "#/definitions/response" },
+            "keys": { "$ref": "#/definitions/keys" }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/step" }
+        }
+      }
+    },
+    "step": {
+      "description": "One refresh run: the platform answers with response, or does not answer within the provider's read timeout (timeout).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "expect" ],
+      "properties": {
+        "response": { "$ref": "#/definitions/response" },
+        "timeout": { "type": "boolean", "enum": [ true ] },
+        "expect": { "$ref": "#/definitions/expect" }
+      },
+      "oneOf": [
+        { "required": [ "response" ] },
+        { "required": [ "timeout" ] }
+      ]
+    },
+    "expect": {
+      "description": "refreshed: whether the run succeeded. keys: the complete flat keys after the run. notifications: the change notifications since the start, cumulative. ifNoneMatch: the tag the run's read sent, or null. error: the failure of the run, exactly when refreshed is false.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "refreshed", "keys", "notifications", "ifNoneMatch" ],
+      "properties": {
+        "refreshed": { "type": "boolean" },
+        "keys": { "$ref": "#/definitions/keys" },
+        "notifications": { "type": "integer", "minimum": 0 },
+        "ifNoneMatch": { "type": [ "string", "null" ] },
+        "error": { "$ref": "#/definitions/failure" }
+      },
+      "oneOf": [
+        { "properties": { "refreshed": { "enum": [ true ] } }, "not": { "required": [ "error" ] } },
+        { "properties": { "refreshed": { "enum": [ false ] } }, "required": [ "error" ] }
+      ]
+    },
+    "keys": {
+      "description": "The flat keys (target flat) with their raw text, compared by exact text.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "response": {
+      "description": "An answer of the platform. A json body is sent as compact JSON with Content-Type: application/json; charset=utf-8, a text body with Content-Type: text/plain; charset=utf-8; without either there is no body. The headers are sent as written.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "status" ],
+      "properties": {
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "json": { "description": "Any JSON value; an ErrorResponse leaves a field out rather than writing null." },
+        "text": { "type": "string" }
+      },
+      "not": { "required": [ "json", "text" ] }
+    },
+    "failure": {
+      "description": "status: the HTTP status the failure reports, null when no answer arrived or the failure is local. errorCode: the non-blank ErrorCode of the body, or null. transient: worth trying again later, so a provider falls back to its cache and keeps polling.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [ "status", "errorCode", "transient" ],
+      "properties": {
+        "status": { "type": [ "integer", "null" ] },
+        "errorCode": { "type": [ "string", "null" ] },
+        "transient": { "type": "boolean" }
+      }
+    }
+  }
+}
