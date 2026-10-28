@@ -90,6 +90,41 @@ public class MembersHttpTests
         access.Calls.ShouldBe(["set:acme.billing:user-2:Administrator:user-1"]);
     }
 
+    // An actor under NoSecretReveal may not give a member secret reads: a role from ContributorWithSecrets up is refused
+    // in every build, before the service is asked; lower roles pass, and so does every role without the restriction.
+    [Theory]
+    [InlineData(AccountRole.ContributorWithSecrets)]
+    [InlineData(AccountRole.Administrator)]
+    [InlineData(AccountRole.Owner)]
+    public async Task SetMemberRole_ARoleThatReadsSecrets_ThroughARestrictedActor_IsActorRestricted(AccountRole role)
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+        var body = FunctionTestDoubles.ToJsonBody(new MemberRoleUpdate { Role = role });
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.SetMemberRole(UserRequest(body, restricted: true), "acme.billing", "user-2"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        access.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(AccountRole.Reader, true)]
+    [InlineData(AccountRole.Contributor, true)]
+    [InlineData(AccountRole.ContributorWithSecrets, false)]
+    [InlineData(AccountRole.Owner, false)]
+    public async Task SetMemberRole_ALowerRoleThroughARestrictedActor_OrAnyRoleWithoutIt_IsSet(AccountRole role, bool restricted)
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+        var body = FunctionTestDoubles.ToJsonBody(new MemberRoleUpdate { Role = role });
+
+        var result = await http.SetMemberRole(UserRequest(body, restricted: restricted), "acme.billing", "user-2");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Calls.ShouldBe([$"set:acme.billing:user-2:{role}:user-1"]);
+    }
+
     [Fact]
     public async Task RemoveMember_ReturnsNoContent()
     {
@@ -270,8 +305,9 @@ public class MembersHttpTests
             authOptions: Options.Create(new UserAuthenticationOptions { Provider = provider }));
     }
 
-    // A user's request; a body goes as JSON, with its content type unless contentType is false.
-    private static TestHttpRequestData UserRequest(string? body = null, bool contentType = true, string userId = "user-1")
+    // A user's request; a body goes as JSON, with its content type unless contentType is false. Restricted makes it a
+    // call through an actor under NoSecretReveal.
+    private static TestHttpRequestData UserRequest(string? body = null, bool contentType = true, string userId = "user-1", bool restricted = false)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
         var headers = body is not null && contentType ? FunctionTestDoubles.JsonContentType() : null;
@@ -283,6 +319,13 @@ public class MembersHttpTests
             new("name", "Ada"),
             new("scp", Scopes.User.Impersonation),
         };
+
+        if (restricted)
+        {
+            context.Items[FunctionContextItemKeys.DelegatedActor] = "mcp";
+            context.Items[FunctionContextItemKeys.DelegatedRestrictions] = new[] { ActorRestrictions.NoSecretReveal };
+        }
+
         return request;
     }
 
