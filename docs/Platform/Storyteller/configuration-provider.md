@@ -181,7 +181,7 @@ The first `Load()` of a source runs the startup read. It blocks the caller, runs
 | Definitive | `400`, `401`, `403`, `404` (with or without a body, `AnnotationDeleted` included), `422`, `501`, `505`, a redirect (never followed), and any other `4xx`; a credential failure with the reason `Configuration` or `Rejected`; an invalid document; any other resolver failure |
 | Withheld | `X-2S-Secrets-Withheld` on a resolved read, handled as definitive |
 
-Every failure is a `StorytellerConfigurationException` with `Key`, `StatusCode`, `ErrorCode` (from the platform's `ErrorResponse`), `IsTransient`, and the inner exception. Messages name the key, the status and the fix, never a secret.
+Every failure is a `StorytellerConfigurationException` with `Key`, `StatusCode`, `ErrorCode` (from the platform's `ErrorResponse`), `IsTransient`, and the inner exception. Messages name the key, the status and the fix, never a secret. `conformance/errors.json` in the [conformance suite](conformance.md) pins the mapping of each answer, at the startup and at a refresh, for the providers of every language.
 
 - **Withheld secrets fail loudly.** The platform sends the header to a machine with `Secrets.Read` that presented no certificate, under a project policy that delivers secrets only over mTLS. The header depends on the caller, not on the document, so such a machine fails even on a document without secrets. The message names the fix: present the machine certificate (`STORYTELLER_CLIENT_CERTIFICATE`), or remove `Secrets.Read` from the machine.
 - **Unbound bindings.** A machine without `Secrets.Read` gets secret bindings as their `@…` expressions, without the header. In `Resolved` mode the provider logs one warning per applied document, with the count and up to 20 JSON paths of the strings that start with `@`, never their values. The strings are applied as written.
@@ -220,6 +220,7 @@ A run is the startup, a timer refresh, a `TryRefreshAsync` or a switch. Runs nev
 - **No change.** A `200` with a new tag but the same keys and values reloads nothing.
 - **Failures** keep the applied document, log a warning without values, and count in the [status](#status).
 - **Notifications** run one at a time, so a reload error belongs to the document of its notification.
+- **The portable contract.** `conformance/refresh.json` in the [conformance suite](conformance.md) pins what any provider shows across refresh runs: the keys, the notifications, the tag it sends, and the failure of a run. The provider's tests run it with `TryRefreshAsync`.
 
 ### A document that does not bind
 

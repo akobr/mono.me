@@ -1,0 +1,188 @@
+name: Storyteller SDK release
+run-name: ${{ inputs.publish && 'Publish' || 'Pack' }} the Storyteller SDKs (${{ inputs.packages }})
+
+# Releases the Storyteller SDKs once the conformance suite passes on the same commit: the NuGet packages of the .NET
+# configuration provider and the packages it depends on, and the npm package of the TypeScript SDK. The packages are
+# packed once, after the gate, and the publish jobs push exactly those files. Without publish the run is a dry run that
+# uploads the packages as an artifact. Spec: docs/Platform/Storyteller/specs/2026-10-28 Shared Conformance Vectors for
+# Configuration Providers and SDKs.md, section 8.
+on:
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: The packages to release
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - nuget
+          - npm
+      publish:
+        description: Publish to nuget.org and npm; without it, pack only
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: storyteller-sdk-release
+  cancel-in-progress: false
+
+# The token of this run only reads this repository; the registries are written with the secrets NUGET_API_KEY and
+# NPM_TOKEN of the environment storyteller-sdk, which only the publish jobs use.
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  SDK_DIR: src/Platform/Storyteller/sdk.typescript/src
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  conformance:
+    name: Conformance
+    uses: ./.github/workflows/storyteller-conformance.yml
+
+  pack:
+    name: Pack
+    needs: conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Inputs reach the scripts only through env:, never as ${{ }} in a script.
+    env:
+      PACKAGES: ${{ inputs.packages }}
+      PUBLISH: ${{ inputs.publish }}
+    steps:
+      - name: Check the run
+        run: |
+          if [ "$PUBLISH" = true ] && [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::The SDKs are published from main only; run the workflow from main, or without publish for a dry run."
+            exit 1
+          fi
+
+      # The whole history: the versioning computes the public version of main from it.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        if: inputs.packages != 'npm'
+        with:
+          global-json-file: global.json
+
+      # The configuration provider and every package it depends on, released together. The Hosting packages join the
+      # list when they reach main.
+      - name: Pack the NuGet packages
+        if: inputs.packages != 'npm'
+        run: |
+          for project in Abstractions.Annotations KeyValues.ClientEncryption Sdk.NSwag ConfigurationFormats Configuration Configuration.KeyVault; do
+            dotnet pack "src/Platform/Storyteller/$project/src/$project.csproj" -c Release -p:ContinuousIntegrationBuild=true -o out/nuget
+          done
+
+          ls -l out/nuget
+
+      - uses: actions/setup-node@v4
+        if: inputs.packages != 'nuget'
+        with:
+          node-version-file: src/Platform/Storyteller/sdk.typescript/src/.nvmrc
+          cache: npm
+          cache-dependency-path: src/Platform/Storyteller/sdk.typescript/src/package-lock.json
+
+      - name: npm 11
+        if: inputs.packages != 'nuget'
+        run: npm install --global npm@11
+
+      # The version follows the OpenAPI document, and a published version is never replaced.
+      - name: Pack the npm package
+        if: inputs.packages != 'nuget'
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          npm ci
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+
+          if [ "$PUBLISH" = true ] && npm view "$name@$version" version > /dev/null 2>&1; then
+            echo "::error::$name@$version is on npm already; generate the SDK from a newer OpenAPI document before the release."
+            exit 1
+          fi
+
+          npm run build
+          mkdir -p "$GITHUB_WORKSPACE/out/npm"
+          npm pack --pack-destination "$GITHUB_WORKSPACE/out/npm"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storyteller-sdk-packages
+          path: out/
+          if-no-files-found: error
+
+  publish-nuget:
+    name: Publish to nuget.org
+    needs: pack
+    if: inputs.publish && inputs.packages != 'npm'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: storyteller-sdk
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: storyteller-sdk-packages
+          path: out
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # --skip-duplicate: a run that failed half-way can run again.
+      - name: Push the packages
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "::error::Set the secret NUGET_API_KEY of the environment storyteller-sdk to a nuget.org API key that may push the 42.Platform.Storyteller.* packages."
+            exit 1
+          fi
+
+          dotnet nuget push "out/nuget/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+
+  publish-npm:
+    name: Publish to npm
+    needs: pack
+    if: inputs.publish && inputs.packages != 'nuget'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: storyteller-sdk
+    steps:
+      # Only for the Node version of the SDK; the package is the packed file.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: storyteller-sdk-packages
+          path: out
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/Platform/Storyteller/sdk.typescript/src/.nvmrc
+          registry-url: https://registry.npmjs.org
+
+      - name: npm 11
+        run: npm install --global npm@11
+
+      - name: Publish the package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::Set the secret NPM_TOKEN of the environment storyteller-sdk to an npm token that may publish @42for.net/2splatform.sdk."
+            exit 1
+          fi
+
+          npm publish out/npm/*.tgz --access public

@@ -193,7 +193,7 @@ features:
 
 ## Test vectors
 
-Four files of the [conformance suite](conformance.md), in `src/Platform/Storyteller/conformance/`, pin the rules in a shape that an implementation in another language can reuse. Each has a `$schema` and a `description` and `vectors`, every vector a `name` and a `document`, the `Content` object; a flattening file also names its `target`. The library's tests (`ConfigurationFormats/test`) embed and run all of them, read as the SDK reads a body (date-like strings stay strings, numbers are doubles).
+Four files of the [conformance suite](conformance.md), in `src/Platform/Storyteller/conformance/`, pin the rules in a shape that an implementation in another language can reuse. Each has a `$schema` and a `description` and `vectors`, every vector a `name` and a `document`, the `Content` object; a flattening file also names its `target`. The library's tests (`ConfigurationFormats/test`) embed and run all of them, read as the SDK reads a body (date-like strings stay strings, numbers are doubles). The TypeScript SDK runs the flattening files through `flattenConfiguration`, and the `flat` and `env` vectors of `formats.json` through `formatConfiguration`.
 
 | File | Target | Vectors | Each vector has |
 | --- | --- | --- | --- |

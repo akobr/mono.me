@@ -248,7 +248,7 @@ if (!result.notModified) {
 }
 ```
 
-A timeout of `AbortSignal.timeout` rejects with a `TimeoutError`, not an `AbortError`, so it surfaces like a network failure: `StorytellerError` with `status: 0`, the "not reachable" message and `aborted: false`. A poller treats it as transient and tries again with the same tag.
+A timeout of `AbortSignal.timeout` rejects with a `TimeoutError`, not an `AbortError`, so it surfaces like a network failure: `StorytellerError` with `status: 0`, the "not reachable" message and `aborted: false`. A poller treats it as transient and tries again with the same tag. `isTransientError(error)` classifies a failure as the .NET configuration provider does (see [Configuration formats and errors](#configuration-formats-and-errors)).
 
 `ifNoneMatch` overrides an `If-None-Match` in `options.headers`; an empty `ifNoneMatch` removes it, and an `undefined` one leaves it as it is. An error status throws `StorytellerError`, as the fetcher does (an empty `404` for a missing configuration; a `422` with the `errorCode` `binding.evaluation` or `binding.limit.<kind>` for a binding of the resolved read that fails, or `format.<rule>` for a [format](#formatted-reads) that cannot write the document).
 
@@ -283,3 +283,31 @@ if (!result.notModified) {
 ## User token exchange
 
 The generated `exchangeUserToken` posts the RFC 8693 exchange of an actor, such as the MCP server, to `POST /v1/access/token`: the person's token for the actor (`subject_token`), the actor's id (`client_id`) and its proof (`actor_token`, `client_assertion`, or `client_secret` in Development) give a short-lived Storyteller user token that names the person and the actor, with the actor's `restrictions`. Like `exchangeMachineToken`, it goes through the configured fetcher, which adds `Authorization` whenever `getAccessToken` returns a token, and the endpoint refuses that with `invalid_request`. Call it only while `getAccessToken` returns nothing, with `{ redirect: 'error' }` as its options (the subject token is in the body), or post the form with plain `fetch`. `getAuthorizationServerMetadata` (RFC 8414) and `getJsonWebKeySet` read the issuer's metadata and signing keys, which are anonymous routes, but they go through the configured fetcher as well, which attaches a bearer token whenever `getAccessToken` returns one. To keep these reads clear of authentication middleware (an expired or foreign token, or a fetcher that refreshes tokens first), call them while `getAccessToken` returns no token, or read `/.well-known/oauth-authorization-server` and `/.well-known/jwks.json` under the API base URL with plain `fetch`.
+## Configuration formats and errors
+
+`lib/configuration-formats.ts` flattens and formats the `Content` of a configuration locally, with the rules of the .NET library `ConfigurationFormats` and of the API's `?format=` (`docs/Platform/Storyteller/configuration-formats.md`). It is a different contract from the key/value helpers above, which keep dotted keys, write arrays as JSON and null as `''`:
+
+| Helper | Purpose |
+| --- | --- |
+| `flattenConfiguration(content, target)` | The keys and raw values of a target, in document order: `flat` (the default, `db:hosts:0`), `properties` (`db.hosts[0]`) or `env` (`DB__HOSTS__0`) |
+| `formatConfiguration(content, format)` | The exact text of `flat` or `env`, as `?format=` writes it; the API also renders `properties` and `yaml` |
+| `InvalidDocumentError` | A document the target cannot hold: `rule` (`colon-in-name`, `case-collision`, `bracket-in-name`, `array-gap`, `invalid-env-name`, …) and the JSON `path`; the message never holds a value |
+| `isTransientError(error)` | A network failure, `408`, `424`, `429`, a `5xx` other than `501` and `505`, or an unexpected `2xx`: keep the last document and poll again. Any other status gets the same answer again |
+
+```ts
+import { flattenConfiguration, formatConfiguration, getResolvedConfigurationConditional, isTransientError } from '@42for.net/2splatform.sdk'
+
+try {
+  const result = await getResolvedConfigurationConditional('acme', 'billing', 'default', 'exe.billing.api.prod')
+  const keys = flattenConfiguration(result.value?.Content, 'env')   // { DB__HOST: 'db.local', DB__PORT: '5432' }
+  const dotenv = formatConfiguration(result.value?.Content, 'env')   // 'DB__HOST=db.local\nDB__PORT=5432\n'
+} catch (error) {
+  if (!isTransientError(error)) {
+    throw error                                                       // a wrong key, a refused credential, an invalid document
+  }
+}
+```
+
+A number is its text as .NET writes it: `5432`, `0.5`, `1E+20`. JavaScript cannot tell `1.0` from `1` or hold an integer beyond 2^53, so such numbers can differ from the .NET text.
+
+`test/conformance` runs the shared [conformance suite](../conformance/README.md) (`src/Platform/Storyteller/conformance`): the flattening vectors of every target, the `flat` and `env` vectors of `formats.json`, and the error-mapping vectors through the conditional reads. `npx vitest run test/conformance` runs only these; `npm test` runs them with the rest.
