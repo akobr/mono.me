@@ -79,7 +79,9 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = new PartitionKey($"{project}.access");
 
-        // A concurrent write to another field (a certificate renewal) only moves the ETag, so one retry suffices.
+        // A concurrent write to another field (a certificate renewal) only moves the ETag, so a few retries suffice.
+        const int maxAttempts = 3;
+
         for (var attempt = 1; ; attempt++)
         {
             var machineAccess = await repository.Container.TryReadItemAsync(
@@ -102,7 +104,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
                 machineAccessId,
                 partitionKey,
                 [PatchOperation.Set($"/{nameof(MachineAccessEntity.HashedSecret)}", newHashedSecret)],
-                new PatchItemRequestOptions { IfMatchEtag = machineAccess.ETag });
+                new PatchItemRequestOptions { IfMatchEtag = machineAccess.ETag, EnableContentResponseOnWrite = false });
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -111,7 +113,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
 
             if (response.StatusCode == HttpStatusCode.PreconditionFailed)
             {
-                if (attempt > 1)
+                if (attempt >= maxAttempts)
                 {
                     throw new ConflictException($"The machine access {machineAccessId} was changed concurrently; reload and retry.");
                 }

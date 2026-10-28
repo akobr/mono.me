@@ -612,7 +612,8 @@ public class CosmosAccessService : IAccessService
         using var response = await repository.Container.PatchItemStreamAsync(
             appId,
             partitionKey,
-            [PatchOperation.Set($"/{nameof(MachineAccessEntity.AccessKey)}", maskedKey)]);
+            [PatchOperation.Set($"/{nameof(MachineAccessEntity.AccessKey)}", maskedKey)],
+            new PatchItemRequestOptions { EnableContentResponseOnWrite = true });
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {

@@ -401,7 +401,7 @@ public class MachineResetTests(CosmosFixture fixture)
 
         await Should.ThrowAsync<ConflictException>(() => hashStore.ReplaceAsync(Organization, Project, machine.Id, stored!.HashedSecret, "new-hash"));
 
-        statuses.ShouldBe([HttpStatusCode.PreconditionFailed, HttpStatusCode.PreconditionFailed]);
+        statuses.ShouldBe([HttpStatusCode.PreconditionFailed, HttpStatusCode.PreconditionFailed, HttpStatusCode.PreconditionFailed]);
         (await HashStore.GetAsync(Organization, Project, machine.Id))!.HashedSecret.ShouldBe(stored!.HashedSecret);
     }
 
