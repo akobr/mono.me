@@ -1,0 +1,125 @@
+name: Storyteller conformance
+
+# The conformance suite of the configuration providers and SDKs, src/Platform/Storyteller/conformance: the .NET
+# reference (the formats library and the provider, with all their tests) on Linux and Windows, and the TypeScript SDK,
+# on the same commit. The SDK release calls it as its gate. Spec: docs/Platform/Storyteller/specs/2026-10-28 Shared
+# Conformance Vectors for Configuration Providers and SDKs.md, section 7.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/Platform/Storyteller/conformance/**
+      - src/Platform/Storyteller/Abstractions.Annotations/**
+      - src/Platform/Storyteller/Configuration/**
+      - src/Platform/Storyteller/ConfigurationFormats/**
+      - src/Platform/Storyteller/KeyValues.ClientEncryption/**
+      - src/Platform/Storyteller/Sdk.NSwag/**
+      - src/Platform/Storyteller/sdk.typescript/**
+      - src/Libraries/Testing/System.IO.Abstractions.Trace/**
+      - src/.stylecop/**
+      - src/Platform/version.json
+      - Directory.Build.props
+      - Directory.Packages.props
+      - global.json
+      - nuget.config
+      - stylecop.json
+      - version.json
+      - .github/workflows/storyteller-conformance.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/Platform/Storyteller/conformance/**
+      - src/Platform/Storyteller/Abstractions.Annotations/**
+      - src/Platform/Storyteller/Configuration/**
+      - src/Platform/Storyteller/ConfigurationFormats/**
+      - src/Platform/Storyteller/KeyValues.ClientEncryption/**
+      - src/Platform/Storyteller/Sdk.NSwag/**
+      - src/Platform/Storyteller/sdk.typescript/**
+      - src/Libraries/Testing/System.IO.Abstractions.Trace/**
+      - src/.stylecop/**
+      - src/Platform/version.json
+      - Directory.Build.props
+      - Directory.Packages.props
+      - global.json
+      - nuget.config
+      - stylecop.json
+      - version.json
+      - .github/workflows/storyteller-conformance.yml
+  workflow_dispatch:
+  # The gate of storyteller-sdk-release.yml; path filters do not apply to a call.
+  workflow_call:
+
+# Under workflow_call the context is the caller's, so the group differs from the caller's own and a release never
+# cancels its gate; only a newer push to a pull request cancels a run.
+concurrency:
+  group: storyteller-conformance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  SDK_DIR: src/Platform/Storyteller/sdk.typescript/src
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  dotnet:
+    name: .NET reference (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      # The whole history: the versioning of the build fails on a shallow clone.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # The whole test projects: the vectors run in them, and this is the repository's .NET test job.
+      - name: Configuration formats – flattening and format vectors
+        run: dotnet test src/Platform/Storyteller/ConfigurationFormats/test/ConfigurationFormats.UnitTests.csproj
+
+      - name: Configuration provider – suite, error and refresh vectors
+        run: dotnet test src/Platform/Storyteller/Configuration/test/Configuration.UnitTests.csproj
+
+  typescript:
+    name: TypeScript SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/Platform/Storyteller/sdk.typescript/src/.nvmrc
+          cache: npm
+          cache-dependency-path: src/Platform/Storyteller/sdk.typescript/src/package-lock.json
+
+      - name: npm 11
+        run: npm install --global npm@11
+
+      # The runners in test/conformance read the suite from the repository.
+      - name: Type-check and test
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          npm ci
+          npm run typecheck
+          npm test

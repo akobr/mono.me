@@ -441,7 +441,7 @@ The rules port from the .NET library:
 - **Paths** follow `JsonPaths`: `.name` for plain names, otherwise `['name']`, with `\` and `'` escaped, C0 controls and DEL as `\n`, `\r`, `\t` or `\uXXXX` (upper-case hex), and `#` as `#`.
 - **Output.** The output record has a null prototype, so a `__proto__` name is a plain key.
 - **`formatConfiguration`** first canonicalizes the content as `ConfigurationFormatter.Canonicalize` does: an unpaired surrogate in a name or a string becomes U+FFFD (`String.prototype.toWellFormed`). Then it renders:
-  - `flat`: `{}` and LF for an empty document. Otherwise `{`, one `  "key": "value"` line per leaf joined with `,` and LF, then `}` and LF, with Newtonsoft's default escaping. That is `JSON.stringify`'s escaping plus `\u0085`, ` ` and ` `, which Newtonsoft also escapes.
+  - `flat`: `{}` and LF for an empty document. Otherwise `{`, one `  "key": "value"` line per leaf joined with `,` and LF, then `}` and LF, with Newtonsoft's default escaping. That is `JSON.stringify`'s escaping plus `\u0085`, `\u2028` and `\u2029`, which Newtonsoft also escapes.
   - `env`: `NAME=value` and LF per leaf. A value of bare characters is left as it is. A value is single-quoted when it has no `'`, `\`, CR or LF; otherwise it is double-quoted with `\\`, `\"`, `\n`, `\r` and `\t`.
 
   `properties` and `yaml` text stay .NET-only, and `formatConfiguration` does not accept them. The issue asks for `.env` and flat JSON helpers, and the API renders all four formats anyway (`getConfigurationFormattedConditional`).
