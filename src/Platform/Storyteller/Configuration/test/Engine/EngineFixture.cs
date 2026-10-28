@@ -29,7 +29,7 @@ internal sealed class EngineFixture : IDisposable
 
     public FakeTimeProvider Time { get; }
 
-    public MockFileSystem FileSystem { get; } = new();
+    public MockFileSystem FileSystem { get; } = new UnixModeMockFileSystem();
 
     public RecordingLoggerFactory Logs { get; } = new();
 
