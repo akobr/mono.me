@@ -183,7 +183,13 @@ Every credential works with every provider; the samples show one each.
 | `Mcp:SecretTools:Enabled` | no | `false` (default) leaves out the [tools that return secrets](#tools-that-return-secrets). |
 | `Storyteller:BaseUrl` | yes | The API base URL with `/api`, no trailing slash. HTTPS outside Development. The exchange goes to `{Storyteller:BaseUrl}/v1/access/token`. |
 
-Settings are validated at start; a missing or wrong value stops the host. `Mcp:Actor` takes exactly one credential, and a credential counts as set when any of its values is, so a half-filled block is reported rather than ignored. `Mcp:EntraId:*` and `Storyteller:Scopes` of the on-behalf-of version are no longer read.
+Settings are validated at start; a missing or wrong value stops the host. `Mcp:Actor` takes exactly one credential, and a credential counts as set when any of its values is, so a half-filled block is reported rather than ignored. `Mcp:EntraId:*` and `Storyteller:Scopes` of the on-behalf-of version are no longer read and do not stop the host, so move them before an upgrade:
+
+| Before (on-behalf-of) | Now |
+| --- | --- |
+| `Mcp:EntraId:TenantId`, `ClientId`, `Audience`, `Scope`, `AllowedClientIds:*` | `Mcp:Authentication:TenantId`, `ClientId`, `Audience`, `Scope`, `AllowedClientIds:*`, with `Mcp:Provider` `EntraId` |
+| `Mcp:EntraId:ClientSecret`, `CertificatePath`, `CertificatePassword`, `UseManagedIdentity`, `ManagedIdentityClientId` (credentials of the MCP app at Entra ID) | Removed. The server proves itself to the API as an actor: `Mcp:Actor:Id` and one credential of `Mcp:Actor` (a workload identity, a client assertion key, or a client secret in Development), registered in the API's `Auth:TokenExchange:Actors` (see [Registering the actor in the API](#registering-the-actor-in-the-api)) |
+| `Storyteller:Scopes:*` | Removed. The API grants the actor's `Scopes` (`User.Impersonation` by default); `Storyteller` keeps only `BaseUrl` |
 
 ## Local development
 
