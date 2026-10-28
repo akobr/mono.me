@@ -72,6 +72,7 @@ public static class EntryPoint
         services.AddSingleton<ActorAuthenticator>();
         services.AddSingleton<UserTokenExchangeService>();
         services.AddSingleton<IUserTokenExchange>(provider => provider.GetRequiredService<UserTokenExchangeService>());
+        services.AddHostedService<TokenExchangeActorNotice>();
         return services;
     }
 }

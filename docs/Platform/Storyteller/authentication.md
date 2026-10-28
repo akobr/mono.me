@@ -709,7 +709,7 @@ An actor, `Auth:TokenExchange:Actors:{n}`:
 | `Authentication:ClientAssertion:JwksUri` | one proof | | A [client assertion](#actors-and-their-proof). An HTTPS URL; needs `MachineAuth:Federation:PublicBaseUrl`. |
 | `Authentication:ClientSecretHash` | one proof | | A [client secret](#actors-and-their-proof): the hex SHA-256 hash of the secret, 64 digits. `Development` only. |
 | `SubjectAudiences:*` | yes | | The audiences of the tokens issued to the actor: the subject token's `aud` must be one of them. At least one and none blank. None may be the API's own audience (`api://{Auth:ClientId}`, `{Auth:ClientId}`, `Auth:AuthKit:Audience` or `Auth:Keycloak:Audience`, compared ignoring case and a trailing `/`): a token issued for the API would become exchangeable, and the API would refuse its own users' tokens. |
-| `AllowedClientIds:*` | no | none | The clients the subject token may be issued to (`azp`, `appid` or `client_id`). Empty: any client. No blank entries. |
+| `AllowedClientIds:*` | no | none | The clients the subject token may be issued to (`azp`, `appid` or `client_id`). Empty: any client, and while the exchange is on the API logs a warning at start that names the actor and its `SubjectAudiences`. No blank entries. |
 | `Scopes:*` | no | `User.Impersonation` | The most an issued token carries. Storyteller scopes only, and it must contain `User.Impersonation`. |
 | `Restrictions:*` | no | none | [Restrictions](#restrictions-of-actors) on top of the default. Known values only. |
 | `AllowSecrets` | no | `false` | `true` removes `NoSecretReveal` from the defaults. Refused together with `NoSecretReveal` in `Restrictions`. |
