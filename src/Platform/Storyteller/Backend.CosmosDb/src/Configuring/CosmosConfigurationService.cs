@@ -351,14 +351,8 @@ public partial class CosmosConfigurationService : IConfigurationService
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationHistoryEntity>(_serializerOptions));
 
-        if (versionEntity is not null)
-        {
-            return versionEntity.ToConfiguration();
-        }
-
-        return configEntity is not null && configEntity.Version == version
-            ? configEntity.ToConfigurationFromContent()
-            : null;
+        // a cache row is no stored version, so it gives no content
+        return versionEntity?.ToConfiguration();
     }
 
     public Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint version)

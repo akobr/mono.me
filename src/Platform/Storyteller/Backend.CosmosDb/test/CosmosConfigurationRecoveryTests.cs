@@ -422,12 +422,28 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         await Configurations.GetRawConfigurationAsync(unit);
         (await ReadRowAsync(unit))["Version"]!.Value<ulong>().Should().Be(0);
         (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(new uint[] { 1, 2 }, "a cache row is no version");
+        (await Configurations.GetConfigurationVersionContentAsync(unit, 0)).Should().BeNull("a cache row has no stored content");
 
         var patched = await Configurations.PatchConfigurationAsync(unit, JArray.Parse("""[{ "op": "add", "path": "/u", "value": 3 }]"""), AuditActor.System);
 
         patched.Version.Should().Be(3);
         (await HasItemAsync(unit, HistoryId(unit, 0))).Should().BeFalse();
         (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(1U, 2U, 3U);
+    }
+
+    [Fact]
+    public async Task CacheRow_OfANeverWrittenConfiguration_HasNoVersion()
+    {
+        var (responsibility, unitOfExecution) = await CreateTreeAsync("rec-cache-only");
+        var unit = FullKey.Create(unitOfExecution.Annotation.GetUnitKey(), unitOfExecution);
+        await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+
+        // the read caches the inherited document in a row of version 0
+        await Configurations.GetRawConfigurationAsync(unit);
+        (await HasItemAsync(unit, RowId(unit))).Should().BeTrue();
+
+        (await Configurations.GetConfigurationVersionsAsync(unit)).Should().BeEmpty();
+        (await Configurations.GetConfigurationVersionContentAsync(unit, 0)).Should().BeNull();
     }
 
     [Theory]
