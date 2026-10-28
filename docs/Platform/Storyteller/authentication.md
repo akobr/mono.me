@@ -546,7 +546,7 @@ A refused actor answers `400 invalid_client` with "The actor is not known or its
 | `client_assertion`, `client_assertion_type` | The proof of a `ClientAssertion` actor, of type `urn:ietf:params:oauth:client-assertion-type:jwt-bearer`. Each needs the other. |
 | `client_secret` | The proof of a `ClientSecretHash` actor, in the `Development` environment only. |
 | `audience`, `resource` | Optional and repeatable. Every value must equal `MachineAuth:Federation:Audience`, otherwise `invalid_target`. They name the Storyteller token's audience, not the subject token's; leave them out. |
-| `scope` | Optional: scopes separated by single spaces. The token gets those of them that are among the actor's `Scopes`, and the others are dropped; without it, the token gets all of the actor's. The result must contain `User.Impersonation`, otherwise `invalid_scope`. |
+| `scope` | Optional: scopes separated by single spaces. The token gets those of them that are among the actor's `Scopes`, and the others are dropped and logged by name at `Information`; without it, the token gets all of the actor's. The result must contain `User.Impersonation`, otherwise `invalid_scope`. |
 | `requested_token_type` | Optional: only `urn:ietf:params:oauth:token-type:access_token`; anything else answers `invalid_request`. |
 
 Any other parameter given twice answers `invalid_request`. A parameter with an empty value counts as absent.
