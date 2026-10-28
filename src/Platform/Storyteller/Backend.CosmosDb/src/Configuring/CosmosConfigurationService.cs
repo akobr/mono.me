@@ -1405,7 +1405,23 @@ public partial class CosmosConfigurationService : IConfigurationService
     // A failed invalidation keeps every token, a later request finishes it.
     private async Task InvalidateAndCompleteAsync(FullKey key, IContainerRepository repository, string? rowToken, IReadOnlyCollection<PendingClear> clears)
     {
-        await InvalidateConfigurationsAsync(key, repository);
+        try
+        {
+            await InvalidateConfigurationsAsync(key, repository);
+        }
+        catch (Exception exception)
+        {
+            // until the next write request on the configuration finishes it, descendants keep their cached documents
+            _logger.LogWarning(
+                exception,
+                "The cache invalidation of the configuration {AnnotationKey} in {Organization}/{Project}/{View} failed and stays pending.",
+                key.Annotation.ToString(),
+                key.OrganizationName,
+                key.ProjectName,
+                key.ViewName);
+            throw;
+        }
+
         var partitionKey = key.GetCosmosPartitionKey();
 
         if (rowToken is not null)
