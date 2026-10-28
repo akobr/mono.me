@@ -838,7 +838,7 @@ The SDKs read both with `GetAuthorizationServerMetadataAsync` and `GetJsonWebKey
 - **No leaks in refusals.** A refused actor or subject token gets one fixed text; the reasons go to the logs, never with tokens. An unknown actor and a bad proof answer alike.
 - **Who adds trust.** Actors and additional issuers are deployment settings, so only operators add them. Projects keep their own [trusted issuers](#trusted-issuers), for machines only, and Storyteller's own issuer cannot be one of them.
 - **Restrictions** run in every build, and tightening an actor reaches the tokens already issued (see **Revocation** in [Storyteller user tokens](#storyteller-user-tokens)).
-- **What `NoSecretReveal` leaves open.** A person who may write secrets can, through the actor, still learn whether a guessed value equals the stored one: an import, also as a dry run, reports such an item as `Unchanged`.
+- **No equality oracle under `NoSecretReveal`.** A caller who may write secrets but not read them, such as a person through the actor, never has a secret compared with the stored value: a set of the same secret writes a new version, and an import, also as a dry run, reports such an item as `Update`, never `Unchanged`. Public values keep the comparison.
 
 ## Machine authentication policy
 
