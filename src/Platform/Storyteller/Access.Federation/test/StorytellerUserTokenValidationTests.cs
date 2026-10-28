@@ -22,7 +22,7 @@ public sealed class StorytellerUserTokenValidationTests
     private readonly ManualTimeProvider _time = new(DateTimeOffset.FromUnixTimeSeconds(1_793_000_000));
     private readonly CountingSigningKeyStore _store = new();
     private readonly FederationOptions _options = new() { Issuer = Issuer, Audience = Audience };
-    private readonly TokenExchangeOptions _exchangeOptions = new() { Enabled = true, Actors = [new TokenExchangeActorOptions { Id = ActorId }] };
+    private readonly TokenExchangeOptions _exchangeOptions = new() { Enabled = true, Actors = [new TokenExchangeActorOptions { Id = ActorId, Scopes = [UserScopes.Impersonation, "Annotation.Read"] }] };
     private readonly RecordingLogger<StorytellerTokenValidator> _logger = new();
     private readonly TokenSigningKeyProvider _keyProvider;
     private readonly StorytellerTokenIssuer _issuer;
@@ -146,6 +146,29 @@ public sealed class StorytellerUserTokenValidationTests
 
         result.ShouldNotBeNull().Claims.Where(claim => claim.Type == "scp").Select(claim => claim.Value)
             .ShouldBe([UserScopes.Impersonation, "Annotation.Read"]);
+    }
+
+    // The token's scopes count only within those the actor may carry now, as its restrictions count with the actor's:
+    // a scope taken from the actor leaves its tokens at once, and one the actor never had is dropped.
+    [Fact]
+    public async Task Scope_IsNarrowedToTheScopesTheActorHasNow()
+    {
+        var payload = UserPayload();
+        payload["scope"] = "User.Impersonation Annotation.Read Configuration.Read";
+
+        var full = await _validator.ValidateAsync(await SignAsync(payload));
+        full.ShouldNotBeNull().Claims.Where(claim => claim.Type == "scp").Select(claim => claim.Value)
+            .ShouldBe([UserScopes.Impersonation, "Annotation.Read"]);
+
+        _exchangeOptions.Actors[0].Scopes = [];
+        var narrowed = await _validator.ValidateAsync(await SignAsync(payload));
+        narrowed.ShouldNotBeNull().Claims.Where(claim => claim.Type == "scp").Select(claim => claim.Value)
+            .ShouldBe([UserScopes.Impersonation]);
+
+        _exchangeOptions.Actors[0].Scopes = ["Annotation.Read"];
+        var withoutImpersonation = await _validator.ValidateAsync(await SignAsync(payload));
+        withoutImpersonation.ShouldNotBeNull().Claims.Where(claim => claim.Type == "scp").Select(claim => claim.Value)
+            .ShouldBe(["Annotation.Read"], "without User.Impersonation the token simply carries fewer scopes");
     }
 
     // The actor is matched ordinally, like the exchange matches client_id.

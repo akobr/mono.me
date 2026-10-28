@@ -324,7 +324,11 @@ public class StorytellerTokenValidator : IUserTokenIssuerValidator
         var enforced = restrictions.Union(actor.GetRestrictions(), StringComparer.Ordinal).ToArray();
         var claims = new List<Claim> { new("sub", accountId) };
 
-        foreach (var value in scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal))
+        // Likewise the token's scopes within those the actor may carry now: a scope taken from the actor leaves its tokens
+        // at once. Without User.Impersonation the token no longer acts for the user, and the routes refuse it as usual.
+        var allowed = actor.GetScopes();
+
+        foreach (var value in scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).Where(value => allowed.Contains(value, StringComparer.Ordinal)))
         {
             claims.Add(new Claim("scp", value));
         }
