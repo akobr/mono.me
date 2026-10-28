@@ -309,7 +309,8 @@ public partial class CosmosConfigurationService : IConfigurationService
             .Select(entity => entity.ToConfigurationVersion())
             .ToList();
 
-        if (configuration is not null)
+        // a cache row (version 0, no content) only caches the effective document, it is no version
+        if (configuration is not null && IsWrittenVersion(configuration))
         {
             versions.Add(configuration.ToConfigurationVersion());
         }

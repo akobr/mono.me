@@ -421,6 +421,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         // the read caches the inherited document in a row of version 0
         await Configurations.GetRawConfigurationAsync(unit);
         (await ReadRowAsync(unit))["Version"]!.Value<ulong>().Should().Be(0);
+        (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(new uint[] { 1, 2 }, "a cache row is no version");
 
         var patched = await Configurations.PatchConfigurationAsync(unit, JArray.Parse("""[{ "op": "add", "path": "/u", "value": 3 }]"""), AuditActor.System);
 
