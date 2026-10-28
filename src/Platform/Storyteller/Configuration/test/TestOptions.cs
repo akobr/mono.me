@@ -15,7 +15,7 @@ internal static class TestOptions
         {
             GetEnvironmentVariable = name => environment.TryGetValue(name, out var value) ? value : null,
             PrimaryHandler = primaryHandler,
-            FileSystem = fileSystem ?? new MockFileSystem(),
+            FileSystem = fileSystem ?? new UnixModeMockFileSystem(),
             Resilience = new StorytellerResilienceOptions { BaseDelay = TimeSpan.Zero },
         };
     }

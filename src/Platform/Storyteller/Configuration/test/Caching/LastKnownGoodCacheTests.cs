@@ -19,7 +19,7 @@ public class LastKnownGoodCacheTests
 
     private static readonly string CacheDirectory = MockUnixSupport.Path(@"C:\cache\storyteller");
 
-    private readonly MockFileSystem _fileSystem = new();
+    private readonly MockFileSystem _fileSystem = new UnixModeMockFileSystem();
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 23, 8, 0, 0, TimeSpan.Zero));
     private readonly RecordingLoggerFactory _logs = new();
 
