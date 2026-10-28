@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using _42.Platform.Storyteller.Sdk.Configuring;
 using _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -212,6 +213,46 @@ public sealed class SubjectOptionsTests : IDisposable
         ]);
         stop.Cancel();
         await Should.ThrowAsync<OperationCanceledException>(() => watching.WaitAsync(HostingFixture.Patience));
+    }
+
+    [Fact]
+    public async Task AWatcherThatFellBehind_GetsOptionsOfTheCurrentView_SoASubjectThatLeftFailsUntilItsRemovedArrives()
+    {
+        Subscribe("contoso");
+        Subscribe("northwind");
+        await using var harness = Harness();
+        await harness.StartAndPollAsync();
+        var monitor = harness.Services.GetRequiredService<IOptionsMonitor<AppOptions>>();
+        using var stop = new CancellationTokenSource();
+        var watch = harness.Subscriptions.WatchAsync(stop.Token).GetAsyncEnumerator();
+
+        try
+        {
+            // The replay queues Added for both; the watcher takes the first and falls behind while northwind leaves.
+            (await watch.MoveNextAsync()).ShouldBeTrue();
+            watch.Current.Subscription.Subject.ShouldBe("contoso");
+            _catalog.Purge(Execution("northwind"));
+            await harness.NextPollAsync();
+
+            (await watch.MoveNextAsync()).ShouldBeTrue();
+            var behind = watch.Current;
+            behind.Kind.ShouldBe(StorytellerChangeKind.Added);
+            behind.Subscription.Subject.ShouldBe("northwind");
+
+            // What hosting.md's worker handles: Get follows the subscriptions as they are now, and the event's own
+            // document still binds.
+            Should.Throw<OptionsValidationException>(() => monitor.Get("northwind"));
+            behind.Subscription.Document.Configuration.GetSection("App").Get<AppOptions>().ShouldNotBeNull().Name.ShouldBe("northwind");
+
+            (await watch.MoveNextAsync()).ShouldBeTrue();
+            watch.Current.Kind.ShouldBe(StorytellerChangeKind.Removed);
+            watch.Current.Subscription.Subject.ShouldBe("northwind");
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            await watch.DisposeAsync();
+        }
     }
 
     [Fact]

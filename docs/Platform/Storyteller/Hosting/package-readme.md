@@ -42,6 +42,7 @@ builder.Services.AddStoryteller()
 ```
 
 - `IStorytellerSubscriptions.WatchAsync` gives `Added` for every current subscription, then `Added`, `Changed` and `Removed` as they happen, each with the subject's execution, usage and document.
+- A watcher catches the failures of `Get(subject)` per subject: `OptionsValidationException` for a subject that left since the event, `StorytellerConfigurationException` for a document that does not bind. One tenant's document must not stop the host that serves every tenant.
 - The settings are the provider's: `STORYTELLER_ENDPOINT`, `STORYTELLER_KEY` and the variables of the machine's credential, or the same options in code.
 - Who am I and the catalog need `Annotation.Read`; the subscriptions also need `Configuration.Read`, and `Secrets.Read` for secrets. The informer needs an unrestricted machine, or one restricted to the responsibility.
 - The subscriptions poll, every 30 seconds by default, and keep the last good document of a subject when a read fails.

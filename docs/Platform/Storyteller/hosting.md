@@ -65,6 +65,7 @@ builder.Services.AddStoryteller(configure);        // Hosting
 A worker that holds a responsibility finds its subjects through the catalog. Its key is the responsibility's, and it subscribes to one context:
 
 ```csharp
+using _42.Platform.Storyteller.Sdk.Configuring;
 using _42.Platform.Storyteller.Sdk.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -83,11 +84,13 @@ public sealed class InvoicingWorker : BackgroundService
 {
     private readonly IStorytellerSubscriptions _subscriptions;
     private readonly IOptionsMonitor<InvoicingOptions> _options;
+    private readonly ILogger<InvoicingWorker> _logger;
 
-    public InvoicingWorker(IStorytellerSubscriptions subscriptions, IOptionsMonitor<InvoicingOptions> options)
+    public InvoicingWorker(IStorytellerSubscriptions subscriptions, IOptionsMonitor<InvoicingOptions> options, ILogger<InvoicingWorker> logger)
     {
         _subscriptions = subscriptions;
         _options = options;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -103,10 +106,36 @@ public sealed class InvoicingWorker : BackgroundService
                 continue;
             }
 
-            // The options bound to the subject's document, and the usage's values: the subject's plan.
-            var options = _options.Get(subject);
+            // The options bound to the subject's document, and the usage's values: the subject's plan. Without
+            // options, the tenant keeps what it runs on, or waits for its next change.
+            if (TryGetOptions(subject) is not { } options)
+            {
+                continue;
+            }
+
             var plan = change.Subscription.Usage.Values.GetValueOrDefault("plan") as string;
             RunTenant(subject, options, plan);
+        }
+    }
+
+    // Per subject: an exception that leaves ExecuteAsync stops the host, and with it every tenant.
+    private InvoicingOptions? TryGetOptions(string subject)
+    {
+        try
+        {
+            return _options.Get(subject);
+        }
+        catch (OptionsValidationException)
+        {
+            // No subscription of the subject now: this watcher is behind, and the subject's Removed follows.
+            return null;
+        }
+        catch (StorytellerConfigurationException exception)
+        {
+            // The subject's document does not bind; a document that binds arrives as Changed. The message names the
+            // key, the type and the section, never the value.
+            _logger.LogWarning("The options of {Subject} do not bind. {Error}", subject, exception.Message);
+            return null;
         }
     }
 
@@ -124,6 +153,7 @@ public sealed class InvoicingWorker : BackgroundService
 
 - `AddSubscriptions("production")` takes the responsibility from the key. `AddSubscriptions("invoicing", "production")` names it.
 - `WaitUntilReadyOnStart` holds the host's start until the first poll and the first reads of the documents completed.
+- **One tenant at a time.** `Get(subject)` can fail for one subject while the others are fine: with `OptionsValidationException` when the watcher fell behind and the subject left since the event, and with `StorytellerConfigurationException` when the subject's document does not bind. An exception that leaves `ExecuteAsync` stops the host by default (`BackgroundServiceExceptionBehavior.StopHost`), and after a restart the replay meets the same document again, so the worker catches both per subject. See [Named options](#named-options).
 - A worker that also wants the configuration of its own key in `IConfiguration` calls `builder.AddStoryteller()` instead of `builder.Services.AddStoryteller()`, and adds to the builder it returns.
 
 ## Registration
@@ -443,7 +473,7 @@ The documents are read as [`IStorytellerDocuments`](configuration-provider.md#do
 | `Failing` | The number of subscriptions whose latest read failed, while they keep their last good document |
 | `IsDegraded` | The latest poll failed, or a subscription is pending or failing |
 
-`ToString()` prints the errors by their messages, which name keys and statuses only. A health check of ASP.NET Core over it:
+`ToString()` prints the failure of the latest poll by its message, the pending subscriptions by their keys, and the failing ones as a count. The errors of those are in `Pending[i].LastError`, and in `LastError` of the subscriptions of `GetAll()`. The messages name keys, statuses and error codes, and may carry the endpoint with the message of a network failure, the platform's error message and hint, or the type name of an unexpected exception; never a value, and no inner exception. A health check of ASP.NET Core over it:
 
 ```csharp
 using _42.Platform.Storyteller.Sdk.Hosting;
@@ -494,8 +524,10 @@ var options = serviceProvider.GetRequiredService<IOptionsMonitor<InvoicingOption
 - **The default name** is left alone: `Configure<TOptions>(configuration)` and `IOptions<TOptions>.Value` work as usual.
 - **Shared values.** Values that all subjects share come from `ConfigureAll<TOptions>`. The order of registration decides, as for any configure action: `ConfigureAll` before `AddSubjectOptions` gives defaults that the documents override, `ConfigureAll` after it overrides the documents, and `PostConfigureAll` runs after both in any order.
 - **Changes.** On every `Added` and `Changed` of a subject, its options are dropped from the cache and `OnChange` is raised with `(Get(subject), subject)`. On `Removed` they are dropped, and nothing is raised, as `Get(subject)` would fail validation; removal is an event of `WatchAsync`. The other subjects keep their cached instance.
-- **In step with the watchers.** The options of a subject are dropped before a watcher or a waiter hears of its change, so a watcher that calls `Get(subject)` on `Changed` gets options bound to the new document.
-- **A value that does not convert** throws `StorytellerConfigurationException` from `Get`, naming the key, the type and the section, never the value. After a change, `OnChange` is then not raised for the subject, and a warning is logged.
+- **In step with the watchers.** The options of a subject are dropped before a watcher or a waiter hears of its change, so a watcher that is not behind and calls `Get(subject)` on `Added` or `Changed` gets options bound to that document.
+- **A watcher that fell behind.** Each watcher has its own queue of events, and `Get(subject)` binds the subscriptions as they are now, not as they were at the event. A watcher that is a poll or more behind, after a long replay or slow work per tenant, gets the options of a newer document, and fails validation for a subject that left since the event; that subject's `Removed` follows in its queue. To bind exactly the document of an event, bind `change.Subscription.Document.Configuration`, or its section, yourself; that skips `ConfigureAll`, `PostConfigure` and the validators.
+- **A value that does not convert** throws `StorytellerConfigurationException` from `Get`, naming the key, the type and the section, never the value. The options of the previous document are not kept: the subject has none until a document that binds arrives, as `Changed`. After a change, `OnChange` is then not raised for the subject, and a warning is logged. The status of the subscriptions does not show it, as the document was read; only binding it failed.
+- **Handle a failure per subject.** A watcher calls `Get(subject)` per event, so it catches `OptionsValidationException` and `StorytellerConfigurationException` per subject, as the [worker](#a-worker-for-every-subject) does. One tenant's document must not end the loop that serves every tenant.
 - **Calls.** `AddSubjectOptions` needs `AddSubscriptions`, in any order: without it, the first resolution of the options throws `InvalidOperationException`. A second `AddSubjectOptions` of the same type throws `InvalidOperationException`. An empty section throws `ArgumentException`.
 
 ### Which to use
