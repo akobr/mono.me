@@ -168,7 +168,7 @@ public sealed class ActorAuthenticator : IDisposable
     }
 
     // A token of the actor's platform identity: iss and sub as configured, Audience among its aud. Managed identity
-    // tokens live about a day, so only exp limits the lifetime.
+    // tokens live about a day, so the lifetime is not limited; iat is required and its age is (MaxActorTokenAgeMinutes).
     private async Task<ActorAuthenticationResult> VerifyWorkloadIdentityAsync(
         TokenExchangeActorOptions actor,
         ActorWorkloadIdentityOptions identity,
@@ -195,7 +195,13 @@ public sealed class ActorAuthenticator : IDisposable
             KeySource = string.IsNullOrWhiteSpace(identity.JwksUri) ? FederatedIssuerKeySource.Discovery : FederatedIssuerKeySource.JwksUri,
             JwksUri = string.IsNullOrWhiteSpace(identity.JwksUri) ? null : identity.JwksUri,
         };
-        var policy = new IssuerTokenPolicy([identity.Audience], TimeSpan.FromSeconds(options.ClockSkewSeconds));
+        // Platform tokens carry iat, so one without it is refused, and one issued more than MaxActorTokenAgeMinutes ago
+        // is refused too, whatever its exp: a leaked token stops working after that age.
+        var policy = new IssuerTokenPolicy(
+            [identity.Audience],
+            TimeSpan.FromSeconds(options.ClockSkewSeconds),
+            RequireIssuedAt: true,
+            MaxAgeSeconds: _exchangeOptions.Value.MaxActorTokenAgeMinutes * 60);
         var verification = await _tokenVerifier.VerifyAsync(actorToken, token, KeyScope, actor.Id, issuer, policy, cancellationToken);
 
         if (!verification.IsValid)
