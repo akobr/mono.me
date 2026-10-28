@@ -100,7 +100,7 @@ When `Auth:Provider` is `Keycloak`, `BearerAuthenticationMiddleware` hands `Auth
 - The signature must be **RS256**, using a key from the realm's OpenID metadata. A token signed with an unknown key ID returns 401 and triggers a refresh of the metadata, so a rotated key is picked up by the next token.
 - `aud` must contain `Auth:Keycloak:Audience`.
 - `exp` is required, and `exp` and `nbf` are enforced with a 30-second clock skew.
-- The token must be a person's access token: it has a `sub`, it is not a service account's (no `client_id` or `clientId` claim, and no `preferred_username` that starts with `service-account-`), and its `typ`, when present, is `Bearer` (an ID token has `ID`).
+- The token must be a person's access token: it has a `sub`, it is not a service account's (no `client_id` or `clientId` claim, and no `preferred_username` that starts with `service-account-`), and its `typ` is `Bearer`, which Keycloak puts on every access token: an ID token has `ID`, and a token without `typ` is refused.
 - `azp` must be one of `Auth:Keycloak:AllowedClientIds`.
 
 An invalid token gets **401**. If the metadata cannot be fetched, the response is **503** with `Retry-After: 5`. A token the user validator refuses goes to the machine validator of the issuer only when [Keycloak machine access](#keycloak-confidential-clients) is registered, and that validator accepts service-account tokens only, so a person's token is never a machine, whatever its `azp`.

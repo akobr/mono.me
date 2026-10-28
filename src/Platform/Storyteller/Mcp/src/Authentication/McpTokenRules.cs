@@ -103,7 +103,7 @@ public static class McpTokenRules
     }
 
     // A person of the realm: a sub, not a client's service account (client_id, clientId in older versions, or the user
-    // service-account-{client}), an access token (typ Bearer when present; an ID token says ID), through an accepted
+    // service-account-{client}), an access token (typ Bearer, required; an ID token says ID), through an accepted
     // client (azp) when AllowedClientIds lists any.
     private static string? CheckKeycloak(ClaimsPrincipal principal, McpAuthSettings settings)
     {
@@ -116,7 +116,7 @@ public static class McpTokenRules
 
         var tokenType = principal.FindFirst("typ")?.Value;
 
-        if (tokenType is not null && !string.Equals(tokenType, KeycloakAccessTokenType, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(tokenType, KeycloakAccessTokenType, StringComparison.OrdinalIgnoreCase))
         {
             return "The token is not an access token.";
         }

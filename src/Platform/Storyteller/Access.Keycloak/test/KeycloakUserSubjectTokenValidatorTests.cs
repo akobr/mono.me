@@ -132,6 +132,17 @@ public sealed class KeycloakUserSubjectTokenValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task TokenWithoutTyp_IsRefused()
+    {
+        var claims = UserClaims();
+        claims.Remove("typ");
+
+        var result = await CreateValidator().ValidateAsync(Token(claims), Audiences, []);
+
+        result.RefusalReason.ShouldBe("The token is not a person's access token (no sub, a service account, or not typ Bearer).");
+    }
+
+    [Fact]
     public async Task TokenWithoutSub_IsRefused()
     {
         var claims = UserClaims();
@@ -208,6 +219,7 @@ public sealed class KeycloakUserSubjectTokenValidatorTests : IDisposable
         var claims = new Dictionary<string, object>
         {
             ["sub"] = UserId,
+            ["typ"] = "Bearer",
             ["azp"] = McpClientId,
             ["preferred_username"] = "ada",
             ["given_name"] = "Ada",
