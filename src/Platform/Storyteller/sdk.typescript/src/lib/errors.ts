@@ -56,11 +56,14 @@ export class StorytellerError extends Error {
       ?? `Storyteller API returned ${status}${statusText ? ` ${statusText}` : ''}.`
     const errors = record?.Errors
 
+    // A blank ErrorCode is no code, as for the .NET SDK.
+    const errorCode = readString(record, 'ErrorCode')
+
     return new StorytellerError({
       status,
       message,
       hint: readString(record, 'Hint'),
-      errorCode: readString(record, 'ErrorCode') ?? oauthError,
+      errorCode: (errorCode?.trim() ? errorCode : undefined) ?? oauthError,
       schemaErrors: Array.isArray(errors) ? (errors as SchemaValidationErrorDetail[]) : undefined,
       body,
     })
@@ -84,6 +87,30 @@ export const isPreconditionFailed = hasStatus(412)
 /** True for errors that carry the given ErrorResponse.ErrorCode. */
 export const hasErrorCode = (error: unknown, errorCode: string): error is StorytellerError =>
   isStorytellerError(error) && error.errorCode === errorCode
+
+/**
+ * True for a failure worth trying again later, as the .NET configuration provider classifies it: a network failure,
+ * 408, 424, 429, a 5xx other than 501 and 505, and a 2xx that was not the answer the SDK expected. A poller keeps its
+ * last document and polls again; any other status gets the same answer again. False for an aborted request and for
+ * errors that are not StorytellerError, which the SDK cannot classify.
+ */
+export function isTransientError(error: unknown): boolean {
+  if (!isStorytellerError(error) || error.aborted) {
+    return false
+  }
+
+  const { status } = error
+
+  if (status === 0 || status === 408 || status === 424 || status === 429) {
+    return true
+  }
+
+  if (status === 501 || status === 505) {
+    return false
+  }
+
+  return status >= 500 || (status >= 200 && status < 300)
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
