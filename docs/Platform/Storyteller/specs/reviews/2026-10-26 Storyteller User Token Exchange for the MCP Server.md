@@ -231,7 +231,7 @@ As planned, with two differences. The commits are on `feat/424-106` instead of `
 
 Partly done:
 
-- The test projects of section 13 ran, except the `Backend.CosmosDb` emulator suite.
+- The test projects of section 13 ran, the `Backend.CosmosDb` emulator suite included.
 - The build was checked per project and with `dotnet build src/Platform`, which stops at one pre-existing error.
 - The end-to-end sign-in with Entra ID and AuthKit against staging was not done.
 
@@ -252,18 +252,20 @@ The last run is on `d8f99902`. In brackets: the count before this branch.
 | `Api.Functions/test`, Release | 2453 passed (2256) |
 | `Mcp/test`, Debug and Release | 724 passed (486) |
 | `Cli/test` | 793 passed |
-| `Backend.CosmosDb/test`, filter `AuditActorSerializationTests` | 6 passed; the emulator suite was not run |
+| `Backend.CosmosDb/test`, filter `AuditActorSerializationTests` | 6 passed |
+| `Backend.CosmosDb/test`, the emulator suite | 508 passed (507 on `998e9c31`; the Lowkey Vault test then passed on `11a9d8f1` with Docker) |
 | `Mcp/testint` | builds; skipped without the `MCP_TEST_*` variables |
 | `Aspire.Host/src` build | 0 errors |
 | TypeScript SDK (`sdk.typescript/src`) | typecheck and lint OK, 130 passed and 1 skipped (the smoke test needs a running API), build OK, regeneration reproducible |
 | `ui.admin` with the packed SDK | lint OK, 1427 passed, build OK |
 | `dotnet build src/Platform` | 1 error, in `Supervisor/Abstraction/test` (net6.0, pre-existing, see Left for later) |
 
+The emulator suite ran later, on `998e9c31`, against the Windows Cosmos DB emulator, the four new `Via` round-trips included. In its first run, `KeyValueEndToEndTests.Secret_WrittenWithTheVaultKey_RoundTripsThroughCosmos` failed because Docker was not running for its Lowkey Vault container; it passed in a rerun with Docker on `11a9d8f1`, which changes only `CLAUDE.md`.
+
 The TypeScript SDK and `ui.admin` ran with the SDK commit; nothing in them changed afterwards. The Mcp projects build without compiler or StyleCop warnings. In the other touched projects, the warnings are on lines this branch did not change.
 
 Not run:
 
-- **The `Backend.CosmosDb` emulator suite**, including the four new `Via` round-trips. The Windows Cosmos DB emulator needs elevation on this machine, and Docker was not running.
 - **The end-to-end sign-in with Entra ID and AuthKit against staging**, which the issue's "Done when" lists. There were no staging credentials.
 - **The real Functions host.** `func start` fails on this machine in the Storage Queues extension (`System.Memory.Data` 8.0.0.1), which is unrelated to this branch. The `/api/.well-known` routes are checked only by the route-template tests and the rendered OpenAPI document.
 
@@ -364,7 +366,6 @@ Found on the way:
 Not done in this change:
 
 - The end-to-end sign-in with Entra ID and AuthKit against staging, and `Mcp/testint` against a real environment.
-- The `Backend.CosmosDb` emulator suite.
 - A run on the real Functions host.
 - A real Azure managed identity, and the API fetching the MCP server's JWKS through its public-address filter.
 
@@ -382,5 +383,4 @@ Not done in this change:
 - **Accounts under Entra** are keyed by `{tid}:{oid}`. Existing local databases need DbCreator's `baseAccount:id` and a re-run, and accounts registered under the pairwise `sub` do not resolve. No deployment has Entra accounts yet.
 - **To verify after deployment**:
   - `GET /api/.well-known/oauth-authorization-server` and `GET /api/.well-known/jwks.json` on the real Functions host;
-  - an Entra ID and an AuthKit sign-in through the MCP server, with an account and without one (the fixed text), which `Mcp/testint` can run per environment;
-  - the `Backend.CosmosDb` emulator suite.
+  - an Entra ID and an AuthKit sign-in through the MCP server, with an account and without one (the fixed text), which `Mcp/testint` can run per environment.
