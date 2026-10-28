@@ -38,7 +38,7 @@
   "scripts": {
     "generate": "node scripts/generate.mjs",
     "build": "tsup",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --ignore-pattern \"generated/**\" --ignore-pattern \"dist/**\"",
     "test": "vitest run"
