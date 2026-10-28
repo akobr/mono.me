@@ -279,7 +279,7 @@ public class AccessHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Permission), Description = "The requested permission to grant.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The affected access point (organization or project).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenRoleGrant)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostGrantPermission(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Grant)]
@@ -297,6 +297,8 @@ public class AccessHttp
         {
             return badRequestResult;
         }
+
+        EnsureActorMayGrantRole(request, permissionModel.Role);
 
         var accountId = request.GetIdentityUniqueId();
         permissionModel = permissionModel with { CreatedById = accountId };
@@ -679,6 +681,17 @@ public class AccessHttp
     internal static void EnsureActorMayGiveOutSecretReads(HttpRequestData request, IEnumerable<MachineScope> scopes)
     {
         if (request.HasActorRestriction(ActorRestrictions.NoSecretReveal) && scopes.Any(MachineScopes.IsSecrets))
+        {
+            throw KeyValueErrors.ActorRestricted();
+        }
+    }
+
+    // Nor may such an actor give a person secret reads: granting a role that reads secrets (ContributorWithSecrets or
+    // higher), directly, by a member's role change or by an invitation, is refused; lower roles stay allowed. Not a role
+    // check, so it runs in every build, DEV_AUTH included; the service checks the caller's role after it.
+    internal static void EnsureActorMayGrantRole(HttpRequestData request, AccountRole role)
+    {
+        if (role >= AccountRole.ContributorWithSecrets && request.HasActorRestriction(ActorRestrictions.NoSecretReveal))
         {
             throw KeyValueErrors.ActorRestricted();
         }

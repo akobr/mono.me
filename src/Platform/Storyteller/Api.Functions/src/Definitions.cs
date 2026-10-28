@@ -509,6 +509,9 @@ public static class Definitions
 
         // Replacing a trusted issuer redirects the tokens of the machines whose rules name it, as new rules would.
         public const string ResponseForbiddenFederatedIssuerReplace = ResponseForbiddenUserOnly + " Replacing an existing trusted issuer is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).";
+
+        // A role that reads secrets gives a person secret reads, as a machine with a Secrets scope gives them to a machine.
+        public const string ResponseForbiddenRoleGrant = ResponseForbiddenUserOnly + " Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).";
         public const string ResponseConfigurationNotFound = "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).";
         public const string ResponseConcurrentChange = "The annotations changed concurrently three times in a row (Conflict); try again.";
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
