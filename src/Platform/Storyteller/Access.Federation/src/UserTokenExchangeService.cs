@@ -156,9 +156,20 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
 
         // 6. The scope: the requested one within the actor's, or all of the actor's; it acts for the person.
         var actorScopes = actor.GetScopes();
-        var scopes = string.IsNullOrEmpty(request.Scope)
+        var requested = string.IsNullOrEmpty(request.Scope) ? [] : request.Scope.Split(' ').Distinct(StringComparer.Ordinal).ToList();
+        var scopes = requested.Count == 0
             ? actorScopes.ToList()
-            : request.Scope.Split(' ').Distinct(StringComparer.Ordinal).Where(scope => actorScopes.Contains(scope, StringComparer.Ordinal)).ToList();
+            : requested.Where(scope => actorScopes.Contains(scope, StringComparer.Ordinal)).ToList();
+
+        // Scope names (the syntax check let only scope characters through), never secrets: they tell the operator what an
+        // actor asks for beyond its Scopes.
+        if (requested.Count > scopes.Count)
+        {
+            _logger.LogInformation(
+                "A user token exchange by the actor {ActorId} drops the requested scopes {DroppedScopes}: they are not in the actor's Scopes",
+                actor.Id,
+                string.Join(' ', requested.Except(scopes, StringComparer.Ordinal)));
+        }
 
         if (!scopes.Contains(UserScopes.Impersonation, StringComparer.Ordinal))
         {

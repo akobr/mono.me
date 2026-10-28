@@ -422,6 +422,31 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         new JsonWebToken(result.AccessToken).GetPayloadValue<string>("scope").ShouldBe(granted);
     }
 
+    // The narrowing stays; the scopes it drops are logged by name at Information, once per exchange, and nothing is logged
+    // when every requested scope is granted.
+    [Theory]
+    [InlineData("User.Impersonation Configuration.Read Secrets.Read", "Configuration.Read Secrets.Read")]
+    [InlineData("User.Impersonation Annotation.Read", null)]
+    [InlineData(null, null)]
+    public async Task Scope_DroppedByTheActorsScopes_IsLoggedByName(string? requested, string? dropped)
+    {
+        _exchangeOptions.Actors[0].Scopes = [UserScopes.Impersonation, "Annotation.Read"];
+
+        (await _exchange.ExchangeAsync(Request() with { Scope = requested })).Succeeded.ShouldBeTrue();
+
+        var entries = _logger.Entries.Where(entry => entry.Message.Contains("drops the requested scopes", StringComparison.Ordinal)).ToList();
+
+        if (dropped is null)
+        {
+            entries.ShouldBeEmpty();
+            return;
+        }
+
+        var entry = entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(Microsoft.Extensions.Logging.LogLevel.Information);
+        entry.Message.ShouldBe($"A user token exchange by the actor {ActorId} drops the requested scopes {dropped}: they are not in the actor's Scopes");
+    }
+
     [Theory]
     [InlineData("Annotation.Read")]
     [InlineData("Configuration.Read")]
