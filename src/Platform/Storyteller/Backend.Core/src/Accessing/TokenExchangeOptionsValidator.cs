@@ -53,6 +53,11 @@ public sealed class TokenExchangeOptionsValidator : IValidateOptions<TokenExchan
             failures.Add($"{Section}:MaxExchangesPerSubjectTokenPerMinute must be between 1 and {TokenExchangeOptions.MaxExchangesPerSubjectTokenPerMinuteLimit}.");
         }
 
+        if (options.MaxActorTokenAgeMinutes is < TokenExchangeOptions.MinActorTokenAgeMinutes or > TokenExchangeOptions.MaxActorTokenAgeMinutesLimit)
+        {
+            failures.Add($"{Section}:MaxActorTokenAgeMinutes must be between {TokenExchangeOptions.MinActorTokenAgeMinutes} and {TokenExchangeOptions.MaxActorTokenAgeMinutesLimit}.");
+        }
+
         return failures.Count > 0
             ? ValidateOptionsResult.Fail(failures)
             : ValidateOptionsResult.Success;

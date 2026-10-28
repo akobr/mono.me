@@ -10,6 +10,8 @@ public class TokenExchangeOptions
     public const int MinTokenLifetimeMinutes = 5;
     public const int MaxTokenLifetimeMinutes = 15;
     public const int MaxExchangesPerSubjectTokenPerMinuteLimit = 60;
+    public const int MinActorTokenAgeMinutes = 5;
+    public const int MaxActorTokenAgeMinutesLimit = 1440;
 
     // Off: v1/access/token answers unsupported_grant_type, and the actors are not trusted.
     public bool Enabled { get; set; }
@@ -25,6 +27,9 @@ public class TokenExchangeOptions
 
     // Per actor and subject token (jti, else the hash of the token), in memory per instance.
     public int MaxExchangesPerSubjectTokenPerMinute { get; set; } = 10;
+
+    // The longest time since the iat of a workload identity actor_token; an older one is refused whatever its exp.
+    public int MaxActorTokenAgeMinutes { get; set; } = MaxActorTokenAgeMinutesLimit;
 
     // True when one of the audiences (a token's aud) is in the SubjectAudiences of an actor, enabled or not: the token was
     // issued to the actor for the exchange, and presenting it as a bearer token is token passthrough. Compared as the start

@@ -77,6 +77,37 @@ public sealed class ActorAuthenticatorTests : IDisposable
         (await _authenticator.AuthenticateAsync(WithActorToken(_workloadKey.Sign(payload)))).Succeeded.ShouldBeTrue();
     }
 
+    // The age counts, not the lifetime: a token issued longer ago than MaxActorTokenAgeMinutes (a day by default), with
+    // the clock skew, is refused even while its exp is ahead.
+    [Theory]
+    [InlineData(1440, 86400, true)]
+    [InlineData(1440, 86430, true)]
+    [InlineData(1440, 86431, false)]
+    [InlineData(60, 3630, true)]
+    [InlineData(60, 3631, false)]
+    public async Task WorkloadIdentityToken_IssuedLongerAgoThanTheMaxAge_IsInvalidClient(int maxAgeMinutes, int age, bool accepted)
+    {
+        UseWorkloadIdentity();
+        _exchangeOptions.MaxActorTokenAgeMinutes = maxAgeMinutes;
+        var payload = WorkloadPayload();
+        payload["iat"] = Now() - age;
+        payload["nbf"] = Now() - age;
+        payload["exp"] = Now() + 86400;
+
+        (await _authenticator.AuthenticateAsync(WithActorToken(_workloadKey.Sign(payload)))).Succeeded.ShouldBe(accepted);
+    }
+
+    // Platform tokens carry iat, so the age is always known: a token without one is refused.
+    [Fact]
+    public async Task WorkloadIdentityToken_WithoutIat_IsInvalidClient()
+    {
+        UseWorkloadIdentity();
+        var payload = WorkloadPayload();
+        payload.Remove("iat");
+
+        ShouldBeNotAccepted(await _authenticator.AuthenticateAsync(WithActorToken(_workloadKey.Sign(payload))));
+    }
+
     [Fact]
     public async Task WorkloadIdentityToken_WithTheAudienceAmongOthers_IsAccepted()
     {
