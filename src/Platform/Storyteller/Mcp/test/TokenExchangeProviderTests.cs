@@ -383,6 +383,19 @@ public sealed class TokenExchangeProviderTests : IDisposable
         token.Restrictions.ShouldBeEmpty();
     }
 
+    // The API always lists the restrictions; an answer without the member fails closed, to NoSecretReveal.
+    [Fact]
+    public async Task AnswerWithoutTheRestrictionsMember_WithholdsSecrets()
+    {
+        var fixture = TokenFileFixture();
+        fixture.Endpoint.Respond = _ => Task.FromResult(TokenEndpointHandler.Json("""{"access_token":"storyteller-token","token_type":"Bearer","expires_in":600,"scope":"User.Impersonation"}"""));
+
+        var token = await fixture.Provider.GetTokenAsync(TestTokens.Create(), CancellationToken.None);
+
+        token.Restrictions.ShouldBe([StorytellerToken.NoSecretReveal]);
+        token.WithholdsSecrets.ShouldBeTrue();
+    }
+
     [Fact]
     public async Task Answer_IsCachedUntilAMinuteBeforeItExpires()
     {

@@ -344,7 +344,13 @@ public sealed class StorytellerTokenExchangeProvider : IStorytellerTokenProvider
 
         var restrictions = new HashSet<string>(StringComparer.Ordinal);
 
-        if (answer.TryGetProperty("restrictions", out var listed))
+        // The API always lists them, an empty array when there are none; a missing member fails closed, as the default of
+        // every actor.
+        if (!answer.TryGetProperty("restrictions", out var listed))
+        {
+            restrictions.Add(StorytellerToken.NoSecretReveal);
+        }
+        else
         {
             if (listed.ValueKind != JsonValueKind.Array)
             {
