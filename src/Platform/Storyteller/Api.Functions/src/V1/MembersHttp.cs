@@ -59,7 +59,7 @@ public class MembersHttp
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The access point doesn't exist, or the account is not a member (MemberNotFound).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The last owner can't be demoted (LastOwner), and members can't change their own role (SelfRoleChange).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenRoleGrant)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetMemberRole(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.Member)]
@@ -79,6 +79,8 @@ public class MembersHttp
         {
             return new BadRequestObjectResult(new ErrorResponse("A role other than None is required; remove the member instead."));
         }
+
+        AccessHttp.EnsureActorMayGrantRole(request, update.Role);
 
         var member = await _accessService.SetMemberRoleAsync(NormalizeKey(key), accountId, update.Role, request.GetIdentityUniqueId());
         return new OkObjectResult(member);

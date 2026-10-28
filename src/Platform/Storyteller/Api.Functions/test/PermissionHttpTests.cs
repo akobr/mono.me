@@ -146,6 +146,51 @@ public class PermissionHttpTests
         access.Calls.ShouldBeEmpty();
     }
 
+    // An actor under NoSecretReveal may not give a person secret reads: a role from ContributorWithSecrets up is refused
+    // in every build, before the service is asked.
+    [Theory]
+    [InlineData(AccountRole.ContributorWithSecrets)]
+    [InlineData(AccountRole.Administrator)]
+    [InlineData(AccountRole.Owner)]
+    public async Task Grant_ARoleThatReadsSecrets_ThroughARestrictedActor_IsActorRestricted(AccountRole role)
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.PostGrantPermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(role)), restricted: true)));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        access.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(AccountRole.Reader)]
+    [InlineData(AccountRole.Contributor)]
+    public async Task Grant_ALowerRole_ThroughARestrictedActor_IsGranted(AccountRole role)
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        var result = await http.PostGrantPermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(role)), restricted: true));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Calls.ShouldBe([$"grant:user-1:user-2:{role}", $"point:{PointKey}"]);
+    }
+
+    [Theory]
+    [InlineData(AccountRole.ContributorWithSecrets)]
+    [InlineData(AccountRole.Owner)]
+    public async Task Grant_ARoleThatReadsSecrets_WithoutTheRestriction_IsGranted(AccountRole role)
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        (await http.PostGrantPermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(role))))).ShouldBeOfType<OkObjectResult>();
+        (await http.PostGrantPermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(role)), restrictions: []))).ShouldBeOfType<OkObjectResult>();
+
+        access.Calls.Count(call => call.StartsWith("grant:", StringComparison.Ordinal)).ShouldBe(2);
+    }
+
     private static Permission Permission(AccountRole role)
     {
         return new Permission
@@ -157,8 +202,9 @@ public class PermissionHttpTests
         };
     }
 
-    // A user's request; the body goes as JSON, with its content type unless contentType is false.
-    private static TestHttpRequestData UserRequest(string body, bool contentType = true)
+    // A user's request; the body goes as JSON, with its content type unless contentType is false. Restricted makes it
+    // a call through an actor under NoSecretReveal; restrictions, through an actor with exactly those.
+    private static TestHttpRequestData UserRequest(string body, bool contentType = true, bool restricted = false, string[]? restrictions = null)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
         var headers = contentType ? FunctionTestDoubles.JsonContentType() : null;
@@ -168,6 +214,13 @@ public class PermissionHttpTests
             new("sub", "user-1"),
             new("scp", Scopes.User.Impersonation),
         };
+
+        if (restricted || restrictions is not null)
+        {
+            context.Items[FunctionContextItemKeys.DelegatedActor] = "mcp";
+            context.Items[FunctionContextItemKeys.DelegatedRestrictions] = restrictions ?? [ActorRestrictions.NoSecretReveal];
+        }
+
         return request;
     }
 

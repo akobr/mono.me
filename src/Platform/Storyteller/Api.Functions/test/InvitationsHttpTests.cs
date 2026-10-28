@@ -313,6 +313,43 @@ public class InvitationsHttpTests
         service.LastCreated.ShouldBe(new InvitationCreate { Email = "ada@example.com", Role = AccountRole.Contributor, ExpiresInDays = 3 });
     }
 
+    // An actor under NoSecretReveal may not invite with a role that reads secrets (ContributorWithSecrets and up): refused
+    // in every build, before the service is asked.
+    [Theory]
+    [InlineData(AccountRole.ContributorWithSecrets)]
+    [InlineData(AccountRole.Administrator)]
+    [InlineData(AccountRole.Owner)]
+    public async Task Create_WithARoleThatReadsSecrets_ThroughARestrictedActor_IsActorRestricted(AccountRole role)
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+        var body = FunctionTestDoubles.ToJsonBody(new InvitationCreate { Email = "ada@example.com", Role = role });
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.CreateInvitation(Request([new("sub", "user_01")], body, delegatedActor: true), "acme.billing"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.ActorRestricted);
+        service.Calls.ShouldBeEmpty();
+        service.LastCreated.ShouldBeNull();
+    }
+
+    // Lower roles pass through a restricted actor, and every role passes without the restriction.
+    [Theory]
+    [InlineData(AccountRole.Reader, true)]
+    [InlineData(AccountRole.Contributor, true)]
+    [InlineData(AccountRole.ContributorWithSecrets, false)]
+    [InlineData(AccountRole.Owner, false)]
+    public async Task Create_WithALowerRoleThroughARestrictedActor_OrAnyRoleWithoutIt_IsCreated(AccountRole role, bool delegatedActor)
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+        var body = FunctionTestDoubles.ToJsonBody(new InvitationCreate { Email = "ada@example.com", Role = role });
+
+        var result = await http.CreateInvitation(Request([new("sub", "user_01")], body, delegatedActor: delegatedActor), "acme.billing");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        service.LastCreated.ShouldNotBeNull().Role.ShouldBe(role);
+    }
+
     // Invitations are for users (spec 7.4): a machine is refused in every build, also one whose credentials carry every
     // scope and User.Impersonation, before the service is asked.
     [Fact]

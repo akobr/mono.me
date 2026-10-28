@@ -572,6 +572,28 @@ public class OpenApiExportTests
             + " Replacing an existing trusted issuer is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).");
     }
 
+    // A role that reads secrets gives a person secret reads, so an actor under NoSecretReveal may not grant it: the 403
+    // of the grant, the member's role change and the invitation name it; the revoke does not.
+    [Fact]
+    public async Task Document_RoleGrants_NameTheActorRestrictionInTheir403()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        foreach (var routeId in new[] { Definitions.RouteIds.Access.GrantUserAccess, Definitions.RouteIds.Access.SetMemberRole, Definitions.RouteIds.Access.CreateInvitation })
+        {
+            Operation(document, routeId).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
+                .ShouldBe(Definitions.Descriptions.ResponseForbiddenRoleGrant, routeId);
+        }
+
+        Operation(document, Definitions.RouteIds.Access.RevokeUserAccess).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
+            .ShouldBe(Definitions.Descriptions.ResponseForbiddenUserOnly);
+
+        Definitions.Descriptions.ResponseForbiddenRoleGrant.ShouldBe(
+            Definitions.Descriptions.ResponseForbiddenUserOnly
+            + " Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).");
+    }
+
     // An actor under NoSecretReveal refuses the reads of secret values (ActorRestricted), never the writes: only the 403
     // of the reads names it.
     [Fact]
