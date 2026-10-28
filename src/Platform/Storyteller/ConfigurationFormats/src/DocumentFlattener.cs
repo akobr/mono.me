@@ -6,8 +6,8 @@ namespace _42.Platform.Storyteller.ConfigurationFormats;
 
 // Reads the Content object of a configuration into its leaves and IConfiguration keys: properties join with ':', array
 // items with their index (db:hosts:0); a string is its value, a number or a boolean its JSON text; null and empty
-// containers make no key; names keep their casing. Configuration/test/Vectors/flattening.json pins the rules for every
-// language.
+// containers make no key; names keep their casing. The conformance suite, src/Platform/Storyteller/conformance, pins
+// the rules for every language.
 public static class DocumentFlattener
 {
     // The leaves in document order. With validate, the base rules of every format, and the first error throws: the

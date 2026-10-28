@@ -14,9 +14,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Shared with the providers of other languages and kept where the docs name them, next to the provider's tests;
-         embedded so the tests read them without the file system. -->
-    <EmbeddedResource Include="..\..\Configuration\test\Vectors\*.json" LogicalName="Vectors.%(Filename)%(Extension)" Link="Vectors\%(Filename)%(Extension)" />
+    <!-- The conformance suite, shared with the providers and SDKs of other languages; embedded so the tests read it
+         without the file system. RecursiveDir holds the separator of the OS, which ConformanceFiles normalizes. -->
+    <EmbeddedResource Include="..\..\conformance\**\*.json" LogicalName="Conformance/%(RecursiveDir)%(Filename)%(Extension)" Link="Conformance\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,6 @@
 {
+  "$schema": "../schema/flattening.schema.json",
+  "target": "flat",
   "description": "How the Content object of a Storyteller configuration becomes configuration keys. Each vector has a name, the document (the Content object) and either the keys it flattens to or the error that makes it invalid. Keys compare by their exact text; IConfiguration then compares them case-insensitively. Numbers are read as double-precision floats. Error paths: $ is the root, .name a property whose name is ASCII letters, digits, _ and - (starting with an ASCII letter or _), ['name'] any other property (with \\ and ' escaped by a backslash, the C0 control characters U+0000 to U+001F and DEL written as \\n, \\r, \\t or \\uXXXX with upper-case hex digits, and # written as \\u0023; every other character, C1 controls and U+2028 and U+2029 included, is kept, so a path never holds a CR, an LF or a #), [0] an array item.",
   "vectors": [
     {
@@ -76,6 +78,35 @@
         "fraction": "0.5",
         "negativeFraction": "-0.25",
         "trailingZero": "1.5"
+      }
+    },
+    {
+      "name": "numbers that are not safe integers are their double text",
+      "document": {
+        "large": 1E+20,
+        "huge": 1.7976931348623157E+308,
+        "tiny": 5E-324,
+        "small": 1.5E-07,
+        "tenThousandth": 0.0001,
+        "hundredThousandth": 0.00001,
+        "fraction": 123456.789,
+        "longFraction": 1000000000000000.5,
+        "sum": 0.30000000000000004,
+        "maxSafe": 9007199254740991,
+        "minSafe": -9007199254740991
+      },
+      "keys": {
+        "large": "1E+20",
+        "huge": "1.7976931348623157E+308",
+        "tiny": "5E-324",
+        "small": "1.5E-07",
+        "tenThousandth": "0.0001",
+        "hundredThousandth": "1E-05",
+        "fraction": "123456.789",
+        "longFraction": "1000000000000000.5",
+        "sum": "0.30000000000000004",
+        "maxSafe": "9007199254740991",
+        "minSafe": "-9007199254740991"
       }
     },
     {
