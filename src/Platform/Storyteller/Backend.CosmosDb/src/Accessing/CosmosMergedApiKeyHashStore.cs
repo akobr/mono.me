@@ -37,7 +37,8 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         var partitionKeyValue = $"{project}.access";
         var partitionKey = new PartitionKey(partitionKeyValue);
 
-        // A patch never creates the document, so a missing one answers 404 and gets the partial entity below.
+        // Unlike ReplaceAsync, this creates the machine when it is missing: it runs on create, before the machine exists.
+        // A stored machine gets only its two fields patched; a missing one answers 404 and gets the partial entity below.
         using var response = await repository.Container.PatchItemStreamAsync(
             machineAccessId,
             partitionKey,

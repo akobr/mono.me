@@ -2,6 +2,7 @@ namespace _42.Platform.Storyteller.Accessing;
 
 public interface IApiKeyHashStore
 {
+    // Stores the hash of a new machine, and creates the machine when it does not exist yet. A reset uses ReplaceAsync.
     Task StoreAsync(
         string organization,
         string project,
