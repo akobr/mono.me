@@ -20,7 +20,7 @@ src/Platform/Storyteller/conformance/
 
 - **The manifest.** A runner reads `suite.json` and runs every listed file of a kind it implements. It fails on a kind it does not know, and it says which kinds it does not run and why. A new kind or file therefore fails every runner until each one decides; nothing is skipped silently.
 - **Schemas.** Every file has a `$schema` with the relative path of `schema/<kind>.schema.json`, so an editor validates and completes it. The schemas are self-contained: a runner can validate a file from a string, without resolving references to other files.
-- **Identity.** A vector is identified by its file and its `name`, and names are unique within a file. A flattening file is identified by its `target`. The three flattening files hold the same documents under the same names, so the outcome of one document can be read side by side for every target.
+- **Identity.** A vector is identified by its file and its `name`, and names are unique within a file. A flattening file is identified by its `target`. `properties.json` and `env.json` hold every document of `flat.json` under the same name, plus documents of their own, so the outcome of one document can be read side by side for every target.
 
 ### Versions
 
@@ -68,7 +68,8 @@ How the `Content` object of a configuration becomes the keys of a target. The ru
 
 - **The outcome** is either `keys` or `error`.
   - `keys` holds every key with its raw value, compared by exact text, in document order.
-  - `error` holds the rule and the JSON path of the first error in document order.
+  - `error` holds the rule and the JSON path of the first error. The rules run group by group over the whole document, each group in document order: first the base rules, then the target's name rule, then its value rule.
+- **Case.** Two keys collide when .NET's `OrdinalIgnoreCase` finds them equal: the simple upper-case mapping of each code point. So `ß`, the dotless `ı` and the long `ſ` keep their case, letters beyond the Basic Multilingual Plane fold, and the Greek letters with ypogegrammeni fold to their title-case forms. The vectors pin each of these.
 - **The seven rules** are `not-an-object`, `empty-name`, `colon-in-name` and `case-collision` for every target, plus `bracket-in-name` and `array-gap` for `properties` and `invalid-env-name` for `env`.
 
 Every target covers the five rules of the study, and a suite test checks that each target keeps them:
@@ -162,7 +163,7 @@ A vector is read with `JSON.parse` in JavaScript and with Newtonsoft (`FloatPars
 1. **Numbers.**
    - An integer is within ±(2^53 − 1), because a JavaScript number cannot hold `9007199254740993`.
    - A number written with a fraction or an exponent is either not an integer, or of magnitude 2^53 or more. JavaScript reads `1.0` and `1E+2` as `1` and `100`, but Newtonsoft keeps them as doubles and writes `1.0` and `100.0`.
-2. **Order.** No object has a name that is an array index (`"0"`, `"12"`) after a name that is not, because `JSON.parse` lists array indexes first.
+2. **Order.** No object has a name that is an array index (`"0"`, `"12"`) after a name that is not, and the array-index names are in ascending order, because `JSON.parse` lists array indexes first, in ascending order.
 3. **Duplicates.** No object has the same name twice, because `JSON.parse` keeps the last one.
 
 **The text of a double**, as the .NET reference writes it:
