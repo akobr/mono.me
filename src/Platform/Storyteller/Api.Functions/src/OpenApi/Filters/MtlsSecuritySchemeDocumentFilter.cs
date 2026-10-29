@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Accessing;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
 using Microsoft.OpenApi.Models;
 
@@ -23,9 +24,6 @@ namespace _42.Platform.Storyteller.Api.OpenApi.Filters;
 /// </summary>
 public class MtlsSecuritySchemeDocumentFilter : IDocumentFilter
 {
-    // The header of MachineAuthenticationOptions.CertificateHeaderName by default, which App Service fills.
-    private const string CertificateHeaderName = "X-ARR-ClientCert";
-
     public void Apply(IHttpRequestDataObject req, OpenApiDocument document)
     {
         document.Components ??= new OpenApiComponents();
@@ -35,7 +33,7 @@ public class MtlsSecuritySchemeDocumentFilter : IDocumentFilter
         {
             Type = SecuritySchemeType.ApiKey,
             In = ParameterLocation.Header,
-            Name = CertificateHeaderName,
+            Name = MachineAuthenticationOptions.DefaultCertificateHeaderName,
             Description = Definitions.Descriptions.SecureMtls,
         };
     }
