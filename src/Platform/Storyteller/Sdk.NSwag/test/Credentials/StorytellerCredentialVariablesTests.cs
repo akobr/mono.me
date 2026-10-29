@@ -301,6 +301,19 @@ public class StorytellerCredentialVariablesTests
         variables.Names.ShouldNotContain(name => name.StartsWith("ACTIONS_"));
     }
 
+    // An Entra ID job whose secret expanded to an empty value still has its token URL: client credentials, not an exchange.
+    [Fact]
+    public void AGuidClientId_WithATokenUrlButNoSecret_InAGitHubActionsJob_NamesTheSecret()
+    {
+        UseGitHubActions();
+        _variables["STORYTELLER_CLIENT_ID"] = MachineId;
+        _variables["STORYTELLER_TOKEN_URL"] = "https://login.microsoftonline.com/tenant/oauth2/v2.0/token";
+        _variables["STORYTELLER_CLIENT_SECRET"] = " ";
+
+        ShouldFail("STORYTELLER_CLIENT_SECRET").Message.ShouldBe(
+            "Client credentials need STORYTELLER_CLIENT_ID and STORYTELLER_CLIENT_SECRET; STORYTELLER_CLIENT_SECRET is missing.");
+    }
+
     [Fact]
     public void ATokenScopeWithoutAClientId_IsAnError_EvenInAGitHubActionsJob()
     {
