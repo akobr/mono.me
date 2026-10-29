@@ -263,7 +263,8 @@ public sealed class StorytellerCredentialVariables
             ClientId = clientId,
             TokenScope = tokenScope,
             SubjectTokenPath = path,
-            SubjectTokenPathSource = tokenFile is not null ? StorytellerVariables.TOKEN_FILE : StorytellerVariables.SUBJECT_TOKEN_FILE,
+            // The deprecated name only when it gave the path; a GitHub Actions source has none.
+            SubjectTokenPathSource = tokenFile is null && subjectTokenFile is not null ? StorytellerVariables.SUBJECT_TOKEN_FILE : StorytellerVariables.TOKEN_FILE,
             SubjectTokenType = normalizedType,
             GitHubRequestUrl = gitHubRequestUrl,
             GitHubRequestToken = path is null ? gitHub.Token : null,
