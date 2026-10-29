@@ -15,7 +15,7 @@ namespace _42.Platform.Storyteller.Sdk.Credentials;
 // Token, discovery and GitHub Actions ID token requests: their own HttpClient, which follows no redirect (a secret is in
 // the body, or in the header of the ID token request) and sends no Authorization, except the request token on the ID
 // token request only; behind the resilience pipeline with POST retries, as a token request has no side effect.
-internal sealed class TokenEndpointClient
+internal sealed class TokenEndpointClient : IDisposable
 {
     private const string BearerScheme = "Bearer";
 
@@ -42,14 +42,26 @@ internal sealed class TokenEndpointClient
         var options = resilience?.Clone() ?? new StorytellerResilienceOptions();
         options.RetryUnsafeMethods = true;
 
-        _httpClient = new Lazy<HttpClient>(() => new HttpClient(new ResilienceHandler(StorytellerResilience.CreatePipeline(options))
-        {
-            InnerHandler = primaryHandler ?? CreatePrimaryHandler(configureHandler),
-        })
+        // A primary handler of the caller (the seam of tests) belongs to the caller; it is not disposed with the client.
+        _httpClient = new Lazy<HttpClient>(() => new HttpClient(
+            new ResilienceHandler(StorytellerResilience.CreatePipeline(options))
+            {
+                InnerHandler = primaryHandler ?? CreatePrimaryHandler(configureHandler),
+            },
+            disposeHandler: primaryHandler is null)
         {
             // Attempt timeouts and the caller's token bound a request.
             Timeout = Timeout.InfiniteTimeSpan,
         });
+    }
+
+    // Closes the connections of token and discovery requests; a client that never sent one holds none.
+    public void Dispose()
+    {
+        if (_httpClient.IsValueCreated)
+        {
+            _httpClient.Value.Dispose();
+        }
     }
 
     public async Task<AccessToken> RequestTokenAsync(Uri tokenUrl, IReadOnlyDictionary<string, string> form, CancellationToken cancellationToken)

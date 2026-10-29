@@ -28,6 +28,9 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     private readonly MachineCredentialHooks _hooks;
     private readonly Lazy<LoadedCredential> _credential;
     private readonly object _bindingLock = new();
+
+    // Copies replaced by a binding to another target; a call may still use one, so they are disposed with the service.
+    private readonly List<StorytellerCredential> _replaced = [];
     private volatile BoundCredential? _bound;
     private volatile ExchangeTarget? _target;
 
@@ -163,8 +166,16 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
 
     public void Dispose()
     {
+        lock (_bindingLock)
+        {
+            _bound?.Credential.Dispose();
+            _replaced.ForEach(credential => credential.Dispose());
+            _replaced.Clear();
+        }
+
         if (_credential.IsValueCreated)
         {
+            _credential.Value.Credential?.Dispose();
             _credential.Value.Credential?.ClientCertificate?.Dispose();
         }
     }
@@ -374,6 +385,11 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 var boundCopy = credential.Credential.Bind(binding);
                 return _hooks.Decorate?.Invoke(boundCopy) ?? boundCopy;
             });
+
+            if (_bound is { } replaced && !ReferenceEquals(replaced.Credential, credential.Credential))
+            {
+                _replaced.Add(replaced.Credential);
+            }
 
             _bound = new BoundCredential(key, copy);
             return copy;

@@ -40,6 +40,22 @@ public class ClientCredentialsTests
         });
     }
 
+    // Disposing a copy closes its own token client; a handler of the caller, and the other copies, keep working.
+    [Fact]
+    public async Task Disposing_ACopy_LeavesTheCallersHandlerAndTheOtherCopies()
+    {
+        _http.Respond(HttpStatusCode.OK, TestTokens.TokenResponse("token-1"))
+            .Respond(HttpStatusCode.OK, TestTokens.TokenResponse("token-2"));
+        var first = Create();
+        var second = Create();
+
+        await first.GetAuthorizationAsync(null, CancellationToken.None);
+        first.Dispose();
+        first.Dispose();
+
+        (await second.GetAuthorizationAsync(null, CancellationToken.None)).ShouldBe(new AuthenticationHeaderValue("Bearer", "token-2"));
+    }
+
     [Fact]
     public async Task WithoutAScope_NoScopeIsSent()
     {
