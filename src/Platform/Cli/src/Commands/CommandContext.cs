@@ -114,6 +114,12 @@ public class CommandContext : ICommandContext
             throw Invalid($"{TargetVariables.PROJECT} must be <organization>.<project>.");
         }
 
+        // Only where the key would pick the target: -p and STORYTELLER_PROJECT win over it.
+        if (!isExplicitProject && settings.Project is null && _machine.IsConfigured && settings.IsKeyInvalid)
+        {
+            throw settings.InvalidKey();
+        }
+
         if (!_machine.IsConfigured)
         {
             return;

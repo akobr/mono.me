@@ -237,7 +237,7 @@ public class MachineSignInSettingsTests
 
     // Read for every process, reported only for a machine: a user never reads STORYTELLER_KEY.
     [Fact]
-    public void Key_ThatIsNoFullKey_IsReportedByGetKind()
+    public void Key_ThatIsNoFullKey_IsKeptForTheTargetAndNotReportedByGetKind()
     {
         var settings = Read(new()
         {
@@ -247,7 +247,9 @@ public class MachineSignInSettingsTests
         });
 
         settings.Key.ShouldBeNull();
-        var exception = Should.Throw<AuthenticationException>(() => settings.GetKind());
+        settings.IsKeyInvalid.ShouldBeTrue();
+        settings.GetKind().ShouldBe(MachineSignInKind.ApiKey);
+        var exception = settings.InvalidKey();
         exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
         exception.Message.ShouldBe("STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}.");
     }
