@@ -483,6 +483,17 @@ public class MachineAuthenticationServiceTests
         exception.InnerException.ShouldBeSameAs(isSdkFailure ? failure.InnerException : failure);
     }
 
+    // A null argument is a bug, not a setting: it is not turned into a configuration error.
+    [Fact]
+    public async Task ANullArgument_IsNotMapped()
+    {
+        UseClientCredentials("client_01");
+        var hooks = new MachineCredentialHooks { Decorate = _ => throw new ArgumentNullException("binding") };
+        var service = TestMachines.Create(TestMachines.Settings(_environment), _fileSystem, hooks, _time);
+
+        await Should.ThrowAsync<ArgumentNullException>(() => service.GetAccessTokenAsync());
+    }
+
     // Neither the token factory nor the renewal handler can cancel, and the SDK honours any Retry-After: the service ends
     // a token request at its deadline (100 seconds), as a single request ended at the default timeout of HttpClient.
     [Fact]
