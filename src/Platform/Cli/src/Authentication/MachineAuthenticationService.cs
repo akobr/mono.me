@@ -107,14 +107,17 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
 
         var credential = GetCredential();
 
+        // One read: a command may bind another target meanwhile.
+        var target = _target;
+
         // Only for the target a command bound: sform account ca and the user-only commands must not exchange, nor ask
         // GitHub for a token, just because STORYTELLER_PROJECT or STORYTELLER_KEY is set.
-        if (credential.Identity.Kind == MachineSignInKind.Federated && _target is null)
+        if (credential.Identity.Kind == MachineSignInKind.Federated && target is null)
         {
             return null;
         }
 
-        var authorization = await GetAuthorizationAsync(credential, _target, null, cancellationToken);
+        var authorization = await GetAuthorizationAsync(credential, target, null, cancellationToken);
 
         // The certificate goes in the TLS handshake (or the development header); no Authorization header.
         return authorization switch
@@ -139,13 +142,14 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         }
 
         var credential = GetCredential();
+        var target = _target;
 
-        if (!credential.Credential.CanRenew || (credential.Identity.Kind == MachineSignInKind.Federated && _target is null))
+        if (!credential.Credential.CanRenew || (credential.Identity.Kind == MachineSignInKind.Federated && target is null))
         {
             return null;
         }
 
-        return await GetTokenAsync(credential, _target, rejectedToken, cancellationToken);
+        return await GetTokenAsync(credential, target, rejectedToken, cancellationToken);
     }
 
     public Task<SignedInUser> LoginWithDeviceCodeAsync(
