@@ -112,7 +112,10 @@ public sealed class StorytellerCredentialVariables
         // CLIENT_ID and TOKEN_SCOPE belong to client credentials or federation; alone they are one more kind, except a
         // machine id in a GitHub Actions job. Both GitHub variables are in every job with id-token: write, so they
         // federate only an id that is a GUID, as every federated machine id is and AuthKit and Keycloak client ids are
-        // not: a client-credentials job with a missing secret must not turn into an exchange.
+        // not: a client-credentials job with a missing secret must not turn into an exchange. An Entra ID appId is a GUID
+        // too, but such a job also sets STORYTELLER_TOKEN_URL (only a client_ id discovers it), which keeps it client
+        // credentials and names the missing secret; without the token URL either, a refused exchange names the audience
+        // and the secret (FederatedTokenCredential).
         var sharedOnly = (clientId is not null || tokenScope is not null) && !clientCredentials && !federation;
 
         if (sharedOnly && gitHub.IsSet && Guid.TryParse(clientId, out _))
