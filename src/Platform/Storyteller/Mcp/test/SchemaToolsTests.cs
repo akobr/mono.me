@@ -51,12 +51,16 @@ public class SchemaToolsTests
     }
 
     [Theory]
-    [InlineData("http://10.0.0.5:8080/admin/reset")]
-    [InlineData("file:///etc/passwd")]
-    [InlineData("other.json#/definitions/a")]
-    public async Task SetSchema_ExternalReference_IsRefused_AndNothingIsSent(string reference)
+    [InlineData("$ref", "http://10.0.0.5:8080/admin/reset")]
+    [InlineData("$ref", "file:///etc/passwd")]
+    [InlineData("$ref", "other.json#/definitions/a")]
+    [InlineData("$REF", "http://10.0.0.5:8080/admin/reset")]
+    [InlineData("$Ref", "file:///etc/passwd")]
+    public async Task SetSchema_ExternalReference_IsRefused_AndNothingIsSent(string name, string reference)
     {
-        var schema = Element("""{"type":"object","properties":{"a":{"items":[{"$ref":"REFERENCE"}]}}}""".Replace("REFERENCE", reference, StringComparison.Ordinal));
+        var schema = Element("""{"type":"object","properties":{"a":{"items":[{"NAME":"REFERENCE"}]}}}"""
+            .Replace("NAME", name, StringComparison.Ordinal)
+            .Replace("REFERENCE", reference, StringComparison.Ordinal));
 
         var exception = await Should.ThrowAsync<ToolInputException>(() => Tools.SetSchema(Organization, Project, "type", schema, annotationType: "exe"));
 
