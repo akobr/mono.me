@@ -54,6 +54,7 @@ var keyVault = builder.AddContainer("keyvault", "nagyesta/lowkey-vault", "7.3.11
     .WithLifetime(ContainerLifetime.Persistent);
 
 var apiFunctions = builder.AddProject<Projects.Api_Functions>("api-functions")
+    .WithHttpEndpoint(port: 7071, name: "http", isProxied: false)
     .WithReference(cosmos)
     .WaitFor(cosmos)
     .WithEnvironment("AzureKeyVaults__default", keyVault.GetEndpoint("https"))
