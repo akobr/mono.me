@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.0.13575
+ * OpenAPI spec version: 0.10.6.40696
  */
 import * as zod from "zod";
 
@@ -49,6 +49,7 @@ export const StartViewExportResponse = zod.object({
         .default(startViewExportResponseCreatedByKindDefault),
       Id: zod.string().optional(),
       Name: zod.string().optional(),
+      Via: zod.string().optional(),
     })
     .optional(),
   StartedAt: zod.iso.datetime({ offset: true }).nullish(),
@@ -97,6 +98,7 @@ export const GetViewExportResponse = zod.object({
         .default(getViewExportResponseCreatedByKindDefault),
       Id: zod.string().optional(),
       Name: zod.string().optional(),
+      Via: zod.string().optional(),
     })
     .optional(),
   StartedAt: zod.iso.datetime({ offset: true }).nullish(),
@@ -193,6 +195,7 @@ export const StartViewImportResponse = zod.object({
         .default(startViewImportResponseCreatedByKindDefault),
       Id: zod.string().optional(),
       Name: zod.string().optional(),
+      Via: zod.string().optional(),
     })
     .optional(),
   StartedAt: zod.iso.datetime({ offset: true }).nullish(),
@@ -319,6 +322,7 @@ export const GetViewImportResponse = zod.object({
         .default(getViewImportResponseCreatedByKindDefault),
       Id: zod.string().optional(),
       Name: zod.string().optional(),
+      Via: zod.string().optional(),
     })
     .optional(),
   StartedAt: zod.iso.datetime({ offset: true }).nullish(),

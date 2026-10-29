@@ -1624,7 +1624,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -2222,6 +2222,16 @@ namespace _42.Platform.Storyteller.Sdk
                             return objectResponse_.Object;
                         }
                         else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The machine id is not valid, or the machine has no secret to reset (a Federated or Certificate machine).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
@@ -2236,6 +2246,26 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The machine doesn\'t exist, or it was deleted during its reset (NotFound).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Another reset replaced the API key meanwhile, or the machine changed concurrently (Conflict); reload and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -3859,7 +3889,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Replacing an existing trusted issuer is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -4564,7 +4594,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -5524,7 +5554,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Granting the role ContributorWithSecrets or higher is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -11386,7 +11416,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<SchemaValidationErrorResponse>("The configuration violates the schema, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<SchemaValidationErrorResponse>("The configuration violates the schema, the annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 412)
@@ -11571,7 +11601,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<SchemaValidationErrorResponse>("The patch violates the configuration schema, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<SchemaValidationErrorResponse>("The patch violates the configuration schema, the annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 412)
@@ -11732,7 +11762,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("The annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("The annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)

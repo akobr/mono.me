@@ -185,7 +185,7 @@ public class UnderstandingToolsTests
             .Setup(client => client.GetDescendantsAsync(Org, Project, View, It.IsAny<string>(), "all", null, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.AnnotationsResponse { Annotations = [] });
         _configurations
-            .Setup(client => client.GetConfigurationAsync(Org, Project, View, "usg.northwind.invoicing", It.IsAny<CancellationToken>()))
+            .Setup(client => client.GetConfigurationAsync(Org, Project, View, "usg.northwind.invoicing", It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { Version = 2, Content = new JObject() });
         _configurations
             .Setup(client => client.GetConfigurationVersionAsync(Org, Project, View, "usg.northwind.invoicing", 2, It.IsAny<CancellationToken>()))
@@ -275,13 +275,13 @@ public class UnderstandingToolsTests
     {
         SetupComposition(Compositions.ExecutionKey, composition);
         _configurations
-            .Setup(client => client.GetConfigurationAsync(Org, Project, View, Compositions.ExecutionKey, It.IsAny<CancellationToken>()))
+            .Setup(client => client.GetConfigurationAsync(Org, Project, View, Compositions.ExecutionKey, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Compositions.ExecutionKey, Hash = effectiveHash, Content = composition.Content() });
     }
 
     private void SetupComposition(string key, Sdk.ConfigurationComposition? composition)
     {
-        var setup = _configurations.Setup(client => client.GetConfigurationCompositionAsync(Org, Project, View, key, It.IsAny<CancellationToken>()));
+        var setup = _configurations.Setup(client => client.GetConfigurationCompositionAsync(Org, Project, View, key, It.IsAny<string>(), It.IsAny<CancellationToken>()));
 
         if (composition is null)
         {

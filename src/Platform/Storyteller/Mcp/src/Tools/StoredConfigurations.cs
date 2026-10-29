@@ -15,7 +15,7 @@ public static class StoredConfigurations
         string key,
         CancellationToken cancellationToken)
     {
-        var effective = await configurations.GetConfigurationAsync(organization, project, view, key, cancellationToken);
+        var effective = await configurations.GetConfigurationAsync(organization, project, view, key, null, cancellationToken);
 
         if (effective.Version <= 0)
         {
