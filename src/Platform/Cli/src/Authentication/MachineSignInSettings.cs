@@ -49,8 +49,11 @@ public sealed class MachineSignInSettings
     public string? View { get; private init; }
 
     // STORYTELLER_KEY, the full key of the annotation a provider of the job reads: a machine targets its project and view
-    // (CommandContext), a user ignores it. Null when unset or not a full key, which GetKind reports.
+    // (CommandContext), a user ignores it. Null when unset or not a full key; an invalid key fails only where it would pick
+    // the target, as -p and STORYTELLER_PROJECT win over it.
     public FullKey? Key { get; private init; }
+
+    public bool IsKeyInvalid { get; private init; }
 
     // Any credential variable is set, valid or not: sform signs in as that machine and never as the stored user.
     // The GitHub Actions variables are not among them: a job with id-token: write may run sform as a user.
@@ -62,8 +65,6 @@ public sealed class MachineSignInSettings
     // The deprecated names that are set: of the credential, and STORYTELLER_API_URL, even next to STORYTELLER_ENDPOINT, as
     // the SDK reports a deprecated credential name next to its canonical one.
     public IReadOnlyList<string> DeprecatedVariables { get; }
-
-    private bool IsKeyInvalid { get; init; }
 
     public static MachineSignInSettings FromEnvironment(Func<string, string?> getVariable)
     {
@@ -133,7 +134,7 @@ public sealed class MachineSignInSettings
         return true;
     }
 
-    // The credential, the endpoint, STORYTELLER_PROJECT and STORYTELLER_KEY are checked; throws AuthenticationException
+    // The credential, the endpoint and STORYTELLER_PROJECT are checked; throws AuthenticationException
     // (Configuration), a new one on every call.
     public MachineSignInKind GetKind()
     {
@@ -155,12 +156,13 @@ public sealed class MachineSignInSettings
             throw Invalid($"{TargetVariables.PROJECT} must be <organization>.<project>.");
         }
 
-        if (IsKeyInvalid)
-        {
-            throw Invalid($"{StorytellerVariables.KEY} must be a full key, @{{organization}}.{{project}}.{{view}}.{{annotation key}}.");
-        }
-
         return kind;
+    }
+
+    // Where STORYTELLER_KEY would pick the target and is no full key.
+    public AuthenticationException InvalidKey()
+    {
+        return Invalid($"{StorytellerVariables.KEY} must be a full key, @{{organization}}.{{project}}.{{view}}.{{annotation key}}.");
     }
 
     // The checked credential variables; throws AuthenticationException (Configuration) as GetKind does.

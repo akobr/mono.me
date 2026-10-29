@@ -304,6 +304,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         var target = _target
             ?? (MachineSignInSettings.TrySplitProject(Settings.Project, out var organization, out var project) ? new ExchangeTarget(organization, project) : null)
             ?? (Settings.Key is { } key ? new ExchangeTarget(key.OrganizationName, key.ProjectName) : null)
+            ?? (Settings.IsKeyInvalid ? throw Settings.InvalidKey() : (ExchangeTarget?)null)
             ?? throw Invalid(
                 $"No project is set for the machine: set {TargetVariables.PROJECT}=<organization>.<project>, set {StorytellerVariables.KEY} to a full key of the project, or pass -p.");
         var token = await GetTokenAsync(credential, target, null, cancellationToken);

@@ -293,7 +293,8 @@ public class CommandContextTests
         exception.Message.ShouldBe("The machine credentials in STORYTELLER_API_KEY belong to acme.billing, not acme.web.");
     }
 
-    // FullKey.TryParse, as the provider parses it: a machine stops at a key that is not a full key, also with -p.
+    // FullKey.TryParse, as the provider parses it: a machine stops at a key that is not a full key where the key would pick
+    // the project; -p and STORYTELLER_PROJECT win over it.
     [Theory]
     [InlineData("acme.billing")]
     [InlineData("@acme.billing")]
@@ -305,10 +306,15 @@ public class CommandContextTests
         _environment[StorytellerVariables.KEY] = key;
         var context = CreateContext();
 
-        var exception = Should.Throw<AuthenticationException>(() => context.TrySetExplicitTarget("acme.billing", null));
+        var exception = Should.Throw<AuthenticationException>(() => context.TrySetExplicitTarget(null, null));
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
         exception.Message.ShouldBe("STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}.");
+
+        CreateContext().TrySetExplicitTarget("acme.billing", null);
+
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+        CreateContext().TrySetExplicitTarget(null, null);
     }
 
     [Theory]

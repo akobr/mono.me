@@ -704,23 +704,27 @@ public class MachineAuthenticationServiceTests
         _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
     }
 
-    // A machine reads STORYTELLER_KEY as the provider does: a key that is not a full key fails every call, before any request.
+    // A machine reads STORYTELLER_KEY as the provider does: a key that is not a full key fails where it would pick the
+    // project, before any request; STORYTELLER_PROJECT wins over it.
     [Fact]
-    public async Task AnInvalidStorytellerKey_FailsEveryCallWithAConfigurationError()
+    public async Task AnInvalidStorytellerKey_FailsOnlyWhereItWouldPickTheProject()
     {
         _environment[StorytellerVariables.KEY] = "@acme.billing";
         UseFederatedFile();
         var service = CreateService();
-        service.BindTarget("acme", "billing");
 
-        var first = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
-        var second = await Should.ThrowAsync<AuthenticationException>(() => service.SignInAsync());
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.SignInAsync());
 
-        first.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
-        first.Message.ShouldBe("STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}.");
-        second.Message.ShouldBe(first.Message);
-        service.TryGetIdentity().ShouldBeNull();
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe("STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}.");
+        service.TryGetIdentity().ShouldNotBeNull();
+        (await service.GetAccessTokenAsync()).ShouldBeNull();
         _http.Requests.ShouldBeEmpty();
+
+        _environment[TargetVariables.PROJECT] = "acme.billing";
+        _http.Respond(HttpStatusCode.OK, $$"""{"access_token":"{{TestTokens.AccessToken(Start.AddMinutes(15))}}","token_type":"Bearer","expires_in":900}""");
+
+        (await CreateService().SignInAsync()).Project.ShouldBe("billing");
     }
 
     [Fact]
