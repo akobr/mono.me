@@ -9,15 +9,17 @@ public sealed class StorytellerVariableReader
 {
     private readonly Func<string, string?> _getVariable;
     private readonly List<string> _setNames = [];
+    private readonly IReadOnlyList<string> _setNamesView;
 
     // The process environment when getVariable is null.
     public StorytellerVariableReader(Func<string, string?>? getVariable = null)
     {
         _getVariable = getVariable ?? Environment.GetEnvironmentVariable;
+        _setNamesView = _setNames.AsReadOnly();
     }
 
     // The names read so far that were set, in the order they were read.
-    public IReadOnlyList<string> SetNames => _setNames.AsReadOnly();
+    public IReadOnlyList<string> SetNames => _setNamesView;
 
     public string? Read(string name)
     {
