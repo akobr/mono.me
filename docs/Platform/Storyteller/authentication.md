@@ -328,7 +328,7 @@ Token valid until 2026-10-18T14:15:00.0000000+00:00.
 **Changes against the earlier machine sign-in.** `sform` signs a machine in through the SDK's credential since the [alignment with the provider contract](specs/2026-10-26%20Align%20the%20OpenAPI%20Document%20and%20sform%20with%20the%20Provider%20Contract.md) (API 0.10). Against the earlier `sform`:
 
 1. `STORYTELLER_ENDPOINT`, `STORYTELLER_CLIENT_CERTIFICATE` and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD` are read; `STORYTELLER_API_URL`, `STORYTELLER_CERTIFICATE_FILE`, `STORYTELLER_CERTIFICATE_PASSWORD` and `STORYTELLER_SUBJECT_TOKEN_FILE` are deprecated, and `sform account` names them. `machine create` prints the canonical names.
-2. `STORYTELLER_TOKEN_FILE` with `STORYTELLER_CLIENT_ID` is a `Federated` machine; it stopped with exit code `2`. `STORYTELLER_API_KEY=ApiKey` is an error; it was sent as the key.
+2. `STORYTELLER_TOKEN_FILE` with `STORYTELLER_CLIENT_ID` is a `Federated` machine; it stopped with exit code `2`. A job that uses a bearer token file and still has `STORYTELLER_CLIENT_ID` set, for example left over from client credentials, now exchanges the file's content as a platform token instead of sending it; remove the client id from such a job. `STORYTELLER_API_KEY=ApiKey` is an error; it was sent as the key.
 3. `STORYTELLER_KEY` is a target of a machine, after `-p` and `STORYTELLER_PROJECT`.
 4. A URL with user info, an endpoint with a query or fragment, and `http` to a host named `loopback` are refused.
 5. A `403`, `404` or redirect of the token endpoint, and a `2xx` without a bearer token, end with `44`; they ended with `3`. So do a redirect, a `4xx` or an answer without a token of the GitHub Actions runner.

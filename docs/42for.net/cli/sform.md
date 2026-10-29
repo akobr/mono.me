@@ -37,7 +37,7 @@ The older names still work, but are deprecated, and `sform account` names them: 
 
 A federated machine has no secret. `sform` exchanges the platform token for a short-lived Storyteller token at the token endpoint of the project, `<STORYTELLER_ENDPOINT>/v1/<organization>/<project>/access/token`, and exchanges again before that token expires. In GitHub Actions it asks the runner for the platform token itself, for the audience of that address, so the audience of the machine's GitHub rule must be exactly that address, in the same case: use the `TokenEndpoint` and the variables that `sform account machine create` prints. A token from a file is sent as it is, so its audience is whatever your platform put in it, and the rule's audience must match that instead. The `TokenEndpoint` is a good choice where you pick the audience yourself, as in the Kubernetes example below.
 
-`STORYTELLER_CLIENT_ID` decides what `STORYTELLER_TOKEN_FILE` holds: without it, a token the API accepts, sent as it is; with it, a token of your platform, which `sform` exchanges.
+`STORYTELLER_CLIENT_ID` decides what `STORYTELLER_TOKEN_FILE` holds: without it, a token the API accepts, sent as it is; with it, a token of your platform, which `sform` exchanges. Earlier versions of `sform` refused the two together, so check that a job with a bearer token file has no `STORYTELLER_CLIENT_ID` left over. They also ended with exit code `3` where a refused token request now ends with `44`, and they made one token request where `sform` now retries transient failures.
 
 ``` yaml
 # GitHub Actions
