@@ -207,12 +207,13 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
 
     // The API resolves every $ref of a schema it parses, on a write of the schema and of each configuration it checks:
     // a reference to a URL would make it fetch the URL from its own network, one to a file read the file. Only
-    // references inside the document are sent. A "$ref" whose value is not a string is a property named "$ref".
+    // references inside the document are sent. A "$ref" whose value is not a string is a property named "$ref". The name
+    // is matched in any case, because Newtonsoft falls back to a case-insensitive match and reads "$REF" as a reference.
     private static void EnsureLocalReferences(JObject schema)
     {
         var external = schema.Descendants()
             .OfType<JProperty>()
-            .FirstOrDefault(property => property.Name == "$ref"
+            .FirstOrDefault(property => string.Equals(property.Name, "$ref", StringComparison.OrdinalIgnoreCase)
                 && property.Value is JValue { Type: JTokenType.String } value
                 && !((string?)value ?? string.Empty).StartsWith('#'));
 
