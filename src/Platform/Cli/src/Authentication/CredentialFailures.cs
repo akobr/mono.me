@@ -21,12 +21,14 @@ internal static class CredentialFailures
         return new AuthenticationException(reason, exception.Message, exception.InnerException);
     }
 
-    // The argument checks of the SDK's factories: a value the variables let through, but the credential refuses.
+    // The argument checks of the SDK's factories and of a binding: a value the variables let through, but the credential
+    // refuses. Requests (GetAuthorizationAsync) report their failures as StorytellerAuthenticationException only.
     public static AuthenticationException Map(ArgumentException exception)
     {
         return new AuthenticationException(AuthenticationFailureReason.Configuration, exception.Message, exception);
     }
 
+    // A null argument is a bug, not a setting, so it is not mapped.
     public static T Guard<T>(Func<T> call)
     {
         try
@@ -37,7 +39,7 @@ internal static class CredentialFailures
         {
             throw Map(exception);
         }
-        catch (ArgumentException exception)
+        catch (ArgumentException exception) when (exception is not ArgumentNullException)
         {
             throw Map(exception);
         }
@@ -50,10 +52,6 @@ internal static class CredentialFailures
             return await call();
         }
         catch (StorytellerAuthenticationException exception)
-        {
-            throw Map(exception);
-        }
-        catch (ArgumentException exception)
         {
             throw Map(exception);
         }
