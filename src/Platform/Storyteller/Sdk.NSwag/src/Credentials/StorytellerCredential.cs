@@ -9,8 +9,9 @@ using System.Threading.Tasks;
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
 // How a machine authenticates to the Storyteller API: an Authorization value, a client certificate, or both.
-// Immutable; an application or a test can derive its own kind.
-public abstract class StorytellerCredential
+// Immutable; an application or a test can derive its own kind. Disposing a credential closes the connections of its token
+// requests; a client certificate stays the caller's.
+public abstract class StorytellerCredential : IDisposable
 {
     // The certificate for mutual TLS, if any.
     public virtual X509Certificate2? ClientCertificate => null;
@@ -73,6 +74,16 @@ public abstract class StorytellerCredential
     {
         ArgumentNullException.ThrowIfNull(binding);
         return this;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
     }
 
     // The seam of tests: token and discovery requests go to this handler instead of the network.

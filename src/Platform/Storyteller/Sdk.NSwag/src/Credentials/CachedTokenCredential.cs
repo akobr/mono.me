@@ -122,6 +122,17 @@ internal abstract class CachedTokenCredential : StorytellerCredential
 
     protected abstract Task<AccessToken> RequestTokenAsync(TokenEndpointClient client, CancellationToken cancellationToken);
 
+    // Every bound copy has a client of its own, so disposing one leaves the others working.
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _client.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
     // The binding's endpoint, or the environment's when unbound; the credential's own value wins over both.
     protected Uri ResolveEndpoint(Uri? own, string purpose)
     {
