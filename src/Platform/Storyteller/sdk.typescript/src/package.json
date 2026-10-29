@@ -1,10 +1,6 @@
 {
   "name": "@42for.net/2splatform.sdk",
-<<<<<<< HEAD
-  "version": "0.10.0",
-=======
-  "version": "0.9.54",
->>>>>>> 5c6ac0f4 (chore(platform): regenerate the SDKs from OpenAPI 0.9.54)
+  "version": "0.10.6",
   "description": "TypeScript SDK for the 2S Platform Storyteller API: fetch functions, Vue Query composables, Zod schemas, MSW mocks, key/value helpers and client-side encryption.",
   "license": "MIT",
   "author": "Ales Kobr",

@@ -121,8 +121,8 @@ public sealed class UnderstandingTools(
         var path = JsonPointer.Parse(pointer, "pointer");
         var keyText = annotationKey.ToString();
 
-        var composition = await configurations.GetConfigurationCompositionAsync(organization, project, view, keyText, cancellationToken);
-        var effective = await configurations.GetConfigurationAsync(organization, project, view, keyText, cancellationToken);
+        var composition = await configurations.GetConfigurationCompositionAsync(organization, project, view, keyText, null, cancellationToken);
+        var effective = await configurations.GetConfigurationAsync(organization, project, view, keyText, null, cancellationToken);
 
         var lookups = ConfigurationExplainer.ValuesStoreKeys(ConfigurationExplainer.BindingsOf(composition, path))
             .Take(ConfigurationExplainer.MaxKeyValueLookups)
@@ -283,7 +283,7 @@ public sealed class UnderstandingTools(
     {
         try
         {
-            return await configurations.GetConfigurationCompositionAsync(organization, project, view, key, cancellationToken);
+            return await configurations.GetConfigurationCompositionAsync(organization, project, view, key, null, cancellationToken);
         }
         catch (Sdk.ApiException exception) when (exception.StatusCode == 404)
         {

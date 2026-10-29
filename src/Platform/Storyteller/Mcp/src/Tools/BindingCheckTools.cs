@@ -35,7 +35,7 @@ public sealed class BindingCheckTools(Sdk.IConfigurationsApiClient configuration
         CancellationToken cancellationToken = default)
     {
         var annotationKey = AnnotationKeys.Parse(key).ToString();
-        var effective = await configurations.GetConfigurationAsync(organization, project, view, annotationKey, cancellationToken);
+        var effective = await configurations.GetConfigurationAsync(organization, project, view, annotationKey, null, cancellationToken);
         var stored = ToolResults.ToToken(effective.Content) as JObject ?? new JObject();
 
         // a binding in the $context of an object binding is replaced together with that object
@@ -53,7 +53,7 @@ public sealed class BindingCheckTools(Sdk.IConfigurationsApiClient configuration
 
         try
         {
-            var read = await configurations.GetResolvedConfigurationAsync(organization, project, view, annotationKey, cancellationToken);
+            var read = await configurations.GetResolvedConfigurationAsync(organization, project, view, annotationKey, null, cancellationToken);
             resolved = ToolResults.ToToken(read.Content) as JObject ?? new JObject();
         }
         catch (Sdk.ApiException exception)

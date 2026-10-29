@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.0.13575
+ * OpenAPI spec version: 0.10.6.40696
  */
 import * as zod from "zod";
 
@@ -36,6 +36,7 @@ export const GetConfigurationSchemaResponse = zod.object({
             .default(getConfigurationSchemaResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -82,6 +83,7 @@ export const SetConfigurationSchemaResponse = zod.object({
             .default(setConfigurationSchemaResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -126,6 +128,7 @@ export const GetAnnotationSchemaResponse = zod.object({
             .default(getAnnotationSchemaResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -168,6 +171,7 @@ export const SetAnnotationSchemaResponse = zod.object({
             .default(setAnnotationSchemaResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -209,6 +213,7 @@ export const GetDescendantTypeSchemaResponse = zod.object({
             .default(getDescendantTypeSchemaResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -252,6 +257,7 @@ export const SetDescendantTypeSchemaResponse = zod.object({
             .default(setDescendantTypeSchemaResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -301,6 +307,7 @@ export const GetCombinedConfigurationSchemaResponse = zod.object({
                   ),
                 Id: zod.string().optional(),
                 Name: zod.string().optional(),
+                Via: zod.string().optional(),
               })
               .optional(),
           })
@@ -339,6 +346,7 @@ export const GetConfigurationSchemasResponseItem = zod.object({
             .default(getConfigurationSchemasResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -373,6 +381,7 @@ export const GetSchemaVersionsResponseItem = zod.object({
             .default(getSchemaVersionsResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -413,6 +422,7 @@ export const GetSchemaVersionResponse = zod.object({
             .default(getSchemaVersionResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -571,6 +581,7 @@ export const GetAnnotationSchemaVersionsResponseItem = zod.object({
             .default(getAnnotationSchemaVersionsResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -607,6 +618,7 @@ export const GetAnnotationSchemaVersionResponse = zod.object({
             .default(getAnnotationSchemaVersionResponseModifiedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -760,6 +772,7 @@ export const GetDescendantTypeSchemaVersionsResponseItem = zod.object({
             ),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })
@@ -799,6 +812,7 @@ export const GetDescendantTypeSchemaVersionResponse = zod.object({
             ),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
+          Via: zod.string().optional(),
         })
         .optional(),
     })

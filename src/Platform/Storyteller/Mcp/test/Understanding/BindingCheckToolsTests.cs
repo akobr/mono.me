@@ -32,7 +32,7 @@ public class BindingCheckToolsTests
             }
             """);
         _configurations
-            .Setup(client => client.GetResolvedConfigurationAsync(Org, Project, View, Key, It.IsAny<CancellationToken>()))
+            .Setup(client => client.GetResolvedConfigurationAsync(Org, Project, View, Key, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration
             {
                 Content = JObject.Parse($$"""{"password": "{{Secret}}", "host": "@db.host", "plain": "x", "list": ["{{Secret}}-region"], "rule": 5}"""),
@@ -57,7 +57,7 @@ public class BindingCheckToolsTests
     {
         Effective("""{"password": "@secret(db.password)"}""");
         _configurations
-            .Setup(client => client.GetResolvedConfigurationAsync(Org, Project, View, Key, It.IsAny<CancellationToken>()))
+            .Setup(client => client.GetResolvedConfigurationAsync(Org, Project, View, Key, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Sdk.ApiException<Sdk.ErrorResponse>(
                 $"Binding failed near {Secret}",
                 422,
@@ -83,7 +83,7 @@ public class BindingCheckToolsTests
         var result = await new BindingCheckTools(_configurations.Object).CheckConfigurationBindings(Org, Project, Key, View);
 
         JObject.Parse(result.StructuredContent!.Value.GetRawText())["Bindings"]!.ShouldBeEmpty();
-        _configurations.Verify(client => client.GetResolvedConfigurationAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _configurations.Verify(client => client.GetResolvedConfigurationAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static Dictionary<string, bool> Bindings(ModelContextProtocol.Protocol.CallToolResult result)
@@ -95,7 +95,7 @@ public class BindingCheckToolsTests
     private void Effective(string json)
     {
         _configurations
-            .Setup(client => client.GetConfigurationAsync(Org, Project, View, Key, It.IsAny<CancellationToken>()))
+            .Setup(client => client.GetConfigurationAsync(Org, Project, View, Key, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Content = JObject.Parse(json) });
     }
 }
