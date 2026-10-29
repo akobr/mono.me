@@ -26,7 +26,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     private readonly IFileSystem _fileSystem;
     private readonly TimeProvider _time;
     private readonly MachineCredentialHooks _hooks;
-    private readonly Lazy<LoadedCredential> _credential;
+    private readonly Lazy<LoadResult> _credential;
     private readonly object _bindingLock = new();
 
     // Copies replaced by a binding to another target; a call may still use one, so they are disposed with the service.
@@ -49,7 +49,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         _fileSystem = fileSystem;
         _time = time;
         _hooks = hooks;
-        _credential = new Lazy<LoadedCredential>(Load);
+        _credential = new Lazy<LoadResult>(Load);
     }
 
     public MachineSignInSettings Settings { get; }
@@ -63,12 +63,12 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
 
     public MachineIdentity? TryGetIdentity()
     {
-        return IsConfigured && _credential.Value.Failure is null ? _credential.Value.Identity : null;
+        return IsConfigured ? _credential.Value.Credential?.Identity : null;
     }
 
     public X509Certificate2? TryGetCertificate()
     {
-        return IsConfigured && _credential.Value.Failure is null ? _credential.Value.Credential.ClientCertificate : null;
+        return IsConfigured ? _credential.Value.Credential?.Credential.ClientCertificate : null;
     }
 
     public async Task<MachineIdentity> SignInAsync(CancellationToken cancellationToken = default)
@@ -179,8 +179,8 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
 
         if (_credential.IsValueCreated)
         {
-            _credential.Value.Credential?.Dispose();
-            _credential.Value.Credential?.ClientCertificate?.Dispose();
+            _credential.Value.Credential?.Credential.Dispose();
+            _credential.Value.Credential?.Credential.ClientCertificate?.Dispose();
         }
     }
 
@@ -229,16 +229,14 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
             throw Invalid("No machine sign-in variable is set.");
         }
 
-        var credential = _credential.Value;
-        var failure = credential.Failure;
+        var (credential, failure) = _credential.Value;
 
         // A new exception on every call: the cached one keeps the reason and the message.
-        return failure is null
-            ? credential
-            : throw new AuthenticationException(failure.Reason, failure.Message, failure.InnerException);
+        return credential
+            ?? throw new AuthenticationException(failure!.Reason, failure.Message, failure.InnerException);
     }
 
-    private LoadedCredential Load()
+    private LoadResult Load()
     {
         StorytellerCredential? credential = null;
 
@@ -291,12 +289,13 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 _ => new MachineIdentity(kind, names, null, null, null),
             };
 
-            return new LoadedCredential(identity, credential, endpoint, null);
+            return new LoadResult(new LoadedCredential(identity, credential, endpoint), null);
         }
         catch (AuthenticationException exception)
         {
+            credential?.Dispose();
             credential?.ClientCertificate?.Dispose();
-            return new LoadedCredential(null!, null!, null!, exception);
+            return new LoadResult(null, exception);
         }
     }
 
@@ -412,6 +411,8 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     private sealed record LoadedCredential(
         MachineIdentity Identity,
         StorytellerCredential Credential,
-        Uri Endpoint,
-        AuthenticationException? Failure);
+        Uri Endpoint);
+
+    // The loaded credential, or why it could not be loaded.
+    private sealed record LoadResult(LoadedCredential? Credential, AuthenticationException? Failure);
 }
