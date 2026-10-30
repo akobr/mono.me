@@ -4,15 +4,15 @@
     "userAgent": "42.sform.cli"
   },
   "authentication": {
-    "tenantId": "",
-    "clientId": ""
+    "provider": "AuthKit",
+    "clientId": "client_01M3MMV9SP2W3D7VDZ3242KJNR"
   },
   "logging": {
     "logFilePath": "logs/cli.log",
     "sentryDsn": ""
   },
   "telemetry": {
-    "postHogProjectToken": "phc_uGDiouxjcaRUArCSCi3knvAbub5eoCorCg8c9Wam7yke",
+    "postHogProjectToken": "",
     "postHogHost": "https://eu.i.posthog.com"
   }
 }
