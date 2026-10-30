@@ -45,16 +45,21 @@ Switch the dashboard to the **Staging** environment first; settings of Productio
 
 After changing WorkOS settings, clear the client's OAuth state and sign in again: a refresh token can keep the old audience.
 
-## 4. API settings (`src/Platform/Storyteller/Api.Functions/src/local.settings.json`)
+## 4. API settings
 
-The AuthKit part already points at staging (`Auth:Provider` `AuthKit`, `Auth:AuthKit:Issuer` the AuthKit domain). For the MCP server add the actor of the token exchange:
+The API, the MCP server and `sform` read **user secrets in the `Development` environment**, after their own settings files, so a user secret overrides a value of `local.settings.json`, `appsettings*.json` or `app.config.json`. Keep local and secret values there and the tracked files unchanged. The keys are the configuration keys (`:` between sections).
 
-```json
-"Auth:TokenExchange:Enabled": true,
-"Auth:TokenExchange:Actors:0:Id": "mcp",
-"Auth:TokenExchange:Actors:0:Authentication:ClientSecretHash": "<hex SHA-256 of the MCP secret>",
-"Auth:TokenExchange:Actors:0:SubjectAudiences:0": "https://localhost:7180/mcp"
+`local.settings.json` sets `DOTNET_ENVIRONMENT` to `Development` and already points at AuthKit staging (`Auth:Provider` `AuthKit`, `Auth:AuthKit:Issuer` the AuthKit domain). Add the actor of the token exchange for the MCP server as user secrets of the API:
+
+```sh
+cd src/Platform/Storyteller/Api.Functions/src
+dotnet user-secrets set "Auth:TokenExchange:Enabled" "true"
+dotnet user-secrets set "Auth:TokenExchange:Actors:0:Id" "mcp"
+dotnet user-secrets set "Auth:TokenExchange:Actors:0:Authentication:ClientSecretHash" "<hex SHA-256 of the MCP secret>"
+dotnet user-secrets set "Auth:TokenExchange:Actors:0:SubjectAudiences:0" "https://localhost:7180/mcp"
 ```
+
+The same keys also work in the `Values` of `local.settings.json`; a user secret wins over them.
 
 - An actor without `ClientSecretHash` (or another proof) and `SubjectAudiences` stops the API at start.
 - Do not add `Auth:TokenExchange:AdditionalIssuers` for the AuthKit domain: `Auth:AuthKit:Issuer` already is that domain, and listing it again stops the API at start.
@@ -71,7 +76,7 @@ The **hash** goes to the API, the **secret itself** to the MCP server. Giving th
 
 ## 5. MCP server settings
 
-`src/Platform/Storyteller/Mcp/src/appsettings.Development.json` (tracked, so keep secrets out of it):
+`src/Platform/Storyteller/Mcp/src/appsettings.Development.json` (tracked, so keep secrets out of it), or the same keys as user secrets of the MCP server:
 
 ```json
 {
@@ -110,6 +115,17 @@ dotnet run --project src/Platform/Aspire.Host/src --launch-profile https-local-c
 1. Wait for `cosmos`, `storage`, `keyvault` and `api-functions`. Run `db-creator` once for a new database (with `BaseAccount:Id` = your WorkOS `user_…` id in the host's user secrets).
 2. Start `mcp` from the dashboard. Its console log shows `The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: https://localhost:7180/mcp.` and `Now listening on: https://localhost:<random port>`; always use port 7180, the proxy.
 3. Make sure you have an account in the local database: sign in once through the admin UI or `sform` against `http://localhost:7071/api` (sform reads the AuthKit details from `v1/auth/configuration`).
+
+   Run from source in `Development`, `sform` takes its local address from a user secret instead of an edit of `app.config.json`:
+
+   ```powershell
+   cd src/Platform/Cli/src
+   dotnet user-secrets set "general:baseUrl" "http://localhost:7071/api"
+   $env:DOTNET_ENVIRONMENT = "Development"
+   dotnet run -- account register
+   ```
+
+   The installed `sform` tool never reads user secrets.
 
 Checks:
 

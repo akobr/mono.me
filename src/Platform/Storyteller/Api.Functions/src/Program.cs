@@ -37,6 +37,14 @@ var host = new HostBuilder()
         worker.UseMiddleware<MachineAuthenticationMiddleware>();
         worker.UseMiddleware<BearerAuthenticationMiddleware>();
     })
+    .ConfigureAppConfiguration((context, configuration) =>
+    {
+        // Development only: user secrets override local.settings.json, whose values reach the worker as environment variables.
+        if (context.HostingEnvironment.IsDevelopment())
+        {
+            configuration.AddUserSecrets(typeof(Program).Assembly, optional: true);
+        }
+    })
     .ConfigureServices((context, services) =>
     {
         // Registered after the OpenAPI extension's own singleton, so this one is used.
