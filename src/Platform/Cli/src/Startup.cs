@@ -77,6 +77,12 @@ namespace _42.Platform.Cli
             builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
             builder.AddJsonFile(Constants.ACCESS_DEFAULT_JSON, true, false);
             builder.AddJsonFile(Constants.EDITOR_CONFIG_JSON, true, false);
+
+            // Development only (DOTNET_ENVIRONMENT, a run from source): user secrets override app.config.json.
+            if (Environment.IsDevelopment())
+            {
+                builder.AddUserSecrets(typeof(Startup).Assembly, optional: true);
+            }
         }
 
         /// <summary>
