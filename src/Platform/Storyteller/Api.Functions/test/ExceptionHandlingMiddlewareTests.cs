@@ -121,6 +121,30 @@ public class ExceptionHandlingMiddlewareTests
     }
 
     [Fact]
+    public async Task Invoke_FailingBindingUnderAKeyComputedFromASecret_LogsTheStoredPath()
+    {
+        var source = new SecretSource();
+        var content = """
+            {
+              "a": {
+                "$binding": "jsone",
+                "$definition": { "${s}": "@a." },
+                "$context": { "s": "@value" }
+              }
+            }
+            """;
+
+        var (response, body, logger) = await ResolveThroughMiddlewareAsync(content, source);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        body.ShouldNotContain(Secret);
+        using var json = JsonDocument.Parse(body);
+        json.RootElement.GetProperty(nameof(Models.ErrorResponse.ErrorCode)).GetString().ShouldBe("binding.evaluation");
+        ShouldLogNoSecret(logger);
+        logger.Entries.ShouldHaveSingleItem().Message.ShouldBe("Binding evaluation failed (binding.evaluation) at a.");
+    }
+
+    [Fact]
     public async Task Invoke_TheIssuesFortyKilobyteBinding_Responds422ExpressionLength()
     {
         var raw = NestedCalls(10_000);

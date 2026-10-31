@@ -9,6 +9,9 @@ namespace _42.Platform.Storyteller.Binding.Object;
 /// One <see cref="EvaluationMeter"/> bounds the work of all envelopes in one read (see <see cref="ObjectBindingLimits"/>).
 /// Every string binding gets the same scope, so its reads record into one <see cref="BindingScope.Dependencies"/>.
 /// JSON-e can read the clock, and a string executor that does not record hides its reads; both make the manifest volatile.
+/// The result of an envelope is walked again, so it can hold more bindings. Their paths and texts are computed and can carry
+/// an evaluated value, even a secret: a failure inside a result is reported at the path of the stored envelope that produced it,
+/// with a fixed message.
 /// </summary>
 public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver, IRecordingBinding
 {
@@ -43,7 +46,7 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(scope);
         var budget = new EvaluationBudget(_limits, _timeProvider);
-        await ResolveTokenAsync(content, includeSecrets, scope, depth: 0, isRoot: true, budget);
+        await ResolveTokenAsync(content, includeSecrets, scope, depth: 0, isRoot: true, budget, emittedBy: null);
 
         if (budget.Count > 0 && _logger?.IsEnabled(LogLevel.Debug) == true)
         {
@@ -89,31 +92,33 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         return obj.Property(BindingProperty)?.Value.Type == JTokenType.String;
     }
 
+    // emittedBy is the path of the stored envelope whose result holds the token, or null for the stored document itself
     private async ValueTask<JToken> ResolveTokenAsync(
         JToken token,
         bool includeSecrets,
         BindingScope scope,
         int depth,
         bool isRoot,
-        EvaluationBudget budget)
+        EvaluationBudget budget,
+        string? emittedBy)
     {
         switch (token)
         {
             case JValue value when value.Type == JTokenType.String:
-                return await BindStringAsync(value, includeSecrets, scope);
+                return await BindStringAsync(value, includeSecrets, scope, emittedBy);
 
             case JArray array:
             {
                 for (var index = 0; index < array.Count; index++)
                 {
-                    array[index] = await ResolveTokenAsync(array[index], includeSecrets, scope, depth, isRoot: false, budget);
+                    array[index] = await ResolveTokenAsync(array[index], includeSecrets, scope, depth, isRoot: false, budget, emittedBy);
                 }
 
                 return array;
             }
 
             case JObject obj:
-                return await ResolveObjectAsync(obj, includeSecrets, scope, depth, isRoot, budget);
+                return await ResolveObjectAsync(obj, includeSecrets, scope, depth, isRoot, budget, emittedBy);
 
             default:
                 return token;
@@ -126,11 +131,12 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         BindingScope scope,
         int depth,
         bool isRoot,
-        EvaluationBudget budget)
+        EvaluationBudget budget,
+        string? emittedBy)
     {
         if (TryReadEnvelope(obj, out var kind, out var definition, out var context, out var error))
         {
-            var path = DisplayPath(obj);
+            var path = emittedBy ?? DisplayPath(obj);
             if (error is not null)
             {
                 throw new BindingEvaluationException(
@@ -152,7 +158,7 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
                     scope);
             }
 
-            var resolvedContext = await ResolveContextAsync(context, includeSecrets, scope, depth + 1, path, budget);
+            var resolvedContext = await ResolveContextAsync(context, includeSecrets, scope, depth + 1, path, budget, emittedBy);
             if (budget.Count >= _limits.MaxEnvelopeEvaluations)
             {
                 throw LimitExceeded(
@@ -177,7 +183,7 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
             JToken result;
             try
             {
-                result = ObjectBindingEngine.Evaluate(kind!, definition!, resolvedContext, budget.Meter);
+                result = ObjectBindingEngine.Evaluate(kind!, definition!, resolvedContext, budget.Meter, emitted: emittedBy is not null);
             }
             catch (EvaluationLimitExceededException exception)
             {
@@ -217,15 +223,15 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
                 }
 
                 ReplaceContents(obj, resultObject);
-                return await ResolveTokenAsync(obj, includeSecrets, scope, depth + 1, isRoot: true, budget);
+                return await ResolveTokenAsync(obj, includeSecrets, scope, depth + 1, isRoot: true, budget, path);
             }
 
-            return await ResolveTokenAsync(result, includeSecrets, scope, depth + 1, isRoot: false, budget);
+            return await ResolveTokenAsync(result, includeSecrets, scope, depth + 1, isRoot: false, budget, path);
         }
 
         foreach (var property in obj.Properties().ToList())
         {
-            property.Value = await ResolveTokenAsync(property.Value, includeSecrets, scope, depth, isRoot: false, budget);
+            property.Value = await ResolveTokenAsync(property.Value, includeSecrets, scope, depth, isRoot: false, budget, emittedBy);
         }
 
         return obj;
@@ -237,14 +243,15 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         BindingScope scope,
         int depth,
         string path,
-        EvaluationBudget budget)
+        EvaluationBudget budget,
+        string? emittedBy)
     {
         if (context is null)
         {
             return new JObject();
         }
 
-        var resolved = await ResolveTokenAsync(context, includeSecrets, scope, depth, isRoot: false, budget);
+        var resolved = await ResolveTokenAsync(context, includeSecrets, scope, depth, isRoot: false, budget, emittedBy);
         if (resolved is not JObject resolvedObject)
         {
             throw new BindingEvaluationException(
@@ -254,6 +261,36 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         }
 
         return resolvedObject;
+    }
+
+    private async ValueTask<JToken> BindStringAsync(JValue value, bool includeSecrets, BindingScope scope, string? emittedBy)
+    {
+        if (emittedBy is null)
+        {
+            return await BindStringAsync(value, includeSecrets, scope);
+        }
+
+        // A string in a result: its JSON path and its text are computed, so neither may reach the message or the log.
+        try
+        {
+            return await BindStringAsync(value, includeSecrets, scope);
+        }
+        catch (EvaluationLimitExceededException exception)
+        {
+            throw new EvaluationLimitExceededException(
+                exception.Kind,
+                exception.Limit,
+                $"Failed to process the object binding for '{emittedBy}': a data binding in its result exceeds the {exception.Kind} limit of {exception.Limit}.",
+                emittedBy,
+                exception);
+        }
+        catch (BindingEvaluationException exception)
+        {
+            throw new BindingEvaluationException(
+                $"Failed to process the object binding for '{emittedBy}': a data binding in its result cannot be evaluated.",
+                emittedBy,
+                exception);
+        }
     }
 
     private async ValueTask<JToken> BindStringAsync(JValue value, bool includeSecrets, BindingScope scope)
@@ -336,7 +373,7 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
 
         if (!known)
         {
-            error = $"Unknown object binding '{kind}'.";
+            error = $"Unknown object binding: $binding must be '{ObjectBindingEngine.JsonEKind}' or '{ObjectBindingEngine.JsonLogicKind}'.";
             return true;
         }
 
@@ -350,7 +387,7 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         {
             if (property.Name is not (BindingProperty or DefinitionProperty or ContextProperty))
             {
-                error = $"Unexpected property '{property.Name}' on an object binding.";
+                error = "An object binding allows only $binding, $definition and $context.";
                 return true;
             }
         }

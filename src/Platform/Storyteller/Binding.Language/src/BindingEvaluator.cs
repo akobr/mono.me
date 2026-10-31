@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json;
@@ -89,7 +90,9 @@ public sealed class BindingEvaluator
     {
         if (token is JValue { Type: JTokenType.Integer or JTokenType.Float, Value: { } raw })
         {
-            return Convert.ToDecimal(raw, CultureInfo.InvariantCulture);
+            // Newtonsoft holds an integer past long as a BigInteger, which is not IConvertible; past decimal, the cast
+            // throws OverflowException like Convert does, and EvaluateMathAsync reports it.
+            return raw is BigInteger big ? (decimal)big : Convert.ToDecimal(raw, CultureInfo.InvariantCulture);
         }
 
         throw new BindingEvaluationException(

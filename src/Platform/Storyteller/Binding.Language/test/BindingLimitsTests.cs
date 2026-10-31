@@ -14,8 +14,10 @@ public class BindingLimitsTests
 {
     private const string Secret = "SECRET_SENTINEL";
 
+    // The MCP reader (Mcp/src/Understanding/BindingExpressions.cs) uses the same values; no project references both, so
+    // each side pins them.
     [Fact]
-    public void Limits_MatchTheMcpReader()
+    public void Limits_ArePinnedToTheMcpReadersValues()
     {
         BindingExpressionLimits.MaxLength.Should().Be(8192);
         BindingExpressionLimits.MaxDepth.Should().Be(64);

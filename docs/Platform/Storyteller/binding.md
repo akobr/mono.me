@@ -143,10 +143,11 @@ A message names the kind of a value, never the value, because a resolved value c
 
 - In the `@` language, a math operand that is not a number is named by its JSON type, and the messages of `@config` and `@annotation` do not quote their arguments.
 - The vendored JSON-e has four messages that quote an evaluated value. `ObjectBindingEngine` replaces them with fixed ones, for example `A called value is not a function.` `unknown context value` keeps its name only when the name is a whole word of the `$definition`.
-- Every JSON Logic failure answers `JSON Logic evaluation failed.`, because the library's messages are not all verified.
-- Any other engine exception is named by its type.
+- A `JsonLogicException` answers `JSON Logic evaluation failed.`, because the library's messages are not all verified.
+- Any other exception from either engine, for example an `OverflowException` from JSON Logic arithmetic, is named by its type.
+- The result of an envelope is walked again, so it can hold more envelopes and `@` strings. Their keys, paths, kinds and definitions are computed and can carry an evaluated value. A failure inside a result is therefore reported at the path of the stored envelope that produced it, with a fixed message: `a data binding in its result cannot be evaluated` (or `exceeds the <kind> limit of <limit>`, which keeps the `Kind` and `Limit`), `JSON-e evaluation failed.`, or the fixed messages of a malformed envelope.
 
-The API logs a binding failure at Warning with its code and path, and with the kind and limit of a limit. It never logs the message.
+The API logs a binding failure at Warning with its code and path, and with the kind and limit of a limit. It never logs the message. The path is the stored one, also for a failure inside a result.
 
 With `?format=` the endpoint has one more 422 after the evaluation: a resolved document that the format cannot represent, for example a binding that returns an object with a `:` in a name, answers `format.<rule>` with the rule and the JSON path in `Details` (see [the API of the formats](configuration-formats.md#the-api)).
 
@@ -212,6 +213,8 @@ Provides integration with Azure Key Vault:
 ### `@config("<expr>")`
 
 Reads a value out of the *same* configuration document currently being resolved. `<expr>` is a JSONPath expression (leading `$`, e.g. `"$.a.b"`) or a JSON Pointer (leading `/` or empty, e.g. `"/a/b"`); the dialect is auto-detected from the leading character. Implemented by `ConfigBindingFunction` in `Binding.Language`.
+
+A JSONPath query is bounded on its own, because it can be computed (for example `@config(@config("/q"))` reads the query from the document), so the limits of the `@` string do not cover it. A query longer than 8,192 characters answers `binding.limit.expressionLength`. A query with more than 64 `[` and `(` in total answers `binding.limit.depth`, because the JSONPath parser recurses once per nested filter. A `=~` filter matches each value with a timeout of 200 ms (`JsonQuery.RegexMatchTimeout`), and a timeout answers `binding.evaluation`. The same applies to `@annotation`.
 
 `@config` always resolves against an immutable snapshot of the configuration taken *before* the binding pass started (see `CosmosConfigurationService.GetResolvedConfigurationInternalAsync`), so the result never depends on the order in which properties are processed and never reflects other bindings' resolved output.
 
