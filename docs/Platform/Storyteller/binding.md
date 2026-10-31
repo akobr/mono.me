@@ -217,7 +217,7 @@ Reads a value out of the *same* configuration document currently being resolved.
 A JSONPath query has limits of its own, because it can be computed (for example `@config(@config("/q"))` reads the query from the document), so the limits of the `@` string do not cover it. The JSONPath engine (Newtonsoft) recurses once per nested filter while parsing and once per path segment while evaluating, without a guard of its own.
 
 - A query longer than 8,192 characters answers `binding.limit.expressionLength`.
-- A query with more than 64 `.`, `[` and `(` in total answers `binding.limit.depth`.
+- A query with more than 64 `.`, `[` and `(` in total answers `binding.limit.depth`. These counts, like the ones below, include characters inside quoted names and literals (`$['a.b']`, `10.5`).
 - A query may use at most one recursive descent (`..`), and `$` at most once after its start: a root reference inside a filter, or the end anchor of a regular expression. Chained, either makes the time exponential in a short query over a small document. Such a query answers `binding.evaluation`.
 - A `=~` filter matches each value with a timeout of 200 ms (`JsonQuery.RegexMatchTimeout`), and a timeout answers `binding.evaluation`.
 
