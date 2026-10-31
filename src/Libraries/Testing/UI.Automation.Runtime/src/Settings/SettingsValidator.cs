@@ -1,4 +1,5 @@
 using _42.Testing.UI.Automation.Runtime.Access;
+using _42.Testing.UI.Automation.Runtime.Browsers;
 using _42.Testing.UI.Automation.Runtime.Reporting;
 
 namespace _42.Testing.UI.Automation.Runtime.Settings;
@@ -225,7 +226,45 @@ internal static class SettingsValidator
             errors.Add($"BrowserStack:Browser '{browserStack.Browser}' is not one of: {string.Join(", ", BrowserStackSettings.Browsers.Keys)}.");
         }
 
+        // The endpoint is shown without its query: a pasted caps URL holds the access key.
+        if (!Uri.TryCreate(browserStack.Endpoint, UriKind.Absolute, out var endpoint) || (endpoint.Scheme != Uri.UriSchemeWs && endpoint.Scheme != Uri.UriSchemeWss))
+        {
+            errors.Add($"BrowserStack:Endpoint must be an absolute ws or wss URL; it is '{BrowserStackCapabilities.Describe(browserStack.Endpoint ?? string.Empty)}'.");
+        }
+        else if (endpoint.Query.Contains("caps=", StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add("BrowserStack:Endpoint must not have a caps parameter; the provider adds it from the BrowserStack section.");
+        }
+
+        if (string.IsNullOrWhiteSpace(browserStack.Os) || string.IsNullOrWhiteSpace(browserStack.OsVersion))
+        {
+            errors.Add("BrowserStack:Os and BrowserStack:OsVersion are required, e.g. Windows and 11, or OS X and Tahoe.");
+        }
+
+        if (!BrowserStackSettings.ConsoleLevels.Contains(browserStack.Console, StringComparer.OrdinalIgnoreCase))
+        {
+            errors.Add($"BrowserStack:Console '{browserStack.Console}' is not one of: {string.Join(", ", BrowserStackSettings.ConsoleLevels)}.");
+        }
+
+        if (browserStack.Build is not null)
+        {
+            errors.AddRange(RunNameFormatter.Validate(browserStack.Build).Select(error => $"BrowserStack:Build: {error}"));
+        }
+
+        foreach (var key in browserStack.AdditionalCapabilities.Keys)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                errors.Add("BrowserStack:AdditionalCapabilities has an empty key.");
+            }
+            else if (BrowserStackCapabilities.IsCredential(key))
+            {
+                errors.Add($"BrowserStack:AdditionalCapabilities must not set {key}; use BrowserStack:Username and BrowserStack:AccessKey.");
+            }
+        }
+
         RequireAtLeast(browserStack.MaxParallelSessions, 1, "BrowserStack:MaxParallelSessions", errors);
+        RequireAtLeast(browserStack.ConnectTimeoutSeconds, 1, "BrowserStack:ConnectTimeoutSeconds", errors);
     }
 
     private static void RequireAtLeast(int value, int minimum, string name, List<string> errors)

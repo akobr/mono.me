@@ -21,4 +21,11 @@ public interface IBrowserProvider : IAsyncDisposable
 
     // result: the test's report, known at release, e.g. for the pass/fail status of a remote session.
     ValueTask ReleaseAsync(BrowserLease lease, TestResultReport? result, CancellationToken cancellationToken);
+
+    // The final report of the test is known (AutomationSession.Report), whether it acquired a browser or not: an
+    // attribute skipped it, it was blocked before its browser, or its last attempt ended. A provider that shares a
+    // remote session between tests closes it once its tests are done. Never throws.
+    void TestCompleted(TestIdentity test)
+    {
+    }
 }

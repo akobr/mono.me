@@ -208,6 +208,77 @@ public sealed class SettingsLoaderTests
     }
 
     [Fact]
+    public void Load_ChecksTheBrowserStackSection_WithoutShowingACapsQuery()
+    {
+        var files = Files(("testsettings.json", """
+            {
+              "Target": { "BaseUrl": "https://admin.example.test" },
+              "Browser": { "Provider": "BrowserStack" },
+              "BrowserStack": {
+                "Username": "ada", "AccessKey": "bs-key-456", "Endpoint": "https://cdp.browserstack.com/playwright?caps=bs-key-456",
+                "Os": "", "Console": "loud", "Build": "{Nightly}", "ConnectTimeoutSeconds": 0,
+                "AdditionalCapabilities": { "browserstack.accessKey": "bs-key-456", "browserstack.idleTimeout": "300" }
+              }
+            }
+            """));
+
+        var exception = Should.Throw<UiAutomationSettingsException>(() => Load(files));
+
+        exception.Errors.ShouldBe(
+        [
+            "BrowserStack:Endpoint must be an absolute ws or wss URL; it is 'https://cdp.browserstack.com/playwright'.",
+            "BrowserStack:Os and BrowserStack:OsVersion are required, e.g. Windows and 11, or OS X and Tahoe.",
+            "BrowserStack:Console 'loud' is not one of: disable, errors, warnings, info, verbose.",
+            "BrowserStack:Build: the placeholder {Nightly} is unknown; use one of {RunId}, {Date}, {Time}, {Profile}, {Provider}, {Engine}, {Device}, {Branch}, {Sha7}, {BuildNumber}, {Machine}.",
+            "BrowserStack:AdditionalCapabilities must not set browserstack.accessKey; use BrowserStack:Username and BrowserStack:AccessKey.",
+            "BrowserStack:ConnectTimeoutSeconds must be at least 1.",
+        ]);
+        exception.Message.ShouldNotContain("bs-key-456");
+    }
+
+    [Fact]
+    public void Load_RefusesAnEndpointWithItsOwnCaps()
+    {
+        var files = Files(("testsettings.json", """
+            {
+              "Target": { "BaseUrl": "https://admin.example.test" },
+              "Browser": { "Provider": "BrowserStack" },
+              "BrowserStack": { "Username": "ada", "AccessKey": "bs-key-456", "Endpoint": "wss://cdp.browserstack.com/playwright?caps=%7B%7D" }
+            }
+            """));
+
+        var exception = Should.Throw<UiAutomationSettingsException>(() => Load(files));
+
+        exception.Errors.ShouldHaveSingleItem().ShouldBe("BrowserStack:Endpoint must not have a caps parameter; the provider adds it from the BrowserStack section.");
+    }
+
+    [Fact]
+    public void Load_BindsTheBrowserStackSection()
+    {
+        var files = Files(("testsettings.json", """
+            {
+              "Target": { "BaseUrl": "https://admin.example.test" },
+              "Users": { "Pool": [ { "Email": "ui-01@example.test" } ] },
+              "Browser": { "Provider": "BrowserStack" },
+              "BrowserStack": {
+                "Username": "ada", "Browser": "playwright-webkit", "Os": "OS X", "OsVersion": "Tahoe", "Endpoint": "ws://localhost:4242/",
+                "BuildTag": "nightly", "AdditionalCapabilities": { "browserstack.idleTimeout": "300" }
+              }
+            }
+            """));
+
+        var settings = Load(files, environment: new Dictionary<string, string?> { ["UITESTS_BrowserStack__AccessKey"] = "bs-key-456" });
+
+        settings.BrowserStack.AccessKey.ShouldBe("bs-key-456");
+        settings.BrowserStack.Endpoint.ShouldBe("ws://localhost:4242/");
+        settings.BrowserStack.BuildTag.ShouldBe("nightly");
+        settings.BrowserStack.AdditionalCapabilities.ShouldBe(new Dictionary<string, string> { ["browserstack.idleTimeout"] = "300" });
+        settings.EffectiveEngine.ShouldBe(BrowserEngine.Webkit);
+        settings.Describe().ShouldContain("BrowserStack:AccessKey = ***");
+        settings.Describe().ShouldNotContain("bs-key-456");
+    }
+
+    [Fact]
     public void Load_RequiresAPassword_WhenTheSignInFlowNeedsOne()
     {
         var files = Files(("testsettings.json", Configured));

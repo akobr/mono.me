@@ -1,0 +1,16 @@
+{
+  // The suite on BrowserStack in Safari's engine on macOS: Playwright's WebKit build (BrowserStack runs no branded
+  // Safari for Playwright) on OS X Tahoe (macOS 26), the newest macOS BrowserStack lists for its recent Playwright
+  // versions (1.59 to 1.63; WebKit no longer runs on Ventura or Sonoma there, and Golden Gate is listed for Playwright
+  // 1.57 and older only). The credentials are not committed: README.md, "Run on BrowserStack".
+  "Browser": {
+    "Provider": "BrowserStack"
+  },
+  "BrowserStack": {
+    "Os": "OS X",
+    "OsVersion": "Tahoe",
+    "Browser": "playwright-webkit",
+    "BrowserVersion": null,
+    "Resolution": "1920x1080"
+  }
+}

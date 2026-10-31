@@ -43,8 +43,10 @@
   "BrowserStack": {
     "Username": "",
     "AccessKey": "",
+    "Endpoint": "wss://cdp.browserstack.com/playwright",
     "Project": "2S Platform - admin UI",
     "Build": null,
+    "BuildTag": null,
     "Os": "Windows",
     "OsVersion": "11",
     "Browser": "chrome",
@@ -58,7 +60,9 @@
     "NetworkLogs": false,
     "Debug": false,
     "Video": true,
-    "MaxParallelSessions": 5
+    "MaxParallelSessions": 5,
+    "ConnectTimeoutSeconds": 300,
+    "AdditionalCapabilities": {}
   },
   "Reporting": {
     "Enabled": false,
