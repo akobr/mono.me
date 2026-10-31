@@ -8,7 +8,7 @@ namespace _42.Platform.Storyteller;
 
 public class PolicyAwareMachineAccessService : IMachineAccessService
 {
-    public const string CertificateResetNotSupportedMessage = "A Certificate machine has no key to reset: it renews its certificate itself over mTLS, and is revoked by deleting it.";
+    public const string CertificateResetNotSupportedMessage = "A Certificate machine has no key to reset: it renews its certificate itself over mTLS, and deleting the machine requests the revocation of its certificate.";
 
     private readonly ApiKeyMachineAccessService _apiKeyService;
     private readonly CertificateMachineAccessService _certificateService;

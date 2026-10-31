@@ -492,7 +492,7 @@ describe('machine authentication policy against the mock API', () => {
     await expect(resetMachineAccess('acme', 'billing', 'mach-billing-sync')).rejects.toMatchObject({
       status: 400,
       message:
-        'A Certificate machine has no key to reset: it renews its certificate itself over mTLS, and is revoked by deleting it.',
+        'A Certificate machine has no key to reset: it renews its certificate itself over mTLS, and deleting the machine requests the revocation of its certificate.',
       errorCode: 'MachineAccessNotSupported',
     })
     expect(stored()).toEqual(before)
