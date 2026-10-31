@@ -40,7 +40,7 @@ public sealed class AutomationSessionOptions
     public string? RunId { get; set; }
 
     // BrowserProviderFactory.CreateAsync when unset; a seam for other providers and for tests.
-    public Func<UiAutomationSettings, ILogger, CancellationToken, Task<IBrowserProvider>>? BrowserProviderFactory { get; set; }
+    public Func<BrowserProviderContext, CancellationToken, Task<IBrowserProvider>>? BrowserProviderFactory { get; set; }
 
     public static AutomationSessionOptions FromSetup(IUiAutomationSetup setup)
     {

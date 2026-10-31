@@ -6,15 +6,21 @@ namespace _42.Testing.UI.Automation.Runtime.Browsers;
 // The provider of Browser:Provider, started.
 public static class BrowserProviderFactory
 {
-    public static async Task<IBrowserProvider> CreateAsync(UiAutomationSettings settings, ILogger? logger = null, CancellationToken cancellationToken = default)
+    public static Task<IBrowserProvider> CreateAsync(UiAutomationSettings settings, ILogger? logger = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        return CreateAsync(BrowserProviderContext.ForSettings(settings, logger), cancellationToken);
+    }
 
+    public static async Task<IBrowserProvider> CreateAsync(BrowserProviderContext context, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var settings = context.Settings;
         return settings.Browser.Provider switch
         {
-            BrowserProviderKind.Local => await LocalBrowserProvider.StartAsync(settings.Browser, logger, cancellationToken),
-            BrowserProviderKind.BrowserStack => throw new NotSupportedException(
-                "Browser:Provider BrowserStack is not available yet (phase 4 of the UI automation libraries); use Browser:Provider Local."),
+            BrowserProviderKind.Local => await LocalBrowserProvider.StartAsync(settings.Browser, context.Logger, cancellationToken),
+            BrowserProviderKind.BrowserStack => await BrowserStackBrowserProvider.StartAsync(context, cancellationToken),
             _ => throw new NotSupportedException($"Browser:Provider {settings.Browser.Provider} is not supported."),
         };
     }

@@ -58,7 +58,7 @@ public sealed class AutomationSession : IAsyncDisposable
         Logger = logger;
     }
 
-    // The version of the Microsoft.Playwright client, e.g. 1.64.1.
+    // The version of the Microsoft.Playwright client, e.g. 1.63.0.
     public static string PlaywrightVersion { get; } = typeof(IPlaywright).Assembly.GetName().Version is { } version
         ? $"{version.Major}.{version.Minor}.{version.Build}"
         : "unknown";
@@ -123,8 +123,17 @@ public sealed class AutomationSession : IAsyncDisposable
         var runDirectory = fileSystem.Path.Combine(settings.ResolvePath(settings.Execution.ArtifactsPath), runId);
         fileSystem.Directory.CreateDirectory(runDirectory);
 
-        var createProvider = options.BrowserProviderFactory ?? ((current, log, token) => BrowserProviderFactory.CreateAsync(current, log, token));
-        var browserProvider = await createProvider(settings, logger, cancellationToken);
+        var environment = options.Environment ?? RunEnvironment.Current;
+        var values = RunNameValues.For(settings, runId, TimeZoneInfo.ConvertTime(startedAt, timeProvider.LocalTimeZone), environment);
+        var providerContext = new BrowserProviderContext(settings, values)
+        {
+            PlannedTests = options.PlannedTests,
+            Logger = logger,
+            TimeProvider = timeProvider,
+        };
+
+        var createProvider = options.BrowserProviderFactory ?? BrowserProviderFactory.CreateAsync;
+        var browserProvider = await createProvider(providerContext, cancellationToken);
 
         IReadOnlyList<ITestRunReporter> reporters = [];
         ReportingDispatcher? reporting = null;
@@ -133,9 +142,8 @@ public sealed class AutomationSession : IAsyncDisposable
             var contextOptions = new ContextOptionsFactory(settings, browserProvider.Devices);
             Assertions.SetDefaultExpectTimeout(settings.Execution.ExpectTimeoutMs);
 
-            var environment = options.Environment ?? RunEnvironment.Current;
-            var run = CreateRun(settings, runId, seed, startedAt, timeProvider, environment, browserProvider, contextOptions, options.TestEngine);
-            reporters = await ReporterSelection.CreateAsync(settings, options.ReporterProviders, options.Services ?? EmptyServiceProvider.Instance, run);
+            var run = CreateRun(settings, runId, seed, startedAt, environment, values, browserProvider, contextOptions, options.TestEngine);
+            reporters = await ReporterSelection.CreateAsync(settings, options.ReporterProviders, options.Services ?? EmptyServiceProvider.Instance, run, logger);
 
             var dispatcherOptions = ReportingDispatcherOptions.FromSettings(settings.Reporting);
             dispatcherOptions.ResultsFilePath = fileSystem.Path.Combine(runDirectory, ResultsFile.FileName);
@@ -191,7 +199,7 @@ public sealed class AutomationSession : IAsyncDisposable
             throw new UiAutomationSettingsException($"Reporting:ReplayFile {path} has no run line; it is not a results file of this runtime.");
         }
 
-        var reporters = await ReporterSelection.CreateAsync(settings, options.ReporterProviders, options.Services ?? EmptyServiceProvider.Instance, content.Run);
+        var reporters = await ReporterSelection.CreateAsync(settings, options.ReporterProviders, options.Services ?? EmptyServiceProvider.Instance, content.Run, logger);
         var dispatcherOptions = ReportingDispatcherOptions.FromSettings(settings.Reporting);
         dispatcherOptions.FileSystem = fileSystem;
         dispatcherOptions.TimeProvider = options.TimeProvider;
@@ -296,10 +304,21 @@ public sealed class AutomationSession : IAsyncDisposable
             values);
     }
 
-    // Never throws for a reporter: see ReportingDispatcher.Report.
+    // The final report of a test (one per test and attempt that is not run again). Never throws for a reporter (see
+    // ReportingDispatcher.Report) or the browser provider, which learns that the test is done.
     public void Report(TestResultReport report)
     {
+        ArgumentNullException.ThrowIfNull(report);
+
         Reporting.Report(report);
+        try
+        {
+            BrowserProvider.TestCompleted(report.Test);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "The browser provider did not take the end of {Test}.", report.Test.DisplayName);
+        }
     }
 
     // Once: drains and completes the reporters (with the settings' warnings first), then closes the browsers.
@@ -321,20 +340,18 @@ public sealed class AutomationSession : IAsyncDisposable
         string runId,
         int seed,
         DateTimeOffset startedAt,
-        TimeProvider timeProvider,
         RunEnvironment environment,
+        RunNameValues values,
         IBrowserProvider browserProvider,
         ContextOptionsFactory contextOptions,
         string? testEngine)
     {
-        var engine = contextOptions.Engine.ToString().ToLowerInvariant();
-        var provider = settings.Browser.Provider.ToString();
         var properties = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [TestRunProperties.RunId] = runId,
             [TestRunProperties.Target] = WithoutUserInfo(settings.Target.BaseUrl!),
-            [TestRunProperties.Provider] = provider,
-            [TestRunProperties.Engine] = engine,
+            [TestRunProperties.Provider] = settings.Browser.Provider.ToString(),
+            [TestRunProperties.Engine] = contextOptions.Engine.ToString().ToLowerInvariant(),
             [TestRunProperties.Headless] = settings.Browser.Headless ? "true" : "false",
             [TestRunProperties.Seed] = seed.ToString(System.Globalization.CultureInfo.InvariantCulture),
             [TestRunProperties.Machine] = environment.Machine,
@@ -353,20 +370,6 @@ public sealed class AutomationSession : IAsyncDisposable
         AddIfSet(properties, TestRunProperties.BuildNumber, environment.BuildNumber);
         AddIfSet(properties, TestRunProperties.BuildUrl, environment.BuildUrl);
         AddIfSet(properties, TestRunProperties.TestEngine, testEngine);
-
-        var values = new RunNameValues
-        {
-            RunId = runId,
-            StartedAt = TimeZoneInfo.ConvertTime(startedAt, timeProvider.LocalTimeZone),
-            Profile = settings.Profile,
-            Provider = provider,
-            Engine = engine,
-            Device = contextOptions.Device,
-            Branch = environment.Branch,
-            Sha = environment.Sha,
-            BuildNumber = environment.BuildNumber,
-            Machine = environment.Machine,
-        };
 
         var name = RunNameFormatter.Format(settings.Reporting.RunName, values);
         var description = settings.Reporting.RunDescription is { } pattern

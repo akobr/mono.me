@@ -1,0 +1,17 @@
+{
+  // The suite on BrowserStack: Chrome (the latest) on Windows 11 at 1920x1080, a session per test, at most
+  // BrowserStack:MaxParallelSessions at once. Combine it with a target BrowserStack can reach, e.g.
+  // UITESTS_PROFILE=browserstack-win-chrome with Target:BaseUrl in testsettings.local.json (a localhost target needs
+  // BrowserStack Local). The credentials are not committed: BrowserStack:Username and BrowserStack:AccessKey in the user
+  // secrets, or UITESTS_BrowserStack__Username and UITESTS_BrowserStack__AccessKey. README.md, "Run on BrowserStack".
+  "Browser": {
+    "Provider": "BrowserStack"
+  },
+  "BrowserStack": {
+    "Os": "Windows",
+    "OsVersion": "11",
+    "Browser": "chrome",
+    "BrowserVersion": "latest",
+    "Resolution": "1920x1080"
+  }
+}

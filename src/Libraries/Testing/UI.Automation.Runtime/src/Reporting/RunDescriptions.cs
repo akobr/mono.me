@@ -13,6 +13,7 @@ public static class RunDescriptions
         (TestRunProperties.Engine, "Engine"),
         (TestRunProperties.Channel, "Channel"),
         (TestRunProperties.BrowserVersion, "Browser version"),
+        (TestRunProperties.Os, "OS"),
         (TestRunProperties.Device, "Device"),
         (TestRunProperties.Seed, "Seed"),
         (TestRunProperties.Branch, "Branch"),

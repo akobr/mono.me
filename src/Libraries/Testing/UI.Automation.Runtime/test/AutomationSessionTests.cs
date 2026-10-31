@@ -5,7 +5,10 @@ using _42.Testing.UI.Automation.Runtime.Reporting;
 using _42.Testing.UI.Automation.Runtime.Settings;
 using _42.Testing.UI.Automation.Runtime.UnitTests.Fakes;
 using _42.Testing.UI.Automation.Runtime.Users;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
+using Moq;
 
 namespace _42.Testing.UI.Automation.Runtime.UnitTests;
 
@@ -52,6 +55,31 @@ public sealed class AutomationSessionTests
         reporter.StartedRun.ShouldBeSameAs(session.Run);
         reporter.PlannedTests.ShouldHaveSingleItem().ShouldBe(planned);
         reporterProvider.Section.ShouldNotBeNull()["ApiKey"].ShouldBe("key");
+    }
+
+    [Fact]
+    public async Task StartAsync_HandsTheProvidersTheRunsConfiguration_AndTheConsumersServices()
+    {
+        var settings = Load("""
+            {
+              "Target": { "BaseUrl": "https://admin.example.test", "SignIn": "None" },
+              "Reporting": { "Enabled": true, "UnmappedTests": "Warn", "Testiny": { "ApiKey": "key" } }
+            }
+            """);
+        var options = Options();
+        var logger = new Mock<ILogger>();
+        options.Logger = logger.Object;
+        var consumerServices = new Mock<IServiceProvider>();
+        consumerServices.Setup(services => services.GetService(typeof(TimeProvider))).Returns(time);
+        options.Services = consumerServices.Object;
+
+        await using var session = await AutomationSession.StartAsync(settings, options);
+
+        var services = reporterProvider.Services.ShouldNotBeNull();
+        var configuration = services.GetService(typeof(IConfiguration)).ShouldBeAssignableTo<IConfiguration>().ShouldNotBeNull();
+        configuration["Reporting:UnmappedTests"].ShouldBe("Warn");
+        services.GetService(typeof(TimeProvider)).ShouldBeSameAs(time);
+        services.GetService(typeof(ILoggerFactory)).ShouldBeAssignableTo<ILoggerFactory>().ShouldNotBeNull().CreateLogger("Testiny").ShouldBeSameAs(logger.Object);
     }
 
     [Fact]
@@ -121,7 +149,7 @@ public sealed class AutomationSessionTests
         };
         var options = Options();
         var launched = false;
-        options.BrowserProviderFactory = (_, _, _) =>
+        options.BrowserProviderFactory = (_, _) =>
         {
             launched = true;
             return Task.FromResult<IBrowserProvider>(browserProvider);
@@ -155,13 +183,32 @@ public sealed class AutomationSessionTests
     }
 
     [Fact]
-    public async Task BrowserProviderFactory_RefusesBrowserStack_ForNow()
+    public async Task StartAsync_HandsTheProviderTheRunValues_AndThePlannedTests()
     {
-        var settings = new UiAutomationSettings { Browser = new BrowserSettings { Provider = BrowserProviderKind.BrowserStack } };
+        var settings = Load("""{ "Target": { "BaseUrl": "https://admin.example.test", "SignIn": "None" }, "Browser": { "Device": "Pixel 7" } }""");
+        var planned = TestData.Identity("Planned");
+        var devices = new DeviceCatalog(new Dictionary<string, Microsoft.Playwright.BrowserNewContextOptions> { ["Pixel 7"] = new() });
+        BrowserProviderContext? received = null;
+        var options = Options();
+        options.PlannedTests = [planned];
+        options.BrowserProviderFactory = (context, _) =>
+        {
+            received = context;
+            return Task.FromResult<IBrowserProvider>(new FakeBrowserProvider(devices));
+        };
 
-        var exception = await Should.ThrowAsync<NotSupportedException>(() => BrowserProviderFactory.CreateAsync(settings));
+        await using var session = await AutomationSession.StartAsync(settings, options);
 
-        exception.Message.ShouldContain("BrowserStack is not available yet");
+        received.ShouldNotBeNull();
+        received.Settings.ShouldBeSameAs(settings);
+        received.PlannedTests.ShouldHaveSingleItem().ShouldBe(planned);
+        received.Run.RunId.ShouldBe("20261031-142500-abcd");
+        received.Run.Engine.ShouldBe("chromium");
+        received.Run.Device.ShouldBe("Pixel 7");
+        received.Run.Branch.ShouldBe("feat/424-133");
+        received.Run.BuildNumber.ShouldBe("1");
+        received.Run.Machine.ShouldBe("runner");
+        session.Run.Properties[TestRunProperties.Device].ShouldBe("Pixel 7");
     }
 
     [Fact]
@@ -226,6 +273,24 @@ public sealed class AutomationSessionTests
         reporterProvider.Created.ShouldHaveSingleItem().CompletedSummary.ShouldNotBeNull().Passed.ShouldBe(1);
         browserProvider.Disposed.ShouldBeTrue();
         (await session.StopAsync()).ShouldBeSameAs(summary);
+    }
+
+    [Fact]
+    public async Task Report_TellsTheBrowserProviderThatTheTestIsDone_AndSurvivesItsFailure()
+    {
+        var settings = Load("""{ "Target": { "BaseUrl": "https://admin.example.test", "SignIn": "None" } }""");
+        await using var session = await Start(settings);
+        var skipped = TestData.Identity("Skipped");
+        var blocked = TestData.Identity("Blocked");
+
+        session.Report(session.CreateReport(skipped, TestOutcome.Skipped, TestData.Start, TimeSpan.Zero, 1, new InvalidOperationException("Requires WebKit.")));
+        browserProvider.FailCompleted = new InvalidOperationException("Boom");
+        session.Report(session.CreateReport(blocked, TestOutcome.Blocked, TestData.Start, TimeSpan.Zero, 1));
+
+        browserProvider.Completed.ShouldBe([skipped, blocked]);
+        var summary = await session.StopAsync();
+        summary.Skipped.ShouldBe(1);
+        summary.Blocked.ShouldBe(1);
     }
 
     [Fact]
@@ -294,7 +359,7 @@ public sealed class AutomationSessionTests
             RunId = "20261031-142500-abcd",
             TestEngine = "xUnit",
             Environment = new RunEnvironment("feat/424-133", "268a67a2e4f1c0de", "1", "https://github.com/akobr/mono.me/actions/runs/1", "runner"),
-            BrowserProviderFactory = (_, _, _) => Task.FromResult<IBrowserProvider>(browserProvider),
+            BrowserProviderFactory = (_, _) => Task.FromResult<IBrowserProvider>(browserProvider),
         };
     }
 }
