@@ -43,9 +43,18 @@ Binding is triggered whenever a string value starts with the `@` character. The 
     - Evaluates a numeric expression using `+ - * / %` with standard precedence and parentheses. Operands are number literals or nested `@...` statements that resolve to numbers.
     - Example: `@{(@base.value + 10) * 2}`
 
-Expressions never nest inside one another (an interpolation cannot contain a math expression or vice versa), but statements can nest arbitrarily as function arguments, interpolation parts, or math operands.
+Expressions never nest inside one another (an interpolation cannot contain a math expression or vice versa), but statements nest as function arguments, interpolation parts, or math operands, up to the limit below.
 
-When a top-level path, sourced path, or function statement cannot be resolved (no matching source/function registered, or the source declines), the original string value is left untouched. Inside an interpolation or math expression, an unresolved statement instead throws a `BindingEvaluationException`. Malformed syntax throws a `BindingSyntaxException` that includes the character offset of the problem; both exceptions are wrapped with the JSON property path when raised through `IBindingExecutor`.
+When a top-level path, sourced path, or function statement cannot be resolved (no matching source/function registered, or the source declines), the original string value is left untouched. Inside an interpolation or math expression, an unresolved statement instead throws a `BindingEvaluationException`. Malformed syntax throws a `BindingSyntaxException` that includes the character offset of the problem, and a string past a limit throws an `EvaluationLimitExceededException`. Raised through `IBindingExecutor`, every failure becomes a `BindingEvaluationException` with the JSON property path; a limit stays an `EvaluationLimitExceededException` with its `Kind` and `Limit`. The message names the path, not the expression.
+
+#### Limits of a string
+
+`BindingExpressionLimits` bounds every `@` string:
+
+- **Length.** At most 8,192 characters, counted in UTF-16 code units with the leading `@` included. A longer string is refused before it is read, with `ExpressionLength`.
+- **Depth.** At most 64 levels. Every statement is a level: the outermost one, a statement argument, an interpolation part, a math operand, and the innermost `@x`. So is every parenthesis of math. The `@[` and `@{` wrappers, the parentheses of a call, sibling statements and chains of operators are not. For example, `@f(@g(@x))` is 3 levels deep, `@{(@a + 1) * 2}` is 2 and `@[@a @b]` is 1. A deeper string is refused while it is parsed, with `Depth`, and so is a string that would exhaust the thread's stack.
+
+The MCP server's reader uses the same limits and rules. Operator chains are evaluated without recursion, so a flat `@{1 + 1 + … + 1}` of any length within the cap evaluates.
 
 ### Object binding
 
@@ -128,7 +137,18 @@ Converting `$definition` and `$context` to the engines' JSON model is linear in 
 
 #### Errors
 
-A malformed envelope throws `BindingEvaluationException` before either engine runs, and the token is left unchanged. `JsonEException` and `JsonLogicException` are rethrown as `BindingEvaluationException`, and so is any other exception an engine throws for the author's input (for example an `OverflowException` from `2 ** 100000`). The resolver adds the JSON path to the message and keeps the type: a `BindingEvaluationException` stays one, and an `EvaluationLimitExceededException` keeps its `Kind` and `Limit`. The resolved-configuration endpoint returns these as `422 Unprocessable Content` with an `ErrorResponse` whose `ErrorCode` is `binding.evaluation` or `binding.limit.<kind>` (`binding.limit.steps`, `binding.limit.time`, `binding.limit.memory`, `binding.limit.depth`, `binding.limit.result`, `binding.limit.envelopeDepth`, `binding.limit.envelopeCount`). The response carries no exception details. `@config` and `@annotation` evaluation failures are `BindingEvaluationException` too and also return 422. With `?format=` the endpoint has one more 422 after the evaluation: a resolved document that the format cannot represent, for example a binding that returns an object with a `:` in a name, answers `format.<rule>` with the rule and the JSON path in `Details` (see [the API of the formats](configuration-formats.md#the-api)).
+A malformed envelope throws `BindingEvaluationException` before either engine runs, and the token is left unchanged. `JsonEException` and `JsonLogicException` are rethrown as `BindingEvaluationException`, and so is any other exception an engine throws for the author's input (for example an `OverflowException` from `2 ** 100000`). The resolver adds the JSON path to the message and keeps the type: a `BindingEvaluationException` stays one, and an `EvaluationLimitExceededException` keeps its `Kind` and `Limit`. The resolved-configuration endpoint returns these as `422 Unprocessable Content` with an `ErrorResponse` whose `ErrorCode` is `binding.evaluation` or `binding.limit.<kind>` (`binding.limit.steps`, `binding.limit.time`, `binding.limit.memory`, `binding.limit.depth`, `binding.limit.result`, `binding.limit.envelopeDepth`, `binding.limit.envelopeCount`, `binding.limit.expressionLength`). The response carries no exception details. Failures of `@` strings answer the same way. A syntax error or a failed statement, `@config` and `@annotation` included, answers `binding.evaluation`. A string past its limits answers `binding.limit.expressionLength` or `binding.limit.depth`.
+
+A message names the kind of a value, never the value, because a resolved value can be a secret:
+
+- In the `@` language, a math operand that is not a number is named by its JSON type, and the messages of `@config` and `@annotation` do not quote their arguments.
+- The vendored JSON-e has four messages that quote an evaluated value. `ObjectBindingEngine` replaces them with fixed ones, for example `A called value is not a function.` `unknown context value` keeps its name only when the name is a whole word of the `$definition`.
+- Every JSON Logic failure answers `JSON Logic evaluation failed.`, because the library's messages are not all verified.
+- Any other engine exception is named by its type.
+
+The API logs a binding failure at Warning with its code and path, and with the kind and limit of a limit. It never logs the message.
+
+With `?format=` the endpoint has one more 422 after the evaluation: a resolved document that the format cannot represent, for example a binding that returns an object with a `:` in a name, answers `format.<rule>` with the rule and the JSON path in `Details` (see [the API of the formats](configuration-formats.md#the-api)).
 
 The JSON Logic `log` operator writes its operand to `ILogger` only when Debug is enabled.
 
@@ -150,15 +170,16 @@ Defines the fundamental building blocks:
 - `BindingValue`: A thin wrapper around a `Newtonsoft.Json.Linq.JToken`.
 - `BindingException`: Base exception type for binding failures.
 - `BindingEvaluationException`: A binding's own content cannot be evaluated: a failed statement, a malformed envelope, or an engine error. Carries the JSON `Path` when known. The API returns it as 422.
-- `EvaluationLimitExceededException` / `EvaluationLimitKind`: An object-binding read ran into an evaluation limit (`Steps`, `Time`, `Memory`, `Depth`, `Result`, `EnvelopeDepth`, `EnvelopeCount`).
+- `EvaluationLimitExceededException` / `EvaluationLimitKind`: A binding read ran into an evaluation limit (`Steps`, `Time`, `Memory`, `Depth`, `Result`, `EnvelopeDepth`, `EnvelopeCount`, `ExpressionLength`).
 
 ### Binding.Language
 
 Contains the interpreter pipeline:
 - `Tokenizer` / `Token` / `TokenType`: Lexes a binding string into tokens, tracking offsets for diagnostics.
-- `Parser` and the AST node types (`PathStatement`, `SourcedStatement`, `FunctionStatement`, `InterpolationExpression`, `MathExpression`, etc.): Build a `BindingNode` tree via recursive descent.
-- `BindingEvaluator`: Walks the AST, resolving statements against registered sources/functions and evaluating interpolation/math. Accepts an optional `BindingScope` (a `Document`, an opaque `Context` and the `Dependencies`) which is forwarded onto every `BindingFunctionRequest` so functions can see ambient data beyond their own arguments; the `Context` and `Dependencies` also reach every `BindingRequest`. Calling a source or function that is not `IRecordingBinding` makes the `Dependencies` volatile; an unregistered name reads nothing and records nothing.
-- `BindingExecutor`: Implements `IBindingExecutor`, `IBindingRegistry` and `IBindingCatalog`; it guards on the leading `@`, then tokenizes, parses, evaluates, and assigns the result back onto the JSON token. `TryBinding` accepts an optional `BindingScope`.
+- `Parser` and the AST node types (`PathStatement`, `SourcedStatement`, `FunctionStatement`, `InterpolationExpression`, `MathExpression`, etc.): Build a `BindingNode` tree via recursive descent, at most `BindingExpressionLimits.MaxDepth` levels deep.
+- `BindingExpressionLimits`: The length and depth limits of an `@` string (see "Limits of a string").
+- `BindingEvaluator`: Walks the AST, resolving statements against registered sources/functions and evaluating interpolation/math. Accepts an optional `BindingScope` (a `Document`, an opaque `Context` and the `Dependencies`) which is forwarded onto every `BindingFunctionRequest` so functions can see ambient data beyond their own arguments; the `Context` and `Dependencies` also reach every `BindingRequest`. Calling a source or function that is not `IRecordingBinding` makes the `Dependencies` volatile; an unregistered name reads nothing and records nothing. It evaluates operator chains in a loop, and it bounds nested statements and the stack for hand-built ASTs too.
+- `BindingExecutor`: Implements `IBindingExecutor`, `IBindingRegistry` and `IBindingCatalog`; it guards on the leading `@` and the length, then tokenizes, parses, evaluates, and assigns the result back onto the JSON token. `TryBinding` accepts an optional `BindingScope`.
 - `JsonQuery`: Resolves a JSONPath or JSON Pointer (RFC 6901) expression against a `JToken`, auto-detecting the dialect from the expression's leading character (`$` for JSONPath, `/` or empty for JSON Pointer).
 - `BindingFunctionArguments`: Shared helper that validates a function argument is a quoted string literal.
 - `ConfigBindingFunction`: The built-in `@config` function (see "Built-in Functions" below).

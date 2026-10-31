@@ -328,7 +328,7 @@ The platform records no runtime reads of configurations. `explain_configuration`
 More details of the analysis:
 
 - What was overridden (`AlsoSetBy`) is listed for scalar values only. Objects and arrays merge, so their members and items carry their own steps.
-- Bindings are read by the server's own reader of the binding language. An expression longer than 8,192 characters or nested more than 64 levels deep is not read and is reported as not valid. A string that starts with `@` inside an object binding's `$definition` is reported as a possible read: it is bound only if the program emits it.
+- Bindings are read by the server's own reader of the binding language. An expression longer than 8,192 characters or nested more than 64 levels deep is not read and is reported as not valid. The API refuses the same expressions on a resolved read (`binding.limit.expressionLength`, `binding.limit.depth`). A string that starts with `@` inside an object binding's `$definition` is reported as a possible read: it is bound only if the program emits it.
 - `suggest_configuration_placement` treats each pointer as one scalar value outside any array. A pointer through an array or onto an object or array gets no `Effective` answer; place such values as a `fragment`. The schema preview is skipped when a pattern of the schema takes longer than the server's regular-expression timeout (200 ms).
 
 ### Machines
