@@ -114,8 +114,33 @@ public partial class CosmosConfigurationSchemaService
         }
 
         var modified = AuditStamp.Of(options.Actor, _timeProvider.GetUtcNow());
-        var errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, content, modified, overlay);
+        IReadOnlyList<SchemaValidationError> errors;
         IReadOnlyList<ViewImportWarning>? warnings = null;
+        InvalidInputException? uncheckedCompliance = null;
+
+        try
+        {
+            errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, content, modified, overlay);
+        }
+        catch (InvalidInputException exception) when (ConfigurationSchemaChecker.IsCheckFailure(exception))
+        {
+            // the configurations could not be checked, as on a schema write: force stores the schema anyway
+            if (!options.Force)
+            {
+                return new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
+            }
+
+            errors = [];
+            uncheckedCompliance = exception;
+            warnings =
+            [
+                new ViewImportWarning
+                {
+                    Code = exception.ErrorCode,
+                    Message = $"Force stores this schema although the configurations could not be checked: {exception.Message}",
+                },
+            ];
+        }
 
         if (errors.Count > 0)
         {
@@ -148,6 +173,12 @@ public partial class CosmosConfigurationSchemaService
 
         // checked above against the view as the import leaves it, so the write does not check again
         LogForcedViolations(organization, project, view, identity, errors);
+
+        if (uncheckedCompliance is not null)
+        {
+            LogForcedUncheckedCompliance(organization, project, view, identity, uncheckedCompliance);
+        }
+
         var written = await SaveAsync(organization, project, view, identity, content, options.Actor, force: true, isChecked: true);
         return new ViewImportResult(outcome, written.Version, Warnings: warnings);
     }

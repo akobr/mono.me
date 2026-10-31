@@ -1,6 +1,7 @@
 namespace _42.Platform.Storyteller;
 
-// Something a written document of an import should be checked for: a forced schema violation (SchemaViolation),
+// Something a written document of an import should be checked for: a forced schema violation (SchemaViolation), a
+// forced write whose schema check could not run (InvalidSchema, ExternalSchemaReference, SchemaValidationTimeout),
 // ancestors created with defaults (AncestorCreated), or re-created deleted annotations (AnnotationRecreated).
 public record class ViewImportWarning
 {

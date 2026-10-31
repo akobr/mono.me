@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.Entities;
+using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Transferring;
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
@@ -544,6 +546,31 @@ public class CosmosViewImportTests(Startup startup)
         (await Schemas.ImportSchemaAsync(target, Limit(), Options(), overlay)).ErrorCode.Should().Be(ErrorCodes.SchemaViolation);
     }
 
+    // A stored layer that refers outside itself (stored before such layers were refused) makes the check of the
+    // configurations fail; force stores the schema anyway, as a forced schema write does.
+    [Fact]
+    public async Task ImportSchema_WhoseCheckMeetsAStoredExternalLayer_FailsAndForceStoresItWithAWarning()
+    {
+        const string project = "import-schema-unchecked";
+        await CreateAsync(project, "rst.unchecked");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.unchecked", project), JObject.Parse("""{ "limit": 5 }"""), Creator);
+        await PlantTypeSchemaAsync(project, AnnotationTypeCodes.Responsibility, ExternalSchema());
+        var target = AnnotationSchema(project, "rst.unchecked");
+
+        var failed = await Schemas.ImportSchemaAsync(target, Limit(), Options(), new ViewImportOverlay());
+        var checkedForce = await Schemas.ImportSchemaAsync(target, Limit(), Options(dryRun: true, force: true), new ViewImportOverlay());
+        var forced = await Schemas.ImportSchemaAsync(target, Limit(), Options(force: true), new ViewImportOverlay());
+
+        failed.Outcome.Should().Be(ViewImportOutcome.Failed);
+        failed.ErrorCode.Should().Be(ErrorCodes.ExternalSchemaReference);
+        checkedForce.Should().BeEquivalentTo(new ViewImportResult(ViewImportOutcome.Created, Warnings: forced.Warnings));
+        forced.Outcome.Should().Be(ViewImportOutcome.Created);
+        forced.Version.Should().Be(1UL);
+        var warning = forced.Warnings.Should().ContainSingle().Subject;
+        warning.Code.Should().Be(ErrorCodes.ExternalSchemaReference);
+        warning.Message.Should().Be($"Force stores this schema although the configurations could not be checked: {failed.Message}");
+    }
+
     [Fact]
     public async Task ImportSchema_LeavesAnEqualSchemaUnchangedAndSkipKeepsADifferentOne()
     {
@@ -859,6 +886,29 @@ public class CosmosViewImportTests(Startup startup)
         (await Configurations.GetConfigurationVersionContentAsync(key, 1))!.Content["limit"]!.Value<string>().Should().Be("high");
     }
 
+    // The schema could not be used, which a forced write would not check: force stores the document with a warning.
+    [Fact]
+    public async Task ImportConfiguration_WhoseSchemaRefersOutsideItself_FailsAndForceStoresItWithAWarning()
+    {
+        const string project = "import-config-unchecked";
+        await CreateAsync(project, "rst.unchecked");
+        await PlantTypeSchemaAsync(project, AnnotationTypeCodes.Responsibility, ExternalSchema());
+        var key = Key("rst.unchecked", project);
+
+        var failed = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{ "limit": 5 }"""), Options(), new ViewImportOverlay());
+        var forced = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{ "limit": 5 }"""), Options(force: true), new ViewImportOverlay());
+
+        failed.Outcome.Should().Be(ViewImportOutcome.Failed);
+        failed.ErrorCode.Should().Be(ErrorCodes.ExternalSchemaReference);
+        failed.Message.Should().StartWith("External $ref not allowed: 'https://schemas.example/limit.json'.");
+        forced.Outcome.Should().Be(ViewImportOutcome.Created);
+        forced.Version.Should().Be(1UL);
+        (await Configurations.GetConfigurationVersionContentAsync(key, 1))!.Content["limit"]!.Value<int>().Should().Be(5);
+        var warning = forced.Warnings.Should().ContainSingle().Subject;
+        warning.Code.Should().Be(ErrorCodes.ExternalSchemaReference);
+        warning.Message.Should().Be($"Force stores the document although its schema could not be checked: {failed.Message}");
+    }
+
     private static ViewImportOptions Options(ViewImportExisting existing = ViewImportExisting.Overwrite, bool dryRun = false, bool force = false)
     {
         return new ViewImportOptions { Actor = Importer, Existing = existing, DryRun = dryRun, Force = force };
@@ -927,6 +977,25 @@ public class CosmosViewImportTests(Startup startup)
     private static Annotation Model(string annotationKey, string project)
     {
         return AnnotationFactory.CreateDefault(AnnotationKey.Parse(annotationKey), project, View);
+    }
+
+    // A type schema as an earlier version of the service stored it: the ids of SchemaIdentity.ForType.
+    private Task PlantTypeSchemaAsync(string project, string typeCode, JObject content)
+    {
+        return Container.UpsertItemAsync(
+            new ConfigurationSchemaEntity
+            {
+                PartitionKey = $"{project}.schema",
+                Id = $"{View}.{EntityIdPrefixTypes.ConfigurationSchema}.t.{typeCode}",
+                AnnotationKey = typeCode,
+                Name = typeCode,
+                ProjectName = project,
+                ViewName = View,
+                Content = content,
+                Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
+                Version = 1,
+            },
+            new PartitionKey($"{project}.schema"));
     }
 
     private Task CreateAsync(string project, params string[] keys)

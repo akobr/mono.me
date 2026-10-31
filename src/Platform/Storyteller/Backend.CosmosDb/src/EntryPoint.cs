@@ -122,6 +122,16 @@ public static class EntryPoint
             provider.GetRequiredService<IOptions<JsonSerializerSettings>>().Value));
         services.AddSingleton<AnnotationAuditStore>();
 
+        // Schemas: reading one and checking a document against it are bounded in time.
+        services.AddOptions<ConfigurationSchemaOptions>()
+            .Bind(configuration.GetSection(ConfigurationSchemaOptions.SectionName))
+            .Validate(
+                options => options.PatternMatchTimeout >= ConfigurationSchemaOptions.MinPatternMatchTimeout
+                    && options.PatternMatchTimeout <= ConfigurationSchemaOptions.MaxPatternMatchTimeout
+                    && options.CheckBudget >= ConfigurationSchemaOptions.MinCheckBudget
+                    && options.CheckBudget <= ConfigurationSchemaOptions.MaxCheckBudget,
+                $"{ConfigurationSchemaOptions.SectionName}:{nameof(ConfigurationSchemaOptions.PatternMatchTimeout)} must be between 10 ms and 10 s, and {nameof(ConfigurationSchemaOptions.CheckBudget)} between 1 s and 5 min.");
+
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();

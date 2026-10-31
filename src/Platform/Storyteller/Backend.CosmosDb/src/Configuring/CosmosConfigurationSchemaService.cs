@@ -27,7 +27,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerSettings _serializerOptions;
     private readonly JsonContentDiffer _differ;
-    private readonly ConfigurationSchemaChecker _checker = new();
+    private readonly ConfigurationSchemaChecker _checker;
     private readonly ILogger<CosmosConfigurationSchemaService> _logger;
     private readonly TimeProvider _timeProvider;
 
@@ -35,6 +35,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         IContainerRepositoryProvider repositoryProvider,
         IJsonSerializationSettingsProvider jsonSettingsProvider,
         IOptions<JsonSerializerSettings> serializerOptions,
+        IOptions<ConfigurationSchemaOptions> schemaOptions,
         ILogger<CosmosConfigurationSchemaService> logger,
         TimeProvider? timeProvider = null)
     {
@@ -42,6 +43,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
         _differ = new JsonContentDiffer(jsonSettingsProvider);
+        _checker = new ConfigurationSchemaChecker(schemaOptions.Value, _timeProvider);
         _logger = logger;
     }
 
@@ -471,7 +473,19 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
 
             if (!isChecked)
             {
-                var errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, schemaContent, modified);
+                IReadOnlyList<SchemaValidationError> errors;
+
+                try
+                {
+                    errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, schemaContent, modified);
+                }
+                catch (InvalidInputException exception) when (force && ConfigurationSchemaChecker.IsCheckFailure(exception))
+                {
+                    // the configurations could not be checked (another stored layer refers outside itself, or a check
+                    // runs out of time); force stores the schema anyway, as it stores one that they violate
+                    LogForcedUncheckedCompliance(organization, project, view, identity, exception);
+                    errors = [];
+                }
 
                 if (errors.Count > 0 && !force)
                 {
@@ -537,6 +551,19 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
                 error.AnnotationKey,
                 string.Join("; ", error.Errors));
         }
+    }
+
+    // A forced write of a schema whose compliance check could not finish.
+    private void LogForcedUncheckedCompliance(string organization, string project, string view, SchemaIdentity identity, InvalidInputException exception)
+    {
+        _logger.LogWarning(
+            "Schema compliance check could not finish, bypassed with force for {SchemaId} in {Organization}/{Project}/{View}. {ErrorCode}: {Message}",
+            identity.CurrentId,
+            organization,
+            project,
+            view,
+            exception.ErrorCode,
+            exception.Message);
     }
 
     private async Task<bool> DeleteAsync(string organization, string project, string view, SchemaIdentity identity)
@@ -907,11 +934,15 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         return response[response.Count - 1].ETag;
     }
 
-    // A schema that cannot be read, or that refers outside itself, throws InvalidInputException (InvalidSchema or
-    // ExternalSchemaReference) whatever force is.
+    // A schema that cannot be read, that refers outside itself, or whose check cannot even start throws
+    // InvalidInputException (InvalidSchema, ExternalSchemaReference, SchemaValidationTimeout) whatever force is.
     private async Task EnsureValidSchemaAsync(JObject schemaContent)
     {
-        await _checker.ParseAsync(schemaContent);
+        var schema = await _checker.ParseAsync(schemaContent);
+
+        // a trial check of an empty object, whose violations do not matter: a schema that applies itself to the same
+        // value again at its root, or that is its own allOf, is refused here instead of failing every later write
+        _checker.Validate(schema, new JObject());
     }
 
     private async Task<IReadOnlyList<string>> ValidateAgainstSchemaAsync(JObject content, JObject schemaContent)
