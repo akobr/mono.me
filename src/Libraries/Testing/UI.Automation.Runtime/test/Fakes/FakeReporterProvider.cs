@@ -10,9 +10,12 @@ internal sealed class FakeReporterProvider(string system = "Fake") : ITestRunRep
 
     public IConfiguration? Section { get; private set; }
 
+    public IServiceProvider? Services { get; private set; }
+
     public ITestRunReporter Create(IServiceProvider services, IConfiguration section, TestRunDescriptor run)
     {
         Section = section;
+        Services = services;
         if (string.IsNullOrEmpty(section["ApiKey"]))
         {
             throw new InvalidOperationException("ApiKey is required.");

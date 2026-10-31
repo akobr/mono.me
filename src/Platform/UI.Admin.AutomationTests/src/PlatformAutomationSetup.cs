@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using _42.Platform.UI.Admin.AutomationTests;
 using _42.Platform.UI.Admin.AutomationTests.Access;
 using _42.Testing.UI.Automation;
+using _42.Testing.UI.Automation.Reporting.Testiny;
 using _42.Testing.UI.Automation.Runtime;
 using _42.Testing.UI.Automation.Runtime.Access;
 using _42.Testing.UI.Automation.Runtime.Settings;
@@ -17,14 +18,14 @@ using _42.Testing.UI.Automation.Runtime.TUnit;
 namespace _42.Platform.UI.Admin.AutomationTests;
 
 // What the Platform adds to the UI automation runtime: the AuthKit sign-in (Target:SignIn AuthKit, the default; None
-// for the mock target), the reporters (Testiny comes with the reporting phase) and the checks of its own settings.
+// for the mock target), the reporters Reporting:Systems may select (Testiny) and the checks of its own settings.
 public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
 {
     public string ReadmeHint => "src/Platform/UI.Admin.AutomationTests/README.md";
 
     public IReadOnlyList<ISignInFlow> SignInFlows { get; } = [new AuthKitSignIn()];
 
-    public IReadOnlyList<ITestRunReporterProvider> ReporterProviders => [];
+    public IReadOnlyList<ITestRunReporterProvider> ReporterProviders { get; } = [TestinyReporterProvider.Instance];
 
     public void Validate(UiAutomationSettings settings, ICollection<string> errors)
     {
