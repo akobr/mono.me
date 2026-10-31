@@ -89,6 +89,22 @@ describe('ConfigurationEditor (JSON Patch saves)', () => {
     view.host.unmount()
   })
 
+  it('stores a version for a PUT, as the API does for POST and PUT', async () => {
+    const key = unconfiguredExecution()
+
+    const response = await fetch(
+      `http://api.test/api/v1/${scope.org}/${scope.project}/${scope.view}/configuration/${key}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        body: JSON.stringify({ retries: 2 }),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(ownContent(loadDb(), scope, key)).toEqual({ retries: 2 })
+  })
+
   it('gets a 404 for a patch when nothing is stored, as from the API', async () => {
     const key = unconfiguredExecution()
 

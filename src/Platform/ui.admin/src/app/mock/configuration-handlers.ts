@@ -330,6 +330,24 @@ function configurationResponse(db: MockDb, scope: ScopeRef, key: string, content
 
 const pageSize = 1000
 
+/** A write (POST or PUT): merges the body into the stored document and stores the next version. */
+const writeConfiguration = withDb<KeyParams>(async (db, { params, request }) => {
+  const denied = requireRole(db, projectKey(params), 'Contributor')
+  if (denied) {
+    return denied
+  }
+  const scope = scopeOf(params)
+  const missing = missingOrDeleted(db, params, 409)
+  if (missing) {
+    return missing
+  }
+  const body = (await request.json()) as Record<string, unknown>
+  const content = deepMerge(ownContent(db, scope, params.key) ?? {}, body) as Record<string, unknown>
+  const saved = putVersion(db, scope, `configuration:${params.key}`, content)
+  appendAudit(db, scope, params.key, newEntry(db, 'ConfigurationChanged', { ConfigurationVersion: saved.Version }))
+  return HttpResponse.json(configurationResponse(db, scope, params.key, effectiveContent(db, scope, params.key)))
+})
+
 export const configurationHandlers: HttpHandler[] = [
   http.get<ScopeParams>(
     `${api}/configurations`,
@@ -386,25 +404,9 @@ export const configurationHandlers: HttpHandler[] = [
     }),
   ),
 
-  http.post<KeyParams>(
-    `${api}/configuration/:key`,
-    withDb(async (db, { params, request }) => {
-      const denied = requireRole(db, projectKey(params), 'Contributor')
-      if (denied) {
-        return denied
-      }
-      const scope = scopeOf(params)
-      const missing = missingOrDeleted(db, params, 409)
-      if (missing) {
-        return missing
-      }
-      const body = (await request.json()) as Record<string, unknown>
-      const content = deepMerge(ownContent(db, scope, params.key) ?? {}, body) as Record<string, unknown>
-      const saved = putVersion(db, scope, `configuration:${params.key}`, content)
-      appendAudit(db, scope, params.key, newEntry(db, 'ConfigurationChanged', { ConfigurationVersion: saved.Version }))
-      return HttpResponse.json(configurationResponse(db, scope, params.key, effectiveContent(db, scope, params.key)))
-    }),
-  ),
+  // The API takes both methods for a write, a merge into the stored document.
+  http.post<KeyParams>(`${api}/configuration/:key`, writeConfiguration),
+  http.put<KeyParams>(`${api}/configuration/:key`, writeConfiguration),
 
   http.patch<KeyParams>(
     `${api}/configuration/:key`,
