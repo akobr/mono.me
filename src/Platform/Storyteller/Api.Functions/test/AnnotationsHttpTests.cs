@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
@@ -15,6 +17,7 @@ using _42.Platform.Storyteller.Transferring;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 
@@ -41,6 +44,25 @@ public class AnnotationsHttpTests
         nameof(AnnotationsHttp.DeleteAnnotation),
         nameof(AnnotationsHttp.RestoreAnnotations),
     };
+
+    // Both write methods with a key of every type that has relation arrays.
+    public static TheoryData<string, string> TypesWithRelationArrays
+    {
+        get
+        {
+            var data = new TheoryData<string, string>();
+
+            foreach (var method in new[] { "POST", "PUT" })
+            {
+                foreach (var key in new[] { "rst.invoicing", "sbt.northwind", "usg.northwind.invoicing", "cnt.northwind.prod", "exe.northwind.invoicing.prod" })
+                {
+                    data.Add(method, key);
+                }
+            }
+
+            return data;
+        }
+    }
 
     // The catalog the name queries filter: two of each name, so every query has a match and a miss.
     private static readonly Annotation[] Catalog =
@@ -314,6 +336,96 @@ public class AnnotationsHttpTests
 
         result.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe((int)HttpStatusCode.RequestEntityTooLarge);
         request.Body.Position.ShouldBe(0);
+    }
+
+    // The Admin UI saves an annotation as it read it, with its relation arrays, which the serializer could not create:
+    // every save of these five types answered 500 (424-129).
+    [Theory]
+    [MemberData(nameof(TypesWithRelationArrays))]
+    public async Task Set_AnAnnotationAsItWasRead_IsStoredWithItsType(string method, string key)
+    {
+        var annotations = new RecordingAnnotations();
+        var read = AsRead(key);
+
+        var result = await Http(annotations).SetAnnotation(Request(method, FunctionTestDoubles.ToJsonBody<object>(read)), "acme", "billing", "default", key);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        var set = annotations.LastSet.ShouldNotBeNull();
+        set.ShouldBeOfType(read.GetType());
+        set.Title.ShouldBe(read.Title);
+        set.Labels.ShouldBe(["finance"]);
+        RelationArrays(set).Keys.ShouldBe(RelationArrays(read).Keys);
+        RelationArrays(set).ShouldAllBe(pair => pair.Value.SetEquals(RelationArrays(read)[pair.Key]));
+        annotations.Calls.ShouldBe([$"set:acme:{key}"]);
+    }
+
+    [Fact]
+    public async Task Set_NullRelationArray_IsStoredWithAnEmptySet()
+    {
+        var annotations = new RecordingAnnotations();
+        var body = WithMember(AsRead("sbt.northwind"), nameof(Storyteller.Subject.ContextNames), "null");
+
+        var result = await Http(annotations).SetAnnotation(Request("POST", body), "acme", "billing", "default", "sbt.northwind");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.LastSet.ShouldBeOfType<Subject>().ContextNames.ShouldNotBeNull().ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("\"prod\"")]
+    [InlineData("{}")]
+    [InlineData("[1]")]
+    [InlineData("[null]")]
+    public async Task Set_RelationArrayOfTheWrongType_IsRejectedWithItsPath(string value)
+    {
+        var annotations = new RecordingAnnotations();
+        var logger = new CapturingLogger<AnnotationsHttp>();
+        var body = WithMember(AsRead("sbt.northwind"), nameof(Storyteller.Subject.ContextNames), value);
+
+        var result = await Http(annotations, logger: logger).SetAnnotation(Request("POST", body), "acme", "billing", "default", "sbt.northwind");
+
+        result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldContain("Path: $.ContextNames");
+        annotations.Calls.ShouldBeEmpty();
+        logger.Entries.ShouldBeEmpty("an invalid body is no defect of the API");
+    }
+
+    // The relation array failed the body before the required members were checked, so this answered 500.
+    [Fact]
+    public async Task Set_BodyWithARelationArrayButWithoutTheTypeSpecificMembers_IsRejected()
+    {
+        var annotations = new RecordingAnnotations();
+        const string usage = """{"AnnotationKey":"usg.northwind.invoicing","Name":"invoicing","AnnotationType":"Usage","ProjectName":"x","ViewName":"y","ContextNames":["prod"]}""";
+
+        var result = await Http(annotations).SetAnnotation(Request("POST", usage), "acme", "billing", "default", "usg.northwind.invoicing");
+
+        result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldContain("SubjectKey");
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    // The elements of a bulk create are base annotations, so their relation arrays were always skipped.
+    [Fact]
+    public async Task SetMany_AnnotationsAsTheyWereRead_AreCreated()
+    {
+        var annotations = new RecordingAnnotations();
+        var keys = TypesWithRelationArrays.Select(row => (string)row[1]).Distinct().ToList();
+        var body = new JsonArray([.. keys.Select(AsRead).Select(read => JsonSerializer.SerializeToNode(read, read.GetType(), FunctionTestDoubles.ApiJsonSerializerOptions))]);
+
+        var result = await Http(annotations).SetAnnotations(Request("POST", body.ToJsonString()), "acme", "billing", "default");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.LastCreated.ShouldNotBeNull().Select(annotation => annotation.AnnotationKey).ShouldBe(keys);
+    }
+
+    // No model has such a member any more; a record with an IReadOnlySet<string> without a converter stands in.
+    [Fact]
+    public void DeserializeBody_MemberTheSerializerCannotRead_FailsAsAnInvalidBody()
+    {
+        using var document = JsonDocument.Parse("""{"Names":["prod"]}""");
+
+        var exception = Should.Throw<JsonException>(() => AnnotationsHttp.DeserializeBody(document.RootElement, typeof(UnreadableSet)));
+
+        exception.Message.ShouldBe("A member of the annotation has a type the API cannot read.");
+        exception.InnerException.ShouldBeOfType<NotSupportedException>();
     }
 
     [Fact]
@@ -982,9 +1094,9 @@ public class AnnotationsHttpTests
         watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(1));
     }
 
-    private static AnnotationsHttp Http(RecordingAnnotations annotations, AccountRole role = AccountRole.Contributor)
+    private static AnnotationsHttp Http(RecordingAnnotations annotations, AccountRole role = AccountRole.Contributor, ILogger<AnnotationsHttp>? logger = null)
     {
-        return new AnnotationsHttp(annotations, new UserAccess(role), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
+        return new AnnotationsHttp(annotations, new UserAccess(role), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, logger ?? NullLogger<AnnotationsHttp>.Instance);
     }
 
     // The machine of the project has the given management scopes.
@@ -1069,6 +1181,51 @@ public class AnnotationsHttpTests
         return annotations.Select(annotation => annotation.AnnotationKey).ToList();
     }
 
+    // An annotation as a read answers it: relation arrays, labels, values and stamps. The Admin UI sends it back so.
+    private static Annotation AsRead(string key)
+    {
+        var stamp = new AuditStamp { At = Now, By = AuditActor.System };
+        var annotation = AnnotationFactory.CreateDefault(AnnotationKey.Parse(key), "billing", "default") with
+        {
+            Title = $"The {key}",
+            Labels = ["finance"],
+            Values = new Dictionary<string, object> { ["customerType"] = "retail" },
+            Created = stamp,
+            Modified = stamp,
+        };
+
+        return annotation switch
+        {
+            Responsibility responsibility => responsibility with { UnitNames = new HashSet<string> { "api", "worker" } },
+            Subject subject => subject with { ContextNames = new HashSet<string> { "prod", "staging" }, ResponsibilityNames = new HashSet<string> { "invoicing" } },
+            Usage usage => usage with { ContextNames = new HashSet<string> { "prod" } },
+            Context context => context with { ResponsibilityNames = new HashSet<string> { "invoicing" } },
+            Execution execution => execution with { UnitNames = new HashSet<string> { "api" } },
+            _ => throw new ArgumentOutOfRangeException(nameof(key), key, "The type has no relation arrays."),
+        };
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlySet<string>> RelationArrays(Annotation annotation)
+    {
+        return annotation switch
+        {
+            Responsibility responsibility => new Dictionary<string, IReadOnlySet<string>> { [nameof(responsibility.UnitNames)] = responsibility.UnitNames },
+            Subject subject => new Dictionary<string, IReadOnlySet<string>> { [nameof(subject.ContextNames)] = subject.ContextNames, [nameof(subject.ResponsibilityNames)] = subject.ResponsibilityNames },
+            Usage usage => new Dictionary<string, IReadOnlySet<string>> { [nameof(usage.ContextNames)] = usage.ContextNames },
+            Context context => new Dictionary<string, IReadOnlySet<string>> { [nameof(context.ResponsibilityNames)] = context.ResponsibilityNames },
+            Execution execution => new Dictionary<string, IReadOnlySet<string>> { [nameof(execution.UnitNames)] = execution.UnitNames },
+            _ => new Dictionary<string, IReadOnlySet<string>>(),
+        };
+    }
+
+    // The annotation as the API's JSON, with one member replaced by the raw JSON value.
+    private static string WithMember(Annotation annotation, string member, string value)
+    {
+        var body = JsonSerializer.SerializeToNode(annotation, annotation.GetType(), FunctionTestDoubles.ApiJsonSerializerOptions)!.AsObject();
+        body[member] = JsonNode.Parse(value);
+        return body.ToJsonString();
+    }
+
     private static Subject Subject(string key)
     {
         return new Subject
@@ -1135,6 +1292,9 @@ public class AnnotationsHttpTests
         // The annotations CreateAnnotationsAsync was given.
         public IReadOnlyList<Annotation>? LastCreated { get; private set; }
 
+        // The annotation SetAnnotationAsync was given.
+        public Annotation? LastSet { get; private set; }
+
         // What GetAnnotationAsync and GetDeletedAnnotationAsync find.
         public Annotation? Stored { get; init; }
 
@@ -1147,6 +1307,7 @@ public class AnnotationsHttpTests
         {
             Calls.Add($"set:{organization}:{annotation.AnnotationKey}");
             LastActor = actor;
+            LastSet = annotation;
             return Failure is null
                 ? Task.FromResult(annotation with { Created = Stamp, Modified = Stamp })
                 : Task.FromException<Annotation>(Failure);
@@ -1296,5 +1457,11 @@ public class AnnotationsHttpTests
         public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
 
         public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotImplementedException();
+    }
+
+    // A member type the serializer cannot create, as the relation arrays were before their converter.
+    private sealed record UnreadableSet
+    {
+        public IReadOnlySet<string> Names { get; init; } = new HashSet<string>();
     }
 }

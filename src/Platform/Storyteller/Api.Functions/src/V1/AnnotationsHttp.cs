@@ -344,7 +344,7 @@ public partial class AnnotationsHttp
                 return new BadRequestObjectResult(new ErrorResponse("The annotation has no known AnnotationType."));
             }
 
-            var deserializedObject = document.RootElement.Deserialize(AnnotationTypes.GetRuntimeType(type), AnnotationBodyOptions);
+            var deserializedObject = DeserializeBody(document.RootElement, AnnotationTypes.GetRuntimeType(type));
 
             if (deserializedObject is null)
             {
@@ -355,6 +355,7 @@ public partial class AnnotationsHttp
         }
         catch (JsonException exception)
         {
+            LogUnreadableMember(exception);
             return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation object in body: {exception.Message}"));
         }
 
@@ -427,6 +428,7 @@ public partial class AnnotationsHttp
             }
             catch (JsonException exception)
             {
+                LogUnreadableMember(exception);
                 invalidElement = exception;
             }
         }
@@ -968,6 +970,22 @@ public partial class AnnotationsHttp
         return new OkObjectResult(response.AsTyped<UnitOfExecution>());
     }
 
+    // The annotation of a body, read into the given runtime type. A member type the serializer cannot read throws
+    // NotSupportedException for every body that has the member, as the relation arrays did before their converter
+    // (424-129): a defect of the model, not of the body. The body still cannot be stored, so it fails as an invalid
+    // body (400), with a fixed message instead of the serializer's, which names CLR types.
+    internal static object? DeserializeBody(JsonElement element, Type runtimeType)
+    {
+        try
+        {
+            return element.Deserialize(runtimeType, AnnotationBodyOptions);
+        }
+        catch (NotSupportedException exception)
+        {
+            throw new JsonException("A member of the annotation has a type the API cannot read.", exception);
+        }
+    }
+
     private static AnnotationDeletedFilter DeletedFilter(bool includeDeleted)
     {
         return includeDeleted ? AnnotationDeletedFilter.Include : AnnotationDeletedFilter.Exclude;
@@ -994,7 +1012,7 @@ public partial class AnnotationsHttp
     private static Annotation DeserializeAnnotationElement(JsonElement element)
     {
         var runtimeType = IsUnitElement(element) && HasUnitMember(element) ? typeof(Unit) : typeof(Annotation);
-        var deserialized = element.Deserialize(runtimeType, AnnotationBodyOptions);
+        var deserialized = DeserializeBody(element, runtimeType);
 
         if (deserialized is not Annotation annotation)
         {
@@ -1047,5 +1065,15 @@ public partial class AnnotationsHttp
         }
 
         return found;
+    }
+
+    // Only a defect of a model fails a body with a NotSupportedException inside (DeserializeBody), so that one is
+    // logged; a body that is just invalid is not.
+    private void LogUnreadableMember(JsonException exception)
+    {
+        if (exception.InnerException is NotSupportedException unreadable)
+        {
+            _logger.LogError(unreadable, "An annotation body has a member of a type the serializer cannot read.");
+        }
     }
 }
