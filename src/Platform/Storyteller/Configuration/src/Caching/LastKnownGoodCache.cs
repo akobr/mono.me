@@ -409,7 +409,7 @@ internal sealed partial class LastKnownGoodCache
 
         try
         {
-            mode = _fileSystem.DirectoryInfo.New(_directory).UnixFileMode;
+            mode = _fileSystem.File.GetUnixFileMode(_directory);
         }
         catch (NotSupportedException)
         {
