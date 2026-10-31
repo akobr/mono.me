@@ -160,6 +160,8 @@ Routes include the view, like configuration and template routes. The caller send
 | GET, PUT, DELETE | `v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}` | Descendant-type schema on annotation `{key}` for descendant type `{annotationType}` |
 | GET | `v1/{organization}/{project}/{view}/configuration-schema/{key}/definition` | Combined schema for `{key}` |
 
+`{key}` takes only a text with a `.`, as every annotation key has one, so the routes of a key never take the literal `type` of the type routes (the Functions host runs the first function, in the order of the function names, whose route matches). A key without a dot matches no route and gets the host's `404` without a body; a dotted key that doesn't parse gets `400`.
+
 Version routes, on each of the three stored kinds (the combined schema is computed and has no history of its own):
 
 | Method | Route | Operation |

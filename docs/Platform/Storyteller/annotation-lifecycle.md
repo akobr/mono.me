@@ -172,10 +172,11 @@ Machines have no role: their [scopes](authentication.md#scopes-of-machines) deci
 
 The Functions host doesn't rank a literal segment above a parameter: it runs the first function, in the order of the function names, whose route matches. So the routes constrain their parameters (`Definitions.Routes.Constraints`), and the routes of one method never meet:
 
-- `{key}` takes only a text with a `.`. Every annotation key has one after its type code; the literal segments beside it (`simple`, `deleted`, `lookup`, `restore`, `history`) have none.
-- `{descendants}` takes only `usages`, `contexts`, `executions`, `units`, `units-of-execution` or `all`.
+- `{key}` of `…/{key}`, `…/{key}/{descendants}` and `…/{key}/history` takes only a text with a `.`. Every annotation key has one after its type code; the literal segments beside it (`simple`, `deleted`, `history`) have none.
+- `{descendants}` takes only `usages`, `contexts`, `executions`, `units`, `units-of-execution` or `all`, ignoring case (`USAGES` reaches the function, which answers `400`).
+- `{key}` of `…/deleted/{key}` takes any text: it answers `GET` and `DELETE`, and its siblings `lookup` and `restore` only `POST`.
 
-A key without a dot (`…/annotations/nope`) or another kind of descendants (`…/{key}/bogus`) matches no route and gets the host's `404` without a body. A key with a dot that doesn't parse (`…/annotations/boots.app`) reaches the function and gets `400 InvalidKey`.
+A key without a dot (`…/annotations/nope`) or another kind of descendants (`…/{key}/bogus`) matches no route and gets the host's `404` without a body. A key with a dot that doesn't parse (`…/annotations/boots.app`), and any key under `…/deleted/` that doesn't parse, reaches the function and gets `400 InvalidKey`.
 
 `GET …/{key}/{descendants}` follows the inheritance graph: the descendants of a context are its executions and their units of execution, and the descendants of a unit are its units of execution across executions.
 
