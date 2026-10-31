@@ -606,8 +606,8 @@ public class CosmosAccessService : IAccessService
             // A machine of a kind with an API key had none at the read: a delete removed it before the document, or the
             // compensation of a failed create did. No retry brings a key back. Any other kind got no secret from its
             // identity provider, which is no client error.
-            throw machineAccess.CredentialKind is MachineCredentialKind.ApiKey or MachineCredentialKind.CertificateAndApiKey
-                ? new NotFoundException($"The machine access {appId} has no API key to reset; it is being deleted, or its creation failed.")
+            throw machineAccess.CredentialKind.HasApiKey()
+                ? new NotFoundException($"The machine access {appId} has no API key to reset; it is being deleted, or its creation failed. Delete it and create a new one.")
                 : new InvalidOperationException($"The machine access {appId} reset failed.");
         }
 

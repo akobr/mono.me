@@ -107,6 +107,12 @@ public static class MachineAuthenticationPolicies
         return kind is MachineCredentialKind.Certificate or MachineCredentialKind.CertificateAndApiKey;
     }
 
+    // The kinds whose secret is an API key, stored as a hash in the machine document.
+    public static bool HasApiKey(this MachineCredentialKind kind)
+    {
+        return kind is MachineCredentialKind.ApiKey or MachineCredentialKind.CertificateAndApiKey;
+    }
+
     // Whether the presented credentials are what a machine of this kind has to send.
     // ClientCredentials machines send identity provider tokens and Federated machines Storyteller tokens,
     // never an API key or a certificate.
