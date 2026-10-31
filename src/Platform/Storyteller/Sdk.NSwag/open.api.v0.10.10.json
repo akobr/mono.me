@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.6.40696"
+    "version": "0.10.10.63657"
   },
   "servers": [
     {
@@ -4642,6 +4642,14 @@
             }
           },
           {
+            "name": "format",
+            "in": "query",
+            "description": "The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "If-None-Match",
             "in": "header",
             "description": "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
@@ -4652,7 +4660,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The configuration model.",
+            "description": "The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.",
             "headers": {
               "ETag": {
                 "description": "Weak entity tag of the configuration, for If-None-Match.",
@@ -4672,11 +4680,47 @@
                 "schema": {
                   "$ref": "#/components/schemas/Configuration"
                 }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "properties": {
+                    "summary": "format=properties",
+                    "value": "db.hosts[0]=a\ndb.hosts[1]=b\ndb.port=5432\nfeatures[0]=vat\n"
+                  },
+                  "env": {
+                    "summary": "format=env",
+                    "value": "DB__HOSTS__0=a\nDB__HOSTS__1=b\nDB__PORT=5432\nFEATURES__0=vat\n"
+                  }
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "yaml": {
+                    "summary": "format=yaml",
+                    "value": "db:\n  hosts:\n    - \"a\"\n    - \"b\"\n  port: 5432\nfeatures:\n  - \"vat\"\n"
+                  }
+                }
               }
             }
           },
           "400": {
             "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The configuration cannot be written in the requested format (ErrorCode format.<rule>: format.not-an-object, format.empty-name, format.colon-in-name, format.case-collision, format.bracket-in-name, format.array-gap or format.invalid-env-name). Details hold the Format, the Rule and the JSON Path; the message names the path, never a value.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5226,6 +5270,14 @@
             }
           },
           {
+            "name": "format",
+            "in": "query",
+            "description": "The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "If-None-Match",
             "in": "header",
             "description": "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.",
@@ -5236,7 +5288,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The configuration model with resolved substitutions.",
+            "description": "The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.",
             "headers": {
               "ETag": {
                 "description": "Weak entity tag of the configuration, for If-None-Match.",
@@ -5262,6 +5314,32 @@
                 "schema": {
                   "$ref": "#/components/schemas/Configuration"
                 }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "properties": {
+                    "summary": "format=properties",
+                    "value": "db.hosts[0]=a\ndb.hosts[1]=b\ndb.port=5432\nfeatures[0]=vat\n"
+                  },
+                  "env": {
+                    "summary": "format=env",
+                    "value": "DB__HOSTS__0=a\nDB__HOSTS__1=b\nDB__PORT=5432\nFEATURES__0=vat\n"
+                  }
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "yaml": {
+                    "summary": "format=yaml",
+                    "value": "db:\n  hosts:\n    - \"a\"\n    - \"b\"\n  port: 5432\nfeatures:\n  - \"vat\"\n"
+                  }
+                }
               }
             }
           },
@@ -5276,7 +5354,7 @@
             }
           },
           "422": {
-            "description": "A binding in the configuration cannot be evaluated or exceeds an evaluation limit. ErrorCode is binding.evaluation or binding.limit.<kind>.",
+            "description": "A binding in the configuration cannot be evaluated or exceeds an evaluation limit (ErrorCode binding.evaluation or binding.limit.<kind>), or the resolved configuration cannot be written in the requested format (ErrorCode format.<rule>, with Details as on the effective read).",
             "content": {
               "application/json": {
                 "schema": {
