@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.10.63657
+ * OpenAPI spec version: 0.10.11.29126
  */
 
 export type GetSubjectsParams = {
