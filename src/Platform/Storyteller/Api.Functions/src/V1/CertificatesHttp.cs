@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
+using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -144,7 +145,7 @@ public class CertificatesHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(SharedCertificateCreate), Description = "The label and optional lifetime for the shared certificate.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(SharedCertificate), Description = "The issued shared certificate with PKCS#12 data.")]
-    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "An invalid label, or the project does not enable CertificateAndApiKey, which shared certificates belong to.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "An invalid label, or the project does not enable CertificateAndApiKey, which shared certificates belong to (MachineAccessNotSupported).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     public async Task<IActionResult> PostSharedCertificate(
@@ -184,7 +185,7 @@ public class CertificatesHttp
         }
         catch (MachineAccessNotSupportedException exception)
         {
-            return new BadRequestObjectResult(new ErrorResponse { Message = exception.Message });
+            return ErrorResponseMapping.ToActionResult(exception);
         }
     }
 

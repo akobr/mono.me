@@ -6,7 +6,7 @@ using Moq;
 
 namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 
-// The API key reset replaces the stored hash by compare-and-set, and a Certificate machine has no secret to reset.
+// The API key reset replaces the stored hash by compare-and-set, and a Certificate machine has no key to reset.
 // The hash store is strict, so any call a test does not expect fails it.
 public class MachineResetTests
 {
@@ -83,6 +83,7 @@ public class MachineResetTests
             () => CreateRouter().ResetMachineAccessAsync(Access(MachineCredentialKind.Certificate), "org1", "proj1"));
 
         exception.Message.ShouldBe(PolicyAwareMachineAccessService.CertificateResetNotSupportedMessage);
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotSupported);
         _hashStore.VerifyNoOtherCalls();
     }
 

@@ -3,6 +3,7 @@ using System.Net;
 using System.Reflection;
 using System.Text.Json;
 
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
@@ -31,6 +32,7 @@ public class ExceptionHandlingMiddlewareTests
         { new NotFoundException("The member doesn't exist.", ErrorCodes.MemberNotFound), HttpStatusCode.NotFound, ErrorCodes.MemberNotFound },
         { new ConflictException("The last owner can't leave.", ErrorCodes.LastOwner), HttpStatusCode.Conflict, ErrorCodes.LastOwner },
         { new InvalidInputException("The name is reserved.", ErrorCodes.InvalidName), HttpStatusCode.BadRequest, ErrorCodes.InvalidName },
+        { new MachineAccessNotSupportedException("A Certificate machine has no key to reset."), HttpStatusCode.BadRequest, ErrorCodes.MachineAccessNotSupported },
         { new JsonPatchException("JSON Patch operation 0 failed.", JsonPatchFailureKind.TestFailed, 0), HttpStatusCode.PreconditionFailed, ErrorCodes.PatchTestFailed },
     };
 

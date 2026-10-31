@@ -69,6 +69,26 @@ public class CertificatesHttpTests
         backend.Calls.ShouldBe(["policy:acme.billing", "label:acme.billing:build-agent", "issue:acme.billing:build-agent:30", "store:acme.billing:THUMBPRINT"]);
     }
 
+    // A shared certificate belongs to CertificateAndApiKey: a project without that kind gets a coded 400 and no
+    // certificate.
+    [Fact]
+    public async Task PostSharedCertificate_ProjectWithoutCertificateAndApiKey_IsBadRequestWithMachineAccessNotSupported()
+    {
+        var backend = new SharedCertificateBackend { EnabledCredentialKinds = [MachineCredentialKind.ApiKey] };
+        var http = CreateHttp(backend.CreateService());
+        var body = FunctionTestDoubles.ToJsonBody(new SharedCertificateCreate { Label = "build-agent" });
+
+        var result = await http.PostSharedCertificate(UserRequest(body), "acme", "billing");
+
+        var badRequest = result.ShouldBeOfType<ObjectResult>();
+        badRequest.StatusCode.ShouldBe((int)HttpStatusCode.BadRequest);
+        var error = badRequest.Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe("The project acme.billing does not enable CertificateAndApiKey, which shared certificates belong to.");
+        error.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotSupported);
+        error.Error.ShouldBeNull();
+        backend.Calls.ShouldBe(["policy:acme.billing"]);
+    }
+
     // Shared certificates are managed by users (spec 7.4): a machine is refused in every build, also one whose
     // credentials carry every scope and User.Impersonation, before the body is read or a certificate is listed, issued or
     // revoked.
@@ -168,10 +188,13 @@ public class CertificatesHttpTests
     }
 
     // The policy store, the certificate store and the authority of SharedCertificateService in one: a project that
-    // enables CertificateAndApiKey, no label taken yet, and a certificate for every request.
+    // enables CertificateAndApiKey (unless the test enables other kinds), no label taken yet, and a certificate for
+    // every request.
     private sealed class SharedCertificateBackend : IMachineAuthenticationPolicyStore, ISharedCertificateStore, IClientCertificateAuthority
     {
         public List<string> Calls { get; } = [];
+
+        public IReadOnlyList<MachineCredentialKind> EnabledCredentialKinds { get; init; } = [MachineCredentialKind.CertificateAndApiKey];
 
         public SharedCertificateService CreateService()
         {
@@ -188,7 +211,7 @@ public class CertificatesHttpTests
             Calls.Add($"policy:{organization}.{project}");
             return Task.FromResult<MachineAuthenticationPolicy?>(new MachineAuthenticationPolicy
             {
-                EnabledCredentialKinds = [MachineCredentialKind.CertificateAndApiKey],
+                EnabledCredentialKinds = EnabledCredentialKinds,
             });
         }
 

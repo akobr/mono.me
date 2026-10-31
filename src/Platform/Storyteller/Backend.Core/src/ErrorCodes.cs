@@ -37,6 +37,10 @@ public static class ErrorCodes
     public const string MachineNotFederated = "MachineNotFederated";
     public const string FederatedIssuerInUse = "FederatedIssuerInUse";
 
+    // A machine credential kind or an operation that the project or the deployment does not support, or that the
+    // machine's kind does not have, such as the reset of a Certificate machine (400).
+    public const string MachineAccessNotSupported = "MachineAccessNotSupported";
+
     public const string PatchInvalid = "PatchInvalid";
     public const string PatchTestFailed = "PatchTestFailed";
 
