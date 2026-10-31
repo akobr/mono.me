@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, useTemplateRef, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useEventListener, useMediaQuery } from '@vueuse/core'
 import type { RowSelectionState, SortingState } from '@tanstack/vue-table'
 import type { DropdownMenuItem } from '@nuxt/ui'
@@ -54,6 +54,13 @@ const scrollTop = computed({
 })
 const { open: creating } = useAnnotationCreate()
 const { open: bulkCreating } = useAnnotationBulkCreate()
+
+// The dialogs share their open state with Graph: one left open (browser Back) must not open again there (424-130).
+// Not on unmount, which runs after the command palette has opened a dialog for this page.
+onBeforeRouteLeave(() => {
+  creating.value = false
+  bulkCreating.value = false
+})
 
 watch(
   () => context.scope,
@@ -236,35 +243,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
               @click="context.scope && catalog.load(context.scope, { force: true })"
             />
           </UTooltip>
-          <!-- Not below sm, where the navbar has no room for a third button: the command palette and the empty
-               state open it there. Icon-only until lg, where the sidebar is collapsed and the label would push the
-               right group over the breadcrumb. -->
-          <UTooltip v-if="canEdit" text="Bulk create annotations">
-            <UButton
-              label="Bulk create"
-              aria-label="Bulk create"
-              icon="i-lucide-list-plus"
-              color="neutral"
-              variant="outline"
-              class="hidden sm:inline-flex"
-              :ui="{ label: 'hidden lg:inline' }"
-              @click="bulkCreating = true"
-            />
-          </UTooltip>
-          <UButton
-            v-if="canEdit"
-            label="New"
-            icon="i-lucide-plus"
-            class="hidden sm:inline-flex"
-            @click="creating = true"
-          />
-          <UButton
-            v-if="canEdit"
-            icon="i-lucide-plus"
-            aria-label="New annotation"
-            class="sm:hidden"
-            @click="creating = true"
-          />
+          <AnnotationCreateActions variant="header" />
         </template>
       </AppNavbar>
       <UDashboardToolbar class="py-2">
@@ -308,16 +287,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
         title="No annotations in this view"
         description="Create the first annotations, or import them with the sform CLI."
       >
-        <template v-if="canEdit">
-          <UButton label="New annotation" icon="i-lucide-plus" @click="creating = true" />
-          <UButton
-            label="Bulk create"
-            icon="i-lucide-list-plus"
-            color="neutral"
-            variant="outline"
-            @click="bulkCreating = true"
-          />
-        </template>
+        <AnnotationCreateActions variant="empty" />
       </EmptyState>
       <AnnotationGrid
         v-else-if="desktop"
