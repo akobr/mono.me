@@ -18,9 +18,10 @@ public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigur
     [McpServerTool(Name = SecretToolNames.RevealKeyValue, Title = "Reveal a key/value pair", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
         "Returns a pair with its value, a secret's value included, or one stored version of it. " + AskFirst + " Needs "
-        + "ContributorWithSecrets on the project for a secret. The API audits secret reads: every reveal of a secret, of the "
-        + "current value or of a stored version, is recorded as a Reveal event in the project's audit trail "
-        + "(get_key_value_audit). A Hyok value comes back as "
+        + "ContributorWithSecrets on the project for a secret. The API audits secret reads: a reveal of the current value, with "
+        + "or without its version number, is recorded as a Reveal event in the project's audit trail "
+        + "(get_key_value_audit); a reveal of an older version is recorded too by an API that audits its version route "
+        + "(older APIs do not). A Hyok value comes back as "
         + "the stored JWE document (ClientEncrypted: true), which only the holder of a recipient's private key decrypts "
         + "(sform story kv get <key> --reveal --private-key <pem>).")]
     public async Task<CallToolResult> RevealKeyValue(
