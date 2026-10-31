@@ -1,5 +1,7 @@
 using System;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
@@ -460,7 +462,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
 
         var invalid = JObject.Parse("""{ "type": "object", "properties": [] }""");
         var act = () => schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, invalid, AuditActor.Account("test"), true);
-        await act.Should().ThrowAsync<ArgumentException>();
+        (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidSchema);
         (await schemas.GetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility))!.Version.Should().Be(1);
     }
 
@@ -606,6 +608,124 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
 
         var forcedCreate = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 2 }"""), AuditActor.Account("test"), true);
         forcedCreate.Content["badField"]!.Value<int>().Should().Be(2);
+    }
+
+    // Whatever force is, before anything is read or written: the URL is never fetched.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SchemaSave_WithAnExternalReference_IsRefusedWithoutFetchingOrStoring(bool force)
+    {
+        var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
+        var project = force ? "external-ref-forced" : "external-ref";
+        var actor = AuditActor.Account("test");
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var external = ExternalNameSchema(listener);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), actor, false);
+
+        Func<Task>[] writes =
+        [
+            () => schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, external, actor, force),
+            () => schemas.SetAnnotationSchemaAsync(TestConstants.Organization, project, View, "rst.external", external, actor, force),
+            () => schemas.SetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, "rst.external", AnnotationTypeCodes.Execution, external, actor, force),
+        ];
+
+        foreach (var write in writes)
+        {
+            var refused = (await write.Should().ThrowAsync<InvalidInputException>()).Which;
+            refused.ErrorCode.Should().Be(ErrorCodes.ExternalSchemaReference);
+            refused.Message.Should().StartWith($"External $ref not allowed: 'http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}/name.json'.");
+        }
+
+        listener.Pending().Should().BeFalse();
+        (await schemas.GetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility))!.Version.Should().Be(1);
+        (await schemas.GetAnnotationSchemaAsync(TestConstants.Organization, project, View, "rst.external")).Should().BeNull();
+        (await schemas.GetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, "rst.external", AnnotationTypeCodes.Execution)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task SchemaWithLocalReferences_IsSavedAndAppliedToConfigurationWrites()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+        var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
+        var project = "local-ref-test";
+        var schema = JObject.Parse("""
+            {
+                "type": "object",
+                "definitions": { "shortName": { "type": "string", "maxLength": 5 } },
+                "properties": { "name": { "$ref": "#/definitions/shortName" } }
+            }
+            """);
+
+        var stored = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("test"), false);
+        var key = await CreateResponsibilityAsync(annotations, project, "local-ref", View);
+
+        stored.Version.Should().Be(1);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "ok" }"""), AuditActor.Account("test"));
+        var rejected = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "too long" }"""), AuditActor.Account("test"));
+        (await rejected.Should().ThrowAsync<SchemaValidationException>()).Which.ValidationErrors.Should().ContainSingle()
+            .Which.Errors.Should().Equal("#/name: StringTooLong");
+    }
+
+    // A schema stored before external references were refused: the writes it applies to fail until it is replaced, and
+    // its URL is never fetched.
+    [Fact]
+    public async Task StoredSchemaWithAnExternalReference_FailsTheWritesItApplies()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+        var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
+        var project = "stored-external-ref";
+        var actor = AuditActor.Account("test");
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var key = await CreateResponsibilityAsync(annotations, project, "stored-external", View);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "before" }"""), actor);
+        await PlantTypeSchemaAsync(project, AnnotationTypeCodes.Responsibility, ExternalNameSchema(listener));
+
+        var create = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "after" }"""), actor);
+        var patch = () => configs.PatchConfigurationAsync(key, JArray.Parse("""[{ "op": "replace", "path": "/name", "value": "patched" }]"""), actor);
+        var otherLayer = () => schemas.SetAnnotationSchemaAsync(TestConstants.Organization, project, View, key.Annotation.ToString(), StrictNameSchema(), actor, false);
+
+        (await create.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.ExternalSchemaReference);
+        (await patch.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.ExternalSchemaReference);
+        (await otherLayer.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.ExternalSchemaReference);
+        var forced = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "forced" }"""), actor, true);
+        forced.Content["name"]!.Value<string>().Should().Be("forced");
+        listener.Pending().Should().BeFalse();
+    }
+
+    private static JObject ExternalNameSchema(TcpListener listener)
+    {
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        return JObject.Parse($$"""
+            {
+                "type": "object",
+                "properties": { "name": { "$ref": "http://127.0.0.1:{{port}}/name.json" } }
+            }
+            """);
+    }
+
+    // A type schema as an earlier version of the service stored it: the ids of SchemaIdentity.ForType.
+    private async Task PlantTypeSchemaAsync(string project, string typeCode, JObject content)
+    {
+        var containers = Context.Services.GetRequiredService<IContainerRepositoryProvider>();
+        await containers.GetOrganizationContainer(TestConstants.Organization).Container.UpsertItemAsync(
+            new ConfigurationSchemaEntity
+            {
+                PartitionKey = $"{project}.schema",
+                Id = $"{View}.{EntityIdPrefixTypes.ConfigurationSchema}.t.{typeCode}",
+                AnnotationKey = typeCode,
+                Name = typeCode,
+                ProjectName = project,
+                ViewName = View,
+                Content = content,
+                Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
+                Version = 1,
+            },
+            new PartitionKey($"{project}.schema"));
     }
 
     private async Task<FullKey> CreateResponsibilityAsync(IAnnotationService annotations, string project, string name, string view)

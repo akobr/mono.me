@@ -15,7 +15,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using NJsonSchema;
 using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
 namespace _42.Platform.Storyteller.Configuring;
@@ -28,6 +27,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerSettings _serializerOptions;
     private readonly JsonContentDiffer _differ;
+    private readonly ConfigurationSchemaChecker _checker = new();
     private readonly ILogger<CosmosConfigurationSchemaService> _logger;
     private readonly TimeProvider _timeProvider;
 
@@ -190,7 +190,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
-        var overlayLayers = overlay is null ? null : new OverlaySchemaLayers(overlay.Schemas, AuditStamp.Of(AuditActor.System, _timeProvider.GetUtcNow()));
+        var overlayLayers = overlay is null ? null : new OverlaySchemaLayers(overlay.Schemas, AuditStamp.Of(AuditActor.System, _timeProvider.GetUtcNow()), IsValidSchemaAsync);
         var combined = await ResolveCombinedAsync(repository, partitionKey, view, AnnotationKey.Parse(annotationKey), schemaOverride: null, overlayLayers: overlayLayers);
 
         if (combined is null)
@@ -654,7 +654,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         ViewImportOverlay? overlay = null)
     {
         var schemaOverride = new SchemaOverride(identity, schemaContent, modified);
-        var overlayLayers = overlay is null ? null : new OverlaySchemaLayers(overlay.Schemas, modified);
+        var overlayLayers = overlay is null ? null : new OverlaySchemaLayers(overlay.Schemas, modified, IsValidSchemaAsync);
         var imported = overlay is null ? [] : await ReadImportedConfigurationsAsync(overlay, identity);
         var errors = new List<SchemaValidationError>();
         var layerCache = new Dictionary<string, ConfigurationSchemaEntity?>();
@@ -907,39 +907,17 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         return response[response.Count - 1].ETag;
     }
 
-    private static async Task EnsureValidSchemaAsync(JObject schemaContent)
+    // A schema that cannot be read, or that refers outside itself, throws InvalidInputException (InvalidSchema or
+    // ExternalSchemaReference) whatever force is.
+    private async Task EnsureValidSchemaAsync(JObject schemaContent)
     {
-        try
-        {
-            await JsonSchema.FromJsonAsync(schemaContent.ToString(Formatting.None));
-        }
-        catch (Exception ex)
-        {
-            throw new ArgumentException($"Invalid JSON Schema: {ex.Message}", ex);
-        }
+        await _checker.ParseAsync(schemaContent);
     }
 
-    private static async Task<IReadOnlyList<string>> ValidateAgainstSchemaAsync(JObject content, JObject schemaContent)
+    private async Task<IReadOnlyList<string>> ValidateAgainstSchemaAsync(JObject content, JObject schemaContent)
     {
-        JsonSchema schema;
-
-        try
-        {
-            schema = await JsonSchema.FromJsonAsync(schemaContent.ToString(Formatting.None));
-        }
-        catch (Exception ex)
-        {
-            throw new ArgumentException($"Invalid JSON Schema: {ex.Message}", ex);
-        }
-
-        var validationResults = schema.Validate(content.ToString(Formatting.None));
-
-        if (validationResults.Count == 0)
-        {
-            return [];
-        }
-
-        return validationResults.Select(error => $"{error.Path}: {error.Kind}").ToList();
+        var schema = await _checker.ParseAsync(schemaContent);
+        return _checker.Validate(schema, content);
     }
 
     private static bool IsDescendantOf(string annotationKey, string ancestorKey, string descendantTypeCode)

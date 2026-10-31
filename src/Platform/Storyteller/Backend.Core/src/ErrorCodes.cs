@@ -91,7 +91,12 @@ public static class ErrorCodes
     public const string SchemaViolation = "SchemaViolation";
     public const string DocumentExists = "DocumentExists";
     public const string DependencyFailed = "DependencyFailed";
+
+    // A configuration schema that cannot be used: the schema and configuration writes answer it with 400, and an import
+    // fails its file with it. InvalidSchema: it cannot be read. ExternalSchemaReference: a $ref is not '#' or '#/…' and
+    // would point outside the schema, which is never fetched or read.
     public const string InvalidSchema = "InvalidSchema";
+    public const string ExternalSchemaReference = "ExternalSchemaReference";
 
     // Export and import of a view: warnings of written documents.
     public const string AncestorCreated = "AncestorCreated";

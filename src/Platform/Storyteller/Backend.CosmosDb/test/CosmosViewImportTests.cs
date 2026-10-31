@@ -514,6 +514,37 @@ public class CosmosViewImportTests(Startup startup)
     }
 
     [Fact]
+    public async Task ImportSchema_FailsAnExternalReferenceEvenWithForce()
+    {
+        const string project = "import-schema-external";
+        var target = TypeSchema(project, AnnotationTypeCodes.Execution);
+
+        var external = await Schemas.ImportSchemaAsync(target, ExternalSchema(), Options(), new ViewImportOverlay());
+        var forced = await Schemas.ImportSchemaAsync(target, ExternalSchema(), Options(force: true), new ViewImportOverlay());
+
+        external.Outcome.Should().Be(ViewImportOutcome.Failed);
+        external.ErrorCode.Should().Be(ErrorCodes.ExternalSchemaReference);
+        external.Message.Should().StartWith("External $ref not allowed: 'https://schemas.example/limit.json'.");
+        forced.Should().Be(external);
+        (await Schemas.GetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Execution)).Should().BeNull();
+    }
+
+    // the import won't write such a layer, so the stored one stays
+    [Fact]
+    public async Task ImportSchema_IgnoresALayerOfTheArchiveWithAnExternalReference()
+    {
+        const string project = "import-schema-external-layer";
+        await CreateAsync(project, "rst.layer");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.layer", project), JObject.Parse("""{ "limit": 5 }"""), Creator);
+        await Schemas.SetAnnotationSchemaAsync(Organization, project, View, "rst.layer", Maximum(3), Creator, force: true);
+        var target = TypeSchema(project, AnnotationTypeCodes.Responsibility);
+        var overlay = new ViewImportOverlay();
+        overlay.SetSchema(SchemaKey.ForAnnotation("rst.layer"), ExternalSchema());
+
+        (await Schemas.ImportSchemaAsync(target, Limit(), Options(), overlay)).ErrorCode.Should().Be(ErrorCodes.SchemaViolation);
+    }
+
+    [Fact]
     public async Task ImportSchema_LeavesAnEqualSchemaUnchangedAndSkipKeepsADifferentOne()
     {
         const string project = "import-schema-existing";
@@ -868,6 +899,12 @@ public class CosmosViewImportTests(Startup startup)
     private static JObject InvalidSchema()
     {
         return JObject.Parse("""{ "$ref": "#/definitions/missing" }""");
+    }
+
+    // a reference outside the schema, which is never fetched
+    private static JObject ExternalSchema()
+    {
+        return JObject.Parse("""{ "type": "object", "properties": { "limit": { "$ref": "https://schemas.example/limit.json" } } }""");
     }
 
     private static ViewImportResult Skipped(string errorCode, string message)
