@@ -695,10 +695,10 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         var forced = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "forced" }"""), actor, true);
         forced.Content["name"]!.Value<string>().Should().Be("forced");
 
-        // force covers the compliance check that could not finish, so the other layer can be stored and the broken one
-        // replaced
+        // force covers the compliance check that could not finish, so the other layer can be stored; the broken layer
+        // itself is replaced without force, because only the other layers are read from the store
         var forcedLayer = await schemas.SetAnnotationSchemaAsync(TestConstants.Organization, project, View, key.Annotation.ToString(), StrictNameSchema(), actor, true);
-        var replaced = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), actor, true);
+        var replaced = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), actor, false);
 
         forcedLayer.Version.Should().Be(1);
         replaced.Version.Should().Be(2);

@@ -269,9 +269,72 @@ public sealed class ConfigurationSchemaCheckerTests : IDisposable
         checker.Validate(schema, JObject.Parse("""{ "x": 1 }""")).Should().BeEmpty();
     }
 
+    // NJsonSchema asks whether a declared property's schema is nullable when its value is null, before the property's
+    // own step: a cycle through oneOf would overflow the stack there
+    [Theory]
+    [InlineData("""{ "properties": { "x": { "oneOf": [ { "$ref": "#/properties/x" }, { "type": "string" } ] } } }""")]
+    [InlineData("""{ "definitions": { "a": { "oneOf": [ { "$ref": "#/definitions/b" } , { "type": "integer" } ] }, "b": { "oneOf": [ { "$ref": "#/definitions/a" }, { "type": "string" } ] } }, "properties": { "x": { "$ref": "#/definitions/a" } } }""")]
+    public async Task Validate_OfANullValueWhoseSchemaIsNullableThroughACycle_IsAnInvalidSchema(string schemaContent)
+    {
+        var checker = Checker();
+        var schema = await checker.ParseAsync(JObject.Parse(schemaContent));
+
+        var validate = () => checker.Validate(schema, JObject.Parse("""{ "x": null }"""));
+
+        var exception = validate.Should().Throw<InvalidInputException>().Which;
+        exception.ErrorCode.Should().Be(ErrorCodes.InvalidSchema);
+        exception.Message.Should().Contain("applies itself to the same value again");
+    }
+
+    // without a cycle, IsNullable still takes exponential time over a graph of oneOf references, within one step
+    [Fact]
+    public async Task Validate_OfANullValueWhoseSchemaIsAGraphOfOneOf_IsASchemaValidationTimeoutWithoutTheClock()
+    {
+        var definitions = new JObject { ["a20"] = new JObject { ["type"] = "string" } };
+
+        for (var level = 0; level < 20; level++)
+        {
+            var next = new JObject { ["$ref"] = $"#/definitions/a{level + 1}" };
+            definitions[$"a{level}"] = new JObject { ["oneOf"] = new JArray(next, next.DeepClone()) };
+        }
+
+        var checker = Checker(new ConfigurationSchemaOptions(), new SteppingTimeProvider(step: TimeSpan.Zero));
+        var schema = await checker.ParseAsync(new JObject
+        {
+            ["definitions"] = definitions,
+            ["properties"] = new JObject { ["x"] = new JObject { ["$ref"] = "#/definitions/a0" } },
+        });
+
+        var validate = () => checker.Validate(schema, JObject.Parse("""{ "x": null }"""));
+
+        validate.Should().Throw<InvalidInputException>().Which.ErrorCode.Should().Be(ErrorCodes.SchemaValidationTimeout);
+    }
+
+    // NJsonSchema compares each name of 'required' that the object lacks with every property of the object, within one
+    // step
+    [Fact]
+    public async Task Validate_OfAnObjectThatLacksManyRequiredNames_IsASchemaValidationTimeoutWithoutTheClock()
+    {
+        var checker = Checker(new ConfigurationSchemaOptions(), new SteppingTimeProvider(step: TimeSpan.Zero));
+        var required = await checker.ParseAsync(new JObject { ["required"] = new JArray(Enumerable.Range(0, 10_000).Select(index => $"r{index}")) });
+        var declared = await checker.ParseAsync(new JObject
+        {
+            ["properties"] = new JObject(Enumerable.Range(0, 10_000).Select(index => new JProperty($"p{index}", new JObject { ["type"] = "integer" }))),
+        });
+        var others = new JObject(Enumerable.Range(0, 10_000).Select(index => new JProperty($"o{index}", index)));
+        var present = new JObject(Enumerable.Range(0, 10_000).Select(index => new JProperty($"p{index}", index)));
+
+        var lacking = () => checker.Validate(required, others);
+
+        lacking.Should().Throw<InvalidInputException>().Which.ErrorCode.Should().Be(ErrorCodes.SchemaValidationTimeout);
+        checker.Validate(declared, present).Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("""{ "allOf": [ { "$ref": "#" } ] }""", "{}")]
     [InlineData("""{ "properties": { "p": { "pattern": "(" } } }""", """{ "p": "x" }""")]
+    [InlineData("""{ "properties": { "n": { "multipleOf": 0 } } }""", """{ "n": 3 }""")]
+    [InlineData("""{ "properties": { "n": { "multipleOf": 1e-30 } } }""", """{ "n": 3.5 }""")]
     public async Task Validate_OfASchemaWhoseCheckCannotRun_IsAnInvalidSchema(string schemaContent, string content)
     {
         var checker = Checker();
