@@ -94,8 +94,8 @@ public static class JsonQuery
         }
         catch (JsonException exception)
         {
-            // Newtonsoft's messages about the path quote at most one of its characters.
-            throw new BindingEvaluationException($"The JSONPath query is not valid: {exception.Message}", exception);
+            // Newtonsoft's messages quote a character of the query, which can be computed.
+            throw new BindingEvaluationException("The JSONPath query is not valid.", exception);
         }
         catch (RegexMatchTimeoutException exception)
         {

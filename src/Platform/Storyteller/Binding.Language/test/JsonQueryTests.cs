@@ -126,7 +126,7 @@ public class JsonQueryTests
 
     [Theory]
     [InlineData("SECRET_SENTINEL", "The query is neither a JSON Pointer (must start with '/') nor a JSONPath expression (must start with '$').")]
-    [InlineData("$.SECRET_SENTINEL[", "The JSONPath query is not valid: *")]
+    [InlineData("$.SECRET_SENTINEL[", "The JSONPath query is not valid.")]
     [InlineData("$.items[99999999999999999999]", "The JSONPath query is not valid*")]
     [InlineData("$.items[?(@.name =~ /SECRET_SENTINEL(/)]", "The JSONPath query is not valid.")]
     [InlineData("/SECRET~2", "Invalid JSON Pointer escape at offset 7 of the query: '~' must be followed by '0' or '1'.")]
