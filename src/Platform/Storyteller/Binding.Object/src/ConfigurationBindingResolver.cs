@@ -200,8 +200,9 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
             }
             catch (BindingException exception)
             {
-                throw new BindingException(
+                throw new BindingEvaluationException(
                     $"Failed to process the object binding for '{path}': {exception.Message}",
+                    path,
                     exception);
             }
 

@@ -8,6 +8,8 @@ namespace _42.Platform.Storyteller.Binding.Language;
 /// evaluates the expression, then assigns the result back onto the JSON token. Sources and functions
 /// are registered through <see cref="IBindingRegistry"/> and listed through <see cref="IBindingCatalog"/>.
 /// It records through the evaluator: the scope's <see cref="BindingScope.Dependencies"/> reach every source and function.
+/// A string longer than <see cref="BindingExpressionLimits.MaxLength"/> is not parsed. Every failure of the content is a
+/// <see cref="BindingEvaluationException"/> with the JSON path (an <see cref="EvaluationLimitExceededException"/> for a limit).
 /// </summary>
 public sealed class BindingExecutor : IBindingExecutor, IBindingRegistry, IBindingCatalog, IRecordingBinding
 {
@@ -90,6 +92,17 @@ public sealed class BindingExecutor : IBindingExecutor, IBindingRegistry, IBindi
             return false;
         }
 
+        // A longer string is not read at all, as in the MCP reader.
+        if (raw.Length > BindingExpressionLimits.MaxLength)
+        {
+            throw new EvaluationLimitExceededException(
+                EvaluationLimitKind.ExpressionLength,
+                BindingExpressionLimits.MaxLength,
+                $"Failed to process the data binding for '{current.Path}': the expression is longer than {BindingExpressionLimits.MaxLength} characters.",
+                current.Path,
+                innerException: null);
+        }
+
         JToken? result;
         try
         {
@@ -98,10 +111,22 @@ public sealed class BindingExecutor : IBindingExecutor, IBindingRegistry, IBindi
             var evaluator = new BindingEvaluator(_sources, _functions, includeSecrets, scope);
             result = await evaluator.EvaluateAsync(ast);
         }
+        catch (EvaluationLimitExceededException exception)
+        {
+            throw new EvaluationLimitExceededException(
+                exception.Kind,
+                exception.Limit,
+                $"Failed to process the data binding for '{current.Path}': {exception.Message}",
+                current.Path,
+                exception);
+        }
         catch (BindingException exception)
         {
-            throw new BindingException(
-                $"Failed to process the data binding '{raw}' for '{current.Path}': {exception.Message}",
+            // The content of the binding cannot be evaluated: syntax, an operand, a function's arguments. The raw
+            // expression stays out of the message, the path finds it.
+            throw new BindingEvaluationException(
+                $"Failed to process the data binding for '{current.Path}': {exception.Message}",
+                current.Path,
                 exception);
         }
 

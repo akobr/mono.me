@@ -1,16 +1,20 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace _42.Platform.Storyteller.Binding.Language;
 
 /// <summary>
 /// A recursive-descent parser that turns a token stream into a binding AST. Expressions never nest:
 /// only statements may appear inside interpolations and math expressions, although statements may nest
-/// because a function argument can itself be a statement.
+/// because a function argument can itself be a statement. Nested statements and math parentheses count
+/// towards <see cref="BindingExpressionLimits.MaxDepth"/>; deeper input, or input that would exhaust the
+/// stack, throws an <see cref="EvaluationLimitExceededException"/> with <see cref="EvaluationLimitKind.Depth"/>.
 /// </summary>
 public sealed class Parser
 {
     private readonly IReadOnlyList<Token> _tokens;
     private int _index;
+    private int _depth;
 
     public Parser(IReadOnlyList<Token> tokens)
     {
@@ -69,7 +73,33 @@ public sealed class Parser
         return new BindingSyntaxException(message, Current.Start);
     }
 
+    // A nested statement or math parenthesis: beyond MaxDepth, or close to the end of the thread's stack, parsing stops.
+    private void Enter()
+    {
+        _depth++;
+        if (_depth > BindingExpressionLimits.MaxDepth || !RuntimeHelpers.TryEnsureSufficientExecutionStack())
+        {
+            throw new EvaluationLimitExceededException(
+                EvaluationLimitKind.Depth,
+                BindingExpressionLimits.MaxDepth,
+                $"The expression nests deeper than {BindingExpressionLimits.MaxDepth} levels or than the stack allows.");
+        }
+    }
+
     private Statement ParseStatement()
+    {
+        Enter();
+        try
+        {
+            return ParseStatementBody();
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
+
+    private Statement ParseStatementBody()
     {
         Expect(TokenType.At, "Expected '@' to start a statement.");
 
@@ -218,7 +248,12 @@ public sealed class Parser
         if (Check(TokenType.Number))
         {
             var number = Advance();
-            return new NumberNode(decimal.Parse(number.Lexeme, CultureInfo.InvariantCulture));
+            if (!decimal.TryParse(number.Lexeme, NumberStyles.Number, CultureInfo.InvariantCulture, out var value))
+            {
+                throw new BindingSyntaxException("The number is too large.", number.Start);
+            }
+
+            return new NumberNode(value);
         }
 
         if (Check(TokenType.At))
@@ -229,9 +264,17 @@ public sealed class Parser
         if (Check(TokenType.LParen))
         {
             Advance();
-            var expression = ParseExpression();
-            Expect(TokenType.RParen, "Expected ')' in a math expression.");
-            return expression;
+            Enter();
+            try
+            {
+                var expression = ParseExpression();
+                Expect(TokenType.RParen, "Expected ')' in a math expression.");
+                return expression;
+            }
+            finally
+            {
+                _depth--;
+            }
         }
 
         throw Error("Expected a number, statement, or '(' in a math expression.");
