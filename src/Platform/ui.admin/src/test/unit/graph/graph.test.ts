@@ -1,9 +1,11 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { markRaw } from 'vue'
+import { defineComponent, h, markRaw, nextTick, type Component } from 'vue'
+import type { VueWrapper } from '@vue/test-utils'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import type { Annotation } from '@42for.net/2splatform.sdk'
+import EmptyState from '@/components/common/EmptyState.vue'
 import AnnotationGraph from '@/components/graph/AnnotationGraph.vue'
 import {
   buildGraph,
@@ -275,14 +277,28 @@ describe('graph screen', () => {
     await useCatalogStore().forgetSnapshot({ org: 'acme', project: 'billing', view: 'default' })
   })
 
-  async function mountGraph(all: string[], path = '/acme/billing/default/graph') {
+  async function mountGraph(
+    all: string[],
+    path = '/acme/billing/default/graph',
+    component: Component = AnnotationGraph,
+    props: Record<string, unknown> = {},
+  ) {
     serve(all)
     const catalog = useCatalogStore()
     await catalog.load({ org: 'acme', project: 'billing', view: 'default' })
-    const screen = await mountScreen(AnnotationGraph, {}, { path })
+    const screen = await mountScreen(component, props, { path })
     await settle()
     return screen
   }
+
+  /** The graph as the Graph page gives it: with the actions of an empty view. */
+  const WithActions = defineComponent({
+    setup: () => () =>
+      h(AnnotationGraph, null, { 'empty-actions': () => h('button', { type: 'button' }, 'Start the view') }),
+  })
+
+  const legendOf = (host: VueWrapper) => host.find('[role="group"][aria-label="Annotation types"]')
+  const emptyStateOf = (host: VueWrapper) => host.findComponent(EmptyState)
 
   it('shows the whole view with type counts below 5,000 annotations', async () => {
     const { host } = await mountGraph(keys)
@@ -387,6 +403,30 @@ describe('graph screen', () => {
     vi.unstubAllGlobals()
   })
 
+  it('keeps the layout through a reload of the catalog (424-130)', async () => {
+    const worker = fakeWorker()
+    const { host } = await mountGraph(keys)
+    worker.frame(Float32Array.from(keys.flatMap((_, index) => [10 * index, 20 * index])))
+    const frame = usePageMemoryStore().page({ org: 'acme', project: 'billing', view: 'default' }, 'graph').frame
+
+    // A reload of the same scope (Bulk create, Reload the catalog) empties the graph until the catalog is ready, and
+    // the worker answers that init with a frame too.
+    const reload = useCatalogStore().load({ org: 'acme', project: 'billing', view: 'default' }, { force: true })
+    await nextTick()
+    expect(worker.inits().at(-1)!.tiers).toHaveLength(0)
+    worker.frame(new Float32Array(0))
+    expect(usePageMemoryStore().page({ org: 'acme', project: 'billing', view: 'default' }, 'graph').frame).toBe(frame)
+
+    await reload
+    await settle()
+    const init = worker.inits().at(-1)!
+    expect(init.tiers).toHaveLength(keys.length)
+    expect([...init.seed!].every(Number.isFinite)).toBe(true)
+    expect(init.resume).toEqual({ alpha: 0.2, pinned: expect.any(Uint32Array) })
+    host.unmount()
+    vi.unstubAllGlobals()
+  })
+
   it('keeps the hidden types for the next visit of the view', async () => {
     const first = await mountGraph(keys)
     await first.host.find('button[title="Hide subjects"]').trigger('click')
@@ -398,6 +438,61 @@ describe('graph screen', () => {
     expect(again.host.text()).toContain('4 annotations')
     expect(again.host.find('button[title="Show subjects"]').exists()).toBe(true)
     again.host.unmount()
+  })
+
+  it('shows an empty view without the legend, with the actions of the page (424-130)', async () => {
+    const { host } = await mountGraph([], undefined, WithActions)
+    const empty = emptyStateOf(host)
+    expect(empty.text()).toContain('No annotations in this view')
+    expect(empty.find('button').text()).toBe('Start the view')
+    expect(legendOf(host).exists()).toBe(false)
+    host.unmount()
+
+    // Without the slot (a Reader), the empty state has no actions row.
+    const plain = await mountGraph([])
+    expect(emptyStateOf(plain.host).text()).toContain('No annotations in this view')
+    expect(emptyStateOf(plain.host).find('button').exists()).toBe(false)
+    plain.host.unmount()
+  })
+
+  it('lays out "Every type is hidden" below the legend, without actions (424-130)', async () => {
+    const { host } = await mountGraph(keys, undefined, WithActions)
+    for (const chip of host.findAll('button[title^="Hide "]')) {
+      await chip.trigger('click')
+    }
+    await settle()
+
+    const empty = emptyStateOf(host)
+    expect(empty.text()).toContain('Every type is hidden')
+    expect(empty.find('button').exists()).toBe(false)
+    // The state follows the legend in one column instead of covering the viewport, so every chip stays clickable.
+    const legendRow = legendOf(host).element.closest('.p-3')!
+    expect(empty.element.parentElement).toBe(legendRow.parentElement)
+    expect(legendRow.compareDocumentPosition(empty.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(empty.classes()).not.toContain('absolute')
+
+    await host.find('button[title="Show subjects"]').trigger('click')
+    await settle()
+    expect(host.text()).not.toContain('Every type is hidden')
+    host.unmount()
+  })
+
+  it('leaves Enter on a control inside the graph to that control (424-130)', async () => {
+    const { host, inner } = await mountGraph(keys, '/acme/billing/default/graph/sbt.northwind', AnnotationGraph, {
+      selectedKey: 'sbt.northwind',
+    })
+    const enter = (target: Element) => {
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      target.dispatchEvent(event)
+      return event
+    }
+
+    expect(enter(host.find('button[title="Hide subjects"]').element).defaultPrevented).toBe(false)
+    expect(inner().emitted('open')).toBeUndefined()
+
+    expect(enter(host.find('[role="application"]').element).defaultPrevented).toBe(true)
+    expect(inner().emitted('open')).toEqual([['sbt.northwind']])
+    host.unmount()
   })
 })
 
