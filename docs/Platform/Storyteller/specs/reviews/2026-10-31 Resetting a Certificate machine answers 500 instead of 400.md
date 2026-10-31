@@ -142,3 +142,14 @@ The builds of the changed projects add no warnings in the changed lines. Prettie
 - The compensations of a failed create clear the hash but leave the document: the partial one of `CosmosMergedApiKeyHashStore.StoreAsync`, or the full one after a failed upsert. They should delete it. Then a machine without its key could only be a delete in progress.
 - The `500` of a `ClientCredentials` reset whose identity provider gives no secret. Entra ID could answer `404` for a deleted application. Keycloak cannot tell a missing client from a failure.
 - `Cli/test/Commands/MachineListAndResetCommandTests.cs:127` says "ResetMachineAccess declares no 400". That has been stale since the reset declared its `400`.
+
+## Follow-up from the PR review
+
+- **Deleting a machine requests the revocation of its certificate.** The delete revokes the certificate best effort, so the Certificate refusal no longer says that deleting the machine revokes it (`065dd5a5`).
+- **`MachineCredentialKind.HasApiKey()`** names the kinds with an API key once, with a test over every kind. The reset uses it, and the `404` of a machine without its API key ends with "Delete it and create a new one." (`b871b2ad`).
+- **A configuration gap of the deployment answers `501`, not `400`.** The refusals that depend on the deployment and not on the request throw `FeatureNotConfiguredException` with the new code `MachineAccessNotConfigured`, which the central mapping answers with `501`:
+  - no `ClientCredentials` or federated provider (`PolicyAwareMachineAccessService`);
+  - no AuthKit machine organization, or no AuthKit permission for a requested scope (`AuthKitMachineAccessService`);
+  - no Entra ID app role for a requested scope, or no service principal of the API application (`AzureAdMachineAccessService`).
+
+  `MachineAccessNotSupported` (`400`) stays for what the request or the project decides: a kind the project does not enable, a shared certificate on another kind or in a project without `CertificateAndApiKey`, and the reset of a `Federated` or `Certificate` machine. The delete no longer throws `MachineAccessNotSupportedException`, so its catch is gone: its `400` is the invalid id alone. Create, reset and delete declare the `501` in OpenAPI. The only clients are in this repository: the MCP server replaces a `5xx` message with its generic one but keeps the code, `sform` exits with its crash code, and the Admin UI reports it as a server error.

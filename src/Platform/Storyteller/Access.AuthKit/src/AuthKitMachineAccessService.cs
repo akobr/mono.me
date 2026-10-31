@@ -35,7 +35,7 @@ public sealed class AuthKitMachineAccessService : IIdentityProviderMachineAccess
 
         if (string.IsNullOrWhiteSpace(organizationId))
         {
-            throw new MachineAccessNotSupportedException("Auth:AuthKit:MachineOrganizationId is required for AuthKit machine access.");
+            throw new FeatureNotConfiguredException("Auth:AuthKit:MachineOrganizationId is required for AuthKit machine access.", ErrorCodes.MachineAccessNotConfigured);
         }
 
         // The slugs come first, so a scope without its permission fails before WorkOS is called.
@@ -115,8 +115,9 @@ public sealed class AuthKitMachineAccessService : IIdentityProviderMachineAccess
                 .Select(entry => entry.Key)
                 .Order(StringComparer.Ordinal)
                 .FirstOrDefault()
-                ?? throw new MachineAccessNotSupportedException(
-                    $"No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scope {scopeString}.");
+                ?? throw new FeatureNotConfiguredException(
+                    $"No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scope {scopeString}.",
+                    ErrorCodes.MachineAccessNotConfigured);
 
             slugs.Add(slug);
         }

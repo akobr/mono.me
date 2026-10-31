@@ -89,10 +89,11 @@ public class PolicyAwareFederatedTests
     [Fact]
     public async Task Create_FederatedWithoutTheService_IsNotSupported()
     {
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(
             () => CreateService(withFederated: false).CreateMachineAccessAsync(Model(MachineCredentialKind.Federated, [Rule()])));
 
         exception.Message.ShouldBe("Federated machine access is not configured for this deployment.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
     }
 
     [Fact]
@@ -130,9 +131,10 @@ public class PolicyAwareFederatedTests
         var existing = Access(MachineCredentialKind.Federated);
         var service = CreateService(withFederated: false);
 
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => service.ResetMachineAccessAsync(existing, "org1", "proj1"));
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(() => service.ResetMachineAccessAsync(existing, "org1", "proj1"));
 
         exception.Message.ShouldBe("Federated machine access is not configured for this deployment.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
         (await service.DeleteMachineAccessAsync(existing, "org1", "proj1")).ShouldBeTrue();
     }
 

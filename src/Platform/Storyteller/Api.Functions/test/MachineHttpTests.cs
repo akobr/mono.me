@@ -513,7 +513,7 @@ public class MachineHttpTests
         access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"reset:org1/proj1/{KeycloakId}"]);
     }
 
-    // Create and delete answer the same refusal with the same coded 400.
+    // Create answers the same refusal with the same coded 400.
     [Fact]
     public async Task PostMachines_OfAKindTheProjectDoesNotEnable_IsBadRequestWithMachineAccessNotSupported()
     {
@@ -527,16 +527,18 @@ public class MachineHttpTests
         access.Calls.ShouldBe(["create:org1/proj1"]);
     }
 
+    // A kind the deployment does not configure is no fault of the request: the handler leaves it to the middleware,
+    // which answers 501 MachineAccessNotConfigured.
     [Fact]
-    public async Task DeleteMachine_OfAKindTheDeploymentDoesNotConfigure_IsBadRequestWithMachineAccessNotSupported()
+    public async Task DeleteMachine_OfAKindTheDeploymentDoesNotConfigure_IsLeftToTheMiddleware()
     {
-        const string message = "ClientCredentials machine access is not configured for this deployment.";
-        var access = new RecordingAccess(Machine()) { Refusal = new MachineAccessNotSupportedException(message) };
+        var refusal = new FeatureNotConfiguredException("ClientCredentials machine access is not configured for this deployment.", ErrorCodes.MachineAccessNotConfigured);
+        var access = new RecordingAccess(Machine()) { Refusal = refusal };
         var http = CreateHttp(access);
 
-        var result = await http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId);
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(() => http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId));
 
-        ShouldBeMachineAccessNotSupported(result).Message.ShouldBe(message);
+        exception.ShouldBeSameAs(refusal);
         access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
     }
 

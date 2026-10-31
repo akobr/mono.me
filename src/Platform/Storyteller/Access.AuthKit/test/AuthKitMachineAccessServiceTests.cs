@@ -125,10 +125,11 @@ public class AuthKitMachineAccessServiceTests
             .Where(entry => entry.Value != "Secrets.Write")
             .ToDictionary());
 
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => service.CreateMachineAccessAsync(
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(() => service.CreateMachineAccessAsync(
             Model(MachineScope.ConfigurationRead, MachineScope.SecretsRead, MachineScope.SecretsWrite)));
 
         exception.Message.ShouldBe("No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scope Secrets.Write.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
         _client.Calls.ShouldBeEmpty();
     }
 
@@ -142,9 +143,10 @@ public class AuthKitMachineAccessServiceTests
         // No subset matching and no old strings: only a value equal to the scope string grants the scope.
         var service = CreateService(permissionMap: new Dictionary<string, string> { ["storyteller:other"] = mapped });
 
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => service.CreateMachineAccessAsync(Model(scope)));
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(() => service.CreateMachineAccessAsync(Model(scope)));
 
         exception.Message.ShouldBe($"No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scope {scopeString}.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
         _client.Calls.ShouldBeEmpty();
     }
 
@@ -161,10 +163,11 @@ public class AuthKitMachineAccessServiceTests
     [Fact]
     public async Task Create_UndefinedScope_FailsBeforeCallingWorkOs()
     {
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => CreateService().CreateMachineAccessAsync(
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(() => CreateService().CreateMachineAccessAsync(
             Model(MachineScope.AnnotationRead, (MachineScope)99)));
 
         exception.Message.ShouldBe("No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scope 99.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
         _client.Calls.ShouldBeEmpty();
     }
 
@@ -183,7 +186,7 @@ public class AuthKitMachineAccessServiceTests
     {
         var service = CreateService(organizationId: null);
 
-        await Should.ThrowAsync<MachineAccessNotSupportedException>(() => service.CreateMachineAccessAsync(Model(MachineScope.AnnotationRead)));
+        await Should.ThrowAsync<FeatureNotConfiguredException>(() => service.CreateMachineAccessAsync(Model(MachineScope.AnnotationRead)));
 
         _client.Calls.ShouldBeEmpty();
     }

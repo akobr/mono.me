@@ -21,6 +21,7 @@ public class ErrorResponseMappingTests
         { new InvalidInputException("bad key", ErrorCodes.InvalidKey), HttpStatusCode.BadRequest, ErrorCodes.InvalidKey },
         { new InvalidInputException("bad pattern", ErrorCodes.InvalidQuery), HttpStatusCode.BadRequest, ErrorCodes.InvalidQuery },
         { new MachineAccessNotSupportedException("no key to reset"), HttpStatusCode.BadRequest, ErrorCodes.MachineAccessNotSupported },
+        { new FeatureNotConfiguredException("no provider", ErrorCodes.MachineAccessNotConfigured), HttpStatusCode.NotImplemented, ErrorCodes.MachineAccessNotConfigured },
         { new ConflictException("deleted", ErrorCodes.AnnotationDeleted), HttpStatusCode.Conflict, ErrorCodes.AnnotationDeleted },
         { new ConflictException("active", ErrorCodes.AnnotationNotDeleted), HttpStatusCode.Conflict, ErrorCodes.AnnotationNotDeleted },
         { new JsonPatchException("stale", JsonPatchFailureKind.TestFailed, 0), HttpStatusCode.PreconditionFailed, ErrorCodes.PatchTestFailed },

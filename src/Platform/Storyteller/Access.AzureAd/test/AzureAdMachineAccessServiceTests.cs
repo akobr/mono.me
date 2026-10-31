@@ -134,7 +134,7 @@ public class AzureAdMachineAccessServiceTests
         StubCreate();
         var service = CreateService(roles => roles.Remove(missing.ToString("G")));
 
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => service.CreateMachineAccessAsync(new MachineAccessCreate
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(() => service.CreateMachineAccessAsync(new MachineAccessCreate
         {
             Organization = "org1",
             Project = "proj1",
@@ -143,6 +143,7 @@ public class AzureAdMachineAccessServiceTests
 
         exception.Message.ShouldBe(
             $"Machines with the scope {scopeString} need the app role Auth:AppRoles:{missing:G}, which this deployment does not configure.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
         _graph.Requests.ShouldBeEmpty();
     }
 
@@ -152,7 +153,7 @@ public class AzureAdMachineAccessServiceTests
         StubCreate();
         var service = CreateService(roles => roles["AnnotationWrite"] = "not-a-guid");
 
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => service.CreateMachineAccessAsync(new MachineAccessCreate
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(() => service.CreateMachineAccessAsync(new MachineAccessCreate
         {
             Organization = "org1",
             Project = "proj1",
@@ -161,6 +162,7 @@ public class AzureAdMachineAccessServiceTests
 
         exception.Message.ShouldBe(
             "Machines with the scope Annotation.Write need the app role Auth:AppRoles:AnnotationWrite, which this deployment does not configure.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
         _graph.Requests.ShouldBeEmpty();
     }
 
@@ -205,7 +207,7 @@ public class AzureAdMachineAccessServiceTests
         StubCreate();
         _graph.On(HttpMethod.Get, "/v1.0/servicePrincipals", HttpStatusCode.OK, servicePrincipals);
 
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => CreateService().CreateMachineAccessAsync(new MachineAccessCreate
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(() => CreateService().CreateMachineAccessAsync(new MachineAccessCreate
         {
             Organization = "org1",
             Project = "proj1",
@@ -213,6 +215,7 @@ public class AzureAdMachineAccessServiceTests
         }));
 
         exception.Message.ShouldBe("The service principal of the Storyteller API application api-client was not found in the machine tenant, so no app role can be assigned.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
         _graph.Requests.Select(request => $"{request.Method} {request.PathAndQuery.Split('?')[0]}").ShouldBe(["GET /v1.0/servicePrincipals"]);
     }
 

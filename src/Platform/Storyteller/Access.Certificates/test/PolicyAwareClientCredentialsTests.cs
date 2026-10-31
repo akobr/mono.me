@@ -44,10 +44,11 @@ public class PolicyAwareClientCredentialsTests
         _policyStore.Setup(store => store.GetAsync("org1", "proj1"))
             .ReturnsAsync(new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ClientCredentials });
 
-        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(
+        var exception = await Should.ThrowAsync<FeatureNotConfiguredException>(
             () => CreateService(withIdentityProvider: false).CreateMachineAccessAsync(Model()));
 
         exception.Message.ShouldBe("ClientCredentials machine access is not configured for this deployment.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotConfigured);
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public class PolicyAwareClientCredentialsTests
     [Fact]
     public async Task ResetOfAnM2MAccess_WithoutIdentityProvider_IsNotSupported()
     {
-        await Should.ThrowAsync<MachineAccessNotSupportedException>(
+        await Should.ThrowAsync<FeatureNotConfiguredException>(
             () => CreateService(withIdentityProvider: false).ResetMachineAccessAsync(Access(MachineCredentialKind.ClientCredentials), "org1", "proj1"));
     }
 
