@@ -650,9 +650,9 @@ public partial class CosmosAnnotationService : IAnnotationService
             return;
         }
 
-        var dynamicConditions = model.Request.Conditions
-            .Where(b => b.Against == annotationType)
-            .Cast<AnnotationsRequest.Condition<TEntity>>();
+        // the conditions are over the models (a name query can be a regular expression, which Cosmos can't run), so
+        // they filter the mapped page like the validity window
+        var conditions = model.Request.CompileConditions<TAnnotation>();
 
         // descendants of a key: the scope gives the partition and the key prefix of this type; the prefix can cover
         // more (the units of execution of every unit of a responsibility), so the page is filtered by the graph
@@ -729,11 +729,6 @@ public partial class CosmosAnnotationService : IAnnotationService
             matches = matches.Where(r => r.PartitionKey.StartsWith(partitionPrefix));
         }
 
-        foreach (var by in dynamicConditions)
-        {
-            matches = matches.Where(by.Predicate);
-        }
-
         var feed = matches.ToFeedIterator();
 
         if (!feed.HasMoreResults)
@@ -760,6 +755,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             .Where(entity => model.Request.IncludeInactive
                              || AnnotationStatusExtensions.GetStatus(entity.IsDisabled, entity.ValidFrom, entity.ExpiresAt, model.Now) == AnnotationStatus.Active)
             .Select(entity => entity.ToModel<TEntity, TAnnotation>())
+            .Where(conditions)
             .ToList();
         model.Annotations = model.Annotations.Concat(mapped);
         model.TotalCount += mapped.Count;
