@@ -556,7 +556,8 @@ export const annotationHandlers: HttpHandler[] = [
         return denied
       }
 
-      // the API's answers: a blank body or JSON null has no list, anything else must be a list of strings
+      // the API's answers, as it reads a List<string>: a blank body or JSON null has no list, an entry that is neither a
+      // string nor null is refused with its JSON path, and null entries are skipped like blank lines
       const text = await request.text()
       let body: unknown
       try {
@@ -567,15 +568,17 @@ export const annotationHandlers: HttpHandler[] = [
       if (body === null) {
         return errorResponse(400, 'The annotations are missing.')
       }
-      if (!Array.isArray(body) || body.some((entry) => typeof entry !== 'string')) {
-        return errorResponse(400, 'The request body is not a list of annotation keys or lines.')
+      const unreadable = Array.isArray(body) ? body.findIndex((entry) => entry !== null && typeof entry !== 'string') : -1
+      if (!Array.isArray(body) || unreadable >= 0) {
+        const at = Array.isArray(body) ? `$[${unreadable}]` : '$'
+        return errorResponse(400, `The request body is not a list of annotation keys or lines (at ${at}).`)
       }
       if (body.length > maxKeys) {
         return errorResponse(400, `The number of annotations to create is too large, maximum allowed is ${maxKeys}.`)
       }
 
-      const keys = (body as string[])
-        .map((entry) => keyOfSimpleLine(entry))
+      const keys = (body as (string | null)[])
+        .map((entry) => (entry === null ? undefined : keyOfSimpleLine(entry)))
         .filter((key): key is string => !!key)
         .toSorted((a, b) => mergeOrderOf(a) - mergeOrderOf(b))
       const created: Annotation[] = []

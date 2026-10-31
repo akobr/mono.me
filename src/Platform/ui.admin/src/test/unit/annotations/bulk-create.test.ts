@@ -139,8 +139,13 @@ describe('the mock SetAnnotationsSimple', () => {
     })
     await expect(setAnnotationsSimple(org, project, view, [1] as unknown as string[])).rejects.toMatchObject({
       status: 400,
-      message: 'The request body is not a list of annotation keys or lines.',
+      message: 'The request body is not a list of annotation keys or lines (at $[0]).',
     })
+  })
+
+  it('skips null entries like the API', async () => {
+    const lines = [null, 'nullsafe'] as unknown as string[]
+    expect(keysOf(await setAnnotationsSimple(org, project, view, lines))).toEqual(['sbt.nullsafe'])
   })
 
   it('needs the Contributor role', async () => {
