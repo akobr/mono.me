@@ -326,6 +326,12 @@ public class CosmosKeyValueService : IKeyValueService
         if (catalog is not null && catalog.Version == version)
         {
             var currentValue = await ResolveValueAsync(place, catalog, reveal, caller);
+
+            if (currentValue is not null && catalog.Content.Protection.IsSecret())
+            {
+                await RecordRevealAsync(place, caller, catalog.Key, catalog.Version, catalog.Content.Protection, KeyValueAuditOperation.Reveal, $"version {catalog.Version}");
+            }
+
             return catalog.ToKeyValue(currentValue, _timeProvider.GetUtcNow());
         }
 
@@ -337,6 +343,12 @@ public class CosmosKeyValueService : IKeyValueService
         }
 
         var value = await ResolveValueAsync(place, item.Key, item.Version, item.Content, reveal, caller);
+
+        if (value is not null && item.Content.Protection.IsSecret())
+        {
+            await RecordRevealAsync(place, caller, item.Key, item.Version, item.Content.Protection, KeyValueAuditOperation.Reveal, $"version {item.Version}");
+        }
+
         return item.ToKeyValue(catalog, value);
     }
 
@@ -346,12 +358,25 @@ public class CosmosKeyValueService : IKeyValueService
         key = KeyValueRules.EnsureKey(key);
         var place = GetPlace(organization, project, view);
 
-        var fromText = await GetVersionTextAsync(place, key, fromVersion, caller)
+        var from = await GetVersionTextAsync(place, key, fromVersion, caller)
             ?? throw new InvalidOperationException($"Unknown version {fromVersion} of the key '{key}' in view '{view}'.");
-        var toText = await GetVersionTextAsync(place, key, toVersion, caller)
+        var to = await GetVersionTextAsync(place, key, toVersion, caller)
             ?? throw new InvalidOperationException($"Unknown version {toVersion} of the key '{key}' in view '{view}'.");
 
-        return _differ.GetTextChanges(fromText, toText);
+        // The diff of a secret carries its plaintext: each secret version is a reveal, recorded once both sides resolved.
+        var detail = $"diff {fromVersion}..{toVersion}";
+
+        if (from is { Key: { } fromKey, Protection: { } fromProtection } && fromProtection.IsSecret())
+        {
+            await RecordRevealAsync(place, caller, fromKey, fromVersion, fromProtection, KeyValueAuditOperation.Reveal, detail);
+        }
+
+        if (toVersion != fromVersion && to is { Key: { } toKey, Protection: { } toProtection } && toProtection.IsSecret())
+        {
+            await RecordRevealAsync(place, caller, toKey, toVersion, toProtection, KeyValueAuditOperation.Reveal, detail);
+        }
+
+        return _differ.GetTextChanges(from.Text, to.Text);
     }
 
     public async Task<KeyValueDocument> ExportAsync(string organization, string project, string view, KeyValueExportRequest request, KeyValueCaller caller)
@@ -750,26 +775,31 @@ public class CosmosKeyValueService : IKeyValueService
         return string.Equals(current, value, StringComparison.Ordinal);
     }
 
-    private async Task<string?> GetVersionTextAsync(Place place, string key, ulong version, KeyValueCaller caller)
+    // The text of a version with its stored key and level, for the audit of a diff; version 0 is the empty text of no key.
+    private async Task<(string Text, string? Key, KeyValueProtection? Protection)?> GetVersionTextAsync(Place place, string key, ulong version, KeyValueCaller caller)
     {
         if (version == 0)
         {
-            return string.Empty;
+            return (string.Empty, null, null);
         }
 
         var (catalog, _) = await ReadAsync(place, key);
-        StoredValue? content = null;
+        string? storedKey;
+        StoredValue? content;
 
         if (catalog is not null && catalog.Version == version)
         {
+            storedKey = catalog.Key;
             content = catalog.Content;
         }
         else
         {
-            content = (await ReadVersionAsync(place, KeyValueRules.Normalize(key), version))?.Content;
+            var item = await ReadVersionAsync(place, KeyValueRules.Normalize(key), version);
+            storedKey = item?.Key;
+            content = item?.Content;
         }
 
-        if (content is null)
+        if (storedKey is null || content is null)
         {
             return null;
         }
@@ -779,7 +809,8 @@ public class CosmosKeyValueService : IKeyValueService
             throw new InvalidInputException("A client-encrypted value cannot be compared on the server.", ErrorCodes.NotSupportedForProtection);
         }
 
-        return await ResolveValueAsync(place, key, version, content, reveal: true, caller);
+        var text = await ResolveValueAsync(place, key, version, content, reveal: true, caller);
+        return text is null ? null : (text, storedKey, content.Protection);
     }
 
     private async Task<ulong> GetNextVersionAsync(Place place, string normalizedKey)
@@ -1521,10 +1552,10 @@ public class CosmosKeyValueService : IKeyValueService
         }
     }
 
-    private async Task RecordRevealAsync(Place place, KeyValueCaller caller, string key, ulong version, KeyValueProtection protection, KeyValueAuditOperation operation)
+    private async Task RecordRevealAsync(Place place, KeyValueCaller caller, string key, ulong version, KeyValueProtection protection, KeyValueAuditOperation operation, string? detail = null)
     {
         _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.Reveals);
-        await AuditAsync(place, caller, operation, key, version, protection, detail: null);
+        await AuditAsync(place, caller, operation, key, version, protection, detail);
     }
 
     private async Task AuditAsync(Place place, KeyValueCaller caller, KeyValueAuditOperation operation, string? key, ulong? version, KeyValueProtection? protection, string? detail)

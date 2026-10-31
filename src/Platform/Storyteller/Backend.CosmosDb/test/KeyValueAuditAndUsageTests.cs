@@ -19,6 +19,7 @@ public class KeyValueAuditAndUsageTests(Startup startup)
     private const string View = Constants.DefaultViewName;
 
     private static readonly KeyValueCaller Admin = new(AuditActor.Account("admin"), true, true, KeyValueChannel.User) { CorrelationId = "corr-1" };
+    private static readonly KeyValueCaller Reader = KeyValueCaller.WithoutSecrets(AuditActor.Account("reader"));
 
     private IKeyValueService KeyValues => Context.Services.GetRequiredService<IKeyValueService>();
 
@@ -66,6 +67,122 @@ public class KeyValueAuditAndUsageTests(Startup startup)
 
         var future = await Audit.QueryAsync(Org, project, new KeyValueAuditQuery { From = DateTimeOffset.UtcNow.AddMinutes(5) });
         future.Items.Should().BeEmpty();
+    }
+
+    // A secret version read with reveal is a reveal on both paths: the current version from the catalog item, an older one
+    // from its history item.
+    [Fact]
+    public async Task SecretVersionReads_AreAuditedAsReveals()
+    {
+        var project = $"kv-audit-ver-{Guid.NewGuid().ToString("N")[..8]}";
+        await KeyValues.SetAsync(Org, project, View, "sec", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s1" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "sec", new KeyValueWrite { Value = "s2" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "sec", new KeyValueWrite { Value = "s3" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "pub", new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "p1" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "pub", new KeyValueWrite { Value = "p2" }, Admin);
+
+        (await KeyValues.GetVersionAsync(Org, project, View, "sec", 3, reveal: true, Admin))!.Value.Should().Be("s3");
+        (await KeyValues.GetVersionAsync(Org, project, View, "sec", 1, reveal: true, Admin))!.Value.Should().Be("s1");
+        (await KeyValues.GetVersionAsync(Org, project, View, "sec", 3, reveal: false, Admin))!.Value.Should().BeNull();
+        (await KeyValues.GetVersionAsync(Org, project, View, "sec", 2, reveal: false, Admin))!.Value.Should().BeNull();
+        (await KeyValues.GetVersionAsync(Org, project, View, "pub", 2, reveal: true, Admin))!.Value.Should().Be("p2");
+        (await KeyValues.GetVersionAsync(Org, project, View, "pub", 1, reveal: true, Admin))!.Value.Should().Be("p1");
+        (await KeyValues.GetVersionAsync(Org, project, View, "sec", 9, reveal: true, Admin)).Should().BeNull();
+        var withoutRights = () => KeyValues.GetVersionAsync(Org, project, View, "sec", 2, reveal: true, Reader);
+        await withoutRights.Should().ThrowAsync<AccessDeniedException>();
+
+        var reveals = await Audit.QueryAsync(Org, project, new KeyValueAuditQuery { Operation = KeyValueAuditOperation.Reveal });
+
+        reveals.Items.Should().HaveCount(2, "only the two secret versions read with reveal and secret rights are reveals");
+        reveals.Items.Select(entry => (entry.Key, entry.Version, entry.Detail)).Should().BeEquivalentTo(
+        [
+            ("sec", (ulong?)3, "version 3"),
+            ("sec", (ulong?)1, "version 1"),
+        ]);
+        reveals.Items.Should().OnlyContain(entry => entry.Protection == KeyValueProtection.Standard && entry.View == View);
+        reveals.Items.Should().OnlyContain(entry => entry.Actor == AuditActor.Account("admin") && entry.CorrelationId == "corr-1" && entry.Channel == KeyValueChannel.User);
+    }
+
+    // A diff of a secret carries the plaintext of both sides: each secret version it resolves is one reveal, written only
+    // after the whole diff resolved.
+    [Fact]
+    public async Task SecretDiffs_AreAuditedPerSecretVersion()
+    {
+        var project = $"kv-audit-diff-{Guid.NewGuid().ToString("N")[..8]}";
+        await KeyValues.SetAsync(Org, project, View, "Db.Password", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s1" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "Db.Password", new KeyValueWrite { Value = "s2" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "pub", new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "p1" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "pub", new KeyValueWrite { Value = "p2" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "moved", new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "m1" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "moved", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "m2" }, Admin);
+
+        async Task<KeyValueAuditEvent[]> RevealsAfter(Func<Task> act)
+        {
+            var before = (await Audit.QueryAsync(Org, project, new KeyValueAuditQuery { Operation = KeyValueAuditOperation.Reveal })).Items.Select(entry => entry.Id).ToHashSet();
+            await act();
+            var after = await Audit.QueryAsync(Org, project, new KeyValueAuditQuery { Operation = KeyValueAuditOperation.Reveal });
+            return after.Items.Where(entry => !before.Contains(entry.Id)).ToArray();
+        }
+
+        var bothSides = await RevealsAfter(() => KeyValues.GetVersionChangesAsync(Org, project, View, "db.password", 1, 2, Admin));
+        bothSides.Select(entry => (entry.Key, entry.Version, entry.Detail)).Should().BeEquivalentTo(
+            [("Db.Password", (ulong?)1, "diff 1..2"), ("Db.Password", (ulong?)2, "diff 1..2")],
+            "the stored key is recorded, not the casing of the request");
+        bothSides.Should().OnlyContain(entry => entry.Protection == KeyValueProtection.Standard
+            && entry.Actor == AuditActor.Account("admin") && entry.CorrelationId == "corr-1" && entry.Channel == KeyValueChannel.User);
+
+        var fromNothing = await RevealsAfter(() => KeyValues.GetVersionChangesAsync(Org, project, View, "Db.Password", 0, 1, Admin));
+        fromNothing.Select(entry => (entry.Version, entry.Detail)).Should().BeEquivalentTo([((ulong?)1, "diff 0..1")], "version 0 is the empty text");
+
+        var sameVersion = await RevealsAfter(() => KeyValues.GetVersionChangesAsync(Org, project, View, "Db.Password", 2, 2, Admin));
+        sameVersion.Select(entry => (entry.Version, entry.Detail)).Should().BeEquivalentTo([((ulong?)2, "diff 2..2")], "one version compared with itself is one reveal");
+
+        var levelChange = await RevealsAfter(() => KeyValues.GetVersionChangesAsync(Org, project, View, "moved", 1, 2, Admin));
+        levelChange.Select(entry => (entry.Key, entry.Version, entry.Protection)).Should().BeEquivalentTo(
+            [("moved", (ulong?)2, (KeyValueProtection?)KeyValueProtection.Standard)],
+            "only the secret side of a level change is a reveal");
+
+        (await RevealsAfter(() => KeyValues.GetVersionChangesAsync(Org, project, View, "pub", 1, 2, Admin))).Should().BeEmpty();
+
+        var unknown = await RevealsAfter(async () =>
+        {
+            var act = () => KeyValues.GetVersionChangesAsync(Org, project, View, "Db.Password", 1, 9, Admin);
+            await act.Should().ThrowAsync<InvalidOperationException>();
+        });
+        unknown.Should().BeEmpty("a diff that fails on its second side reveals nothing");
+
+        var withoutRights = await RevealsAfter(async () =>
+        {
+            var act = () => KeyValues.GetVersionChangesAsync(Org, project, View, "Db.Password", 1, 2, Reader);
+            await act.Should().ThrowAsync<AccessDeniedException>();
+        });
+        withoutRights.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Usage_CountsRevealsOfSecretVersionsAndDiffs()
+    {
+        var project = $"kv-usage-ver-{Guid.NewGuid().ToString("N")[..8]}";
+        await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "1" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Value = "2" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "p", new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "1" }, Admin);
+        await KeyValues.GetVersionAsync(Org, project, View, "s", 2, reveal: true, Admin);
+        await KeyValues.GetVersionAsync(Org, project, View, "s", 1, reveal: true, Admin);
+        await KeyValues.GetVersionAsync(Org, project, View, "s", 1, reveal: false, Admin);
+        await KeyValues.GetVersionAsync(Org, project, View, "p", 1, reveal: true, Admin);
+        await KeyValues.GetVersionChangesAsync(Org, project, View, "s", 1, 2, Admin);
+        await KeyValues.GetVersionChangesAsync(Org, project, View, "s", 0, 1, Admin);
+        await KeyValues.GetVersionChangesAsync(Org, project, View, "p", 0, 1, Admin);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await Usage.FlushAsync();
+        await Usage.TakeSnapshotAsync(today);
+        var report = await Usage.GetReportAsync(Org, project, today, today);
+
+        report.Days.Should().ContainSingle();
+        report.Days[0].Values[KeyValueUsageMeters.Reveals].Should().Be(5, "two secret version reads, two sides of the first diff and one of the second");
+        var reveals = await Audit.QueryAsync(Org, project, new KeyValueAuditQuery { Operation = KeyValueAuditOperation.Reveal });
+        reveals.Items.Should().HaveCount(5, "one event per counted reveal");
     }
 
     [Fact]
