@@ -540,19 +540,31 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         changes.Should().NotBeNull();
     }
 
-    // The Admin UI's "Create empty" stores {} as version 1, and its first save patches it.
-    [Fact]
-    public async Task Patch_OfAnEmptyFirstVersion_WritesTheNextVersion()
+    // The Admin UI's "Create empty" stores {} as version 1, and its first save patches it. The UI reads the effective
+    // document first, which leaves a cache row when the key inherits values.
+    [Theory]
+    [InlineData("no-row")]
+    [InlineData("cache-row")]
+    public async Task Patch_OfAnEmptyFirstVersion_WritesTheNextVersion(string state)
     {
-        var responsibility = await CreateResponsibilityAsync("rec-empty-first");
-        (await Configurations.CreateOrUpdateConfigurationAsync(responsibility, new JObject(), AuditActor.System)).Version.Should().Be(1);
+        var (responsibility, unitOfExecution) = await CreateTreeAsync($"rec-empty-first-{state}");
+        var unit = FullKey.Create(unitOfExecution.Annotation.GetUnitKey(), unitOfExecution);
 
-        var patched = await Configurations.PatchConfigurationAsync(responsibility, JArray.Parse("""[{ "op": "add", "path": "/a", "value": 1 }]"""), AuditActor.System);
+        if (state == "cache-row")
+        {
+            await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+            await Configurations.GetRawConfigurationAsync(unit);
+            (await ReadRowAsync(unit))["Version"]!.Value<ulong>().Should().Be(0);
+        }
+
+        (await Configurations.CreateOrUpdateConfigurationAsync(unit, new JObject(), AuditActor.System)).Version.Should().Be(1);
+
+        var patched = await Configurations.PatchConfigurationAsync(unit, JArray.Parse("""[{ "op": "add", "path": "/u", "value": 1 }]"""), AuditActor.System);
 
         patched.Version.Should().Be(2);
-        patched.Content["a"]!.Value<int>().Should().Be(1);
-        (await HasItemAsync(responsibility, HistoryId(responsibility, 1))).Should().BeTrue("the empty version 1 is archived");
-        (await Configurations.GetConfigurationVersionsAsync(responsibility)).Select(version => version.Version).Should().Equal(1U, 2U);
+        patched.Content["u"]!.Value<int>().Should().Be(1);
+        (await HasItemAsync(unit, HistoryId(unit, 1))).Should().BeTrue("the empty version 1 is archived");
+        (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(1U, 2U);
     }
 
     // A clear whose invalidation failed is finished by a patch that finds nothing stored, with or without a cache row
