@@ -30,6 +30,8 @@ import type { SimulationCommand, SimulationFrame } from './simulation-protocol'
  */
 const props = defineProps<{ selectedKey?: string }>()
 const emit = defineEmits<{ open: [key: string]; close: [] }>()
+// The actions of an empty view, given by the page that mounts their dialogs.
+defineSlots<{ 'empty-actions'?: () => unknown }>()
 
 const focusThreshold = 5_000
 const showAllLimit = 20_000
@@ -342,7 +344,9 @@ watch(
 const nodeKeys = computed(() => graph.value.nodes.map((node) => node.key))
 
 function onFrame(event: MessageEvent<SimulationFrame>) {
-  if (event.data.generation !== generation) {
+  // A graph without nodes (while the catalog reloads, or with every type hidden) is not remembered: the next layout
+  // seeds from the frame before it and keeps its zoom (424-130).
+  if (event.data.generation !== generation || graph.value.nodes.length === 0) {
     return
   }
   positions.value = event.data.positions
@@ -491,7 +495,8 @@ function openAsList() {
   })
 }
 
-// Keyboard: the arrow keys move to the neighbour in that direction, Enter opens it, Escape closes the detail.
+// Keyboard: the arrow keys move to the neighbour in that direction, Enter opens it, Escape closes the detail. Enter on
+// a control inside the graph (a legend chip, an action of the empty view) presses that control instead.
 const directions: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 },
   ArrowDown: { x: 0, y: 1 },
@@ -515,7 +520,7 @@ function onKeydown(event: KeyboardEvent) {
       activeKey.value = keyAt(next)
       canvas.value?.reveal(next)
     }
-  } else if (event.key === 'Enter' && activeKey.value) {
+  } else if (event.key === 'Enter' && activeKey.value && event.target === event.currentTarget) {
     event.preventDefault()
     emit('open', activeKey.value)
   } else if (event.key === 'Escape' && props.selectedKey) {
@@ -544,6 +549,12 @@ const summary = computed(() => {
 })
 
 const waitingForFocus = computed(() => hasData.value && large.value && !focusKey.value && !showAll.value)
+const loading = computed(
+  () => (!hasData.value && catalog.status !== 'error') || layingOut.value || waitingForFocus.value,
+)
+// An empty view has no legend: every count is 0 and no toggle changes anything (424-130).
+const empty = computed(() => catalog.status === 'ready' && catalog.loadedCount === 0)
+const allHidden = computed(() => hasData.value && visibleKeys.value.length === 0 && candidates.value.length > 0)
 </script>
 
 <template>
@@ -611,25 +622,54 @@ const waitingForFocus = computed(() => hasData.value && large.value && !focusKey
         :neighbours="graph.neighbours[hover.index]?.length ?? 0"
       />
 
-      <div class="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2">
-        <GraphLegend
-          class="pointer-events-auto"
-          :counts="typeCounts"
-          :hidden="hidden"
-          :collapsed="bounds.width.value > 0 && bounds.width.value < 640"
-          @toggle="toggleType"
-          @show-all="hidden = new Set()"
-        />
-      </div>
       <p class="pointer-events-none absolute start-3 bottom-3 rounded bg-default/80 px-2 py-1 text-xs text-muted">
         {{ summary }}
       </p>
       <p class="sr-only" aria-live="polite">{{ activeNode }}</p>
 
-      <div
-        v-if="(!hasData && catalog.status !== 'error') || layingOut || waitingForFocus"
-        class="absolute inset-0 flex items-center justify-center bg-default/60"
-      >
+      <!-- The error and empty states follow the legend, so they never cover it, however many rows it wraps to
+           (424-130). Only the legend and the states take pointer events; the canvas pans around them. -->
+      <div class="pointer-events-none absolute inset-0 flex flex-col">
+        <div v-if="!empty" class="flex flex-wrap items-start justify-between gap-2 p-3">
+          <GraphLegend
+            class="pointer-events-auto"
+            :counts="typeCounts"
+            :hidden="hidden"
+            :collapsed="bounds.width.value > 0 && bounds.width.value < 640"
+            @toggle="toggleType"
+            @show-all="hidden = new Set()"
+          />
+        </div>
+        <template v-if="!loading">
+          <ErrorState
+            v-if="catalog.status === 'error'"
+            class="pointer-events-auto"
+            :error="catalog.error"
+            title="The catalog could not be loaded"
+            @retry="context.scope && catalog.load(context.scope, { force: true })"
+          />
+          <EmptyState
+            v-else-if="empty"
+            class="pointer-events-auto"
+            icon="i-lucide-waypoints"
+            title="No annotations in this view"
+            description="The graph shows annotations and their ancestors once the view has some."
+          >
+            <template v-if="$slots['empty-actions']" #default>
+              <slot name="empty-actions" />
+            </template>
+          </EmptyState>
+          <EmptyState
+            v-else-if="allHidden"
+            class="pointer-events-auto"
+            icon="i-lucide-eye-off"
+            title="Every type is hidden"
+            description="Turn types back on in the legend."
+          />
+        </template>
+      </div>
+
+      <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-default/60">
         <LoadingState
           :label="
             layingOut
@@ -638,27 +678,6 @@ const waitingForFocus = computed(() => hasData.value && large.value && !focusKey
           "
         />
       </div>
-      <ErrorState
-        v-else-if="catalog.status === 'error'"
-        class="absolute inset-0"
-        :error="catalog.error"
-        title="The catalog could not be loaded"
-        @retry="context.scope && catalog.load(context.scope, { force: true })"
-      />
-      <EmptyState
-        v-else-if="catalog.status === 'ready' && catalog.loadedCount === 0"
-        class="absolute inset-0"
-        icon="i-lucide-waypoints"
-        title="No annotations in this view"
-        description="The graph shows annotations and their ancestors once the view has some."
-      />
-      <EmptyState
-        v-else-if="hasData && visibleKeys.length === 0 && candidates.length > 0"
-        class="absolute inset-0"
-        icon="i-lucide-eye-off"
-        title="Every type is hidden"
-        description="Turn types back on in the legend."
-      />
     </div>
   </div>
 </template>
