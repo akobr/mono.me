@@ -8,7 +8,7 @@ namespace _42.Platform.Storyteller;
 
 public class PolicyAwareMachineAccessService : IMachineAccessService
 {
-    public const string CertificateResetNotSupportedMessage = "A Certificate machine has no secret to reset. Its certificate is renewed in the renewal window; to replace it, create a new machine and delete this one.";
+    public const string CertificateResetNotSupportedMessage = "A Certificate machine has no key to reset: it renews its certificate itself over mTLS, and is revoked by deleting it.";
 
     private readonly ApiKeyMachineAccessService _apiKeyService;
     private readonly CertificateMachineAccessService _certificateService;
@@ -114,7 +114,7 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
     }
 
     // Routed by the kind the access was created with: the project policy may have changed since.
-    // A Federated machine never reaches the API key or certificate services. A Certificate machine has no secret,
+    // A Federated machine never reaches the API key or certificate services. A Certificate machine has no key,
     // so it is refused before the API key service, which would find no hash.
     public async Task<string?> ResetMachineAccessAsync(MachineAccess existingAccess, string organization, string project)
     {

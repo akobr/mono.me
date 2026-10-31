@@ -118,7 +118,8 @@ public sealed class MachineTools(Sdk.IAccessApiClient access)
     {
         var machineId = ToolArguments.Required(id, nameof(id));
 
-        // The API has nothing to reset on a Certificate machine and answers 500, which no retry fixes.
+        // The API refuses to reset a Certificate machine (400 MachineAccessNotSupported); the tool refuses first, with
+        // its own explanation of what to do instead.
         var existing = await access.GetMachineAccessAsync(organization, project, machineId, cancellationToken);
 
         if (existing.CredentialKind == Sdk.MachineAccessCredentialKind.Certificate)

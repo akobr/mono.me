@@ -446,6 +446,7 @@ describe('machine authentication policy against the mock API', () => {
     ).rejects.toMatchObject({
       status: 400,
       message: 'The credential kind ClientCredentials is not enabled in the project acme.billing.',
+      errorCode: 'MachineAccessNotSupported',
     })
   })
 
@@ -454,10 +455,11 @@ describe('machine authentication policy against the mock API', () => {
     await expect(issueSharedCertificate('acme', 'billing', { Label: 'edge' })).rejects.toMatchObject({
       status: 400,
       message: 'The project acme.billing does not enable CertificateAndApiKey, which shared certificates belong to.',
+      errorCode: 'MachineAccessNotSupported',
     })
     await expect(
       createMachineAccess('acme', 'billing', { Scopes: ['AnnotationRead'], UseSharedCertificate: true }),
-    ).rejects.toMatchObject({ status: 400 })
+    ).rejects.toMatchObject({ status: 400, errorCode: 'MachineAccessNotSupported' })
 
     await setMachineAuthentication('acme.billing', { EnabledCredentialKinds: ['ApiKey', 'CertificateAndApiKey'] })
     expect((await issueSharedCertificate('acme', 'billing', { Label: 'edge' })).Label).toBe('edge')
@@ -480,7 +482,7 @@ describe('machine authentication policy against the mock API', () => {
     expect(reset.UsesSharedCertificate).toBe(true)
   })
 
-  it('refuses the reset of a Certificate machine, which is renewed, and leaves it as it was (424-82)', async () => {
+  it('refuses the reset of a Certificate machine, which is renewed, and leaves it as it was (424-82, 424-102)', async () => {
     // The seed is stored first: until then every read makes it anew, with other times.
     saveDb(loadDb())
     const stored = () => loadDb().machines?.['acme.billing']?.find((entry) => entry.Id === 'mach-billing-sync')
@@ -490,7 +492,8 @@ describe('machine authentication policy against the mock API', () => {
     await expect(resetMachineAccess('acme', 'billing', 'mach-billing-sync')).rejects.toMatchObject({
       status: 400,
       message:
-        'A Certificate machine has no secret to reset. Its certificate is renewed in the renewal window; to replace it, create a new machine and delete this one.',
+        'A Certificate machine has no key to reset: it renews its certificate itself over mTLS, and is revoked by deleting it.',
+      errorCode: 'MachineAccessNotSupported',
     })
     expect(stored()).toEqual(before)
   })

@@ -18,6 +18,7 @@ import { MachineScope, roleRank } from '@42for.net/2splatform.sdk'
 import { mockDirectory, type MockDb } from './db'
 import {
   certificateResetNotSupportedMessage,
+  machineAccessNotSupported,
   issuerError,
   issuerImmutableMessage,
   maxIssuersPerProject,
@@ -505,10 +506,18 @@ export const accessManagementHandlers: HttpHandler[] = [
       const policy = effectivePolicy(db.accessPoints[key]?.MachineAuthentication)
       const kind = body.CredentialKind ?? policy.CredentialKind!
       if (!policy.EnabledCredentialKinds!.includes(kind)) {
-        return errorResponse(400, `The credential kind ${kind} is not enabled in the project ${key}.`)
+        return errorResponse(
+          400,
+          `The credential kind ${kind} is not enabled in the project ${key}.`,
+          machineAccessNotSupported,
+        )
       }
       if (body.UseSharedCertificate && kind !== 'CertificateAndApiKey') {
-        return errorResponse(400, `Only CertificateAndApiKey machines can use a shared certificate, not ${kind}.`)
+        return errorResponse(
+          400,
+          `Only CertificateAndApiKey machines can use a shared certificate, not ${kind}.`,
+          machineAccessNotSupported,
+        )
       }
       if (kind !== 'Federated' && body.FederationRules?.length) {
         return errorResponse(400, rulesOnOtherKindMessage, 'MachineNotFederated')
@@ -569,11 +578,11 @@ export const accessManagementHandlers: HttpHandler[] = [
       // A reset follows the kind the machine was created with, as the API does.
       const kind = stored.CredentialKind ?? 'ApiKey'
       if (kind === 'Federated') {
-        return errorResponse(400, resetNotSupportedMessage)
+        return errorResponse(400, resetNotSupportedMessage, machineAccessNotSupported)
       }
       // A certificate is renewed, not reset (424-82).
       if (kind === 'Certificate') {
-        return errorResponse(400, certificateResetNotSupportedMessage)
+        return errorResponse(400, certificateResetNotSupportedMessage, machineAccessNotSupported)
       }
       // A CertificateAndApiKey machine gets only a new API key: its certificate, its own or a shared one, keeps working
       // and the stored record keeps its thumbprint, lifetime, expiry and renewal (424-82).
@@ -744,6 +753,7 @@ export const accessManagementHandlers: HttpHandler[] = [
         return errorResponse(
           400,
           `The project ${key} does not enable CertificateAndApiKey, which shared certificates belong to.`,
+          machineAccessNotSupported,
         )
       }
       const body = (await request.json()) as SharedCertificateCreate

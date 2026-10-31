@@ -89,6 +89,7 @@ public class MachineResetTests(CosmosFixture fixture)
             () => accessService.ResetMachineAccessAsync(Organization, Project, machine.Id));
 
         exception.Message.ShouldBe(PolicyAwareMachineAccessService.CertificateResetNotSupportedMessage);
+        exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotSupported);
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(before!));
     }
 
@@ -178,6 +179,41 @@ public class MachineResetTests(CosmosFixture fixture)
         router.IssuedKey.ShouldBeNull();
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(cleared!));
         await ShouldHoldOnlyTheClearedHashAsync(before!, machine, router.IssuedKey);
+    }
+
+    // A delete that cleared the hash before the reset read the machine, or stopped after it (as the compensation of a
+    // failed create does): the record has no key to replace, and the reset answers 404, not 500 (424-102). It writes
+    // nothing.
+    [Theory]
+    [InlineData(MachineCredentialKind.ApiKey)]
+    [InlineData(MachineCredentialKind.CertificateAndApiKey)]
+    public async Task Reset_HashClearedBeforeTheRead_AnswersNotFound_AndWritesNothing(MachineCredentialKind kind)
+    {
+        var accessService = await PrepareAsync();
+        var machine = await accessService.CreateMachineAccessAsync(Model(kind));
+        var before = await ReadDocumentAsync(machine.Id);
+        var cleared = await ClearTheHashAsync(machine.Id);
+
+        var exception = await Should.ThrowAsync<NotFoundException>(() => accessService.ResetMachineAccessAsync(Organization, Project, machine.Id));
+
+        exception.Message.ShouldBe($"The machine access {machine.Id} has no API key to reset; it is being deleted, or its creation failed.");
+        ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(cleared));
+        await ShouldHoldOnlyTheClearedHashAsync(before!, machine, issuedKey: null);
+    }
+
+    // A ClientCredentials machine never has a hash. Its identity provider giving no secret is a failure there, not a
+    // delete, so the 404 above stays with the kinds that have an API key.
+    [Fact]
+    public async Task Reset_OfAClientCredentialsMachineWithoutASecret_IsNotAnsweredAsDeleted()
+    {
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ClientCredentials));
+        var before = await ReadDocumentAsync(machine.Id);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => CreateAccessService(new SecretlessRouter()).ResetMachineAccessAsync(Organization, Project, machine.Id));
+
+        exception.Message.ShouldBe($"The machine access {machine.Id} reset failed.");
+        ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(before!));
     }
 
     [Fact]
@@ -741,6 +777,18 @@ public class MachineResetTests(CosmosFixture fixture)
         {
             return inner.DeleteMachineAccessAsync(existingAccess, organization, project);
         }
+    }
+
+    // A router whose reset gets no secret, as an identity provider that answers without one.
+    private sealed class SecretlessRouter : IMachineAccessService
+    {
+        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotSupportedException();
+
+        public Task<string?> ResetMachineAccessAsync(string objectId, string organization, string project) => Task.FromResult<string?>(null);
+
+        public Task<string?> ResetMachineAccessAsync(MachineAccess existingAccess, string organization, string project) => Task.FromResult<string?>(null);
+
+        public Task<bool> DeleteMachineAccessAsync(string objectId, string organization, string project) => throw new NotSupportedException();
     }
 
     // Runs a step after the API key service read the stored hash and before it replaces it.
