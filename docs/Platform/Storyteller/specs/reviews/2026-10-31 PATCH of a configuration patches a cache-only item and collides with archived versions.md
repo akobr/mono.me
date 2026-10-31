@@ -20,6 +20,7 @@ The version collision named in the issue's title was already fixed by 424-50. Th
 | `cf576c25` | Section 8: the Admin UI mock and its tests |
 | `54db7d7a` | Section 9: the docs |
 | `dee3508e` | Fixes from the review: "Create empty" over a cache row, and one sentence of `inheritance.md` |
+| — | PR review: one written-version rule for rows and archives, a neutral exception message with the `PUT`/`POST` hint in the HTTP answer |
 | — | This review |
 
 ## What Was Done
@@ -130,5 +131,5 @@ Three independent reviewers covered correctness, tests, and contract and clients
 - **`DELETE` of an emptied version** answers `404` and leaves the row (`ClearConfigurationAsync` tests the content). The Admin UI's "Delete own" therefore fails on a configuration created empty, which can now be patched.
 - **The Admin UI after a `404` on save** shows a generic toast instead of switching to the create flow. It now happens after a concurrent delete, and for a cache row in front of a legacy archive of version 0 with content (section 2).
 - **MCP and legacy rows.** `StoredConfigurations.GetOwnAsync` treats a version 0 with content as nothing stored.
-- **Leftovers of the old patch path.** Archives of a later version than the current item stay readable. Data already written with collisions is not repaired.
+- **Leftovers of the old patch path.** Archives of a later version than the current item stay readable. Data already written with collisions is not repaired. The old patch path ran from 2026-05-03 to 2026-10-26. Whether it ever patched a cache row in a deployed database is unknown from the code, so a one-off query for empty archives of version 0 (`{view}.cfv.{key}.0` with `{}`) is the way to tell, and the cleanup is worth doing only if it finds any.
 - **The SDKs** keep the old `404` description until the next OpenAPI export.

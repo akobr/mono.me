@@ -44,6 +44,7 @@ public class ConfigurationPatchHttpTests
         var notFound = result.ShouldBeOfType<NotFoundObjectResult>();
         var error = notFound.Value.ShouldBeOfType<ErrorResponse>();
         error.Message.ShouldBe(new ConfigurationNotFoundException(Key).Message);
+        error.Hint.ShouldBe("A PUT or POST writes a first document.");
         proxy.Keys.ShouldHaveSingleItem().ToString().ShouldBe(FullKey.Create(AnnotationKey.Parse(Key), Org, Project, View).ToString());
         proxy.Operations.ShouldHaveSingleItem().Count.ShouldBe(1);
     }

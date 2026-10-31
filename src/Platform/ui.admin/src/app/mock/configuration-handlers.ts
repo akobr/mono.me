@@ -424,7 +424,9 @@ export const configurationHandlers: HttpHandler[] = [
       if (stored === undefined) {
         return errorResponse(
           404,
-          `Configuration for '${params.key}' has no stored version to patch: it was never written, or it was deleted. A PUT or POST writes a first document.`,
+          `Configuration for '${params.key}' has no stored version to patch: it was never written, or it was deleted.`,
+          undefined,
+          'A PUT or POST writes a first document.',
         )
       }
       const operations = (await request.json()) as Operation[]

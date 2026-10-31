@@ -414,7 +414,7 @@ public partial class ConfigurationHttp
         }
         catch (ConfigurationNotFoundException ex)
         {
-            return new NotFoundObjectResult(new ErrorResponse(ex.Message));
+            return new NotFoundObjectResult(new ErrorResponse(ex.Message) { Hint = "A PUT or POST writes a first document." });
         }
         catch (JsonPatchException ex)
         {
