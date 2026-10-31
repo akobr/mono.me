@@ -312,7 +312,7 @@ See [annotation-lifecycle.md](annotation-lifecycle.md).
 | `list_schemas`, `get_schema`, `set_schema`, `delete_schema`, `get_combined_schema`, `list_schema_versions`, `diff_schema` | Schemas of a type, an annotation, or a descendant type (`level`); the combined schema a write is checked against |
 | `list_templates`, `get_template`, `set_template`, `replace_template`, `patch_template`, `delete_template`, `list_template_versions`, `diff_template` | View templates per type code |
 
-Writes address the annotation's own stored document. Writing back an edited effective document would copy every inherited value onto the annotation. A configuration write on an annotation that does not exist is refused, because such a configuration is inherited but not listed. `set_schema` refuses a `$ref` that does not point inside the document (`#/…`), because the API would fetch a URL or file reference from its own network. See [inheritance.md](inheritance.md), [templating.md](templating.md), [definitions.md](definitions.md) and [binding.md](binding.md).
+Writes address the annotation's own stored document. Writing back an edited effective document would copy every inherited value onto the annotation. A configuration write on an annotation that does not exist is refused, because such a configuration is inherited but not listed. `set_schema` refuses a `$ref` that does not point inside the document (`#/…`) before it calls the API. The API refuses such a reference too (`400 ExternalSchemaReference`, [definitions.md](definitions.md#references)), so this check is defense in depth. See [inheritance.md](inheritance.md), [templating.md](templating.md), [definitions.md](definitions.md) and [binding.md](binding.md).
 
 ### Understanding configuration
 
