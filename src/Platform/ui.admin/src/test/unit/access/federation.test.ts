@@ -362,6 +362,7 @@ describe('federated machines against the mock API', () => {
     await expect(resetMachineAccess('acme', 'billing', 'mach-release-pipeline')).rejects.toMatchObject({
       status: 400,
       message: 'A Federated machine has no secret to reset. Change its federation rules instead.',
+      errorCode: 'MachineAccessNotSupported',
     })
   })
 
