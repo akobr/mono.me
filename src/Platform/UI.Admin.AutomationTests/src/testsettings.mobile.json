@@ -1,0 +1,8 @@
+{
+  // An emulated phone: Playwright's Pixel 7 descriptor as is (412x839, device scale factor 2.625, touch, mobile user
+  // agent). The TypeScript suite's mobile project narrows it to 390x844; both are below the sm breakpoint (640 px), so
+  // the layout is the same. Combine with an engine profile: UITESTS_PROFILE=webkit,mobile.
+  "Browser": {
+    "Device": "Pixel 7"
+  }
+}

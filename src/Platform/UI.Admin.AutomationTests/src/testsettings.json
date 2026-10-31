@@ -1,0 +1,75 @@
+{
+  // The committed defaults; README.md lists every layer above them. No secrets here: passwords and keys go to the
+  // user secrets (or UITESTS_* variables in CI). Without Target:BaseUrl every test is skipped.
+  "Target": {
+    "BaseUrl": "",
+    "Organization": "ui-tests",
+    "Project": "automation",
+    "View": "default",
+    "SignIn": "AuthKit",
+    "MockScenario": null,
+    "EmailDomain": "example.com"
+  },
+  "Browser": {
+    "Provider": "Local",
+    "Engine": "chromium",
+    "Channel": null,
+    "Headless": true,
+    "SlowMoMs": 0,
+    "Device": null,
+    "Viewport": { "Width": 1440, "Height": 900 },
+    "Locale": "en-US",
+    "TimeZone": "Europe/Prague",
+    "ColorScheme": "light"
+  },
+  "Execution": {
+    "MaxParallelTests": 4,
+    "Seed": null,
+    "ActionTimeoutMs": 10000,
+    "NavigationTimeoutMs": 30000,
+    "ExpectTimeoutMs": 10000,
+    "Retries": 0,
+    "Trace": "OnFailure",
+    "Screenshot": "OnFailure",
+    "Video": "Off",
+    "ArtifactsPath": "TestResults/artifacts"
+  },
+  "Users": {
+    "LeaseTimeoutSeconds": 120,
+    // { "Email": "...", "DisplayName": "...", "Roles": [ "Owner" ] } per pre-provisioned user, in testsettings.local.json
+    // or UITESTS_Users__Pool__<n>__Email; the passwords in the user secrets.
+    "Pool": []
+  },
+  "BrowserStack": {
+    "Username": "",
+    "AccessKey": "",
+    "Project": "2S Platform - admin UI",
+    "Build": null,
+    "Os": "Windows",
+    "OsVersion": "11",
+    "Browser": "chrome",
+    "BrowserVersion": "latest",
+    "Resolution": "1920x1080",
+    "Local": false,
+    "LocalIdentifier": null,
+    "PlaywrightVersion": null,
+    "SessionPerTest": true,
+    "Console": "errors",
+    "NetworkLogs": false,
+    "Debug": false,
+    "Video": true,
+    "MaxParallelSessions": 5
+  },
+  "Reporting": {
+    "Enabled": false,
+    "Systems": [],
+    "RunName": "UI automation {Date:yyyy-MM-dd} {Time:HH:mm} {Profile}",
+    "RunDescription": null,
+    "UnmappedTests": "Ignore",
+    "BatchSize": 20,
+    "FlushIntervalSeconds": 5,
+    "MaxAttempts": 5,
+    "CompleteTimeoutSeconds": 120,
+    "ReplayFile": null
+  }
+}

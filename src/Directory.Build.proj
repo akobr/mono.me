@@ -2,5 +2,7 @@
   <ItemGroup>
     <!-- bin and obj hold generated projects, such as the WorkerExtensions project of a Functions app with triggers -->
     <ProjectReference Include="**\*.*?proj" Exclude="**\bin\**;**\obj\**" />
+    <!-- TUnit on Microsoft.Testing.Platform refuses the VSTest-mode 'dotnet test' of the .NET 10 SDK: built here, run with 'dotnet run' -->
+    <ProjectReference Update="**\UI.Admin.AutomationTests.csproj" Test="false" />
   </ItemGroup>
 </Project>

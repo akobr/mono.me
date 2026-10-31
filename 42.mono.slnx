@@ -79,6 +79,7 @@
     <Project Path="src/Platform/Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
     <Project Path="src/Platform/Cli/src/Cli.csproj" />
     <Project Path="src/Platform/Cli/test/Cli.UnitTests.csproj" />
+    <Project Path="src/Platform/UI.Admin.AutomationTests/src/UI.Admin.AutomationTests.csproj" />
     <Project Path="src/Platform/ui.admin/src/ui.admin.esproj">
       <Build />
       <Deploy />

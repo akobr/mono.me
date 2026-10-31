@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.UI.Admin.AutomationTests</AssemblyName>
+    <RootNamespace>_42.Platform.UI.Admin.AutomationTests</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- TUnit on Microsoft.Testing.Platform supplies the entry point. The traversals build the project but do not test it:
+         run it with 'dotnet run' (see README.md). -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+
+    <UserSecretsId>3d07d28d-5b62-432e-9cfc-b53b6b883740</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="TUnit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Libraries\Testing\UI.Automation.Runtime.TUnit\src\UI.Automation.Runtime.TUnit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="testsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
