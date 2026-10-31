@@ -361,7 +361,7 @@ With `Mcp:SecretTools:Enabled` set to `true`, three more tools are registered. T
 
 | Tool | What it does |
 | --- | --- |
-| `reveal_key_value` | The secret value of a pair or a version; needs `ContributorWithSecrets`. The API records every reveal of a secret, of the current value or of a stored version, as a `Reveal` event |
+| `reveal_key_value` | The secret value of a pair or a version; needs `ContributorWithSecrets`. The API records a reveal of the current value as a `Reveal` event; a reveal of an older version too, by an API that audits its version route (older APIs do not) |
 | `get_resolved_configuration` | The configuration with bindings evaluated; secret bindings are filled in with secret rights, and the API records every secret it reads |
 | `check_configuration_bindings` | Per binding, whether it resolves; never the value, but the API reads the secrets for the check |
 

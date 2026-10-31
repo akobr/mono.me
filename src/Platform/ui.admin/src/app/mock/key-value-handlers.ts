@@ -743,11 +743,12 @@ const viewHandlers: HttpHandler[] = [
         if (before === undefined || after === undefined) {
           return errorResponse(404, `A version of the key '${params.key}' does not exist.`, 'KeyValueNotFound')
         }
-        // like the API: each secret version of the diff is a reveal, recorded once both sides resolved
+        // like the API: each secret version of the diff is a reveal, recorded once both sides resolved, in one request
+        const correlationId = crypto.randomUUID()
         for (const version of new Set([from, to])) {
           const entry = stored?.Versions.find((candidate) => candidate.Version === version)
           if (stored && entry && isSecret(entry.Protection)) {
-            recordAudit(db, projectKey, { Operation: 'Reveal', View: params.view, Key: stored.Key, Version: entry.Version, Protection: entry.Protection, Detail: `diff ${from}..${to}` })
+            recordAudit(db, projectKey, { Operation: 'Reveal', View: params.view, Key: stored.Key, Version: entry.Version, Protection: entry.Protection, Detail: `diff ${from}..${to}`, CorrelationId: correlationId })
           }
         }
         return HttpResponse.json(diffTexts(before, after))
