@@ -136,6 +136,15 @@ curl -k https://localhost:7180/.well-known/oauth-protected-resource/mcp     # th
 
 Opening `https://localhost:7180/mcp` in a browser answers `405`: the server is stateless and only accepts `POST`. A `POST` without a token answers `401` with `WWW-Authenticate: Bearer resource_metadata=…`, which is correct.
 
+The routing of the Functions host (it runs the first function, in the order of the function names, whose route matches; see [the annotation routes](Storyteller/annotation-lifecycle.md)) has a smoke test that changes nothing:
+
+```powershell
+$env:STORYTELLER_TEST_API_BASE_URL = "http://localhost:7071/api"
+$env:STORYTELLER_TEST_TOKEN = "<access token of a Contributor>"
+$env:STORYTELLER_TEST_ORGANIZATION = "<organization>"; $env:STORYTELLER_TEST_PROJECT = "<project>"   # STORYTELLER_TEST_VIEW: default
+dotnet test src/Platform/Storyteller/Api.Functions/testint
+```
+
 ## 7. Connect an MCP client
 
 ```sh

@@ -254,6 +254,8 @@ Every endpoint is under `v1/{organization}/{project}` and needs a bearer token (
 
 Base `K` = `v1/{organization}/{project}/{view}/key-values`.
 
+`{view}` of these routes is never `usage`, a reserved view name: the Functions host runs the first function, in the order of the function names, whose route matches, so without that constraint the list `K` would take the project's usage report `v1/{organization}/{project}/usage/key-values`.
+
 | Method | Route | Query | Body → response | Errors |
 | --- | --- | --- | --- | --- |
 | `GET` | `K` | `keyPrefix`, `protection` (repeatable or comma-separated), `state` (`Active`, `Deleted`, `All`), `includeValues`, `continuationToken` | → `KeyValuesResponse`, ordered by key, up to 1,000 per page | 400 |
