@@ -56,7 +56,8 @@ public static class JsonQuery
     private static JToken? ResolveJsonPath(JToken root, string expression)
     {
         // The query can be computed (a stored string read by a nested statement), so neither the length cap nor the
-        // depth limit of the @ string covers it, and Newtonsoft's parser recurses once per nested '[' or '(' with no guard.
+        // depth limit of the @ string covers it. Newtonsoft guards none of its recursion: its parser recurses once per nested
+        // '[' or '(', and its evaluation chains one lazy filter per '.', '[' and '(' that the first match runs through.
         if (expression.Length > BindingExpressionLimits.MaxLength)
         {
             throw new EvaluationLimitExceededException(
@@ -65,13 +66,26 @@ public static class JsonQuery
                 $"The JSONPath query is longer than {BindingExpressionLimits.MaxLength} characters.");
         }
 
-        // Counting every '[' and '(' bounds the nesting even when quotes would hide a closing one.
-        if (expression.Count(c => c is '[' or '(') > BindingExpressionLimits.MaxDepth)
+        // Counting every one of them bounds both, even when quotes would hide a closing one.
+        if (expression.Count(c => c is '.' or '[' or '(') > BindingExpressionLimits.MaxDepth)
         {
             throw new EvaluationLimitExceededException(
                 EvaluationLimitKind.Depth,
                 BindingExpressionLimits.MaxDepth,
-                $"The JSONPath query has more than {BindingExpressionLimits.MaxDepth} brackets and parentheses.");
+                $"The JSONPath query has more than {BindingExpressionLimits.MaxDepth} path segments, brackets and parentheses.");
+        }
+
+        // A recursive descent scans below every match of the previous step, and a root reference inside a filter runs a
+        // whole query for every candidate. Chained, either costs time exponential in a short query over a small document.
+        if (expression.Split("..").Length > 2)
+        {
+            throw new BindingEvaluationException("A JSONPath query can use at most one recursive descent ('..').");
+        }
+
+        if (expression.Count(c => c == '$') > 2)
+        {
+            throw new BindingEvaluationException(
+                "A JSONPath query can use '$' at most once after its start (a root reference inside a filter, or a regular expression's end).");
         }
 
         try
@@ -87,10 +101,11 @@ public static class JsonQuery
         {
             throw new BindingEvaluationException("The JSONPath query took too long to evaluate.", exception);
         }
-        catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException or IndexOutOfRangeException)
+        catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException or IndexOutOfRangeException or InvalidCastException)
         {
-            // An index Newtonsoft cannot convert, an invalid =~ pattern (its message quotes the pattern), or a query that
-            // ends inside an indexer or a filter, which Newtonsoft reads past its end.
+            // An index Newtonsoft cannot convert, an invalid =~ pattern (its message quotes the pattern), a query that ends
+            // inside an indexer or a filter, which Newtonsoft reads past its end, or a filter that compares values of
+            // incompatible types, such as a date or a BigInteger with a number or a boolean.
             throw new BindingEvaluationException("The JSONPath query is not valid.", exception);
         }
     }

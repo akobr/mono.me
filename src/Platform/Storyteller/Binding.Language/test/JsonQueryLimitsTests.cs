@@ -32,10 +32,12 @@ public class JsonQueryLimitsTests
         thrown.Message.Should().Be("The JSONPath query is longer than 8192 characters.");
     }
 
-    [Fact]
-    public void Resolve_SixtyFourBrackets_AreRead()
+    [Theory]
+    [InlineData("$.items", 63, "[0]")]
+    [InlineData("$", 64, ".a")]
+    public void Resolve_SixtyFourSegments_AreRead(string start, int count, string unit)
     {
-        var query = "$.items" + string.Concat(Enumerable.Repeat("[0]", 64));
+        var query = start + string.Concat(Enumerable.Repeat(unit, count));
 
         var act = () => JsonQuery.Resolve(Items, query);
 
@@ -43,17 +45,66 @@ public class JsonQueryLimitsTests
     }
 
     [Theory]
-    [InlineData(65, "[0]")]
-    [InlineData(33, "[?(")]
-    public void Resolve_MoreThanSixtyFourBracketsAndParentheses_ThrowsDepth(int count, string unit)
+    [InlineData("$.items", 64, "[0]")]
+    [InlineData("$.items", 32, "[?(")]
+    [InlineData("$", 65, ".a")]
+    [InlineData("$", 4095, ".a")]
+    [InlineData("$", 65, ".*")]
+    public void Resolve_MoreThanSixtyFourSegmentsBracketsAndParentheses_ThrowsDepth(string start, int count, string unit)
     {
-        var query = "$.items" + string.Concat(Enumerable.Repeat(unit, count));
+        // Newtonsoft's parser recurses per nested '[' and '(', its evaluation per segment; 4,095 '.a' overflowed a 1 MB stack.
+        var query = start + string.Concat(Enumerable.Repeat(unit, count));
 
         var act = () => JsonQuery.Resolve(Items, query);
 
         var thrown = act.Should().Throw<EvaluationLimitExceededException>().Which;
         thrown.Kind.Should().Be(EvaluationLimitKind.Depth);
-        thrown.Message.Should().Be("The JSONPath query has more than 64 brackets and parentheses.");
+        thrown.Message.Should().Be("The JSONPath query has more than 64 path segments, brackets and parentheses.");
+    }
+
+    [Theory]
+    [InlineData("$..a..a", "A JSONPath query can use at most one recursive descent ('..').")]
+    [InlineData("$[?($[?($.zz)])]", "A JSONPath query can use '$' at most once after its start (a root reference inside a filter, or a regular expression's end).")]
+    public void Resolve_QueryWhoseCostIsExponential_IsRefused(string query, string message)
+    {
+        var act = () => JsonQuery.Resolve(Items, query);
+
+        act.Should().Throw<BindingEvaluationException>().WithMessage(message);
+    }
+
+    [Theory]
+    [InlineData("$..name")]
+    [InlineData("$.items[?(@.name == $.items[0].name)]")]
+    [InlineData("$.items[?(@.name =~ /^a$/)]")]
+    public void Resolve_OneDescentOrOneRootReference_IsRead(string query)
+    {
+        JsonQuery.Resolve(Items, query).Should().NotBeNull();
+    }
+
+    [Theory]
+    [InlineData("$.items[?(@.since > 5)]")]
+    [InlineData("$.items[?(@.since > true)]")]
+    [InlineData("$.items[?(@.big > true)]")]
+    public void Resolve_FilterComparingIncompatibleTypes_IsNotValid(string query)
+    {
+        // JObject.Parse reads an ISO date as a date and a long integer as a BigInteger, as the reads of the API do.
+        var document = JObject.Parse("""{ "items": [ { "since": "2026-01-01T00:00:00Z", "big": 123456789012345678901234567890 } ] }""");
+
+        var act = () => JsonQuery.Resolve(document, query);
+
+        act.Should().Throw<BindingEvaluationException>().WithMessage("The JSONPath query is not valid.");
+    }
+
+    [Fact]
+    public async Task Config_LiteralChainOfSegmentsAtTheCap_ThrowsDepthWithoutCrashing()
+    {
+        var raw = "@config(\"$" + string.Concat(Enumerable.Repeat(".a", 4090)) + "\")";
+        var (executor, property) = Config(new JObject { ["settings"] = new JObject { ["value"] = raw } });
+
+        raw.Length.Should().Be(BindingExpressionLimits.MaxLength);
+        var act = () => executor.TryBinding(property, includeSecrets: true, Scope(property)).AsTask();
+
+        (await act.Should().ThrowAsync<EvaluationLimitExceededException>()).Which.Kind.Should().Be(EvaluationLimitKind.Depth);
     }
 
     [Fact]
