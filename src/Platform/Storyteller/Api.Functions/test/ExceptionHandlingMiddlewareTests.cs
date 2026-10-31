@@ -4,19 +4,27 @@ using System.Reflection;
 using System.Text.Json;
 
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.Binding.Language;
+using _42.Platform.Storyteller.Binding.Object;
 using _42.Platform.Storyteller.Configuring;
 
 using Azure.Core.Serialization;
 
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 public class ExceptionHandlingMiddlewareTests
 {
+    private const string Secret = "SECRET_SENTINEL";
+
     public static TheoryData<Exception, HttpStatusCode, string> ClientErrors => new()
     {
         { new AccessDeniedException("No Administrator access to 'acme.web'."), HttpStatusCode.Forbidden, ErrorCodes.AccessDenied },
@@ -63,6 +71,142 @@ public class ExceptionHandlingMiddlewareTests
         var context = FunctionTestDoubles.CreateNonHttp(services);
 
         await Should.ThrowAsync<InvalidOperationException>(() => InvokeThrowingAsync(context, new InvalidOperationException("boom")));
+    }
+
+    // The bindings below run through the real resolver and executor: the exception is the one a resolved read throws.
+    [Fact]
+    public async Task Invoke_SecretOperandInMath_Responds422WithoutTheSecret()
+    {
+        var source = new SecretSource();
+
+        var (response, body, logger) = await ResolveThroughMiddlewareAsync("""{ "settings": { "value": "@{@value + 1}" } }""", source);
+
+        source.SawIncludeSecrets.ShouldBeTrue();
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        body.ShouldNotContain(Secret);
+        using var json = JsonDocument.Parse(body);
+        json.RootElement.GetProperty(nameof(Models.ErrorResponse.ErrorCode)).GetString().ShouldBe("binding.evaluation");
+        json.RootElement.GetProperty(nameof(Models.ErrorResponse.Message)).GetString()
+            .ShouldBe("Failed to process the data binding for 'settings.value': A math operand of type 'string' is not a number.");
+        HasValue(json, nameof(Models.ErrorResponse.Error)).ShouldBeFalse();
+        ShouldLogNoSecret(logger);
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        entry.Message.ShouldBe("Binding evaluation failed (binding.evaluation) at settings.value.");
+    }
+
+    [Fact]
+    public async Task Invoke_SecretInJsonEContext_Responds422WithoutTheSecret()
+    {
+        var source = new SecretSource();
+        var content = """
+            {
+              "value": {
+                "$binding": "jsone",
+                "$definition": { "$eval": "pin()" },
+                "$context": { "pin": "@value" }
+              }
+            }
+            """;
+
+        var (response, body, logger) = await ResolveThroughMiddlewareAsync(content, source);
+
+        source.SawIncludeSecrets.ShouldBeTrue();
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        body.ShouldNotContain(Secret);
+        using var json = JsonDocument.Parse(body);
+        json.RootElement.GetProperty(nameof(Models.ErrorResponse.ErrorCode)).GetString().ShouldBe("binding.evaluation");
+        HasValue(json, nameof(Models.ErrorResponse.Error)).ShouldBeFalse();
+        ShouldLogNoSecret(logger);
+    }
+
+    [Fact]
+    public async Task Invoke_TheIssuesFortyKilobyteBinding_Responds422ExpressionLength()
+    {
+        var raw = NestedCalls(10_000);
+
+        var (response, body, logger) = await ResolveThroughMiddlewareAsync(Settings(raw), new SecretSource());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        body.ShouldNotContain("f(@");
+        using var json = JsonDocument.Parse(body);
+        json.RootElement.GetProperty(nameof(Models.ErrorResponse.ErrorCode)).GetString().ShouldBe("binding.limit.expressionLength");
+        HasValue(json, nameof(Models.ErrorResponse.Error)).ShouldBeFalse();
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Message.ShouldBe("Binding limit ExpressionLength (8192) exceeded (binding.limit.expressionLength) at settings.value.");
+        entry.Values.ShouldContain(value => value.Key == "Kind" && Equals(value.Value, EvaluationLimitKind.ExpressionLength));
+        entry.Values.ShouldContain(value => value.Key == "Limit" && Equals(value.Value, 8192L));
+    }
+
+    [Fact]
+    public async Task Invoke_BindingDeeperThanTheLimit_Responds422Depth()
+    {
+        var raw = NestedCalls(65);
+
+        var (response, body, logger) = await ResolveThroughMiddlewareAsync(Settings(raw), new SecretSource());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        body.ShouldNotContain("f(@");
+        using var json = JsonDocument.Parse(body);
+        json.RootElement.GetProperty(nameof(Models.ErrorResponse.ErrorCode)).GetString().ShouldBe("binding.limit.depth");
+        logger.Entries.ShouldHaveSingleItem().Message.ShouldBe("Binding limit Depth (64) exceeded (binding.limit.depth) at settings.value.");
+    }
+
+    [Fact]
+    public async Task Invoke_MalformedBinding_Responds422InsteadOf500()
+    {
+        var (response, body, logger) = await ResolveThroughMiddlewareAsync(Settings("@a."), new SecretSource());
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        body.ShouldNotContain("'@a.'");
+        using var json = JsonDocument.Parse(body);
+        json.RootElement.GetProperty(nameof(Models.ErrorResponse.ErrorCode)).GetString().ShouldBe("binding.evaluation");
+        HasValue(json, nameof(Models.ErrorResponse.Error)).ShouldBeFalse();
+        logger.Entries.ShouldHaveSingleItem().Level.ShouldBe(LogLevel.Warning);
+    }
+
+    private static async Task<(TestHttpResponseData Response, string Body, CapturingLogger<ExceptionHandlingMiddleware> Logger)> ResolveThroughMiddlewareAsync(
+        string content,
+        IBindingSource source)
+    {
+        var executor = new BindingExecutor();
+        executor.RegisterSource(BindingExecutor.DefaultSourceKey, source);
+        var resolver = new ConfigurationBindingResolver(executor);
+        var logger = new CapturingLogger<ExceptionHandlingMiddleware>();
+        var middleware = new ExceptionHandlingMiddleware(logger);
+        var (context, bindings) = CreateContext();
+
+        await middleware.Invoke(context, async _ => await resolver.ResolveAsync(JObject.Parse(content), includeSecrets: true, new BindingScope()));
+
+        var response = bindings.InvocationResult.ShouldBeOfType<TestHttpResponseData>();
+        response.Body.Position = 0;
+        using var reader = new StreamReader(response.Body, leaveOpen: true);
+        return (response, await reader.ReadToEndAsync(), logger);
+    }
+
+    private static void ShouldLogNoSecret(CapturingLogger<ExceptionHandlingMiddleware> logger)
+    {
+        logger.Entries.ShouldNotBeEmpty();
+        foreach (var entry in logger.Entries)
+        {
+            entry.Message.ShouldNotContain(Secret);
+            foreach (var value in entry.Values)
+            {
+                (value.Value?.ToString() ?? string.Empty).ShouldNotContain(Secret);
+            }
+
+            entry.Exception.ShouldBeNull();
+        }
+    }
+
+    private static string Settings(string raw)
+    {
+        return new JObject { ["settings"] = new JObject { ["value"] = raw } }.ToString();
+    }
+
+    private static string NestedCalls(int statements)
+    {
+        return "@" + string.Concat(Enumerable.Repeat("f(@", statements - 1)) + "x" + new string(')', statements - 1);
     }
 
     private static async Task InvokeThrowingAsync(FunctionContext context, Exception exception)
@@ -142,5 +286,17 @@ public class ExceptionHandlingMiddlewareTests
         public override IImmutableDictionary<string, BindingMetadata> InputBindings => ImmutableDictionary<string, BindingMetadata>.Empty;
 
         public override IImmutableDictionary<string, BindingMetadata> OutputBindings => ImmutableDictionary<string, BindingMetadata>.Empty;
+    }
+
+    // The default source: a secret only for a caller that may read secrets, as the key/value and Key Vault sources.
+    private sealed class SecretSource : IBindingSource
+    {
+        public bool SawIncludeSecrets { get; private set; }
+
+        public ValueTask<BindingValue?> ResolveAsync(BindingRequest request)
+        {
+            SawIncludeSecrets |= request.IncludeSecrets;
+            return new ValueTask<BindingValue?>(request.IncludeSecrets ? BindingValue.FromString(Secret) : null);
+        }
     }
 }

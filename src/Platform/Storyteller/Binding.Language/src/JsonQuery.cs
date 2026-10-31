@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -14,6 +15,7 @@ namespace _42.Platform.Storyteller.Binding.Language;
 /// whole top-level expression, so it is intentionally not auto-detected here; only a leading <c>$</c> is treated as
 /// JSONPath and only a leading <c>/</c> (or the empty string, meaning the whole document) is treated as a JSON
 /// Pointer. Anything else is a validation error naming both accepted forms.
+/// The expression can be the value of a nested statement, even a secret, so no message quotes it.
 /// </remarks>
 public static class JsonQuery
 {
@@ -40,7 +42,7 @@ public static class JsonQuery
         }
 
         throw new BindingEvaluationException(
-            $"'{expression}' is neither a JSON Pointer (must start with '/') nor a JSONPath expression (must start with '$').");
+            "The query is neither a JSON Pointer (must start with '/') nor a JSONPath expression (must start with '$').");
     }
 
     private static JToken? ResolveJsonPath(JToken root, string expression)
@@ -51,8 +53,17 @@ public static class JsonQuery
         }
         catch (JsonException exception)
         {
-            throw new BindingEvaluationException(
-                $"Invalid JSONPath expression '{expression}': {exception.Message}", exception);
+            // Newtonsoft's messages about the path quote at most one of its characters.
+            throw new BindingEvaluationException($"The JSONPath query is not valid: {exception.Message}", exception);
+        }
+        catch (RegexMatchTimeoutException exception)
+        {
+            throw new BindingEvaluationException("The JSONPath query took too long to evaluate.", exception);
+        }
+        catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException)
+        {
+            // An index Newtonsoft cannot convert, or an invalid =~ pattern, whose message quotes the pattern.
+            throw new BindingEvaluationException("The JSONPath query is not valid.", exception);
         }
     }
 
@@ -65,11 +76,13 @@ public static class JsonQuery
 
         var current = root;
         var segments = pointer.Split('/');
+        var offset = 0;
 
         // pointer starts with '/', so the first split segment is always empty; skip it.
         for (var i = 1; i < segments.Length; i++)
         {
-            var segment = Unescape(segments[i]);
+            offset += segments[i - 1].Length + 1;
+            var segment = Unescape(segments[i], offset);
 
             switch (current)
             {
@@ -104,7 +117,8 @@ public static class JsonQuery
         return current;
     }
 
-    private static string Unescape(string segment)
+    // offset is the position of the segment in the whole pointer
+    private static string Unescape(string segment, int offset)
     {
         if (!segment.Contains('~'))
         {
@@ -116,7 +130,7 @@ public static class JsonQuery
             if (segment[i] == '~' && (i + 1 >= segment.Length || (segment[i + 1] != '0' && segment[i + 1] != '1')))
             {
                 throw new BindingEvaluationException(
-                    $"Invalid JSON Pointer escape at position {i} in token '{segment}': '~' must be followed by '0' or '1'.");
+                    $"Invalid JSON Pointer escape at offset {offset + i} of the query: '~' must be followed by '0' or '1'.");
             }
         }
 

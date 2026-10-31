@@ -96,10 +96,12 @@ public sealed class AnnotationBindingFunction : IBindingFunction, IDescribedBind
         {
             var typeName = BindingFunctionArguments.RequireString(request.Arguments[1], FunctionName, 2);
 
-            if (!Enum.TryParse<AnnotationType>(typeName, ignoreCase: true, out var annotationType))
+            // The argument can be the value of a nested statement, so the message names the accepted types instead.
+            if (!Enum.TryParse<AnnotationType>(typeName, ignoreCase: true, out var annotationType)
+                || !Enum.IsDefined(annotationType))
             {
                 throw new BindingEvaluationException(
-                    $"'{typeName}' is not a known annotation type for function '{FunctionName}'.");
+                    $"The second argument of '{FunctionName}' is not a known annotation type ({string.Join(", ", Enum.GetNames<AnnotationType>())}).");
             }
 
             var ancestorKey = context.ConfigurationKey.Annotation.TryGetAncestorKey(annotationType)
