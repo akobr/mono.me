@@ -916,6 +916,33 @@ public class CosmosConfigurationServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task PatchConfigurationAsync_WithoutAConfiguration_ThrowsNotFound()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("patch-missing");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "patch-missing",
+            ProjectName = Project,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
+        var patchOps = JArray.Parse("""[{ "op": "add", "path": "/a", "value": 1 }]""");
+
+        var act = () => configs.PatchConfigurationAsync(key, patchOps, AuditActor.System);
+
+        await act.Should().ThrowAsync<ConfigurationNotFoundException>()
+            .WithMessage("*'rst.patch-missing' has no stored version to patch*");
+        (await configs.GetConfigurationVersionsAsync(key)).Should().BeEmpty();
+        (await configs.GetConfigurationVersionContentAsync(key, 1)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task PatchConfigurationAsync_InvalidPath_Throws()
     {
         var annotations = Context.Services.GetRequiredService<IAnnotationService>();

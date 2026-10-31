@@ -351,8 +351,11 @@ public partial class CosmosConfigurationService : IConfigurationService
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationHistoryEntity>(_serializerOptions));
 
-        // a cache row is no stored version, so it gives no content
-        return versionEntity?.ToConfiguration();
+        // a cache row is no stored version, so it gives no content; neither does an empty archive of version 0 (an old
+        // patch archived cache rows so), as in the version list
+        return versionEntity is not null && (versionEntity.Version > 0 || versionEntity.Content.HasValues)
+            ? versionEntity.ToConfiguration()
+            : null;
     }
 
     public Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint version)
@@ -499,7 +502,9 @@ public partial class CosmosConfigurationService : IConfigurationService
         {
             var (existingConfiguration, etag) = await ReadForWriteAsync(key, repository, id, partitionKey);
 
-            if (existingConfiguration is null)
+            // a cache row (version 0, no content) only caches the effective document of a read: nothing is stored to
+            // patch; an emptied version is a written one and is patched
+            if (existingConfiguration is null || !IsWrittenVersion(existingConfiguration))
             {
                 throw new ConfigurationNotFoundException(key.Annotation);
             }

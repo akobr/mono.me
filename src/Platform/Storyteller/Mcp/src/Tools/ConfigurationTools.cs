@@ -187,8 +187,8 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
         var patch = DocumentWrites.ReadPatch(operations);
         await AnnotationGuards.EnsureAnnotationExistsAsync(annotations, organization, project, view, annotationKey, cancellationToken);
 
-        // The API patches an item an effective read cached (Version 0, empty content) as if it were stored, and its
-        // version 1 then collides with the versions a delete_configuration kept; only a stored document is patched.
+        // Only a stored document is patched. The API refuses the rest with 404, also an item an effective read cached
+        // (Version 0, empty content); the check here names the first writes instead.
         var stored = await StoredConfigurations.GetOwnAsync(configurations, organization, project, view, annotationKey, cancellationToken);
 
         if (stored.Content is null)

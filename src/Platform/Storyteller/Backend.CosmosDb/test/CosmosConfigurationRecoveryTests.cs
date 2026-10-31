@@ -408,27 +408,53 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         row["Content"]!["a"]!.Value<int>().Should().Be(1);
     }
 
-    [Fact]
-    public async Task Patch_OfACacheRow_ContinuesAfterTheArchivedVersions()
+    // The sequence of 424-100: a clear or a delete keeps versions 1 and 2, and a read caches the inherited document. A
+    // patch of that cache row writes nothing, and the next writes continue after the archived versions.
+    [Theory]
+    [InlineData("clear")]
+    [InlineData("delete")]
+    public async Task Patch_OfACacheRow_IsRefused_AndTheNextWritesContinueAfterTheArchivedVersions(string operation)
     {
-        var (responsibility, unitOfExecution) = await CreateTreeAsync("rec-cache-row");
+        var (responsibility, unitOfExecution) = await CreateTreeAsync($"rec-cache-row-{operation}");
         var unit = FullKey.Create(unitOfExecution.Annotation.GetUnitKey(), unitOfExecution);
         await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
         await Configurations.CreateOrUpdateConfigurationAsync(unit, JObject.Parse("""{ "u": 1 }"""), AuditActor.System);
         await Configurations.CreateOrUpdateConfigurationAsync(unit, JObject.Parse("""{ "u": 2 }"""), AuditActor.System);
-        await Configurations.ClearConfigurationAsync(unit);
+
+        if (operation == "clear")
+        {
+            (await Configurations.ClearConfigurationAsync(unit)).Should().BeTrue();
+        }
+        else
+        {
+            await Configurations.DeleteAsync(unit);
+        }
 
         // the read caches the inherited document in a row of version 0
-        await Configurations.GetRawConfigurationAsync(unit);
+        (await Configurations.GetRawConfigurationAsync(unit))!.Content["a"]!.Value<int>().Should().Be(1);
         (await ReadRowAsync(unit))["Version"]!.Value<ulong>().Should().Be(0);
         (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(new uint[] { 1, 2 }, "a cache row is no version");
         (await Configurations.GetConfigurationVersionContentAsync(unit, 0)).Should().BeNull("a cache row has no stored content");
 
-        var patched = await Configurations.PatchConfigurationAsync(unit, JArray.Parse("""[{ "op": "add", "path": "/u", "value": 3 }]"""), AuditActor.System);
+        await FluentActions.Awaiting(() => Configurations.PatchConfigurationAsync(unit, JArray.Parse("""[{ "op": "add", "path": "/u", "value": 3 }]"""), AuditActor.System))
+            .Should().ThrowAsync<ConfigurationNotFoundException>();
 
-        patched.Version.Should().Be(3);
+        var row = await ReadRowAsync(unit);
+        row["Version"]!.Value<ulong>().Should().Be(0);
+        row["Content"]!.HasValues.Should().BeFalse();
         (await HasItemAsync(unit, HistoryId(unit, 0))).Should().BeFalse();
+        (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(1U, 2U);
+        (await Configurations.GetConfigurationVersionContentAsync(unit, 1))!.Content["u"]!.Value<int>().Should().Be(1);
+        (await Configurations.GetConfigurationVersionContentAsync(unit, 2))!.Content["u"]!.Value<int>().Should().Be(2);
+
+        // a write over the cache row starts after the archived versions, and the one after it archives that version
+        (await Configurations.CreateOrUpdateConfigurationAsync(unit, JObject.Parse("""{ "u": 3 }"""), AuditActor.System)).Version.Should().Be(3);
         (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(1U, 2U, 3U);
+        (await Configurations.GetConfigurationVersionContentAsync(unit, 1))!.Content["u"]!.Value<int>().Should().Be(1);
+
+        (await Configurations.CreateOrUpdateConfigurationAsync(unit, JObject.Parse("""{ "u": 4 }"""), AuditActor.System)).Version.Should().Be(4);
+        (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(1U, 2U, 3U, 4U);
+        (await Configurations.GetConfigurationVersionContentAsync(unit, 3))!.Content["u"]!.Value<int>().Should().Be(3);
     }
 
     [Fact]
@@ -444,11 +470,39 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
 
         (await Configurations.GetConfigurationVersionsAsync(unit)).Should().BeEmpty();
         (await Configurations.GetConfigurationVersionContentAsync(unit, 0)).Should().BeNull();
+
+        // nothing is stored to patch: a change, an empty patch and a test that fails on {} are all refused alike
+        string[] patches = ["""[{ "op": "add", "path": "/u", "value": 1 }]""", "[]", """[{ "op": "test", "path": "/a", "value": 1 }]"""];
+
+        foreach (var patch in patches)
+        {
+            await FluentActions.Awaiting(() => Configurations.PatchConfigurationAsync(unit, JArray.Parse(patch), AuditActor.System))
+                .Should().ThrowAsync<ConfigurationNotFoundException>();
+        }
+
+        (await ReadRowAsync(unit))["Version"]!.Value<ulong>().Should().Be(0);
+        (await HasItemAsync(unit, HistoryId(unit, 0))).Should().BeFalse();
+        (await Configurations.GetConfigurationVersionsAsync(unit)).Should().BeEmpty();
+    }
+
+    // What the old patch path archived of a cache row: an empty version 0, which neither the list nor the read shows.
+    [Fact]
+    public async Task EmptyArchiveOfVersionZero_IsNoVersion()
+    {
+        var (responsibility, unitOfExecution) = await CreateTreeAsync("rec-empty-archive-zero");
+        var unit = FullKey.Create(unitOfExecution.Annotation.GetUnitKey(), unitOfExecution);
+        await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+        await Configurations.GetRawConfigurationAsync(unit);
+        await InsertHistoryAsync(unit, 0, await ReadRowAsync(unit));
+
+        (await Configurations.GetConfigurationVersionContentAsync(unit, 0)).Should().BeNull();
+        (await Configurations.GetConfigurationVersionsAsync(unit)).Should().BeEmpty();
     }
 
     [Theory]
     [InlineData("write")]
     [InlineData("import")]
+    [InlineData("patch")]
     public async Task EmptiedVersion_IsArchived(string operation)
     {
         var responsibility = await CreateResponsibilityAsync($"rec-emptied-{operation}");
@@ -459,24 +513,132 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         // an empty document over the emptied version changes nothing
         (await Configurations.CreateOrUpdateConfigurationAsync(responsibility, new JObject(), AuditActor.System)).Version.Should().Be(2);
 
-        if (operation == "write")
+        switch (operation)
         {
-            (await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "b": 1 }"""), AuditActor.System)).Version.Should().Be(3);
-        }
-        else
-        {
-            var result = await Configurations.ImportConfigurationAsync(
-                responsibility,
-                JObject.Parse("""{ "b": 1 }"""),
-                new ViewImportOptions { Actor = AuditActor.System },
-                new ViewImportOverlay());
-            result.Version.Should().Be(3);
+            case "write":
+                (await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "b": 1 }"""), AuditActor.System)).Version.Should().Be(3);
+                break;
+
+            case "import":
+                var result = await Configurations.ImportConfigurationAsync(
+                    responsibility,
+                    JObject.Parse("""{ "b": 1 }"""),
+                    new ViewImportOptions { Actor = AuditActor.System },
+                    new ViewImportOverlay());
+                result.Version.Should().Be(3);
+                break;
+
+            default:
+                // the emptied version is a written version, so a patch of it writes the next one
+                (await Configurations.PatchConfigurationAsync(responsibility, JArray.Parse("""[{ "op": "add", "path": "/b", "value": 1 }]"""), AuditActor.System)).Version.Should().Be(3);
+                break;
         }
 
         (await HasItemAsync(responsibility, HistoryId(responsibility, 2))).Should().BeTrue();
         (await Configurations.GetConfigurationVersionsAsync(responsibility)).Select(version => version.Version).Should().Equal(1U, 2U, 3U);
         var changes = await Configurations.GetConfigurationVersionChangesAsync(responsibility, 3);
         changes.Should().NotBeNull();
+    }
+
+    // The Admin UI's "Create empty" stores {} as version 1, and its first save patches it.
+    [Fact]
+    public async Task Patch_OfAnEmptyFirstVersion_WritesTheNextVersion()
+    {
+        var responsibility = await CreateResponsibilityAsync("rec-empty-first");
+        (await Configurations.CreateOrUpdateConfigurationAsync(responsibility, new JObject(), AuditActor.System)).Version.Should().Be(1);
+
+        var patched = await Configurations.PatchConfigurationAsync(responsibility, JArray.Parse("""[{ "op": "add", "path": "/a", "value": 1 }]"""), AuditActor.System);
+
+        patched.Version.Should().Be(2);
+        patched.Content["a"]!.Value<int>().Should().Be(1);
+        (await HasItemAsync(responsibility, HistoryId(responsibility, 1))).Should().BeTrue("the empty version 1 is archived");
+        (await Configurations.GetConfigurationVersionsAsync(responsibility)).Select(version => version.Version).Should().Equal(1U, 2U);
+    }
+
+    // A clear whose invalidation failed is finished by a patch that finds nothing stored, with or without a cache row
+    // that a read created after the clear.
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("cache-row")]
+    public async Task FailedClearInvalidation_IsCompletedByARefusedPatch(string state)
+    {
+        var (responsibility, unitOfExecution) = await CreateTreeAsync($"rec-clear-patch-{state}");
+        var unit = FullKey.Create(unitOfExecution.Annotation.GetUnitKey(), unitOfExecution);
+        var (configs, storage) = CreateService();
+        await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+        await Configurations.CreateOrUpdateConfigurationAsync(unit, JObject.Parse("""{ "u": 1 }"""), AuditActor.System);
+        await Configurations.GetRawConfigurationAsync(unitOfExecution);
+
+        storage.Interceptor.BeforeBatch = FailInvalidation;
+        await FluentActions.Awaiting(() => configs.ClearConfigurationAsync(unit)).Should().ThrowAsync<ConfigurationStorageException>();
+        (await HasCachedCalculationAsync(unitOfExecution)).Should().BeTrue("the invalidation failed");
+
+        if (state == "cache-row")
+        {
+            (await Configurations.GetRawConfigurationAsync(unit))!.Content["a"]!.Value<int>().Should().Be(1);
+            (await ReadRowAsync(unit))["Version"]!.Value<ulong>().Should().Be(0);
+        }
+
+        storage.Interceptor.Reset();
+        await FluentActions.Awaiting(() => configs.PatchConfigurationAsync(unit, JArray.Parse("""[{ "op": "add", "path": "/u", "value": 2 }]"""), AuditActor.System))
+            .Should().ThrowAsync<ConfigurationNotFoundException>();
+
+        (await HasCachedCalculationAsync(unitOfExecution)).Should().BeFalse();
+        (await ReadItemAsync(unit, HistoryId(unit, 1))).ContainsKey("PendingInvalidationId").Should().BeFalse();
+        var effective = (await Configurations.GetRawConfigurationAsync(unitOfExecution))!.Content;
+        effective["a"]!.Value<int>().Should().Be(1);
+        effective.Should().NotContainKey("u");
+    }
+
+    // A soft delete marks the cache row too, so the patch answers that the annotation is deleted, not that nothing is
+    // stored.
+    [Fact]
+    public async Task Patch_OfACacheRow_OfADeletedAnnotation_AnswersAnnotationDeleted()
+    {
+        var (responsibility, unitOfExecution) = await CreateTreeAsync("rec-cache-row-deleted");
+        var unit = FullKey.Create(unitOfExecution.Annotation.GetUnitKey(), unitOfExecution);
+        await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+        await Configurations.GetRawConfigurationAsync(unit);
+        (await ReadRowAsync(unit))["Version"]!.Value<ulong>().Should().Be(0);
+        await Annotations.DeleteAnnotationAsync(unit);
+
+        var failure = await FluentActions.Awaiting(() => Configurations.PatchConfigurationAsync(unit, JArray.Parse("""[{ "op": "add", "path": "/u", "value": 1 }]"""), AuditActor.System))
+            .Should().ThrowAsync<ConflictException>();
+
+        failure.Which.ErrorCode.Should().Be(ErrorCodes.AnnotationDeleted);
+    }
+
+    [Fact]
+    public async Task Patch_OfARowThatBecomesACacheRow_IsRefusedOnTheRetry()
+    {
+        var (responsibility, unitOfExecution) = await CreateTreeAsync("rec-patch-turns-cache-row");
+        var unit = FullKey.Create(unitOfExecution.Annotation.GetUnitKey(), unitOfExecution);
+        var (configs, storage) = CreateService();
+        await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+        await Configurations.CreateOrUpdateConfigurationAsync(unit, JObject.Parse("""{ "u": 1 }"""), AuditActor.System);
+        var rowId = RowId(unit);
+        var cleared = false;
+
+        // between the patch's read and its write, a clear and a read put a cache row in place of the version
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (batch.Contains(BatchOperationKind.Replace, rowId) && !cleared)
+            {
+                cleared = true;
+                await Configurations.ClearConfigurationAsync(unit);
+                await Configurations.GetRawConfigurationAsync(unit);
+            }
+
+            return null;
+        };
+
+        await FluentActions.Awaiting(() => configs.PatchConfigurationAsync(unit, JArray.Parse("""[{ "op": "replace", "path": "/u", "value": 2 }]"""), AuditActor.System))
+            .Should().ThrowAsync<ConfigurationNotFoundException>();
+
+        cleared.Should().BeTrue();
+        (await ReadRowAsync(unit))["Version"]!.Value<ulong>().Should().Be(0);
+        (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(1U);
+        (await Configurations.GetConfigurationVersionContentAsync(unit, 1))!.Content["u"]!.Value<int>().Should().Be(1);
     }
 
     [Fact]

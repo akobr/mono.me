@@ -359,7 +359,7 @@ public partial class ConfigurationHttp
     [OpenApiRequestBody("application/json-patch+json", typeof(JArray), Description = "A JSON Patch document (RFC 6902) containing the operations to apply.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The patched configuration.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The configuration doesn't exist or has no content to patch.")]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The configuration has no stored version to patch: it was never written, or it was deleted.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The patch violates the configuration schema, the annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
