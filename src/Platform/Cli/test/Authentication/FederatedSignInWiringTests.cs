@@ -177,6 +177,6 @@ public class FederatedSignInWiringTests : IDisposable
     private async Task<AnnotationsResponse> CallAsync()
     {
         _provider!.GetRequiredService<ICommandContext>().TrySetExplicitTarget("acme.billing", null);
-        return await _provider!.GetRequiredService<IAnnotationsApiClient>().GetAnnotationsAsync("acme", "billing", "default", null, null, null);
+        return await _provider!.GetRequiredService<IAnnotationsApiClient>().GetAnnotationsAsync("acme", "billing", "default");
     }
 }

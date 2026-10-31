@@ -176,8 +176,7 @@ public class StorytellerDeleteCommand : BaseContextCommand
             annotationKey,
             "all",
             null,
-            includeInactive: true,
-            includeDeleted: null);
+            includeInactive: true);
 
         var count = response.Annotations?.Count ?? 0;
         var more = string.IsNullOrWhiteSpace(response.ContinuationToken) ? string.Empty : "+";

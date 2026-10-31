@@ -73,8 +73,8 @@ public class KeyValueDiffCommand : KeyValueCommandBase
         }
 
         var diff = from is null
-            ? await KeyValues.GetKeyValueVersionDiffAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, to.Value, null)
-            : await KeyValues.GetKeyValueVersionDiffCustomAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, to.Value, from.Value, null);
+            ? await KeyValues.GetKeyValueVersionDiffAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, to.Value)
+            : await KeyValues.GetKeyValueVersionDiffCustomAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, to.Value, from.Value);
 
         Console.WriteDiffResult(diff);
         return ExitCodes.SUCCESS;

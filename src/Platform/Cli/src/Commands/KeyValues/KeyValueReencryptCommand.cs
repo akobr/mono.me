@@ -50,7 +50,7 @@ public class KeyValueReencryptCommand : KeyValueBulkCommandBase
 
         foreach (var key in keys)
         {
-            var pair = await KeyValues.GetKeyValueAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, true, null);
+            var pair = await KeyValues.GetKeyValueAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, true);
 
             if (!KeyValueLevels.IsClientEncrypted(pair.Protection) || pair.Value is null)
             {

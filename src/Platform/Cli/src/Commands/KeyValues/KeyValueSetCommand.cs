@@ -114,7 +114,7 @@ public class KeyValueSetCommand : KeyValueCommandBase
 
         try
         {
-            var existing = await KeyValues.GetKeyValueAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, null, null);
+            var existing = await KeyValues.GetKeyValueAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key);
 
             // the write keeps the stored level; the value is still read and encrypted for that level
             return (null, Enum.Parse<KeyValueProtection>(existing.Protection.ToString()));
