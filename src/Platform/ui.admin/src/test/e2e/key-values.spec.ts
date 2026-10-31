@@ -169,6 +169,26 @@ test('loads the versions only when the tab opens', async ({ page }, testInfo) =>
   expect(versionRequests.length).toBeGreaterThan(0)
 })
 
+// A secret version revealed or compared in the versions panel is a reveal in the audit trail, as the API records it (424-101).
+test('reveals and compares secret versions, and the audit trail records both', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await openKey(page, 'db.password', testInfo)
+  await page.getByRole('link', { name: 'Versions' }).click()
+  const rows = page
+    .getByRole('table')
+    .filter({ has: page.getByRole('columnheader', { name: 'Expires' }) })
+    .getByRole('row')
+  await rows.filter({ hasText: 'v1' }).getByRole('button', { name: 'Reveal' }).click()
+  await expect(page.getByText('s3cret-billing-1').first()).toBeVisible()
+  await rows.filter({ hasText: 'v2' }).getByRole('button', { name: 'Compare' }).click()
+  await expect(page.getByRole('button', { name: 'Close the comparison' })).toBeVisible()
+
+  await goto(page, '/acme/billing/monitor?tab=audit')
+  const reveals = page.getByRole('row').filter({ hasText: 'Reveal' }).filter({ hasText: 'db.password' })
+  await expect(reveals.filter({ hasText: 'version 1' })).toHaveCount(1)
+  await expect(reveals.filter({ hasText: 'diff 1..2' })).toHaveCount(2)
+})
+
 // The switcher keeps Values store, without the open key, and the selection stays behind with its project (424-68).
 test('the switcher keeps Values store, without the key and the selection', async ({ page }, testInfo) => {
   test.skip(isMobile(testInfo), 'The view switcher of the top bar is hidden on a phone')

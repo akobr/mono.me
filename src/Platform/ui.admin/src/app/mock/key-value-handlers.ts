@@ -700,8 +700,11 @@ const viewHandlers: HttpHandler[] = [
         return errorResponse(404, `The version ${params.version} of the key '${params.key}' does not exist.`, 'KeyValueNotFound')
       }
       const reveal = new URL(request.url).searchParams.get('reveal') === 'true'
-      if (reveal && isSecret(version.Protection) && !hasSecretRights(db, projectKey)) {
-        return errorResponse(403, `The key '${stored.Key}' is a secret; the caller has no rights to secrets.`, 'AccessDenied')
+      if (reveal && isSecret(version.Protection)) {
+        if (!hasSecretRights(db, projectKey)) {
+          return errorResponse(403, `The key '${stored.Key}' is a secret; the caller has no rights to secrets.`, 'AccessDenied')
+        }
+        recordAudit(db, projectKey, { Operation: 'Reveal', View: params.view, Key: stored.Key, Version: version.Version, Protection: version.Protection, Detail: `version ${version.Version}` })
       }
       return HttpResponse.json(toKeyValue(stored, version, reveal))
     }),
@@ -739,6 +742,13 @@ const viewHandlers: HttpHandler[] = [
         const after = text(to)
         if (before === undefined || after === undefined) {
           return errorResponse(404, `A version of the key '${params.key}' does not exist.`, 'KeyValueNotFound')
+        }
+        // like the API: each secret version of the diff is a reveal, recorded once both sides resolved
+        for (const version of new Set([from, to])) {
+          const entry = stored?.Versions.find((candidate) => candidate.Version === version)
+          if (stored && entry && isSecret(entry.Protection)) {
+            recordAudit(db, projectKey, { Operation: 'Reveal', View: params.view, Key: stored.Key, Version: entry.Version, Protection: entry.Protection, Detail: `diff ${from}..${to}` })
+          }
         }
         return HttpResponse.json(diffTexts(before, after))
       } catch (error) {
