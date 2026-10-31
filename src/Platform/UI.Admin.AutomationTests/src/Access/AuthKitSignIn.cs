@@ -13,7 +13,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Access;
 // the code and opens the shell. The hosted page is WorkOS' own UI, not the admin UI's: its steps use WorkOS' labels
 // (Email, Continue, Password, Sign in), so a change on WorkOS' side fails SignIn_ShowsOrganizations first. The AuthKit
 // environment needs password authentication, no MFA for the pool users, verified e-mails and the admin host's
-// /callback as a redirect URI (README.md, "AuthKit checklist").
+// /callback as a redirect URI (docs/Platform/UI.Admin.AutomationTests/automation-tests.md, "AuthKit checklist").
 //
 // authkit-js refreshes the session on every page load and AuthKit rotates the refresh token, so the runtime carries
 // the cookies (the session on the auth domain) and the workos:* items (the tokens in local storage on localhost) of a

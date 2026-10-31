@@ -18,10 +18,11 @@ using _42.Testing.UI.Automation.Runtime.TUnit;
 namespace _42.Platform.UI.Admin.AutomationTests;
 
 // What the Platform adds to the UI automation runtime: the AuthKit sign-in (Target:SignIn AuthKit, the default; None
-// for the mock target), the reporters Reporting:Systems may select (Testiny) and the checks of its own settings.
+// for the mock target), the reporters Reporting:Systems may select (Testiny), the checks of its own settings, and the
+// check of the target before the first test (the organization, project and view exist and a pool user may open them).
 public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
 {
-    public string ReadmeHint => "src/Platform/UI.Admin.AutomationTests/README.md";
+    public string ReadmeHint => "docs/Platform/UI.Admin.AutomationTests/automation-tests.md";
 
     public IReadOnlyList<ISignInFlow> SignInFlows { get; } = [new AuthKitSignIn()];
 
@@ -49,8 +50,15 @@ public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
 
         if (settings.Users.Pool.Count == 0)
         {
-            errors.Add("Users:Pool is empty; add the pre-provisioned users to testsettings.local.json and their passwords to the user secrets (README.md, \"Configure\").");
+            errors.Add("Users:Pool is empty; add the pre-provisioned users to testsettings.local.json and their passwords to the user secrets (docs/Platform/UI.Admin.AutomationTests/automation-tests.md, \"Configure\").");
         }
+    }
+
+    // Once per run, before the first test, as a pool user (PlatformTargetCheck); a failure fails every UI test at once.
+    public Task CheckTargetAsync(TargetCheckContext context, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return new PlatformTargetCheck(context.Page, context.Settings.Bind<PlatformTarget>(PlatformTarget.Section), context.User).RunAsync();
     }
 
     private static void RequireName(string value, string setting, ICollection<string> errors)

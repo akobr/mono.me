@@ -15,6 +15,8 @@ public sealed record AppRoutes(string Organization, string Project, string View)
 
     public string Settings => $"{Organization}/{Project}/settings";
 
+    public string Views => $"{Organization}/{Project}/views";
+
     public string Annotations => $"{ViewPath}/annotations";
 
     public string Configurations => $"{ViewPath}/configurations";

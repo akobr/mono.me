@@ -1,6 +1,7 @@
 {
-  // The committed defaults; README.md lists every layer above them. No secrets here: passwords and keys go to the
-  // user secrets (or UITESTS_* variables in CI). Without Target:BaseUrl every test is skipped.
+  // The committed defaults; docs/Platform/UI.Admin.AutomationTests/automation-tests.md ("Configure") lists every
+  // layer above them. No secrets here: passwords and keys go to the user secrets (or UITESTS_* variables in CI).
+  // Without Target:BaseUrl every test is skipped.
   "Target": {
     "BaseUrl": "",
     "Organization": "ui-tests",

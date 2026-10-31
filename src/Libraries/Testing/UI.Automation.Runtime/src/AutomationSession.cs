@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using System.Runtime.ExceptionServices;
 using _42.Testing.UI.Automation.Runtime.Access;
 using _42.Testing.UI.Automation.Runtime.Artifacts;
 using _42.Testing.UI.Automation.Runtime.Browsers;
@@ -15,9 +16,10 @@ namespace _42.Testing.UI.Automation.Runtime;
 // One run of a UI suite, engine-neutral: the engine adapter starts it once before the first test and stops it after
 // the last. It holds the run id (yyyyMMdd-HHmmss-xxxx) and the data seed, the browser provider, the context options,
 // the user pool, the cached sign-ins and the reporting dispatcher. Start fails fast: unknown sign-in flow, a pool that
-// cannot lease, browsers that do not launch, an unknown device or a reporter that refuses its settings stop the run
-// before any test, and before a reporter creates a run; a failure after the reporters started completes their runs
-// and disposes them. No static state: the adapter keeps the current session.
+// cannot lease, browsers that do not launch, an unknown device, a reporter that refuses its settings or a target the
+// setup's check refuses (AutomationSessionOptions.TargetCheck) stop the run before any test, and before a reporter
+// creates a run; a failure after the reporters started completes their runs and disposes them. No static state: the
+// adapter keeps the current session.
 public sealed class AutomationSession : IAsyncDisposable
 {
     private const string RunIdCharacters = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -127,7 +129,8 @@ public sealed class AutomationSession : IAsyncDisposable
         var values = RunNameValues.For(settings, runId, TimeZoneInfo.ConvertTime(startedAt, timeProvider.LocalTimeZone), environment);
         var providerContext = new BrowserProviderContext(settings, values)
         {
-            PlannedTests = options.PlannedTests,
+            // The check's scope is one more test of the provider, so a session per class closes once it is done.
+            PlannedTests = options.TargetCheck is null ? options.PlannedTests : [.. options.PlannedTests, TargetCheckContext.Test],
             Logger = logger,
             TimeProvider = timeProvider,
         };
@@ -137,6 +140,7 @@ public sealed class AutomationSession : IAsyncDisposable
 
         IReadOnlyList<ITestRunReporter> reporters = [];
         ReportingDispatcher? reporting = null;
+        var reportingStarted = false;
         try
         {
             var contextOptions = new ContextOptionsFactory(settings, browserProvider.Devices);
@@ -151,16 +155,22 @@ public sealed class AutomationSession : IAsyncDisposable
             dispatcherOptions.TimeProvider = timeProvider;
 
             reporting = new ReportingDispatcher(reporters, dispatcherOptions, logger);
-            await reporting.StartAsync(run, options.PlannedTests, cancellationToken);
-
             var session = new AutomationSession(
                 settings, runId, seed, startedAt, runDirectory, run, browserProvider, contextOptions, signInFlow, users, reporting, fileSystem, timeProvider, logger);
             session.LogStart();
+
+            if (options.TargetCheck is { } check)
+            {
+                await session.CheckTargetAsync(check, cancellationToken);
+            }
+
+            reportingStarted = true;
+            await reporting.StartAsync(run, options.PlannedTests, cancellationToken);
             return session;
         }
         catch
         {
-            await AbandonReportingAsync(reporting, reporters, logger);
+            await AbandonReportingAsync(reportingStarted ? reporting : null, reporters, logger);
             await browserProvider.DisposeAsync();
             throw;
         }
@@ -396,7 +406,7 @@ public sealed class AutomationSession : IAsyncDisposable
     }
 
     // After a start that failed: completes the runs of started reporters (the dispatcher disposes them), or disposes
-    // reporters that no dispatcher took over. Never throws, so the start's own error is the one that surfaces.
+    // reporters that no dispatcher started. Never throws, so the start's own error is the one that surfaces.
     private static async Task AbandonReportingAsync(ReportingDispatcher? reporting, IReadOnlyList<ITestRunReporter> reporters, ILogger logger)
     {
         if (reporting is null)
@@ -421,6 +431,51 @@ public sealed class AutomationSession : IAsyncDisposable
         {
             logger.LogInformation("{System} run: {Url}", system, url);
         }
+    }
+
+    // The setup's check of the target, once, before any reporter creates a run: in a scope of its own
+    // (TargetCheckContext.Test) with a leased user and a signed-in page, whose artifacts follow the Execution policies
+    // and which is not reported. Any exception of the check becomes a TargetCheckException that names its artifacts.
+    private async Task CheckTargetAsync(Func<TargetCheckContext, CancellationToken, Task> check, CancellationToken cancellationToken)
+    {
+        await using var scope = TestScope.Create(this, TargetCheckContext.Test);
+        Exception? failure = null;
+        try
+        {
+            await scope.BeginAsync(cancellationToken);
+            await check(new TargetCheckContext(scope), cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+
+        var cancelled = failure is OperationCanceledException && cancellationToken.IsCancellationRequested;
+        var outcome = failure is null ? TestOutcome.Passed : cancelled ? TestOutcome.Cancelled : TestOutcome.Failed;
+        var user = scope.HasUser ? scope.User.ToString() : "no user";
+        var report = await scope.EndAsync(outcome, failure, report: false);
+        try
+        {
+            BrowserProvider.TestCompleted(TargetCheckContext.Test);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "The browser provider did not take the end of the target check.");
+        }
+
+        if (cancelled)
+        {
+            ExceptionDispatchInfo.Throw(failure!);
+        }
+
+        if (failure is not null)
+        {
+            var reason = failure is TargetCheckException ? failure.Message : $"{failure.GetType().Name}: {failure.Message}";
+            var artifacts = report.Artifacts.Count > 0 ? $" The check's {string.Join(", ", report.Artifacts.Select(artifact => artifact.Name))} are in {scope.Artifacts.Directory}." : string.Empty;
+            throw new TargetCheckException($"The target check failed: {reason}{artifacts}", failure);
+        }
+
+        Logger.LogInformation("The target check passed in {Seconds:0.0} s with {User}.", report.Duration.TotalSeconds, user);
     }
 
     private void LogStart()

@@ -52,6 +52,10 @@ public sealed partial class App
     // action.
     public ILocator Notifications => Page.GetByRole(AriaRole.Region, new() { Name = "Notifications (F8)", Exact = true, IncludeHidden = true });
 
+    // Shown instead of the page of an organization or a project the user has no role in (or that does not exist: the
+    // app tells them apart only by the user's memberships).
+    public ILocator NoAccessHeading => Page.GetByRole(AriaRole.Heading, new() { Name = "You have no access here", Exact = true });
+
     public bool HasDockedSidebar => Page.ViewportSize is not { Width: < DockedSidebarWidth };
 
     public bool IsPhone => Page.ViewportSize is { Width: < PhoneWidth };
@@ -139,6 +143,13 @@ public sealed partial class App
         await Expect(best).ToHaveAccessibleNameAsync(new Regex($"^{Regex.Escape(command)}"));
         await best.ClickAsync();
         await Expect(CommandPalette).ToBeHiddenAsync();
+    }
+
+    // The href of every link of the page outside the navigation (the sidebar and its slideover are nav elements), for a
+    // page object that lists what the page links to.
+    internal async Task<IReadOnlyList<string>> ContentLinksAsync()
+    {
+        return await Page.Locator("a[href]").EvaluateAllAsync<string[]>("links => links.filter(link => !link.closest('nav')).map(link => link.getAttribute('href') ?? '')");
     }
 
     // Adds name=value to the query of a path, before its #fragment.
