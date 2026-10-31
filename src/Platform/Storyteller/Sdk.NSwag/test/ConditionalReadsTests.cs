@@ -52,6 +52,26 @@ public class ConditionalReadsTests
         return data;
     }
 
+    [Fact]
+    public async Task TheComposition_A200ThenA304_SendsTheTagBackAndReturnsNoBody()
+    {
+        _http.Respond(HttpStatusCode.OK, """{ "AnnotationKey": "sbt.northwind", "Hash": "a1b2c3d4" }""", ("ETag", WeakTag));
+        _http.Respond(HttpStatusCode.NotModified, null, ("ETag", WeakTag));
+        var client = CreateClient();
+
+        var first = await client.GetConfigurationCompositionConditionalAsync("acme", "billing", "default", "sbt.northwind", null);
+        var second = await client.GetConfigurationCompositionConditionalAsync("acme", "billing", "default", "sbt.northwind", first.ETag);
+
+        first.StatusCode.ShouldBe(200);
+        first.Result.ShouldNotBeNull().Hash.ShouldBe("a1b2c3d4");
+        first.ETag.ShouldBe(WeakTag);
+        second.IsNotModified.ShouldBeTrue();
+        second.Result.ShouldBeNull();
+        second.ETag.ShouldBe(WeakTag);
+        _http.Requests[0].Uri.AbsolutePath.ShouldBe("/api/v1/acme/billing/default/configuration/sbt.northwind/composition");
+        _http.Requests[1].Headers["If-None-Match"].ShouldBe(WeakTag);
+    }
+
     [Theory]
     [InlineData(false, "/api/v1/acme/billing/default/configuration/sbt.northwind")]
     [InlineData(true, "/api/v1/acme/billing/default/configuration/sbt.northwind/resolved")]
