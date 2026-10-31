@@ -130,7 +130,8 @@ public static class EntryPoint
                     && options.PatternMatchTimeout <= ConfigurationSchemaOptions.MaxPatternMatchTimeout
                     && options.CheckBudget >= ConfigurationSchemaOptions.MinCheckBudget
                     && options.CheckBudget <= ConfigurationSchemaOptions.MaxCheckBudget,
-                $"{ConfigurationSchemaOptions.SectionName}:{nameof(ConfigurationSchemaOptions.PatternMatchTimeout)} must be between 10 ms and 10 s, and {nameof(ConfigurationSchemaOptions.CheckBudget)} between 1 s and 5 min.");
+                $"{ConfigurationSchemaOptions.SectionName}:{nameof(ConfigurationSchemaOptions.PatternMatchTimeout)} must be between 10 ms and 10 s, and {nameof(ConfigurationSchemaOptions.CheckBudget)} between 1 s and 5 min.")
+            .ValidateOnStart();
 
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
