@@ -286,6 +286,63 @@ public sealed class ConfigurationSchemaCheckerTests : IDisposable
         exception.Message.Should().Contain("applies itself to the same value again");
     }
 
+    // NJsonSchema's IsNullable uses more stack per level than the guard's walk, so the walk is limited by a fixed depth:
+    // on a 1.5 MiB stack, like a thread-pool thread, no length of the chain may pass the guard and then overflow
+    [Theory]
+    [InlineData(100, null)]
+    [InlineData(300, ErrorCodes.InvalidSchema)]
+    [InlineData(1_524, ErrorCodes.InvalidSchema)]
+    [InlineData(1_550, ErrorCodes.InvalidSchema)]
+    [InlineData(1_600, ErrorCodes.InvalidSchema)]
+    public async Task Validate_OfANullValueWhoseSchemaIsALongChainOfOneOf_NeverOverflowsTheStack(int levels, string expectedCode)
+    {
+        var definitions = new JObject { [$"d{levels}"] = new JObject { ["type"] = "null" } };
+
+        for (var level = 0; level < levels; level++)
+        {
+            definitions[$"d{level}"] = new JObject
+            {
+                ["type"] = "object",
+                ["nullable"] = true,
+                ["oneOf"] = new JArray(new JObject { ["$ref"] = $"#/definitions/d{level + 1}" }),
+            };
+        }
+
+        var checker = Checker();
+        var schema = await checker.ParseAsync(new JObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JObject { ["x"] = new JObject { ["$ref"] = "#/definitions/d0" } },
+            ["definitions"] = definitions,
+        });
+        Exception failure = null;
+
+        var thread = new Thread(
+            () =>
+            {
+                try
+                {
+                    checker.Validate(schema, JObject.Parse("""{ "x": null }"""));
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                }
+            },
+            maxStackSize: 1536 * 1024);
+        thread.Start();
+        thread.Join();
+
+        if (expectedCode is null)
+        {
+            failure.Should().BeNull();
+        }
+        else
+        {
+            failure.Should().BeOfType<InvalidInputException>().Which.ErrorCode.Should().Be(expectedCode);
+        }
+    }
+
     // without a cycle, IsNullable still takes exponential time over a graph of oneOf references, within one step
     [Fact]
     public async Task Validate_OfANullValueWhoseSchemaIsAGraphOfOneOf_IsASchemaValidationTimeoutWithoutTheClock()

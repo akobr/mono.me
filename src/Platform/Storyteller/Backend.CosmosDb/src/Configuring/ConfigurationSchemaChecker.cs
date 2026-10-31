@@ -33,6 +33,11 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
     // Far more calls of NJsonSchema's IsNullable than any schema needs for one value (a few milliseconds).
     private const int MaxNullabilityCalls = 100_000;
 
+    // Far deeper than any chain of oneOf and references a schema needs. A fixed depth, not the stack left: NJsonSchema's
+    // own walk uses more stack per level than the walk here, so a walk limited by the stack alone could pass here and
+    // then overflow in NJsonSchema.
+    private const int MaxNullabilityDepth = 256;
+
     public static bool IsCheckFailure(InvalidInputException exception)
     {
         return exception.ErrorCode
@@ -305,7 +310,7 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
         // JsonSchema.IsNullable(SchemaType.JsonSchema), call for call (JsonSchemaProperty adds a rule for Swagger 2 only).
         private bool IsNullable(JsonSchema schema)
         {
-            if (!RuntimeHelpers.TryEnsureSufficientExecutionStack())
+            if (_nullabilityPath.Count >= MaxNullabilityDepth || !RuntimeHelpers.TryEnsureSufficientExecutionStack())
             {
                 throw new InsufficientExecutionStackException();
             }
