@@ -507,7 +507,7 @@ public class LastKnownGoodCacheTests
 
             if (!OperatingSystem.IsWindows())
             {
-                fileSystem.DirectoryInfo.New(directory).UnixFileMode.ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+                fileSystem.File.GetUnixFileMode(directory).ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
                 fileSystem.File.GetUnixFileMode(cache.GetPath(identity)).ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
         }
