@@ -96,12 +96,12 @@ public class StorytellerImportCommand : BaseContextCommand
                     Context.OrganizationName,
                     Context.ProjectName,
                     Context.ViewName,
+                    archive,
                     include,
                     existing,
                     IsForced ? true : null,
                     IsDryRun ? true : null,
-                    fileName,
-                    archive);
+                    fileName);
             }
             catch (ApiException exception) when (exception.StatusCode is 400 or 403 or 409 or 413)
             {

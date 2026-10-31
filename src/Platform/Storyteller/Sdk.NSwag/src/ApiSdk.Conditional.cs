@@ -14,24 +14,24 @@ public partial interface IConfigurationsApiClient
 {
     // GET v1/{organization}/{project}/{view}/configuration/{key} with If-None-Match: a 304 is an answer, not an error.
     Task<ConditionalResponse<Configuration>> GetConfigurationConditionalAsync(
-        string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default);
+        string organization, string project, string view, string key, string? ifNoneMatch = null, CancellationToken cancellationToken = default);
 
     // GET v1/{organization}/{project}/{view}/configuration/{key}/resolved with If-None-Match.
     Task<ConditionalResponse<Configuration>> GetResolvedConfigurationConditionalAsync(
-        string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default);
+        string organization, string project, string view, string key, string? ifNoneMatch = null, CancellationToken cancellationToken = default);
 
     // GET v1/{organization}/{project}/{view}/configuration/{key}?format={format} with If-None-Match: the Content alone as
     // flat, properties, env or yaml, as text.
     Task<ConditionalResponse<string>> GetConfigurationFormattedConditionalAsync(
-        string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default);
+        string organization, string project, string view, string key, string format, string? ifNoneMatch = null, CancellationToken cancellationToken = default);
 
     // GET v1/{organization}/{project}/{view}/configuration/{key}/resolved?format={format} with If-None-Match.
     Task<ConditionalResponse<string>> GetResolvedConfigurationFormattedConditionalAsync(
-        string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default);
+        string organization, string project, string view, string key, string format, string? ifNoneMatch = null, CancellationToken cancellationToken = default);
 
     // GET v1/{organization}/{project}/{view}/configuration/{key}/composition with If-None-Match.
     Task<ConditionalResponse<ConfigurationComposition>> GetConfigurationCompositionConditionalAsync(
-        string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default);
+        string organization, string project, string view, string key, string? ifNoneMatch = null, CancellationToken cancellationToken = default);
 }
 
 // Hand-written twins of GetConfigurationAsync, GetResolvedConfigurationAsync and GetConfigurationCompositionAsync of ApiSdk.g.cs: the same route, query,
@@ -51,19 +51,19 @@ public partial class ConfigurationsApiClient
     };
 
     public virtual Task<ConditionalResponse<Configuration>> GetConfigurationConditionalAsync(
-        string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default)
+        string organization, string project, string view, string key, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
     {
         return SendConditionalAsync(organization, project, view, key, false, false, null, JsonMediaType, ReadConfigurationAsync, ifNoneMatch, cancellationToken);
     }
 
     public virtual Task<ConditionalResponse<Configuration>> GetResolvedConfigurationConditionalAsync(
-        string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default)
+        string organization, string project, string view, string key, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
     {
         return SendConditionalAsync(organization, project, view, key, true, false, null, JsonMediaType, ReadConfigurationAsync, ifNoneMatch, cancellationToken);
     }
 
     public virtual async Task<ConditionalResponse<string>> GetConfigurationFormattedConditionalAsync(
-        string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default)
+        string organization, string project, string view, string key, string format, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(format);
 
@@ -71,7 +71,7 @@ public partial class ConfigurationsApiClient
     }
 
     public virtual async Task<ConditionalResponse<string>> GetResolvedConfigurationFormattedConditionalAsync(
-        string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default)
+        string organization, string project, string view, string key, string format, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(format);
 
@@ -79,7 +79,7 @@ public partial class ConfigurationsApiClient
     }
 
     public virtual Task<ConditionalResponse<ConfigurationComposition>> GetConfigurationCompositionConditionalAsync(
-        string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default)
+        string organization, string project, string view, string key, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
     {
         return SendConditionalAsync(organization, project, view, key, false, true, null, JsonMediaType, ReadCompositionAsync, ifNoneMatch, cancellationToken);
     }

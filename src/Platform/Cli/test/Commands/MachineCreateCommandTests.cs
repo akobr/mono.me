@@ -132,7 +132,7 @@ public class MachineCreateCommandTests
         MachineAccessCreate? sent = null;
         _accessApi
             .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
-            .Callback((string _, string _, MachineAccessCreate body) => sent = body)
+            .Callback((string _, string _, MachineAccessCreate body, CancellationToken _) => sent = body)
             .ReturnsAsync(new MachineAccess { Id = "m1", AccessKey = "api-key" });
 
         await Execute();
@@ -151,7 +151,7 @@ public class MachineCreateCommandTests
         MachineAccessCreate? sent = null;
         _accessApi
             .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
-            .Callback((string _, string _, MachineAccessCreate body) => sent = body)
+            .Callback((string _, string _, MachineAccessCreate body, CancellationToken _) => sent = body)
             .ReturnsAsync(new MachineAccess { Id = "m1", AccessKey = string.Empty });
 
         var exitCode = await Execute(value, lifetimeDays: 30);
@@ -169,7 +169,7 @@ public class MachineCreateCommandTests
         MachineAccessCreate? sent = null;
         _accessApi
             .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
-            .Callback((string _, string _, MachineAccessCreate body) => sent = body)
+            .Callback((string _, string _, MachineAccessCreate body, CancellationToken _) => sent = body)
             .ReturnsAsync(new MachineAccess
             {
                 Id = "m1",
@@ -202,7 +202,7 @@ public class MachineCreateCommandTests
         MachineAccessCreate? sent = null;
         _accessApi
             .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
-            .Callback((string _, string _, MachineAccessCreate body) => sent = body)
+            .Callback((string _, string _, MachineAccessCreate body, CancellationToken _) => sent = body)
             .ReturnsAsync(new MachineAccess { Id = "m1", AccessKey = "api-key" });
 
         await Execute("certificate-and-api-key");
@@ -696,7 +696,7 @@ public class MachineCreateCommandTests
         var bodies = new List<MachineAccessCreate>();
         _accessApi
             .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
-            .Callback((string _, string _, MachineAccessCreate body) => bodies.Add(body))
+            .Callback((string _, string _, MachineAccessCreate body, CancellationToken _) => bodies.Add(body))
             .ReturnsAsync(new MachineAccess { Id = "m1", AccessKey = "api-key", CredentialKind = MachineAccessCredentialKind.ApiKey });
         return bodies;
     }

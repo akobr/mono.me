@@ -19,8 +19,10 @@ Use the version that generated `src/ApiSdk.g.cs` (its header names it); another 
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.10.11.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
+nswag openapi2csclient /input:open.api.v0.10.11.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true /GenerateOptionalParameters:true
 ```
+
+`/GenerateOptionalParameters:true` gives each operation one method: the parameters the document marks optional (query, header, and a body it does not mark `required`) come last with `= null`, and `cancellationToken` with `= default`. A required body therefore comes before the optional parameters (`ImportKeyValuesAsync(organization, project, view, body, mode, dryRun, keyPrefix)`, `StartViewImportAsync(organization, project, view, body, include, …)`). Leave out what you don't send, and pass a later argument by name: `GetConfigurationAsync(organization, project, view, key, cancellationToken: cancellationToken)`. The compiler also lets you leave out an optional body, but the API answers a missing body with `400` for most operations.
 
 The OpenAPI document comes from the API test `OpenApiExportTests`: it renders the document with the same engine the Functions host uses, so no running host is needed.
 

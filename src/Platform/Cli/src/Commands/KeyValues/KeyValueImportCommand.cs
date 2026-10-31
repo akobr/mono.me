@@ -72,7 +72,7 @@ public class KeyValueImportCommand : KeyValueCommandBase
 
         Console.WriteHeader($"Import of {document.Items?.Count ?? 0} pair(s) from {File} into {Context.OrganizationName}.{Context.ProjectName} / {Context.ViewName} ({mode})");
 
-        var plan = await KeyValues.ImportKeyValuesAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, mode, true, Prefix, document);
+        var plan = await KeyValues.ImportKeyValuesAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, document, mode, dryRun: true, keyPrefix: Prefix);
         var planCode = Console.WriteImportResult(plan);
 
         if (DryRun || planCode == ExitCodes.WARNING_NO_WORK_NEEDED)
@@ -94,7 +94,7 @@ public class KeyValueImportCommand : KeyValueCommandBase
             return ExitCodes.WARNING_ABORTED;
         }
 
-        var result = await KeyValues.ImportKeyValuesAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, mode, null, Prefix, document);
+        var result = await KeyValues.ImportKeyValuesAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, document, mode, keyPrefix: Prefix);
         Console.WriteLine();
         return Console.WriteImportResult(result);
     }

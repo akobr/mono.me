@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.Storyteller;
 using _42.Platform.Cli.Configuration;
@@ -187,9 +188,9 @@ public class StorytellerSetCommandTests
     {
         _fixture.Api
             .Setup(api => api.RestoreAnnotationsAsync("org1", "proj1", "default", It.IsAny<AnnotationRestoreRequest>()))
-            .Callback<string, string, string, AnnotationRestoreRequest>((_, _, _, request) =>
+            .Callback<string, string, string, AnnotationRestoreRequest, CancellationToken>((_, _, _, request, _) =>
                 _calls.Add($"restore:{string.Join(",", request.Keys)}:{request.Descendants}"))
-            .ReturnsAsync((string _, string _, string _, AnnotationRestoreRequest request) => new AnnotationRestoreResult
+            .ReturnsAsync((string _, string _, string _, AnnotationRestoreRequest request, CancellationToken _) => new AnnotationRestoreResult
             {
                 Annotations = request.Keys.Select(AnnotationCommandFixture.Active).ToList(),
                 CreatedKeys = [],

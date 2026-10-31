@@ -1,4 +1,5 @@
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.KeyValues;
 using _42.Platform.Storyteller.Sdk;
@@ -18,7 +19,7 @@ public class KeyValueBulkAndDeleteCommandTests
     {
         KeyValueBulkRequest? sent = null;
         _api.Setup(api => api.RestoreKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueBulkRequest>()))
-            .Callback<string, string, string, KeyValueBulkRequest>((_, _, _, request) => sent = request)
+            .Callback<string, string, string, KeyValueBulkRequest, CancellationToken>((_, _, _, request, _) => sent = request)
             .ReturnsAsync(KeyValueTestContext.Bulk(("a", KeyValueBulkItemResultOutcome.Done), ("b", KeyValueBulkItemResultOutcome.NotFound)));
 
         var exitCode = await new KeyValueRestoreCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Keys = ["a", "b"] }.OnExecuteAsync();
@@ -64,7 +65,7 @@ public class KeyValueBulkAndDeleteCommandTests
     {
         KeyValueBulkRequest? sent = null;
         _api.Setup(api => api.ProtectKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueBulkRequest>()))
-            .Callback<string, string, string, KeyValueBulkRequest>((_, _, _, request) => sent = request)
+            .Callback<string, string, string, KeyValueBulkRequest, CancellationToken>((_, _, _, request, _) => sent = request)
             .ReturnsAsync(KeyValueTestContext.Bulk(("a", KeyValueBulkItemResultOutcome.Done)));
 
         var @public = await new KeyValueProtectCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Keys = ["a"], Protection = "public" }.OnExecuteAsync();

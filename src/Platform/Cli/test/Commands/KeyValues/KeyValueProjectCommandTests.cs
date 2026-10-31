@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.KeyValues;
 using _42.Platform.Storyteller.KeyValues.ClientEncryption;
@@ -23,7 +24,7 @@ public class KeyValueProjectCommandTests
     {
         KeyValuePolicyUpdate? sent = null;
         _api.Setup(api => api.SetKeyValuePolicyAsync("org1", "proj1", It.IsAny<KeyValuePolicyUpdate>()))
-            .Callback<string, string, KeyValuePolicyUpdate>((_, _, update) => sent = update)
+            .Callback<string, string, KeyValuePolicyUpdate, CancellationToken>((_, _, update, _) => sent = update)
             .ReturnsAsync(new KeyValuePolicy { Version = 2 });
 
         var exitCode = await new KeyValuePolicySetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Allow = ["public", "standard", "HSM"], RequireMtls = "false", HsmRotationDays = 90 }.OnExecuteAsync();
@@ -46,7 +47,7 @@ public class KeyValueProjectCommandTests
     {
         KeyValuePolicyUpdate? sent = null;
         _api.Setup(api => api.SetKeyValuePolicyAsync("org1", "proj1", It.IsAny<KeyValuePolicyUpdate>()))
-            .Callback<string, string, KeyValuePolicyUpdate>((_, _, update) => sent = update)
+            .Callback<string, string, KeyValuePolicyUpdate, CancellationToken>((_, _, update, _) => sent = update)
             .ReturnsAsync(new KeyValuePolicy());
         _api.Setup(api => api.RotateKeyValueKeyAsync("org1", "proj1", It.IsAny<KeyValueRotateRequest>()))
             .ReturnsAsync(new KeyValuePolicy { Standard = new ProtectionKeyInfo { KeyId = "k", CurrentKeyVersion = "v2" }, Rewrap = new RewrapStatus { Protection = RewrapStatusProtection.Standard, TargetKeyVersion = "v2", StartedAt = DateTimeOffset.UnixEpoch, Processed = 0, Remaining = 12 } });
@@ -85,10 +86,10 @@ public class KeyValueProjectCommandTests
     {
         ClientEncryptionRecipientCreate? created = null;
         _api.Setup(api => api.AddRecipientAsync("org1", "proj1", It.IsAny<ClientEncryptionRecipientCreate>()))
-            .Callback<string, string, ClientEncryptionRecipientCreate>((_, _, create) => created = create)
+            .Callback<string, string, ClientEncryptionRecipientCreate, CancellationToken>((_, _, create, _) => created = create)
             .ReturnsAsync(new ClientEncryptionRecipient { Id = "api", Name = "API", IsEnabled = true });
         _api.Setup(api => api.UpdateRecipientAsync("org1", "proj1", "api", It.IsAny<ClientEncryptionRecipientUpdate>()))
-            .ReturnsAsync((string _, string _, string id, ClientEncryptionRecipientUpdate update) => new ClientEncryptionRecipient { Id = id, Name = id, IsEnabled = update.IsEnabled ?? true });
+            .ReturnsAsync((string _, string _, string id, ClientEncryptionRecipientUpdate update, CancellationToken _) => new ClientEncryptionRecipient { Id = id, Name = id, IsEnabled = update.IsEnabled ?? true });
         var files = KeyValueTestContext.Files(("api.pem", "-----BEGIN PUBLIC KEY-----\nMIIB\n-----END PUBLIC KEY-----"));
 
         var added = await new KeyValueRecipientAddCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, files) { Name = "API", PublicKey = "api.pem" }.OnExecuteAsync();
@@ -124,8 +125,8 @@ public class KeyValueProjectCommandTests
         _api.Setup(a => a.GetKeyValueAsync("org1", "proj1", "default", "db.other", true, null))
             .ReturnsAsync(KeyValueTestContext.Pair("db.other", KeyValueProtection.Hyok, ClientSecretEncryptor.Encrypt("x", [new ClientEncryptionRecipientKey("api", RsaPublicJwk.FromRsa(api.Rsa))], "org1/proj1/default/db.other")));
         _api.Setup(a => a.SetKeyValueAsync("org1", "proj1", "default", It.IsAny<string>(), It.IsAny<KeyValueWrite>()))
-            .Callback<string, string, string, string, KeyValueWrite>((_, _, _, key, write) => writes.Add((key, write)))
-            .ReturnsAsync((string _, string _, string _, string key, KeyValueWrite _) => KeyValueTestContext.Pair(key, KeyValueProtection.Hyok, null, 5));
+            .Callback<string, string, string, string, KeyValueWrite, CancellationToken>((_, _, _, key, write, _) => writes.Add((key, write)))
+            .ReturnsAsync((string _, string _, string _, string key, KeyValueWrite _, CancellationToken _) => KeyValueTestContext.Pair(key, KeyValueProtection.Hyok, null, 5));
 
         var exitCode = await new KeyValueReencryptCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Prefix = "db.", PrivateKeyPath = old.PrivateKeyPem, RecipientId = "old" }.OnExecuteAsync();
 
