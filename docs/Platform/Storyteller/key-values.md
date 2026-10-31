@@ -254,7 +254,7 @@ Every endpoint is under `v1/{organization}/{project}` and needs a bearer token (
 
 Base `K` = `v1/{organization}/{project}/{view}/key-values`.
 
-`{view}` of these routes is never `usage`, a reserved view name: the Functions host runs the first function, in the order of the function names, whose route matches, so without that constraint the list `K` would take the project's usage report `v1/{organization}/{project}/usage/key-values`.
+`{view}` of the list (`GET K`) is never `usage`, a reserved view name: the Functions host runs the first function, in the order of the function names, whose route matches, so without that constraint the list would take the project's usage report `v1/{organization}/{project}/usage/key-values`. A view named `usage` from before the name was reserved keeps its other key/value routes, but `GET` of its list is the usage report.
 
 | Method | Route | Query | Body → response | Errors |
 | --- | --- | --- | --- | --- |
