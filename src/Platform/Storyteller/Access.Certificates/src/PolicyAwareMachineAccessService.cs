@@ -142,13 +142,13 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
     private IIdentityProviderMachineAccessService RequireIdentityProviderService()
     {
         return _identityProviderService
-            ?? throw new MachineAccessNotSupportedException("ClientCredentials machine access is not configured for this deployment.");
+            ?? throw new FeatureNotConfiguredException("ClientCredentials machine access is not configured for this deployment.", ErrorCodes.MachineAccessNotConfigured);
     }
 
     private IFederatedMachineAccessService RequireFederatedService()
     {
         return _federatedService
-            ?? throw new MachineAccessNotSupportedException("Federated machine access is not configured for this deployment.");
+            ?? throw new FeatureNotConfiguredException("Federated machine access is not configured for this deployment.", ErrorCodes.MachineAccessNotConfigured);
     }
 
     private async Task<MachineAccess> CreateFederatedAsync(MachineAccessCreate model)

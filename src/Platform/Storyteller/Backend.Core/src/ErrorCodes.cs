@@ -41,6 +41,10 @@ public static class ErrorCodes
     // machine's kind does not have, such as the reset of a Certificate machine (400).
     public const string MachineAccessNotSupported = "MachineAccessNotSupported";
 
+    // The deployment lacks the configuration a machine operation needs: a ClientCredentials or Federated provider, the
+    // AuthKit machine organization, a permission or app role of a scope, or the Entra ID service principal (501).
+    public const string MachineAccessNotConfigured = "MachineAccessNotConfigured";
+
     public const string PatchInvalid = "PatchInvalid";
     public const string PatchTestFailed = "PatchTestFailed";
 

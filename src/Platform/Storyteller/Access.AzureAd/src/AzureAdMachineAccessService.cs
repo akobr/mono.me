@@ -60,8 +60,9 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
                 requestConfiguration.QueryParameters.Filter = $"appId eq '{clientId}'";
             });
         var resourceSpId = resourceSpList?.Value?.FirstOrDefault()?.Id
-            ?? throw new MachineAccessNotSupportedException(
-                $"The service principal of the Storyteller API application {clientId} was not found in the machine tenant, so no app role can be assigned.");
+            ?? throw new FeatureNotConfiguredException(
+                $"The service principal of the Storyteller API application {clientId} was not found in the machine tenant, so no app role can be assigned.",
+                ErrorCodes.MachineAccessNotConfigured);
 
         var application = new Application
         {
@@ -186,8 +187,9 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
             if (!_options.AppRoles.TryGetValue(roleKey, out var configuredRoleId)
                 || !Guid.TryParse(configuredRoleId, out var roleId))
             {
-                throw new MachineAccessNotSupportedException(
-                    $"Machines with the scope {MachineScopes.ToScopeString(scope)} need the app role Auth:AppRoles:{roleKey}, which this deployment does not configure.");
+                throw new FeatureNotConfiguredException(
+                    $"Machines with the scope {MachineScopes.ToScopeString(scope)} need the app role Auth:AppRoles:{roleKey}, which this deployment does not configure.",
+                    ErrorCodes.MachineAccessNotConfigured);
             }
 
             roleIds.Add(roleId);

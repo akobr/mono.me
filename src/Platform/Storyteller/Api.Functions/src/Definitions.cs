@@ -480,7 +480,10 @@ public static class Definitions
         public const string ResponseAccount = "Details about the log in account, contains all accessible access points.";
         public const string ResponseBadRequest = "The request is not well formed.";
         public const string ResponseBadRequestDescendantType = "The request is not well formed, or the descendant type cannot descend from the annotation key (ErrorCode InvalidKey).";
-        public const string ResponseBadRequestMachineAccessCreate = "The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the credential kind is not supported or its identity provider cannot carry one of the scopes (ErrorCode MachineAccessNotSupported).";
+        public const string ResponseBadRequestMachineAccessCreate = "The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the project does not enable the credential kind or its shared certificate (ErrorCode MachineAccessNotSupported).";
+
+        // The 501 of the machine routes whose credential kind needs configuration the deployment lacks.
+        public const string ResponseNotImplementedMachineAccess = "The deployment does not configure what the machine's credential kind needs: its ClientCredentials or Federated provider, the permission or app role of a scope, or the Entra ID service principal (MachineAccessNotConfigured).";
 
         // The 401 of the routes machines and users call. Data scopes are no part of it: a machine without the scopes of
         // the operation is authenticated and gets 403.
