@@ -53,7 +53,9 @@ public static class PlainOutputExtensions
         return KeyValueConsoleExtensions.ExitCodeOf(status);
     }
 
-    // The text with the line-number gutter of WriteJson, without colours, for a reader in a terminal.
+    // The text with the line-number gutter of WriteJson, without colours, for a reader in a terminal. Every # is shown as
+    // #, so a line cannot hold the ##[command] the runner of GitHub Actions finds anywhere in a line; the gutter
+    // keeps :: from starting one. --content-only writes the text as it is.
     public static void WriteNumberedText(this IExtendedConsole @this, string text)
     {
         var lines = text.Split('\n');
@@ -63,7 +65,7 @@ public static class PlainOutputExtensions
 
         for (var index = 0; index < count; index++)
         {
-            output.Append((index + 1).ToString(CultureInfo.InvariantCulture).PadLeft(width)).Append(" │ ").Append(lines[index]).Append('\n');
+            output.Append((index + 1).ToString(CultureInfo.InvariantCulture).PadLeft(width)).Append(" │ ").Append(lines[index].Replace("#", "\\u0023", StringComparison.Ordinal)).Append('\n');
         }
 
         @this.WriteRaw(output.ToString());
@@ -115,6 +117,20 @@ public static class PlainOutputExtensions
             }
 
             builder.Append(char.IsControl(character) || character is '\u2028' or '\u2029' ? ' ' : character);
+        }
+
+        // A message that starts with :: would be a command (::add-mask::, ::stop-commands::); the masks sform writes on
+        // purpose go through WriteRaw, never through here.
+        var start = 0;
+
+        while (start < builder.Length && char.IsWhiteSpace(builder[start]))
+        {
+            start++;
+        }
+
+        if (start + 1 < builder.Length && builder[start] == ':' && builder[start + 1] == ':')
+        {
+            builder.Remove(start, 1).Insert(start, "\\u003A");
         }
 
         return builder.ToString();

@@ -13,7 +13,8 @@ The Storyteller configuration action brings the resolved configuration of an ann
     key: exe.northwind.invoicing.production
     export-env: true
     env-prefix: APP_
-    cli-version: 0.8.115-alpha-gd665130ae2
+    cli-version: ${{ steps.sform.outputs.version }}   # packed first, see Until sform is published
+    cli-source: ${{ runner.temp }}/sform
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
     STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx   # a certificate machine, see Sign-in
@@ -21,7 +22,7 @@ The Storyteller configuration action brings the resolved configuration of an ann
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
-The action lives in the [mono.me repository](https://github.com/akobr/mono.me/tree/main/src/Platform/GitHubAction) and has no release tags yet: pin a commit. It runs on Linux, macOS and Windows runners. Until a `sform` with these options is on NuGet, the workflow packs `sform` itself, see [Until sform is published](#until-sform-is-published).
+The action lives in the [mono.me repository](https://github.com/akobr/mono.me/tree/main/src/Platform/GitHubAction) and has no release tags yet: pin a commit. It runs on Linux, macOS and Windows runners. No `sform` on NuGet has these options yet, so every example installs the one the workflow packed in an earlier step `sform` (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
 
 ## Inputs
 
@@ -67,7 +68,8 @@ For a configuration with secrets, a **certificate machine over mTLS** is the rec
     key: exe.northwind.invoicing.production
     export-env: true
     env-prefix: APP_
-    cli-version: 0.8.115-alpha-gd665130ae2
+    cli-version: ${{ steps.sform.outputs.version }}   # packed first, see Until sform is published
+    cli-source: ${{ runner.temp }}/sform
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
     STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx
@@ -88,7 +90,8 @@ steps:
       endpoint: https://storyteller.example.com/api
       client-id: 3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07
       output-file: ${{ runner.temp }}/billing.env
-      cli-version: 0.8.115-alpha-gd665130ae2
+      cli-version: ${{ steps.sform.outputs.version }}   # packed first, see Until sform is published
+      cli-source: ${{ runner.temp }}/sform
   - run: docker compose --env-file "$RUNNER_TEMP/billing.env" up --detach
 ```
 

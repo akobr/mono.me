@@ -46,6 +46,26 @@ public class PlainOutputExtensionsTests
         _error.ToString().ShouldNotContain("#");
     }
 
+    [Theory]
+    [InlineData("::add-mask::x", "\\u003A:add-mask::x\n")]
+    [InlineData("  ::stop-commands::t", "  \\u003A:stop-commands::t\n")]
+    [InlineData("\n::warning::x", " \\u003A:warning::x\n")]
+    [InlineData("a ::b:: c", "a ::b:: c\n")]
+    public void WriteErrorLine_CannotStartAWorkflowCommand(string message, string expected)
+    {
+        _console.Object.WriteErrorLine(message);
+
+        _error.ToString().ShouldBe(expected);
+    }
+
+    [Fact]
+    public void WriteNumberedText_EscapesEveryHash()
+    {
+        _console.Object.WriteNumberedText("A=##[error]x\n");
+
+        _out.ToString().ShouldBe("\n1 │ A=\\u0023\\u0023[error]x\n");
+    }
+
     [Fact]
     public void WriteRaw_WritesTheTextAsItIs()
     {

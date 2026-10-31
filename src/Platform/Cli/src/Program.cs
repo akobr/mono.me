@@ -81,8 +81,9 @@ public class Program
             // A missing or an invalid option value, or a single value given twice: the input is wrong, not the tool.
             CurrentRun.Exception = parsingException;
             CurrentRun.Command = CommandPath.Of(parsingException.Command);
-            Console.WriteLine(parsingException.Message, Color.DarkGray);
-            Console.WriteLine($"  What happened, {ParsingErrorResponseMessages.GetRandom()}?", Color.DarkGray);
+            // On standard error, so a redirected standard output stays empty.
+            WriteError(parsingException.Message);
+            WriteError($"  What happened, {ParsingErrorResponseMessages.GetRandom()}?");
 
             // Neither the arguments nor the message, which quotes a value: it may be a value of a key/value pair.
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
@@ -252,6 +253,20 @@ public class Program
     private static void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
     {
         CurrentRun.Cancelled = true;
+    }
+
+    private static void WriteError(string line)
+    {
+        System.Console.ForegroundColor = ConsoleColor.DarkGray;
+
+        try
+        {
+            System.Console.Error.WriteLine(line);
+        }
+        finally
+        {
+            System.Console.ResetColor();
+        }
     }
 
     private static void LogWithSentry(Action logOperation)

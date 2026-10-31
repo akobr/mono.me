@@ -83,8 +83,9 @@ runs:
 
         if [ -z "$SA_KEY" ]; then
           fail "The input key is required: the annotation key of the configuration."
-        elif [ "${SA_KEY#-}" != "$SA_KEY" ]; then
-          fail "The input key must be an annotation key; it cannot start with '-'."
+        else
+          # '-' would be an option of sform, '@' a response file whose lines become its arguments.
+          case "$SA_KEY" in -*|@*) fail "The input key must be an annotation key; it cannot start with '-' or '@'." ;; esac
         fi
 
         # An exact version, never a range or a path: it also names the folder the tool is installed into.
@@ -199,14 +200,15 @@ runs:
         # sform refuses --env-prefix without --github-env or --format env.
         if [ -n "$SA_ENV_PREFIX" ]; then
           if is_true "$SA_EXPORT_ENV"; then
-            args+=(--env-prefix "$SA_ENV_PREFIX")
+            args+=("--env-prefix=$SA_ENV_PREFIX")
           elif [ -n "$SA_OUTPUT_FILE" ]; then
-            case "$format" in [Ee][Nn][Vv]) args+=(--env-prefix "$SA_ENV_PREFIX") ;; esac
+            case "$format" in [Ee][Nn][Vv]) args+=("--env-prefix=$SA_ENV_PREFIX") ;; esac
           fi
         fi
 
+        # The --option=value form: McMaster expands a separate argument that starts with '@' as a response file.
         if [ -n "$SA_OUTPUT_FILE" ]; then
-          args+=(--export "$SA_OUTPUT_FILE" --format "$format" --content-only)
+          args+=("--export=$SA_OUTPUT_FILE" "--format=$format" --content-only)
         fi
 
         "$RUNNER_TEMP/storyteller-action/sform-$SA_CLI_VERSION/sform" "${args[@]}"

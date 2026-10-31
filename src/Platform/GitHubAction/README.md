@@ -16,7 +16,8 @@ A composite GitHub Action that reads the resolved configuration of an annotation
     key: exe.northwind.invoicing.production
     export-env: true
     env-prefix: APP_
-    cli-version: 0.8.115-alpha-gd665130ae2
+    cli-version: ${{ steps.sform.outputs.version }}   # packed first, see Until sform is published
+    cli-source: ${{ runner.temp }}/sform
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
     STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx   # a certificate machine, see Credentials
@@ -24,7 +25,7 @@ A composite GitHub Action that reads the resolved configuration of an annotation
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
-The action is released into a repository of its own, listed on GitHub Marketplace, with a tag `vX.Y.Z` per release and a major tag `vX` that moves with them (see [Releasing](#releasing)). Once the first release is out, use it from there as `<owner>/<name>@v1`; the owner and the name of that repository are not decided yet. Until then, and for changes that are not released, pin a commit of the monorepo, `akobr/mono.me/src/Platform/GitHubAction@<commit>`, as the examples here do. A workflow of the monorepo uses `./src/Platform/GitHubAction` after `actions/checkout`. Until a `sform` with these options is on NuGet, the workflow packs it first, see [Until sform is published](#until-sform-is-published).
+The action is released into a repository of its own, listed on GitHub Marketplace, with a tag `vX.Y.Z` per release and a major tag `vX` that moves with them (see [Releasing](#releasing)). Once the first release is out, use it from there as `<owner>/<name>@v1`; the owner and the name of that repository are not decided yet. Until then, and for changes that are not released, pin a commit of the monorepo, `akobr/mono.me/src/Platform/GitHubAction@<commit>`, as the examples here do. A workflow of the monorepo uses `./src/Platform/GitHubAction` after `actions/checkout`. No `sform` on NuGet has these options yet, so every example installs the one the workflow packed in an earlier step `sform` (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
 
 ## Inputs
 
@@ -70,7 +71,8 @@ For a configuration with secrets, a certificate machine over mTLS is the recomme
     key: exe.northwind.invoicing.production
     export-env: true
     env-prefix: APP_
-    cli-version: 0.8.115-alpha-gd665130ae2
+    cli-version: ${{ steps.sform.outputs.version }}   # packed first, see Until sform is published
+    cli-source: ${{ runner.temp }}/sform
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
     STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx
@@ -91,7 +93,8 @@ steps:
       endpoint: https://storyteller.example.com/api
       client-id: 3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07
       output-file: ${{ runner.temp }}/billing.env
-      cli-version: 0.8.115-alpha-gd665130ae2
+      cli-version: ${{ steps.sform.outputs.version }}   # packed first, see Until sform is published
+      cli-source: ${{ runner.temp }}/sform
   - run: docker compose --env-file "$RUNNER_TEMP/billing.env" up --detach
 ```
 

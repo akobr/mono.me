@@ -88,6 +88,12 @@ jobs:
         env:
           ACTION_TOKEN: ${{ secrets.STORYTELLER_ACTION_TOKEN }}
           GIT_TERMINAL_PROMPT: '0'
+          # The author and committer of the release commit and the tagger of both annotated tags: a hosted runner has
+          # no git identity.
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           tag="v$VERSION"
           major="v${VERSION%%.*}"
@@ -132,8 +138,7 @@ jobs:
           cp "$action_dir/action.yml" "$action_dir/README.md" "$action_dir/LICENSE" .
           git add --all
 
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit --quiet --allow-empty -m "Release $tag" \
+          git commit --quiet --allow-empty -m "Release $tag" \
             -m "Source: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA (src/Platform/GitHubAction)"
           git tag -a "$tag" -m "Release $tag"
           git tag --force -a "$major" -m "Release $tag"
