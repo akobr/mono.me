@@ -26,6 +26,13 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
     // serialized), which happens within one step of the validator.
     private const long MaxEnumerationWork = 50_000_000;
 
+    // About half a second of NJsonSchema's search of an object for the names of 'properties' and 'required' it lacks (in
+    // name comparisons), which happens within one step of the validator.
+    private const long MaxPropertySearchWork = 50_000_000;
+
+    // Far more calls of NJsonSchema's IsNullable than any schema needs for one value (a few milliseconds).
+    private const int MaxNullabilityCalls = 100_000;
+
     public static bool IsCheckFailure(InvalidInputException exception)
     {
         return exception.ErrorCode
@@ -93,9 +100,10 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
         {
             throw InvalidSchema("the schema nests too deeply to be checked.");
         }
-        catch (Exception exception) when (exception is InvalidOperationException or ArgumentException)
+        catch (Exception exception) when (exception is InvalidOperationException or ArgumentException or ArithmeticException)
         {
-            // for example "Cyclic references detected." of a schema that is its own allOf, or an invalid pattern
+            // for example "Cyclic references detected." of a schema that is its own allOf, an invalid pattern, or a
+            // multipleOf of 0 (also 1e-30, which is 0 as a decimal)
             throw InvalidSchema(exception.Message);
         }
 
@@ -141,6 +149,10 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
         // the steps being validated, outermost first
         private readonly List<(JToken Token, JsonSchema Schema)> _path = [];
 
+        // the schemas of the current walk of IsNullable, and its calls so far
+        private readonly HashSet<JsonSchema> _nullabilityPath = new(ReferenceEqualityComparer.Instance);
+        private int _nullabilityCalls;
+
         public GuardedValidator(ConfigurationSchemaOptions options, TimeProvider timeProvider)
             : base((JsonSchemaValidatorSettings?)null)
         {
@@ -158,9 +170,18 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
 
             EnsureNoCycle(token, schema);
             EnsureWithinBudget();
+
+            // ValidateEnum and ValidateType ask whether the step's schema is nullable
+            EnsureNullabilityFits(schema);
             MatchPattern(token, schema);
-            MatchPatternProperties(token, schema);
             EnsureEnumerationFits(token, schema);
+
+            if (token is JObject value)
+            {
+                MatchPatternProperties(value, schema);
+                EnsurePropertySearchFits(value, schema);
+                EnsureNullPropertiesFit(value, schema);
+            }
 
             _path.Add((token, schema));
 
@@ -183,7 +204,7 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
             {
                 if (ReferenceEquals(_path[index].Schema, schema))
                 {
-                    throw InvalidSchema("the schema applies itself to the same value again (for example \"not\": { \"$ref\": \"#\" }), so its check would never end.");
+                    throw Cycle();
                 }
             }
         }
@@ -208,9 +229,9 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
 
         // NJsonSchema matches each property that 'properties' does not declare against the patterns in order, up to the
         // first match, all within one step; the same matches here have the explicit timeout and the budget between them.
-        private void MatchPatternProperties(JToken token, JsonSchema schema)
+        private void MatchPatternProperties(JObject value, JsonSchema schema)
         {
-            if (token is not JObject value || schema.PatternProperties.Count == 0)
+            if (schema.PatternProperties.Count == 0)
             {
                 return;
             }
@@ -242,6 +263,134 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
             {
                 throw TooLong();
             }
+        }
+
+        // NJsonSchema looks up every name of 'properties' and of 'required'; for a name the object lacks, it compares the
+        // name with every property of the object, all within one step.
+        private void EnsurePropertySearchFits(JObject value, JsonSchema schema)
+        {
+            long missing = schema.Properties.Keys.Count(name => !value.ContainsKey(name))
+                + schema.RequiredProperties.Count(name => !schema.Properties.ContainsKey(name) && !value.ContainsKey(name));
+
+            if (missing * value.Count > MaxPropertySearchWork)
+            {
+                throw TooLong();
+            }
+        }
+
+        // NJsonSchema asks whether the schema of a declared property is nullable when its value is null, within this
+        // step, before the property's own step.
+        private void EnsureNullPropertiesFit(JObject value, JsonSchema schema)
+        {
+            foreach (var (name, propertySchema) in schema.Properties)
+            {
+                if (value.TryGetValue(name, out var propertyValue) && propertyValue.Type == JTokenType.Null)
+                {
+                    EnsureNullabilityFits(propertySchema);
+                }
+            }
+        }
+
+        // NJsonSchema's IsNullable recurses through oneOf and through the actual (type) schema, without memoization and
+        // without passing the protected Validate: a cycle there overflows the stack, and a graph of oneOf references takes
+        // exponential time within one step. The same walk here, counted and with its path, refuses both; when it ends,
+        // NJsonSchema's walk makes the same calls.
+        private void EnsureNullabilityFits(JsonSchema schema)
+        {
+            _nullabilityCalls = 0;
+            _nullabilityPath.Clear();
+            IsNullable(schema);
+        }
+
+        // JsonSchema.IsNullable(SchemaType.JsonSchema), call for call (JsonSchemaProperty adds a rule for Swagger 2 only).
+        private bool IsNullable(JsonSchema schema)
+        {
+            if (!RuntimeHelpers.TryEnsureSufficientExecutionStack())
+            {
+                throw new InsufficientExecutionStackException();
+            }
+
+            if (++_nullabilityCalls > MaxNullabilityCalls)
+            {
+                throw TooLong();
+            }
+
+            // the call depends only on the schema, so meeting it again below itself never ends
+            if (!_nullabilityPath.Add(schema))
+            {
+                throw Cycle();
+            }
+
+            try
+            {
+                // (the type test is NJsonSchema's internal JsonObjectType.IsNull)
+                if (schema.IsNullableRaw == true
+                    || (schema.IsEnumeration && schema.Enumeration.Contains(null))
+                    || (schema.Type & JsonObjectType.Null) != 0)
+                {
+                    return true;
+                }
+
+                if (schema.Type == JsonObjectType.None)
+                {
+                    foreach (var oneOf in schema.OneOf)
+                    {
+                        if (IsNullable(oneOf))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                var actualSchema = schema.ActualSchema;
+
+                if (actualSchema != schema && IsNullable(actualSchema))
+                {
+                    return true;
+                }
+
+                var actualTypeSchema = ActualTypeSchema(schema);
+
+                if (actualTypeSchema != schema && IsNullable(actualTypeSchema))
+                {
+                    return true;
+                }
+
+                return schema.ExtensionData is not null
+                    && schema.ExtensionData.TryGetValue("nullable", out var nullable)
+                    && bool.TryParse(nullable?.ToString(), out var isNullable)
+                    && isNullable;
+            }
+            finally
+            {
+                _nullabilityPath.Remove(schema);
+            }
+        }
+
+        // JsonSchema.ActualTypeSchema, whose oneOf branch asks IsNullable of the entries in order.
+        private JsonSchema ActualTypeSchema(JsonSchema schema)
+        {
+            var source = schema.Reference ?? schema;
+
+            if (source.AllOf.Count > 1 && source.AllOf.Count(static entry => !entry.HasReference && !entry.IsDictionary) == 1)
+            {
+                return source.AllOf.First(static entry => !entry.HasReference && !entry.IsDictionary).ActualSchema;
+            }
+
+            foreach (var oneOf in source.OneOf)
+            {
+                if (!IsNullable(oneOf))
+                {
+                    return oneOf.ActualSchema;
+                }
+            }
+
+            return schema.ActualSchema;
+        }
+
+        private static InvalidInputException Cycle()
+        {
+            return InvalidSchema("the schema applies itself to the same value again (for example \"not\": { \"$ref\": \"#\" }), so its check would never end.");
         }
 
         private InvalidInputException TooLong()
