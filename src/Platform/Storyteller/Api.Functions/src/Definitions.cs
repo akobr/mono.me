@@ -6,6 +6,23 @@ public static class Definitions
 {
     public static class Routes
     {
+        // Inline constraints of route parameters. The Functions host tries the routes in the order of the function names
+        // and takes the first that matches; it doesn't rank a literal segment above a parameter like ASP.NET Core does
+        // (azure-functions-host#9876). Routes of one method must therefore exclude each other, and these constraints keep
+        // a parameter off its literal siblings. Keep them free of braces and slashes (the template syntax and the OpenAPI
+        // path filter) and of "):" and ")=" (they end a constraint in the template parser).
+        public static class Constraints
+        {
+            // An annotation key always has a '.' after its type code; the literal segments beside {key} have none.
+            public const string AnnotationKey = ":regex(\\.)";
+
+            // The values GetDescendants accepts (AnnotationsHttp.GetDescendants); keep both lists the same.
+            public const string Descendants = ":regex(^(usages|contexts|executions|units|units-of-execution|all)$)";
+
+            // "usage" is a reserved view name, the literal of the project's key/value usage report.
+            public const string KeyValuesView = ":regex(^(?!usage$))";
+        }
+
         public static class Access
         {
             public static class V1
@@ -74,11 +91,14 @@ public static class Definitions
             {
                 public const string Annotations = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations";
                 public const string AnnotationsSimple = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/simple";
-                public const string Annotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}";
-                public const string Descendants = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}/{{{Parameters.Descendants}}}";
-                public const string History = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}/history";
 
-                // Literal segments win over {key}; an annotation key always starts with a type code and a dot.
+                // The constrained {key} and {descendants} never take a literal sibling ("simple", "deleted", "history"), so
+                // the host's order of the functions decides nothing; DeletedAnnotation needs no constraint, as {key} of
+                // Descendants refuses "deleted".
+                public const string Annotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}{Constraints.AnnotationKey}}}";
+                public const string Descendants = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}{Constraints.AnnotationKey}}}/{{{Parameters.Descendants}{Constraints.Descendants}}}";
+                public const string History = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}{Constraints.AnnotationKey}}}/history";
+
                 public const string Deleted = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/deleted";
                 public const string DeletedAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/deleted/{{{Parameters.Key}}}";
                 public const string DeletedLookup = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/deleted/lookup";
@@ -175,8 +195,9 @@ public static class Definitions
             public static class V1
             {
                 // View-scoped: the pairs of a view. The collection actions are POST only, and a key is never addressed by POST,
-                // so a key named "restore" or "export" still reaches the key functions with GET, PUT and DELETE.
-                public const string KeyValues = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/key-values";
+                // so a key named "restore" or "export" still reaches the key functions with GET, PUT and DELETE. The view is
+                // never "usage", so the list doesn't take the project's usage report (Usage).
+                public const string KeyValues = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}{Constraints.KeyValuesView}}}/key-values";
                 public const string KeyValue = $"{KeyValues}/{{{Parameters.Key}}}";
                 public const string Restore = $"{KeyValues}/restore";
                 public const string Purge = $"{KeyValues}/purge";

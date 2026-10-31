@@ -351,6 +351,45 @@ public class OpenApiExportTests
     // The scopes of a machine (424-79): one list on the create model and the machine, of one shared enum of the 11
     // scopes without a default, so both SDKs have one type for it and send nothing on their own. The presets and the
     // separate management list are gone, also from every description.
+    // The inline constraints of the routes (Definitions.Routes.Constraints) stay out of the paths: the extension's
+    // RouteConstraintFilter strips them, so the SDKs keep the plain parameters of the public URLs.
+    [Fact]
+    public async Task Document_Paths_HaveNoRouteConstraints()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var operations = document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject().Select(operation => (
+                Path: path.Name,
+                Method: operation.Name.ToUpperInvariant(),
+                Id: operation.Value.GetProperty("operationId").GetString())))
+            .ToList();
+        const string annotations = "/v1/{organization}/{project}/{view}/annotations";
+        const string keyValues = "/v1/{organization}/{project}/{view}/key-values";
+
+        foreach (var (routeId, method, expectedPath) in new[]
+                 {
+                     (Definitions.RouteIds.Annotations.GetAnnotation, "GET", $"{annotations}/{{key}}"),
+                     (Definitions.RouteIds.Annotations.SetAnnotation, "POST", $"{annotations}/{{key}}"),
+                     (Definitions.RouteIds.Annotations.DeleteAnnotation, "DELETE", $"{annotations}/{{key}}"),
+                     (Definitions.RouteIds.Annotations.GetDescendants, "GET", $"{annotations}/{{key}}/{{descendants}}"),
+                     (Definitions.RouteIds.Annotations.GetAnnotationHistory, "GET", $"{annotations}/{{key}}/history"),
+                     (Definitions.RouteIds.Annotations.SetAnnotationsSimple, "POST", $"{annotations}/simple"),
+                     (Definitions.RouteIds.Annotations.GetDeletedAnnotations, "GET", $"{annotations}/deleted"),
+                     (Definitions.RouteIds.Annotations.GetDeletedAnnotation, "GET", $"{annotations}/deleted/{{key}}"),
+                     (Definitions.RouteIds.KeyValues.GetKeyValues, "GET", keyValues),
+                     (Definitions.RouteIds.KeyValues.GetKeyValue, "GET", $"{keyValues}/{{key}}"),
+                     (Definitions.RouteIds.KeyValues.GetKeyValueUsage, "GET", "/v1/{organization}/{project}/usage/key-values"),
+                 })
+        {
+            operations.Where(operation => operation.Id == routeId && operation.Method == method).Select(operation => operation.Path)
+                .ShouldHaveSingleItem(routeId).ShouldBe(expectedPath, routeId);
+        }
+
+        operations.Select(operation => operation.Path).Where(path => path.Contains(':') || path.Contains("regex", StringComparison.Ordinal)).ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Document_Scopes_AreAListOfTheSharedMachineScopeEnum()
     {

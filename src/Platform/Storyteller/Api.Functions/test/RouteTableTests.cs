@@ -257,8 +257,10 @@ public partial class RouteTableTests
         method.GetCustomAttributes<Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes.OpenApiSecurityAttribute>().ShouldBeEmpty();
     }
 
-    // The literal segments of the new routes can never be an annotation key, so they never shadow a key route.
+    // The literal segments beside {key} are no annotation keys and have no dot, so the constrained {key} never takes them
+    // (Definitions.Routes.Constraints.AnnotationKey); RouteDispatchTests checks the dispatch itself.
     [Theory]
+    [InlineData("simple")]
     [InlineData("deleted")]
     [InlineData("lookup")]
     [InlineData("restore")]
@@ -266,6 +268,7 @@ public partial class RouteTableTests
     public void LiteralSegments_AreNotAnnotationKeys(string segment)
     {
         AnnotationKey.TryParse(segment, out _).ShouldBeFalse();
+        segment.ShouldNotContain('.');
     }
 
     // A key named like a collection action ("restore", "export", ...) still reaches the key functions: the actions
