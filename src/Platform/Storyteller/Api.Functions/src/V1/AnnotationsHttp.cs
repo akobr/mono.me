@@ -131,7 +131,7 @@ public partial class AnnotationsHttp
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
-            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
+            return InvalidKey(key);
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
@@ -195,7 +195,7 @@ public partial class AnnotationsHttp
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
-            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
+            return InvalidKey(key);
         }
 
         switch (annotationKey.Type)
@@ -255,9 +255,10 @@ public partial class AnnotationsHttp
                 return new BadRequestObjectResult(new ErrorResponse("An unit of execution has no descendants."));
 
             default:
-                return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
+                return InvalidKey(key);
         }
 
+        // the route takes only these values (Definitions.Routes.Constraints.Descendants); keep both lists the same
         AnnotationType[]? types = descendants switch
         {
             "usages" => [AnnotationType.Usage],
@@ -548,7 +549,7 @@ public partial class AnnotationsHttp
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
-            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
+            return InvalidKey(key);
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
