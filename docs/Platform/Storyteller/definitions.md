@@ -179,7 +179,7 @@ PUT accepts a query parameter `force`. It defaults to false. See [Force](#force)
   - `SchemaValidationTimeout`: reading the schema, or its trial check against an empty object, takes too long.
 
   Without force, the compliance step answers `400` with the same codes when the configurations cannot be checked, for example because another stored layer refers outside itself or a check runs out of time. With force, the schema is stored (see [Force](#force)).
-- `404` means the requested schema, version, or (for a patch of configuration) the configuration is absent.
+- `404` means the requested schema or version is absent, or (for a patch of configuration) the configuration has no stored version: it was never written, or it was deleted. A document emptied by an earlier write is still a stored version and can be patched.
 - `413` with `ErrorCode` `BodyTooLarge` means the body of a schema, configuration or JSON Patch write is larger than 4 MiB; it is refused before it is parsed. A stored document is one Cosmos item of at most 2 MB.
 - `409` with `SchemaValidationErrorResponse` means a compliance check failed and force was not set. Each entry carries `AnnotationKey`, `ViewName`, and the list of messages. A message is the JSON path and the NJsonSchema error kind, for example `#/currency: NotInEnumeration`.
 - `409` with `ErrorResponse` means a concurrent writer won the race after the retries. That body is a different type from the compliance failure.
@@ -292,7 +292,7 @@ Force breaks one side of that deadlock for a single call. The caller passes it e
 
 On the HTTP API the parameter is the query `force=true`. On the CLI it is `-f` or `--force` on `schema type|annotation|descendant set|edit` and on `config set`, `config edit`, and `config patch`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
 
-Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, a schema with a reference outside itself or whose check cannot start, an unknown type code or annotation key, a descendant type that cannot descend from its key, a patch of a missing configuration, and a lost concurrency race still fail.
+Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, a schema with a reference outside itself or whose check cannot start, an unknown type code or annotation key, a descendant type that cannot descend from its key, a patch of a configuration without a stored version, and a lost concurrency race still fail.
 
 Force covers the check of the other side, whatever stops it. On a schema `PUT`, the compliance step can fail without a violation:
 
