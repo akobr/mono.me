@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
+using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
@@ -469,7 +470,7 @@ public class AccessHttp
         }
         catch (MachineAccessNotSupportedException exception)
         {
-            return new BadRequestObjectResult(new ErrorResponse { Message = exception.Message });
+            return ErrorResponseMapping.ToActionResult(exception);
         }
     }
 
@@ -483,7 +484,7 @@ public class AccessHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAccess), Description = "The restarted machine access.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
-    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine id is not valid, or the machine has no secret to reset (a Federated or Certificate machine).")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine id is not valid, or the machine has no key to reset: a Federated or Certificate machine, or a kind the deployment does not configure (MachineAccessNotSupported).")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine doesn't exist, or it was deleted during its reset (NotFound).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "Another reset replaced the API key meanwhile, or the machine changed concurrently (Conflict); reload and retry.")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -512,7 +513,7 @@ public class AccessHttp
         }
         catch (MachineAccessNotSupportedException exception)
         {
-            return new BadRequestObjectResult(new ErrorResponse { Message = exception.Message });
+            return ErrorResponseMapping.ToActionResult(exception);
         }
     }
 
@@ -524,6 +525,7 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdMachine)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine id is not valid, or the deployment does not configure the machine's credential kind (MachineAccessNotSupported).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The machine access doesn't exist.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
@@ -553,7 +555,7 @@ public class AccessHttp
         }
         catch (MachineAccessNotSupportedException exception)
         {
-            return new BadRequestObjectResult(new ErrorResponse { Message = exception.Message });
+            return ErrorResponseMapping.ToActionResult(exception);
         }
 
         return isSuccess

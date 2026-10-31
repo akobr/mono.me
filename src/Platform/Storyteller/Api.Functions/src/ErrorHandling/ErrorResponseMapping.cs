@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.KeyValues;
@@ -18,6 +19,7 @@ public static class ErrorResponseMapping
             NotFoundException e => (HttpStatusCode.NotFound, e.ErrorCode),
             ConflictException e => (HttpStatusCode.Conflict, e.ErrorCode),
             InvalidInputException e => (HttpStatusCode.BadRequest, e.ErrorCode),
+            MachineAccessNotSupportedException e => (HttpStatusCode.BadRequest, e.ErrorCode),
             KeyValueImportInvalidException e => (HttpStatusCode.BadRequest, e.ErrorCode),
             PreconditionFailedException e => (HttpStatusCode.PreconditionFailed, e.ErrorCode),
             FailedDependencyException e => (HttpStatusCode.FailedDependency, e.ErrorCode),

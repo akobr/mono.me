@@ -1,5 +1,6 @@
 using System.Net;
 
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Configuring;
 
@@ -19,6 +20,7 @@ public class ErrorResponseMappingTests
         { new InvalidInputException("title too long", ErrorCodes.InvalidAnnotation), HttpStatusCode.BadRequest, ErrorCodes.InvalidAnnotation },
         { new InvalidInputException("bad key", ErrorCodes.InvalidKey), HttpStatusCode.BadRequest, ErrorCodes.InvalidKey },
         { new InvalidInputException("bad pattern", ErrorCodes.InvalidQuery), HttpStatusCode.BadRequest, ErrorCodes.InvalidQuery },
+        { new MachineAccessNotSupportedException("no key to reset"), HttpStatusCode.BadRequest, ErrorCodes.MachineAccessNotSupported },
         { new ConflictException("deleted", ErrorCodes.AnnotationDeleted), HttpStatusCode.Conflict, ErrorCodes.AnnotationDeleted },
         { new ConflictException("active", ErrorCodes.AnnotationNotDeleted), HttpStatusCode.Conflict, ErrorCodes.AnnotationNotDeleted },
         { new JsonPatchException("stale", JsonPatchFailureKind.TestFailed, 0), HttpStatusCode.PreconditionFailed, ErrorCodes.PatchTestFailed },

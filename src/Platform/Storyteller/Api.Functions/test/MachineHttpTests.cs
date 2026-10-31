@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -494,6 +495,51 @@ public class MachineHttpTests
         access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"reset:org1/proj1/{KeycloakId}"]);
     }
 
+    // A Certificate machine has no key to reset: the router refuses it, and the answer is a coded 400 that no retry
+    // changes, not a 500 (424-102).
+    [Fact]
+    public async Task PutMachine_OfACertificateMachine_IsBadRequestWithMachineAccessNotSupported()
+    {
+        var access = new RecordingAccess(Machine() with { CredentialKind = MachineCredentialKind.Certificate })
+        {
+            Refusal = new MachineAccessNotSupportedException(PolicyAwareMachineAccessService.CertificateResetNotSupportedMessage),
+        };
+        var http = CreateHttp(access);
+
+        var result = await http.PutMachine(ContributorRequest(), "org1", "proj1", KeycloakId);
+
+        var error = ShouldBeMachineAccessNotSupported(result);
+        error.Message.ShouldBe(PolicyAwareMachineAccessService.CertificateResetNotSupportedMessage);
+        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"reset:org1/proj1/{KeycloakId}"]);
+    }
+
+    // Create and delete answer the same refusal with the same coded 400.
+    [Fact]
+    public async Task PostMachines_OfAKindTheProjectDoesNotEnable_IsBadRequestWithMachineAccessNotSupported()
+    {
+        const string message = "The credential kind Federated is not enabled in the project org1.proj1.";
+        var access = new RecordingAccess(Machine()) { Refusal = new MachineAccessNotSupportedException(message) };
+        var http = CreateHttp(access);
+
+        var result = await http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(MachineCreate(null))), "org1", "proj1");
+
+        ShouldBeMachineAccessNotSupported(result).Message.ShouldBe(message);
+        access.Calls.ShouldBe(["create:org1/proj1"]);
+    }
+
+    [Fact]
+    public async Task DeleteMachine_OfAKindTheDeploymentDoesNotConfigure_IsBadRequestWithMachineAccessNotSupported()
+    {
+        const string message = "ClientCredentials machine access is not configured for this deployment.";
+        var access = new RecordingAccess(Machine()) { Refusal = new MachineAccessNotSupportedException(message) };
+        var http = CreateHttp(access);
+
+        var result = await http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId);
+
+        ShouldBeMachineAccessNotSupported(result).Message.ShouldBe(message);
+        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
+    }
+
     // Deleting a machine stops whatever runs with its scopes, so it needs the role they need, as the reset does, from
     // one point read of the stored machine. Debug builds (DEV_AUTH) skip the role checks of users, so there every
     // delete passes.
@@ -721,6 +767,17 @@ public class MachineHttpTests
         store.Stored.ShouldBeNull();
     }
 
+    // The coded 400 of a refused machine operation, without exception details.
+    private static Models.ErrorResponse ShouldBeMachineAccessNotSupported(IActionResult result)
+    {
+        var badRequest = result.ShouldBeOfType<ObjectResult>();
+        badRequest.StatusCode.ShouldBe((int)HttpStatusCode.BadRequest);
+        var error = badRequest.Value.ShouldBeOfType<Models.ErrorResponse>();
+        error.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotSupported);
+        error.Error.ShouldBeNull();
+        return error;
+    }
+
     private static AccessHttp CreateHttp(RecordingAccess access, IMachineAuthenticationPolicyStore? policyStore = null)
     {
         var options = Options.Create(new MachineAuthenticationOptions
@@ -833,6 +890,9 @@ public class MachineHttpTests
         // The model the handler passed to CreateMachineAccessAsync; null while no machine was created.
         public MachineAccessCreate? Created { get; private set; }
 
+        // Thrown by create, reset and delete after they record their call, as a service refuses an operation.
+        public Exception? Refusal { get; init; }
+
         public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey)
         {
             Roles.Add(accessPointKey);
@@ -855,6 +915,12 @@ public class MachineHttpTests
         public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId)
         {
             Calls.Add($"reset:{organization}/{project}/{appId}");
+
+            if (Refusal is not null)
+            {
+                return Task.FromException<MachineAccess>(Refusal);
+            }
+
             return machine is null
                 ? Task.FromException<MachineAccess>(new NotFoundException($"The machine access {appId} has not been found."))
                 : Task.FromResult(machine with { AccessKey = "new-secret" });
@@ -864,13 +930,19 @@ public class MachineHttpTests
         public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)
         {
             Calls.Add($"delete:{organization}/{project}/{appId}");
-            return Task.FromResult(machine is not null);
+            return Refusal is null ? Task.FromResult(machine is not null) : Task.FromException<bool>(Refusal);
         }
 
         // Every service returns exactly the requested scopes (spec 3.5).
         public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
         {
             Calls.Add($"create:{model.Organization}/{model.Project}");
+
+            if (Refusal is not null)
+            {
+                return Task.FromException<MachineAccess>(Refusal);
+            }
+
             Created = model;
             return Task.FromResult((machine ?? Machine()) with { Scopes = model.Scopes ?? [], AnnotationKey = model.AnnotationKey });
         }

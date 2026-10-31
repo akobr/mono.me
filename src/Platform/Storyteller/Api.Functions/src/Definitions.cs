@@ -480,7 +480,7 @@ public static class Definitions
         public const string ResponseAccount = "Details about the log in account, contains all accessible access points.";
         public const string ResponseBadRequest = "The request is not well formed.";
         public const string ResponseBadRequestDescendantType = "The request is not well formed, or the descendant type cannot descend from the annotation key (ErrorCode InvalidKey).";
-        public const string ResponseBadRequestMachineAccessCreate = "The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the credential kind is not supported or its identity provider cannot carry one of the scopes.";
+        public const string ResponseBadRequestMachineAccessCreate = "The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the credential kind is not supported or its identity provider cannot carry one of the scopes (ErrorCode MachineAccessNotSupported).";
 
         // The 401 of the routes machines and users call. Data scopes are no part of it: a machine without the scopes of
         // the operation is authenticated and gets 403.

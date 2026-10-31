@@ -540,7 +540,7 @@ public class OpenApiExportTests
         using var document = JsonDocument.Parse(json);
 
         Operation(document, Definitions.RouteIds.Access.CreateMachineAccess).GetProperty("responses").GetProperty("400").GetProperty("description").GetString()
-            .ShouldBe("The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the credential kind is not supported or its identity provider cannot carry one of the scopes.");
+            .ShouldBe("The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the credential kind is not supported or its identity provider cannot carry one of the scopes (ErrorCode MachineAccessNotSupported).");
 
         foreach (var routeId in new[] { Definitions.RouteIds.Access.CreateMachineAccess, Definitions.RouteIds.Access.ResetMachineAccess, Definitions.RouteIds.Access.SetMachineFederationRules, Definitions.RouteIds.Access.DeleteMachineAccess })
         {
@@ -552,6 +552,22 @@ public class OpenApiExportTests
             Definitions.Descriptions.ResponseForbiddenUserOnly
             + " Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied)."
             + " Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).");
+    }
+
+    // 424-102: every route that answers MachineAccessNotSupportedException declares its 400 with the code, the delete
+    // included, which declared no 400 before.
+    [Theory]
+    [InlineData(Definitions.RouteIds.Access.CreateMachineAccess)]
+    [InlineData(Definitions.RouteIds.Access.ResetMachineAccess)]
+    [InlineData(Definitions.RouteIds.Access.DeleteMachineAccess)]
+    [InlineData(Definitions.RouteIds.Access.IssueSharedCertificate)]
+    public async Task Document_MachineAccessRefusals_NameTheirErrorCodeInTheir400(string routeId)
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        Operation(document, routeId).GetProperty("responses").GetProperty("400").GetProperty("description").GetString()
+            .ShouldNotBeNull().ShouldContain(ErrorCodes.MachineAccessNotSupported, Case.Sensitive);
     }
 
     // Replacing a trusted issuer redirects the tokens of the machines whose rules name it, so an actor under
