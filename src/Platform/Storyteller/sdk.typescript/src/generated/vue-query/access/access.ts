@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.11.29126
+ * OpenAPI spec version: 0.10.15.18712
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -1452,7 +1452,7 @@ export const getDeleteMachineAccessMutationKey = () =>
   ["deleteMachineAccess"] as const;
 
 export const getDeleteMachineAccessMutationOptions = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse | void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1493,7 +1493,7 @@ export type DeleteMachineAccessMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteMachineAccess>>
 >;
 
-export type DeleteMachineAccessMutationError = ErrorType<void | ErrorResponse>;
+export type DeleteMachineAccessMutationError = ErrorType<ErrorResponse | void>;
 export type DeleteMachineAccessMutationVariables = {
   organization: string;
   project: string;
@@ -1501,7 +1501,7 @@ export type DeleteMachineAccessMutationVariables = {
 };
 
 export const useDeleteMachineAccess = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse | void>,
   TContext = unknown,
 >(
   options?: {
