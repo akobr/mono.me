@@ -194,12 +194,12 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
 
         var diff = (target.Kind, versionFrom) switch
         {
-            (SchemaTarget.Level.Type, null) => await schemas.GetSchemaVersionDiffAsync(organization, project, view, type, version, null, cancellationToken),
-            (SchemaTarget.Level.Type, { } from) => await schemas.GetSchemaVersionDiffCustomAsync(organization, project, view, type, version, from, null, cancellationToken),
-            (SchemaTarget.Level.Annotation, null) => await schemas.GetAnnotationSchemaVersionDiffAsync(organization, project, view, annotationKey, version, null, cancellationToken),
-            (SchemaTarget.Level.Annotation, { } from) => await schemas.GetAnnotationSchemaVersionDiffCustomAsync(organization, project, view, annotationKey, version, from, null, cancellationToken),
-            (_, null) => await schemas.GetDescendantTypeSchemaVersionDiffAsync(organization, project, view, annotationKey, type, version, null, cancellationToken),
-            (_, { } from) => await schemas.GetDescendantTypeSchemaVersionDiffCustomAsync(organization, project, view, annotationKey, type, version, from, null, cancellationToken),
+            (SchemaTarget.Level.Type, null) => await schemas.GetSchemaVersionDiffAsync(organization, project, view, type, version, cancellationToken: cancellationToken),
+            (SchemaTarget.Level.Type, { } from) => await schemas.GetSchemaVersionDiffCustomAsync(organization, project, view, type, version, from, cancellationToken: cancellationToken),
+            (SchemaTarget.Level.Annotation, null) => await schemas.GetAnnotationSchemaVersionDiffAsync(organization, project, view, annotationKey, version, cancellationToken: cancellationToken),
+            (SchemaTarget.Level.Annotation, { } from) => await schemas.GetAnnotationSchemaVersionDiffCustomAsync(organization, project, view, annotationKey, version, from, cancellationToken: cancellationToken),
+            (_, null) => await schemas.GetDescendantTypeSchemaVersionDiffAsync(organization, project, view, annotationKey, type, version, cancellationToken: cancellationToken),
+            (_, { } from) => await schemas.GetDescendantTypeSchemaVersionDiffCustomAsync(organization, project, view, annotationKey, type, version, from, cancellationToken: cancellationToken),
         };
 
         return ToolResults.Json(diff);

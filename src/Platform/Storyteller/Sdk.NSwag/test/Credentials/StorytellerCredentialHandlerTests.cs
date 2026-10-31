@@ -160,7 +160,7 @@ public class StorytellerCredentialHandlerTests
                 .ConfigurePrimaryHttpMessageHandler(() => _api));
         await using var provider = services.BuildServiceProvider();
 
-        await provider.GetRequiredService<IConfigurationsApiClient>().GetConfigurationConditionalAsync("acme", "billing", "default", "sbt.northwind", null);
+        await provider.GetRequiredService<IConfigurationsApiClient>().GetConfigurationConditionalAsync("acme", "billing", "default", "sbt.northwind");
 
         _api.Requests.ShouldHaveSingleItem().Authorization.ShouldBe("ApiKey 2s.a2V5.secret");
     }

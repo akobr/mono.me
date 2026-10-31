@@ -35,7 +35,7 @@ public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigur
 
         if (version is not { } number)
         {
-            return ToolResults.Json(KeyValueProtections.Describe(await keyValues.GetKeyValueAsync(organization, project, view, name, true, null, cancellationToken)));
+            return ToolResults.Json(KeyValueProtections.Describe(await keyValues.GetKeyValueAsync(organization, project, view, name, true, cancellationToken: cancellationToken)));
         }
 
         // The API audits a reveal through the pair, not through its version route, so the current version is revealed
@@ -71,6 +71,6 @@ public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigur
         CancellationToken cancellationToken = default)
     {
         var annotationKey = AnnotationKeys.Parse(key).ToString();
-        return ToolResults.Json(await configurations.GetResolvedConfigurationAsync(organization, project, view, annotationKey, null, null, cancellationToken));
+        return ToolResults.Json(await configurations.GetResolvedConfigurationAsync(organization, project, view, annotationKey, cancellationToken: cancellationToken));
     }
 }

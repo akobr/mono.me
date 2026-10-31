@@ -89,7 +89,7 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
                 return ToolResults.Json(await configurations.GetConfigurationVersionAsync(organization, project, view, annotationKey, version.GetValueOrDefault(), cancellationToken));
 
             default:
-                return ToolResults.Json(await configurations.GetConfigurationAsync(organization, project, view, annotationKey, null, null, cancellationToken));
+                return ToolResults.Json(await configurations.GetConfigurationAsync(organization, project, view, annotationKey, cancellationToken: cancellationToken));
         }
     }
 
@@ -258,12 +258,12 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
 
         if (otherView is not null)
         {
-            return ToolResults.Json(await configurations.GetConfigurationViewDiffAsync(organization, project, view, annotationKey, otherView, null, cancellationToken));
+            return ToolResults.Json(await configurations.GetConfigurationViewDiffAsync(organization, project, view, annotationKey, otherView, cancellationToken: cancellationToken));
         }
 
         return ToolResults.Json(versionFrom.HasValue
-            ? await configurations.GetConfigurationVersionDiffCustomAsync(organization, project, view, annotationKey, version.GetValueOrDefault(), versionFrom.Value, null, cancellationToken)
-            : await configurations.GetConfigurationVersionDiffAsync(organization, project, view, annotationKey, version.GetValueOrDefault(), null, cancellationToken));
+            ? await configurations.GetConfigurationVersionDiffCustomAsync(organization, project, view, annotationKey, version.GetValueOrDefault(), versionFrom.Value, cancellationToken: cancellationToken)
+            : await configurations.GetConfigurationVersionDiffAsync(organization, project, view, annotationKey, version.GetValueOrDefault(), cancellationToken: cancellationToken));
     }
 
     // The force query is left out unless it is asked for.

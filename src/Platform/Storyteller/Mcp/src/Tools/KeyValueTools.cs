@@ -260,8 +260,8 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
         }
 
         var diff = versionFrom is { } from
-            ? await keyValues.GetKeyValueVersionDiffCustomAsync(organization, project, view, name, version, from, null, cancellationToken)
-            : await keyValues.GetKeyValueVersionDiffAsync(organization, project, view, name, version, null, cancellationToken);
+            ? await keyValues.GetKeyValueVersionDiffCustomAsync(organization, project, view, name, version, from, cancellationToken: cancellationToken)
+            : await keyValues.GetKeyValueVersionDiffAsync(organization, project, view, name, version, cancellationToken: cancellationToken);
 
         return ToolResults.Json(diff);
     }

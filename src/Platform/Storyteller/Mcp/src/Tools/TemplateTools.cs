@@ -175,7 +175,7 @@ public sealed class TemplateTools(Sdk.ITemplatesApiClient templates)
         var type = TypeCodes.Parse(annotationType);
 
         return ToolResults.Json(versionFrom is { } from
-            ? await templates.GetTemplateVersionDiffCustomAsync(organization, project, view, type, version, from, null, cancellationToken)
-            : await templates.GetTemplateVersionDiffAsync(organization, project, view, type, version, null, cancellationToken));
+            ? await templates.GetTemplateVersionDiffCustomAsync(organization, project, view, type, version, from, cancellationToken: cancellationToken)
+            : await templates.GetTemplateVersionDiffAsync(organization, project, view, type, version, cancellationToken: cancellationToken));
     }
 }

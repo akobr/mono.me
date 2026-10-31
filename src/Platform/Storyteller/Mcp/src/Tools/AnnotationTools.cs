@@ -651,7 +651,7 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
     {
         try
         {
-            return await annotations.GetAnnotationAsync(organization, project, view, key, true, null, cancellationToken);
+            return await annotations.GetAnnotationAsync(organization, project, view, key, true, cancellationToken: cancellationToken);
         }
         catch (Sdk.ApiException exception) when (exception.StatusCode == 404)
         {

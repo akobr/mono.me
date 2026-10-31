@@ -217,7 +217,7 @@ public class StorytellerResilienceTests
                 .ConfigurePrimaryHttpMessageHandler(() => _api));
         await using var provider = services.BuildServiceProvider();
 
-        var response = await provider.GetRequiredService<IConfigurationsApiClient>().GetConfigurationConditionalAsync("acme", "billing", "default", "sbt.northwind", null);
+        var response = await provider.GetRequiredService<IConfigurationsApiClient>().GetConfigurationConditionalAsync("acme", "billing", "default", "sbt.northwind");
 
         response.StatusCode.ShouldBe(200);
         _api.Requests.Count.ShouldBe(2);
