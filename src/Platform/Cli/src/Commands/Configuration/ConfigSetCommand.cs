@@ -107,9 +107,7 @@ public class ConfigSetCommand : BaseContextCommand
                     Context.OrganizationName,
                     Context.ProjectName,
                     Context.ViewName,
-                    AnnotationKey,
-                    format: null,
-                    if_None_Match: null);
+                    AnnotationKey);
             }
         }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)

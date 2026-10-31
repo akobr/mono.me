@@ -293,15 +293,15 @@ public class ConfigGetCommand : BaseContextCommand
         }
 
         var response = IsResolvedRetrievalRequested
-            ? await _configurationApi.GetResolvedConfigurationConditionalAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, ifNoneMatch: null)
-            : await _configurationApi.GetConfigurationConditionalAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, ifNoneMatch: null);
+            ? await _configurationApi.GetResolvedConfigurationConditionalAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key)
+            : await _configurationApi.GetConfigurationConditionalAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key);
 
         return (ResultOf(response), response.SecretsWithheld);
     }
 
     private async Task<ConfigurationModel> ReadEffectiveAsync(string key)
     {
-        return ResultOf(await _configurationApi.GetConfigurationConditionalAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, ifNoneMatch: null));
+        return ResultOf(await _configurationApi.GetConfigurationConditionalAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key));
     }
 
     private int WriteReadFailure(string key, ApiException exception)

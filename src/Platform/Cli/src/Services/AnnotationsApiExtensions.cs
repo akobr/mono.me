@@ -19,7 +19,7 @@ public static class AnnotationsApiExtensions
     {
         try
         {
-            return await @this.GetAnnotationAsync(organization, project, view, annotationKey, includeInactive: true, includeDeleted: null);
+            return await @this.GetAnnotationAsync(organization, project, view, annotationKey, includeInactive: true);
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {

@@ -74,8 +74,7 @@ public class ConfigDiffCommand : BaseContextCommand
                     Context.ProjectName,
                     Context.ViewName,
                     AnnotationKey,
-                    TargetView,
-                    null);
+                    TargetView);
             }
             else if (int.TryParse(ToVersion, out var toVersion))
             {
@@ -87,8 +86,7 @@ public class ConfigDiffCommand : BaseContextCommand
                         Context.ViewName,
                         AnnotationKey,
                         toVersion,
-                        fromVersion,
-                        null);
+                        fromVersion);
                 }
                 else
                 {
@@ -97,8 +95,7 @@ public class ConfigDiffCommand : BaseContextCommand
                         Context.ProjectName,
                         Context.ViewName,
                         AnnotationKey,
-                        toVersion,
-                        null);
+                        toVersion);
                 }
             }
             else
@@ -122,8 +119,7 @@ public class ConfigDiffCommand : BaseContextCommand
                     Context.ProjectName,
                     Context.ViewName,
                     AnnotationKey,
-                    latestVersion,
-                    null);
+                    latestVersion);
             }
 
             Console.WriteDiffResult(diff);

@@ -51,7 +51,7 @@ public class ConfigurationsApiClientDateTests
             """;
         _http.Respond(HttpStatusCode.OK, json);
 
-        var composition = await CreateClient().GetConfigurationCompositionAsync("org1", "proj1", "default", "sbt.northwind", null);
+        var composition = await CreateClient().GetConfigurationCompositionAsync("org1", "proj1", "default", "sbt.northwind");
 
         _http.Requests.ShouldHaveSingleItem().Uri.AbsolutePath.ShouldBe("/api/v1/org1/proj1/default/configuration/sbt.northwind/composition");
         ShouldKeepTheStrings(composition.Content.ShouldBeOfType<JObject>());
@@ -76,7 +76,7 @@ public class ConfigurationsApiClientDateTests
             }
             """);
 
-        var configuration = await CreateClient().GetConfigurationAsync("org1", "proj1", "default", "sbt.northwind", null, null);
+        var configuration = await CreateClient().GetConfigurationAsync("org1", "proj1", "default", "sbt.northwind");
 
         ShouldKeepTheStrings(configuration.Content.ShouldBeOfType<JObject>());
         configuration.Modified.At.ShouldBe(ModifiedAt);

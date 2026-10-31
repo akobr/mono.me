@@ -60,15 +60,13 @@ public class TemplateDiffCommand : BaseContextCommand
                         Context.ViewName,
                         annotationType,
                         toVersion,
-                        fromVersion,
-                        null)
+                        fromVersion)
                     : await _templatesApi.GetTemplateVersionDiffAsync(
                         Context.OrganizationName,
                         Context.ProjectName,
                         Context.ViewName,
                         annotationType,
-                        toVersion,
-                        null);
+                        toVersion);
             }
             else
             {
@@ -91,8 +89,7 @@ public class TemplateDiffCommand : BaseContextCommand
                     Context.ProjectName,
                     Context.ViewName,
                     annotationType,
-                    latestVersion,
-                    null);
+                    latestVersion);
             }
 
             Console.WriteDiffResult(diff);
