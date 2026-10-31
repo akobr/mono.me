@@ -293,7 +293,7 @@ Tools carry the MCP hints: reads are read-only; deletes, purges, resets and repl
 | `create_annotations` | Up to 100 keys or compact lines at once; existing keys are skipped |
 | `delete_annotation`, `restore_annotations`, `purge_annotation` | Soft delete with descendants, restore, permanent delete (Administrator) |
 
-- `find_annotations` lists the annotations of one type and filters them by the names in their keys (`responsibility`, `subject`, `context`, `unit`) in the server, page by page. An exact name ignores case. A filter that starts with `^` or ends with `$` is a .NET regular expression, case-sensitive unless it starts with `(?i)`, with a match timeout of 100 ms; an invalid or too slow pattern is refused. The API's own name queries are not used, because they filter almost nothing today.
+- `find_annotations` lists the annotations of one type and filters them by the names in their keys (`responsibility`, `subject`, `context`, `unit`) in the server, page by page. An exact name ignores case. A filter that starts with `^` or ends with `$` is a .NET regular expression, case-sensitive unless it starts with `(?i)`, with a match timeout of 100 ms; an invalid or too slow pattern is refused. The tool does not use the API's name queries ([annotation-lifecycle.md](annotation-lifecycle.md)), which compare exact names case-sensitively and run patterns on the non-backtracking engine.
 - `list_deleted_annotations` with a `deletionId` lists everything that delete removed, descendants included, unless `roots` is `true`.
 - New names follow the rule of `sform`: 1 to 50 letters, numbers, dashes or underscores. A name is new when its responsibility, subject, context or unit does not exist yet, deleted ones included; existing names are used as they are.
 

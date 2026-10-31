@@ -78,7 +78,7 @@ The catalog is queryable by type. These reads are how you answer the operational
 
 `descendants` is one of `usages`, `contexts`, `executions`, `units`, `units-of-execution`, or `all`. A responsibility has no contexts. A unit's only descendants are units of execution.
 
-A continuation token pages large catalogs. Name filters on the collection routes find a customer or a module without scanning the whole graph by eye.
+A continuation token pages large catalogs. Name filters on the collection routes find a customer or a module without scanning the whole graph by eye: `nameQuery`, `responsibilityNameQuery`, `subjectNameQuery`, `contextNameQuery` or `unitNameQuery`, depending on the route, takes an exact name (`northwind`), a contained text (`%north%`) or a regular expression that starts with `^` or ends with `$` (`^north`, `-eu$`). Names compare case-sensitively, and an invalid pattern answers `400`.
 
 ## Writing the catalog
 
