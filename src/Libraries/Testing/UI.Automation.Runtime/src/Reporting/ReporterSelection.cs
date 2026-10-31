@@ -1,19 +1,22 @@
 using _42.Testing.UI.Automation.Runtime.Settings;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace _42.Testing.UI.Automation.Runtime.Reporting;
 
 // The reporters of a run: none unless Reporting:Enabled; then the providers named by Reporting:Systems, or every
 // registered provider whose Reporting:<System> section exists. A configuration that selects nothing, names an
 // unregistered system or that a provider refuses fails the start, because reporting was asked for explicitly; the
-// reporters created before the failure are disposed.
+// reporters created before the failure are disposed. The services a provider gets answer IConfiguration with the run's
+// configuration and, unless the consumer has one, ILoggerFactory with the session's logger (ReporterServices).
 internal static class ReporterSelection
 {
     public static async Task<IReadOnlyList<ITestRunReporter>> CreateAsync(
         UiAutomationSettings settings,
         IReadOnlyList<ITestRunReporterProvider> providers,
         IServiceProvider services,
-        TestRunDescriptor run)
+        TestRunDescriptor run,
+        ILogger logger)
     {
         if (!settings.Reporting.Enabled)
         {
@@ -33,6 +36,7 @@ internal static class ReporterSelection
                 : $"Reporting:Enabled is true, but no reporter is selected; set Reporting:Systems or add a Reporting:<System> section for one of: {registered}.");
         }
 
+        var reporterServices = new ReporterServices(services, settings.Configuration, logger);
         var reporters = new List<ITestRunReporter>();
         try
         {
@@ -44,7 +48,7 @@ internal static class ReporterSelection
 
                 try
                 {
-                    reporters.Add(provider.Create(services, reporting.GetSection(provider.System), run));
+                    reporters.Add(provider.Create(reporterServices, reporting.GetSection(provider.System), run));
                 }
                 catch (Exception exception) when (exception is not UiAutomationSettingsException)
                 {

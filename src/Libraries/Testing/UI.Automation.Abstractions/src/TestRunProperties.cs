@@ -11,6 +11,9 @@ public static class TestRunProperties
     public const string Engine = "engine";
     public const string Channel = "channel";
     public const string BrowserVersion = "browserVersion";
+
+    // The operating system of a remote browser, e.g. "Windows 11" or "OS X Tahoe".
+    public const string Os = "os";
     public const string Device = "device";
     public const string Headless = "headless";
     public const string Seed = "seed";

@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Libraries\Testing\UI.Automation.Reporting.Testiny\src\UI.Automation.Reporting.Testiny.csproj" />
     <ProjectReference Include="..\..\..\Libraries\Testing\UI.Automation.Runtime.TUnit\src\UI.Automation.Runtime.TUnit.csproj" />
   </ItemGroup>
 
