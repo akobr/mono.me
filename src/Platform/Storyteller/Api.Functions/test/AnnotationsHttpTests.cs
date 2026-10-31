@@ -168,6 +168,62 @@ public class AnnotationsHttpTests
         annotations.Calls.ShouldBeEmpty();
     }
 
+    // Every {key} function answers a key that doesn't parse with 400 InvalidKey, before the service. A dotted key passes
+    // the route constraint (Definitions.Routes.Constraints.AnnotationKey), so the function is what refuses it.
+    [Theory]
+    [InlineData(nameof(AnnotationsHttp.GetAnnotation), "boots.another-app")]
+    [InlineData(nameof(AnnotationsHttp.GetAnnotation), "nope")]
+    [InlineData(nameof(AnnotationsHttp.GetDescendants), "boots.another-app")]
+    [InlineData(nameof(AnnotationsHttp.DeleteAnnotation), "boots.another-app")]
+    [InlineData(nameof(AnnotationsHttp.GetDeletedAnnotation), "boots.another-app")]
+    [InlineData(nameof(AnnotationsHttp.PurgeAnnotation), "boots.another-app")]
+    [InlineData(nameof(AnnotationsHttp.GetAnnotationHistory), "boots.another-app")]
+    public async Task KeyFunctions_AnswerAnInvalidKeyWithInvalidKey(string function, string key)
+    {
+        var annotations = new RecordingAnnotations();
+        var http = Http(annotations, AccountRole.Administrator);
+
+        var result = function switch
+        {
+            nameof(AnnotationsHttp.GetAnnotation) => await http.GetAnnotation(Request("GET"), "acme", "billing", "default", key),
+            nameof(AnnotationsHttp.GetDescendants) => await http.GetDescendants(Request("GET"), "acme", "billing", "default", key, "usages"),
+            nameof(AnnotationsHttp.DeleteAnnotation) => await http.DeleteAnnotation(Request("DELETE"), "acme", "billing", "default", key),
+            nameof(AnnotationsHttp.GetDeletedAnnotation) => await http.GetDeletedAnnotation(Request("GET"), "acme", "billing", "default", key),
+            nameof(AnnotationsHttp.PurgeAnnotation) => await http.PurgeAnnotation(Request("DELETE"), "acme", "billing", "default", key),
+            nameof(AnnotationsHttp.GetAnnotationHistory) => await http.GetAnnotationHistory(Request("GET"), "acme", "billing", "default", key),
+            _ => throw new ArgumentOutOfRangeException(nameof(function)),
+        };
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe($"Invalid annotation key: {key}");
+        error.ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    // The values the route constraint takes (Definitions.Routes.Constraints.Descendants) are the values the function
+    // reads; "history", the literal of the sibling route, is not one.
+    [Theory]
+    [InlineData("rst.billing", "usages", true)]
+    [InlineData("sbt.northwind", "contexts", true)]
+    [InlineData("usg.northwind.billing", "executions", true)]
+    [InlineData("rst.billing", "units", true)]
+    [InlineData("exe.northwind.billing.prod", "units-of-execution", true)]
+    [InlineData("sbt.northwind", "all", true)]
+    [InlineData("rst.billing", "history", false)]
+    public async Task Descendants_ReadsTheValuesOfTheRouteConstraint(string key, string descendants, bool read)
+    {
+        var result = await Http(new RecordingAnnotations()).GetDescendants(Request("GET"), "acme", "billing", "default", key, descendants);
+
+        if (read)
+        {
+            result.ShouldBeOfType<OkObjectResult>();
+        }
+        else
+        {
+            result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldStartWith("Invalid type of descendants");
+        }
+    }
+
     [Fact]
     public async Task Set_BodyWithoutTheTypeSpecificMembers_IsRejected()
     {
