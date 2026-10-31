@@ -105,6 +105,24 @@ describe('ConfigurationEditor (JSON Patch saves)', () => {
     expect(ownContent(loadDb(), scope, key)).toEqual({ retries: 2 })
   })
 
+  it('refuses a PUT that fails the schema with 409, and stores it with force=true', async () => {
+    const key = unconfiguredExecution()
+    const url = `http://api.test/api/v1/${scope.org}/${scope.project}/${scope.view}/configuration/${key}`
+    const put = (query = '') =>
+      fetch(url + query, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' },
+        body: JSON.stringify({ retries: 20 }),
+      })
+
+    const refused = await put()
+    expect(refused.status).toBe(409)
+    expect(ownContent(loadDb(), scope, key)).toBeUndefined()
+
+    expect((await put('?force=true')).status).toBe(200)
+    expect(ownContent(loadDb(), scope, key)).toEqual({ retries: 20 })
+  })
+
   it('gets a 404 for a patch when nothing is stored, as from the API', async () => {
     const key = unconfiguredExecution()
 

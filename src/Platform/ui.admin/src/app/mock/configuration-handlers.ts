@@ -343,6 +343,23 @@ const writeConfiguration = withDb<KeyParams>(async (db, { params, request }) => 
   }
   const body = (await request.json()) as Record<string, unknown>
   const content = deepMerge(ownContent(db, scope, params.key) ?? {}, body) as Record<string, unknown>
+  // Like the API: a document with values is checked against the combined schema unless force=true.
+  const force = new URL(request.url).searchParams.get('force') === 'true'
+  const errors =
+    force || !Object.keys(content).length
+      ? []
+      : schemaErrors(combinedSchema(db, scope, params.key)?.MergedContent, content)
+  if (errors.length) {
+    return HttpResponse.json(
+      {
+        Message: `The configuration of ${params.key} does not comply with its schema.`,
+        Hint: 'Fix the values or save with force=true.',
+        ErrorCode: 'SchemaValidationFailed',
+        Errors: [{ AnnotationKey: params.key, ViewName: params.view, Errors: errors }],
+      },
+      { status: 409 },
+    )
+  }
   const saved = putVersion(db, scope, `configuration:${params.key}`, content)
   appendAudit(db, scope, params.key, newEntry(db, 'ConfigurationChanged', { ConfigurationVersion: saved.Version }))
   return HttpResponse.json(configurationResponse(db, scope, params.key, effectiveContent(db, scope, params.key)))
