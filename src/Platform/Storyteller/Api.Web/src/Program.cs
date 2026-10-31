@@ -1,5 +1,6 @@
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Annotating;
+using _42.Platform.Storyteller.Api;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Json;
 using Asp.Versioning;
@@ -73,7 +74,7 @@ builder.Services.AddApiVersioning(options =>
     options.ReportApiVersions = true;
 });
 
-builder.Services.AddControllers()
+builder.Services.AddControllers(options => options.Filters.Add<InvalidInputExceptionFilter>())
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JObjectConverter());
