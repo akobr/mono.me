@@ -115,8 +115,9 @@ export function toAnnotationDraft(annotation: Annotation): AnnotationForm {
 
 /**
  * The body for SetAnnotation: empty strings and collections become absent. SetAnnotation replaces the whole
- * document and requires the type-specific members (SubjectKey, ContextNames, …), which the form does not edit,
- * so they are taken from the loaded `original`. A unit's trigger is edited, and the trimmed draft replaces it.
+ * document and requires the type-specific members (SubjectKey, ResponsibilityName, …), which the form does not edit,
+ * so they are taken from the loaded `original`. The relation arrays (ContextNames, …) come along; the server ignores
+ * their values. A unit's trigger is edited, and the trimmed draft replaces it.
  */
 export function toAnnotationBody(draft: AnnotationForm, original?: Annotation): Annotation {
   const blank = (value: string | undefined) => (value && value.trim() ? value.trim() : undefined)
