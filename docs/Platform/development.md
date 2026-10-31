@@ -1,6 +1,6 @@
 # Running the Platform Locally
 
-A cookbook for running the Storyteller API, the admin UI and the MCP server on one machine, signed in with the **AuthKit staging** environment. It collects the setup steps and the problems met along the way. The resources of the Aspire host are described in [Local Development with the Aspire Host](Aspire.Host/local-development.md), the MCP server in [MCP Server](Storyteller/mcp.md), and the token exchange in [User Authentication](Storyteller/authentication.md#user-token-exchange).
+A cookbook for running the Storyteller API, the admin UI and the MCP server on one machine, signed in with the **AuthKit staging** environment. It collects the setup steps and the problems met along the way. The resources of the Aspire host are described in [Local Development with the Aspire Host](Aspire.Host/local-development.md), the MCP server in [MCP Server](Storyteller/mcp.md), the token exchange in [User Authentication](Storyteller/authentication.md#user-token-exchange), and the browser tests of the admin UI in [Admin UI Automation Tests](UI.Admin.AutomationTests/automation-tests.md).
 
 ## What runs where
 
@@ -173,6 +173,10 @@ $t = "<access token>"; $p = $t.Split('.')[1].Replace('-','+').Replace('_','/'); 
 ```
 
 Expect `iss` = the AuthKit domain, `aud` = `https://localhost:7180/mcp`, `sub` = `user_…` and `scope` with the MCP scope.
+
+## UI automation tests
+
+The admin UI's browser tests (`src/Platform/UI.Admin.AutomationTests`) run against this local stack like against a deployed one: `Target:BaseUrl` `http://localhost:5173`, `Target:SignIn` `AuthKit` with pool users of AuthKit staging that have accounts and the configured organization, project and view in the local database. Without the stack, the admin UI's mock build (`npm run dev:mock`, the `mock` profile) needs no backend. Everything else, including the CI workflow, is in [Admin UI Automation Tests](UI.Admin.AutomationTests/automation-tests.md).
 
 ## Against a deployed API
 
