@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 
 // The annotation graph. Like the grid, the selected node's detail is a nested route (<RouterView>), so the graph
-// keeps its layout, zoom and focus while the detail changes (spec section 12).
+// keeps its layout, zoom and focus while the detail changes (spec section 12). New annotation and Bulk create are
+// here too, as on Annotations (424-130); a new annotation opens in the graph.
 const route = useRoute()
 const router = useRouter()
 const catalog = useCatalogStore()
 const context = useContextStore()
 const detail = useDetailPanel()
+const canEdit = useCan('edit')
+const { open: creating } = useAnnotationCreate()
+const { open: bulkCreating } = useAnnotationBulkCreate()
+
+// The dialogs share their open state with Annotations: one left open (browser Back) must not open again there.
+// Not on unmount, which runs after the command palette has opened a dialog for Annotations.
+onBeforeRouteLeave(() => {
+  creating.value = false
+  bulkCreating.value = false
+})
 
 watch(
   () => context.scope,
@@ -52,12 +63,20 @@ function close() {
               @click="context.scope && catalog.load(context.scope, { force: true })"
             />
           </UTooltip>
+          <AnnotationCreateActions variant="header" />
         </template>
       </AppNavbar>
     </template>
 
     <template #body>
-      <AnnotationGraph :selected-key="selectedKey" class="min-h-0 flex-1" @open="open" @close="close" />
+      <AnnotationGraph :selected-key="selectedKey" class="min-h-0 flex-1" @open="open" @close="close">
+        <template v-if="canEdit" #empty-actions>
+          <AnnotationCreateActions variant="empty" />
+        </template>
+      </AnnotationGraph>
+
+      <AnnotationCreateDialog v-if="canEdit" v-model:open="creating" @created="open" />
+      <AnnotationBulkCreateDialog v-if="canEdit" v-model:open="bulkCreating" />
     </template>
   </UDashboardPanel>
 
