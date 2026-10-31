@@ -694,7 +694,50 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         (await otherLayer.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.ExternalSchemaReference);
         var forced = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "forced" }"""), actor, true);
         forced.Content["name"]!.Value<string>().Should().Be("forced");
+
+        // force covers the compliance check that could not finish, so the other layer can be stored and the broken one
+        // replaced
+        var forcedLayer = await schemas.SetAnnotationSchemaAsync(TestConstants.Organization, project, View, key.Annotation.ToString(), StrictNameSchema(), actor, true);
+        var replaced = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), actor, true);
+
+        forcedLayer.Version.Should().Be(1);
+        replaced.Version.Should().Be(2);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "checked again" }"""), actor);
         listener.Pending().Should().BeFalse();
+    }
+
+    // the trial check on save: whatever force is, such a schema is not stored
+    [Theory]
+    [InlineData("""{ "not": { "$ref": "#" } }""")]
+    [InlineData("""{ "allOf": [ { "$ref": "#" } ] }""")]
+    public async Task SchemaSave_WhoseCheckCannotStart_IsRefusedEvenWithForce(string schemaContent)
+    {
+        var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
+        var save = () => schemas.SetSchemaAsync(TestConstants.Organization, "schema-cannot-check", View, AnnotationTypeCodes.Responsibility, JObject.Parse(schemaContent), AuditActor.Account("test"), true);
+
+        var refused = (await save.Should().ThrowAsync<InvalidInputException>()).Which;
+
+        refused.ErrorCode.Should().Be(ErrorCodes.InvalidSchema);
+        refused.Message.Should().StartWith("Invalid JSON Schema: ");
+        (await schemas.GetSchemaAsync(TestConstants.Organization, "schema-cannot-check", View, AnnotationTypeCodes.Responsibility)).Should().BeNull();
+    }
+
+    // below a property the trial check cannot see the cycle; the write that reaches it fails instead of crashing
+    [Fact]
+    public async Task SchemaWithACycleBelowAProperty_FailsTheWritesThatReachIt()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+        var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
+        var project = "schema-cycle-below";
+        var schema = JObject.Parse("""{ "properties": { "x": { "not": { "$ref": "#/properties/x" } } } }""");
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("test"), false);
+        var key = await CreateResponsibilityAsync(annotations, project, "cycle", View);
+
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "y": 1 }"""), AuditActor.Account("test"));
+        var reaching = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "x": 1 }"""), AuditActor.Account("test"));
+
+        (await reaching.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidSchema);
     }
 
     private static JObject ExternalNameSchema(TcpListener listener)

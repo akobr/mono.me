@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Configuring;
 using FluentAssertions;
@@ -16,6 +17,9 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 // failure is an InvalidInputException with a schema code.
 public sealed class ConfigurationSchemaCheckerTests : IDisposable
 {
+    // 30 'a' and a '!': about 2^30 steps of backtracking for ^(a+)+$
+    private static readonly string Evil = $"{new string('a', 30)}!";
+
     // the target of the URL references: NJsonSchema's default resolver would connect to it
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
 
@@ -162,15 +166,133 @@ public sealed class ConfigurationSchemaCheckerTests : IDisposable
         errors.Should().Equal(expected).And.Contain("#/email: EmailExpected").And.Contain("#/when: PatternMismatch");
     }
 
+    // a real catastrophic match: the checker's own timeout bounds it, not the process default of the test host
+    [Theory]
+    [InlineData("""{ "type": "object", "properties": { "p": { "type": "string", "pattern": "^(a+)+$" } } }""", """{ "p": "{evil}" }""")]
+    [InlineData("""{ "properties": { "list": { "type": "array", "items": { "type": "string", "pattern": "^(a+)+$" } } } }""", """{ "list": ["aaa", "{evil}"] }""")]
+    [InlineData("""{ "oneOf": [ { "type": "object", "properties": { "p": { "pattern": "^(a+)+$" } } }, { "type": "string" } ] }""", """{ "p": "{evil}" }""")]
+    [InlineData("""{ "type": "object", "patternProperties": { "^(a+)+$": { "type": "integer" } } }""", """{ "{evil}": 1 }""")]
+    public async Task Validate_OfAPatternThatRunsOutOfItsTimeout_IsASchemaValidationTimeout(string schemaContent, string content)
+    {
+        var checker = Checker(new ConfigurationSchemaOptions { PatternMatchTimeout = TimeSpan.FromMilliseconds(20) });
+        var schema = await checker.ParseAsync(JObject.Parse(schemaContent));
+
+        var validate = () => checker.Validate(schema, JObject.Parse(content.Replace("{evil}", Evil)));
+
+        var exception = validate.Should().Throw<InvalidInputException>().Which;
+        exception.ErrorCode.Should().Be(ErrorCodes.SchemaValidationTimeout);
+        exception.Message.Should().Be("The pattern '^(a+)+$' of the schema took longer than 20 ms to match a value; simplify the pattern.");
+    }
+
+    [Fact]
+    public async Task Validate_OfALongPatternThatRunsOutOfItsTimeout_QuotesItShortened()
+    {
+        var pattern = $"^(a+)+$|{new string('x', 300)}";
+        var checker = Checker(new ConfigurationSchemaOptions { PatternMatchTimeout = TimeSpan.FromMilliseconds(20) });
+        var schema = await checker.ParseAsync(new JObject { ["properties"] = new JObject { ["p"] = new JObject { ["pattern"] = pattern } } });
+
+        var validate = () => checker.Validate(schema, new JObject { ["p"] = Evil });
+
+        var exception = validate.Should().Throw<InvalidInputException>().Which;
+        exception.ErrorCode.Should().Be(ErrorCodes.SchemaValidationTimeout);
+        exception.Message.Should().Contain("xxx…'").And.NotContain(new string('x', 101));
+    }
+
+    // every step of the validator reads the clock, which advances a second per reading here
+    [Fact]
+    public async Task Validate_OverItsBudget_IsASchemaValidationTimeout()
+    {
+        var checker = Checker(new ConfigurationSchemaOptions(), new SteppingTimeProvider());
+        var schema = await checker.ParseAsync(JObject.Parse("""{ "properties": { "list": { "type": "array", "items": { "type": "integer" } } } }"""));
+
+        var validate = () => checker.Validate(schema, new JObject { ["list"] = new JArray(Enumerable.Range(0, 50)) });
+
+        var exception = validate.Should().Throw<InvalidInputException>().Which;
+        exception.ErrorCode.Should().Be(ErrorCodes.SchemaValidationTimeout);
+        exception.Message.Should().Be("Checking the document against its schema takes longer than 10 s; simplify the schema or the document.");
+    }
+
+    [Fact]
+    public async Task Parse_OverItsBudget_IsASchemaValidationTimeout()
+    {
+        var exception = await ParseFailureAsync(WithReference("#/definitions/a"), Checker(new ConfigurationSchemaOptions { CheckBudget = TimeSpan.Zero }));
+
+        exception.ErrorCode.Should().Be(ErrorCodes.SchemaValidationTimeout);
+        exception.Message.Should().Be("Reading the schema takes longer than 0 ms; simplify its references.");
+    }
+
+    // NJsonSchema serializes an object once per entry within one step, which the clock would not see
+    [Fact]
+    public async Task Validate_OfAnObjectAgainstALargeEnum_IsASchemaValidationTimeoutWithoutTheClock()
+    {
+        var entries = new JArray(Enumerable.Range(0, 2_000).Select(index => new JObject { ["k"] = index }));
+        var checker = Checker(new ConfigurationSchemaOptions(), new SteppingTimeProvider(step: TimeSpan.Zero));
+        var onTheObject = await checker.ParseAsync(new JObject { ["enum"] = entries });
+        var onAScalar = await checker.ParseAsync(new JObject { ["properties"] = new JObject { ["v"] = new JObject { ["enum"] = entries } } });
+
+        var large = () => checker.Validate(onTheObject, new JObject { ["data"] = new string('x', 30_000) });
+
+        large.Should().Throw<InvalidInputException>().Which.ErrorCode.Should().Be(ErrorCodes.SchemaValidationTimeout);
+        checker.Validate(onAScalar, new JObject { ["v"] = "x" }).Should().Equal("#/v: NotInEnumeration");
+    }
+
+    // a step depends only on its value and its schema: meeting the pair again below itself never ends
+    [Theory]
+    [InlineData("""{ "not": { "$ref": "#" } }""", "{}")]
+    [InlineData("""{ "oneOf": [ { "$ref": "#" }, { "type": "string" } ] }""", "{}")]
+    [InlineData("""{ "type": "object", "anyOf": [ { "not": { "not": { "$ref": "#" } } } ] }""", """{ "a": 1 }""")]
+    [InlineData("""{ "properties": { "x": { "not": { "$ref": "#/properties/x" } } } }""", """{ "x": 1 }""")]
+    public async Task Validate_OfASchemaThatAppliesItselfToTheSameValue_IsAnInvalidSchema(string schemaContent, string content)
+    {
+        var checker = Checker();
+        var schema = await checker.ParseAsync(JObject.Parse(schemaContent));
+
+        var validate = () => checker.Validate(schema, JObject.Parse(content));
+
+        var exception = validate.Should().Throw<InvalidInputException>().Which;
+        exception.ErrorCode.Should().Be(ErrorCodes.InvalidSchema);
+        exception.Message.Should().Be(
+            "Invalid JSON Schema: the schema applies itself to the same value again (for example \"not\": { \"$ref\": \"#\" }), so its check would never end.");
+    }
+
+    // the same schema on child values is no cycle
+    [Fact]
+    public async Task Validate_OfARecursiveSchemaOverNestedValues_Passes()
+    {
+        var checker = Checker();
+        var schema = await checker.ParseAsync(JObject.Parse("""
+            { "type": "object", "properties": { "child": { "$ref": "#" }, "name": { "type": "string" } } }
+            """));
+
+        checker.Validate(schema, JObject.Parse("""{ "child": { "child": { "child": { "name": 5 } } } }"""))
+            .Should().Equal("#/child.child.child.name: StringExpected");
+        checker.Validate(schema, JObject.Parse("""{ "x": 1 }""")).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("""{ "allOf": [ { "$ref": "#" } ] }""", "{}")]
+    [InlineData("""{ "properties": { "p": { "pattern": "(" } } }""", """{ "p": "x" }""")]
+    public async Task Validate_OfASchemaWhoseCheckCannotRun_IsAnInvalidSchema(string schemaContent, string content)
+    {
+        var checker = Checker();
+        var schema = await checker.ParseAsync(JObject.Parse(schemaContent));
+
+        var validate = () => checker.Validate(schema, JObject.Parse(content));
+
+        var exception = validate.Should().Throw<InvalidInputException>().Which;
+        exception.ErrorCode.Should().Be(ErrorCodes.InvalidSchema);
+        exception.Message.Should().StartWith("Invalid JSON Schema: ");
+    }
+
     public void Dispose()
     {
         _listener.Stop();
         _listener.Dispose();
     }
 
-    private static ConfigurationSchemaChecker Checker()
+    private static ConfigurationSchemaChecker Checker(ConfigurationSchemaOptions options = null, TimeProvider timeProvider = null)
     {
-        return new ConfigurationSchemaChecker();
+        return new ConfigurationSchemaChecker(options ?? new ConfigurationSchemaOptions(), timeProvider ?? TimeProvider.System);
     }
 
     private static JObject WithReference(string reference)
@@ -183,9 +305,23 @@ public sealed class ConfigurationSchemaCheckerTests : IDisposable
         };
     }
 
-    private static async Task<InvalidInputException> ParseFailureAsync(JObject schema)
+    private static async Task<InvalidInputException> ParseFailureAsync(JObject schema, ConfigurationSchemaChecker checker = null)
     {
-        var parse = () => Checker().ParseAsync(schema);
+        var parse = () => (checker ?? Checker()).ParseAsync(schema);
         return (await parse.Should().ThrowAsync<InvalidInputException>()).Which;
+    }
+
+    // a clock that advances by its step on every reading
+    private sealed class SteppingTimeProvider(TimeSpan? step = null) : TimeProvider
+    {
+        private readonly long _step = (step ?? TimeSpan.FromSeconds(1)).Ticks;
+        private long _now;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp()
+        {
+            return Interlocked.Add(ref _now, _step);
+        }
     }
 }

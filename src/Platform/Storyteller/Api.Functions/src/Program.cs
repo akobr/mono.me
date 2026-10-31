@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Api;
 using _42.Platform.Storyteller.Api.ConditionalReads;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Json;
@@ -21,6 +22,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
+// First, before anything uses a Regex: the default match timeout is infinite unless it is set, and Regex reads it once.
+ProcessDefaults.Apply();
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>

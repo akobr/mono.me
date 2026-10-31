@@ -755,6 +755,24 @@ public partial class CosmosConfigurationService : IConfigurationService
                     },
                 ];
             }
+            catch (InvalidInputException exception) when (ConfigurationSchemaChecker.IsCheckFailure(exception))
+            {
+                // the schema could not be used (it refers outside itself, or its check runs out of time); force stores
+                // the document anyway, as a forced write stores it without a check
+                if (!options.Force)
+                {
+                    return new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
+                }
+
+                warnings =
+                [
+                    new ViewImportWarning
+                    {
+                        Code = exception.ErrorCode,
+                        Message = $"Force stores the document although its schema could not be checked: {exception.Message}",
+                    },
+                ];
+            }
         }
 
         var outcome = hasContent ? ViewImportOutcome.Updated : ViewImportOutcome.Created;
