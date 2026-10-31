@@ -546,8 +546,8 @@ export const annotationHandlers: HttpHandler[] = [
 
   // SetAnnotationsSimple, like CreateAnnotationsFromStringAsync: each entry is read into a key (keyOfSimpleLine),
   // the keys are created in type order with their missing ancestors, and existing or repeated keys are skipped.
-  // The response lists, per key, the ancestors created for it (roots first) and then the key. The literal segment
-  // "simple" wins over {key}, like the API's route table.
+  // The response lists, per key, the ancestors created for it (roots first) and then the key. The API's {key} routes
+  // take only keys with a dot, so "simple" never reaches them; here the literal route comes first.
   http.post<ScopeParams>(
     `${api}/annotations/simple`,
     withDb(async (db, { params, request }) => {
@@ -556,17 +556,26 @@ export const annotationHandlers: HttpHandler[] = [
         return denied
       }
 
-      const body: unknown = await request.json().catch(() => null)
-      if (!Array.isArray(body)) {
-        // the server dereferences the null list
-        return errorResponse(500, 'Object reference not set to an instance of an object.')
+      // the API's answers: a blank body or JSON null has no list, anything else must be a list of strings
+      const text = await request.text()
+      let body: unknown
+      try {
+        body = text.trim() ? JSON.parse(text) : null
+      } catch {
+        body = undefined
+      }
+      if (body === null) {
+        return errorResponse(400, 'The annotations are missing.')
+      }
+      if (!Array.isArray(body) || body.some((entry) => typeof entry !== 'string')) {
+        return errorResponse(400, 'The request body is not a list of annotation keys or lines.')
       }
       if (body.length > maxKeys) {
         return errorResponse(400, `The number of annotations to create is too large, maximum allowed is ${maxKeys}.`)
       }
 
-      const keys = body
-        .map((entry) => (typeof entry === 'string' ? keyOfSimpleLine(entry) : undefined))
+      const keys = (body as string[])
+        .map((entry) => keyOfSimpleLine(entry))
         .filter((key): key is string => !!key)
         .toSorted((a, b) => mergeOrderOf(a) - mergeOrderOf(b))
       const created: Annotation[] = []
@@ -600,7 +609,7 @@ export const annotationHandlers: HttpHandler[] = [
     }),
   ),
 
-  // The literal segment "deleted" wins over {key}, like the API's route table.
+  // The API's {key} routes take only keys with a dot, so "deleted" never reaches them; here the literal route comes first.
   http.get<ScopeParams>(
     `${api}/annotations/deleted`,
     withDb((db, { params, request }) => {

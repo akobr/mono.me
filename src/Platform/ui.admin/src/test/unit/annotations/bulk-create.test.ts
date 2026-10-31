@@ -126,14 +126,21 @@ describe('the mock SetAnnotationsSimple', () => {
     expect(history.Entries?.[0]?.Action).toBe('Recreated')
   })
 
-  it('answers 400 above 100 entries, blank ones included, and 500 without a list', async () => {
+  it('answers 400 above 100 entries, blank ones included, and without a list, like the API', async () => {
     await expect(setAnnotationsSimple(org, project, view, [...subjects(100), ''])).rejects.toMatchObject({
       status: 400,
       message: 'The number of annotations to create is too large, maximum allowed is 100.',
       errorCode: undefined,
     })
     expect(active().has('sbt.bulk-0')).toBe(false)
-    await expect(setAnnotationsSimple(org, project, view)).rejects.toMatchObject({ status: 500 })
+    await expect(setAnnotationsSimple(org, project, view)).rejects.toMatchObject({
+      status: 400,
+      message: 'The annotations are missing.',
+    })
+    await expect(setAnnotationsSimple(org, project, view, [1] as unknown as string[])).rejects.toMatchObject({
+      status: 400,
+      message: 'The request body is not a list of annotation keys or lines.',
+    })
   })
 
   it('needs the Contributor role', async () => {
