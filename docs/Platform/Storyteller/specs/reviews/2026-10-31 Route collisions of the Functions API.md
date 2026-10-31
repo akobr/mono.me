@@ -109,6 +109,17 @@ The plan proposed the same constraints, the dispatch test, an OpenAPI path check
 - The key/value usage route and the crosswise overlaps are included: the same defect, found by the inventory and the pair test.
 - The `500` of the side panel was not traced to the `GET …/deleted` misroute: that misroute answered `400 "Invalid annotation key: deleted"` (424-131).
 
+### 424-131 and its plan
+
+424-131 (Modeling → Deleted answers `400 "Invalid annotation key: deleted"`) has the same cause: `GetAnnotation` sorts before `GetDeletedAnnotations`, so `GET …/annotations/deleted?roots=true` ran `GetAnnotation` with the key `deleted`. The query string takes no part in routing, so `roots=false` behaved the same. The `{key}` constraint of section 1 fixes it; the local host answered the deleted list with this branch and the issue's `400` with `main` (Validation). The issue asks for the same audit as 424-128 (the literal siblings under `annotations/` and `configuration-schema/{key}`) and tests of the routing, which sections 3, 5 and 8 cover.
+
+Its CodeRabbit plan differs from this branch in four places:
+
+- It also constrains `{key}` of `…/deleted/{key}`. That route meets nothing once `{key}` of `Descendants` needs a dot (`lookup` and `restore` are `POST`), so it stays unconstrained and a key there that doesn't parse keeps the function's `400 InvalidKey`.
+- It allow-lists the reserved-name overlaps (`GetAccessPoint` against `GetViews` and `GetBindingCatalog`, `GetKeyValues` against `GetKeyValueUsage`) and avoids `?` in constraints. This branch removes them with negative lookaheads (`^(?!access$)`, `^(?!usage$)`). The template parser takes a `?` inside `regex(...)`; only a `?` at the end of a parameter marks it optional. The local host listed and dispatched those routes correctly. `GetKeyValues` against `GetKeyValueUsage` was not only a reserved-name overlap: the usage report of the Admin UI and `sform` reached the list.
+- Its witness `GET configuration-schema/type/versions` → `GetSchemaVersions` has one segment too few: that URL is the type schema of the type `versions` (`GetConfigurationSchema`, `400`). `RouteDispatchTests` checks `…/type/rst/versions` → `GetSchemaVersions`, the combined schema and a descendant-type schema instead, and `LiteralSegments_AreNotAnnotationKeys` has `type`.
+- It checks an encoded dot (`rst%2Ename`). Kestrel decodes every escape in the path but `%2F` before routing, so the constraint sees the dot; this was not tried on the host.
+
 ## Validation
 
 - `Api.Functions.UnitTests`: 2680/2680.
