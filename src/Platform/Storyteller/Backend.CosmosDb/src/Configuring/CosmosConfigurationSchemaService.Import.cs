@@ -89,10 +89,10 @@ public partial class CosmosConfigurationSchemaService
         {
             await EnsureValidSchemaAsync(content);
         }
-        catch (ArgumentException exception)
+        catch (InvalidInputException exception)
         {
-            // Force never stores a broken schema
-            return new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: ErrorCodes.InvalidSchema, Message: exception.Message);
+            // Force never stores a broken schema, or one that refers outside itself (InvalidSchema, ExternalSchemaReference)
+            return new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
         }
 
         var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
@@ -266,14 +266,14 @@ public partial class CosmosConfigurationSchemaService
             : ($"configurations of {listed}", "violate");
     }
 
-    private static async Task<bool> IsValidSchemaAsync(JObject schemaContent)
+    private async Task<bool> IsValidSchemaAsync(JObject schemaContent)
     {
         try
         {
             await EnsureValidSchemaAsync(schemaContent);
             return true;
         }
-        catch (ArgumentException)
+        catch (InvalidInputException)
         {
             return false;
         }
@@ -284,9 +284,12 @@ public partial class CosmosConfigurationSchemaService
         return new ViewImportResult(ViewImportOutcome.Skipped, ErrorCode: errorCode, Message: message);
     }
 
-    // The schemas an import brings (ViewImportOverlay.Schemas) as layers of combined schemas. An empty or invalid one is
-    // not written by the import, so the stored layer stays; each is validated once.
-    private sealed class OverlaySchemaLayers(IReadOnlyDictionary<SchemaKey, JObject> schemas, AuditStamp modified)
+    // The schemas an import brings (ViewImportOverlay.Schemas) as layers of combined schemas. An empty or invalid one,
+    // or one that refers outside itself, is not written by the import, so the stored layer stays; each is validated once.
+    private sealed class OverlaySchemaLayers(
+        IReadOnlyDictionary<SchemaKey, JObject> schemas,
+        AuditStamp modified,
+        Func<JObject, Task<bool>> isValidSchemaAsync)
     {
         private readonly Dictionary<SchemaKey, bool> _validity = new();
 
@@ -301,7 +304,7 @@ public partial class CosmosConfigurationSchemaService
 
             if (!_validity.TryGetValue(key, out var isValid))
             {
-                isValid = await IsValidSchemaAsync(content);
+                isValid = await isValidSchemaAsync(content);
                 _validity[key] = isValid;
             }
 
