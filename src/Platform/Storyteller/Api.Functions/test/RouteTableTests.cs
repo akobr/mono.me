@@ -258,13 +258,15 @@ public partial class RouteTableTests
     }
 
     // The literal segments beside {key} are no annotation keys and have no dot, so the constrained {key} never takes them
-    // (Definitions.Routes.Constraints.AnnotationKey); RouteDispatchTests checks the dispatch itself.
+    // (Definitions.Routes.Constraints.AnnotationKey): "simple", "deleted" and "history" beside the annotation routes, and
+    // "type" beside the schema routes of a key. RouteDispatchTests checks the dispatch itself.
     [Theory]
     [InlineData("simple")]
     [InlineData("deleted")]
     [InlineData("lookup")]
     [InlineData("restore")]
     [InlineData("history")]
+    [InlineData("type")]
     public void LiteralSegments_AreNotAnnotationKeys(string segment)
     {
         AnnotationKey.TryParse(segment, out _).ShouldBeFalse();

@@ -65,6 +65,9 @@ public class RouteDispatchTests
     [InlineData("GET", "v1/acme/billing/views", nameof(ViewsHttp.GetViews))]
     [InlineData("GET", Scope + "/configuration-schema/type/rst", nameof(ConfigurationSchemaHttp.GetConfigurationSchema))]
     [InlineData("GET", Scope + "/configuration-schema/rst.billing", nameof(ConfigurationSchemaHttp.GetAnnotationSchema))]
+    [InlineData("GET", Scope + "/configuration-schema/rst.billing/definition", nameof(ConfigurationSchemaHttp.GetCombinedConfigurationSchema))]
+    [InlineData("GET", Scope + "/configuration-schema/type/rst/versions", nameof(ConfigurationSchemaHttp.GetSchemaVersions))]
+    [InlineData("GET", Scope + "/configuration-schema/sbt.northwind/type/usg", nameof(ConfigurationSchemaHttp.GetDescendantTypeSchema))]
     public void Request_MatchesExactlyItsFunction(string method, string path, string function)
     {
         Match(method, path).ShouldBe([function]);
