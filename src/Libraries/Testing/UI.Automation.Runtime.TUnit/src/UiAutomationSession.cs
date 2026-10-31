@@ -11,11 +11,12 @@ namespace _42.Testing.UI.Automation.Runtime.TUnit;
 // [assembly: UiAutomationSetup<T>] and the receivers it wants. Before discovery the settings load with the
 // --test-parameter values, because registration-time code (the Requires* skips, [ConfiguredRetry], the BrowserStack
 // limiter) runs before Before(TestSession); the hook also hands Execution:MaxParallelTests to TUnit, whose command line
-// and TUNIT_MAX_PARALLEL_TESTS still win. Before the first test the AutomationSession starts with every selected test as
-// planned (the start ends with the setup's target check, when it has one); after the last it stops and the run summary
-// goes to the terminal. A failure to load or to start (a failed target check included) is logged once and kept, and
-// fails each UI test at once with its message (UiAutomationUnavailableException, never retried), instead of failing
-// TUnit's discovery or every test of the assembly.
+// and TUNIT_MAX_PARALLEL_TESTS still win, raises TUnit's hook timeout (5 minutes) to the settings' StartBudget when that
+// is longer, and has the terminal log show the settings' secrets as ***. Before the first test the AutomationSession
+// starts with every selected test as planned (the start ends with the setup's target check, when it has one); after the
+// last it stops and the run summary goes to the terminal. A failure to load or to start (a failed target check
+// included) is logged once and kept, and fails each UI test at once with its message (UiAutomationUnavailableException,
+// never retried), instead of failing TUnit's discovery or every test of the assembly.
 public static class UiAutomationSession
 {
     private static readonly object Gate = new();
@@ -94,6 +95,7 @@ public static class UiAutomationSession
             return;
         }
 
+        ConsoleSessionLogger.Instance.Redact = SettingsRedaction.CreateRedactor(settings);
         if (SkipReason is { } reason)
         {
             Logger.LogInformation("{Reason} Every UI test is skipped.", reason);
@@ -101,6 +103,14 @@ public static class UiAutomationSession
         }
 
         context.Settings.Parallelism.MaximumParallelTests = settings.Execution.MaxParallelTests;
+
+        // The start of a test (the lease, a BrowserStack connection, the first sign-in) and the session's start (the
+        // target check) run in hooks; under TUnit's default hook timeout a slow start would end cancelled instead of
+        // with the pool's or the provider's message.
+        if (settings.StartBudget > context.Settings.Timeouts.DefaultHookTimeout)
+        {
+            context.Settings.Timeouts.DefaultHookTimeout = settings.StartBudget;
+        }
     }
 
     [Before(HookType.TestSession)]
@@ -204,7 +214,10 @@ public static class UiAutomationSession
     {
         if (failure is not null)
         {
-            throw new UiAutomationUnavailableException($"UI automation is not available: {failure.Message}", failure);
+            var redact = settings is null ? null : SettingsRedaction.CreateRedactor(settings, includeEmails: true);
+            var text = failure.ToString();
+            var clean = redact is null || redact(text) == text;
+            throw new UiAutomationUnavailableException($"UI automation is not available: {redact?.Invoke(failure.Message) ?? failure.Message}", clean ? failure : null);
         }
 
         if (settings is null)
@@ -375,6 +388,7 @@ public static class UiAutomationSession
         settings = null;
         setup = null;
         failure = null;
+        ConsoleSessionLogger.Instance.Redact = null;
     }
 
     private sealed record PendingReport(

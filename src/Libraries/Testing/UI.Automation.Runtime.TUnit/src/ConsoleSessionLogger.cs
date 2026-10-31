@@ -7,7 +7,8 @@ namespace _42.Testing.UI.Automation.Runtime.TUnit;
 // terminal shows only with --output Detailed, so this writes to the standard output stream of the process directly
 // (but not under --server, where an IDE drives the process and the console stays TUnit's). Under --list-tests it writes
 // to the standard error stream, so the output of '--list-tests json' stays a JSON document. Information and above; a
-// warning shows the exception's message, an error the whole exception.
+// warning shows the exception's message, an error the whole exception. Once the settings load, every line goes through
+// Redact: their secrets are *** (a Playwright call log in an exception may hold a typed password).
 internal sealed class ConsoleSessionLogger : ILogger
 {
     public const string Prefix = "ui-automation";
@@ -28,6 +29,9 @@ internal sealed class ConsoleSessionLogger : ILogger
 
     public static ConsoleSessionLogger Instance { get; } = new();
 
+    // SettingsRedaction.CreateRedactor of the loaded settings; null before they load.
+    public Func<string?, string>? Redact { get; set; }
+
     public IDisposable? BeginScope<TState>(TState state)
         where TState : notnull
     {
@@ -46,19 +50,13 @@ internal sealed class ConsoleSessionLogger : ILogger
             return;
         }
 
-        var message = formatter(state, exception);
-        Write(logLevel switch
-        {
-            LogLevel.Warning => exception is null ? $"warning: {message}" : $"warning: {message} ({exception.Message})",
-            >= LogLevel.Error => exception is null ? $"error: {message}" : $"error: {message}{Environment.NewLine}{exception}",
-            _ => message,
-        });
+        Write(Format(logLevel, formatter(state, exception), exception));
     }
 
-    // Every line of text, prefixed.
+    // Every line of text, prefixed, with the secrets of the settings as ***.
     public void Write(string text)
     {
-        var lines = text.ReplaceLineEndings("\n").Split('\n');
+        var lines = Lines(text);
         lock (gate)
         {
             var writer = terminal ?? Console.Out;
@@ -67,5 +65,22 @@ internal sealed class ConsoleSessionLogger : ILogger
                 writer.WriteLine($"{Prefix}: {line}");
             }
         }
+    }
+
+    // A warning shows the exception's message, an error the whole exception.
+    internal static string Format(LogLevel logLevel, string message, Exception? exception)
+    {
+        return logLevel switch
+        {
+            LogLevel.Warning => exception is null ? $"warning: {message}" : $"warning: {message} ({exception.Message})",
+            >= LogLevel.Error => exception is null ? $"error: {message}" : $"error: {message}{Environment.NewLine}{exception}",
+            _ => message,
+        };
+    }
+
+    // The lines Write prints, before their prefix.
+    internal string[] Lines(string text)
+    {
+        return (Redact?.Invoke(text) ?? text).ReplaceLineEndings("\n").Split('\n');
     }
 }

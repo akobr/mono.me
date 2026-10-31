@@ -19,4 +19,10 @@ public sealed class TestScopeOptions
 
     // When the engine started the test; the scope's creation when unset.
     public DateTimeOffset? StartedAt { get; set; }
+
+    // The engine's cancellation of the test itself (e.g. the run was stopped), when BeginAsync gets another token: one
+    // that also ends when a budget of the engine runs out (e.g. TUnit's hook timeout). A start that this budget ended
+    // fails like a pool or a browser that did not deliver in time (Blocked: UserLeaseException, BrowserUnavailableException;
+    // a TimeoutException for a later step), not as a cancelled test. Unset: a cancelled start is a cancelled test.
+    public CancellationToken? TestCancellation { get; set; }
 }

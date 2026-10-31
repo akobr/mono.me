@@ -33,7 +33,8 @@ public static class BrowserStackCapabilities
     }
 
     // In this order: the platform, the dashboard's grouping, the credentials, BrowserStack Local, the Playwright
-    // versions and the logs; then BrowserStack:AdditionalCapabilities, each replacing a capability of its name.
+    // versions, the logs and what they mask; then BrowserStack:AdditionalCapabilities, each replacing a capability of
+    // its name.
     // clientPlaywrightVersion: the version of the Microsoft.Playwright client, e.g. 1.63.0.
     public static IReadOnlyList<KeyValuePair<string, string>> Create(BrowserStackSettings settings, string sessionName, string build, string clientPlaywrightVersion)
     {
@@ -64,6 +65,8 @@ public static class BrowserStackCapabilities
         Add(capabilities, "browserstack.networkLogs", Flag(settings.NetworkLogs));
         Add(capabilities, "browserstack.debug", Flag(settings.Debug));
         Add(capabilities, "browserstack.video", Flag(settings.Video));
+        Add(capabilities, "browserstack.playwrightLogs", Flag(settings.PlaywrightLogs));
+        Add(capabilities, "browserstack.maskCommands", NormalizeList(settings.MaskCommands));
 
         foreach (var (key, value) in settings.AdditionalCapabilities)
         {
@@ -170,6 +173,13 @@ public static class BrowserStackCapabilities
         {
             capabilities.Add(new(key, value.Trim()));
         }
+    }
+
+    // "a, b": the entries trimmed, empty ones dropped; null for none.
+    private static string? NormalizeList(string? value)
+    {
+        var entries = (value ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return entries.Length == 0 ? null : string.Join(", ", entries);
     }
 
     private static string Flag(bool value)

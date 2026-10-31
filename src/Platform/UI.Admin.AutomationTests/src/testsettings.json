@@ -61,6 +61,8 @@
     "NetworkLogs": false,
     "Debug": false,
     "Video": true,
+    "MaskCommands": "sendType, sendPress, setHTTPCredentials, setStorageState",
+    "PlaywrightLogs": false,
     "MaxParallelSessions": 5,
     "ConnectTimeoutSeconds": 300,
     "AdditionalCapabilities": {}

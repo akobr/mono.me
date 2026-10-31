@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using _42.Testing.UI.Automation.Runtime.Browsers;
 using Microsoft.Extensions.Configuration;
 
 namespace _42.Testing.UI.Automation.Runtime.Settings;
@@ -39,6 +40,46 @@ public static class SettingsRedaction
     public static string? Redact(string key, string? value)
     {
         return IsSecret(key) && !string.IsNullOrEmpty(value) ? Mask : value;
+    }
+
+    // The values of the settings' secrets: of every configuration key IsSecret finds (Users:Pool:<n>:Password,
+    // BrowserStack:AccessKey, Reporting:Testiny:ApiKey, a consumer's own), and the bound pool passwords and access key.
+    public static IReadOnlyList<string> SecretValues(UiAutomationSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var values = new List<string>();
+        foreach (var (key, value) in settings.Configuration.AsEnumerable())
+        {
+            if (!string.IsNullOrEmpty(value) && IsSecret(key))
+            {
+                values.Add(value);
+            }
+        }
+
+        values.AddRange(settings.Users.Pool.Select(user => user.Password).OfType<string>());
+        if (settings.BrowserStack.AccessKey is { } accessKey)
+        {
+            values.Add(accessKey);
+        }
+
+        return values.Where(value => value.Trim().Length > 0).Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    // Replaces every secret value of the settings (SecretValues) by ***, as is, trimmed, URL-encoded and JSON-escaped;
+    // with includeEmails also the pool users' e-mail addresses, which no report shows. For text that leaves the process:
+    // failure messages and stack traces, logs. Built from the settings as they are now.
+    public static Func<string?, string> CreateRedactor(UiAutomationSettings settings, bool includeEmails = false)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        IEnumerable<string?> values = SecretValues(settings);
+        if (includeEmails)
+        {
+            values = values.Concat(settings.Users.Pool.Select(user => user.Email));
+        }
+
+        return new SecretRedactor(values).Redact;
     }
 
     // Every key of the configuration and every effective value of the six sections (defaults included), sorted.

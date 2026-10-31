@@ -62,6 +62,10 @@ public abstract class UiTest
             SignedIn = SignedIn && LeasesUser,
             Attempt = context.Execution.CurrentRetryAttempt + 1,
             StartedAt = context.Execution.TestStart,
+
+            // The hook's token also ends at TUnit's hook timeout (raised over the start's budget by UiAutomationSession);
+            // a start it ends is Blocked by the step that did not finish, not a cancelled test.
+            TestCancellation = context.Execution.CancellationToken,
         });
 
         // On failure the scope keeps the exception; After(Test) still runs and reports it.

@@ -52,6 +52,15 @@ public sealed class TestScope : IAsyncDisposable
         Artifacts = session.CreateArtifacts(test, options.Attempt);
     }
 
+    // What BeginAsync was doing when a budget of the engine ran out.
+    private enum BeginStep
+    {
+        Lease,
+        Browser,
+        SignIn,
+        Page,
+    }
+
     public AutomationSession Session { get; }
 
     public TestIdentity Test { get; }
@@ -109,7 +118,9 @@ public sealed class TestScope : IAsyncDisposable
         return new TestScope(session, test, options);
     }
 
-    // Once per scope. On failure the exception is kept in BeginException and rethrown; call EndAsync anyway.
+    // Once per scope. On failure the exception is kept in BeginException and rethrown; call EndAsync anyway. A
+    // cancellation of cancellationToken while TestScopeOptions.TestCancellation is not cancelled is a budget of the
+    // engine that ran out; it becomes the exception of the step that did not finish (see TestScopeOptions).
     public async Task BeginAsync(CancellationToken cancellationToken = default)
     {
         if (Interlocked.Exchange(ref begun, 1) != 0)
@@ -117,6 +128,7 @@ public sealed class TestScope : IAsyncDisposable
             throw new InvalidOperationException("BeginAsync runs once per scope.");
         }
 
+        var step = BeginStep.Lease;
         try
         {
             if (options.LeaseUser)
@@ -124,13 +136,17 @@ public sealed class TestScope : IAsyncDisposable
                 user = await Session.Users.LeaseAsync(options.User, cancellationToken);
             }
 
+            step = BeginStep.Browser;
             lease = await Session.BrowserProvider.AcquireAsync(Test, cancellationToken);
 
+            step = BeginStep.SignIn;
             string? storageState = null;
             if (options.SignedIn && Session.StorageStates is { } cache)
             {
                 storageState = await cache.GetAsync(user!, lease.Browser, Session.ContextOptions.Create(), Artifacts, cancellationToken);
             }
+
+            step = BeginStep.Page;
 
             var execution = Session.Settings.Execution;
             if (execution.Video != ArtifactPolicy.Off)
@@ -160,6 +176,11 @@ public sealed class TestScope : IAsyncDisposable
             }
 
             page = await context.NewPageAsync();
+        }
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested && options.TestCancellation is { IsCancellationRequested: false })
+        {
+            BeginException = OutOfTime(step, exception);
+            throw BeginException;
         }
         catch (Exception exception)
         {
@@ -248,6 +269,18 @@ public sealed class TestScope : IAsyncDisposable
     private static InvalidOperationException NotStarted()
     {
         return new InvalidOperationException("The test scope has not begun (BeginAsync) or its start failed.");
+    }
+
+    private Exception OutOfTime(BeginStep step, OperationCanceledException exception)
+    {
+        const string budget = "the engine's time for the start of the test ran out (e.g. its hook timeout)";
+        return step switch
+        {
+            BeginStep.Lease => new UserLeaseException($"No user with {options.User} was leased before {budget}; the pool has {Session.Users.Users.Count}, {Session.Users.LeasedCount} leased."),
+            BeginStep.Browser => new BrowserUnavailableException($"No {Session.BrowserProvider.Kind} browser was available before {budget}.", exception),
+            BeginStep.SignIn => new TimeoutException($"The sign-in of {user} did not finish before {budget}.", exception),
+            _ => new TimeoutException($"The context and page of the test did not open before {budget}.", exception),
+        };
     }
 
     private async Task<IBrowserContext> NewContextCoreAsync(string? storageState, string? recordVideoDirectory, string? label)
