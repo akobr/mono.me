@@ -145,7 +145,7 @@ A message names the kind of a value, never the value, because a resolved value c
 - The vendored JSON-e has four messages that quote an evaluated value. `ObjectBindingEngine` replaces them with fixed ones, for example `A called value is not a function.` `unknown context value` keeps its name only when the name is a whole word of the `$definition`.
 - A `JsonLogicException` answers `JSON Logic evaluation failed.`, because the library's messages are not all verified.
 - Any other exception from either engine, for example an `OverflowException` from JSON Logic arithmetic, is named by its type.
-- The result of an envelope is walked again, so it can hold more envelopes and `@` strings. Their keys, paths, kinds and definitions are computed and can carry an evaluated value. A failure inside a result is therefore reported at the path of the stored envelope that produced it, with a fixed message: `a data binding in its result cannot be evaluated` (or `exceeds the <kind> limit of <limit>`, which keeps the `Kind` and `Limit`), `JSON-e evaluation failed.`, or the fixed messages of a malformed envelope.
+- The result of an envelope is walked again, so it can hold more envelopes and `@` strings. Their keys, paths, kinds and definitions are computed and can carry an evaluated value. A failure inside a result is therefore reported at the path of the stored envelope that produced it, with a fixed message that quotes no computed key, path, kind or text. Examples are `a data binding in its result cannot be evaluated` (or `exceeds the <kind> limit of <limit>`, which keeps the `Kind` and `Limit`), `JSON-e evaluation failed.`, and the fixed messages of a malformed envelope, of the limits and of the engines above.
 
 The API logs a binding failure at Warning with its code and path, and with the kind and limit of a limit. It never logs the message. The path is the stored one, also for a failure inside a result.
 
@@ -214,7 +214,14 @@ Provides integration with Azure Key Vault:
 
 Reads a value out of the *same* configuration document currently being resolved. `<expr>` is a JSONPath expression (leading `$`, e.g. `"$.a.b"`) or a JSON Pointer (leading `/` or empty, e.g. `"/a/b"`); the dialect is auto-detected from the leading character. Implemented by `ConfigBindingFunction` in `Binding.Language`.
 
-A JSONPath query is bounded on its own, because it can be computed (for example `@config(@config("/q"))` reads the query from the document), so the limits of the `@` string do not cover it. A query longer than 8,192 characters answers `binding.limit.expressionLength`. A query with more than 64 `[` and `(` in total answers `binding.limit.depth`, because the JSONPath parser recurses once per nested filter. A `=~` filter matches each value with a timeout of 200 ms (`JsonQuery.RegexMatchTimeout`), and a timeout answers `binding.evaluation`. The same applies to `@annotation`.
+A JSONPath query has limits of its own, because it can be computed (for example `@config(@config("/q"))` reads the query from the document), so the limits of the `@` string do not cover it. The JSONPath engine (Newtonsoft) recurses once per nested filter while parsing and once per path segment while evaluating, without a guard of its own.
+
+- A query longer than 8,192 characters answers `binding.limit.expressionLength`.
+- A query with more than 64 `.`, `[` and `(` in total answers `binding.limit.depth`.
+- A query may use at most one recursive descent (`..`), and `$` at most once after its start: a root reference inside a filter, or the end anchor of a regular expression. Chained, either makes the time exponential in a short query over a small document. Such a query answers `binding.evaluation`.
+- A `=~` filter matches each value with a timeout of 200 ms (`JsonQuery.RegexMatchTimeout`), and a timeout answers `binding.evaluation`.
+
+These limits keep a query from crashing the worker or running for an exponential time. They do not bound its work fully: a filter can still cost time proportional to the square of a large document, and a `=~` filter up to 200 ms per value. The same applies to `@annotation`.
 
 `@config` always resolves against an immutable snapshot of the configuration taken *before* the binding pass started (see `CosmosConfigurationService.GetResolvedConfigurationInternalAsync`), so the result never depends on the order in which properties are processed and never reflects other bindings' resolved output.
 
