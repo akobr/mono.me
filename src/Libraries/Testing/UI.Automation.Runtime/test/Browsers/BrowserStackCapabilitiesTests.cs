@@ -47,7 +47,36 @@ public sealed class BrowserStackCapabilitiesTests
             new("browserstack.networkLogs", "true"),
             new("browserstack.debug", "true"),
             new("browserstack.video", "true"),
+            new("browserstack.playwrightLogs", "false"),
+            new("browserstack.maskCommands", "sendType, sendPress, setHTTPCredentials, setStorageState"),
         ]);
+    }
+
+    [Fact]
+    public void Create_MasksWhatATestTypes_AndTheStorageState_AndTurnsThePlaywrightLogsOff_ByDefault()
+    {
+        var capabilities = BrowserStackCapabilities.Create(new BrowserStackSettings(), "SignInTests", "build", "1.63.0").ToDictionary();
+
+        capabilities["browserstack.maskCommands"].Split(", ").ShouldBe(["sendType", "sendPress", "setHTTPCredentials", "setStorageState"]);
+        capabilities["browserstack.playwrightLogs"].ShouldBe("false");
+    }
+
+    [Fact]
+    public void Create_TakesTheMaskedCommandsAndThePlaywrightLogs_FromTheSettings_OrTheAdditionalCapabilities()
+    {
+        var none = BrowserStackCapabilities.Create(new BrowserStackSettings { MaskCommands = " , ", PlaywrightLogs = true }, "SignInTests", "build", "1.63.0").ToDictionary();
+        var listed = BrowserStackCapabilities.Create(new BrowserStackSettings { MaskCommands = " sendType ,setGeolocation,," }, "SignInTests", "build", "1.63.0").ToDictionary();
+        var replaced = BrowserStackCapabilities.Create(
+            new BrowserStackSettings { AdditionalCapabilities = new Dictionary<string, string> { ["browserstack.maskCommands"] = "sendType", ["browserstack.playwrightLogs"] = "true" } },
+            "SignInTests",
+            "build",
+            "1.63.0");
+
+        none.Keys.ShouldNotContain("browserstack.maskCommands");
+        none["browserstack.playwrightLogs"].ShouldBe("true");
+        listed["browserstack.maskCommands"].ShouldBe("sendType, setGeolocation");
+        replaced.Where(capability => capability.Key == "browserstack.maskCommands").ShouldHaveSingleItem().Value.ShouldBe("sendType");
+        replaced.Where(capability => capability.Key == "browserstack.playwrightLogs").ShouldHaveSingleItem().Value.ShouldBe("true");
     }
 
     [Fact]

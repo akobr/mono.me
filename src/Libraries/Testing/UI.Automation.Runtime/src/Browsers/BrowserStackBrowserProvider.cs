@@ -10,14 +10,16 @@ namespace _42.Testing.UI.Automation.Runtime.Browsers;
 // the caps parameter. SessionPerTest (the default): a session per test, named <Class>.<Method>, connected by
 // AcquireAsync, marked passed or failed and closed by ReleaseAsync. Otherwise a session per test class, named <Class>,
 // which its tests share (each in its own context), marked from the last attempt of each of them. It closes once no test
-// holds it and every planned test of the class is done: it released a browser, or its final report is known
-// (TestCompleted, also for a test an attribute skipped or one that ended without a browser). A session that no test
-// holds while tests of its class are still to come (a [Serial] one, a retry, a test that never starts) closes after
-// IdleCloseAfter, before BrowserStack's idle timeout would end it unmarked, and the class's next test opens another;
-// one that BrowserStack ended is replaced, and closes when its last test leaves it. What is still open closes when the
-// provider is disposed. The mark goes through a page of the session, a new one when the tests' contexts are closed.
+// holds it and every planned test of the class is done: its final report is known (TestCompleted, which the session
+// calls for every final report, also of a test an attribute skipped or one that ended without a browser). A release
+// alone does not make a test done: TUnit may run the attempt again. A session that no test holds while tests of its
+// class are still to come (a [Serial] one, a retry, a test that never starts) closes after IdleCloseAfter, before
+// BrowserStack's idle timeout would end it unmarked, and the class's next test opens another; one that BrowserStack
+// ended is replaced, and closes when its last test leaves it. What is still open closes when the provider is disposed.
+// The mark goes through a page of the session, a new one when the tests' contexts are closed.
 // Nothing connects at start: the first test shows wrong credentials. The access key travels in the caps URL, so every
-// message and exception of the provider shows it as ***.
+// message and exception of the provider shows it as *** (also when it was set with surrounding whitespace, which the
+// capabilities trim).
 public sealed class BrowserStackBrowserProvider : IBrowserProvider
 {
     private const string VersionTable = "https://www.browserstack.com/docs/automate/playwright/browsers-and-os";
@@ -147,6 +149,8 @@ public sealed class BrowserStackBrowserProvider : IBrowserProvider
             return;
         }
 
+        // Not done yet: the final report (TestCompleted) says so, after the release; an attempt that runs again finds
+        // the session open (or reopened after IdleCloseAfter).
         Task[] ended;
         lock (gate)
         {
@@ -156,7 +160,6 @@ public sealed class BrowserStackBrowserProvider : IBrowserProvider
                 session.Results[holder.Test.Id] = result;
             }
 
-            MarkDone(holder.Test);
             ended = CloseIdleSessions(holder.Test.ClassName, session);
         }
 
@@ -164,7 +167,8 @@ public sealed class BrowserStackBrowserProvider : IBrowserProvider
     }
 
     // A session per class only: the test is done for the session of its class, whether it held it or not (an attribute
-    // skipped it, it was blocked before its browser, or its connection failed). Never throws.
+    // skipped it, it was blocked before its browser, or its connection failed); a session that is then complete and
+    // unheld closes (in the background; DisposeAsync waits for it). Never throws.
     public void TestCompleted(TestIdentity test)
     {
         ArgumentNullException.ThrowIfNull(test);
@@ -231,6 +235,15 @@ public sealed class BrowserStackBrowserProvider : IBrowserProvider
 
         await Task.WhenAll(pending);
         await connector.DisposeAsync();
+    }
+
+    // Every close started so far, e.g. the one a TestCompleted started; for tests.
+    internal Task ClosingAsync()
+    {
+        lock (gate)
+        {
+            return Task.WhenAll([.. closing]);
+        }
     }
 
     private async Task<(RemoteSession Session, IBrowser Browser)> ConnectForTestAsync(TestIdentity test, CancellationToken cancellationToken)

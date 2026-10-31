@@ -5,7 +5,7 @@ using Microsoft.Playwright;
 namespace _42.Testing.UI.Automation.Runtime.UnitTests.Fakes;
 
 // A provider without Playwright: enough for the session's start and stop. A test acquires Browser (e.g. a mock) when it
-// is set and fails to otherwise. It records the tests that acquired and released a browser and the tests the session
+// is set and fails to otherwise; Hold keeps an acquisition waiting (until its token is cancelled). It records the tests that acquired and released a browser and the tests the session
 // reported as completed.
 internal sealed class FakeBrowserProvider(DeviceCatalog? devices = null) : IBrowserProvider
 {
@@ -29,6 +29,8 @@ internal sealed class FakeBrowserProvider(DeviceCatalog? devices = null) : IBrow
     public bool Disposed { get; private set; }
 
     public IBrowser? Browser { get; init; }
+
+    public TaskCompletionSource? Hold { get; init; }
 
     public IReadOnlyList<TestIdentity> Acquired
     {
@@ -66,8 +68,13 @@ internal sealed class FakeBrowserProvider(DeviceCatalog? devices = null) : IBrow
         }
     }
 
-    public ValueTask<BrowserLease> AcquireAsync(TestIdentity test, CancellationToken cancellationToken)
+    public async ValueTask<BrowserLease> AcquireAsync(TestIdentity test, CancellationToken cancellationToken)
     {
+        if (Hold is { } hold)
+        {
+            await hold.Task.WaitAsync(cancellationToken);
+        }
+
         if (Browser is null)
         {
             throw new NotSupportedException("The fake provider has no browser.");
@@ -78,7 +85,7 @@ internal sealed class FakeBrowserProvider(DeviceCatalog? devices = null) : IBrow
             acquired.Add(test);
         }
 
-        return ValueTask.FromResult(new BrowserLease(Browser, null, new Dictionary<string, string>()));
+        return new BrowserLease(Browser, null, new Dictionary<string, string>());
     }
 
     public ValueTask ReleaseAsync(BrowserLease lease, TestResultReport? result, CancellationToken cancellationToken)

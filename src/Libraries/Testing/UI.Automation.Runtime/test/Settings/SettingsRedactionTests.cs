@@ -70,4 +70,38 @@ public sealed class SettingsRedactionTests
         description.ShouldContain("Browser:ColorScheme = Light");
         description.ShouldContain("Browser:Headless = true");
     }
+
+    [Fact]
+    public void CreateRedactor_MasksEverySecretValue_AndThePoolEmailsOnlyWhenAsked()
+    {
+        var settings = new UiAutomationSettings
+        {
+            Users = new UsersSettings { Pool = [new PoolUserSettings { Email = "ui-01@example.test", Password = "pw-123\r\n" }] },
+            BrowserStack = new BrowserStackSettings { AccessKey = "bs key/456" },
+        };
+        const string text = "fill(\"pw-123\") for ui-01@example.test, caps=bs%20key%2F456";
+
+        SettingsRedaction.SecretValues(settings).ShouldBe(["pw-123\r\n", "bs key/456"]);
+        SettingsRedaction.CreateRedactor(settings)(text).ShouldBe("fill(\"***\") for ui-01@example.test, caps=***");
+        SettingsRedaction.CreateRedactor(settings, includeEmails: true)(text).ShouldBe("fill(\"***\") for ***, caps=***");
+        SettingsRedaction.CreateRedactor(new UiAutomationSettings())(text).ShouldBe(text);
+    }
+
+    [Fact]
+    public void StartBudget_CoversTheLease_ABrowserStackConnection_AndTheFirstSignIn()
+    {
+        var local = new UiAutomationSettings();
+        var browserStack = new UiAutomationSettings { Browser = new BrowserSettings { Provider = BrowserProviderKind.BrowserStack } };
+        var tuned = new UiAutomationSettings
+        {
+            Browser = new BrowserSettings { Provider = BrowserProviderKind.BrowserStack },
+            BrowserStack = new BrowserStackSettings { ConnectTimeoutSeconds = 600 },
+            Users = new UsersSettings { LeaseTimeoutSeconds = 30 },
+            Execution = new ExecutionSettings { NavigationTimeoutMs = 60_000 },
+        };
+
+        local.StartBudget.ShouldBe(TimeSpan.FromSeconds(120 + 150 + 60));
+        browserStack.StartBudget.ShouldBe(TimeSpan.FromSeconds(120 + 300 + 150 + 60));
+        tuned.StartBudget.ShouldBe(TimeSpan.FromSeconds(30 + 600 + 300 + 60));
+    }
 }

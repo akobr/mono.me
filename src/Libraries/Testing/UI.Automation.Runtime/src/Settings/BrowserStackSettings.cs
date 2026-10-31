@@ -6,6 +6,11 @@ public sealed class BrowserStackSettings
 {
     public const string DefaultEndpoint = "wss://cdp.browserstack.com/playwright";
 
+    // The Playwright commands whose values BrowserStack's text and raw logs show as REDACTED VALUE: what a test types
+    // (type, press: a sign-in flow types the password with PressSequentiallyAsync, because BrowserStack cannot mask a
+    // fill), HTTP credentials and the storage state a context starts from (the pool user's session cookies and tokens).
+    public const string DefaultMaskCommands = "sendType, sendPress, setHTTPCredentials, setStorageState";
+
     // The values of Console.
     public static readonly IReadOnlyList<string> ConsoleLevels = ["disable", "errors", "warnings", "info", "verbose"];
 
@@ -70,15 +75,23 @@ public sealed class BrowserStackSettings
 
     public bool Video { get; set; } = true;
 
+    // browserstack.maskCommands: the Playwright commands BrowserStack masks in its text and raw logs (sendType,
+    // sendPress, setHTTPCredentials, setStorageState, setGeolocation, setWebAuthnCredentials); empty masks none.
+    public string? MaskCommands { get; set; } = DefaultMaskCommands;
+
+    // browserstack.playwrightLogs: BrowserStack's Playwright logs, which it never masks; off, so typed values and the
+    // signed-in storage state stay out of the dashboard.
+    public bool PlaywrightLogs { get; set; }
+
     // The parallel sessions of the BrowserStack plan; the engine adapter limits the tests to it.
     public int MaxParallelSessions { get; set; } = 5;
 
     // How long a connection may take, a session queued at BrowserStack included.
     public int ConnectTimeoutSeconds { get; set; } = 300;
 
-    // More capabilities as strings, over the ones above, e.g. "browserstack.idleTimeout": "300",
-    // "browserstack.maskCommands": "setValues, setCookies" or "browserstack.geoLocation": "DE". The credentials are
-    // not set here.
+    // More capabilities as strings, over the ones above, e.g. "browserstack.idleTimeout": "300" or
+    // "browserstack.geoLocation": "DE"; one of the same name replaces a capability above. The credentials are not set
+    // here.
     public Dictionary<string, string> AdditionalCapabilities { get; set; } = new(StringComparer.Ordinal);
 
     public BrowserEngine? GetEngine()

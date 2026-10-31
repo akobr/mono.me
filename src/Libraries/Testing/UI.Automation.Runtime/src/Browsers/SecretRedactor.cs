@@ -5,18 +5,28 @@ using _42.Testing.UI.Automation.Runtime.Settings;
 namespace _42.Testing.UI.Automation.Runtime.Browsers;
 
 // Replaces secrets by *** in text that is logged or thrown, in every form a URL or a JSON document may carry them:
-// as is, URL-encoded (%20 and + for a space), JSON-escaped and both together. Playwright 1.63 and 1.64 leave the query
-// out of the endpoint in their call log, but an error of the grid, or of another Playwright version, may still echo the
-// caps URL.
+// as is, URL-encoded (%20 and + for a space), JSON-escaped and both together, each also trimmed (a value pasted with a
+// trailing newline still authenticates, because the capabilities send it trimmed). Playwright 1.63 and 1.64 leave the
+// query out of the endpoint in their call log, but an error of the grid, or of another Playwright version, may still
+// echo the caps URL; and Playwright's call log of fill and type keeps the typed value, e.g. a password.
 internal sealed class SecretRedactor
 {
     private readonly string[] forms;
 
     public SecretRedactor(params string?[] secrets)
+        : this((IEnumerable<string?>)secrets)
     {
+    }
+
+    public SecretRedactor(IEnumerable<string?> secrets)
+    {
+        ArgumentNullException.ThrowIfNull(secrets);
+
         forms = secrets
             .Where(secret => !string.IsNullOrEmpty(secret))
-            .SelectMany(secret => Forms(secret!))
+            .SelectMany(secret => new[] { secret!, secret!.Trim() })
+            .Where(secret => secret.Length > 0)
+            .SelectMany(Forms)
             .Distinct(StringComparer.Ordinal)
             .OrderByDescending(form => form.Length)
             .ToArray();
@@ -24,7 +34,7 @@ internal sealed class SecretRedactor
 
     public string Redact(string? text)
     {
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(text) || forms.Length == 0)
         {
             return text ?? string.Empty;
         }

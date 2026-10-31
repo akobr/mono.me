@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using _42.Testing.UI.Automation.Runtime.Artifacts;
+using _42.Testing.UI.Automation.Runtime.Browsers;
 using _42.Testing.UI.Automation.Runtime.Users;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,7 +11,8 @@ namespace _42.Testing.UI.Automation.Runtime.Access;
 // The signed-in storage state (cookies and local storage) of each pool user, captured after the user's first sign-in
 // of the session; kept in memory only, never written to disk. A user signs in in a throw-away, untraced context of the
 // test's browser, once, even when two scopes ask at the same time. Invalidate drops a state the application no longer
-// accepts, so the next request signs in again; Refresh takes the rotated tokens of a test that ended signed in.
+// accepts, so the next request signs in again; Refresh takes the rotated tokens of a test that ended signed in. A failed
+// sign-in throws a SignInException that shows neither the user's e-mail nor the password.
 public sealed class StorageStateCache
 {
     private readonly ConcurrentDictionary<string, string> states = new(StringComparer.OrdinalIgnoreCase);
@@ -142,7 +144,7 @@ public sealed class StorageStateCache
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 await TryScreenshotAsync(page, artifacts);
-                throw new SignInException($"The sign-in flow {Flow.Name} failed for {user}: {exception.Message}", exception);
+                throw Failed(user, exception);
             }
 
             return await context.StorageStateAsync();
@@ -151,6 +153,16 @@ public sealed class StorageStateCache
         {
             await context.CloseAsync();
         }
+    }
+
+    // Playwright's call log of a fill or a type that failed after its element resolved keeps the typed value, and the
+    // .NET client puts the call log into the exception's message: the failure of a sign-in may hold the user's e-mail
+    // and password. Its message goes out with both as ***, and the original exception is not kept (as the inner
+    // exception it would reach every report's stack trace).
+    private SignInException Failed(TestUser user, Exception exception)
+    {
+        var redactor = new SecretRedactor(user.Password, user.Email);
+        return new SignInException($"The sign-in flow {Flow.Name} failed for {user}: {exception.GetType().Name}: {redactor.Redact(exception.Message)}");
     }
 
     private async Task TryScreenshotAsync(IPage page, ArtifactCollector? artifacts)

@@ -235,6 +235,40 @@ public sealed class AutomationSessionTests
         report.Output.ShouldBeNull();
     }
 
+    // A Playwright call log keeps what a fill typed; no report shows a secret of the settings or a pool user's e-mail.
+    [Fact]
+    public async Task CreateReport_ShowsTheSecretsOfTheSettingsAndThePoolEmails_AsStars()
+    {
+        var settings = Load("""
+            {
+              "Target": { "BaseUrl": "https://admin.example.test", "SignIn": "None" },
+              "Users": { "Pool": [ { "Email": "ada@example.test", "Password": "pool-password-1" }, { "Email": "grace@example.test", "Password": " pool-password-2\n" } ] },
+              "BrowserStack": { "AccessKey": "bs-access-key" },
+              "Reporting": { "Testiny": { "ApiKey": "testiny-api-key" } }
+            }
+            """);
+        await using var session = await Start(settings);
+        var exception = new InvalidOperationException(
+            "fill(\"pool-password-1\") as ada@example.test, then pool-password-2 of grace@example.test, with bs-access-key and testiny-api-key",
+            new TimeoutException("inner: pool-password-1"));
+
+        var failed = session.CreateReport(TestData.Identity("Leaks"), TestOutcome.Failed, TestData.Start, TimeSpan.Zero, 1, exception, output: "typed pool-password-1");
+        var skipped = session.CreateReport(TestData.Identity("Skips"), TestOutcome.Skipped, TestData.Start, TimeSpan.Zero, 1, new InvalidOperationException("no bs-access-key"));
+
+        var failure = failed.Failure.ShouldNotBeNull();
+        failure.Message.ShouldBe("fill(\"***\") as ***, then *** of ***, with *** and ***");
+        var stackTrace = failure.StackTrace.ShouldNotBeNull();
+        stackTrace.ShouldContain("inner: ***");
+        foreach (var secret in new[] { "pool-password", "ada@", "grace@", "bs-access-key", "testiny-api-key" })
+        {
+            stackTrace.ShouldNotContain(secret);
+        }
+
+        failed.Output.ShouldBe("typed ***");
+        skipped.Failure.ShouldNotBeNull().Message.ShouldBe("no ***");
+        session.Redact("Users:Pool:0 (ada@example.test)").ShouldBe("Users:Pool:0 (***)");
+    }
+
     [Fact]
     public async Task CreateReport_KeepsOnlyTheReasonOfASkip()
     {

@@ -108,6 +108,27 @@ public sealed class TargetCheckTests
     }
 
     [Fact]
+    public async Task StartAsync_ShowsASecretInTheChecksFailure_AsStars_AndDropsTheExceptionThatHeldIt()
+    {
+        var settings = Load("""
+            {
+              "Target": { "BaseUrl": "https://admin.example.test", "SignIn": "None" },
+              "Execution": { "Trace": "Off" },
+              "Users": { "Pool": [ { "Email": "ada@example.test", "Password": "pool-password-1" } ] }
+            }
+            """);
+        var options = Options((_, _) => throw new InvalidOperationException("Call log:\n  -   fill(\"pool-password-1\") for ada@example.test"));
+
+        var exception = await Should.ThrowAsync<TargetCheckException>(() => AutomationSession.StartAsync(settings, options));
+
+        exception.Message.ShouldStartWith("The target check failed: InvalidOperationException: Call log:");
+        exception.Message.ShouldContain("fill(\"***\") for ***");
+        exception.InnerException.ShouldBeNull();
+        exception.ToString().ShouldNotContain("pool-password-1");
+        exception.ToString().ShouldNotContain("ada@example.test");
+    }
+
+    [Fact]
     public async Task StartAsync_FailsTheCheck_WhenItsScopeCannotBegin()
     {
         var settings = Load(Settings);

@@ -147,6 +147,27 @@ public sealed class BrowserStackBrowserProviderTests
         ShouldHideTheAccessKey(exception.ToString());
     }
 
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    [InlineData(" ")]
+    public async Task AcquireAsync_HidesAnAccessKeySetWithSurroundingWhitespace_ThatTheCapabilitiesTrim(string padding)
+    {
+        string? sent = null;
+        connector.Fail = endpoint =>
+        {
+            sent = endpoint;
+            return new PlaywrightException($"WebSocket error: 401 Unauthorized\nCall log:\n  - <ws connecting> {endpoint}\n  - <ws error> {AccessKey} rejected");
+        };
+        await using var provider = Provider(settings => settings.AccessKey = $" {AccessKey}{padding}");
+
+        var exception = await Should.ThrowAsync<BrowserUnavailableException>(async () => await provider.AcquireAsync(Test("SignInTests", "SignIn"), CancellationToken.None));
+
+        Caps(sent.ShouldNotBeNull())["browserstack.accessKey"].ShouldBe(AccessKey);
+        exception.Message.ShouldContain("***");
+        ShouldHideTheAccessKey(exception.ToString());
+    }
+
     [Fact]
     public async Task ReleaseAsync_HidesTheAccessKey_InTheWarningOfAMarkThatFailed_AndStillCloses()
     {
@@ -186,17 +207,17 @@ public sealed class BrowserStackBrowserProviderTests
         Caps(connector.Connections.Single(connection => connection.Browser.Object == firstLease.Browser).Endpoint)["name"].ShouldBe("AnnotationsTests");
 
         var annotations = connector.Connections.Single(connection => connection.Browser.Object == firstLease.Browser).Browser;
-        await provider.ReleaseAsync(firstLease, Report(first, TestOutcome.Failed, "Boom"), CancellationToken.None);
+        await EndAsync(provider, firstLease, Report(first, TestOutcome.Failed, "Boom"));
         annotations.Closes.ShouldBe(0);
 
-        await provider.ReleaseAsync(secondLease, Report(second, TestOutcome.Passed), CancellationToken.None);
+        await EndAsync(provider, secondLease, Report(second, TestOutcome.Passed));
         annotations.Closes.ShouldBe(1);
         var status = Status(annotations.Evaluated.ShouldHaveSingleItem().Argument);
         status.GetProperty("status").GetString().ShouldBe("failed");
         status.GetProperty("reason").GetString().ShouldBe("1 of 2 test(s) failed; AnnotationsTests.Create: Boom");
 
         var projects = connector.Connections.Single(connection => connection.Browser.Object == otherLease.Browser).Browser;
-        await provider.ReleaseAsync(otherLease, Report(other, TestOutcome.Passed), CancellationToken.None);
+        await EndAsync(provider, otherLease, Report(other, TestOutcome.Passed));
         projects.Closes.ShouldBe(1);
         Status(projects.Evaluated.ShouldHaveSingleItem().Argument).GetProperty("status").GetString().ShouldBe("passed");
     }
@@ -212,8 +233,49 @@ public sealed class BrowserStackBrowserProviderTests
         var attempt1 = await provider.AcquireAsync(first, CancellationToken.None);
         await provider.ReleaseAsync(attempt1, Report(first, TestOutcome.Failed, "Flaky"), CancellationToken.None);
         var attempt2 = await provider.AcquireAsync(first, CancellationToken.None);
-        await provider.ReleaseAsync(attempt2, Report(first, TestOutcome.Passed) with { Attempt = 2 }, CancellationToken.None);
-        await provider.ReleaseAsync(secondLease, Report(second, TestOutcome.Passed), CancellationToken.None);
+        await EndAsync(provider, attempt2, Report(first, TestOutcome.Passed) with { Attempt = 2 });
+        await EndAsync(provider, secondLease, Report(second, TestOutcome.Passed));
+
+        var browser = connector.Connections.ShouldHaveSingleItem().Browser;
+        browser.Closes.ShouldBe(1);
+        Status(browser.Evaluated.ShouldHaveSingleItem().Argument).GetProperty("status").GetString().ShouldBe("passed");
+    }
+
+    // The attempt that runs again is the last open test of its class: its release (without TestCompleted, as the
+    // session ends an attempt TUnit runs again) leaves the session open for the retry.
+    [Fact]
+    public async Task SessionPerClass_KeepsTheSession_ForTheRetryOfTheLastOpenTestOfTheClass()
+    {
+        var first = Test("AnnotationsTests", "Create");
+        var second = Test("AnnotationsTests", "Delete");
+        await using var provider = Provider(settings => settings.SessionPerTest = false, planned: [first, second]);
+
+        await EndAsync(provider, await provider.AcquireAsync(second, CancellationToken.None), Report(second, TestOutcome.Passed));
+        var attempt1 = await provider.AcquireAsync(first, CancellationToken.None);
+        await provider.ReleaseAsync(attempt1, Report(first, TestOutcome.Failed, "Flaky"), CancellationToken.None);
+        await provider.ClosingAsync();
+        var browser = connector.Connections.ShouldHaveSingleItem().Browser;
+        browser.Closes.ShouldBe(0);
+
+        var attempt2 = await provider.AcquireAsync(first, CancellationToken.None);
+        await EndAsync(provider, attempt2, Report(first, TestOutcome.Passed) with { Attempt = 2 });
+
+        connector.Connections.ShouldHaveSingleItem();
+        attempt2.Browser.ShouldBeSameAs(browser.Object);
+        browser.Closes.ShouldBe(1);
+        Status(browser.Evaluated.ShouldHaveSingleItem().Argument).GetProperty("status").GetString().ShouldBe("passed");
+    }
+
+    [Fact]
+    public async Task SessionPerClass_KeepsTheSessionOfAOneTestClass_ForItsRetry()
+    {
+        var only = Test("SignInTests", "SignIn");
+        await using var provider = Provider(settings => settings.SessionPerTest = false, planned: [only]);
+
+        await provider.ReleaseAsync(await provider.AcquireAsync(only, CancellationToken.None), Report(only, TestOutcome.Failed, "Flaky"), CancellationToken.None);
+        await provider.ClosingAsync();
+        connector.Connections.ShouldHaveSingleItem().Browser.Closes.ShouldBe(0);
+        await EndAsync(provider, await provider.AcquireAsync(only, CancellationToken.None), Report(only, TestOutcome.Passed) with { Attempt = 2 });
 
         var browser = connector.Connections.ShouldHaveSingleItem().Browser;
         browser.Closes.ShouldBe(1);
@@ -316,7 +378,7 @@ public sealed class BrowserStackBrowserProviderTests
         await using var provider = Provider(settings => settings.SessionPerTest = false, planned: [first, serial]);
 
         var lease = await provider.AcquireAsync(first, CancellationToken.None);
-        await provider.ReleaseAsync(lease, Report(first, TestOutcome.Failed, "Boom"), CancellationToken.None);
+        await EndAsync(provider, lease, Report(first, TestOutcome.Failed, "Boom"));
         var idle = connector.Connections.ShouldHaveSingleItem().Browser;
 
         provider.IdleCloseAfter.ShouldBe(TimeSpan.FromSeconds(60));
@@ -332,7 +394,7 @@ public sealed class BrowserStackBrowserProviderTests
         var later = await provider.AcquireAsync(serial, CancellationToken.None);
         connector.Connections.Count.ShouldBe(2);
         later.Browser.ShouldBeSameAs(connector.Connections[1].Browser.Object);
-        await provider.ReleaseAsync(later, Report(serial, TestOutcome.Passed), CancellationToken.None);
+        await EndAsync(provider, later, Report(serial, TestOutcome.Passed));
         connector.Connections[1].Browser.Closes.ShouldBe(1);
         Status(connector.Connections[1].Browser.Evaluated.ShouldHaveSingleItem().Argument).GetProperty("status").GetString().ShouldBe("passed");
     }
@@ -344,7 +406,7 @@ public sealed class BrowserStackBrowserProviderTests
         var second = Test("ProjectsTests", "Delete");
         await using var provider = Provider(settings => settings.SessionPerTest = false, planned: [first, second]);
 
-        await provider.ReleaseAsync(await provider.AcquireAsync(first, CancellationToken.None), Report(first, TestOutcome.Passed), CancellationToken.None);
+        await EndAsync(provider, await provider.AcquireAsync(first, CancellationToken.None), Report(first, TestOutcome.Passed));
         time.Advance(TimeSpan.FromSeconds(30));
         var lease = await provider.AcquireAsync(second, CancellationToken.None);
         time.Advance(TimeSpan.FromSeconds(60));
@@ -354,7 +416,7 @@ public sealed class BrowserStackBrowserProviderTests
         lease.Browser.ShouldBeSameAs(browser.Object);
         browser.Closes.ShouldBe(0);
 
-        await provider.ReleaseAsync(lease, Report(second, TestOutcome.Passed), CancellationToken.None);
+        await EndAsync(provider, lease, Report(second, TestOutcome.Passed));
         browser.Closes.ShouldBe(1);
     }
 
@@ -386,11 +448,11 @@ public sealed class BrowserStackBrowserProviderTests
         var replacement = connector.Connections[1].Browser;
         thirdLease.Browser.ShouldBeSameAs(replacement.Object);
 
-        await provider.ReleaseAsync(thirdLease, Report(third, TestOutcome.Failed, "Gone"), CancellationToken.None);
+        await EndAsync(provider, thirdLease, Report(third, TestOutcome.Failed, "Gone"));
         replacement.Closes.ShouldBe(0);
-        await provider.ReleaseAsync(firstLease, Report(first, TestOutcome.Passed), CancellationToken.None);
+        await EndAsync(provider, firstLease, Report(first, TestOutcome.Passed));
         ended.Closes.ShouldBe(0);
-        await provider.ReleaseAsync(secondLease, Report(second, TestOutcome.Passed), CancellationToken.None);
+        await EndAsync(provider, secondLease, Report(second, TestOutcome.Passed));
 
         ended.Closes.ShouldBe(1);
         ended.Evaluated.ShouldBeEmpty();
@@ -473,6 +535,15 @@ public sealed class BrowserStackBrowserProviderTests
         await provider.ReleaseAsync(new BrowserLease(browser.Object, "other", new Dictionary<string, string>()), null, CancellationToken.None);
 
         browser.Closes.ShouldBe(0);
+    }
+
+    // The end of a final attempt as the session does it: the release with the report, then TestCompleted; returns once
+    // the closes it started are done.
+    private static async Task EndAsync(BrowserStackBrowserProvider provider, BrowserLease lease, TestResultReport report)
+    {
+        await provider.ReleaseAsync(lease, report, CancellationToken.None);
+        provider.TestCompleted(report.Test);
+        await provider.ClosingAsync();
     }
 
     private static TestIdentity Test(string className, string method)

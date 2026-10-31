@@ -55,6 +55,15 @@ public sealed class UiAutomationSettings
     // A results file is to be sent through the reporters instead of running tests.
     public bool IsReplay => !string.IsNullOrWhiteSpace(Reporting.ReplayFile);
 
+    // How long the start of a test, or the target check, may take within the settings' own timeouts: the lease
+    // (Users:LeaseTimeoutSeconds), a BrowserStack connection (BrowserStack:ConnectTimeoutSeconds, queueing included),
+    // the user's first sign-in and the page (5 × Execution:NavigationTimeoutMs) and a minute more. An engine adapter
+    // gives its hooks at least this long, so the pool's and the provider's timeouts end a slow start, with their message.
+    public TimeSpan StartBudget => TimeSpan.FromSeconds(Math.Max(Users.LeaseTimeoutSeconds, 0))
+        + (Browser.Provider == BrowserProviderKind.BrowserStack ? TimeSpan.FromSeconds(Math.Max(BrowserStack.ConnectTimeoutSeconds, 0)) : TimeSpan.Zero)
+        + TimeSpan.FromMilliseconds(5.0 * Math.Max(Execution.NavigationTimeoutMs, 0))
+        + TimeSpan.FromMinutes(1);
+
     // The engine the browsers run: Browser:Engine, or the one BrowserStack:Browser runs on.
     public BrowserEngine EffectiveEngine => Browser.Provider == BrowserProviderKind.BrowserStack
         ? BrowserStack.GetEngine() ?? Browser.Engine

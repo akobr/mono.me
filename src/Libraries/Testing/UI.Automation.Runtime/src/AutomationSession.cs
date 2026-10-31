@@ -19,12 +19,14 @@ namespace _42.Testing.UI.Automation.Runtime;
 // cannot lease, browsers that do not launch, an unknown device, a reporter that refuses its settings or a target the
 // setup's check refuses (AutomationSessionOptions.TargetCheck) stop the run before any test, and before a reporter
 // creates a run; a failure after the reporters started completes their runs and disposes them. No static state: the
-// adapter keeps the current session.
+// adapter keeps the current session. Every report it creates, and the message of a failed target check, shows the
+// settings' secrets and the pool users' e-mails as *** (Redact).
 public sealed class AutomationSession : IAsyncDisposable
 {
     private const string RunIdCharacters = "abcdefghijklmnopqrstuvwxyz0123456789";
 
     private readonly object stopGate = new();
+    private readonly Func<string?, string> redact;
     private Task<TestRunSummary>? stopping;
 
     private AutomationSession(
@@ -58,6 +60,7 @@ public sealed class AutomationSession : IAsyncDisposable
         FileSystem = fileSystem;
         TimeProvider = timeProvider;
         Logger = logger;
+        redact = SettingsRedaction.CreateRedactor(settings, includeEmails: true);
     }
 
     // The version of the Microsoft.Playwright client, e.g. 1.63.0.
@@ -247,6 +250,14 @@ public sealed class AutomationSession : IAsyncDisposable
         return $"{now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture)}-{suffix}";
     }
 
+    // The text with every secret of the settings (SettingsRedaction.SecretValues: the pool passwords, the BrowserStack
+    // access key, the reporters' API keys) and every pool user's e-mail as ***, in each form a URL or a JSON document
+    // may carry them. CreateReport applies it to the failure and the output of every report.
+    public string Redact(string? text)
+    {
+        return redact(text);
+    }
+
     // The data of one attempt of a test, from the session seed.
     public SeededData CreateData(TestIdentity test, int attempt = 1)
     {
@@ -262,7 +273,8 @@ public sealed class AutomationSession : IAsyncDisposable
 
     // A report with the session's properties (provider, engine, device, seed) under the given ones. A failure caused by
     // a missing user or browser becomes Blocked; any other outcome than Passed carries the exception as its failure,
-    // except that a skip keeps only its reason (the exception's message), without a type or stack trace.
+    // except that a skip keeps only its reason (the exception's message), without a type or stack trace. The failure's
+    // message and stack trace and the output go through Redact: a Playwright call log keeps what a fill typed.
     public TestResultReport CreateReport(
         TestIdentity test,
         TestOutcome outcome,
@@ -298,8 +310,8 @@ public sealed class AutomationSession : IAsyncDisposable
         var failure = (refined, exception) switch
         {
             (TestOutcome.Passed, _) or (_, null) => null,
-            (TestOutcome.Skipped, _) => new TestFailure(exception.Message, null, null, null, null),
-            _ => TestFailure.FromException(exception),
+            (TestOutcome.Skipped, _) => new TestFailure(Redact(exception.Message), null, null, null, null),
+            _ => Redacted(TestFailure.FromException(exception)),
         };
 
         return new TestResultReport(
@@ -309,7 +321,7 @@ public sealed class AutomationSession : IAsyncDisposable
             duration < TimeSpan.Zero ? TimeSpan.Zero : duration,
             attempt,
             failure,
-            string.IsNullOrEmpty(output) ? null : output,
+            string.IsNullOrEmpty(output) ? null : Redact(output),
             artifacts ?? [],
             values);
     }
@@ -433,9 +445,19 @@ public sealed class AutomationSession : IAsyncDisposable
         }
     }
 
+    private TestFailure Redacted(TestFailure failure)
+    {
+        return failure with
+        {
+            Message = Redact(failure.Message),
+            StackTrace = failure.StackTrace is null ? null : Redact(failure.StackTrace),
+        };
+    }
+
     // The setup's check of the target, once, before any reporter creates a run: in a scope of its own
     // (TargetCheckContext.Test) with a leased user and a signed-in page, whose artifacts follow the Execution policies
-    // and which is not reported. Any exception of the check becomes a TargetCheckException that names its artifacts.
+    // and which is not reported. Any exception of the check becomes a TargetCheckException that names its artifacts; its
+    // message goes through Redact, and an exception whose text holds a secret is not kept as its inner exception.
     private async Task CheckTargetAsync(Func<TargetCheckContext, CancellationToken, Task> check, CancellationToken cancellationToken)
     {
         await using var scope = TestScope.Create(this, TargetCheckContext.Test);
@@ -470,9 +492,10 @@ public sealed class AutomationSession : IAsyncDisposable
 
         if (failure is not null)
         {
-            var reason = failure is TargetCheckException ? failure.Message : $"{failure.GetType().Name}: {failure.Message}";
+            var reason = Redact(failure is TargetCheckException ? failure.Message : $"{failure.GetType().Name}: {failure.Message}");
             var artifacts = report.Artifacts.Count > 0 ? $" The check's {string.Join(", ", report.Artifacts.Select(artifact => artifact.Name))} are in {scope.Artifacts.Directory}." : string.Empty;
-            throw new TargetCheckException($"The target check failed: {reason}{artifacts}", failure);
+            var text = failure.ToString();
+            throw new TargetCheckException($"The target check failed: {reason}{artifacts}", Redact(text) == text ? failure : null);
         }
 
         Logger.LogInformation("The target check passed in {Seconds:0.0} s with {User}.", report.Duration.TotalSeconds, user);

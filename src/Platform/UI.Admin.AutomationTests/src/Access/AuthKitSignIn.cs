@@ -48,9 +48,9 @@ public sealed class AuthKitSignIn : ISignInFlow
 
         // The AuthKit hosted page, on the AuthKit domain: the e-mail first, then the password.
         await page.WaitForURLAsync(url => !IsOnApp(url, app));
-        await page.GetByRole(AriaRole.Textbox, new() { Name = "Email" }).FillAsync(user.Email);
+        await TypeAsync(page.GetByRole(AriaRole.Textbox, new() { Name = "Email" }), user.Email);
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue", Exact = true }).ClickAsync();
-        await page.GetByLabel("Password", new() { Exact = true }).FillAsync(password);
+        await TypeAsync(page.GetByLabel("Password", new() { Exact = true }), password);
         await page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
 
         // Back on the app, past /callback, which replaces itself with the return path.
@@ -77,6 +77,16 @@ public sealed class AuthKitSignIn : ISignInFlow
     {
         ArgumentNullException.ThrowIfNull(name);
         return name.StartsWith(StoragePrefix, StringComparison.Ordinal);
+    }
+
+    // Typed, not filled: BrowserStack masks a typed value in its session logs (browserstack.maskCommands sendType, the
+    // provider's default) but cannot mask a fill. The clear (an empty fill) waits until the field is visible, enabled
+    // and editable, which typing alone does not. Playwright's own call log keeps the value of both; the runtime's
+    // SignInException shows the e-mail and the password as ***.
+    private static async Task TypeAsync(ILocator field, string value)
+    {
+        await field.ClearAsync();
+        await field.PressSequentiallyAsync(value);
     }
 
     private static bool IsOnApp(string url, Uri app)
