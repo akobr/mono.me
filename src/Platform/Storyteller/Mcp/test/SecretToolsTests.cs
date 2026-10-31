@@ -85,8 +85,8 @@ public class SecretToolsTests
     {
         var description = Description(nameof(SecretTools.RevealKeyValue));
 
-        description.ShouldContain("a reveal of the current value, with or without its version number, is recorded as a Reveal event");
-        description.ShouldContain("a reveal by an older version number is not audited by the API");
+        description.ShouldContain("every reveal of a secret, of the current value or of a stored version, is recorded as a Reveal event");
+        description.ShouldNotContain("not audited");
     }
 
     [Fact]
