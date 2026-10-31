@@ -1,7 +1,6 @@
-using System.Text.Json;
+using System.Linq.Expressions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.Security;
 using Asp.Versioning;
@@ -76,16 +75,14 @@ public class AnnotationsController : ControllerBase
             View = view,
         };
 
-        if (!string.IsNullOrWhiteSpace(nameQuery))
+        var conditions = new List<AnnotationsRequest.ICondition>();
+
+        if (AddNameQuery<Responsibility>(conditions, nameQuery, nameof(nameQuery), r => r.Name) is { IsExact: true } name)
         {
-            request.Conditions = new[]
-            {
-                new AnnotationsRequest.Condition<Responsibility>
-                {
-                    Predicate = r => r.Name.Contains(nameQuery),
-                },
-            };
+            request.PartitionKey = PartitionKeys.GetResponsibility(project, name.Value);
         }
+
+        request.Conditions = conditions;
 
         var response = await _annotations.GetAnnotationsAsync(request);
         return new OkObjectResult(response.AsTyped<Responsibility>());
@@ -112,16 +109,14 @@ public class AnnotationsController : ControllerBase
             View = view,
         };
 
-        if (!string.IsNullOrWhiteSpace(nameQuery))
+        var conditions = new List<AnnotationsRequest.ICondition>();
+
+        if (AddNameQuery<Subject>(conditions, nameQuery, nameof(nameQuery), s => s.Name) is { IsExact: true } name)
         {
-            request.Conditions = new[]
-            {
-                new AnnotationsRequest.Condition<Subject>
-                {
-                    Predicate = s => s.Name.Contains(nameQuery),
-                },
-            };
+            request.PartitionKey = PartitionKeys.GetSubject(project, name.Value);
         }
+
+        request.Conditions = conditions;
 
         var response = await _annotations.GetAnnotationsAsync(request);
         return new OkObjectResult(response.AsTyped<Subject>());
@@ -150,63 +145,12 @@ public class AnnotationsController : ControllerBase
             View = view,
         };
 
-        if (!string.IsNullOrWhiteSpace(responsibilityNameQuery))
+        if (AddNameQuery<Usage>(conditions, responsibilityNameQuery, nameof(responsibilityNameQuery), u => u.ResponsibilityName) is { IsExact: true } responsibility)
         {
-            responsibilityNameQuery = responsibilityNameQuery.Trim();
-
-            if (responsibilityNameQuery.StartsWith('^') || responsibilityNameQuery.EndsWith('$'))
-            {
-                var regex = new Regex(responsibilityNameQuery, RegexOptions.Compiled);
-                conditions.Add(new AnnotationsRequest.Condition<Usage>
-                {
-                    Predicate = u => regex.IsMatch(u.ResponsibilityName),
-                });
-            }
-            else if (responsibilityNameQuery.StartsWith('%') || responsibilityNameQuery.EndsWith('%'))
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Usage>
-                {
-                    Predicate = u => u.ResponsibilityName.Contains(responsibilityNameQuery),
-                });
-            }
-            else
-            {
-                request.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
-                conditions.Add(new AnnotationsRequest.Condition<Usage>
-                {
-                    Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
-                });
-            }
+            request.PartitionKey = PartitionKeys.GetResponsibility(project, responsibility.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(subjectNameQuery))
-        {
-            subjectNameQuery = subjectNameQuery.Trim();
-
-            if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
-            {
-                var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new AnnotationsRequest.Condition<Usage>
-                {
-                    Predicate = u => regex.IsMatch(u.SubjectName),
-                });
-            }
-            else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Usage>
-                {
-                    Predicate = u => u.SubjectName.Contains(subjectNameQuery),
-                });
-            }
-            else
-            {
-                string subjectKey = AnnotationKey.CreateSubject(subjectNameQuery);
-                conditions.Add(new AnnotationsRequest.Condition<Usage>
-                {
-                    Predicate = u => u.SubjectKey == subjectKey,
-                });
-            }
-        }
+        AddNameQuery<Usage>(conditions, subjectNameQuery, nameof(subjectNameQuery), u => u.SubjectName);
 
         request.Conditions = conditions;
         var response = await _annotations.GetAnnotationsAsync(request);
@@ -236,62 +180,12 @@ public class AnnotationsController : ControllerBase
             View = view,
         };
 
-        if (!string.IsNullOrWhiteSpace(subjectNameQuery))
+        if (AddNameQuery<Context>(conditions, subjectNameQuery, nameof(subjectNameQuery), c => c.SubjectName) is { IsExact: true } subject)
         {
-            subjectNameQuery = subjectNameQuery.Trim();
-
-            if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
-            {
-                var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new AnnotationsRequest.Condition<Context>
-                {
-                    Predicate = u => regex.IsMatch(u.SubjectName),
-                });
-            }
-            else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Context>
-                {
-                    Predicate = u => u.SubjectName.Contains(subjectNameQuery),
-                });
-            }
-            else
-            {
-                request.PartitionKey = PartitionKeys.GetSubject(project, subjectNameQuery);
-                conditions.Add(new AnnotationsRequest.Condition<Context>
-                {
-                    Predicate = u => u.SubjectName == subjectNameQuery,
-                });
-            }
+            request.PartitionKey = PartitionKeys.GetSubject(project, subject.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(contextNameQuery))
-        {
-            contextNameQuery = contextNameQuery.Trim();
-
-            if (contextNameQuery.StartsWith('^') || contextNameQuery.EndsWith('$'))
-            {
-                var regex = new Regex(contextNameQuery, RegexOptions.Compiled);
-                conditions.Add(new AnnotationsRequest.Condition<Context>
-                {
-                    Predicate = u => regex.IsMatch(u.Name),
-                });
-            }
-            else if (contextNameQuery.StartsWith('%') || contextNameQuery.EndsWith('%'))
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Context>
-                {
-                    Predicate = u => u.Name.Contains(contextNameQuery),
-                });
-            }
-            else
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Context>
-                {
-                    Predicate = u => u.Name == contextNameQuery,
-                });
-            }
-        }
+        AddNameQuery<Context>(conditions, contextNameQuery, nameof(contextNameQuery), c => c.Name);
 
         request.Conditions = conditions;
         var response = await _annotations.GetAnnotationsAsync(request);
@@ -322,90 +216,13 @@ public class AnnotationsController : ControllerBase
             View = view,
         };
 
-        if (!string.IsNullOrWhiteSpace(responsibilityNameQuery))
+        if (AddNameQuery<Execution>(conditions, responsibilityNameQuery, nameof(responsibilityNameQuery), e => e.ResponsibilityName) is { IsExact: true } responsibility)
         {
-            responsibilityNameQuery = responsibilityNameQuery.Trim();
-
-            if (responsibilityNameQuery.StartsWith('^') || responsibilityNameQuery.EndsWith('$'))
-            {
-                var regex = new Regex(responsibilityNameQuery, RegexOptions.Compiled);
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => regex.IsMatch(u.ResponsibilityName),
-                });
-            }
-            else if (responsibilityNameQuery.StartsWith('%') || responsibilityNameQuery.EndsWith('%'))
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => u.ResponsibilityName.Contains(responsibilityNameQuery),
-                });
-            }
-            else
-            {
-                request.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
-                });
-            }
+            request.PartitionKey = PartitionKeys.GetResponsibility(project, responsibility.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(subjectNameQuery))
-        {
-            subjectNameQuery = subjectNameQuery.Trim();
-
-            if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
-            {
-                var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => regex.IsMatch(u.SubjectName),
-                });
-            }
-            else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => u.SubjectName.Contains(subjectNameQuery),
-                });
-            }
-            else
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => u.SubjectName == subjectNameQuery,
-                });
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(contextNameQuery))
-        {
-            contextNameQuery = contextNameQuery.Trim();
-
-            if (contextNameQuery.StartsWith('^') || contextNameQuery.EndsWith('$'))
-            {
-                var regex = new Regex(contextNameQuery, RegexOptions.Compiled);
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => regex.IsMatch(u.Name),
-                });
-            }
-            else if (contextNameQuery.StartsWith('%') || contextNameQuery.EndsWith('%'))
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => u.Name.Contains(contextNameQuery),
-                });
-            }
-            else
-            {
-                conditions.Add(new AnnotationsRequest.Condition<Execution>
-                {
-                    Predicate = u => u.Name == contextNameQuery,
-                });
-            }
-        }
+        AddNameQuery<Execution>(conditions, subjectNameQuery, nameof(subjectNameQuery), e => e.SubjectName);
+        AddNameQuery<Execution>(conditions, contextNameQuery, nameof(contextNameQuery), e => e.Name);
 
         request.Conditions = conditions;
         var response = await _annotations.GetAnnotationsAsync(request);
@@ -653,6 +470,21 @@ public class AnnotationsController : ControllerBase
         return new OkObjectResult(jobGuid);
     }
 
+    // The condition of a name query on one name of the listed type; answers the query, so that an exact one can narrow
+    // the read to its partition, or null without one.
+    private static NameQuery? AddNameQuery<TAnnotation>(List<AnnotationsRequest.ICondition> conditions, string? text, string parameter, Expression<Func<TAnnotation, string?>> name)
+        where TAnnotation : Annotation
+    {
+        var query = NameQuery.Parse(text, parameter);
+
+        if (query is not null)
+        {
+            conditions.Add(query.ToCondition(name));
+        }
+
+        return query;
+    }
+
     private AuditActor GetAuditActor()
     {
         var id = User.FindFirst("sub")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -661,4 +493,5 @@ public class AnnotationsController : ControllerBase
             ? AuditActor.System
             : AuditActor.Account(id, User.FindFirst("name")?.Value);
     }
+
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;
@@ -39,6 +40,88 @@ public class AnnotationsHttpTests
         nameof(AnnotationsHttp.SetAnnotationsSimple),
         nameof(AnnotationsHttp.DeleteAnnotation),
         nameof(AnnotationsHttp.RestoreAnnotations),
+    };
+
+    // The catalog the name queries filter: two of each name, so every query has a match and a miss.
+    private static readonly Annotation[] Catalog =
+    [
+        .. new[]
+        {
+            "rst.invoicing", "rst.shipping",
+            "sbt.northwind", "sbt.contoso",
+            "usg.northwind.invoicing", "usg.northwind.shipping", "usg.contoso.invoicing",
+            "cnt.northwind.production", "cnt.northwind.staging", "cnt.contoso.production",
+            "exe.northwind.invoicing.production", "exe.northwind.shipping.staging", "exe.contoso.invoicing.production",
+            "unt.invoicing.api", "unt.shipping.worker",
+            "uxe.northwind.invoicing.production.api", "uxe.northwind.shipping.staging.worker", "uxe.contoso.invoicing.production.api",
+        }.Select(key => AnnotationFactory.CreateDefault(AnnotationKey.Parse(key), "billing", "default")),
+    ];
+
+    // Every name parameter of every typed list with an exact, a contains and a pattern query: the returned keys and
+    // the partition an exact query narrows to.
+    public static TheoryData<string, string, string, string[], string?> NameQueries => new()
+    {
+        { "responsibilities", "nameQuery", "invoicing", ["rst.invoicing"], "billing.rst.invoicing" },
+        { "responsibilities", "nameQuery", "%ship%", ["rst.shipping"], null },
+        { "responsibilities", "nameQuery", "^inv", ["rst.invoicing"], null },
+        { "subjects", "nameQuery", "contoso", ["sbt.contoso"], "billing.sbt.contoso" },
+        { "subjects", "nameQuery", "%wind", ["sbt.northwind"], null },
+        { "subjects", "nameQuery", "^cont", ["sbt.contoso"], null },
+        { "usages", "responsibilityNameQuery", "shipping", ["usg.northwind.shipping"], "billing.rst.shipping" },
+        { "usages", "responsibilityNameQuery", "%voic%", ["usg.northwind.invoicing", "usg.contoso.invoicing"], null },
+        { "usages", "responsibilityNameQuery", "^ship", ["usg.northwind.shipping"], null },
+        { "usages", "subjectNameQuery", "contoso", ["usg.contoso.invoicing"], null },
+        { "usages", "subjectNameQuery", "%wind", ["usg.northwind.invoicing", "usg.northwind.shipping"], null },
+        { "usages", "subjectNameQuery", "^cont", ["usg.contoso.invoicing"], null },
+        { "contexts", "subjectNameQuery", "northwind", ["cnt.northwind.production", "cnt.northwind.staging"], "billing.sbt.northwind" },
+        { "contexts", "subjectNameQuery", "%oso", ["cnt.contoso.production"], null },
+        { "contexts", "subjectNameQuery", "^north", ["cnt.northwind.production", "cnt.northwind.staging"], null },
+        { "contexts", "nameQuery", "staging", ["cnt.northwind.staging"], null },
+        { "contexts", "nameQuery", "%duct%", ["cnt.northwind.production", "cnt.contoso.production"], null },
+        { "contexts", "nameQuery", "ing$", ["cnt.northwind.staging"], null },
+        { "executions", "responsibilityNameQuery", "invoicing", ["exe.northwind.invoicing.production", "exe.contoso.invoicing.production"], "billing.rst.invoicing" },
+        { "executions", "responsibilityNameQuery", "%ship%", ["exe.northwind.shipping.staging"], null },
+        { "executions", "responsibilityNameQuery", "^inv", ["exe.northwind.invoicing.production", "exe.contoso.invoicing.production"], null },
+        { "executions", "subjectNameQuery", "contoso", ["exe.contoso.invoicing.production"], null },
+        { "executions", "subjectNameQuery", "%wind", ["exe.northwind.invoicing.production", "exe.northwind.shipping.staging"], null },
+        { "executions", "subjectNameQuery", "^cont", ["exe.contoso.invoicing.production"], null },
+        { "executions", "contextNameQuery", "staging", ["exe.northwind.shipping.staging"], null },
+        { "executions", "contextNameQuery", "%duct%", ["exe.northwind.invoicing.production", "exe.contoso.invoicing.production"], null },
+        { "executions", "contextNameQuery", "^stag", ["exe.northwind.shipping.staging"], null },
+        { "units", "responsibilityNameQuery", "shipping", ["unt.shipping.worker"], "billing.rst.shipping" },
+        { "units", "responsibilityNameQuery", "%voic%", ["unt.invoicing.api"], null },
+        { "units", "responsibilityNameQuery", "^ship", ["unt.shipping.worker"], null },
+        { "units-of-execution", "responsibilityNameQuery", "shipping", ["uxe.northwind.shipping.staging.worker"], "billing.rst.shipping" },
+        { "units-of-execution", "responsibilityNameQuery", "%voic%", ["uxe.northwind.invoicing.production.api", "uxe.contoso.invoicing.production.api"], null },
+        { "units-of-execution", "responsibilityNameQuery", "^ship", ["uxe.northwind.shipping.staging.worker"], null },
+        { "units-of-execution", "unitNameQuery", "worker", ["uxe.northwind.shipping.staging.worker"], null },
+        { "units-of-execution", "unitNameQuery", "%ap%", ["uxe.northwind.invoicing.production.api", "uxe.contoso.invoicing.production.api"], null },
+        { "units-of-execution", "unitNameQuery", "^wor", ["uxe.northwind.shipping.staging.worker"], null },
+        { "units-of-execution", "subjectNameQuery", "contoso", ["uxe.contoso.invoicing.production.api"], null },
+        { "units-of-execution", "subjectNameQuery", "%wind", ["uxe.northwind.invoicing.production.api", "uxe.northwind.shipping.staging.worker"], null },
+        { "units-of-execution", "subjectNameQuery", "^cont", ["uxe.contoso.invoicing.production.api"], null },
+        { "units-of-execution", "contextNameQuery", "staging", ["uxe.northwind.shipping.staging.worker"], null },
+        { "units-of-execution", "contextNameQuery", "%duct%", ["uxe.northwind.invoicing.production.api", "uxe.contoso.invoicing.production.api"], null },
+        { "units-of-execution", "contextNameQuery", "^stag", ["uxe.northwind.shipping.staging.worker"], null },
+    };
+
+    // Every name parameter of every typed list.
+    public static TheoryData<string, string> NameParameters => new()
+    {
+        { "responsibilities", "nameQuery" },
+        { "subjects", "nameQuery" },
+        { "usages", "responsibilityNameQuery" },
+        { "usages", "subjectNameQuery" },
+        { "contexts", "subjectNameQuery" },
+        { "contexts", "nameQuery" },
+        { "executions", "responsibilityNameQuery" },
+        { "executions", "subjectNameQuery" },
+        { "executions", "contextNameQuery" },
+        { "units", "responsibilityNameQuery" },
+        { "units-of-execution", "responsibilityNameQuery" },
+        { "units-of-execution", "unitNameQuery" },
+        { "units-of-execution", "subjectNameQuery" },
+        { "units-of-execution", "contextNameQuery" },
     };
 
     // Debug builds (DEV_AUTH) skip the role check of users.
@@ -769,6 +852,80 @@ public class AnnotationsHttpTests
         result.ShouldBeOfType<NotFoundResult>();
     }
 
+    // 424-97: the name queries filter every typed list, and an exact one on a partition parameter narrows the read.
+    [Theory]
+    [MemberData(nameof(NameQueries))]
+    public async Task TypedList_NameQuery_ReturnsTheMatchingAnnotations(string route, string parameter, string query, string[] keys, string? partitionKey)
+    {
+        var annotations = new RecordingAnnotations { Listed = Catalog };
+
+        var result = await ListByName(Http(annotations), route, new Dictionary<string, string> { [parameter] = query });
+
+        ListedKeys(result).ShouldBe(keys, ignoreOrder: true);
+        annotations.LastRequest!.PartitionKey.ShouldBe(partitionKey);
+    }
+
+    // The responsibilities answered 500 with a name query: the conditions were cast to the entity type.
+    [Theory]
+    [InlineData("invoicing")]
+    [InlineData("%voic%")]
+    [InlineData("^inv")]
+    public async Task Responsibilities_NameQuery_IsNoLongerAServerError(string query)
+    {
+        var annotations = new RecordingAnnotations { Listed = Catalog };
+
+        var result = await Http(annotations).GetResponsibilities(Request("GET"), "acme", "billing", "default", nameQuery: query);
+
+        ListedKeys(result).ShouldBe(["rst.invoicing"]);
+        annotations.LastRequest!.Conditions.ShouldHaveSingleItem().Against.ShouldBe(AnnotationType.Responsibility);
+    }
+
+    // The name queries of one list combine with AND.
+    [Theory]
+    [InlineData("usages", "responsibilityNameQuery", "invoicing", "subjectNameQuery", "^cont", "usg.contoso.invoicing")]
+    [InlineData("usages", "responsibilityNameQuery", "shipping", "subjectNameQuery", "contoso", null)]
+    [InlineData("executions", "subjectNameQuery", "northwind", "contextNameQuery", "staging", "exe.northwind.shipping.staging")]
+    [InlineData("executions", "responsibilityNameQuery", "%voic%", "contextNameQuery", "staging", null)]
+    [InlineData("units-of-execution", "unitNameQuery", "api", "subjectNameQuery", "%wind", "uxe.northwind.invoicing.production.api")]
+    [InlineData("units-of-execution", "unitNameQuery", "worker", "contextNameQuery", "^prod", null)]
+    public async Task TypedList_TwoNameQueries_ReturnOnlyWhatMatchesBoth(string route, string first, string firstQuery, string second, string secondQuery, string? key)
+    {
+        var annotations = new RecordingAnnotations { Listed = Catalog };
+
+        var result = await ListByName(Http(annotations), route, new Dictionary<string, string> { [first] = firstQuery, [second] = secondQuery });
+
+        ListedKeys(result).ShouldBe(key is null ? [] : [key]);
+    }
+
+    [Theory]
+    [MemberData(nameof(NameParameters))]
+    public async Task TypedList_InvalidPattern_IsInvalidQueryBeforeTheRead(string route, string parameter)
+    {
+        var annotations = new RecordingAnnotations { Listed = Catalog };
+
+        var exception = await Should.ThrowAsync<InvalidInputException>(() => ListByName(Http(annotations), route, new Dictionary<string, string> { [parameter] = "^[" }));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.InvalidQuery);
+        exception.Message.ShouldStartWith($"The {parameter} is not a valid regular expression: ");
+        annotations.LastRequest.ShouldBeNull();
+    }
+
+    // Nested repetitions backtrack for seconds per name on the backtracking engine; the name queries don't backtrack.
+    [Fact]
+    public async Task TypedList_CatastrophicPattern_AnswersWithoutDelay()
+    {
+        var annotations = new RecordingAnnotations
+        {
+            Listed = [.. Catalog, AnnotationFactory.CreateDefault(AnnotationKey.CreateResponsibility(new string('a', 30)), "billing", "default")],
+        };
+        var watch = Stopwatch.StartNew();
+
+        var result = await Http(annotations).GetResponsibilities(Request("GET"), "acme", "billing", "default", nameQuery: "^([a-zA-Z0-9_-]+)+!");
+
+        ListedKeys(result).ShouldBeEmpty();
+        watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(1));
+    }
+
     private static AnnotationsHttp Http(RecordingAnnotations annotations, AccountRole role = AccountRole.Contributor)
     {
         return new AnnotationsHttp(annotations, new UserAccess(role), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
@@ -826,6 +983,34 @@ public class AnnotationsHttpTests
         yield return (inactive, deleted) => http.GetUnits(Request("GET"), "acme", "billing", "default", null, null, inactive, deleted);
         yield return (inactive, deleted) => http.GetUnitsOfExecution(Request("GET"), "acme", "billing", "default", null, null, null, null, null, inactive, deleted);
         yield return (inactive, deleted) => http.GetDescendants(Request("GET"), "acme", "billing", "default", "sbt.northwind", "all", null, inactive, deleted);
+    }
+
+    // A typed list called with the given name queries, by parameter name.
+    private static Task<IActionResult> ListByName(AnnotationsHttp http, string route, IReadOnlyDictionary<string, string> queries)
+    {
+        var request = Request("GET");
+
+        return route switch
+        {
+            "responsibilities" => http.GetResponsibilities(request, "acme", "billing", "default", nameQuery: Query("nameQuery")),
+            "subjects" => http.GetSubjects(request, "acme", "billing", "default", nameQuery: Query("nameQuery")),
+            "usages" => http.GetUsages(request, "acme", "billing", "default", responsibilityNameQuery: Query("responsibilityNameQuery"), subjectNameQuery: Query("subjectNameQuery")),
+            "contexts" => http.GetContexts(request, "acme", "billing", "default", subjectNameQuery: Query("subjectNameQuery"), nameQuery: Query("nameQuery")),
+            "executions" => http.GetExecutions(request, "acme", "billing", "default", responsibilityNameQuery: Query("responsibilityNameQuery"), subjectNameQuery: Query("subjectNameQuery"), contextNameQuery: Query("contextNameQuery")),
+            "units" => http.GetUnits(request, "acme", "billing", "default", responsibilityNameQuery: Query("responsibilityNameQuery")),
+            "units-of-execution" => http.GetUnitsOfExecution(request, "acme", "billing", "default", responsibilityNameQuery: Query("responsibilityNameQuery"), unitNameQuery: Query("unitNameQuery"), subjectNameQuery: Query("subjectNameQuery"), contextNameQuery: Query("contextNameQuery")),
+            _ => throw new ArgumentOutOfRangeException(nameof(route), route, null),
+        };
+
+        string? Query(string parameter) => queries.GetValueOrDefault(parameter);
+    }
+
+    // The keys of a typed list answer (AnnotationsResponse<T>).
+    private static List<string> ListedKeys(IActionResult result)
+    {
+        var response = result.ShouldBeOfType<OkObjectResult>().Value.ShouldNotBeNull();
+        var annotations = (IEnumerable<Annotation>)response.GetType().GetProperty(nameof(AnnotationsResponse.Annotations))!.GetValue(response)!;
+        return annotations.Select(annotation => annotation.AnnotationKey).ToList();
     }
 
     private static Subject Subject(string key)
@@ -899,6 +1084,9 @@ public class AnnotationsHttpTests
 
         public Annotation? StoredDeleted { get; init; }
 
+        // What GetAnnotationsAsync lists.
+        public IReadOnlyList<Annotation> Listed { get; init; } = [];
+
         public Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor)
         {
             Calls.Add($"set:{organization}:{annotation.AnnotationKey}");
@@ -923,10 +1111,16 @@ public class AnnotationsHttpTests
             });
         }
 
+        // The listed annotations of the requested types that pass the conditions of their type, as the Cosmos
+        // service filters a page (it reads the partition first; the double ignores it).
         public Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request)
         {
             LastRequest = request;
-            return Task.FromResult(new AnnotationsResponse());
+            var annotations = Listed
+                .Where(annotation => request.Types.Contains(annotation.AnnotationType))
+                .Where(annotation => Passes(request, annotation))
+                .ToList();
+            return Task.FromResult(new AnnotationsResponse { Annotations = annotations, Count = annotations.Count });
         }
 
         public Task<IReadOnlyList<Annotation>> GetViewAnnotationsAsync(string organization, string project, string view, CancellationToken cancellationToken = default) => throw new NotImplementedException();
@@ -985,6 +1179,21 @@ public class AnnotationsHttpTests
         {
             Calls.Add($"simple:{organization}:{project}:{view}:{string.Join(",", annotations)}");
             return Task.FromResult<IEnumerable<Annotation>>([]);
+        }
+
+        private static bool Passes(AnnotationsRequest request, Annotation annotation)
+        {
+            return annotation switch
+            {
+                Responsibility responsibility => request.CompileConditions<Responsibility>()(responsibility),
+                Subject subject => request.CompileConditions<Subject>()(subject),
+                Usage usage => request.CompileConditions<Usage>()(usage),
+                Context context => request.CompileConditions<Context>()(context),
+                Execution execution => request.CompileConditions<Execution>()(execution),
+                Unit unit => request.CompileConditions<Unit>()(unit),
+                UnitOfExecution unitOfExecution => request.CompileConditions<UnitOfExecution>()(unitOfExecution),
+                _ => throw new ArgumentOutOfRangeException(nameof(annotation), annotation.AnnotationType, null),
+            };
         }
     }
 

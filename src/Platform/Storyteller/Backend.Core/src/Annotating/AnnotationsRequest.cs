@@ -33,6 +33,11 @@ public class AnnotationsRequest
     // Only the descendants of this key in the inheritance graph, of the requested types.
     public AnnotationKey? DescendantsOf { get; set; }
 
+    public interface ICondition
+    {
+        public AnnotationType Against { get; }
+    }
+
     // The conditions of one annotation type, compiled once and combined with AND; conditions of other types don't
     // apply. The service runs it on the mapped models of a page.
     public Func<TAnnotation, bool> CompileConditions<TAnnotation>()
@@ -49,11 +54,6 @@ public class AnnotationsRequest
             1 => predicates[0],
             _ => annotation => predicates.TrueForAll(predicate => predicate(annotation)),
         };
-    }
-
-    public interface ICondition
-    {
-        public AnnotationType Against { get; }
     }
 
     // A condition on the models of one type: the type parameter decides which type it applies to.
