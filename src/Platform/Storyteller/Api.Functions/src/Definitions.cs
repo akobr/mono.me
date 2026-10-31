@@ -21,6 +21,9 @@ public static class Definitions
 
             // "usage" is a reserved view name, the literal of the project's key/value usage report.
             public const string KeyValuesView = ":regex(^(?!usage$))";
+
+            // "access" is a reserved organization name, the literal of the v1/access/... routes.
+            public const string Organization = ":regex(^(?!access$))";
         }
 
         public static class Access
@@ -118,7 +121,8 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string Bindings = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/bindings";
+                // The organization is never "access", so the route doesn't take the access point of an organization "bindings".
+                public const string Bindings = $"v1/{{{Parameters.Organization}{Constraints.Organization}}}/{{{Parameters.Project}}}/bindings";
             }
         }
 
@@ -126,8 +130,10 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string Views = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/views";
-                public const string View = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/views/{{{Parameters.View}}}";
+                // The organization is never "access", so the routes don't take the access point of an organization "views"
+                // (GET v1/access/points/views) or its machine authentication (PUT v1/access/points/views/machine-authentication).
+                public const string Views = $"v1/{{{Parameters.Organization}{Constraints.Organization}}}/{{{Parameters.Project}}}/views";
+                public const string View = $"v1/{{{Parameters.Organization}{Constraints.Organization}}}/{{{Parameters.Project}}}/views/{{{Parameters.View}}}";
             }
         }
 
@@ -169,9 +175,11 @@ public static class Definitions
             {
                 public const string Schemas = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schemas";
                 public const string SchemaType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/type/{{{Parameters.AnnotationType}}}";
-                public const string SchemaAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}";
-                public const string SchemaDescendantType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}/type/{{{Parameters.AnnotationType}}}";
-                public const string SchemaCombined = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}/definition";
+
+                // {key} is an annotation key, so the routes of a key never take the literal "type" of the type routes.
+                public const string SchemaAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}{Constraints.AnnotationKey}}}";
+                public const string SchemaDescendantType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}{Constraints.AnnotationKey}}}/type/{{{Parameters.AnnotationType}}}";
+                public const string SchemaCombined = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}{Constraints.AnnotationKey}}}/definition";
 
                 public const string SchemaTypeVersions = $"{SchemaType}/versions";
                 public const string SchemaTypeVersion = $"{SchemaType}/versions/{{{Parameters.Version}}}";
@@ -195,9 +203,12 @@ public static class Definitions
             public static class V1
             {
                 // View-scoped: the pairs of a view. The collection actions are POST only, and a key is never addressed by POST,
-                // so a key named "restore" or "export" still reaches the key functions with GET, PUT and DELETE. The view is
-                // never "usage", so the list doesn't take the project's usage report (Usage).
-                public const string KeyValues = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}{Constraints.KeyValuesView}}}/key-values";
+                // so a key named "restore" or "export" still reaches the key functions with GET, PUT and DELETE.
+                public const string KeyValues = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/key-values";
+
+                // The list (GET) of KeyValues, whose view is never "usage", so it doesn't take the project's usage report
+                // (Usage); the other routes of the view have no sibling of their method and length.
+                public const string List = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}{Constraints.KeyValuesView}}}/key-values";
                 public const string KeyValue = $"{KeyValues}/{{{Parameters.Key}}}";
                 public const string Restore = $"{KeyValues}/restore";
                 public const string Purge = $"{KeyValues}/purge";

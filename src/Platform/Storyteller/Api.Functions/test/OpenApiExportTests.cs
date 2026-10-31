@@ -348,9 +348,6 @@ public class OpenApiExportTests
         PropertyNames(schemas, "TokenExchangeConfiguration").ShouldBe(["Enabled"]);
     }
 
-    // The scopes of a machine (424-79): one list on the create model and the machine, of one shared enum of the 11
-    // scopes without a default, so both SDKs have one type for it and send nothing on their own. The presets and the
-    // separate management list are gone, also from every description.
     // The inline constraints of the routes (Definitions.Routes.Constraints) stay out of the paths: the extension's
     // RouteConstraintFilter strips them, so the SDKs keep the plain parameters of the public URLs.
     [Fact]
@@ -390,6 +387,9 @@ public class OpenApiExportTests
         operations.Select(operation => operation.Path).Where(path => path.Contains(':') || path.Contains("regex", StringComparison.Ordinal)).ShouldBeEmpty();
     }
 
+    // The scopes of a machine (424-79): one list on the create model and the machine, of one shared enum of the 11
+    // scopes without a default, so both SDKs have one type for it and send nothing on their own. The presets and the
+    // separate management list are gone, also from every description.
     [Fact]
     public async Task Document_Scopes_AreAListOfTheSharedMachineScopeEnum()
     {
