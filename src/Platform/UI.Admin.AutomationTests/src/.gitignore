@@ -1,0 +1,5 @@
+# Personal overrides of testsettings.json (target, pool e-mails, headed runs); passwords and keys go to the user secrets
+testsettings.local.json
+
+# TUnit's reports and the runs' artifacts (results.jsonl, traces, screenshots, console logs)
+TestResults/
