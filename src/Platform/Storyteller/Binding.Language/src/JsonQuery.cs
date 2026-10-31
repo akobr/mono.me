@@ -19,6 +19,14 @@ namespace _42.Platform.Storyteller.Binding.Language;
 /// </remarks>
 public static class JsonQuery
 {
+    /// <summary>
+    /// The time one <c>=~</c> filter of a JSONPath query may take to match one value. Without settings, Newtonsoft
+    /// matches with no timeout at all.
+    /// </summary>
+    public static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(200);
+
+    private static readonly JsonSelectSettings SelectSettings = new() { RegexMatchTimeout = RegexMatchTimeout };
+
     public static JToken? Resolve(JToken root, string expression)
     {
         if (root is null)
@@ -47,9 +55,28 @@ public static class JsonQuery
 
     private static JToken? ResolveJsonPath(JToken root, string expression)
     {
+        // The query can be computed (a stored string read by a nested statement), so neither the length cap nor the
+        // depth limit of the @ string covers it, and Newtonsoft's parser recurses once per nested '[' or '(' with no guard.
+        if (expression.Length > BindingExpressionLimits.MaxLength)
+        {
+            throw new EvaluationLimitExceededException(
+                EvaluationLimitKind.ExpressionLength,
+                BindingExpressionLimits.MaxLength,
+                $"The JSONPath query is longer than {BindingExpressionLimits.MaxLength} characters.");
+        }
+
+        // Counting every '[' and '(' bounds the nesting even when quotes would hide a closing one.
+        if (expression.Count(c => c is '[' or '(') > BindingExpressionLimits.MaxDepth)
+        {
+            throw new EvaluationLimitExceededException(
+                EvaluationLimitKind.Depth,
+                BindingExpressionLimits.MaxDepth,
+                $"The JSONPath query has more than {BindingExpressionLimits.MaxDepth} brackets and parentheses.");
+        }
+
         try
         {
-            return root.SelectToken(expression);
+            return root.SelectToken(expression, SelectSettings);
         }
         catch (JsonException exception)
         {
@@ -60,9 +87,10 @@ public static class JsonQuery
         {
             throw new BindingEvaluationException("The JSONPath query took too long to evaluate.", exception);
         }
-        catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException)
+        catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException or IndexOutOfRangeException)
         {
-            // An index Newtonsoft cannot convert, or an invalid =~ pattern, whose message quotes the pattern.
+            // An index Newtonsoft cannot convert, an invalid =~ pattern (its message quotes the pattern), or a query that
+            // ends inside an indexer or a filter, which Newtonsoft reads past its end.
             throw new BindingEvaluationException("The JSONPath query is not valid.", exception);
         }
     }

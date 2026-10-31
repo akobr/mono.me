@@ -30,8 +30,9 @@ internal static class ObjectBindingEngine
     /// are linear in data that is already bounded (the stored document and the checked result) and are not metered.
     /// Every failure is a <see cref="BindingException"/>; anything thrown by an engine for author-supplied input becomes
     /// <see cref="BindingEvaluationException"/>, with a message that quotes no evaluated value (see <see cref="EngineMessages"/>).
+    /// An <paramref name="emitted"/> envelope comes from an earlier result, so its definition is computed too.
     /// </summary>
-    public static JToken Evaluate(string kind, JToken definition, JObject context, EvaluationMeter meter)
+    public static JToken Evaluate(string kind, JToken definition, JObject context, EvaluationMeter meter, bool emitted = false)
     {
         try
         {
@@ -53,7 +54,7 @@ internal static class ObjectBindingEngine
                 {
                     JsonLogicKind => JsonLogic.Apply(definitionNode, contextNode),
                     JsonEKind => JsonE.Evaluate(definitionNode, contextNode, meter),
-                    _ => throw new BindingEvaluationException($"Unknown object binding '{kind}'."),
+                    _ => throw new BindingEvaluationException($"Unknown object binding: $binding must be '{JsonEKind}' or '{JsonLogicKind}'."),
                 };
 
                 // No step follows the last primitive, and a library catch block could have swallowed a latched limit.
@@ -69,7 +70,7 @@ internal static class ObjectBindingEngine
         }
         catch (JsonEException exception)
         {
-            throw new BindingEvaluationException(EngineMessages.ForJsonE(exception.Message, definition), exception);
+            throw new BindingEvaluationException(EngineMessages.ForJsonE(exception.Message, definition, emitted), exception);
         }
         catch (JsonLogicException exception)
         {

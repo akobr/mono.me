@@ -124,6 +124,15 @@ public class BindingExpressionsTests
         parentheses.ExceedsLimits.ShouldBeTrue();
     }
 
+    // The API refuses the same strings on a resolved read (Binding.Language/src/BindingExpressionLimits.cs); no project
+    // references both, so each side pins the shared values.
+    [Fact]
+    public void Limits_MatchTheApi()
+    {
+        BindingExpressions.MaxLength.ShouldBe(8192);
+        BindingExpressions.MaxDepth.ShouldBe(64);
+    }
+
     [Fact]
     public void Parse_LongerThanTheLimit_IsInvalid()
     {

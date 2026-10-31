@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Binding;
 using FluentAssertions;
@@ -102,6 +104,76 @@ public class EngineMessagesTests
         thrown.Message.Should().Be("Failed to process the object binding for 'value': Object binding evaluation failed (OverflowException).");
     }
 
+    [Fact]
+    public async Task JsonE_LongStringCalledAsFunction_IsCheckedInLinearTime()
+    {
+        // The name is not a word of the definition, but it matches at every offset of the padding.
+        var definition = new JObject
+        {
+            ["$let"] = new JObject { ["p"] = new string('a', 600_000) },
+            ["in"] = Eval(new string('a', 300_000)),
+        };
+        var watch = Stopwatch.StartNew();
+
+        var thrown = await ResolveThrows("jsone", definition, new JObject());
+
+        thrown.Message.Should().EndWith(": unknown context value");
+        watch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+    }
+
+    [Theory]
+    [MemberData(nameof(EmittedEnvelopes))]
+    public async Task EmittedEnvelope_ComputedFromASecret_IsReportedAtTheStoredEnvelope(string emitted, string message)
+    {
+        // The outer JSON-e emits an envelope ($$ escapes $) built from a $context value, and the resolver evaluates it too.
+        var thrown = await ResolveThrows("jsone", Parse(emitted), new JObject { ["s"] = Secret });
+
+        thrown.Message.Should().Be($"Failed to process the object binding for 'value': {message}");
+    }
+
+    [Theory]
+    [InlineData("@fail", false)]
+    [InlineData("@deep", true)]
+    public async Task EmittedDataBinding_UnderAComputedKey_IsReportedAtTheStoredEnvelope(string binding, bool limit)
+    {
+        var resolver = new ConfigurationBindingResolver(new FailingStringBinding());
+        var content = Envelope("jsone", new JObject { ["${s}"] = binding }, new JObject { ["s"] = Secret });
+
+        var act = () => resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        var thrown = (await act.Should().ThrowAsync<BindingEvaluationException>()).Which;
+        thrown.Path.Should().Be("value");
+        thrown.Message.Should().NotContain(Secret).And.StartWith("Failed to process the object binding for 'value': a data binding in its result");
+        thrown.InnerException!.Message.Should().Contain(Secret, "the executor's own message names the computed path");
+        if (limit)
+        {
+            var exceeded = thrown.Should().BeOfType<EvaluationLimitExceededException>().Subject;
+            exceeded.Kind.Should().Be(EvaluationLimitKind.Depth);
+            exceeded.Limit.Should().Be(64);
+        }
+    }
+
+    [Fact]
+    public async Task StoredDataBinding_KeepsItsPathAndMessage()
+    {
+        var resolver = new ConfigurationBindingResolver(new FailingStringBinding());
+        var content = Parse("""{ "settings": { "value": "@fail" } }""");
+
+        var act = () => resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        var thrown = (await act.Should().ThrowAsync<BindingEvaluationException>()).Which;
+        thrown.Path.Should().Be("settings.value");
+        thrown.Message.Should().Be("Failed to process the data binding for 'settings.value': it failed.");
+    }
+
+    public static IEnumerable<object[]> EmittedEnvelopes()
+    {
+        yield return ["""{ "$$binding": "${s}", "$$definition": 1 }""", "Unknown object binding: $binding must be 'jsone' or 'jlogic'."];
+        yield return ["""{ "$$binding": "jsone", "$$definition": 1, "${s}": 1 }""", "An object binding allows only $binding, $definition and $context."];
+        yield return ["""{ "$$binding": "jsone", "$$definition": { "$$eval": "${s}" } }""", "JSON-e evaluation failed."];
+        yield return ["""{ "$$binding": "jsone", "$$context": { "o": {} }, "$$definition": { "$$eval": "o.${s}" } }""", "JSON-e evaluation failed."];
+    }
+
     public static IEnumerable<object[]> JsonLogicFailures()
     {
         yield return ["""{ "cat": [{ "var": "o" }] }"""];
@@ -123,5 +195,30 @@ public class EngineMessagesTests
         thrown.Path.Should().Be("value");
         thrown.Message.Should().NotContain(Secret);
         return thrown;
+    }
+
+    // Fails like the real executor: the message names the JSON path of the string, which is computed inside a result.
+    private sealed class FailingStringBinding : IBindingExecutor
+    {
+        public ValueTask<bool> TryBinding(JProperty property, bool includeSecrets, BindingScope? scope = null)
+        {
+            return Fail(property.Value);
+        }
+
+        public ValueTask<bool> TryBinding(JValue value, bool includeSecrets, BindingScope? scope = null)
+        {
+            return Fail(value);
+        }
+
+        private static ValueTask<bool> Fail(JToken current)
+        {
+            var path = current.Path;
+            throw current.Value<string>() switch
+            {
+                "@fail" => new BindingEvaluationException($"Failed to process the data binding for '{path}': it failed.", path, null),
+                "@deep" => new EvaluationLimitExceededException(EvaluationLimitKind.Depth, 64, $"Failed to process the data binding for '{path}': too deep.", path, null),
+                _ => new InvalidOperationException("Unexpected binding."),
+            };
+        }
     }
 }
