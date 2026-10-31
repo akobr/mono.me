@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Testing.UI.Automation.Abstractions</AssemblyName>
+    <RootNamespace>_42.Testing.UI.Automation</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <IsPackable>true</IsPackable>
+    <Description>Engine-neutral contracts of the 42 UI automation framework: the [TestCase] link to a test case management system, the category names, the result, artifact and run records, and the test run reporter contract.</Description>
+    <PackageTags>$(PackageTags);testing;ui;automation;playwright</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Only for IConfiguration in ITestRunReporterProvider.Create: a provider binds its own Reporting:<System> section. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+  </ItemGroup>
+
+</Project>

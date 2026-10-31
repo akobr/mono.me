@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Testing.UI.Automation.Runtime.TUnit.UnitTests</AssemblyName>
+    <RootNamespace>_42.Testing.UI.Automation.Runtime.TUnit.UnitTests</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- An xUnit project: TUnit.Core comes with the library under test, its global usings are not wanted here. -->
+    <TUnitImplicitUsings>false</TUnitImplicitUsings>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\UI.Automation.Runtime.TUnit.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Testing.UI.Automation.Runtime</AssemblyName>
+    <RootNamespace>_42.Testing.UI.Automation.Runtime</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <IsPackable>true</IsPackable>
+    <Description>Engine-neutral runtime of the 42 UI automation framework on Playwright: layered testsettings*.json settings with user secrets and UITESTS_ variables, browser providers, context options, the user pool with cached sign-ins, seeded test data, artifacts and the reporting dispatcher with batching, back-off and a replayable results file.</Description>
+    <PackageTags>$(PackageTags);testing;ui;automation;playwright</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="42.Testing.UI.Automation.Runtime.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\UI.Automation.Abstractions\src\UI.Automation.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
