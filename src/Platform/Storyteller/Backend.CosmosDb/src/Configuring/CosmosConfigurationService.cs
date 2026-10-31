@@ -304,7 +304,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         // an empty archive of version 0 holds no written version (an old patch archived cache rows so), and an archive
         // of the current or a later version is a leftover that a write counts as archived, as in an export
         var versions = history
-            .Where(entity => entity.Version > 0 || entity.Content.HasValues)
+            .Where(entity => IsWrittenVersion(entity.Version, entity.Content))
             .Where(entity => configuration is null || configuration.Version == 0 || entity.Version < configuration.Version)
             .Select(entity => entity.ToConfigurationVersion())
             .ToList();
@@ -353,7 +353,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
         // a cache row is no stored version, so it gives no content; neither does an empty archive of version 0 (an old
         // patch archived cache rows so), as in the version list
-        return versionEntity is not null && (versionEntity.Version > 0 || versionEntity.Content.HasValues)
+        return versionEntity is not null && IsWrittenVersion(versionEntity.Version, versionEntity.Content)
             ? versionEntity.ToConfiguration()
             : null;
     }
@@ -1218,9 +1218,15 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // Every write gives version 1 or more; a calculation creates a cache row with version 0 and no content. A version
     // 0 with content comes from the time before versions were counted.
+    // The same rule holds for archives: an empty archive of version 0 is the archive of a cache row.
     private static bool IsWrittenVersion(ConfigurationEntity configuration)
     {
-        return configuration.Version > 0 || configuration.Content.HasValues;
+        return IsWrittenVersion(configuration.Version, configuration.Content);
+    }
+
+    private static bool IsWrittenVersion(ulong version, JObject content)
+    {
+        return version > 0 || content.HasValues;
     }
 
     // Archives the stored version and writes the next one, guarded by the ETag of the read. Returns null when another

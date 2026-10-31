@@ -47,7 +47,8 @@ public interface IConfigurationService
     Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force = false);
 
     // Throws ConfigurationNotFoundException when no version is stored: no item, or only the cache of an effective read.
-    // Every written version is patched, an empty one too.
+    // Every written version is patched, an empty one too. A deleted annotation fails before that check with a
+    // ConflictException (AnnotationDeleted).
     Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, AuditActor actor, bool force = false);
 
     // True when stored content was cleared. Every clear first finishes the cache invalidation an earlier one left
