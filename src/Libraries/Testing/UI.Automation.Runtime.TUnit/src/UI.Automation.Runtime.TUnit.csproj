@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Testing.UI.Automation.Runtime.TUnit</AssemblyName>
+    <RootNamespace>_42.Testing.UI.Automation.Runtime.TUnit</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- TUnit's global 'using static TUnit.Core.HookType' makes Assembly and Test ambiguous; the usings are explicit here. -->
+    <TUnitImplicitUsings>false</TUnitImplicitUsings>
+
+    <IsPackable>true</IsPackable>
+    <Description>TUnit adapter of the 42 UI automation framework: the UiTest base class, the session hooks, the Elementary, Area, Serial, RequiresProvider, RequiresEngine and ConfiguredRetry attributes, and the receiver that reports every result.</Description>
+    <PackageTags>$(PackageTags);testing;ui;automation;playwright;tunit</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="42.Testing.UI.Automation.Runtime.TUnit.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TUnit.Core, not the TUnit package: the engine and the entry point belong to the test project. -->
+    <PackageReference Include="TUnit.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\UI.Automation.Runtime\src\UI.Automation.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>

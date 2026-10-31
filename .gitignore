@@ -65,6 +65,10 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# exception for the artifact collector of the UI automation runtime (source, not build output)
+!src/Libraries/Testing/UI.Automation.Runtime/src/Artifacts/
+!src/Libraries/Testing/UI.Automation.Runtime/test/Artifacts/
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 
