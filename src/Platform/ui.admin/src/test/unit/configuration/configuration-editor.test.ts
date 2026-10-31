@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { setupServer } from 'msw/node'
+import { isNotFound, patchConfiguration } from '@42for.net/2splatform.sdk'
 import ConfigurationEditor from '@/components/configuration/ConfigurationEditor.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import { loadDb, saveDb } from '@/mock/db'
@@ -77,7 +78,26 @@ describe('ConfigurationEditor (JSON Patch saves)', () => {
     await settle(10)
 
     expect(ownContent(loadDb(), scope, key)).toEqual({})
+
+    // The empty document is a stored version, so the first save patches it.
+    await textarea(view).setValue(JSON.stringify({ retries: 2 }, null, 2))
+    await settle()
+    await saveButton(view).trigger('click')
+    await settle(10)
+
+    expect(ownContent(loadDb(), scope, key)).toEqual({ retries: 2 })
     view.host.unmount()
+  })
+
+  it('gets a 404 for a patch when nothing is stored, as from the API', async () => {
+    const key = unconfiguredExecution()
+
+    const error = await patchConfiguration(scope.org, scope.project, scope.view, key, [
+      { op: 'add', path: '/retries', value: 2 },
+    ]).catch((reason: unknown) => reason)
+
+    expect(isNotFound(error)).toBe(true)
+    expect(ownContent(loadDb(), scope, key)).toBeUndefined()
   })
 
   it('shows the 409 schema errors with Save anyway', async () => {

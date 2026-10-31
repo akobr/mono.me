@@ -418,8 +418,17 @@ export const configurationHandlers: HttpHandler[] = [
       if (deleted) {
         return deleted
       }
+      // Like the API: without a stored version there is nothing to patch (the first content is created); a stored {} is
+      // patched.
+      const stored = ownContent(db, scope, params.key)
+      if (stored === undefined) {
+        return errorResponse(
+          404,
+          `Configuration for '${params.key}' has no stored version to patch: it was never written, or it was deleted. A PUT or POST writes a first document.`,
+        )
+      }
       const operations = (await request.json()) as Operation[]
-      const document = structuredClone(ownContent(db, scope, params.key) ?? {})
+      const document = structuredClone(stored)
       let patched: Record<string, unknown>
       try {
         patched = applyPatch(document, operations, true).newDocument
