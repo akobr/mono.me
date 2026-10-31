@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -12,6 +13,10 @@ namespace _42.Platform.Storyteller.Binding.Language;
 /// throw a <see cref="BindingEvaluationException"/> when an inner statement cannot be resolved.
 /// The <see cref="BindingScope.Dependencies"/> of the scope go to every source and function; one that is not an
 /// <see cref="IRecordingBinding"/> makes them volatile. An unregistered name reads nothing and records nothing.
+/// Operator chains are evaluated without recursion. Statements nested deeper than <see cref="BindingExpressionLimits.MaxDepth"/>,
+/// or an AST that would exhaust the stack, throw an <see cref="EvaluationLimitExceededException"/> with
+/// <see cref="EvaluationLimitKind.Depth"/>; the <see cref="Parser"/> never builds such an AST, but a hand-built one can be.
+/// Messages name the kind of a value, never the value: it can be a secret.
 /// </summary>
 public sealed class BindingEvaluator
 {
@@ -38,7 +43,7 @@ public sealed class BindingEvaluator
     {
         return node switch
         {
-            Statement statement => EvaluateStatementAsync(statement),
+            Statement statement => EvaluateStatementAsync(statement, depth: 1),
             InterpolationExpression interpolation => EvaluateInterpolationAsync(interpolation),
             MathExpression math => EvaluateMathAsync(math),
             _ => throw new BindingEvaluationException(
@@ -88,7 +93,15 @@ public sealed class BindingEvaluator
         }
 
         throw new BindingEvaluationException(
-            $"Operand '{token.ToString(Formatting.None)}' is not a number.");
+            $"A math operand of type '{token.Type.ToString().ToLowerInvariant()}' is not a number.");
+    }
+
+    private static EvaluationLimitExceededException DepthExceeded()
+    {
+        return new EvaluationLimitExceededException(
+            EvaluationLimitKind.Depth,
+            BindingExpressionLimits.MaxDepth,
+            $"The expression nests deeper than {BindingExpressionLimits.MaxDepth} levels or than the stack allows.");
     }
 
     private static string Stringify(JToken token)
@@ -101,8 +114,14 @@ public sealed class BindingEvaluator
         };
     }
 
-    private async ValueTask<JToken?> EvaluateStatementAsync(Statement statement)
+    // depth counts nested statements: 1 for a top-level statement, an interpolation part, or a math operand
+    private async ValueTask<JToken?> EvaluateStatementAsync(Statement statement, int depth)
     {
+        if (depth > BindingExpressionLimits.MaxDepth || !RuntimeHelpers.TryEnsureSufficientExecutionStack())
+        {
+            throw DepthExceeded();
+        }
+
         switch (statement)
         {
             case PathStatement path:
@@ -112,7 +131,7 @@ public sealed class BindingEvaluator
                 return await ResolveSourceAsync(sourced.Source, sourced.Path.Segments);
 
             case FunctionStatement function:
-                return await InvokeFunctionAsync(function);
+                return await InvokeFunctionAsync(function, depth);
 
             default:
                 throw new BindingEvaluationException(
@@ -138,7 +157,7 @@ public sealed class BindingEvaluator
         return value?.Token;
     }
 
-    private async ValueTask<JToken?> InvokeFunctionAsync(FunctionStatement function)
+    private async ValueTask<JToken?> InvokeFunctionAsync(FunctionStatement function, int depth)
     {
         if (!_functions.TryGetValue(function.Name, out var binding))
         {
@@ -156,7 +175,7 @@ public sealed class BindingEvaluator
         var arguments = new List<BindingValue>(function.Arguments.Count);
         foreach (var argument in function.Arguments)
         {
-            var value = await EvaluateArgumentAsync(argument);
+            var value = await EvaluateArgumentAsync(argument, depth);
             if (value is null)
             {
                 throw new BindingEvaluationException(
@@ -186,7 +205,7 @@ public sealed class BindingEvaluator
         return result?.Token;
     }
 
-    private async ValueTask<BindingValue?> EvaluateArgumentAsync(BindingNode argument)
+    private async ValueTask<BindingValue?> EvaluateArgumentAsync(BindingNode argument, int depth)
     {
         switch (argument)
         {
@@ -198,7 +217,7 @@ public sealed class BindingEvaluator
                 return resolved is null ? null : new BindingValue(resolved);
 
             case Statement statement:
-                var value = await EvaluateStatementAsync(statement);
+                var value = await EvaluateStatementAsync(statement, depth + 1);
                 return value is null ? null : new BindingValue(value);
 
             default:
@@ -220,7 +239,7 @@ public sealed class BindingEvaluator
                     break;
 
                 case StatementPart statementPart:
-                    var value = await EvaluateStatementAsync(statementPart.Statement);
+                    var value = await EvaluateStatementAsync(statementPart.Statement, depth: 1);
                     if (value is null)
                     {
                         throw new BindingEvaluationException("An interpolated statement could not be resolved.");
@@ -253,13 +272,18 @@ public sealed class BindingEvaluator
 
     private async ValueTask<decimal> EvaluateNumericAsync(BindingNode node)
     {
+        if (!RuntimeHelpers.TryEnsureSufficientExecutionStack())
+        {
+            throw DepthExceeded();
+        }
+
         switch (node)
         {
             case NumberNode number:
                 return number.Value;
 
             case StatementOperand operand:
-                var value = await EvaluateStatementAsync(operand.Statement);
+                var value = await EvaluateStatementAsync(operand.Statement, depth: 1);
                 if (value is null)
                 {
                     throw new BindingEvaluationException("A math operand could not be resolved.");
@@ -268,13 +292,34 @@ public sealed class BindingEvaluator
                 return ToDecimal(value);
 
             case BinaryNode binary:
-                var left = await EvaluateNumericAsync(binary.Left);
-                var right = await EvaluateNumericAsync(binary.Right);
-                return Apply(binary.Operator, left, right);
+                return await EvaluateChainAsync(binary);
 
             default:
                 throw new BindingEvaluationException(
                     $"Cannot evaluate a math operand of type '{node.GetType().Name}'.");
         }
+    }
+
+    // The parser builds 1+2+3 as ((1+2)+3), so a long chain is deep on the left. The left spine is walked in a loop,
+    // in the same order as a recursive evaluation: the leftmost operand, then each right operand from the innermost
+    // node outward. Only right operands recurse, and the parser bounds their depth with the parentheses.
+    private async ValueTask<decimal> EvaluateChainAsync(BinaryNode binary)
+    {
+        var spine = new Stack<BinaryNode>();
+        BindingNode current = binary;
+        while (current is BinaryNode node)
+        {
+            spine.Push(node);
+            current = node.Left;
+        }
+
+        var result = await EvaluateNumericAsync(current);
+        while (spine.TryPop(out var node))
+        {
+            var right = await EvaluateNumericAsync(node.Right);
+            result = Apply(node.Operator, result, right);
+        }
+
+        return result;
     }
 }

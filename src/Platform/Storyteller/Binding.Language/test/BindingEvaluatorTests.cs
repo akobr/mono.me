@@ -259,7 +259,8 @@ public class BindingEvaluatorTests
 
         var act = () => Evaluate("@{@value + 1}", sources: sources);
 
-        await act.Should().ThrowAsync<BindingEvaluationException>();
+        var thrown = await act.Should().ThrowAsync<BindingEvaluationException>();
+        thrown.Which.Message.Should().Be("A math operand of type 'string' is not a number.").And.NotContain("abc");
     }
 
     [Theory]

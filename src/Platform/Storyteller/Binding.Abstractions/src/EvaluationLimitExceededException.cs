@@ -1,7 +1,7 @@
 namespace _42.Platform.Storyteller.Binding;
 
 /// <summary>
-/// An object-binding read ran into one of its evaluation limits.
+/// A binding read ran into one of its evaluation limits.
 /// </summary>
 public sealed class EvaluationLimitExceededException : BindingEvaluationException
 {

@@ -112,8 +112,9 @@ public class BindingExecutorTests
 
         var act = () => executor.TryBinding(property, includeSecrets: true).AsTask();
 
-        var assertion = await act.Should().ThrowAsync<BindingException>();
-        assertion.Which.Message.Should().Contain("settings.value");
+        var assertion = await act.Should().ThrowAsync<BindingEvaluationException>();
+        assertion.Which.Path.Should().Be("settings.value");
+        assertion.Which.Message.Should().Contain("settings.value").And.NotContain("'@a.'");
     }
 
     [Fact]
