@@ -28,9 +28,13 @@ public partial interface IConfigurationsApiClient
     // GET v1/{organization}/{project}/{view}/configuration/{key}/resolved?format={format} with If-None-Match.
     Task<ConditionalResponse<string>> GetResolvedConfigurationFormattedConditionalAsync(
         string organization, string project, string view, string key, string format, string? ifNoneMatch, CancellationToken cancellationToken = default);
+
+    // GET v1/{organization}/{project}/{view}/configuration/{key}/composition with If-None-Match.
+    Task<ConditionalResponse<ConfigurationComposition>> GetConfigurationCompositionConditionalAsync(
+        string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default);
 }
 
-// Hand-written twins of GetConfigurationAsync and GetResolvedConfigurationAsync of ApiSdk.g.cs: the same route, query,
+// Hand-written twins of GetConfigurationAsync, GetResolvedConfigurationAsync and GetConfigurationCompositionAsync of ApiSdk.g.cs: the same route, query,
 // hooks and exceptions, but a 304 returns, and the headers of the answer are kept. Keep them in step with a regeneration.
 public partial class ConfigurationsApiClient
 {
@@ -49,13 +53,13 @@ public partial class ConfigurationsApiClient
     public virtual Task<ConditionalResponse<Configuration>> GetConfigurationConditionalAsync(
         string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default)
     {
-        return SendConditionalAsync(organization, project, view, key, false, null, JsonMediaType, ReadConfigurationAsync, ifNoneMatch, cancellationToken);
+        return SendConditionalAsync(organization, project, view, key, false, false, null, JsonMediaType, ReadConfigurationAsync, ifNoneMatch, cancellationToken);
     }
 
     public virtual Task<ConditionalResponse<Configuration>> GetResolvedConfigurationConditionalAsync(
         string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default)
     {
-        return SendConditionalAsync(organization, project, view, key, true, null, JsonMediaType, ReadConfigurationAsync, ifNoneMatch, cancellationToken);
+        return SendConditionalAsync(organization, project, view, key, true, false, null, JsonMediaType, ReadConfigurationAsync, ifNoneMatch, cancellationToken);
     }
 
     public virtual async Task<ConditionalResponse<string>> GetConfigurationFormattedConditionalAsync(
@@ -63,7 +67,7 @@ public partial class ConfigurationsApiClient
     {
         ArgumentNullException.ThrowIfNull(format);
 
-        return await SendConditionalAsync(organization, project, view, key, false, format, GetFormatMediaType(format), ReadTextAsync, ifNoneMatch, cancellationToken).ConfigureAwait(false);
+        return await SendConditionalAsync(organization, project, view, key, false, false, format, GetFormatMediaType(format), ReadTextAsync, ifNoneMatch, cancellationToken).ConfigureAwait(false);
     }
 
     public virtual async Task<ConditionalResponse<string>> GetResolvedConfigurationFormattedConditionalAsync(
@@ -71,7 +75,13 @@ public partial class ConfigurationsApiClient
     {
         ArgumentNullException.ThrowIfNull(format);
 
-        return await SendConditionalAsync(organization, project, view, key, true, format, GetFormatMediaType(format), ReadTextAsync, ifNoneMatch, cancellationToken).ConfigureAwait(false);
+        return await SendConditionalAsync(organization, project, view, key, true, false, format, GetFormatMediaType(format), ReadTextAsync, ifNoneMatch, cancellationToken).ConfigureAwait(false);
+    }
+
+    public virtual Task<ConditionalResponse<ConfigurationComposition>> GetConfigurationCompositionConditionalAsync(
+        string organization, string project, string view, string key, string? ifNoneMatch, CancellationToken cancellationToken = default)
+    {
+        return SendConditionalAsync(organization, project, view, key, false, true, null, JsonMediaType, ReadCompositionAsync, ifNoneMatch, cancellationToken);
     }
 
     // The raw values, read before anything parses them: Cache-Control would come back reordered.
@@ -104,6 +114,18 @@ public partial class ConfigurationsApiClient
         return ReadAsStringAsync(response.Content, cancellationToken);
     }
 
+    private async Task<ConfigurationComposition> ReadCompositionAsync(
+        HttpResponseMessage response, IReadOnlyDictionary<string, IEnumerable<string>> headers, CancellationToken cancellationToken)
+    {
+        var objectResponse = await ReadObjectResponseAsync<ConfigurationComposition>(response, headers, cancellationToken).ConfigureAwait(false);
+        if (objectResponse.Object == null)
+        {
+            throw new ApiException("Response was null which was not expected.", (int)response.StatusCode, objectResponse.Text, headers, null);
+        }
+
+        return objectResponse.Object;
+    }
+
     private async Task<Configuration> ReadConfigurationAsync(
         HttpResponseMessage response, IReadOnlyDictionary<string, IEnumerable<string>> headers, CancellationToken cancellationToken)
     {
@@ -122,6 +144,7 @@ public partial class ConfigurationsApiClient
         string view,
         string key,
         bool resolved,
+        bool composition,
         string? format,
         string accept,
         Func<HttpResponseMessage, IReadOnlyDictionary<string, IEnumerable<string>>, CancellationToken, Task<TResult>> readResult,
@@ -164,6 +187,11 @@ public partial class ConfigurationsApiClient
         if (resolved)
         {
             urlBuilder.Append("/resolved");
+        }
+
+        if (composition)
+        {
+            urlBuilder.Append("/composition");
         }
 
         // The query as the generated methods build it: without a format, the '?' is taken back.

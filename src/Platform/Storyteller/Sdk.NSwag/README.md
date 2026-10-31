@@ -31,7 +31,7 @@ dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTest
 
 Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (`npm run generate`), then add the new `{controller}ApiClient` to `src/ApiSdk.partial.cs` and `src/ServicesCollectionExtensions.cs`.
 
-`src/ApiSdk.Conditional.cs` is hand-written: it copies the route, the `format` query, the hooks and the exceptions of `GetConfigurationAsync` and `GetResolvedConfigurationAsync`. After a regeneration, compare it with the two generated methods, and keep the members it uses: `ConvertToString`, `ReadObjectResponseAsync`, `ReadAsStringAsync`, the `PrepareRequest` and `ProcessResponse` hooks, and the messages of the exceptions, which differ per read for a `422`.
+`src/ApiSdk.Conditional.cs` is hand-written: it copies the route, the `format` query, the hooks and the exceptions of `GetConfigurationAsync` and `GetResolvedConfigurationAsync`, and of `GetConfigurationCompositionAsync` (its twin, `GetConfigurationCompositionConditionalAsync`, returns `ConditionalResponse<ConfigurationComposition>`). After a regeneration, compare it with the two generated methods, and keep the members it uses: `ConvertToString`, `ReadObjectResponseAsync`, `ReadAsStringAsync`, the `PrepareRequest` and `ProcessResponse` hooks, and the messages of the exceptions, which differ per read for a `422`.
 
 ## Conditional reads
 
