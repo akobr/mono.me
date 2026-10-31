@@ -50,7 +50,7 @@ The settings are read in layers, each over the one before:
 | `Target:EmailDomain` | Generated e-mail addresses are `ui-tests+<slug>@<domain>` |
 | `Browser:*` | `Provider` (`Local`; `BrowserStack` comes later), `Engine` (`chromium`, `firefox`, `webkit`), `Channel`, `Headless`, `SlowMoMs`, `Device` (a Playwright device such as `Pixel 7`), `Viewport`, `Locale`, `TimeZone`, `ColorScheme` |
 | `Execution:*` | `MaxParallelTests` (lowered to the pool size), `Seed`, the `*TimeoutMs`, `Retries` (skips and data conflicts never run again), `Trace` / `Screenshot` / `Video` (`Off`, `OnFailure`, `Always`), `ArtifactsPath` |
-| `Users:Pool` | The pre-provisioned users: `Email`, `DisplayName`, `Roles`; `Password` only in the user secrets. A test leases one for its duration |
+| `Users:Pool` | The pre-provisioned users: `Email`, `DisplayName`, `Roles` (the user's role in the target's organization and project, which a test's `RequiredUser` matches); `Password` only in the user secrets. A test leases one for its duration |
 | `Reporting:*` | The test case management integration; off, and without a reporter until the Testiny phase |
 
 Secrets, from `src/Platform/UI.Admin.AutomationTests/src`:
@@ -87,7 +87,27 @@ UITESTS_PROFILE=mock dotnet run --project src/Platform/UI.Admin.AutomationTests/
 UITESTS_PROFILE=mock UITESTS_Browser__Engine=webkit UITESTS_Browser__Device="Pixel 7" dotnet run --project src/Platform/UI.Admin.AutomationTests/src
 ```
 
-`testsettings.mock.json` targets `http://localhost:5174` with `acme` / `billing` / `default`, `SignIn` `None`, `MockScenario` `default` (`npm run dev:mock` starts the `showcase` dataset otherwise) and four placeholder pool users, which only bound the parallelism. The mock's data lives in the tab's `sessionStorage`: every test starts from the scenario's seed.
+`testsettings.mock.json` targets `http://localhost:5174` with `acme` / `billing` / `default`, `SignIn` `None`, `MockScenario` `default` (`npm run dev:mock` starts the `showcase` dataset otherwise) and four placeholder pool users with the role `Owner` (Ada Lovelace owns `acme` and `acme/billing`), which only bound the parallelism. The mock's data lives in the tab's `sessionStorage`: every test starts from the scenario's seed, and what it creates is gone with its page. The dev server serves the app unbundled, so the profile raises `Execution:ExpectTimeoutMs` to 15 s for slow page loads (Firefox with 4 parallel tests).
+
+## The Elementary set
+
+`--treenode-filter "/**[Category=Elementary]"` runs the PR gate set, one test per area; each creates what it acts on (in the target's view, or a new project in its organization), and the tests that create something lease a user with an editing role:
+
+| Test | Area | What it does |
+|---|---|---|
+| `SignIn_ShowsOrganizations` | Access | `/orgs` lists the target's organization and project, signed in |
+| `Annotations_CreateResponsibility_AppearsInGrid` | Annotations | Bulk create (the toolbar; the command palette on a phone) creates `rst.at-<runId>-…`; the grid (the list on a phone) filtered by `key:` shows it, and its detail, opened by its URL, shows the key in its identity line |
+| `Configurations_SetDocument_EffectiveShowsIt` | Configurations | Bulk create creates a responsibility (no ancestors, and usually no type schema or template); Create empty, a generated JSON document in the editor, save (`v2`); the Effective tab shows every value |
+| `KeyValues_CreateAndRead` | KeyValues | New key `at_<runId>.<word>_<hex4>` with a value; its detail shows the value and the Versions tab `v1(current)` |
+| `Project_Create_OpensSettings` | Projects | A user with the role `Owner` creates a project with a description in the organization; its Settings, opened through the navigation, show the description |
+| `Navigation_MobileMenu_OpensPages` | Navigation | The sidebar (the "Open navigation" slideover below 1024 px) opens Configurations, Values store, Settings, Organizations and Annotations |
+
+```bash
+UITESTS_PROFILE=mock dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"
+UITESTS_PROFILE=mock,mobile dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"
+```
+
+The page objects in `Pages/` follow the admin UI's layouts: `App` (the shell: ready state, navigation by link name in the sidebar or the slideover, the command palette, toasts), `AppRoutes` (the routes of the target's organization, project and view), `LoginPage` (the public `/login` page of the AuthKit sign-in), `OrganizationsPage`, `OrganizationOverview`, `ProjectSettingsPage`, `AnnotationsPage` with `BulkCreateDialog`, `AnnotationDetail`, `ConfigurationsPage`, `ConfigurationDetail` and `KeyValuesPage`. They branch on the viewport's width, as the app does: the phone layout below 640 px (sm), the list instead of the grid below 768 px (md), the slideover instead of the docked sidebar below 1024 px (lg). An action of a page object returns once its effect shows (the page it opens, its dialog closed, the editor in place of the empty state, or its toast when nothing else shows it); the test asserts the exact text it cares about.
 
 ## AuthKit checklist
 
@@ -102,9 +122,11 @@ UITESTS_PROFILE=mock UITESTS_Browser__Engine=webkit UITESTS_Browser__Device="Pix
 
 ## Write a test
 
-- Derive from `PlatformTest` (`Page`, `App`, `Target`, `PlatformData`, `User`, `Data`); mark it `[Test]`, add `[Elementary]` for the PR gate set and `[Area(Area.Annotations)]`; `[Serial]` for a test that must run alone (after the parallel ones, restoring what it changes); `[TestCase("<id>")]` links it to its test case in the test case management system.
+- Derive from `PlatformTest` (`Page`, `App`, `Target`, `Routes`, `PlatformData`, `User`, `Data`); override `RequiredUser` for a test that needs a role (`UserRequirement.WithRole("Owner")`, matched against the pool users' `Roles`): a test that creates or edits something asks for `EditingUser` (Contributor and up), since a Reader gets no create, edit or save action and the pool may hold one; mark it `[Test]`, add `[Elementary]` for the PR gate set and `[Area(Area.Annotations)]`; `[Serial]` for a test that must run alone (after the parallel ones, restoring what it changes); `[TestCase("<id>")]` links it to its test case in the test case management system.
 - Restore what a test changed in an override of `CleanUpAsync` (it runs on the still open page; its failure fails the test), not in an `[After(Test)]` hook of your own: TUnit runs those with the result still `Passed`, so the report would miss their failure.
 - A test that signs in itself (`SignedIn => false`) types the password on its traced page, and the trace keeps it: set `Execution:Trace` `Off` for such a run.
-- Navigate with `App.GotoAsync("<path>")` or a page object's `OpenAsync`, relative to `Target:BaseUrl`; locate by role, label and text (`Pages/`).
-- Create what the test acts on, with names from `PlatformData` (`at-<runId>-…`, key values `at_<runId>.…`), and delete nothing: the growing data set is intended, and the prefix makes leftovers attributable.
+- Navigate with `App.GotoAsync(Routes.<page>)` or a page object's `OpenAsync`, relative to `Target:BaseUrl`, and follow links with `App.NavigateAsync("<link>")`; locate by role, label and text (`Pages/`).
+- The grids and lists of annotations and configurations are virtualized: look for a row only in a filtered result (`key:<key>`), or open the detail's URL.
+- Assert a toast (`App.Toast("<title>")`) right after its action: it closes after about 5 seconds, and while it is open it covers the bottom right of the page.
+- Create what the test acts on, with names from `PlatformData` (`at-<runId>-…`, in every generated part of an annotation key, so the missing ancestors it creates carry it too; key values `at_<runId>.…`), and delete nothing: the growing data set is intended, and the prefix makes leftovers attributable.
 - No `Task.Delay`: Playwright's `Expect` waits up to `Execution:ExpectTimeoutMs`.
