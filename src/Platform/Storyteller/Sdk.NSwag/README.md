@@ -19,7 +19,7 @@ Use the version that generated `src/ApiSdk.g.cs` (its header names it); another 
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.10.10.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
+nswag openapi2csclient /input:open.api.v0.10.11.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
 ```
 
 The OpenAPI document comes from the API test `OpenApiExportTests`: it renders the document with the same engine the Functions host uses, so no running host is needed.

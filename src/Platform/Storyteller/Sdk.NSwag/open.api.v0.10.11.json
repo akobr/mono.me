@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.10.63657"
+    "version": "0.10.11.29126"
   },
   "servers": [
     {
@@ -3224,6 +3224,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AnnotationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The continuation token is not valid (InvalidQuery); list again without it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

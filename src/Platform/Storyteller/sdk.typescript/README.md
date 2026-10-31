@@ -77,7 +77,7 @@ npm test               # vitest
 npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 ```
 
-To generate from a specific document: `SPEC=../open.api.v0.10.10.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.10.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.10.63657` → `0.10.10`).
+To generate from a specific document: `SPEC=../open.api.v0.10.11.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.11.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.11.29126` → `0.10.11`).
 
 Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer) corrects the document:
 

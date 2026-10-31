@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.10.63657
+ * OpenAPI spec version: 0.10.11.29126
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -2160,7 +2160,7 @@ export const getGetDeletedAnnotationsQueryKey = (
 
 export const getGetDeletedAnnotationsQueryOptions = <
   TData = Awaited<ReturnType<typeof getDeletedAnnotations>>,
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse | void>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -2220,11 +2220,11 @@ export const getGetDeletedAnnotationsQueryOptions = <
 export type GetDeletedAnnotationsQueryResult = NonNullable<
   Awaited<ReturnType<typeof getDeletedAnnotations>>
 >;
-export type GetDeletedAnnotationsQueryError = ErrorType<void | ErrorResponse>;
+export type GetDeletedAnnotationsQueryError = ErrorType<ErrorResponse | void>;
 
 export function useGetDeletedAnnotations<
   TData = Awaited<ReturnType<typeof getDeletedAnnotations>>,
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse | void>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
