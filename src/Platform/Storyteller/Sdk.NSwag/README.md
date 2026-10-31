@@ -22,7 +22,7 @@ cd src/Platform/Storyteller/Sdk.NSwag/
 nswag openapi2csclient /input:open.api.v0.10.11.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true /GenerateOptionalParameters:true
 ```
 
-`/GenerateOptionalParameters:true` gives each operation one method: the parameters the document marks optional (query, header, and a body it does not mark `required`) come last with `= null`, and `cancellationToken` with `= default`. A required body therefore comes before the optional parameters (`ImportKeyValuesAsync(organization, project, view, body, mode, dryRun, keyPrefix)`, `StartViewImportAsync(organization, project, view, body, include, …)`). Leave out what you don't send, and pass a later argument by name: `GetConfigurationAsync(organization, project, view, key, cancellationToken: cancellationToken)`. The compiler also lets you leave out an optional body, but the API answers a missing body with `400` for most operations.
+`/GenerateOptionalParameters:true` gives each operation one method: the parameters the document marks optional (query, header, and a body it does not mark `required`) come last with `= null`, and `cancellationToken` with `= default`. A required body therefore comes before the optional parameters (`ImportKeyValuesAsync(organization, project, view, body, mode, dryRun, keyPrefix)`, `StartViewImportAsync(organization, project, view, body, include, …)`). Leave out what you don't send, and pass a later argument by name: `GetConfigurationAsync(organization, project, view, key, cancellationToken: cancellationToken)`. The compiler also lets you leave out a body the document does not mark `required`, but the client then sends the JSON `null`, which most operations answer with `400`.
 
 The OpenAPI document comes from the API test `OpenApiExportTests`: it renders the document with the same engine the Functions host uses, so no running host is needed.
 
@@ -50,13 +50,13 @@ if (!response.IsNotModified)
 etag = response.ETag;             // W/"r.…", sent back as it is
 ```
 
-* `ifNoneMatch` is sent unchanged as `If-None-Match`; `null` or an empty string sends none.
+* `ifNoneMatch` is optional and sent unchanged as `If-None-Match`; `null` (the default) or an empty string sends none.
 * A `304` returns with `IsNotModified` and no `Result`; it does not throw. Every other status throws what `GetConfigurationAsync` and `GetResolvedConfigurationAsync` throw for it, with the same messages: `ApiException<ErrorResponse>` for a `400`, `403`, `404` with a body, `422` or `500`, and a plain `ApiException` for a `401`, a `404` without a body (a missing configuration) and anything else. A `422` is a format error (`format.<rule>`) on both reads, and on the resolved read also a binding that fails (`binding.evaluation`, `binding.limit.<kind>`).
 * `ConditionalResponse<T>` keeps the headers of a `200` and a `304`: `ETag` (raw, weak prefix included), `CacheControl` (raw), `IsNoStore`, `SecretsWithheld` (`X-2S-Secrets-Withheld`: `mtls-required` for a machine with `Secrets.Read` but no certificate), and all `Headers`, with case-insensitive names. `Cache-Control` and `X-2S-Secrets-Withheld` depend on the caller's rights, not on the document: a caller that may read secrets gets `no-store` on every resolved read.
 * Date-like strings of `Content` stay strings, as in the other reads of the client.
 * The client keeps no state of a read; one instance serves concurrent calls.
 
-The generated `GetConfigurationAsync` and `GetResolvedConfigurationAsync` take `format` and then `if_None_Match` after `key`, and `GetConfigurationCompositionAsync` takes `if_None_Match` after `key`, since the document declares them (pass `null` for both, for the envelope without a tag). They still throw an `ApiException` with status `304` when they get one, and they return the body without the response headers. They cannot read a formatted body either: NSwag keeps `Task<Configuration>` and `Accept: application/json` when the `200` also lists other media types, and the `[JsonExtensionData]` of `Configuration` would take the keys of `flat` silently into `AdditionalProperties`. That is why the twins are hand-written: NSwag throws on every documented status that is not a success and has no body, and `/WrapResponses` would expose the headers of a `200` but not turn a `304` into a result.
+The generated `GetConfigurationAsync` and `GetResolvedConfigurationAsync` take `format` and then `if_None_Match` after `key`, and `GetConfigurationCompositionAsync` takes `if_None_Match` after `key`, since the document declares them. They are optional parameters: leave them out for the envelope without a tag. The generated reads still throw an `ApiException` with status `304` when they get one, and they return the body without the response headers. They cannot read a formatted body either: NSwag keeps `Task<Configuration>` and `Accept: application/json` when the `200` also lists other media types, and the `[JsonExtensionData]` of `Configuration` would take the keys of `flat` silently into `AdditionalProperties`. That is why the twins are hand-written: NSwag throws on every documented status that is not a success and has no body, and `/WrapResponses` would expose the headers of a `200` but not turn a `304` into a result.
 
 ### Formatted reads
 
@@ -232,6 +232,6 @@ var recipients = await keyValues.GetRecipientsAsync("acme", "billing");
 var write = KeyValueClientEncryption.CreateWrite("s3cret", recipients, "acme", "billing", "default", "db.password");
 await keyValues.SetKeyValueAsync("acme", "billing", "default", "db.password", write);
 
-var revealed = await keyValues.GetKeyValueAsync("acme", "billing", "default", "db.password", reveal: true, includeDeleted: null);
+var revealed = await keyValues.GetKeyValueAsync("acme", "billing", "default", "db.password", reveal: true);
 var plain = KeyValueClientEncryption.Decrypt(revealed.Value, "api", privateKey);
 ```
