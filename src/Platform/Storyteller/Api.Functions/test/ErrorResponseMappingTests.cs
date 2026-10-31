@@ -18,6 +18,7 @@ public class ErrorResponseMappingTests
         { new InvalidInputException("bad name", ErrorCodes.InvalidName), HttpStatusCode.BadRequest, ErrorCodes.InvalidName },
         { new InvalidInputException("title too long", ErrorCodes.InvalidAnnotation), HttpStatusCode.BadRequest, ErrorCodes.InvalidAnnotation },
         { new InvalidInputException("bad key", ErrorCodes.InvalidKey), HttpStatusCode.BadRequest, ErrorCodes.InvalidKey },
+        { new InvalidInputException("bad pattern", ErrorCodes.InvalidQuery), HttpStatusCode.BadRequest, ErrorCodes.InvalidQuery },
         { new ConflictException("deleted", ErrorCodes.AnnotationDeleted), HttpStatusCode.Conflict, ErrorCodes.AnnotationDeleted },
         { new ConflictException("active", ErrorCodes.AnnotationNotDeleted), HttpStatusCode.Conflict, ErrorCodes.AnnotationNotDeleted },
         { new JsonPatchException("stale", JsonPatchFailureKind.TestFailed, 0), HttpStatusCode.PreconditionFailed, ErrorCodes.PatchTestFailed },
