@@ -26,6 +26,7 @@ public class RouteDispatchTests
         .BuildServiceProvider()
         .GetRequiredService<IInlineConstraintResolver>();
 
+    // In the order of the host: by function name, ignoring case.
     private static readonly IReadOnlyList<FunctionRoute> Functions = ReadFunctions();
 
     [Theory]
@@ -58,6 +59,12 @@ public class RouteDispatchTests
     [InlineData("GET", Scope + "/key-values", nameof(KeyValuesHttp.GetKeyValues))]
     [InlineData("GET", Scope + "/key-values/db-password", nameof(KeyValuesHttp.GetKeyValue))]
     [InlineData("POST", Scope + "/key-values/restore", nameof(KeyValuesHttp.RestoreKeyValues))]
+    [InlineData("GET", "v1/access/points/views", nameof(AccessHttp.GetAccessPoint))]
+    [InlineData("GET", "v1/access/points/bindings", nameof(AccessHttp.GetAccessPoint))]
+    [InlineData("PUT", "v1/access/points/views/machine-authentication", nameof(AccessHttp.PutMachineAuthentication))]
+    [InlineData("GET", "v1/acme/billing/views", nameof(ViewsHttp.GetViews))]
+    [InlineData("GET", Scope + "/configuration-schema/type/rst", nameof(ConfigurationSchemaHttp.GetConfigurationSchema))]
+    [InlineData("GET", Scope + "/configuration-schema/rst.billing", nameof(ConfigurationSchemaHttp.GetAnnotationSchema))]
     public void Request_MatchesExactlyItsFunction(string method, string path, string function)
     {
         Match(method, path).ShouldBe([function]);
@@ -87,6 +94,22 @@ public class RouteDispatchTests
             .Select(request => (request.Method, request.Path, Expected: request.Function.Name, Matched: Match(request.Method, request.Path)))
             .Where(request => request.Matched.Count != 1 || request.Matched[0] != request.Expected)
             .Select(request => $"{request.Method} {request.Path}: {request.Expected} expected, matched {string.Join(", ", request.Matched)}")
+            .ShouldBeEmpty();
+    }
+
+    // Two routes of one method never take the same request, also crosswise: a request with the literals of both routes,
+    // and a sample value where both have a parameter (GET v1/access/points/views is the access point of an organization
+    // "views", not the views of the organization "access").
+    [Fact]
+    public void NoTwoRoutesOfOneMethod_TakeTheSameRequest()
+    {
+        Functions
+            .SelectMany((first, index) => Functions.Skip(index + 1).Select(second => (First: first, Second: second)))
+            .SelectMany(pair => pair.First.Methods.Intersect(pair.Second.Methods)
+                .SelectMany(method => pair.First.CrosswisePaths(pair.Second).Select(path => (pair.First, pair.Second, Method: method, Path: path))))
+            .Where(request => request.First.Matches(request.Method, request.Path) && request.Second.Matches(request.Method, request.Path))
+            .Select(request => $"{request.Method} {request.First.Name} {request.Second.Name}")
+            .Distinct()
             .ShouldBeEmpty();
     }
 
@@ -148,6 +171,7 @@ public class RouteDispatchTests
                 .SingleOrDefault(trigger => trigger?.Route is not null)))
             .Where(function => function.Function is not null && function.Trigger is not null)
             .Select(function => new FunctionRoute(function.Function!.Name, function.Trigger!.Methods!, function.Trigger.Route!))
+            .OrderBy(function => function.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
@@ -184,6 +208,35 @@ public class RouteDispatchTests
             return Methods.Contains(method.ToUpperInvariant())
                 && _matcher.TryMatch(new PathString($"/{path}"), values)
                 && _constraints.All(constraint => constraint.Constraint.Match(null, null, constraint.Parameter, values, RouteDirection.IncomingRequest));
+        }
+
+        // The requests that have the literals of both routes, and a sample of either route where both have a parameter;
+        // none when a literal differs or a segment has more than one part.
+        public IEnumerable<string> CrosswisePaths(FunctionRoute other)
+        {
+            if (_template.Segments.Count != other._template.Segments.Count)
+            {
+                return [];
+            }
+
+            var pairs = _template.Segments.Zip(other._template.Segments, (mine, theirs) => (Mine: Single(mine), Theirs: Single(theirs))).ToList();
+
+            if (pairs.Any(pair => pair.Mine is null || pair.Theirs is null
+                || (!pair.Mine.IsParameter && !pair.Theirs.IsParameter && !string.Equals(pair.Mine.Text, pair.Theirs.Text, StringComparison.OrdinalIgnoreCase))))
+            {
+                return [];
+            }
+
+            return new[] { true, false }
+                .Select(useMine => string.Join('/', pairs.Select(pair => (pair.Mine!, pair.Theirs!) switch
+                {
+                    ({ IsParameter: false } mine, _) => mine.Text,
+                    (_, { IsParameter: false } theirs) => theirs.Text,
+                    var (mine, theirs) => Sample(useMine ? mine.Name! : theirs.Name!),
+                })))
+                .Distinct();
+
+            static TemplatePart? Single(TemplateSegment segment) => segment.Parts.Count == 1 ? segment.Parts[0] : null;
         }
 
         public string SamplePath()

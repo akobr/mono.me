@@ -284,7 +284,7 @@ public partial class RouteTableTests
             .ToList();
 
         var keyRoutes = triggers.Where(trigger => trigger.Route!.Contains("/key-values/{key}", StringComparison.Ordinal)).ToList();
-        var actionRoutes = triggers.Where(trigger => !trigger.Route!.Contains("{key}", StringComparison.Ordinal) && trigger.Route!.Length > Definitions.Routes.KeyValues.V1.KeyValues.Length).ToList();
+        var actionRoutes = triggers.Where(trigger => !trigger.Route!.Contains("{key}", StringComparison.Ordinal) && trigger.Route!.StartsWith($"{Definitions.Routes.KeyValues.V1.KeyValues}/", StringComparison.Ordinal)).ToList();
 
         keyRoutes.ShouldNotBeEmpty();
         keyRoutes.SelectMany(trigger => trigger.Methods!).ShouldAllBe(method => !string.Equals(method, "post", StringComparison.OrdinalIgnoreCase));
