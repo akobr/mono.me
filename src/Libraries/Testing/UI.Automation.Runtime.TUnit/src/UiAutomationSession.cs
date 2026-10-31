@@ -12,8 +12,10 @@ namespace _42.Testing.UI.Automation.Runtime.TUnit;
 // --test-parameter values, because registration-time code (the Requires* skips, [ConfiguredRetry], the BrowserStack
 // limiter) runs before Before(TestSession); the hook also hands Execution:MaxParallelTests to TUnit, whose command line
 // and TUNIT_MAX_PARALLEL_TESTS still win. Before the first test the AutomationSession starts with every selected test as
-// planned; after the last it stops and the run summary goes to the terminal. A failure to load or to start is kept and
-// fails each UI test with its message, instead of failing TUnit's discovery or every test of the assembly.
+// planned (the start ends with the setup's target check, when it has one); after the last it stops and the run summary
+// goes to the terminal. A failure to load or to start (a failed target check included) is logged once and kept, and
+// fails each UI test at once with its message (UiAutomationUnavailableException, never retried), instead of failing
+// TUnit's discovery or every test of the assembly.
 public static class UiAutomationSession
 {
     private static readonly object Gate = new();
@@ -202,7 +204,7 @@ public static class UiAutomationSession
     {
         if (failure is not null)
         {
-            throw new InvalidOperationException($"UI automation is not available: {failure.Message}", failure);
+            throw new UiAutomationUnavailableException($"UI automation is not available: {failure.Message}", failure);
         }
 
         if (settings is null)

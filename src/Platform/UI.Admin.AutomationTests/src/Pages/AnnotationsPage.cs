@@ -15,6 +15,12 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
 
     public ILocator ReloadCatalogButton => app.Page.GetByRole(AriaRole.Button, new() { Name = "Reload the catalog", Exact = true });
 
+    // The catalog loaded: "Reload the catalog" is enabled again.
+    public ILocator CatalogLoaded => app.Page.GetByRole(AriaRole.Button, new() { Name = "Reload the catalog", Exact = true, Disabled = false });
+
+    // The heading of the error state of a catalog the API refused; the API's message follows it.
+    public ILocator CatalogError => app.Page.GetByRole(AriaRole.Heading, new() { Name = "The catalog could not be loaded", Exact = true });
+
     // In the navbar from sm (640 px); a phone opens Bulk create from the command palette. An empty view's empty state
     // has a second one, after the navbar's, hence the first.
     public ILocator BulkCreateButton => app.Page.GetByRole(AriaRole.Button, new() { Name = "Bulk create", Exact = true }).First;

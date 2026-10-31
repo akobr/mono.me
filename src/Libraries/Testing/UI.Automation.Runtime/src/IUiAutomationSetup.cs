@@ -25,4 +25,14 @@ public interface IUiAutomationSetup
     void Validate(UiAutomationSettings settings, ICollection<string> errors)
     {
     }
+
+    // Checks once per run that the target can run the tests (e.g. the pre-provisioned organization and project exist
+    // and the user may open them), on the page of context, signed in as a leased pool user; throws when it cannot, best
+    // a TargetCheckException whose message says what to fix. The session runs it at the end of its start, before any
+    // reporter creates a run: a failure fails the start, so every UI test fails at once with the check's message. Only
+    // a setup that implements it gets a check (and its browser context); none by default.
+    Task CheckTargetAsync(TargetCheckContext context, CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 }

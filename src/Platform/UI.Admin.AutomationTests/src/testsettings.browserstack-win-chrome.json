@@ -3,7 +3,8 @@
   // BrowserStack:MaxParallelSessions at once. Combine it with a target BrowserStack can reach, e.g.
   // UITESTS_PROFILE=browserstack-win-chrome with Target:BaseUrl in testsettings.local.json (a localhost target needs
   // BrowserStack Local). The credentials are not committed: BrowserStack:Username and BrowserStack:AccessKey in the user
-  // secrets, or UITESTS_BrowserStack__Username and UITESTS_BrowserStack__AccessKey. README.md, "Run on BrowserStack".
+  // secrets, or UITESTS_BrowserStack__Username and UITESTS_BrowserStack__AccessKey.
+  // docs/Platform/UI.Admin.AutomationTests/automation-tests.md, "BrowserStack".
   "Browser": {
     "Provider": "BrowserStack"
   },

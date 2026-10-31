@@ -7,13 +7,14 @@ namespace _42.Testing.UI.Automation.Runtime.TUnit;
 // calls the end receivers before it decides, so the adapter repeats the engine's decision to report final attempts only.
 public static class RetryPolicy
 {
-    // The predicate of [ConfiguredRetry]: a skip and a data conflict are final; anything else may run again.
+    // The predicate of [ConfiguredRetry]: a skip, a data conflict and a run whose session is not available (settings
+    // that did not load, a start or a target check that failed) are final; anything else may run again.
     public static bool ShouldRetry(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
         var cause = TestOutcomeMapper.Unwrap(exception);
-        return exception is not SkipTestException && cause is not (SkipTestException or DataConflictException);
+        return exception is not SkipTestException && cause is not (SkipTestException or DataConflictException or UiAutomationUnavailableException);
     }
 
     // The engine's rule: a failed attempt below the retry limit runs again when the test's retry predicate (of

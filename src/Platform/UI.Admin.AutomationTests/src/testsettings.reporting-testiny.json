@@ -2,7 +2,8 @@
   // Reports the run to Testiny as a classic test run whose test cases are the [TestCase] ids of the tests; combine it
   // with a target profile, e.g. UITESTS_PROFILE=mock,reporting-testiny. ProjectId and ApiKey are not committed: the
   // project id in testsettings.local.json or UITESTS_Reporting__Testiny__ProjectId, the API key in the user secrets
-  // (Reporting:Testiny:ApiKey) or UITESTS_Reporting__Testiny__ApiKey. README.md, "Report to Testiny".
+  // (Reporting:Testiny:ApiKey) or UITESTS_Reporting__Testiny__ApiKey. docs/Platform/UI.Admin.AutomationTests/
+  // automation-tests.md, "Testiny".
   "Reporting": {
     "Enabled": true,
     "Systems": [ "Testiny" ],
