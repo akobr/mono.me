@@ -255,7 +255,7 @@ The repository is written by `GitRepositoryWriter`, without a git library:
 | --- | --- | --- |
 | `include` | all four | The kinds to import. The files of the other kinds are counted as excluded and never decompressed. |
 | `existing` | `Overwrite` | What happens to a document the view already has. `Overwrite` writes the file as a new version, or as an update of an annotation, and re-creates a deleted annotation. `Skip` keeps the stored document and leaves a deleted annotation deleted. An equal document is `Unchanged` either way. |
-| `force` | `false` | Store schemas and configurations that break each other, with the warning `SchemaViolation`. It never stores invalid JSON, an invalid JSON Schema, an annotation that breaks its rules, or a broken directive. |
+| `force` | `false` | Store schemas and configurations that break each other, with the warning `SchemaViolation`, or that could not be checked against each other, with the warning of that failure (`InvalidSchema`, `ExternalSchemaReference`, `SchemaValidationTimeout`). It never stores invalid JSON, an invalid JSON Schema, a schema with a reference outside itself, an annotation that breaks its rules, or a broken directive. |
 | `dryRun` | `false` | Decide every outcome and warning without writing anything. |
 
 `IViewTransferService.StartImportAsync` takes all four, and `StartExportAsync` takes `include`. The routes pass them through (see [Request options](#request-options)).
@@ -311,7 +311,7 @@ How it is used:
   - an overlay configuration replaces the stored one, with its `$remove` and `$patch` applied to a copy;
   - the stored configuration of a re-created annotation is not checked;
   - the overlay configurations of keys without a stored document are checked too, for example those of new annotations;
-  - the other layers of the combined schema come from the overlay where the archive brings them. An empty layer, or one that is not a valid JSON Schema, is ignored, because the import won't write it.
+  - the other layers of the combined schema come from the overlay where the archive brings them. An empty layer, one that is not a valid JSON Schema, or one with a reference outside itself is ignored, because the import won't write it.
 - **A configuration** is validated against its combined schema:
   - in a dry run, with the overlay's layers;
   - in a real run, against the stored schemas, which the schema pass has already written.
@@ -357,9 +357,9 @@ The outcome and the warnings come from the states read before the write, so a dr
    - with `AnnotationDeleted` when it is deleted;
    - with `AnnotationNotFound` when it is missing.
 3. `{}` is `Skipped` with `EmptyDocument`: a schema is cleared by `DELETE`.
-4. A document that is not a valid JSON Schema fails with `InvalidSchema` (`Invalid JSON Schema: …`), even with `force`.
+4. A document that is not a valid JSON Schema, or whose check cannot even start, fails with `InvalidSchema` (`Invalid JSON Schema: …`), even with `force`. A document with a `$ref` that points outside it fails with `ExternalSchemaReference`, and one that takes too long to read or to check against an empty object fails with `SchemaValidationTimeout`, also even with `force` ([definitions.md](definitions.md#references)).
 5. An equal stored schema is `Unchanged`. With `Skip`, a different one makes the file `Skipped` with `DocumentExists`. A stored empty schema counts as none.
-6. The compliance check runs as the import leaves the view (see [Overlay](#overlay)). A violation fails with `SchemaViolation`, and the message lists the keys, at most 20 in ordinal order: `The configuration of rst.a violates this schema.`, or `The configurations of a, b, … and N more violate this schema.` With `force`, the schema is written with the warning `SchemaViolation`, and the violations are logged as on a forced save ([definitions.md](definitions.md#force)).
+6. The compliance check runs as the import leaves the view (see [Overlay](#overlay)). A violation fails with `SchemaViolation`, and the message lists the keys, at most 20 in ordinal order: `The configuration of rst.a violates this schema.`, or `The configurations of a, b, … and N more violate this schema.` With `force`, the schema is written with the warning `SchemaViolation`, and the violations are logged as on a forced save ([definitions.md](definitions.md#force)). When the configurations cannot be checked, for example because another stored layer refers outside itself or a check runs out of its [limits](definitions.md#limits-of-a-check), the file fails with that code (`InvalidSchema`, `ExternalSchemaReference`, `SchemaValidationTimeout`). With `force`, it is written with a warning of that code: `Force stores this schema although the configurations could not be checked: …`.
 7. A dry run stops here with `Created` or `Updated`. Otherwise the schema is saved as a new version, without repeating the checks.
 
 ### Templates
@@ -382,7 +382,12 @@ The outcome and the warnings come from the states read before the write, so a dr
   - with `AnnotationNotFound` when it is missing.
 - **Content.** `$remove` and `$patch` apply to the document alone, as on a create. A broken directive fails with `PatchInvalid` or `PatchTestFailed`. A document that ends empty is `Skipped` with `EmptyDocument`: a configuration is cleared by `DELETE`.
 - **Existing.** An equal document is `Unchanged`. With `Skip`, a different one is `Skipped` with `DocumentExists`. Outside a dry run, both finish a cache invalidation that an earlier write of the configuration left pending ([inheritance.md](inheritance.md#cache-and-descendant-freshness)). The configuration of a re-created annotation counts as none: the re-create emptied it, so the file is `Created` as the next version.
-- **Validation.** The document is validated against its combined schema (see [Overlay](#overlay) for the layers). A violation fails with `SchemaViolation`. With `force`, it is written with the warning `SchemaViolation`, which lists the errors.
+- **Validation.** The document is validated against its combined schema (see [Overlay](#overlay) for the layers). A violation fails with `SchemaViolation`. With `force`, it is written with the warning `SchemaViolation`, which lists the errors. When the combined schema cannot be used, the file fails with its code:
+  - `InvalidSchema` when it cannot be read or checked;
+  - `ExternalSchemaReference` when a stored layer refers outside itself;
+  - `SchemaValidationTimeout` when the check runs out of its [limits](definitions.md#limits-of-a-check).
+
+  With `force`, the document is written with a warning of that code, `Force stores the document although its schema could not be checked: …`, as a forced configuration write stores it without a check.
 - **Write.** The version is stamped with the importing caller, and the annotation's audit gets `ConfigurationChanged`. A write that keeps losing to concurrent ones fails only its file (`Conflict`). A committed write whose cache invalidation fails stops the job, as for templates; importing again finishes the invalidation.
 
 ### Outcomes, codes and warnings
@@ -403,7 +408,10 @@ Each file of an included kind gets one outcome:
 | | A second file of the same document | `DuplicateFile` |
 | | An annotation that breaks `AnnotationRules` | `InvalidAnnotation` |
 | | A descendant-type schema whose type cannot descend from its key | `InvalidKey` |
-| | Not a valid JSON Schema | `InvalidSchema` |
+| | Not a valid JSON Schema, or its check cannot start | `InvalidSchema` |
+| | A schema with a `$ref` that points outside it | `ExternalSchemaReference` |
+| | A schema that takes too long to read or to check against an empty object, even with `force` | `SchemaValidationTimeout` |
+| | Without `force`: the schema or the configuration could not be checked against the other side, because a combined schema cannot be used or a check runs out of its limits | `InvalidSchema`, `ExternalSchemaReference`, `SchemaValidationTimeout` |
 | | A broken `$patch` or `$remove` directive of a template or configuration | `PatchInvalid`, `PatchTestFailed` |
 | | Without `force`: the configuration violates its schema, or configurations violate the schema | `SchemaViolation` |
 | | The document kept changing concurrently: its write ran out of retries. The rest of the import goes on, and for an annotation the documents that depend on it are skipped with `DependencyFailed`; importing the file again writes it. | `Conflict` |
@@ -415,6 +423,7 @@ A written document can carry warnings (`ViewImportItem.Warnings`, each a `Code` 
 | `AncestorCreated` | An annotation | Creating it also created missing ancestors that the archive doesn't hold, with defaults: `The missing ancestors rst.payments, usg.northwind.payments are created with defaults.` |
 | `AnnotationRecreated` | An annotation | It or its ancestors were deleted and are re-created: their configurations go to the versions and start empty, and the children deleted with them stay deleted. |
 | `SchemaViolation` | A schema or a configuration | `force` stores it although it breaks the other side. |
+| `InvalidSchema`, `ExternalSchemaReference`, `SchemaValidationTimeout` | A schema or a configuration | `force` stores it although it could not be checked against the other side. The message names the failure. |
 
 - The importing caller is the actor of written versions and audit entries.
 - History in the archive (version files, commits) is never replayed. Documents missing from the archive are left alone: an import never deletes.

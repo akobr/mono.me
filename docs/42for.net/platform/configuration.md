@@ -139,6 +139,8 @@ Later layers win. Object schemas merge. `required` arrays are unioned, so a requ
 
 A type code on that descendant-type schema uses the short code: `unt`, `cnt`, `usg`, `exe`, `uxe`. Only the pairs of the table exist: a schema for a type that cannot descend from the annotation, such as a responsibility below an execution, is rejected with `InvalidKey`.
 
+A schema is self-contained. A `$ref` may point to `#` or into the schema itself, such as `#/definitions/currency`. A reference to a URL or a file is rejected with `ExternalSchemaReference`, because the platform never fetches or reads anything a schema names. A check is bounded in time: a `pattern` that takes longer than 200 ms to match a value, or a check that takes longer than 10 seconds, is rejected with `SchemaValidationTimeout`. A schema that cannot be checked at all, for example one that applies itself to the same value forever, is rejected with `InvalidSchema`.
+
 ## Views
 
 A view is a parallel edition of a project. The default view is `default`. A second view can hold the configuration of a rollout, a rehearsal, or a release candidate while the current view keeps serving.

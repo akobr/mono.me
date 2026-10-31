@@ -105,7 +105,19 @@ Those items are ignored. A read looks only at the view-scoped id. When that id i
 
 Send the JSON Schema object itself. The service stamps `Modified` with the caller and the time and assigns `Version`. A schema write replaces the stored schema document. It does not merge into the previous schema the way a configuration write merges into stored content. The merge described above happens only when layers are combined for a check or for a combined read.
 
-The body has to be an object that NJsonSchema can parse. A document it cannot parse is rejected with `400`, including when the caller passes force. Force covers compliance of configuration content. It does not accept a body that is not a schema.
+The body has to be an object that NJsonSchema can parse. A document it cannot parse is rejected with `400` and `ErrorCode` `InvalidSchema` (`Invalid JSON Schema: …`), including when the caller passes force. Force covers compliance of configuration content. It does not accept a body that is not a schema.
+
+### References
+
+A `$ref` is resolved inside the schema document only: `#` (the whole schema) or a JSON Pointer such as `#/definitions/currency`. The service never fetches a URL and never reads a file, because a schema is data written by a project member and the API would otherwise send requests from its own network position.
+
+- A `$ref` that does not start with `#` is refused with `400` and `ErrorCode` `ExternalSchemaReference`. That includes a URL (`https://…`, also as a meta-schema such as `http://json-schema.org/draft-07/schema#`), a file (`file:///…`, `/etc/…`, `C:/…`), a relative path (`other.json#/definitions/a`) and a URN. The message quotes the reference, cut to 100 characters: `External $ref not allowed: 'https://example.com/a.json'. Only '#' and JSON Pointers inside the schema ('#/…') are resolved.`
+- A `$ref` that starts with `#` but is not a JSON Pointer, such as `#foo` or `#definitions/a`, is not supported and is refused with `InvalidSchema`.
+- A pointer to a part of the document that does not exist (`#/definitions/missing`) is refused with `InvalidSchema`.
+
+Every reference is resolved when the schema is saved, used or not, so a schema with an unused external reference is refused too. Force does not change any of these.
+
+Before the schema is stored, it is also checked once against an empty object, and the violations are ignored. A schema whose check cannot even start is refused with `InvalidSchema`, also with force. That is a schema that applies itself to the same value again at its root, such as `{ "not": { "$ref": "#" } }` or `{ "oneOf": [ { "$ref": "#" }, … ] }`, or one that is its own `allOf` (`Cyclic references detected.`). That trial check has the [limits of a check](#limits-of-a-check) too: one that runs out of them is refused with `SchemaValidationTimeout`, also with force.
 
 A useful schema is a JSON object schema (`"type": "object"`), because stored configuration content is a JSON object. `description` on properties is how the schema acts as documentation. `enum` and `const` are how it lists the allowed values. `additionalProperties: false` refuses names the schema does not declare.
 
@@ -161,7 +173,12 @@ PUT accepts a query parameter `force`. It defaults to false. See [Force](#force)
 
 - Reads require the `Reader` role on the project. A machine needs the scope `Configuration.Read` instead.
 - Writes (`PUT` and `DELETE` of the three kinds) require the `Contributor` role on the project. A machine has no role; it needs `Configuration.Write` and the management scope `Schema.Write`, both stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Scopes of machines](authentication.md#scopes-of-machines)).
-- `400` means the body is not JSON or is not a schema NJsonSchema can parse, or the type code or annotation key is unknown. On the descendant-type `PUT` it also means that the type cannot descend from `{key}`; that response carries `ErrorCode` `InvalidKey`.
+- `400` means the body is not JSON or is not a schema NJsonSchema can parse, or the type code or annotation key is unknown. On the descendant-type `PUT` it also means that the type cannot descend from `{key}`; that response carries `ErrorCode` `InvalidKey`. A schema that cannot be used carries one of these codes, also with force (see [References](#references) and [Limits of a check](#limits-of-a-check)):
+  - `InvalidSchema`: the body cannot be read or its check cannot start;
+  - `ExternalSchemaReference`: a `$ref` points outside the schema;
+  - `SchemaValidationTimeout`: reading the schema, or its trial check against an empty object, takes too long.
+
+  Without force, the compliance step answers `400` with the same codes when the configurations cannot be checked, for example because another stored layer refers outside itself or a check runs out of time. With force, the schema is stored (see [Force](#force)).
 - `404` means the requested schema, version, or (for a patch of configuration) the configuration is absent.
 - `413` with `ErrorCode` `BodyTooLarge` means the body of a schema, configuration or JSON Patch write is larger than 4 MiB; it is refused before it is parsed. A stored document is one Cosmos item of at most 2 MB.
 - `409` with `SchemaValidationErrorResponse` means a compliance check failed and force was not set. Each entry carries `AnnotationKey`, `ViewName`, and the list of messages. A message is the JSON path and the NJsonSchema error kind, for example `#/currency: NotInEnumeration`.
@@ -220,9 +237,40 @@ The check runs at two moments. An import of a view runs a variant of both.
 
 Empty stored documents are skipped. Other views are skipped. A schema that is identical to the current document is not written again and is not checked.
 
-**Importing a view.** An [import](export-import.md#overlay) checks a schema against the configurations as the import leaves them. The archive's configurations replace the stored ones, the stored configurations of annotations the import re-creates are not checked, and the other layers come from the archive where it brings them. In a dry run, a configuration is validated against the archive's schemas too. A document that is not a JSON Schema fails with `InvalidSchema`, also with force.
+**Importing a view.** An [import](export-import.md#overlay) checks a schema against the configurations as the import leaves them. The archive's configurations replace the stored ones, the stored configurations of annotations the import re-creates are not checked, and the other layers come from the archive where it brings them. In a dry run, a configuration is validated against the archive's schemas too. A document that is not a JSON Schema fails with `InvalidSchema`, and one with a reference outside itself with `ExternalSchemaReference`, also with force. When the configurations or a configuration cannot be checked, the file fails with the code, or, with force, is stored with a warning of the code (see [export-import.md](export-import.md#schemas)).
 
 Reads of a configuration do not validate it. A document that fails its schema remains readable, including its calculated and resolved forms, until the next write.
+
+### Limits of a check
+
+A schema is written by any project member, so reading it and checking a document against it are bounded. Hostile and accidental schemas both stay within these limits:
+
+- **A pattern match** of `pattern` or of a `patternProperties` key takes at most `PatternMatchTimeout`, 200 ms by default. The check matches with that timeout itself, so a hostile pattern such as `^(a+)+$` cannot hold the worker. NJsonSchema then repeats the same match with the process default match timeout, which the API host sets to 200 ms too. In the API host, the effective limit is therefore the lower of the two: raising `PatternMatchTimeout` above 200 ms has no effect there, and the message names the limit that was hit. The process default also covers the regular expressions of the `format` validators, among others.
+- **The whole check** of one document stops at `CheckBudget`, 10 s by default. The budget is checked at every step of the validator, that is every value checked against every (sub)schema. A step itself stays short, because NJsonSchema's own loops within one step are guarded too:
+  - `patternProperties` is matched with the budget checked between matches;
+  - an `enum` checked against an object or an array is refused when the comparison would serialize more than 50,000,000 characters (entries × the length of the value);
+  - the names of `properties` and `required` that the object lacks are refused when NJsonSchema would compare them with the object's properties more than 50,000,000 times (missing names × properties);
+  - whether a schema is nullable, which NJsonSchema asks at every step and for every property whose value is `null`, is answered by a walk through `oneOf` and references. That walk is refused when it needs more than 100,000 calls.
+
+  A check therefore ends within about the budget plus one such step.
+- **Reading a schema** takes at most `CheckBudget` too. NJsonSchema resolves a `$ref` to a large map by serializing the map, so many such references could otherwise take minutes.
+- **A schema that applies itself to the same value again** makes a check run forever, either through validation (for example `"not": { "$ref": "#" }` below a property) or through the nullability walk (for example `"oneOf": [ { "$ref": "#/properties/x" }, … ]` for `"x": null`). Such a cycle is detected when it is met and refused with `InvalidSchema` ("the schema applies itself to the same value again …, so its check would never end"). A cycle at the root is refused on save (see [References](#references)).
+- A pattern that is not a valid regular expression (`"("`) or a `multipleOf` that is 0 is also an `InvalidSchema` when it is first used. That includes `1e-30`, which is 0 as a decimal.
+
+When a limit is exceeded, the write answers `400` with `ErrorCode` `SchemaValidationTimeout`:
+
+- `The pattern '…' of the schema took longer than 200 ms to match a value; simplify the pattern.`
+- `Checking the document against its schema takes longer than 10 s; simplify the schema or the document.`
+- `Reading the schema takes longer than 10 s; simplify its references.`
+
+These limits measure wall-clock time on a shared host, so a document near them may pass on one attempt and fail on another. They are options of the backend, in the configuration section `ConfigurationSchemas`:
+
+| Option | Default | Range |
+| --- | --- | --- |
+| `ConfigurationSchemas:PatternMatchTimeout` | `00:00:00.200` | 10 ms to 10 s |
+| `ConfigurationSchemas:CheckBudget` | `00:00:10` | 1 s to 5 min |
+
+A configuration `PUT` or `PATCH` that is checked against a stored schema the check cannot use answers `400` with that schema's code (`InvalidSchema`, `ExternalSchemaReference` or `SchemaValidationTimeout`). That includes a schema stored before references outside the schema were refused. Such a schema fails every write it applies to until it is replaced or deleted. Replacing the broken layer itself needs no force, because only the other layers are read from the store. Force is needed when another layer of the same configurations is broken too (see [Force](#force)). A forced configuration write is stored without a check, as before.
 
 Templates are not checked against configuration schemas. Template content is merged at calculation time and is not part of stored `Content`.
 
@@ -239,12 +287,19 @@ Force breaks one side of that deadlock for a single call. The caller passes it e
 
 | Call | Without force | With force |
 | --- | --- | --- |
-| PUT a schema | Rejected when any in-scope configuration in the view would fail the combined schema after the write | The schema is stored. Existing configurations are left as they are |
-| PUT or PATCH a configuration | Rejected when the document about to be stored fails the combined schema | The document is stored |
+| PUT a schema | Rejected when any in-scope configuration in the view would fail the combined schema after the write (`409`), or when the configurations cannot be checked (`400`, see below) | The schema is stored. Existing configurations are left as they are |
+| PUT or PATCH a configuration | Rejected when the document about to be stored fails the combined schema (`409`), or when that schema cannot be used (`400`) | The document is stored without a check |
 
 On the HTTP API the parameter is the query `force=true`. On the CLI it is `-f` or `--force` on `schema type|annotation|descendant set|edit` and on `config set`, `config edit`, and `config patch`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
 
-Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, an unknown type code or annotation key, a descendant type that cannot descend from its key, a patch of a missing configuration, and a lost concurrency race still fail.
+Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, a schema with a reference outside itself or whose check cannot start, an unknown type code or annotation key, a descendant type that cannot descend from its key, a patch of a missing configuration, and a lost concurrency race still fail.
+
+Force covers the check of the other side, whatever stops it. On a schema `PUT`, the compliance step can fail without a violation:
+
+- another stored layer of a combined schema refers outside itself (`ExternalSchemaReference`) or cannot be used (`InvalidSchema`);
+- a check runs out of its limits (`SchemaValidationTimeout`).
+
+Without force, that answers `400` with the code. With force, the schema is stored and the failure is logged as "Schema compliance check could not finish, bypassed with force". This is how a stored layer that refers outside itself is replaced when another layer of the same configurations is broken too. A `DELETE` of the layer also works, because a delete runs no check.
 
 Two sequences both work.
 
