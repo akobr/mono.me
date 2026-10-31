@@ -19,6 +19,8 @@ The review of the branch found that the non-backtracking engine alone does not b
 | `15ebf2d1` | Sections 3 to 6: `NameQuery`, the Functions routes, Api.Web; parser and route tests |
 | `64e3627a` | Section 7: the docs |
 | `acb70f5f` | Fixes from the review: the matching budget and the length cap, the engine's message for a too large pattern, a stronger multi-type Cosmos test, doc wording, the MCP comments |
+| `4401c577` | This review |
+| `f1510e7f` | PR comment: Api.Web answers a refused query with `400` |
 
 ## What Was Done
 
@@ -66,7 +68,7 @@ Paging, `TotalCount`, the continuation, the partition and the server-side filter
 
 `Api.Web/src/Controllers/AnnotationsController.cs` uses the same helper (`:475`) with the same matrix. Its `nameQuery` of responsibilities and subjects changed from a plain `Contains` to the shared syntax with the partition of an exact query. Before the fix, that query answered `500` on responsibilities and filtered nothing on subjects. The duplicate `using System.Text.Json;` is gone.
 
-The mixed-type conditions of `GetDescendants` now filter, as intended. Api.Web still has no exception mapping, so a refused query answers `500` there.
+The mixed-type conditions of `GetDescendants` now filter, as intended. A refused query answers `400` with its message and `ErrorCode`: `InvalidInputExceptionFilter`, registered for all controllers in `Program.cs`, maps `InvalidInputException` both from the parsing in the controller and from the matching in the service (commit `f1510e7f`, after a CodeRabbit comment on the PR).
 
 ### 6. Tests
 
@@ -149,4 +151,3 @@ The issue carried a CodeRabbit coding plan, and it was used as a second opinion.
 
 - The MCP `find_annotations` could use the API's name queries for the parameters a list has. Its case-insensitive exact names would need a pattern such as `^(?i)name$`.
 - Exact and contains queries could become Cosmos SQL, so that their pages are not short.
-- Api.Web has no exception mapping, so its refusals answer `500`.
