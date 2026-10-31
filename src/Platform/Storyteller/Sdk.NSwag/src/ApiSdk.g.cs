@@ -27,65 +27,34 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface IAccessApiClient
     {
-        /// <returns>Details about the log in account, contains all accessible access points.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Account> GetAccountAsync();
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>Details about the log in account, contains all accessible access points.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Account> GetAccountAsync(System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="body">Organization and project for the new account, and the description of the project.</param>
-        /// <returns>Newly created account.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Account> CreateAccountAsync(AccountCreate body);
+        System.Threading.Tasks.Task<Account> GetAccountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="body">Organization and project for the new account, and the description of the project.</param>
         /// <returns>Newly created account.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Account> CreateAccountAsync(AccountCreate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <returns>The list of all manageable organizations and projects. The access points where the account is Admin or Owner.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPoint>> GetAccessPointsAsync();
+        System.Threading.Tasks.Task<Account> CreateAccountAsync(AccountCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>The list of all manageable organizations and projects. The access points where the account is Admin or Owner.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPoint>> GetAccessPointsAsync(System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="body">An organization or project to create, and the description of the project.</param>
-        /// <returns>The created access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPoint>> GetAccessPointsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="body">An organization or project to create, and the description of the project.</param>
         /// <returns>The created access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="key">The key of requested access point.</param>
-        /// <returns>The access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> GetAccessPointAsync(string key);
+        System.Threading.Tasks.Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="key">The key of requested access point.</param>
         /// <returns>The access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> GetAccessPointAsync(string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Sets the description of a project, trimmed; a blank one clears it. Needs a user with the Administrator role.
-        /// </remarks>
-        /// <param name="key">The key of the project (organization.project).</param>
-        /// <param name="body">The new description; empty or no body clears it.</param>
-        /// <returns>The updated project.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate body);
+        System.Threading.Tasks.Task<AccessPoint> GetAccessPointAsync(string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -95,14 +64,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The new description; empty or no body clears it.</param>
         /// <returns>The updated project.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
-        /// </remarks>
-        /// <returns>The caller's projects.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ProjectSummary>> GetProjectsAsync();
+        System.Threading.Tasks.Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -110,49 +72,26 @@ namespace _42.Platform.Storyteller.Sdk
         /// </remarks>
         /// <returns>The caller's projects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ProjectSummary>> GetProjectsAsync(System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="body">The requested permission to grant.</param>
-        /// <returns>The affected access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> GrantUserAccessAsync(Permission body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ProjectSummary>> GetProjectsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="body">The requested permission to grant.</param>
         /// <returns>The affected access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> GrantUserAccessAsync(Permission body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="body">The requested permission to revoke.</param>
-        /// <returns>The affected access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> RevokeUserAccessAsync(Permission body);
+        System.Threading.Tasks.Task<AccessPoint> GrantUserAccessAsync(Permission body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="body">The requested permission to revoke.</param>
         /// <returns>The affected access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPoint> RevokeUserAccessAsync(Permission body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The list of machine accesses for the project.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<MachineAccess>> GetMachineAccessesAsync(string organization, string project);
+        System.Threading.Tasks.Task<AccessPoint> RevokeUserAccessAsync(Permission body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <returns>The list of machine accesses for the project.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<MachineAccess>> GetMachineAccessesAsync(string organization, string project, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">An organization or project to create.</param>
-        /// <returns>The created access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAccess> CreateMachineAccessAsync(string organization, string project, MachineAccessCreate body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<MachineAccess>> GetMachineAccessesAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -160,14 +99,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">An organization or project to create.</param>
         /// <returns>The created access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAccess> CreateMachineAccessAsync(string organization, string project, MachineAccessCreate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <returns>The machine access.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAccess> GetMachineAccessAsync(string organization, string project, string id);
+        System.Threading.Tasks.Task<MachineAccess> CreateMachineAccessAsync(string organization, string project, MachineAccessCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -175,14 +107,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the machine access.</param>
         /// <returns>The machine access.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAccess> GetMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <returns>The restarted machine access.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id);
+        System.Threading.Tasks.Task<MachineAccess> GetMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -190,14 +115,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the machine access.</param>
         /// <returns>The restarted machine access.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteMachineAccessAsync(string organization, string project, string id);
+        System.Threading.Tasks.Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -205,24 +123,12 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the machine access.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <returns>The CA public certificate in PEM format.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<string> GetCertificateAuthorityAsync();
+        System.Threading.Tasks.Task DeleteMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>The CA public certificate in PEM format.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<string> GetCertificateAuthorityAsync(System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
-        /// </remarks>
-        /// <param name="key">The key of the access point (organization.project).</param>
-        /// <returns>The machine authentication policy of the project.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key);
+        System.Threading.Tasks.Task<string> GetCertificateAuthorityAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -231,27 +137,14 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the access point (organization.project).</param>
         /// <returns>The machine authentication policy of the project.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="key">The key of the access point (organization.project).</param>
-        /// <param name="body">The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.</param>
-        /// <returns>The updated machine authentication policy, with every property filled.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body);
+        System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="key">The key of the access point (organization.project).</param>
         /// <param name="body">The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.</param>
         /// <returns>The updated machine authentication policy, with every property filled.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
-        /// </remarks>
-        /// <returns>The user identity provider of this deployment.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync();
+        System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -259,14 +152,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// </remarks>
         /// <returns>The user identity provider of this deployment.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync(System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
-        /// </remarks>
-        /// <returns>The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync();
+        System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -274,14 +160,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// </remarks>
         /// <returns>The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync(System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
-        /// </remarks>
-        /// <returns>The public keys (Cache-Control: public, max-age=300; no-cache while there is none).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync();
+        System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -289,14 +168,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// </remarks>
         /// <returns>The public keys (Cache-Control: public, max-age=300; no-cache while there is none).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync(System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <returns>The renewal result with the new certificate or an already-renewed message.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<CertificateRenewalResult> RenewMachineCertificateAsync(string organization, string project, string id);
+        System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -304,27 +176,14 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the machine access.</param>
         /// <returns>The renewal result with the new certificate or an already-renewed message.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<CertificateRenewalResult> RenewMachineCertificateAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The list of shared certificates for the project.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<SharedCertificate>> GetSharedCertificatesAsync(string organization, string project);
+        System.Threading.Tasks.Task<CertificateRenewalResult> RenewMachineCertificateAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <returns>The list of shared certificates for the project.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<SharedCertificate>> GetSharedCertificatesAsync(string organization, string project, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The label and optional lifetime for the shared certificate.</param>
-        /// <returns>The issued shared certificate with PKCS#12 data.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<SharedCertificate> IssueSharedCertificateAsync(string organization, string project, SharedCertificateCreate body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<SharedCertificate>> GetSharedCertificatesAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -332,14 +191,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The label and optional lifetime for the shared certificate.</param>
         /// <returns>The issued shared certificate with PKCS#12 data.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<SharedCertificate> IssueSharedCertificateAsync(string organization, string project, SharedCertificateCreate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="thumbprint">The thumbprint of the shared certificate to revoke.</param>
-        /// <returns>The shared certificate was revoked.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task RevokeSharedCertificateAsync(string organization, string project, string thumbprint);
+        System.Threading.Tasks.Task<SharedCertificate> IssueSharedCertificateAsync(string organization, string project, SharedCertificateCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -347,16 +199,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="thumbprint">The thumbprint of the shared certificate to revoke.</param>
         /// <returns>The shared certificate was revoked.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task RevokeSharedCertificateAsync(string organization, string project, string thumbprint, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The trusted issuers of the project: the OIDC issuers whose tokens its Federated machines exchange for Storyteller tokens. Contributor.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The trusted issuers of the project, ordered by name.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<FederatedIssuer>> GetFederatedIssuersAsync(string organization, string project);
+        System.Threading.Tasks.Task RevokeSharedCertificateAsync(string organization, string project, string thumbprint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -366,17 +209,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The trusted issuers of the project, ordered by name.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<FederatedIssuer>> GetFederatedIssuersAsync(string organization, string project, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// A trusted issuer of the project. Contributor.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
-        /// <returns>The trusted issuer.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FederatedIssuer> GetFederatedIssuerAsync(string organization, string project, string name);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<FederatedIssuer>> GetFederatedIssuersAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -387,18 +220,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
         /// <returns>The trusted issuer.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FederatedIssuer> GetFederatedIssuerAsync(string organization, string project, string name, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Creates or replaces a trusted issuer of the project. The route name wins over the body; the Issuer of an existing trusted issuer cannot change. Administrator.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
-        /// <param name="body">The trusted issuer: the exact `iss`, where its keys come from, the longest accepted token lifetime and the claims every token must carry.</param>
-        /// <returns>The stored trusted issuer.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FederatedIssuer> SetFederatedIssuerAsync(string organization, string project, string name, FederatedIssuer body);
+        System.Threading.Tasks.Task<FederatedIssuer> GetFederatedIssuerAsync(string organization, string project, string name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -410,17 +232,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The trusted issuer: the exact `iss`, where its keys come from, the longest accepted token lifetime and the claims every token must carry.</param>
         /// <returns>The stored trusted issuer.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FederatedIssuer> SetFederatedIssuerAsync(string organization, string project, string name, FederatedIssuer body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Deletes a trusted issuer even while federation rules reference it: the kill switch. Those rules stop matching within a minute; Storyteller tokens already issued stay valid until they expire. Administrator.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteFederatedIssuerAsync(string organization, string project, string name);
+        System.Threading.Tasks.Task<FederatedIssuer> SetFederatedIssuerAsync(string organization, string project, string name, FederatedIssuer body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -431,18 +243,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteFederatedIssuerAsync(string organization, string project, string name, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; ContributorWithSecrets for a machine with a Secrets scope, Administrator for one with a management scope.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <param name="body">1 to 10 rules; a platform token must match one of them.</param>
-        /// <returns>The machine access with its new rules and its token endpoint.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, System.Collections.Generic.IEnumerable<FederationRule> body);
+        System.Threading.Tasks.Task DeleteFederatedIssuerAsync(string organization, string project, string name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -454,17 +255,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">1 to 10 rules; a platform token must match one of them.</param>
         /// <returns>The machine access with its new rules and its token endpoint.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, System.Collections.Generic.IEnumerable<FederationRule> body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Anonymous. The RFC 8693 token exchange of Federated machines: client_id names the machine, subject_token is a token of a trusted issuer of the project, and the response is a short-lived Storyteller token for Authorization: Bearer. Send no Authorization header. Every refused subject token gets the same invalid_request description; the reason is only logged.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The token request form. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
-        /// <returns>The Storyteller token (Cache-Control: no-store).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineTokenResponse> ExchangeMachineTokenAsync(string organization, string project, MachineTokenRequest body);
+        System.Threading.Tasks.Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, System.Collections.Generic.IEnumerable<FederationRule> body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -475,15 +266,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The token request form. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
         /// <returns>The Storyteller token (Cache-Control: no-store).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<MachineTokenResponse> ExchangeMachineTokenAsync(string organization, string project, MachineTokenRequest body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Invitations to the organization or project, newest first. Needs Administrator.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <returns>The invitations. A pending invitation past its expiry has the status Expired.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key);
+        System.Threading.Tasks.Task<MachineTokenResponse> ExchangeMachineTokenAsync(string organization, string project, MachineTokenRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -492,16 +275,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
         /// <returns>The invitations. A pending invitation past its expiry has the status Expired.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Invites an email address with a role. Needs Administrator; Owner to offer Owner. With AuthKit and a management key, WorkOS sends the email.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="body">The email, the role, and optionally the validity in days (1 to 30, 7 by default).</param>
-        /// <returns>The pending invitation. IsEmailSent is false when no email went out; share the link instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -511,16 +285,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The email, the role, and optionally the validity in days (1 to 30, 7 by default).</param>
         /// <returns>The pending invitation. IsEmailSent is false when no email went out; share the link instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Sends the invitation email again and restarts its validity. Needs Administrator.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="id">The id of the invitation.</param>
-        /// <returns>The renewed invitation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id);
+        System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -530,16 +295,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the invitation.</param>
         /// <returns>The renewed invitation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Revokes a pending invitation. Needs Administrator.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="id">The id of the invitation.</param>
-        /// <returns>The revoked invitation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id);
+        System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -549,14 +305,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the invitation.</param>
         /// <returns>The revoked invitation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Pending invitations for the email of the signed-in user. Works before the account exists.
-        /// </remarks>
-        /// <returns>Pending, unexpired invitations; empty when the token has no verified email.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync();
+        System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -564,15 +313,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// </remarks>
         /// <returns>Pending, unexpired invitations; empty when the token has no verified email.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync(System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Accepts the invitation: creates the account when needed and grants the role. The verified email of the token must match.
-        /// </remarks>
-        /// <param name="id">The id of the invitation.</param>
-        /// <returns>The account of the signed-in user, with the new membership.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -581,15 +322,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the invitation.</param>
         /// <returns>The account of the signed-in user, with the new membership.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Declines the invitation. The verified email of the token must match.
-        /// </remarks>
-        /// <param name="id">The id of the invitation.</param>
-        /// <returns>The declined invitation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id);
+        System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -598,15 +331,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the invitation.</param>
         /// <returns>The declined invitation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Members of the organization or project, with their names. Needs Administrator.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <returns>The members, owners first.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key);
+        System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -615,17 +340,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
         /// <returns>The members, owners first.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
-        /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
-        /// <returns>The member with the new role.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -636,16 +351,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
         /// <returns>The member with the new role.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
-        /// <returns>The member was removed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId);
+        System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -655,15 +361,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <returns>The member was removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
-        /// </remarks>
-        /// <param name="body">The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
-        /// <returns>The Storyteller user token and the actor's restrictions (Cache-Control: no-store).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body);
+        System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -672,7 +370,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
         /// <returns>The Storyteller user token and the actor's restrictions (Cache-Control: no-store).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
     }
 
@@ -724,17 +422,10 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
-        /// <returns>Details about the log in account, contains all accessible access points.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Account> GetAccountAsync()
-        {
-            return GetAccountAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>Details about the log in account, contains all accessible access points.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Account> GetAccountAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Account> GetAccountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -834,19 +525,11 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="body">Organization and project for the new account, and the description of the project.</param>
-        /// <returns>Newly created account.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Account> CreateAccountAsync(AccountCreate body)
-        {
-            return CreateAccountAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="body">Organization and project for the new account, and the description of the project.</param>
         /// <returns>Newly created account.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Account> CreateAccountAsync(AccountCreate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Account> CreateAccountAsync(AccountCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -950,17 +633,10 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <returns>The list of all manageable organizations and projects. The access points where the account is Admin or Owner.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPoint>> GetAccessPointsAsync()
-        {
-            return GetAccessPointsAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>The list of all manageable organizations and projects. The access points where the account is Admin or Owner.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPoint>> GetAccessPointsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPoint>> GetAccessPointsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1054,19 +730,11 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="body">An organization or project to create, and the description of the project.</param>
-        /// <returns>The created access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate body)
-        {
-            return CreateAccessPointAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="body">An organization or project to create, and the description of the project.</param>
         /// <returns>The created access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1164,19 +832,11 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="key">The key of requested access point.</param>
-        /// <returns>The access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AccessPoint> GetAccessPointAsync(string key)
-        {
-            return GetAccessPointAsync(key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="key">The key of requested access point.</param>
         /// <returns>The access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AccessPoint> GetAccessPointAsync(string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AccessPoint> GetAccessPointAsync(string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -1274,18 +934,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Sets the description of a project, trimmed; a blank one clears it. Needs a user with the Administrator role.
-        /// </remarks>
-        /// <param name="key">The key of the project (organization.project).</param>
-        /// <param name="body">The new description; empty or no body clears it.</param>
-        /// <returns>The updated project.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate body)
-        {
-            return UpdateAccessPointAsync(key, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Sets the description of a project, trimmed; a blank one clears it. Needs a user with the Administrator role.
@@ -1294,7 +942,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The new description; empty or no body clears it.</param>
         /// <returns>The updated project.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -1426,23 +1074,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
-        /// </remarks>
-        /// <returns>The caller's projects.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ProjectSummary>> GetProjectsAsync()
-        {
-            return GetProjectsAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
         /// </remarks>
         /// <returns>The caller's projects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ProjectSummary>> GetProjectsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ProjectSummary>> GetProjectsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1546,19 +1184,11 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="body">The requested permission to grant.</param>
-        /// <returns>The affected access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AccessPoint> GrantUserAccessAsync(Permission body)
-        {
-            return GrantUserAccessAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="body">The requested permission to grant.</param>
         /// <returns>The affected access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AccessPoint> GrantUserAccessAsync(Permission body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AccessPoint> GrantUserAccessAsync(Permission body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1656,19 +1286,11 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="body">The requested permission to revoke.</param>
-        /// <returns>The affected access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AccessPoint> RevokeUserAccessAsync(Permission body)
-        {
-            return RevokeUserAccessAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="body">The requested permission to revoke.</param>
         /// <returns>The affected access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AccessPoint> RevokeUserAccessAsync(Permission body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AccessPoint> RevokeUserAccessAsync(Permission body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -1766,21 +1388,12 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The list of machine accesses for the project.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<MachineAccess>> GetMachineAccessesAsync(string organization, string project)
-        {
-            return GetMachineAccessesAsync(organization, project, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <returns>The list of machine accesses for the project.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<MachineAccess>> GetMachineAccessesAsync(string organization, string project, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<MachineAccess>> GetMachineAccessesAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -1884,23 +1497,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">An organization or project to create.</param>
-        /// <returns>The created access point (organization or project).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<MachineAccess> CreateMachineAccessAsync(string organization, string project, MachineAccessCreate body)
-        {
-            return CreateMachineAccessAsync(organization, project, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="body">An organization or project to create.</param>
         /// <returns>The created access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<MachineAccess> CreateMachineAccessAsync(string organization, string project, MachineAccessCreate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<MachineAccess> CreateMachineAccessAsync(string organization, string project, MachineAccessCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -2018,23 +1621,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <returns>The machine access.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<MachineAccess> GetMachineAccessAsync(string organization, string project, string id)
-        {
-            return GetMachineAccessAsync(organization, project, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="id">The id of the machine access.</param>
         /// <returns>The machine access.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<MachineAccess> GetMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<MachineAccess> GetMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -2142,23 +1735,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <returns>The restarted machine access.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id)
-        {
-            return ResetMachineAccessAsync(organization, project, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="id">The id of the machine access.</param>
         /// <returns>The restarted machine access.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -2297,23 +1880,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteMachineAccessAsync(string organization, string project, string id)
-        {
-            return DeleteMachineAccessAsync(organization, project, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="id">The id of the machine access.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteMachineAccessAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -2421,17 +1994,10 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <returns>The CA public certificate in PEM format.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<string> GetCertificateAuthorityAsync()
-        {
-            return GetCertificateAuthorityAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>The CA public certificate in PEM format.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<string> GetCertificateAuthorityAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<string> GetCertificateAuthorityAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2509,17 +2075,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
-        /// </remarks>
-        /// <param name="key">The key of the access point (organization.project).</param>
-        /// <returns>The machine authentication policy of the project.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key)
-        {
-            return GetMachineAuthenticationAsync(key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
@@ -2527,7 +2082,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the access point (organization.project).</param>
         /// <returns>The machine authentication policy of the project.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -2636,21 +2191,12 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="key">The key of the access point (organization.project).</param>
-        /// <param name="body">The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.</param>
-        /// <returns>The updated machine authentication policy, with every property filled.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body)
-        {
-            return SetMachineAuthenticationAsync(key, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="key">The key of the access point (organization.project).</param>
         /// <param name="body">The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.</param>
         /// <returns>The updated machine authentication policy, with every property filled.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -2763,23 +2309,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
-        /// </remarks>
-        /// <returns>The user identity provider of this deployment.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync()
-        {
-            return GetAuthConfigurationAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Anonymous. Tells clients which identity provider signs users in and with which public settings, and whether the user token exchange is enabled.
         /// </remarks>
         /// <returns>The user identity provider of this deployment.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2857,23 +2393,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
-        /// </remarks>
-        /// <returns>The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync()
-        {
-            return GetAuthorizationServerMetadataAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Anonymous. RFC 8414 metadata of the Storyteller issuer (MachineAuth:Federation:Issuer): the token endpoint of the user token exchange, how actors authenticate there, and the JWKS of the signing keys. URLs start with MachineAuth:Federation:PublicBaseUrl, else with the request's scheme and host.
         /// </remarks>
         /// <returns>The metadata (Cache-Control: public, max-age=300 with MachineAuth:Federation:PublicBaseUrl; no-store without it, because its URLs then come from the request's host).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AuthorizationServerMetadata> GetAuthorizationServerMetadataAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -2951,23 +2477,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
-        /// </remarks>
-        /// <returns>The public keys (Cache-Control: public, max-age=300; no-cache while there is none).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync()
-        {
-            return GetJsonWebKeySetAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Anonymous. The RFC 7517 JWK Set of the public keys Storyteller tokens are signed with: the keys the API accepts, today the one stored key. Empty while no key is stored.
         /// </remarks>
         /// <returns>The public keys (Cache-Control: public, max-age=300; no-cache while there is none).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<PublicJsonWebKeySet> GetJsonWebKeySetAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -3051,23 +2567,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <returns>The renewal result with the new certificate or an already-renewed message.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<CertificateRenewalResult> RenewMachineCertificateAsync(string organization, string project, string id)
-        {
-            return RenewMachineCertificateAsync(organization, project, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="id">The id of the machine access.</param>
         /// <returns>The renewal result with the new certificate or an already-renewed message.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<CertificateRenewalResult> RenewMachineCertificateAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<CertificateRenewalResult> RenewMachineCertificateAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3169,21 +2675,12 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The list of shared certificates for the project.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<SharedCertificate>> GetSharedCertificatesAsync(string organization, string project)
-        {
-            return GetSharedCertificatesAsync(organization, project, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <returns>The list of shared certificates for the project.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<SharedCertificate>> GetSharedCertificatesAsync(string organization, string project, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<SharedCertificate>> GetSharedCertificatesAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3277,23 +2774,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The label and optional lifetime for the shared certificate.</param>
-        /// <returns>The issued shared certificate with PKCS#12 data.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<SharedCertificate> IssueSharedCertificateAsync(string organization, string project, SharedCertificateCreate body)
-        {
-            return IssueSharedCertificateAsync(organization, project, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="body">The label and optional lifetime for the shared certificate.</param>
         /// <returns>The issued shared certificate with PKCS#12 data.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<SharedCertificate> IssueSharedCertificateAsync(string organization, string project, SharedCertificateCreate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<SharedCertificate> IssueSharedCertificateAsync(string organization, string project, SharedCertificateCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3401,23 +2888,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="thumbprint">The thumbprint of the shared certificate to revoke.</param>
-        /// <returns>The shared certificate was revoked.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task RevokeSharedCertificateAsync(string organization, string project, string thumbprint)
-        {
-            return RevokeSharedCertificateAsync(organization, project, thumbprint, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="thumbprint">The thumbprint of the shared certificate to revoke.</param>
         /// <returns>The shared certificate was revoked.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task RevokeSharedCertificateAsync(string organization, string project, string thumbprint, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task RevokeSharedCertificateAsync(string organization, string project, string thumbprint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3515,18 +2992,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The trusted issuers of the project: the OIDC issuers whose tokens its Federated machines exchange for Storyteller tokens. Contributor.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The trusted issuers of the project, ordered by name.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<FederatedIssuer>> GetFederatedIssuersAsync(string organization, string project)
-        {
-            return GetFederatedIssuersAsync(organization, project, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The trusted issuers of the project: the OIDC issuers whose tokens its Federated machines exchange for Storyteller tokens. Contributor.
@@ -3535,7 +3000,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The trusted issuers of the project, ordered by name.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<FederatedIssuer>> GetFederatedIssuersAsync(string organization, string project, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<FederatedIssuer>> GetFederatedIssuersAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3639,19 +3104,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// A trusted issuer of the project. Contributor.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
-        /// <returns>The trusted issuer.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FederatedIssuer> GetFederatedIssuerAsync(string organization, string project, string name)
-        {
-            return GetFederatedIssuerAsync(organization, project, name, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// A trusted issuer of the project. Contributor.
@@ -3661,7 +3113,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
         /// <returns>The trusted issuer.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FederatedIssuer> GetFederatedIssuerAsync(string organization, string project, string name, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<FederatedIssuer> GetFederatedIssuerAsync(string organization, string project, string name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3775,20 +3227,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Creates or replaces a trusted issuer of the project. The route name wins over the body; the Issuer of an existing trusted issuer cannot change. Administrator.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
-        /// <param name="body">The trusted issuer: the exact `iss`, where its keys come from, the longest accepted token lifetime and the claims every token must carry.</param>
-        /// <returns>The stored trusted issuer.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FederatedIssuer> SetFederatedIssuerAsync(string organization, string project, string name, FederatedIssuer body)
-        {
-            return SetFederatedIssuerAsync(organization, project, name, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Creates or replaces a trusted issuer of the project. The route name wins over the body; the Issuer of an existing trusted issuer cannot change. Administrator.
@@ -3799,7 +3237,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The trusted issuer: the exact `iss`, where its keys come from, the longest accepted token lifetime and the claims every token must carry.</param>
         /// <returns>The stored trusted issuer.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FederatedIssuer> SetFederatedIssuerAsync(string organization, string project, string name, FederatedIssuer body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<FederatedIssuer> SetFederatedIssuerAsync(string organization, string project, string name, FederatedIssuer body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3931,19 +3369,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Deletes a trusted issuer even while federation rules reference it: the kill switch. Those rules stop matching within a minute; Storyteller tokens already issued stay valid until they expire. Administrator.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteFederatedIssuerAsync(string organization, string project, string name)
-        {
-            return DeleteFederatedIssuerAsync(organization, project, name, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Deletes a trusted issuer even while federation rules reference it: the kill switch. Those rules stop matching within a minute; Storyteller tokens already issued stay valid until they expire. Administrator.
@@ -3953,7 +3378,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="name">The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteFederatedIssuerAsync(string organization, string project, string name, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteFederatedIssuerAsync(string organization, string project, string name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -4061,20 +3486,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; ContributorWithSecrets for a machine with a Secrets scope, Administrator for one with a management scope.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the machine access.</param>
-        /// <param name="body">1 to 10 rules; a platform token must match one of them.</param>
-        /// <returns>The machine access with its new rules and its token endpoint.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, System.Collections.Generic.IEnumerable<FederationRule> body)
-        {
-            return SetMachineFederationRulesAsync(organization, project, id, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; ContributorWithSecrets for a machine with a Secrets scope, Administrator for one with a management scope.
@@ -4085,7 +3496,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">1 to 10 rules; a platform token must match one of them.</param>
         /// <returns>The machine access with its new rules and its token endpoint.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, System.Collections.Generic.IEnumerable<FederationRule> body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, System.Collections.Generic.IEnumerable<FederationRule> body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -4228,19 +3639,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Anonymous. The RFC 8693 token exchange of Federated machines: client_id names the machine, subject_token is a token of a trusted issuer of the project, and the response is a short-lived Storyteller token for Authorization: Bearer. Send no Authorization header. Every refused subject token gets the same invalid_request description; the reason is only logged.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The token request form. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
-        /// <returns>The Storyteller token (Cache-Control: no-store).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<MachineTokenResponse> ExchangeMachineTokenAsync(string organization, string project, MachineTokenRequest body)
-        {
-            return ExchangeMachineTokenAsync(organization, project, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Anonymous. The RFC 8693 token exchange of Federated machines: client_id names the machine, subject_token is a token of a trusted issuer of the project, and the response is a short-lived Storyteller token for Authorization: Bearer. Send no Authorization header. Every refused subject token gets the same invalid_request description; the reason is only logged.
@@ -4250,7 +3648,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The token request form. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
         /// <returns>The Storyteller token (Cache-Control: no-store).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<MachineTokenResponse> ExchangeMachineTokenAsync(string organization, string project, MachineTokenRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<MachineTokenResponse> ExchangeMachineTokenAsync(string organization, string project, MachineTokenRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -4366,17 +3764,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Invitations to the organization or project, newest first. Needs Administrator.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <returns>The invitations. A pending invitation past its expiry has the status Expired.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key)
-        {
-            return GetInvitationsAsync(key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Invitations to the organization or project, newest first. Needs Administrator.
@@ -4384,7 +3771,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
         /// <returns>The invitations. A pending invitation past its expiry has the status Expired.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -4493,18 +3880,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Invites an email address with a role. Needs Administrator; Owner to offer Owner. With AuthKit and a management key, WorkOS sends the email.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="body">The email, the role, and optionally the validity in days (1 to 30, 7 by default).</param>
-        /// <returns>The pending invitation. IsEmailSent is false when no email went out; share the link instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body)
-        {
-            return CreateInvitationAsync(key, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Invites an email address with a role. Needs Administrator; Owner to offer Owner. With AuthKit and a management key, WorkOS sends the email.
@@ -4513,7 +3888,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The email, the role, and optionally the validity in days (1 to 30, 7 by default).</param>
         /// <returns>The pending invitation. IsEmailSent is false when no email went out; share the link instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -4646,18 +4021,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Sends the invitation email again and restarts its validity. Needs Administrator.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="id">The id of the invitation.</param>
-        /// <returns>The renewed invitation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id)
-        {
-            return ResendInvitationAsync(key, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Sends the invitation email again and restarts its validity. Needs Administrator.
@@ -4666,7 +4029,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the invitation.</param>
         /// <returns>The renewed invitation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -4791,18 +4154,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Revokes a pending invitation. Needs Administrator.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="id">The id of the invitation.</param>
-        /// <returns>The revoked invitation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id)
-        {
-            return RevokeInvitationAsync(key, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Revokes a pending invitation. Needs Administrator.
@@ -4811,7 +4162,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the invitation.</param>
         /// <returns>The revoked invitation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -4934,23 +4285,13 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Pending invitations for the email of the signed-in user. Works before the account exists.
-        /// </remarks>
-        /// <returns>Pending, unexpired invitations; empty when the token has no verified email.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync()
-        {
-            return GetMyInvitationsAsync(System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Pending invitations for the email of the signed-in user. Works before the account exists.
         /// </remarks>
         /// <returns>Pending, unexpired invitations; empty when the token has no verified email.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync(System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -5044,17 +4385,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Accepts the invitation: creates the account when needed and grants the role. The verified email of the token must match.
-        /// </remarks>
-        /// <param name="id">The id of the invitation.</param>
-        /// <returns>The account of the signed-in user, with the new membership.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id)
-        {
-            return AcceptInvitationAsync(id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Accepts the invitation: creates the account when needed and grants the role. The verified email of the token must match.
@@ -5062,7 +4392,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the invitation.</param>
         /// <returns>The account of the signed-in user, with the new membership.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (id == null)
                 throw new System.ArgumentNullException("id");
@@ -5182,17 +4512,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Declines the invitation. The verified email of the token must match.
-        /// </remarks>
-        /// <param name="id">The id of the invitation.</param>
-        /// <returns>The declined invitation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id)
-        {
-            return DeclineInvitationAsync(id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Declines the invitation. The verified email of the token must match.
@@ -5200,7 +4519,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the invitation.</param>
         /// <returns>The declined invitation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (id == null)
                 throw new System.ArgumentNullException("id");
@@ -5320,17 +4639,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Members of the organization or project, with their names. Needs Administrator.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <returns>The members, owners first.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key)
-        {
-            return GetMembersAsync(key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Members of the organization or project, with their names. Needs Administrator.
@@ -5338,7 +4646,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the access point: organization, or organization.project.</param>
         /// <returns>The members, owners first.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -5447,19 +4755,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
-        /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
-        /// <returns>The member with the new role.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body)
-        {
-            return SetMemberRoleAsync(key, accountId, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
@@ -5469,7 +4764,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
         /// <returns>The member with the new role.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -5606,18 +4901,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
-        /// </remarks>
-        /// <param name="key">The key of the access point: organization, or organization.project.</param>
-        /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
-        /// <returns>The member was removed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId)
-        {
-            return RemoveMemberAsync(key, accountId, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
@@ -5626,7 +4909,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="accountId">The id of the account: the user's {tid}:{oid} (tenant and object id, lower case) with Entra ID, the user's sub with AuthKit and Keycloak.</param>
         /// <returns>The member was removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -5743,17 +5026,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
-        /// </remarks>
-        /// <param name="body">The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
-        /// <returns>The Storyteller user token and the actor's restrictions (Cache-Control: no-store).</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body)
-        {
-            return ExchangeUserTokenAsync(body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Anonymous. The RFC 8693 exchange of user tokens by actors (Auth:TokenExchange:Actors), such as the MCP server: subject_token is the person's token for the actor, client_id names the actor, and actor_token, client_assertion or (Development only) client_secret proves it. The response is a short-lived Storyteller user token for Authorization: Bearer that names the person and the actor (act), with the actor's restrictions. The exchange never creates accounts. Send no Authorization header. Each refusal has one fixed error_description; the reason is only logged.
@@ -5761,7 +5033,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The token request form, at most 64 KiB. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.</param>
         /// <returns>The Storyteller user token and the actor's restrictions (Cache-Control: no-store).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<UserTokenResponse> ExchangeUserTokenAsync(UserTokenRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -6002,15 +5274,6 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface IAnnotationsApiClient
     {
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of annotations.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6021,15 +5284,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The annotations to create.</param>
-        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body);
+        System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6038,17 +5293,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The annotations to create.</param>
         /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The requested annotation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6059,19 +5304,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The requested annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="body">The annotation to create or update.</param>
-        /// <returns>The stored annotation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body);
+        System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6084,18 +5317,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The annotation to create or update.</param>
         /// <returns>The stored annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The deletion and the deleted keys, descendants first and the annotation last.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6107,19 +5329,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The deletion and the deleted keys, descendants first and the annotation last.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="descendants">The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of descendant annotations.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6132,15 +5342,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of descendant annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The keys, or compact lines, of the annotations to create.</param>
-        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body);
+        System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6149,18 +5351,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The keys, or compact lines, of the annotations to create.</param>
         /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="nameQuery">The name query to filter the responsibilities.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of responsibilities.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6172,18 +5363,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of responsibilities.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="nameQuery">The name query to filter the subjects.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of subjects.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6195,19 +5375,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of subjects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="responsibilityNameQuery">The name query to filter the usages by responsibility.</param>
-        /// <param name="subjectNameQuery">The name query to filter the usages by subject.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of usages.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6220,19 +5388,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of usages.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="subjectNameQuery">The name query to filter the contexts by subject.</param>
-        /// <param name="nameQuery">The name query to filter the contexts.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of contexts.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery = null, string subjectNameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6245,20 +5401,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of contexts.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="responsibilityNameQuery">The name query to filter the executions by responsibility.</param>
-        /// <param name="subjectNameQuery">The name query to filter the executions by subject.</param>
-        /// <param name="contextNameQuery">The name query to filter the executions by context.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of executions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery = null, string nameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6272,18 +5415,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of executions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="responsibilityNameQuery">The responsibility name query to filter the units.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of units.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery = null, string subjectNameQuery = null, string contextNameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6295,21 +5427,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="responsibilityNameQuery">The responsibility name query to filter the units of execution.</param>
-        /// <param name="unitNameQuery">The unit name query to filter the units of execution.</param>
-        /// <param name="subjectNameQuery">The subject name query to filter the units of execution.</param>
-        /// <param name="contextNameQuery">The context name query to filter the units of execution.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of units of execution.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
+        System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -6324,20 +5442,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units of execution.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="roots">Only the roots of deletions (default true); false lists every deleted annotation.</param>
-        /// <param name="deletionId">Only what one delete removed.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <returns>One page of deleted annotations.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots, string deletionId, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery = null, string unitNameQuery = null, string subjectNameQuery = null, string contextNameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6351,18 +5456,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
         /// <returns>One page of deleted annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots, string deletionId, string continuationToken, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// A deleted annotation with its Deletion.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The deleted annotation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots = null, string deletionId = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6374,18 +5468,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The deleted annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The purged keys, descendants first and the annotation last.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6397,18 +5480,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The purged keys, descendants first and the annotation last.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Up to 100 annotation keys.</param>
-        /// <returns>The deleted annotations among the keys; active and unknown keys are left out.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body);
+        System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6420,18 +5492,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Up to 100 annotation keys.</param>
         /// <returns>The deleted annotations among the keys; active and unknown keys are left out.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Up to 100 annotation keys, and whether their descendants are restored too.</param>
-        /// <returns>The restored and created annotations, ancestors first, and the keys that failed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6443,18 +5504,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Up to 100 annotation keys, and whether their descendants are restored too.</param>
         /// <returns>The restored and created annotations, ancestors first, and the keys that failed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The history of the annotation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6466,17 +5516,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The history of the annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Registered views of the project and "default". With discover=true (Administrator), also views found in the project's data.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="discover">Also scan the project's data for views that are not registered (IsRegistered = false). Needs Administrator.</param>
-        /// <returns>The views, "default" first.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover);
+        System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6487,17 +5527,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="discover">Also scan the project's data for views that are not registered (IsRegistered = false). Needs Administrator.</param>
         /// <returns>The views, "default" first.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Registers a view with an optional description. Needs Administrator.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The view name (2 to 63 lower-case letters, digits or hyphens) and an optional description.</param>
-        /// <returns>The registered view.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6508,18 +5538,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The view name (2 to 63 lower-case letters, digits or hyphens) and an optional description.</param>
         /// <returns>The registered view.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Sets the description of a view and registers it when needed. Needs Administrator.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The new description; empty clears it.</param>
-        /// <returns>The registered view.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body);
+        System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -6531,7 +5550,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The new description; empty clears it.</param>
         /// <returns>The registered view.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
     }
 
@@ -6583,19 +5602,6 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of annotations.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetAnnotationsAsync(organization, project, view, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -6605,7 +5611,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6738,17 +5744,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The annotations to create.</param>
-        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body)
-        {
-            return SetAnnotationsAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -6756,7 +5751,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The annotations to create.</param>
         /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6879,19 +5874,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The requested annotation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetAnnotationAsync(organization, project, view, key, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -6901,7 +5883,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The requested annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -7044,21 +6026,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="body">The annotation to create or update.</param>
-        /// <returns>The stored annotation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body)
-        {
-            return SetAnnotationAsync(organization, project, view, key, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
@@ -7070,7 +6037,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The annotation to create or update.</param>
         /// <returns>The stored annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -7207,20 +6174,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The deletion and the deleted keys, descendants first and the annotation last.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key)
-        {
-            return DeleteAnnotationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
@@ -7231,7 +6184,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The deletion and the deleted keys, descendants first and the annotation last.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -7370,21 +6323,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="descendants">The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of descendant annotations.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetDescendantsAsync(organization, project, view, key, descendants, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -7396,7 +6334,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of descendant annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -7538,17 +6476,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The keys, or compact lines, of the annotations to create.</param>
-        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body)
-        {
-            return SetAnnotationsSimpleAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -7556,7 +6483,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The keys, or compact lines, of the annotations to create.</param>
         /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -7679,20 +6606,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="nameQuery">The name query to filter the responsibilities.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of responsibilities.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetResponsibilitiesAsync(organization, project, view, nameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -7703,7 +6616,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of responsibilities.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -7840,20 +6753,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="nameQuery">The name query to filter the subjects.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of subjects.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetSubjectsAsync(organization, project, view, nameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -7864,7 +6763,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of subjects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -8001,21 +6900,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="responsibilityNameQuery">The name query to filter the usages by responsibility.</param>
-        /// <param name="subjectNameQuery">The name query to filter the usages by subject.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of usages.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetUsagesAsync(organization, project, view, responsibilityNameQuery, subjectNameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -8027,7 +6911,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of usages.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery = null, string subjectNameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -8168,21 +7052,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="subjectNameQuery">The name query to filter the contexts by subject.</param>
-        /// <param name="nameQuery">The name query to filter the contexts.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of contexts.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetContextsAsync(organization, project, view, subjectNameQuery, nameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -8194,7 +7063,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of contexts.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery = null, string nameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -8335,22 +7204,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="responsibilityNameQuery">The name query to filter the executions by responsibility.</param>
-        /// <param name="subjectNameQuery">The name query to filter the executions by subject.</param>
-        /// <param name="contextNameQuery">The name query to filter the executions by context.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of executions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetExecutionsAsync(organization, project, view, responsibilityNameQuery, subjectNameQuery, contextNameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -8363,7 +7216,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of executions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery = null, string subjectNameQuery = null, string contextNameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -8508,20 +7361,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="responsibilityNameQuery">The responsibility name query to filter the units.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of units.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetUnitsAsync(organization, project, view, responsibilityNameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -8532,7 +7371,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -8669,23 +7508,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="responsibilityNameQuery">The responsibility name query to filter the units of execution.</param>
-        /// <param name="unitNameQuery">The unit name query to filter the units of execution.</param>
-        /// <param name="subjectNameQuery">The subject name query to filter the units of execution.</param>
-        /// <param name="contextNameQuery">The context name query to filter the units of execution.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
-        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The list of units of execution.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
-        {
-            return GetUnitsOfExecutionAsync(organization, project, view, responsibilityNameQuery, unitNameQuery, subjectNameQuery, contextNameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -8699,7 +7521,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units of execution.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery = null, string unitNameQuery = null, string subjectNameQuery = null, string contextNameQuery = null, string continuationToken = null, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -8848,22 +7670,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="roots">Only the roots of deletions (default true); false lists every deleted annotation.</param>
-        /// <param name="deletionId">Only what one delete removed.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <returns>One page of deleted annotations.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots, string deletionId, string continuationToken)
-        {
-            return GetDeletedAnnotationsAsync(organization, project, view, roots, deletionId, continuationToken, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
@@ -8876,7 +7682,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
         /// <returns>One page of deleted annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots, string deletionId, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots = null, string deletionId = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -9009,20 +7815,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// A deleted annotation with its Deletion.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The deleted annotation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key)
-        {
-            return GetDeletedAnnotationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// A deleted annotation with its Deletion.
@@ -9033,7 +7825,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The deleted annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -9162,20 +7954,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The purged keys, descendants first and the annotation last.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key)
-        {
-            return PurgeAnnotationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
@@ -9186,7 +7964,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The purged keys, descendants first and the annotation last.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -9329,20 +8107,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Up to 100 annotation keys.</param>
-        /// <returns>The deleted annotations among the keys; active and unknown keys are left out.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body)
-        {
-            return FindDeletedAnnotationsAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
@@ -9353,7 +8117,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Up to 100 annotation keys.</param>
         /// <returns>The deleted annotations among the keys; active and unknown keys are left out.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -9476,20 +8240,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Up to 100 annotation keys, and whether their descendants are restored too.</param>
-        /// <returns>The restored and created annotations, ancestors first, and the keys that failed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body)
-        {
-            return RestoreAnnotationsAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
@@ -9500,7 +8250,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Up to 100 annotation keys, and whether their descendants are restored too.</param>
         /// <returns>The restored and created annotations, ancestors first, and the keys that failed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -9623,20 +8373,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The history of the annotation.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key)
-        {
-            return GetAnnotationHistoryAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
@@ -9647,7 +8383,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The history of the annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -9777,19 +8513,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Registered views of the project and "default". With discover=true (Administrator), also views found in the project's data.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="discover">Also scan the project's data for views that are not registered (IsRegistered = false). Needs Administrator.</param>
-        /// <returns>The views, "default" first.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover)
-        {
-            return GetViewsAsync(organization, project, discover, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Registered views of the project and "default". With discover=true (Administrator), also views found in the project's data.
@@ -9799,7 +8522,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="discover">Also scan the project's data for views that are not registered (IsRegistered = false). Needs Administrator.</param>
         /// <returns>The views, "default" first.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -9909,19 +8632,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Registers a view with an optional description. Needs Administrator.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The view name (2 to 63 lower-case letters, digits or hyphens) and an optional description.</param>
-        /// <returns>The registered view.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body)
-        {
-            return CreateViewAsync(organization, project, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Registers a view with an optional description. Needs Administrator.
@@ -9931,7 +8641,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The view name (2 to 63 lower-case letters, digits or hyphens) and an optional description.</param>
         /// <returns>The registered view.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -10059,20 +8769,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Sets the description of a view and registers it when needed. Needs Administrator.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The new description; empty clears it.</param>
-        /// <returns>The registered view.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body)
-        {
-            return UpdateViewAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Sets the description of a view and registers it when needed. Needs Administrator.
@@ -10083,7 +8779,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The new description; empty clears it.</param>
         /// <returns>The registered view.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -10340,14 +9036,6 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface IConfigurationsApiClient
     {
-        /// <remarks>
-        /// The binding functions and sources registered on the server, with descriptions and examples. Values are never resolved.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The registered functions and sources, sorted by name.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<BindingCatalog> GetBindingCatalogAsync(string organization, string project);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10357,19 +9045,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The registered functions and sources, sorted by name.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<BindingCatalog> GetBindingCatalogAsync(string organization, string project, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation. The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The composition of the effective configuration.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match);
+        System.Threading.Tasks.Task<BindingCatalog> GetBindingCatalogAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10382,20 +9058,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The composition of the effective configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Configurations of the view without their documents, up to 1000 per page.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">Only this annotation type code (rst, unt, sbt, usg, cnt, exe, uxe).</param>
-        /// <param name="keyPrefix">Only annotation keys starting with this prefix.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <returns>One page of configuration summaries.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType, string keyPrefix, string continuationToken);
+        System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10409,20 +9072,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
         /// <returns>One page of configuration summaries.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType, string keyPrefix, string continuationToken, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
-        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match);
+        System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType = null, string keyPrefix = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10436,17 +9086,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
-        /// <param name="body">The configuration model.</param>
-        /// <returns>The created or updated configuration.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force, object body);
+        System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format = null, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -10457,17 +9097,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The configuration model.</param>
         /// <returns>The created or updated configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
-        /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
-        /// <returns>The patched configuration.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force, object body);
+        System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -10478,15 +9108,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
         /// <returns>The patched configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteConfigurationAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -10495,20 +9117,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document without bindings is not evaluated. A document with bindings is revalidated from the versions of the key/value pairs and annotations it read, without evaluating it, when the serving instance recorded them for the sent ETag; otherwise it is evaluated and may still answer 304. JSON-e, and Key Vault secrets for a caller that may read secrets, are evaluated for every read.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
-        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match);
+        System.Threading.Tasks.Task DeleteConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -10522,15 +9131,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The list of configuration versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetConfigurationVersionsAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format = null, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -10539,16 +9140,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The list of configuration versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetConfigurationVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The configuration of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetConfigurationVersionAsync(string organization, string project, string view, string key, int version);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetConfigurationVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -10558,17 +9150,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The configuration of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> GetConfigurationVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format);
+        System.Threading.Tasks.Task<Configuration> GetConfigurationVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -10579,18 +9161,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -10602,17 +9173,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="viewTo">The target view name.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two views. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -10623,7 +9184,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two views. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
     }
 
@@ -10675,18 +9236,6 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
-        /// <remarks>
-        /// The binding functions and sources registered on the server, with descriptions and examples. Values are never resolved.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The registered functions and sources, sorted by name.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<BindingCatalog> GetBindingCatalogAsync(string organization, string project)
-        {
-            return GetBindingCatalogAsync(organization, project, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The binding functions and sources registered on the server, with descriptions and examples. Values are never resolved.
@@ -10695,7 +9244,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The registered functions and sources, sorted by name.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<BindingCatalog> GetBindingCatalogAsync(string organization, string project, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<BindingCatalog> GetBindingCatalogAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -10799,21 +9348,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation. The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The composition of the effective configuration.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match)
-        {
-            return GetConfigurationCompositionAsync(organization, project, view, key, if_None_Match, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation. The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
@@ -10825,7 +9359,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The composition of the effective configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationComposition> GetConfigurationCompositionAsync(string organization, string project, string view, string key, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -10968,22 +9502,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Configurations of the view without their documents, up to 1000 per page.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">Only this annotation type code (rst, unt, sbt, usg, cnt, exe, uxe).</param>
-        /// <param name="keyPrefix">Only annotation keys starting with this prefix.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <returns>One page of configuration summaries.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType, string keyPrefix, string continuationToken)
-        {
-            return GetConfigurationsAsync(organization, project, view, annotationType, keyPrefix, continuationToken, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Configurations of the view without their documents, up to 1000 per page.
@@ -10996,7 +9514,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
         /// <returns>One page of configuration summaries.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType, string keyPrefix, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType = null, string keyPrefix = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -11129,22 +9647,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
-        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match)
-        {
-            return GetConfigurationAsync(organization, project, view, key, format, if_None_Match, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
@@ -11157,7 +9659,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> GetConfigurationAsync(string organization, string project, string view, string key, string format = null, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -11315,19 +9817,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
-        /// <param name="body">The configuration model.</param>
-        /// <returns>The created or updated configuration.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force, object body)
-        {
-            return SetConfigurationAsync(organization, project, view, key, force, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -11337,7 +9826,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The configuration model.</param>
         /// <returns>The created or updated configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -11490,19 +9979,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
-        /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
-        /// <returns>The patched configuration.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force, object body)
-        {
-            return PatchConfigurationAsync(organization, project, view, key, force, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -11512,7 +9988,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
         /// <returns>The patched configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -11675,17 +10151,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteConfigurationAsync(string organization, string project, string view, string key)
-        {
-            return DeleteConfigurationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -11693,7 +10158,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteConfigurationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -11826,22 +10291,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document without bindings is not evaluated. A document with bindings is revalidated from the versions of the key/value pairs and annotations it read, without evaluating it, when the serving instance recorded them for the sent ETag; otherwise it is evaluated and may still answer 304. JSON-e, and Key Vault secrets for a caller that may read secrets, are evaluated for every read.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="format">The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).</param>
-        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
-        /// <returns>The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match)
-        {
-            return GetResolvedConfigurationAsync(organization, project, view, key, format, if_None_Match, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document without bindings is not evaluated. A document with bindings is revalidated from the versions of the key/value pairs and annotations it read, without evaluating it, when the serving instance recorded them for the sent ETag; otherwise it is evaluated and may still answer 304. JSON-e, and Key Vault secrets for a caller that may read secrets, are evaluated for every read.
@@ -11854,7 +10303,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
         /// <returns>The configuration model with resolved substitutions. With format=flat the body is a JSON object of strings (application/json), with properties or env text/plain, with yaml application/yaml.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format, string if_None_Match, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> GetResolvedConfigurationAsync(string organization, string project, string view, string key, string format = null, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -12013,17 +10462,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The list of configuration versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetConfigurationVersionsAsync(string organization, string project, string view, string key)
-        {
-            return GetConfigurationVersionsAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -12031,7 +10469,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The list of configuration versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetConfigurationVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetConfigurationVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -12155,18 +10593,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The configuration of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> GetConfigurationVersionAsync(string organization, string project, string view, string key, int version)
-        {
-            return GetConfigurationVersionAsync(organization, project, view, key, version, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -12175,7 +10601,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The configuration of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> GetConfigurationVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> GetConfigurationVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -12313,19 +10739,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format)
-        {
-            return GetConfigurationVersionDiffAsync(organization, project, view, key, version, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -12335,7 +10748,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -12480,20 +10893,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format)
-        {
-            return GetConfigurationVersionDiffCustomAsync(organization, project, view, key, version, versionFrom, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -12504,7 +10903,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -12649,19 +11048,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="viewTo">The target view name.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two views. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format)
-        {
-            return GetConfigurationViewDiffAsync(organization, project, view, key, viewTo, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -12671,7 +11057,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two views. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -12946,13 +11332,6 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface ISchemasApiClient
     {
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>The configuration schema for the specified annotation type.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -12961,17 +11340,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The configuration schema for the specified annotation type.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
-        /// <param name="body">The JSON Schema to apply to configurations of this annotation type.</param>
-        /// <returns>The created or updated configuration schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force, object body);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -12982,15 +11351,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The JSON Schema to apply to configurations of this annotation type.</param>
         /// <returns>The created or updated configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force, object body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -12999,15 +11360,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The annotation-level configuration schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13016,17 +11369,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The annotation-level configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
-        /// <param name="body">The JSON Schema to apply to configurations of this annotation.</param>
-        /// <returns>The created or updated annotation-level schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force, object body);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13037,15 +11380,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The JSON Schema to apply to configurations of this annotation.</param>
         /// <returns>The created or updated annotation-level schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13054,16 +11389,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <returns>The descendant-type configuration schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType);
+        System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13073,18 +11399,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>The descendant-type configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
-        /// <param name="body">The JSON Schema to apply to descendant configurations of this type.</param>
-        /// <returns>The created or updated descendant-type schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force, object body);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13096,16 +11411,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The JSON Schema to apply to descendant configurations of this type.</param>
         /// <returns>The created or updated descendant-type schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force, object body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13115,15 +11421,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The combined configuration schema from all applicable levels.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13132,17 +11430,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The combined configuration schema from all applicable levels.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Every schema document of the view (type, annotation, descendant type) without its content.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <returns>The schema summaries: type schemas first, then annotation and descendant-type schemas.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view);
+        System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -13153,15 +11441,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <returns>The schema summaries: type schemas first, then annotation and descendant-type schemas.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>The list of type-schema versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13170,16 +11450,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The list of type-schema versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The type schema of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13189,17 +11460,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The type schema of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13210,18 +11471,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format);
+        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13233,15 +11483,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The list of annotation-schema versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13250,16 +11492,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The list of annotation-schema versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The annotation schema of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13269,17 +11502,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The annotation schema of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13290,18 +11513,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format);
+        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13313,16 +11525,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <returns>The list of descendant-type schema versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType);
+        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13332,17 +11535,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>The list of descendant-type schema versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The descendant-type schema of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13353,18 +11546,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The descendant-type schema of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13376,19 +11558,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format);
+        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -13401,7 +11571,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
     }
 
@@ -13453,17 +11623,6 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>The configuration schema for the specified annotation type.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType)
-        {
-            return GetConfigurationSchemaAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -13471,7 +11630,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The configuration schema for the specified annotation type.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -13600,19 +11759,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
-        /// <param name="body">The JSON Schema to apply to configurations of this annotation type.</param>
-        /// <returns>The created or updated configuration schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force, object body)
-        {
-            return SetConfigurationSchemaAsync(organization, project, view, annotationType, force, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -13622,7 +11768,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The JSON Schema to apply to configurations of this annotation type.</param>
         /// <returns>The created or updated configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -13765,17 +11911,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType)
-        {
-            return DeleteConfigurationSchemaAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -13783,7 +11918,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -13916,17 +12051,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The annotation-level configuration schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key)
-        {
-            return GetAnnotationSchemaAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -13934,7 +12058,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The annotation-level configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -14063,19 +12187,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
-        /// <param name="body">The JSON Schema to apply to configurations of this annotation.</param>
-        /// <returns>The created or updated annotation-level schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force, object body)
-        {
-            return SetAnnotationSchemaAsync(organization, project, view, key, force, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -14085,7 +12196,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The JSON Schema to apply to configurations of this annotation.</param>
         /// <returns>The created or updated annotation-level schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -14228,17 +12339,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key)
-        {
-            return DeleteAnnotationSchemaAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -14246,7 +12346,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -14379,18 +12479,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <returns>The descendant-type configuration schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType)
-        {
-            return GetDescendantTypeSchemaAsync(organization, project, view, key, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -14399,7 +12487,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>The descendant-type configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -14533,20 +12621,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
-        /// <param name="body">The JSON Schema to apply to descendant configurations of this type.</param>
-        /// <returns>The created or updated descendant-type schema.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force, object body)
-        {
-            return SetDescendantTypeSchemaAsync(organization, project, view, key, annotationType, force, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -14557,7 +12631,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The JSON Schema to apply to descendant configurations of this type.</param>
         /// <returns>The created or updated descendant-type schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force = null, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -14705,18 +12779,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType)
-        {
-            return DeleteDescendantTypeSchemaAsync(organization, project, view, key, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -14725,7 +12787,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -14863,17 +12925,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The combined configuration schema from all applicable levels.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key)
-        {
-            return GetCombinedConfigurationSchemaAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -14881,7 +12932,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The combined configuration schema from all applicable levels.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -15011,19 +13062,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Every schema document of the view (type, annotation, descendant type) without its content.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <returns>The schema summaries: type schemas first, then annotation and descendant-type schemas.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view)
-        {
-            return GetConfigurationSchemasAsync(organization, project, view, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Every schema document of the view (type, annotation, descendant type) without its content.
@@ -15033,7 +13071,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <returns>The schema summaries: type schemas first, then annotation and descendant-type schemas.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -15142,17 +13180,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>The list of type-schema versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType)
-        {
-            return GetSchemaVersionsAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -15160,7 +13187,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The list of type-schema versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -15284,18 +13311,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The type schema of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version)
-        {
-            return GetSchemaVersionAsync(organization, project, view, annotationType, version, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -15304,7 +13319,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The type schema of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -15438,19 +13453,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format)
-        {
-            return GetSchemaVersionDiffAsync(organization, project, view, annotationType, version, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -15460,7 +13462,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -15605,20 +13607,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format)
-        {
-            return GetSchemaVersionDiffCustomAsync(organization, project, view, annotationType, version, versionFrom, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -15629,7 +13617,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -15778,17 +13766,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>The list of annotation-schema versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key)
-        {
-            return GetAnnotationSchemaVersionsAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -15796,7 +13773,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The list of annotation-schema versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -15920,18 +13897,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The annotation schema of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version)
-        {
-            return GetAnnotationSchemaVersionAsync(organization, project, view, key, version, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -15940,7 +13905,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The annotation schema of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -16074,19 +14039,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format)
-        {
-            return GetAnnotationSchemaVersionDiffAsync(organization, project, view, key, version, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -16096,7 +14048,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -16241,20 +14193,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format)
-        {
-            return GetAnnotationSchemaVersionDiffCustomAsync(organization, project, view, key, version, versionFrom, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -16265,7 +14203,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -16414,18 +14352,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <returns>The list of descendant-type schema versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType)
-        {
-            return GetDescendantTypeSchemaVersionsAsync(organization, project, view, key, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -16434,7 +14360,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>The list of descendant-type schema versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -16563,19 +14489,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The descendant-type schema of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version)
-        {
-            return GetDescendantTypeSchemaVersionAsync(organization, project, view, key, annotationType, version, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -16585,7 +14498,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The descendant-type schema of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -16724,20 +14637,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format)
-        {
-            return GetDescendantTypeSchemaVersionDiffAsync(organization, project, view, key, annotationType, version, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -16748,7 +14647,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -16898,21 +14797,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the requested annotation.</param>
-        /// <param name="annotationType">The descendant annotation type code.</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format)
-        {
-            return GetDescendantTypeSchemaVersionDiffCustomAsync(organization, project, view, key, annotationType, version, versionFrom, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -16924,7 +14808,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -17213,14 +15097,6 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface IKeyValuesApiClient
     {
-        /// <remarks>
-        /// The key/value policy of the project: the allowed levels, the default secret level, the mTLS rule, the keys in use, the customer key, the recipients and a re-wrap in progress.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The policy; the defaults when none was stored yet.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuePolicy> GetKeyValuePolicyAsync(string organization, string project);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17230,17 +15106,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The policy; the defaults when none was stored yet.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuePolicy> GetKeyValuePolicyAsync(string organization, string project, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Changes the policy; a missing member keeps its value. Enabling Hsm creates the project's HSM key, Byok needs a verified customer key, Hyok an enabled recipient. Disabling a level that keys still carry fails with 409 ProtectionInUse. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The members to change, and an optional ExpectedVersion.</param>
-        /// <returns>The policy after the change.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuePolicy> SetKeyValuePolicyAsync(string organization, string project, KeyValuePolicyUpdate body);
+        System.Threading.Tasks.Task<KeyValuePolicy> GetKeyValuePolicyAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17251,16 +15117,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The members to change, and an optional ExpectedVersion.</param>
         /// <returns>The policy after the change.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuePolicy> SetKeyValuePolicyAsync(string organization, string project, KeyValuePolicyUpdate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// What a customer needs to bring their own key: the platform's application id, the admin-consent URL for the customer's tenant, and the role to grant on the key. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The setup information.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ByokSetupInfo> GetByokSetupAsync(string organization, string project);
+        System.Threading.Tasks.Task<KeyValuePolicy> SetKeyValuePolicyAsync(string organization, string project, KeyValuePolicyUpdate body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17270,16 +15127,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The setup information.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ByokSetupInfo> GetByokSetupAsync(string organization, string project, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Checks the customer key set in the policy: enabled, RSA of at least 2048 bits, wrapKey and unwrapKey allowed, and a wrap/unwrap round trip. Records VerifiedAt and the current key version. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The policy with the verification recorded.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuePolicy> VerifyByokAsync(string organization, string project);
+        System.Threading.Tasks.Task<ByokSetupInfo> GetByokSetupAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17289,17 +15137,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The policy with the verification recorded.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuePolicy> VerifyByokAsync(string organization, string project, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Rotates the project's Standard or Hsm key-encryption key now and starts the re-wrap of the stored envelopes; the progress is in the policy's Rewrap. The customer rotates a Byok key in their own vault. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The level whose key rotates: Standard or Hsm.</param>
-        /// <returns>The policy with the new key version and the re-wrap status.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuePolicy> RotateKeyValueKeyAsync(string organization, string project, KeyValueRotateRequest body);
+        System.Threading.Tasks.Task<KeyValuePolicy> VerifyByokAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17310,16 +15148,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The level whose key rotates: Standard or Hsm.</param>
         /// <returns>The policy with the new key version and the re-wrap status.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuePolicy> RotateKeyValueKeyAsync(string organization, string project, KeyValueRotateRequest body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The recipients of client-encrypted (Hyok) values: ids and RSA public keys the clients encrypt for.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The recipients.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ClientEncryptionRecipient>> GetRecipientsAsync(string organization, string project);
+        System.Threading.Tasks.Task<KeyValuePolicy> RotateKeyValueKeyAsync(string organization, string project, KeyValueRotateRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17329,17 +15158,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The recipients.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ClientEncryptionRecipient>> GetRecipientsAsync(string organization, string project, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Registers a recipient: a name and an RSA public key of at least 3072 bits as PEM or JWK; the id (the JWE kid) is generated when missing. At most 20 per project. Existing values are not re-encrypted for it. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The optional id, the name and the public key.</param>
-        /// <returns>The recipient with its public key as a JWK.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ClientEncryptionRecipient> AddRecipientAsync(string organization, string project, ClientEncryptionRecipientCreate body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ClientEncryptionRecipient>> GetRecipientsAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17350,18 +15169,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The optional id, the name and the public key.</param>
         /// <returns>The recipient with its public key as a JWK.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ClientEncryptionRecipient> AddRecipientAsync(string organization, string project, ClientEncryptionRecipientCreate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Renames, enables or disables a recipient. The last enabled recipient cannot be disabled while Hyok is allowed. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the recipient (the JWE kid).</param>
-        /// <param name="body">The new name and/or IsEnabled.</param>
-        /// <returns>The recipient after the change.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ClientEncryptionRecipient> UpdateRecipientAsync(string organization, string project, string id, ClientEncryptionRecipientUpdate body);
+        System.Threading.Tasks.Task<ClientEncryptionRecipient> AddRecipientAsync(string organization, string project, ClientEncryptionRecipientCreate body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17373,17 +15181,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The new name and/or IsEnabled.</param>
         /// <returns>The recipient after the change.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ClientEncryptionRecipient> UpdateRecipientAsync(string organization, string project, string id, ClientEncryptionRecipientUpdate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Removes a recipient. Values already encrypted for it stay readable by the holder of its private key until they are encrypted again. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the recipient (the JWE kid).</param>
-        /// <returns>Removed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task RemoveRecipientAsync(string organization, string project, string id);
+        System.Threading.Tasks.Task<ClientEncryptionRecipient> UpdateRecipientAsync(string organization, string project, string id, ClientEncryptionRecipientUpdate body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17394,22 +15192,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the recipient (the JWE kid).</param>
         /// <returns>Removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task RemoveRecipientAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The pairs of the view, ordered by key, up to 1000 per page. Values of public pairs only with includeValues; secret values are never listed.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="keyPrefix">Only keys starting with this prefix (case-insensitive).</param>
-        /// <param name="protection">Only these protection levels (Public, Standard, Hsm, Byok, Hyok); repeatable or comma-separated.</param>
-        /// <param name="state">Active (default), Deleted or All.</param>
-        /// <param name="includeValues">Include the values of public pairs.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <returns>One page of pairs.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuesResponse> GetKeyValuesAsync(string organization, string project, string view, string keyPrefix, string protection, string state, bool? includeValues, string continuationToken);
+        System.Threading.Tasks.Task RemoveRecipientAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17425,20 +15208,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
         /// <returns>One page of pairs.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValuesResponse> GetKeyValuesAsync(string organization, string project, string view, string keyPrefix, string protection, string state, bool? includeValues, string continuationToken, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The current version of a pair. A secret's value only with reveal=true and secret rights. Responses with a secret value are Cache-Control: no-store.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="reveal">Return the value of a secret (ContributorWithSecrets, or Secrets.Read under the project's mTLS rule).</param>
-        /// <param name="includeDeleted">Also find a soft-deleted key.</param>
-        /// <returns>The pair.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValue> GetKeyValueAsync(string organization, string project, string view, string key, bool? reveal, bool? includeDeleted);
+        System.Threading.Tasks.Task<KeyValuesResponse> GetKeyValuesAsync(string organization, string project, string view, string keyPrefix = null, string protection = null, string state = null, bool? includeValues = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17452,19 +15222,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also find a soft-deleted key.</param>
         /// <returns>The pair.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValue> GetKeyValueAsync(string organization, string project, string view, string key, bool? reveal, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Creates or updates a pair as a new version. Protection is required on create and kept on update when missing. A secret level, or a change to or from a secret level, needs secret rights. The response never carries a secret value.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="body">The value, the content type, the protection level (required on create) and an optional expected version (0 = the key must not exist).</param>
-        /// <returns>The new version, without a secret value.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValue> SetKeyValueAsync(string organization, string project, string view, string key, KeyValueWrite body);
+        System.Threading.Tasks.Task<KeyValue> GetKeyValueAsync(string organization, string project, string view, string key, bool? reveal = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17477,20 +15235,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The value, the content type, the protection level (required on create) and an optional expected version (0 = the key must not exist).</param>
         /// <returns>The new version, without a secret value.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValue> SetKeyValueAsync(string organization, string project, string view, string key, KeyValueWrite body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Soft-deletes a pair (restorable for the deleted retention, 90 days by default), or removes it with every version when permanent=true (Administrator).
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="permanent">Remove the key and every version for good; Administrator only.</param>
-        /// <param name="expectedVersion">Delete only when the key is at this version.</param>
-        /// <returns>Deleted.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteKeyValueAsync(string organization, string project, string view, string key, bool? permanent, long? expectedVersion);
+        System.Threading.Tasks.Task<KeyValue> SetKeyValueAsync(string organization, string project, string view, string key, KeyValueWrite body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17504,18 +15249,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="expectedVersion">Delete only when the key is at this version.</param>
         /// <returns>Deleted.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteKeyValueAsync(string organization, string project, string view, string key, bool? permanent, long? expectedVersion, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Restores soft-deleted keys (a list of at most 100, or a prefix of at most 1000) to their latest version, without a new version. Secrets need secret rights; each key gets its own outcome.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Keys, or a key prefix.</param>
-        /// <returns>The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueBulkResult> RestoreKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body);
+        System.Threading.Tasks.Task DeleteKeyValueAsync(string organization, string project, string view, string key, bool? permanent = null, long? expectedVersion = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17527,18 +15261,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Keys, or a key prefix.</param>
         /// <returns>The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueBulkResult> RestoreKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Removes soft-deleted keys with every version, before their retention ends. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Keys, or a key prefix.</param>
-        /// <returns>The outcome per key: Done, NotFound or Failed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueBulkResult> PurgeKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body);
+        System.Threading.Tasks.Task<KeyValueBulkResult> RestoreKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17550,18 +15273,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Keys, or a key prefix.</param>
         /// <returns>The outcome per key: Done, NotFound or Failed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueBulkResult> PurgeKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Moves keys between the server-side levels Standard, Hsm and Byok as a new version each; older versions keep their level until they expire. Public and Hyok need a new value from the client (NotAllowed). Needs secret rights.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Keys or a key prefix, and the target Protection.</param>
-        /// <returns>The outcome per key: Done (with the new version), Unchanged, NotFound, Forbidden, NotAllowed or Failed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueBulkResult> ProtectKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body);
+        System.Threading.Tasks.Task<KeyValueBulkResult> PurgeKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17573,18 +15285,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Keys or a key prefix, and the target Protection.</param>
         /// <returns>The outcome per key: Done (with the new version), Unchanged, NotFound, Forbidden, NotAllowed or Failed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueBulkResult> ProtectKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Every stored version of a key, oldest first, with its level, author, creation time and expiry.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <returns>The versions, oldest first.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<KeyValueVersion>> GetKeyValueVersionsAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<KeyValueBulkResult> ProtectKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17596,20 +15297,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
         /// <returns>The versions, oldest first.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<KeyValueVersion>> GetKeyValueVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// One version of a key. A secret's value only with reveal=true and secret rights. Responses with a secret value are Cache-Control: no-store.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="version">The version number of the pair.</param>
-        /// <param name="reveal">Return the value of a secret version.</param>
-        /// <returns>The version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValue> GetKeyValueVersionAsync(string organization, string project, string view, string key, int version, bool? reveal);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<KeyValueVersion>> GetKeyValueVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17623,20 +15311,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="reveal">Return the value of a secret version.</param>
         /// <returns>The version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValue> GetKeyValueVersionAsync(string organization, string project, string view, string key, int version, bool? reveal, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The text diff between a version and the one before it (version 0 is the empty text). Secret versions need secret rights; client-encrypted values cannot be compared (400 NotSupportedForProtection).
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="version">The version number of the pair.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffAsync(string organization, string project, string view, string key, int version, string format);
+        System.Threading.Tasks.Task<KeyValue> GetKeyValueVersionAsync(string organization, string project, string view, string key, int version, bool? reveal = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17650,21 +15325,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The text diff between two versions of a key.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format);
+        System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffAsync(string organization, string project, string view, string key, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17679,18 +15340,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The pairs of the view as a 2s.key-values.v1 document. Secret values only with IncludeSecrets and secret rights; otherwise secrets are listed without a value. A POST, so that nothing secret travels in a URL. Responses with a secret value are Cache-Control: no-store.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">An optional key prefix, protection levels and IncludeSecrets.</param>
-        /// <returns>The document.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueDocument> ExportKeyValuesAsync(string organization, string project, string view, KeyValueExportRequest body);
+        System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17702,21 +15352,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">An optional key prefix, protection levels and IncludeSecrets.</param>
         /// <returns>The document.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueDocument> ExportKeyValuesAsync(string organization, string project, string view, KeyValueExportRequest body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Writes a 2s.key-values.v1 document: Merge (default) writes the listed keys, Replace also soft-deletes the other active keys (under keyPrefix, when given). Items with a secret need secret rights; a secret item without a value leaves the stored secret unchanged. dryRun reports the actions without writing.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="mode">Merge (default) or Replace.</param>
-        /// <param name="dryRun">Report the actions without writing.</param>
-        /// <param name="keyPrefix">Replace only the keys under this prefix.</param>
-        /// <param name="body">The document.</param>
-        /// <returns>The action per item: Create, Update, Unchanged or Delete, with the version after a write.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueImportResult> ImportKeyValuesAsync(string organization, string project, string view, string mode, bool? dryRun, string keyPrefix, KeyValueDocument body);
+        System.Threading.Tasks.Task<KeyValueDocument> ExportKeyValuesAsync(string organization, string project, string view, KeyValueExportRequest body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17725,28 +15361,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">The document.</param>
         /// <param name="mode">Merge (default) or Replace.</param>
         /// <param name="dryRun">Report the actions without writing.</param>
         /// <param name="keyPrefix">Replace only the keys under this prefix.</param>
-        /// <param name="body">The document.</param>
         /// <returns>The action per item: Create, Update, Unchanged or Delete, with the version after a write.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueImportResult> ImportKeyValuesAsync(string organization, string project, string view, string mode, bool? dryRun, string keyPrefix, KeyValueDocument body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy or the keys, and the aggregated binding reads. Never a value. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">Only events of this view.</param>
-        /// <param name="key">Only events of this key.</param>
-        /// <param name="operation">Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved).</param>
-        /// <param name="from">Only events at or after this time.</param>
-        /// <param name="to">Only events before this time.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <returns>One page of events, newest first.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueAuditResponse> GetKeyValueAuditAsync(string organization, string project, string view, string key, string operation, System.DateTimeOffset? from, System.DateTimeOffset? to, string continuationToken);
+        System.Threading.Tasks.Task<KeyValueImportResult> ImportKeyValuesAsync(string organization, string project, string view, KeyValueDocument body, string mode = null, bool? dryRun = null, string keyPrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17762,18 +15383,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
         /// <returns>One page of events, newest first.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueAuditResponse> GetKeyValueAuditAsync(string organization, string project, string view, string key, string operation, System.DateTimeOffset? from, System.DateTimeOffset? to, string continuationToken, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The key/value usage of the project over a range of days (the last 30 by default, at most 400): the daily meters, their totals (key meters as key-months) and, when the deployment has prices, the estimated charges. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="from">The first day (yyyy-MM-dd); 30 days before 'to' by default.</param>
-        /// <param name="to">The last day (yyyy-MM-dd); today (UTC) by default.</param>
-        /// <returns>The report.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueUsageReport> GetKeyValueUsageAsync(string organization, string project, string from, string to);
+        System.Threading.Tasks.Task<KeyValueAuditResponse> GetKeyValueAuditAsync(string organization, string project, string view = null, string key = null, string operation = null, System.DateTimeOffset? from = null, System.DateTimeOffset? to = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -17785,7 +15395,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="to">The last day (yyyy-MM-dd); today (UTC) by default.</param>
         /// <returns>The report.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<KeyValueUsageReport> GetKeyValueUsageAsync(string organization, string project, string from, string to, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<KeyValueUsageReport> GetKeyValueUsageAsync(string organization, string project, string from = null, string to = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
     }
 
@@ -17837,18 +15447,6 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
-        /// <remarks>
-        /// The key/value policy of the project: the allowed levels, the default secret level, the mTLS rule, the keys in use, the customer key, the recipients and a re-wrap in progress.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The policy; the defaults when none was stored yet.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValuePolicy> GetKeyValuePolicyAsync(string organization, string project)
-        {
-            return GetKeyValuePolicyAsync(organization, project, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The key/value policy of the project: the allowed levels, the default secret level, the mTLS rule, the keys in use, the customer key, the recipients and a re-wrap in progress.
@@ -17857,7 +15455,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The policy; the defaults when none was stored yet.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValuePolicy> GetKeyValuePolicyAsync(string organization, string project, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValuePolicy> GetKeyValuePolicyAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -17971,19 +15569,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Changes the policy; a missing member keeps its value. Enabling Hsm creates the project's HSM key, Byok needs a verified customer key, Hyok an enabled recipient. Disabling a level that keys still carry fails with 409 ProtectionInUse. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The members to change, and an optional ExpectedVersion.</param>
-        /// <returns>The policy after the change.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValuePolicy> SetKeyValuePolicyAsync(string organization, string project, KeyValuePolicyUpdate body)
-        {
-            return SetKeyValuePolicyAsync(organization, project, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Changes the policy; a missing member keeps its value. Enabling Hsm creates the project's HSM key, Byok needs a verified customer key, Hyok an enabled recipient. Disabling a level that keys still carry fails with 409 ProtectionInUse. Administrator only.
@@ -17993,7 +15578,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The members to change, and an optional ExpectedVersion.</param>
         /// <returns>The policy after the change.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValuePolicy> SetKeyValuePolicyAsync(string organization, string project, KeyValuePolicyUpdate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValuePolicy> SetKeyValuePolicyAsync(string organization, string project, KeyValuePolicyUpdate body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -18154,18 +15739,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// What a customer needs to bring their own key: the platform's application id, the admin-consent URL for the customer's tenant, and the role to grant on the key. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The setup information.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ByokSetupInfo> GetByokSetupAsync(string organization, string project)
-        {
-            return GetByokSetupAsync(organization, project, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// What a customer needs to bring their own key: the platform's application id, the admin-consent URL for the customer's tenant, and the role to grant on the key. Administrator only.
@@ -18174,7 +15747,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The setup information.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ByokSetupInfo> GetByokSetupAsync(string organization, string project, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ByokSetupInfo> GetByokSetupAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -18288,18 +15861,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Checks the customer key set in the policy: enabled, RSA of at least 2048 bits, wrapKey and unwrapKey allowed, and a wrap/unwrap round trip. Records VerifiedAt and the current key version. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The policy with the verification recorded.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValuePolicy> VerifyByokAsync(string organization, string project)
-        {
-            return VerifyByokAsync(organization, project, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Checks the customer key set in the policy: enabled, RSA of at least 2048 bits, wrapKey and unwrapKey allowed, and a wrap/unwrap round trip. Records VerifiedAt and the current key version. Administrator only.
@@ -18308,7 +15869,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The policy with the verification recorded.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValuePolicy> VerifyByokAsync(string organization, string project, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValuePolicy> VerifyByokAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -18443,19 +16004,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Rotates the project's Standard or Hsm key-encryption key now and starts the re-wrap of the stored envelopes; the progress is in the policy's Rewrap. The customer rotates a Byok key in their own vault. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The level whose key rotates: Standard or Hsm.</param>
-        /// <returns>The policy with the new key version and the re-wrap status.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValuePolicy> RotateKeyValueKeyAsync(string organization, string project, KeyValueRotateRequest body)
-        {
-            return RotateKeyValueKeyAsync(organization, project, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Rotates the project's Standard or Hsm key-encryption key now and starts the re-wrap of the stored envelopes; the progress is in the policy's Rewrap. The customer rotates a Byok key in their own vault. Administrator only.
@@ -18465,7 +16013,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The level whose key rotates: Standard or Hsm.</param>
         /// <returns>The policy with the new key version and the re-wrap status.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValuePolicy> RotateKeyValueKeyAsync(string organization, string project, KeyValueRotateRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValuePolicy> RotateKeyValueKeyAsync(string organization, string project, KeyValueRotateRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -18606,18 +16154,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The recipients of client-encrypted (Hyok) values: ids and RSA public keys the clients encrypt for.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <returns>The recipients.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ClientEncryptionRecipient>> GetRecipientsAsync(string organization, string project)
-        {
-            return GetRecipientsAsync(organization, project, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The recipients of client-encrypted (Hyok) values: ids and RSA public keys the clients encrypt for.
@@ -18626,7 +16162,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <returns>The recipients.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ClientEncryptionRecipient>> GetRecipientsAsync(string organization, string project, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ClientEncryptionRecipient>> GetRecipientsAsync(string organization, string project, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -18730,19 +16266,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Registers a recipient: a name and an RSA public key of at least 3072 bits as PEM or JWK; the id (the JWE kid) is generated when missing. At most 20 per project. Existing values are not re-encrypted for it. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="body">The optional id, the name and the public key.</param>
-        /// <returns>The recipient with its public key as a JWK.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ClientEncryptionRecipient> AddRecipientAsync(string organization, string project, ClientEncryptionRecipientCreate body)
-        {
-            return AddRecipientAsync(organization, project, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Registers a recipient: a name and an RSA public key of at least 3072 bits as PEM or JWK; the id (the JWE kid) is generated when missing. At most 20 per project. Existing values are not re-encrypted for it. Administrator only.
@@ -18752,7 +16275,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The optional id, the name and the public key.</param>
         /// <returns>The recipient with its public key as a JWK.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ClientEncryptionRecipient> AddRecipientAsync(string organization, string project, ClientEncryptionRecipientCreate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ClientEncryptionRecipient> AddRecipientAsync(string organization, string project, ClientEncryptionRecipientCreate body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -18883,20 +16406,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Renames, enables or disables a recipient. The last enabled recipient cannot be disabled while Hyok is allowed. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the recipient (the JWE kid).</param>
-        /// <param name="body">The new name and/or IsEnabled.</param>
-        /// <returns>The recipient after the change.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ClientEncryptionRecipient> UpdateRecipientAsync(string organization, string project, string id, ClientEncryptionRecipientUpdate body)
-        {
-            return UpdateRecipientAsync(organization, project, id, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Renames, enables or disables a recipient. The last enabled recipient cannot be disabled while Hyok is allowed. Administrator only.
@@ -18907,7 +16416,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The new name and/or IsEnabled.</param>
         /// <returns>The recipient after the change.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ClientEncryptionRecipient> UpdateRecipientAsync(string organization, string project, string id, ClientEncryptionRecipientUpdate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ClientEncryptionRecipient> UpdateRecipientAsync(string organization, string project, string id, ClientEncryptionRecipientUpdate body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -19052,19 +16561,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Removes a recipient. Values already encrypted for it stay readable by the holder of its private key until they are encrypted again. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="id">The id of the recipient (the JWE kid).</param>
-        /// <returns>Removed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task RemoveRecipientAsync(string organization, string project, string id)
-        {
-            return RemoveRecipientAsync(organization, project, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Removes a recipient. Values already encrypted for it stay readable by the holder of its private key until they are encrypted again. Administrator only.
@@ -19074,7 +16570,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the recipient (the JWE kid).</param>
         /// <returns>Removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task RemoveRecipientAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task RemoveRecipientAsync(string organization, string project, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -19196,24 +16692,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The pairs of the view, ordered by key, up to 1000 per page. Values of public pairs only with includeValues; secret values are never listed.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="keyPrefix">Only keys starting with this prefix (case-insensitive).</param>
-        /// <param name="protection">Only these protection levels (Public, Standard, Hsm, Byok, Hyok); repeatable or comma-separated.</param>
-        /// <param name="state">Active (default), Deleted or All.</param>
-        /// <param name="includeValues">Include the values of public pairs.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <returns>One page of pairs.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValuesResponse> GetKeyValuesAsync(string organization, string project, string view, string keyPrefix, string protection, string state, bool? includeValues, string continuationToken)
-        {
-            return GetKeyValuesAsync(organization, project, view, keyPrefix, protection, state, includeValues, continuationToken, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The pairs of the view, ordered by key, up to 1000 per page. Values of public pairs only with includeValues; secret values are never listed.
@@ -19228,7 +16706,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
         /// <returns>One page of pairs.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValuesResponse> GetKeyValuesAsync(string organization, string project, string view, string keyPrefix, string protection, string state, bool? includeValues, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValuesResponse> GetKeyValuesAsync(string organization, string project, string view, string keyPrefix = null, string protection = null, string state = null, bool? includeValues = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -19369,22 +16847,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The current version of a pair. A secret's value only with reveal=true and secret rights. Responses with a secret value are Cache-Control: no-store.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="reveal">Return the value of a secret (ContributorWithSecrets, or Secrets.Read under the project's mTLS rule).</param>
-        /// <param name="includeDeleted">Also find a soft-deleted key.</param>
-        /// <returns>The pair.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValue> GetKeyValueAsync(string organization, string project, string view, string key, bool? reveal, bool? includeDeleted)
-        {
-            return GetKeyValueAsync(organization, project, view, key, reveal, includeDeleted, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The current version of a pair. A secret's value only with reveal=true and secret rights. Responses with a secret value are Cache-Control: no-store.
@@ -19397,7 +16859,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="includeDeleted">Also find a soft-deleted key.</param>
         /// <returns>The pair.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValue> GetKeyValueAsync(string organization, string project, string view, string key, bool? reveal, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValue> GetKeyValueAsync(string organization, string project, string view, string key, bool? reveal = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -19560,21 +17022,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Creates or updates a pair as a new version. Protection is required on create and kept on update when missing. A secret level, or a change to or from a secret level, needs secret rights. The response never carries a secret value.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="body">The value, the content type, the protection level (required on create) and an optional expected version (0 = the key must not exist).</param>
-        /// <returns>The new version, without a secret value.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValue> SetKeyValueAsync(string organization, string project, string view, string key, KeyValueWrite body)
-        {
-            return SetKeyValueAsync(organization, project, view, key, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Creates or updates a pair as a new version. Protection is required on create and kept on update when missing. A secret level, or a change to or from a secret level, needs secret rights. The response never carries a secret value.
@@ -19586,7 +17033,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The value, the content type, the protection level (required on create) and an optional expected version (0 = the key must not exist).</param>
         /// <returns>The new version, without a secret value.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValue> SetKeyValueAsync(string organization, string project, string view, string key, KeyValueWrite body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValue> SetKeyValueAsync(string organization, string project, string view, string key, KeyValueWrite body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -19766,22 +17213,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Soft-deletes a pair (restorable for the deleted retention, 90 days by default), or removes it with every version when permanent=true (Administrator).
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="permanent">Remove the key and every version for good; Administrator only.</param>
-        /// <param name="expectedVersion">Delete only when the key is at this version.</param>
-        /// <returns>Deleted.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteKeyValueAsync(string organization, string project, string view, string key, bool? permanent, long? expectedVersion)
-        {
-            return DeleteKeyValueAsync(organization, project, view, key, permanent, expectedVersion, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Soft-deletes a pair (restorable for the deleted retention, 90 days by default), or removes it with every version when permanent=true (Administrator).
@@ -19794,7 +17225,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="expectedVersion">Delete only when the key is at this version.</param>
         /// <returns>Deleted.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteKeyValueAsync(string organization, string project, string view, string key, bool? permanent, long? expectedVersion, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteKeyValueAsync(string organization, string project, string view, string key, bool? permanent = null, long? expectedVersion = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -19951,20 +17382,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Restores soft-deleted keys (a list of at most 100, or a prefix of at most 1000) to their latest version, without a new version. Secrets need secret rights; each key gets its own outcome.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Keys, or a key prefix.</param>
-        /// <returns>The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValueBulkResult> RestoreKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body)
-        {
-            return RestoreKeyValuesAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Restores soft-deleted keys (a list of at most 100, or a prefix of at most 1000) to their latest version, without a new version. Secrets need secret rights; each key gets its own outcome.
@@ -19975,7 +17392,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Keys, or a key prefix.</param>
         /// <returns>The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValueBulkResult> RestoreKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValueBulkResult> RestoreKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -20101,20 +17518,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Removes soft-deleted keys with every version, before their retention ends. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Keys, or a key prefix.</param>
-        /// <returns>The outcome per key: Done, NotFound or Failed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValueBulkResult> PurgeKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body)
-        {
-            return PurgeKeyValuesAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Removes soft-deleted keys with every version, before their retention ends. Administrator only.
@@ -20125,7 +17528,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Keys, or a key prefix.</param>
         /// <returns>The outcome per key: Done, NotFound or Failed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValueBulkResult> PurgeKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValueBulkResult> PurgeKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -20251,20 +17654,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Moves keys between the server-side levels Standard, Hsm and Byok as a new version each; older versions keep their level until they expire. Public and Hyok need a new value from the client (NotAllowed). Needs secret rights.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">Keys or a key prefix, and the target Protection.</param>
-        /// <returns>The outcome per key: Done (with the new version), Unchanged, NotFound, Forbidden, NotAllowed or Failed.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValueBulkResult> ProtectKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body)
-        {
-            return ProtectKeyValuesAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Moves keys between the server-side levels Standard, Hsm and Byok as a new version each; older versions keep their level until they expire. Public and Hyok need a new value from the client (NotAllowed). Needs secret rights.
@@ -20275,7 +17664,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">Keys or a key prefix, and the target Protection.</param>
         /// <returns>The outcome per key: Done (with the new version), Unchanged, NotFound, Forbidden, NotAllowed or Failed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValueBulkResult> ProtectKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValueBulkResult> ProtectKeyValuesAsync(string organization, string project, string view, KeyValueBulkRequest body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -20441,20 +17830,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Every stored version of a key, oldest first, with its level, author, creation time and expiry.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <returns>The versions, oldest first.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<KeyValueVersion>> GetKeyValueVersionsAsync(string organization, string project, string view, string key)
-        {
-            return GetKeyValueVersionsAsync(organization, project, view, key, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Every stored version of a key, oldest first, with its level, author, creation time and expiry.
@@ -20465,7 +17840,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
         /// <returns>The versions, oldest first.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<KeyValueVersion>> GetKeyValueVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<KeyValueVersion>> GetKeyValueVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -20599,22 +17974,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// One version of a key. A secret's value only with reveal=true and secret rights. Responses with a secret value are Cache-Control: no-store.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="version">The version number of the pair.</param>
-        /// <param name="reveal">Return the value of a secret version.</param>
-        /// <returns>The version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValue> GetKeyValueVersionAsync(string organization, string project, string view, string key, int version, bool? reveal)
-        {
-            return GetKeyValueVersionAsync(organization, project, view, key, version, reveal, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// One version of a key. A secret's value only with reveal=true and secret rights. Responses with a secret value are Cache-Control: no-store.
@@ -20627,7 +17986,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="reveal">Return the value of a secret version.</param>
         /// <returns>The version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValue> GetKeyValueVersionAsync(string organization, string project, string view, string key, int version, bool? reveal, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValue> GetKeyValueVersionAsync(string organization, string project, string view, string key, int version, bool? reveal = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -20791,22 +18150,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The text diff between a version and the one before it (version 0 is the empty text). Secret versions need secret rights; client-encrypted values cannot be compared (400 NotSupportedForProtection).
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="version">The version number of the pair.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffAsync(string organization, string project, string view, string key, int version, string format)
-        {
-            return GetKeyValueVersionDiffAsync(organization, project, view, key, version, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The text diff between a version and the one before it (version 0 is the empty text). Secret versions need secret rights; client-encrypted values cannot be compared (400 NotSupportedForProtection).
@@ -20819,7 +18162,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffAsync(string organization, string project, string view, string key, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -20974,23 +18317,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The text diff between two versions of a key.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="key">The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format)
-        {
-            return GetKeyValueVersionDiffCustomAsync(organization, project, view, key, version, versionFrom, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The text diff between two versions of a key.
@@ -21004,7 +18330,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetKeyValueVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -21163,20 +18489,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The pairs of the view as a 2s.key-values.v1 document. Secret values only with IncludeSecrets and secret rights; otherwise secrets are listed without a value. A POST, so that nothing secret travels in a URL. Responses with a secret value are Cache-Control: no-store.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">An optional key prefix, protection levels and IncludeSecrets.</param>
-        /// <returns>The document.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValueDocument> ExportKeyValuesAsync(string organization, string project, string view, KeyValueExportRequest body)
-        {
-            return ExportKeyValuesAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The pairs of the view as a 2s.key-values.v1 document. Secret values only with IncludeSecrets and secret rights; otherwise secrets are listed without a value. A POST, so that nothing secret travels in a URL. Responses with a secret value are Cache-Control: no-store.
@@ -21187,7 +18499,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">An optional key prefix, protection levels and IncludeSecrets.</param>
         /// <returns>The document.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValueDocument> ExportKeyValuesAsync(string organization, string project, string view, KeyValueExportRequest body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValueDocument> ExportKeyValuesAsync(string organization, string project, string view, KeyValueExportRequest body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -21330,23 +18642,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Writes a 2s.key-values.v1 document: Merge (default) writes the listed keys, Replace also soft-deletes the other active keys (under keyPrefix, when given). Items with a secret need secret rights; a secret item without a value leaves the stored secret unchanged. dryRun reports the actions without writing.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="mode">Merge (default) or Replace.</param>
-        /// <param name="dryRun">Report the actions without writing.</param>
-        /// <param name="keyPrefix">Replace only the keys under this prefix.</param>
-        /// <param name="body">The document.</param>
-        /// <returns>The action per item: Create, Update, Unchanged or Delete, with the version after a write.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValueImportResult> ImportKeyValuesAsync(string organization, string project, string view, string mode, bool? dryRun, string keyPrefix, KeyValueDocument body)
-        {
-            return ImportKeyValuesAsync(organization, project, view, mode, dryRun, keyPrefix, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Writes a 2s.key-values.v1 document: Merge (default) writes the listed keys, Replace also soft-deletes the other active keys (under keyPrefix, when given). Items with a secret need secret rights; a secret item without a value leaves the stored secret unchanged. dryRun reports the actions without writing.
@@ -21354,13 +18649,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">The document.</param>
         /// <param name="mode">Merge (default) or Replace.</param>
         /// <param name="dryRun">Report the actions without writing.</param>
         /// <param name="keyPrefix">Replace only the keys under this prefix.</param>
-        /// <param name="body">The document.</param>
         /// <returns>The action per item: Create, Update, Unchanged or Delete, with the version after a write.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValueImportResult> ImportKeyValuesAsync(string organization, string project, string view, string mode, bool? dryRun, string keyPrefix, KeyValueDocument body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValueImportResult> ImportKeyValuesAsync(string organization, string project, string view, KeyValueDocument body, string mode = null, bool? dryRun = null, string keyPrefix = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -21540,24 +18835,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy or the keys, and the aggregated binding reads. Never a value. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">Only events of this view.</param>
-        /// <param name="key">Only events of this key.</param>
-        /// <param name="operation">Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved).</param>
-        /// <param name="from">Only events at or after this time.</param>
-        /// <param name="to">Only events before this time.</param>
-        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
-        /// <returns>One page of events, newest first.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValueAuditResponse> GetKeyValueAuditAsync(string organization, string project, string view, string key, string operation, System.DateTimeOffset? from, System.DateTimeOffset? to, string continuationToken)
-        {
-            return GetKeyValueAuditAsync(organization, project, view, key, operation, from, to, continuationToken, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy or the keys, and the aggregated binding reads. Never a value. Administrator only.
@@ -21572,7 +18849,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
         /// <returns>One page of events, newest first.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValueAuditResponse> GetKeyValueAuditAsync(string organization, string project, string view, string key, string operation, System.DateTimeOffset? from, System.DateTimeOffset? to, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValueAuditResponse> GetKeyValueAuditAsync(string organization, string project, string view = null, string key = null, string operation = null, System.DateTimeOffset? from = null, System.DateTimeOffset? to = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -21712,20 +18989,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The key/value usage of the project over a range of days (the last 30 by default, at most 400): the daily meters, their totals (key meters as key-months) and, when the deployment has prices, the estimated charges. Administrator only.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="from">The first day (yyyy-MM-dd); 30 days before 'to' by default.</param>
-        /// <param name="to">The last day (yyyy-MM-dd); today (UTC) by default.</param>
-        /// <returns>The report.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<KeyValueUsageReport> GetKeyValueUsageAsync(string organization, string project, string from, string to)
-        {
-            return GetKeyValueUsageAsync(organization, project, from, to, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The key/value usage of the project over a range of days (the last 30 by default, at most 400): the daily meters, their totals (key meters as key-months) and, when the deployment has prices, the estimated charges. Administrator only.
@@ -21736,7 +18999,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="to">The last day (yyyy-MM-dd); today (UTC) by default.</param>
         /// <returns>The report.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<KeyValueUsageReport> GetKeyValueUsageAsync(string organization, string project, string from, string to, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<KeyValueUsageReport> GetKeyValueUsageAsync(string organization, string project, string from = null, string to = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -21995,15 +19258,6 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface ITemplatesApiClient
     {
-        /// <remarks>
-        /// Templates of the view without their content.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <returns>The template summaries, by annotation type code.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -22014,15 +19268,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <returns>The template summaries, by annotation type code.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>The configuration template of the annotation type in the view.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -22031,16 +19277,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The configuration template of the annotation type in the view.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="body">The template content, merged into the current template (supports $remove and $patch).</param>
-        /// <returns>The created or updated template.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body);
+        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -22050,16 +19287,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The template content, merged into the current template (supports $remove and $patch).</param>
         /// <returns>The created or updated template.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
-        /// <returns>The patched template.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body);
+        System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -22069,15 +19297,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
         /// <returns>The patched template.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType);
+        System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -22086,15 +19306,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>The list of template versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType);
+        System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -22103,16 +19315,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The list of template versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The template of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -22122,17 +19325,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The template of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format);
+        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -22143,18 +19336,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken);
-
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format);
+        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -22166,7 +19348,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
     }
 
@@ -22218,19 +19400,6 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
-        /// <remarks>
-        /// Templates of the view without their content.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <returns>The template summaries, by annotation type code.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view)
-        {
-            return GetTemplatesAsync(organization, project, view, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Templates of the view without their content.
@@ -22240,7 +19409,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <returns>The template summaries, by annotation type code.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -22349,17 +19518,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>The configuration template of the annotation type in the view.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType)
-        {
-            return GetTemplateAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -22367,7 +19525,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The configuration template of the annotation type in the view.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -22496,18 +19654,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="body">The template content, merged into the current template (supports $remove and $patch).</param>
-        /// <returns>The created or updated template.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body)
-        {
-            return SetTemplateAsync(organization, project, view, annotationType, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -22516,7 +19662,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The template content, merged into the current template (supports $remove and $patch).</param>
         /// <returns>The created or updated template.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -22663,18 +19809,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
-        /// <returns>The patched template.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body)
-        {
-            return PatchTemplateAsync(organization, project, view, annotationType, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -22683,7 +19817,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
         /// <returns>The patched template.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -22840,17 +19974,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>Acknowledge of the deletion.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType)
-        {
-            return DeleteTemplateAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -22858,7 +19981,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -22991,17 +20114,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <returns>The list of template versions.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType)
-        {
-            return GetTemplateVersionsAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -23009,7 +20121,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The list of template versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -23133,18 +20245,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The version number.</param>
-        /// <returns>The template of the version.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version)
-        {
-            return GetTemplateVersionAsync(organization, project, view, annotationType, version, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -23153,7 +20253,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The version number.</param>
         /// <returns>The template of the version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -23287,19 +20387,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The version number.</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format)
-        {
-            return GetTemplateVersionDiffAsync(organization, project, view, annotationType, version, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -23309,7 +20396,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -23454,20 +20541,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
-        /// <param name="version">The target version number (to).</param>
-        /// <param name="versionFrom">The source version number (from).</param>
-        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format)
-        {
-            return GetTemplateVersionDiffCustomAsync(organization, project, view, annotationType, version, versionFrom, format, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -23478,7 +20551,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -23762,16 +20835,6 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface ITransfersApiClient
     {
-        /// <remarks>
-        /// Starts an export of the view as a zip: its annotations, schemas, templates and configurations, or the kinds Include names. Folder (default) writes the current documents and the earlier versions as JSON files, Git a repository with every version as a commit. Secrets, effective documents, the audit and deleted annotations are never exported. Poll the export until it has succeeded, then download its archive.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The format of the archive, Folder (default) or Git, and the kinds to include (Annotations, Schemas, Templates, Configurations); none means all four.</param>
-        /// <returns>The queued export, with its Include resolved; Location points to it.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ViewExport> StartViewExportAsync(string organization, string project, string view, ViewExportCreate body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -23783,18 +20846,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The format of the archive, Folder (default) or Git, and the kinds to include (Annotations, Schemas, Templates, Configurations); none means all four.</param>
         /// <returns>The queued export, with its Include resolved; Location points to it.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ViewExport> StartViewExportAsync(string organization, string project, string view, ViewExportCreate body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The state of an export of the view, with the counts of the exported kinds.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="id">The id of the export.</param>
-        /// <returns>The export.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ViewExport> GetViewExportAsync(string organization, string project, string view, string id);
+        System.Threading.Tasks.Task<ViewExport> StartViewExportAsync(string organization, string project, string view, ViewExportCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -23806,18 +20858,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the export.</param>
         /// <returns>The export.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ViewExport> GetViewExportAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The zip of a succeeded export, named by Content-Disposition (the export's FileName).
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="id">The id of the export.</param>
-        /// <returns>The archive.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> GetViewExportArchiveAsync(string organization, string project, string view, string id);
+        System.Threading.Tasks.Task<ViewExport> GetViewExportAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -23829,23 +20870,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the export.</param>
         /// <returns>The archive.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<FileResponse> GetViewExportArchiveAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// Starts an import of a zip into the view. Each file is recognized by its name, in any folder: &lt;key&gt;.json is an annotation, &lt;key&gt;.conf.json a configuration, &lt;type&gt;.template.json a template, and &lt;type&gt;.schema.json, &lt;key&gt;.schema.json and &lt;key&gt;.&lt;type&gt;.schema.json are schemas. Version files, export.json and hidden paths are ignored. The included kinds are written in the order annotations, schemas, templates, configurations; nothing is deleted. Poll the import for the outcome of each file.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="include">The kinds to import, comma-separated and case-insensitive: Annotations, Schemas, Templates, Configurations. Empty means all four. The files of the other kinds are counted as excluded.</param>
-        /// <param name="existing">What happens to a document the view already has: Overwrite (default) writes the file as a new version, updates an annotation and re-creates a deleted one; Skip keeps the stored document. An equal document is Unchanged either way.</param>
-        /// <param name="force">When true, store schemas and configurations that break each other, with the warning SchemaViolation. Invalid JSON, invalid JSON Schemas, broken annotation rules and broken directives still fail.</param>
-        /// <param name="dryRun">When true, decide every outcome and warning without writing anything.</param>
-        /// <param name="fileName">The name of the uploaded file, for display.</param>
-        /// <param name="body">The zip archive.</param>
-        /// <returns>The queued import, with its Include resolved; Location points to it.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ViewImport> StartViewImportAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, System.IO.Stream body);
+        System.Threading.Tasks.Task<FileResponse> GetViewExportArchiveAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -23854,26 +20879,15 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">The zip archive.</param>
         /// <param name="include">The kinds to import, comma-separated and case-insensitive: Annotations, Schemas, Templates, Configurations. Empty means all four. The files of the other kinds are counted as excluded.</param>
         /// <param name="existing">What happens to a document the view already has: Overwrite (default) writes the file as a new version, updates an annotation and re-creates a deleted one; Skip keeps the stored document. An equal document is Unchanged either way.</param>
         /// <param name="force">When true, store schemas and configurations that break each other, with the warning SchemaViolation. Invalid JSON, invalid JSON Schemas, broken annotation rules and broken directives still fail.</param>
         /// <param name="dryRun">When true, decide every outcome and warning without writing anything.</param>
         /// <param name="fileName">The name of the uploaded file, for display.</param>
-        /// <param name="body">The zip archive.</param>
         /// <returns>The queued import, with its Include resolved; Location points to it.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ViewImport> StartViewImportAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, System.IO.Stream body, System.Threading.CancellationToken cancellationToken);
-
-        /// <remarks>
-        /// The state of an import into the view, with a summary per included kind, the total, and the outcome and warnings of its files.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="id">The id of the import.</param>
-        /// <returns>The import.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ViewImport> GetViewImportAsync(string organization, string project, string view, string id);
+        System.Threading.Tasks.Task<ViewImport> StartViewImportAsync(string organization, string project, string view, System.IO.Stream body, System.Collections.Generic.IEnumerable<ViewArchiveContent> include = null, ViewImportExisting? existing = null, bool? force = null, bool? dryRun = null, string fileName = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -23885,7 +20899,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the import.</param>
         /// <returns>The import.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ViewImport> GetViewImportAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ViewImport> GetViewImportAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
     }
 
@@ -23937,20 +20951,6 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
-        /// <remarks>
-        /// Starts an export of the view as a zip: its annotations, schemas, templates and configurations, or the kinds Include names. Folder (default) writes the current documents and the earlier versions as JSON files, Git a repository with every version as a commit. Secrets, effective documents, the audit and deleted annotations are never exported. Poll the export until it has succeeded, then download its archive.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The format of the archive, Folder (default) or Git, and the kinds to include (Annotations, Schemas, Templates, Configurations); none means all four.</param>
-        /// <returns>The queued export, with its Include resolved; Location points to it.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ViewExport> StartViewExportAsync(string organization, string project, string view, ViewExportCreate body)
-        {
-            return StartViewExportAsync(organization, project, view, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Starts an export of the view as a zip: its annotations, schemas, templates and configurations, or the kinds Include names. Folder (default) writes the current documents and the earlier versions as JSON files, Git a repository with every version as a commit. Secrets, effective documents, the audit and deleted annotations are never exported. Poll the export until it has succeeded, then download its archive.
@@ -23961,7 +20961,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="body">The format of the archive, Folder (default) or Git, and the kinds to include (Annotations, Schemas, Templates, Configurations); none means all four.</param>
         /// <returns>The queued export, with its Include resolved; Location points to it.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ViewExport> StartViewExportAsync(string organization, string project, string view, ViewExportCreate body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ViewExport> StartViewExportAsync(string organization, string project, string view, ViewExportCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -24094,20 +21094,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The state of an export of the view, with the counts of the exported kinds.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="id">The id of the export.</param>
-        /// <returns>The export.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ViewExport> GetViewExportAsync(string organization, string project, string view, string id)
-        {
-            return GetViewExportAsync(organization, project, view, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The state of an export of the view, with the counts of the exported kinds.
@@ -24118,7 +21104,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the export.</param>
         /// <returns>The export.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ViewExport> GetViewExportAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ViewExport> GetViewExportAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -24241,20 +21227,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The zip of a succeeded export, named by Content-Disposition (the export's FileName).
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="id">The id of the export.</param>
-        /// <returns>The archive.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<FileResponse> GetViewExportArchiveAsync(string organization, string project, string view, string id)
-        {
-            return GetViewExportArchiveAsync(organization, project, view, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The zip of a succeeded export, named by Content-Disposition (the export's FileName).
@@ -24265,7 +21237,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the export.</param>
         /// <returns>The archive.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<FileResponse> GetViewExportArchiveAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<FileResponse> GetViewExportArchiveAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -24397,25 +21369,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// Starts an import of a zip into the view. Each file is recognized by its name, in any folder: &lt;key&gt;.json is an annotation, &lt;key&gt;.conf.json a configuration, &lt;type&gt;.template.json a template, and &lt;type&gt;.schema.json, &lt;key&gt;.schema.json and &lt;key&gt;.&lt;type&gt;.schema.json are schemas. Version files, export.json and hidden paths are ignored. The included kinds are written in the order annotations, schemas, templates, configurations; nothing is deleted. Poll the import for the outcome of each file.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="include">The kinds to import, comma-separated and case-insensitive: Annotations, Schemas, Templates, Configurations. Empty means all four. The files of the other kinds are counted as excluded.</param>
-        /// <param name="existing">What happens to a document the view already has: Overwrite (default) writes the file as a new version, updates an annotation and re-creates a deleted one; Skip keeps the stored document. An equal document is Unchanged either way.</param>
-        /// <param name="force">When true, store schemas and configurations that break each other, with the warning SchemaViolation. Invalid JSON, invalid JSON Schemas, broken annotation rules and broken directives still fail.</param>
-        /// <param name="dryRun">When true, decide every outcome and warning without writing anything.</param>
-        /// <param name="fileName">The name of the uploaded file, for display.</param>
-        /// <param name="body">The zip archive.</param>
-        /// <returns>The queued import, with its Include resolved; Location points to it.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ViewImport> StartViewImportAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, System.IO.Stream body)
-        {
-            return StartViewImportAsync(organization, project, view, include, existing, force, dryRun, fileName, body, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// Starts an import of a zip into the view. Each file is recognized by its name, in any folder: &lt;key&gt;.json is an annotation, &lt;key&gt;.conf.json a configuration, &lt;type&gt;.template.json a template, and &lt;type&gt;.schema.json, &lt;key&gt;.schema.json and &lt;key&gt;.&lt;type&gt;.schema.json are schemas. Version files, export.json and hidden paths are ignored. The included kinds are written in the order annotations, schemas, templates, configurations; nothing is deleted. Poll the import for the outcome of each file.
@@ -24423,15 +21376,15 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">The zip archive.</param>
         /// <param name="include">The kinds to import, comma-separated and case-insensitive: Annotations, Schemas, Templates, Configurations. Empty means all four. The files of the other kinds are counted as excluded.</param>
         /// <param name="existing">What happens to a document the view already has: Overwrite (default) writes the file as a new version, updates an annotation and re-creates a deleted one; Skip keeps the stored document. An equal document is Unchanged either way.</param>
         /// <param name="force">When true, store schemas and configurations that break each other, with the warning SchemaViolation. Invalid JSON, invalid JSON Schemas, broken annotation rules and broken directives still fail.</param>
         /// <param name="dryRun">When true, decide every outcome and warning without writing anything.</param>
         /// <param name="fileName">The name of the uploaded file, for display.</param>
-        /// <param name="body">The zip archive.</param>
         /// <returns>The queued import, with its Include resolved; Location points to it.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ViewImport> StartViewImportAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, System.IO.Stream body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ViewImport> StartViewImportAsync(string organization, string project, string view, System.IO.Stream body, System.Collections.Generic.IEnumerable<ViewArchiveContent> include = null, ViewImportExisting? existing = null, bool? force = null, bool? dryRun = null, string fileName = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -24612,20 +21565,6 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
-        /// <remarks>
-        /// The state of an import into the view, with a summary per included kind, the total, and the outcome and warnings of its files.
-        /// </remarks>
-        /// <param name="organization">Target organization name.</param>
-        /// <param name="project">Target project name.</param>
-        /// <param name="view">The target view inside the project.</param>
-        /// <param name="id">The id of the import.</param>
-        /// <returns>The import.</returns>
-        /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ViewImport> GetViewImportAsync(string organization, string project, string view, string id)
-        {
-            return GetViewImportAsync(organization, project, view, id, System.Threading.CancellationToken.None);
-        }
-
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
         /// The state of an import into the view, with a summary per included kind, the total, and the outcome and warnings of its files.
@@ -24636,7 +21575,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="id">The id of the import.</param>
         /// <returns>The import.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ViewImport> GetViewImportAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ViewImport> GetViewImportAsync(string organization, string project, string view, string id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");

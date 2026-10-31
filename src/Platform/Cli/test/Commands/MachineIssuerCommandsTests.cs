@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands;
@@ -33,8 +34,8 @@ public class MachineIssuerCommandsTests
         _context.SetupGet(context => context.ProjectName).Returns("proj1");
         _accessApi
             .Setup(api => api.SetFederatedIssuerAsync("org1", "proj1", It.IsAny<string>(), It.IsAny<FederatedIssuer>()))
-            .Callback((string _, string _, string _, FederatedIssuer issuer) => _sent = issuer)
-            .ReturnsAsync((string _, string _, string _, FederatedIssuer issuer) => issuer);
+            .Callback((string _, string _, string _, FederatedIssuer issuer, CancellationToken _) => _sent = issuer)
+            .ReturnsAsync((string _, string _, string _, FederatedIssuer issuer, CancellationToken _) => issuer);
     }
 
     [Fact]

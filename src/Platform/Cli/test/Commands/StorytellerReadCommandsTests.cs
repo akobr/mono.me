@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.Storyteller;
 using _42.Platform.Cli.Output;
@@ -50,8 +51,8 @@ public class StorytellerReadCommandsTests
         var requests = new System.Collections.Generic.List<AnnotationRestoreRequest>();
         _fixture.Api
             .Setup(api => api.RestoreAnnotationsAsync("org1", "proj1", "default", It.IsAny<AnnotationRestoreRequest>()))
-            .Callback<string, string, string, AnnotationRestoreRequest>((_, _, _, request) => requests.Add(request))
-            .ReturnsAsync((string _, string _, string _, AnnotationRestoreRequest request) => new AnnotationRestoreResult
+            .Callback<string, string, string, AnnotationRestoreRequest, CancellationToken>((_, _, _, request, _) => requests.Add(request))
+            .ReturnsAsync((string _, string _, string _, AnnotationRestoreRequest request, CancellationToken _) => new AnnotationRestoreResult
             {
                 Annotations = request.Keys.Where(key => key != "sbt.s7").Select(key => new Annotation { AnnotationKey = key }).ToList(),
                 CreatedKeys = [],

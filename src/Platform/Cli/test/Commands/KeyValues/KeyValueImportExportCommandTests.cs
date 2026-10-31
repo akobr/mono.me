@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.KeyValues;
 using _42.Platform.Storyteller.Sdk;
@@ -20,9 +21,9 @@ public class KeyValueImportExportCommandTests
     {
         _api.Setup(api => api.GetKeyValuePolicyAsync("org1", "proj1"))
             .ReturnsAsync(new KeyValuePolicy { DefaultSecretProtection = KeyValuePolicyDefaultSecretProtection.Hsm });
-        _api.Setup(api => api.ImportKeyValuesAsync("org1", "proj1", "default", It.IsAny<string>(), It.IsAny<bool?>(), It.IsAny<string>(), It.IsAny<KeyValueDocument>()))
-            .Callback<string, string, string, string, bool?, string, KeyValueDocument>((_, _, _, mode, dryRun, prefix, document) => _imports.Add((mode, dryRun, prefix, document)))
-            .ReturnsAsync((string _, string _, string _, string _, bool? dryRun, string _, KeyValueDocument document) =>
+        _api.Setup(api => api.ImportKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueDocument>(), It.IsAny<string>(), It.IsAny<bool?>(), It.IsAny<string>()))
+            .Callback<string, string, string, KeyValueDocument, string, bool?, string, CancellationToken>((_, _, _, document, mode, dryRun, prefix, _) => _imports.Add((mode, dryRun, prefix, document)))
+            .ReturnsAsync((string _, string _, string _, KeyValueDocument document, string _, bool? dryRun, string _, CancellationToken _) =>
                 KeyValueTestContext.Import(dryRun == true, true, document.Items.Select(item => (item.Key, item.Key.StartsWith("db.") ? KeyValueImportItemResultAction.Create : KeyValueImportItemResultAction.Unchanged)).ToArray()));
     }
 
@@ -63,7 +64,7 @@ public class KeyValueImportExportCommandTests
     public async Task Import_ReplaceWithDeletes_NeedsTheViewNameTyped()
     {
         var files = KeyValueTestContext.Files(("flat.json", """{ "db.a": "1" }"""));
-        _api.Setup(api => api.ImportKeyValuesAsync("org1", "proj1", "default", "Replace", true, "db.", It.IsAny<KeyValueDocument>()))
+        _api.Setup(api => api.ImportKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueDocument>(), "Replace", true, "db."))
             .ReturnsAsync(KeyValueTestContext.Import(true, true, ("db.a", KeyValueImportItemResultAction.Create), ("db.old", KeyValueImportItemResultAction.Delete)));
 
         _console.Input("nope");
@@ -73,7 +74,7 @@ public class KeyValueImportExportCommandTests
 
         aborted.ShouldBe(ExitCodes.WARNING_ABORTED);
         applied.ShouldBe(ExitCodes.SUCCESS);
-        _api.Verify(api => api.ImportKeyValuesAsync("org1", "proj1", "default", "Replace", null, "db.", It.IsAny<KeyValueDocument>()), Times.Once);
+        _api.Verify(api => api.ImportKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueDocument>(), "Replace", null, "db."), Times.Once);
     }
 
     [Fact]
@@ -103,7 +104,7 @@ public class KeyValueImportExportCommandTests
         };
         KeyValueExportRequest? sent = null;
         _api.Setup(api => api.ExportKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueExportRequest>()))
-            .Callback<string, string, string, KeyValueExportRequest>((_, _, _, request) => sent = request)
+            .Callback<string, string, string, KeyValueExportRequest, CancellationToken>((_, _, _, request, _) => sent = request)
             .ReturnsAsync(document);
 
         var env = await new KeyValueExportCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Format = "env", Prefix = "db.", Protections = ["public", "standard"] }.OnExecuteAsync();

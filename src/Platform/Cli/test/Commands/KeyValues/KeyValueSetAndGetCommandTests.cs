@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.KeyValues;
 using _42.Platform.Storyteller.KeyValues.ClientEncryption;
@@ -22,8 +23,8 @@ public class KeyValueSetAndGetCommandTests
         _api.Setup(api => api.GetKeyValuePolicyAsync("org1", "proj1"))
             .ReturnsAsync(new KeyValuePolicy { DefaultSecretProtection = KeyValuePolicyDefaultSecretProtection.Standard });
         _api.Setup(api => api.SetKeyValueAsync("org1", "proj1", "default", It.IsAny<string>(), It.IsAny<KeyValueWrite>()))
-            .Callback<string, string, string, string, KeyValueWrite>((_, _, _, _, write) => _written = write)
-            .ReturnsAsync((string _, string _, string _, string key, KeyValueWrite write) =>
+            .Callback<string, string, string, string, KeyValueWrite, CancellationToken>((_, _, _, _, write, _) => _written = write)
+            .ReturnsAsync((string _, string _, string _, string key, KeyValueWrite write, CancellationToken _) =>
                 KeyValueTestContext.Pair(key, write.Protection is null ? KeyValueProtection.Standard : System.Enum.Parse<KeyValueProtection>(write.Protection.ToString()!), null, 2));
     }
 

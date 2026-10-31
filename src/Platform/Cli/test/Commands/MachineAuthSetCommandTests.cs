@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.MachineAccess;
@@ -22,8 +23,8 @@ public class MachineAuthSetCommandTests
         _context.SetupGet(context => context.ProjectName).Returns("proj1");
         _accessApi
             .Setup(api => api.SetMachineAuthenticationAsync(It.IsAny<string>(), It.IsAny<MachineAuthenticationPolicy>()))
-            .Callback((string _, MachineAuthenticationPolicy policy) => _sent = policy)
-            .ReturnsAsync((string _, MachineAuthenticationPolicy policy) => policy);
+            .Callback((string _, MachineAuthenticationPolicy policy, CancellationToken _) => _sent = policy)
+            .ReturnsAsync((string _, MachineAuthenticationPolicy policy, CancellationToken _) => policy);
     }
 
     [Theory]

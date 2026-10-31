@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
@@ -38,8 +39,8 @@ public class MachineCreateFederatedTests
         _context.SetupGet(context => context.ProjectName).Returns("proj1");
         _accessApi
             .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
-            .Callback((string _, string _, MachineAccessCreate body) => _sent = body)
-            .ReturnsAsync((string _, string _, MachineAccessCreate body) => new MachineAccess
+            .Callback((string _, string _, MachineAccessCreate body, CancellationToken _) => _sent = body)
+            .ReturnsAsync((string _, string _, MachineAccessCreate body, CancellationToken _) => new MachineAccess
             {
                 Id = MachineId,
                 ObjectId = MachineId,

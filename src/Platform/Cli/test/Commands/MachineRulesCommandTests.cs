@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.MachineAccess;
@@ -32,8 +33,8 @@ public class MachineRulesCommandTests
         _context.SetupGet(context => context.ProjectName).Returns("proj1");
         _accessApi
             .Setup(api => api.SetMachineFederationRulesAsync("org1", "proj1", MachineId, It.IsAny<IEnumerable<FederationRule>>()))
-            .Callback((string _, string _, string _, IEnumerable<FederationRule> rules) => _sent = rules.ToList())
-            .ReturnsAsync((string _, string _, string _, IEnumerable<FederationRule> rules) => Federated(rules.ToList()));
+            .Callback((string _, string _, string _, IEnumerable<FederationRule> rules, CancellationToken _) => _sent = rules.ToList())
+            .ReturnsAsync((string _, string _, string _, IEnumerable<FederationRule> rules, CancellationToken _) => Federated(rules.ToList()));
     }
 
     [Fact]

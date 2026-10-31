@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands;
@@ -469,7 +470,7 @@ public class StorytellerTransferCommandTests
     {
         _fileSystem.AddFile(P(@"C:\work\bad.zip"), new MockFileData("not a zip"));
         _api
-            .Setup(api => api.StartViewImportAsync(Org, Project, View, null, null, null, null, "bad.zip", It.IsAny<Stream>()))
+            .Setup(api => api.StartViewImportAsync(Org, Project, View, It.IsAny<Stream>(), null, null, null, null, "bad.zip"))
             .ThrowsAsync(AnnotationCommandFixture.Error(status, code, $"Rejected with {code}."));
 
         var exitCode = await ImportAsync("bad.zip");
@@ -483,7 +484,7 @@ public class StorytellerTransferCommandTests
     {
         _fileSystem.AddFile(P(@"C:\work\export.zip"), new MockFileData(Zip(("annotations/rst.a.json", "{}"))));
         _api
-            .Setup(api => api.StartViewImportAsync(Org, Project, View, null, null, null, null, "export.zip", It.IsAny<Stream>()))
+            .Setup(api => api.StartViewImportAsync(Org, Project, View, It.IsAny<Stream>(), null, null, null, null, "export.zip"))
             .ThrowsAsync(AnnotationCommandFixture.Error(401));
 
         var exception = await Should.ThrowAsync<ApiException>(() => ImportAsync("export.zip"));
@@ -660,7 +661,7 @@ public class StorytellerTransferCommandTests
         var bodies = new List<ViewExportCreate>();
         _api
             .Setup(api => api.StartViewExportAsync(Org, Project, View, It.IsAny<ViewExportCreate>()))
-            .Callback<string, string, string, ViewExportCreate>((_, _, _, body) => bodies.Add(body))
+            .Callback<string, string, string, ViewExportCreate, CancellationToken>((_, _, _, body, _) => bodies.Add(body))
             .ReturnsAsync(Export(ViewExportStatus.Queued));
 
         if (states.Length == 1 && error is null)
@@ -705,14 +706,14 @@ public class StorytellerTransferCommandTests
                 Org,
                 Project,
                 View,
+                It.IsAny<Stream>(),
                 It.IsAny<IEnumerable<ViewArchiveContent>>(),
                 It.IsAny<ViewImportExisting?>(),
                 It.IsAny<bool?>(),
                 It.IsAny<bool?>(),
-                It.IsAny<string>(),
-                It.IsAny<Stream>()))
-            .Callback<string, string, string, IEnumerable<ViewArchiveContent>?, ViewImportExisting?, bool?, bool?, string, Stream>(
-                (_, _, _, include, existing, force, dryRun, fileName, body) =>
+                It.IsAny<string>()))
+            .Callback<string, string, string, Stream, IEnumerable<ViewArchiveContent>?, ViewImportExisting?, bool?, bool?, string, CancellationToken>(
+                (_, _, _, body, include, existing, force, dryRun, fileName, _) =>
                     uploads.Add(new Upload(include?.ToList(), existing, force, dryRun, fileName, Entries(body))))
             .ReturnsAsync(Import(ViewImportStatus.Queued));
 
