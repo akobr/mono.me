@@ -12,7 +12,7 @@ export const resetNotSupportedMessage =
   'A Federated machine has no secret to reset. Change its federation rules instead.'
 // The same refusal for a Certificate machine (PolicyAwareMachineAccessService, 424-82, 424-102).
 export const certificateResetNotSupportedMessage =
-  'A Certificate machine has no key to reset: it renews its certificate itself over mTLS, and is revoked by deleting it.'
+  'A Certificate machine has no key to reset: it renews its certificate itself over mTLS, and deleting the machine requests the revocation of its certificate.'
 // The error code of these refusals and of the other MachineAccessNotSupportedException answers (424-102).
 export const machineAccessNotSupported = 'MachineAccessNotSupported'
 
