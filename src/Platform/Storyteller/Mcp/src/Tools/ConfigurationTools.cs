@@ -89,7 +89,7 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
                 return ToolResults.Json(await configurations.GetConfigurationVersionAsync(organization, project, view, annotationKey, version.GetValueOrDefault(), cancellationToken));
 
             default:
-                return ToolResults.Json(await configurations.GetConfigurationAsync(organization, project, view, annotationKey, null, cancellationToken));
+                return ToolResults.Json(await configurations.GetConfigurationAsync(organization, project, view, annotationKey, null, null, cancellationToken));
         }
     }
 

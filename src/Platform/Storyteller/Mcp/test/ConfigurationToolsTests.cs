@@ -99,7 +99,7 @@ public class ConfigurationToolsTests
     [Fact]
     public async Task ReplaceConfiguration_NothingStored_WritesTheDocument()
     {
-        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Version = 0, Content = JObject.Parse("""{"inherited":1}""") });
 
         await Tools.ReplaceConfiguration(Organization, Project, Key, Element("""{"retries":5}"""));
@@ -156,7 +156,7 @@ public class ConfigurationToolsTests
     public async Task PatchConfiguration_NothingStored_IsRefused_NamingTheFirstWrites()
     {
         // an effective read caches an item with Version 0 and the inherited values; the API would patch it as stored
-        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Version = 0, Content = JObject.Parse("""{"inherited":1}""") });
 
         var exception = await Should.ThrowAsync<ToolInputException>(
@@ -196,7 +196,7 @@ public class ConfigurationToolsTests
     [Fact]
     public async Task GetConfiguration_OwnWithNothingStored_SaysSo()
     {
-        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Version = 0, Content = JObject.Parse("""{"inherited":1}""") });
 
         var result = (await Tools.GetConfiguration(Organization, Project, Key, form: "own")).Structured();
@@ -230,7 +230,7 @@ public class ConfigurationToolsTests
 
     private void Own(long version, string json)
     {
-        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Version = version, Content = JObject.Parse("""{"inherited":true}""") });
         _configurations.Setup(api => api.GetConfigurationVersionAsync(Organization, Project, ViewName, Key, (int)version, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Version = version, Content = JObject.Parse(json) });
