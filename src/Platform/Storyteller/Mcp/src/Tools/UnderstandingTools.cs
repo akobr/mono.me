@@ -121,8 +121,8 @@ public sealed class UnderstandingTools(
         var path = JsonPointer.Parse(pointer, "pointer");
         var keyText = annotationKey.ToString();
 
-        var composition = await configurations.GetConfigurationCompositionAsync(organization, project, view, keyText, null, cancellationToken);
-        var effective = await configurations.GetConfigurationAsync(organization, project, view, keyText, null, null, cancellationToken);
+        var composition = await configurations.GetConfigurationCompositionAsync(organization, project, view, keyText, cancellationToken: cancellationToken);
+        var effective = await configurations.GetConfigurationAsync(organization, project, view, keyText, cancellationToken: cancellationToken);
 
         var lookups = ConfigurationExplainer.ValuesStoreKeys(ConfigurationExplainer.BindingsOf(composition, path))
             .Take(ConfigurationExplainer.MaxKeyValueLookups)
@@ -283,7 +283,7 @@ public sealed class UnderstandingTools(
     {
         try
         {
-            return await configurations.GetConfigurationCompositionAsync(organization, project, view, key, null, cancellationToken);
+            return await configurations.GetConfigurationCompositionAsync(organization, project, view, key, cancellationToken: cancellationToken);
         }
         catch (Sdk.ApiException exception) when (exception.StatusCode == 404)
         {
@@ -313,7 +313,7 @@ public sealed class UnderstandingTools(
 
         try
         {
-            await annotations.GetAnnotationAsync(organization, project, view, key, true, null, cancellationToken);
+            await annotations.GetAnnotationAsync(organization, project, view, key, true, cancellationToken: cancellationToken);
         }
         catch (Sdk.ApiException exception) when (exception.StatusCode == 404)
         {
@@ -339,7 +339,7 @@ public sealed class UnderstandingTools(
             return new PlacementEvidence { State = PlacementEvidence.Exists, Descendants = 0, AtLeast = false, Reach = "This annotation only: a unit of execution has no descendants." };
         }
 
-        var descendants = await annotations.GetDescendantsAsync(organization, project, view, key, "all", null, null, null, cancellationToken);
+        var descendants = await annotations.GetDescendantsAsync(organization, project, view, key, "all", cancellationToken: cancellationToken);
         var count = descendants.Annotations?.Count ?? 0;
         var more = !string.IsNullOrEmpty(descendants.ContinuationToken);
 

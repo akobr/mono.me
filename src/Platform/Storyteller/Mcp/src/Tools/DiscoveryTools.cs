@@ -44,6 +44,6 @@ public sealed class DiscoveryTools(Sdk.IAccessApiClient access, Sdk.IAnnotations
         [Description(ToolText.Project)] string project,
         CancellationToken cancellationToken)
     {
-        return ToolResults.Json(await annotations.GetViewsAsync(organization, project, null, cancellationToken));
+        return ToolResults.Json(await annotations.GetViewsAsync(organization, project, cancellationToken: cancellationToken));
     }
 }
