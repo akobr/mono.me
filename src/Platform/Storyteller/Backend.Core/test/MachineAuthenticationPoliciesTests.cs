@@ -221,6 +221,24 @@ public class MachineAuthenticationPoliciesTests
         kind.IssuesCertificate().ShouldBe(expected);
     }
 
+    [Theory]
+    [InlineData(MachineCredentialKind.ApiKey, true)]
+    [InlineData(MachineCredentialKind.Certificate, false)]
+    [InlineData(MachineCredentialKind.CertificateAndApiKey, true)]
+    [InlineData(MachineCredentialKind.ClientCredentials, false)]
+    [InlineData(MachineCredentialKind.Federated, false)]
+    public void HasApiKey_ForTheKindsWithAnApiKey(MachineCredentialKind kind, bool expected)
+    {
+        kind.HasApiKey().ShouldBe(expected);
+    }
+
+    // Every kind is covered above, so a new kind has to decide whether it has an API key.
+    [Fact]
+    public void HasApiKey_CoversEveryKind()
+    {
+        Enum.GetValues<MachineCredentialKind>().Length.ShouldBe(5);
+    }
+
     [Fact]
     public void Resolve_Federated_IsEnabledLastInEnumOrder()
     {

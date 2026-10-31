@@ -196,7 +196,7 @@ public class MachineResetTests(CosmosFixture fixture)
 
         var exception = await Should.ThrowAsync<NotFoundException>(() => accessService.ResetMachineAccessAsync(Organization, Project, machine.Id));
 
-        exception.Message.ShouldBe($"The machine access {machine.Id} has no API key to reset; it is being deleted, or its creation failed.");
+        exception.Message.ShouldBe($"The machine access {machine.Id} has no API key to reset; it is being deleted, or its creation failed. Delete it and create a new one.");
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(cleared));
         await ShouldHoldOnlyTheClearedHashAsync(before!, machine, issuedKey: null);
     }
