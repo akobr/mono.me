@@ -9,6 +9,10 @@ public class NameQueryTests
     // Nested repetitions: seconds of backtracking per 30-character name on the backtracking engine.
     private const string CatastrophicPattern = "^([a-zA-Z0-9_-]+)+!";
 
+    // 26 branches of .*X.{60} (242 characters): too many states for the lazy automaton of the non-backtracking
+    // engine, which falls back to a mode of milliseconds per long name that does not check the match timeout.
+    private static readonly string StateHeavyPattern = "^(?:" + string.Join("|", Enumerable.Range('a', 26).Select(letter => $".*{(char)letter}.{{60}}")) + "|zz)$";
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -110,7 +114,32 @@ public class NameQueryTests
         var exception = Should.Throw<InvalidInputException>(() => NameQuery.Parse(text, "unitNameQuery"));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.InvalidQuery);
-        exception.Message.ShouldBe($"The unitNameQuery '{text}' uses a construct name queries don't support (for example backreferences, lookarounds, atomic groups or conditionals).");
+        exception.Message.ShouldStartWith($"The unitNameQuery '{text}' is not supported by name queries: ");
+    }
+
+    // The engine refuses a pattern whose automaton would be too large; its message says so.
+    [Theory]
+    [InlineData("^.{0,2000}$")]
+    [InlineData("^(a{1,100}){1,100}$")]
+    public void Parse_TooLargeAutomaton_IsInvalidQuery(string text)
+    {
+        var exception = Should.Throw<InvalidInputException>(() => NameQuery.Parse(text, "nameQuery"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.InvalidQuery);
+        exception.Message.ShouldStartWith($"The nameQuery '{text}' is not supported by name queries: ");
+        exception.Message.ShouldContain("10000");
+    }
+
+    [Fact]
+    public void Parse_PatternOverTheMaximalLength_IsInvalidQuery()
+    {
+        var text = "^" + new string('a', NameQuery.PatternMaxLength);
+
+        var exception = Should.Throw<InvalidInputException>(() => NameQuery.Parse(text, "nameQuery"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.InvalidQuery);
+        exception.Message.ShouldBe($"The nameQuery pattern has {NameQuery.PatternMaxLength + 1} characters, at most {NameQuery.PatternMaxLength} are allowed.");
+        NameQuery.Parse("^" + new string('a', NameQuery.PatternMaxLength - 1), "nameQuery").ShouldNotBeNull();
     }
 
     [Theory]
@@ -127,16 +156,44 @@ public class NameQueryTests
         watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(1));
     }
 
-    // The timeout stays as a second bound; a match that runs into it is refused, not a 500.
+    // A match that runs into the timeout is refused, not a 500.
     [Fact]
     public void IsMatch_OverTheTimeout_IsInvalidQuery()
     {
-        var query = NameQuery.Parse("^([a-z]+)+!", "contextNameQuery", TimeSpan.FromTicks(1))!;
+        var query = NameQuery.Parse("^([a-z]+)+!", "contextNameQuery", TimeSpan.FromTicks(1), NameQuery.MatchBudget)!;
 
         var exception = Should.Throw<InvalidInputException>(() => query.IsMatch(new string('a', 5_000_000)));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.InvalidQuery);
-        exception.Message.ShouldBe("The contextNameQuery took too long to match a name; simplify the pattern.");
+        exception.Message.ShouldBe("The contextNameQuery took too long to match the names; simplify the pattern.");
+    }
+
+    // The budget bounds the page where the timeout of one match does not fire: in the slow mode of the engine this
+    // pattern takes about 5 ms per name of 63 characters, about 5 s per page.
+    [Fact]
+    public void IsMatch_StateHeavyPatternOverAPage_RunsOutOfTheBudget()
+    {
+        var query = NameQuery.Parse(StateHeavyPattern, "nameQuery")!;
+        // varied letters keep the automaton growing; a name of one repeated letter would stay fast
+        var random = new Random(42);
+        var names = Enumerable.Range(0, 1000).Select(_ => new string(Enumerable.Range(0, 63).Select(_ => (char)('a' + random.Next(26))).ToArray())).ToList();
+        var watch = Stopwatch.StartNew();
+
+        var exception = Should.Throw<InvalidInputException>(() => names.Count(query.IsMatch));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.InvalidQuery);
+        exception.Message.ShouldBe("The nameQuery took too long to match the names; simplify the pattern.");
+        watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(5));
+    }
+
+    // Names have at most 63 characters, so an ordinary pattern stays far within the budget over a page.
+    [Fact]
+    public void IsMatch_OrdinaryPatternOverAPage_StaysWithinTheBudget()
+    {
+        var query = NameQuery.Parse("^(north|south)-[a-z0-9-]+-eu$", "subjectNameQuery")!;
+        var names = Enumerable.Range(0, 1000).Select(index => $"north-{index:d4}-" + new string('x', 50) + "-eu").ToList();
+
+        names.Count(query.IsMatch).ShouldBe(1000);
     }
 
     [Fact]

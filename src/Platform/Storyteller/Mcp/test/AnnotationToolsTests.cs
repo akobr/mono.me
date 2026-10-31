@@ -323,7 +323,7 @@ public class AnnotationToolsTests
     [Fact]
     public async Task FindAnnotations_MatchesTheNamesInTheHost_NotThroughTheApiQueries()
     {
-        // the API's typed routes drop their name queries, so none is sent and every context comes back
+        // the tool matches the names in the host, so no API name query is sent and every context comes back
         _api.Setup(api => api.GetContextsAsync(Organization, Project, ViewName, null, null, null, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.AnnotationsResponse_Context
             {

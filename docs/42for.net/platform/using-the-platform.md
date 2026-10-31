@@ -78,7 +78,7 @@ The catalog is queryable by type. These reads are how you answer the operational
 
 `descendants` is one of `usages`, `contexts`, `executions`, `units`, `units-of-execution`, or `all`. A responsibility has no contexts. A unit's only descendants are units of execution.
 
-A continuation token pages large catalogs. Name filters on the collection routes find a customer or a module without scanning the whole graph by eye: `nameQuery`, `responsibilityNameQuery`, `subjectNameQuery`, `contextNameQuery` or `unitNameQuery`, depending on the route, takes an exact name (`northwind`), a contained text (`%north%`) or a regular expression that starts with `^` or ends with `$` (`^north`, `-eu$`). Names compare case-sensitively, and an invalid pattern answers `400`.
+A continuation token pages large catalogs. Name filters on the collection routes find a customer or a module without scanning the whole graph by eye: `nameQuery`, `responsibilityNameQuery`, `subjectNameQuery`, `contextNameQuery` or `unitNameQuery`, depending on the route, takes an exact name (`northwind`), a contained text (`%north%`) or a regular expression that starts with `^` or ends with `$` (`^north`, `-eu$`). Exact and contained names compare case-sensitively, and so does a pattern unless it turns on `(?i)` (`^(?i)north`). An invalid pattern answers `400`. The filters run on each page of up to 1000 annotations, so a filtered page can hold fewer items, or none, and still carry a continuation token: follow it until it is absent. [Annotation lifecycle](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/annotation-lifecycle.md) lists the parameters of each route.
 
 ## Writing the catalog
 
