@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -5,23 +6,33 @@ using System.Text.RegularExpressions;
 namespace _42.Platform.Storyteller.Annotating;
 
 // A name query of the typed annotation lists (nameQuery, responsibilityNameQuery, …): a regular expression when it
-// starts with ^ or ends with $, a contained text when it starts or ends with %, an exact name otherwise. The
-// expressions run on the non-backtracking engine, in time linear in the name: a page maps up to 1000 annotations,
-// and a match timeout alone would bound one match, not the page. The timeout stays as a second bound.
+// starts with ^ or ends with $, a contained text when it starts or ends with %, an exact name otherwise. A query is
+// parsed for one request. The expressions run on the non-backtracking engine, which has no catastrophic backtracking,
+// but it is linear in the name only while its lazy automaton fits: a large pattern falls back to a slower mode that
+// does not always check the match timeout. So three bounds hold together: the length of a pattern bounds its
+// construction, the timeout bounds one match where the engine checks it, and the budget bounds the matching time of
+// the whole request (a page maps up to 1000 annotations).
 public sealed class NameQuery
 {
+    public const int PatternMaxLength = 256;
+
     public static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(50);
+
+    public static readonly TimeSpan MatchBudget = TimeSpan.FromMilliseconds(250);
 
     private static readonly MethodInfo IsMatchMethod = typeof(NameQuery).GetMethod(nameof(IsMatch))!;
 
     private readonly Regex? _pattern;
+    private readonly long _budgetTicks;
+    private long _spentTicks;
 
-    private NameQuery(string parameter, NameQueryKind kind, string value, Regex? pattern = null)
+    private NameQuery(string parameter, NameQueryKind kind, string value, Regex? pattern = null, TimeSpan budget = default)
     {
         Parameter = parameter;
         Kind = kind;
         Value = value;
         _pattern = pattern;
+        _budgetTicks = (long)(budget.TotalSeconds * Stopwatch.Frequency);
     }
 
     // The query parameter, for the messages.
@@ -37,9 +48,10 @@ public sealed class NameQuery
     // No query for null, empty or white space text; an invalid pattern is an InvalidInputException (400 InvalidQuery).
     public static NameQuery? Parse(string? text, string parameter)
     {
-        return Parse(text, parameter, MatchTimeout);
+        return Parse(text, parameter, MatchTimeout, MatchBudget);
     }
 
+    // A pattern that runs into the timeout or the budget is an InvalidInputException (400 InvalidQuery).
     public bool IsMatch(string? name)
     {
         if (name is null)
@@ -56,14 +68,25 @@ public sealed class NameQuery
                 return name.Contains(Value, StringComparison.Ordinal);
 
             default:
+                var started = Stopwatch.GetTimestamp();
+                bool matches;
+
                 try
                 {
-                    return _pattern!.IsMatch(name);
+                    matches = _pattern!.IsMatch(name);
                 }
                 catch (RegexMatchTimeoutException)
                 {
-                    throw new InvalidInputException($"The {Parameter} took too long to match a name; simplify the pattern.", ErrorCodes.InvalidQuery);
+                    throw TooSlow();
                 }
+
+                // the predicate runs on one page at a time, but nothing promises a single thread
+                if (Interlocked.Add(ref _spentTicks, Stopwatch.GetTimestamp() - started) > _budgetTicks)
+                {
+                    throw TooSlow();
+                }
+
+                return matches;
         }
     }
 
@@ -80,8 +103,8 @@ public sealed class NameQuery
         };
     }
 
-    // With another match timeout, for the tests.
-    internal static NameQuery? Parse(string? text, string parameter, TimeSpan matchTimeout)
+    // With another match timeout and budget, for the tests.
+    internal static NameQuery? Parse(string? text, string parameter, TimeSpan matchTimeout, TimeSpan matchBudget)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -92,7 +115,7 @@ public sealed class NameQuery
 
         if (query.StartsWith('^') || query.EndsWith('$'))
         {
-            return new NameQuery(parameter, NameQueryKind.Pattern, query, CreatePattern(query, parameter, matchTimeout));
+            return new NameQuery(parameter, NameQueryKind.Pattern, query, CreatePattern(query, parameter, matchTimeout), matchBudget);
         }
 
         if (query.StartsWith('%') || query.EndsWith('%'))
@@ -105,6 +128,11 @@ public sealed class NameQuery
 
     private static Regex CreatePattern(string query, string parameter, TimeSpan matchTimeout)
     {
+        if (query.Length > PatternMaxLength)
+        {
+            throw new InvalidInputException($"The {parameter} pattern has {query.Length} characters, at most {PatternMaxLength} are allowed.", ErrorCodes.InvalidQuery);
+        }
+
         try
         {
             return new Regex(query, RegexOptions.NonBacktracking | RegexOptions.CultureInvariant, matchTimeout);
@@ -113,11 +141,16 @@ public sealed class NameQuery
         {
             throw new InvalidInputException($"The {parameter} is not a valid regular expression: {exception.Message}", ErrorCodes.InvalidQuery);
         }
-        catch (NotSupportedException)
+        catch (NotSupportedException exception)
         {
-            throw new InvalidInputException(
-                $"The {parameter} '{query}' uses a construct name queries don't support (for example backreferences, lookarounds, atomic groups or conditionals).",
-                ErrorCodes.InvalidQuery);
+            // the engine refuses backreferences, lookarounds, atomic groups and conditionals, and a pattern whose
+            // automaton would be too large (long counted repetitions); its message says which
+            throw new InvalidInputException($"The {parameter} '{query}' is not supported by name queries: {exception.Message}", ErrorCodes.InvalidQuery);
         }
+    }
+
+    private InvalidInputException TooSlow()
+    {
+        return new InvalidInputException($"The {Parameter} took too long to match the names; simplify the pattern.", ErrorCodes.InvalidQuery);
     }
 }

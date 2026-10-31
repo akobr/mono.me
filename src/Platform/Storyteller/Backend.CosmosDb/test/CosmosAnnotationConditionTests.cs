@@ -66,13 +66,13 @@ public class CosmosAnnotationConditionTests(Startup startup)
     [Fact]
     public async Task List_SeveralTypes_AppliesEachConditionToItsType()
     {
-        await CreateAsync("usg.mt-north.mt-invoicing", "cnt.mt-north.mt-production");
+        await CreateAsync("usg.mt-north.mt-invoicing", "cnt.mt-north.mt-production", "cnt.mt-north.mt-staging");
 
         var keys = await ListAsync(
             [AnnotationType.Subject, AnnotationType.Usage, AnnotationType.Context],
             null,
             new AnnotationsRequest.Condition<Usage> { Predicate = _ => false },
-            new AnnotationsRequest.Condition<Context> { Predicate = c => c.SubjectName == "mt-north" });
+            new AnnotationsRequest.Condition<Context> { Predicate = c => c.Name == "mt-production" });
 
         // the subjects have no condition, so the subjects of the other tests of the project come too
         keys.Where(key => key.Contains(".mt-", StringComparison.Ordinal)).Should().BeEquivalentTo("sbt.mt-north", "cnt.mt-north.mt-production");

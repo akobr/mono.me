@@ -133,9 +133,10 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         var given = filters.Where(filter => filter.Value is not null).Select(filter => (Name: filter.Key, Match: filter.Value!)).ToList();
         var (inactive, deleted) = (Flag(includeInactive), Flag(includeDeleted));
 
-        // The typed routes take name queries but drop them for most types and fail on responsibilities, so the names
-        // are matched here. A page is filtered before the host page takes its offset: a re-read of the same API page
-        // gives the same matches, so the host cursor stays in place.
+        // The names are matched here, not by the name queries of the typed routes: an exact name of this tool ignores
+        // case and its patterns are full .NET expressions, while the API compares exact names case-sensitively and
+        // runs patterns on the non-backtracking engine. A page is filtered before the host page takes its offset: a
+        // re-read of the same API page gives the same matches, so the host cursor stays in place.
         Func<string?, Task<(IReadOnlyList<Sdk.Annotation> Items, string? Next)>> read = type switch
         {
             AnnotationTypeCodes.Responsibility => async token =>
