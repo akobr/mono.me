@@ -308,20 +308,22 @@ public sealed class ConfigurationSchemaCheckerTests : IDisposable
             };
         }
 
-        var checker = Checker();
-        var schema = await checker.ParseAsync(new JObject
+        var schemaContent = new JObject
         {
             ["type"] = "object",
             ["properties"] = new JObject { ["x"] = new JObject { ["$ref"] = "#/definitions/d0" } },
             ["definitions"] = definitions,
-        });
+        };
         Exception failure = null;
 
+        // a long chain is refused when the schema is read (MaxReferenceChain), or by the walk's depth
         var thread = new Thread(
             () =>
             {
                 try
                 {
+                    var checker = Checker();
+                    var schema = checker.ParseAsync(schemaContent).GetAwaiter().GetResult();
                     checker.Validate(schema, JObject.Parse("""{ "x": null }"""));
                 }
                 catch (Exception exception)
@@ -332,6 +334,7 @@ public sealed class ConfigurationSchemaCheckerTests : IDisposable
             maxStackSize: 1536 * 1024);
         thread.Start();
         thread.Join();
+        await Task.CompletedTask;
 
         if (expectedCode is null)
         {
@@ -340,6 +343,66 @@ public sealed class ConfigurationSchemaCheckerTests : IDisposable
         else
         {
             failure.Should().BeOfType<InvalidInputException>().Which.ErrorCode.Should().Be(expectedCode);
+        }
+    }
+
+    // NJsonSchema follows a chain of references recursively within one step, before the guard runs: on a 1.5 MiB stack,
+    // a long chain is refused when the schema is read, and a short one still checks
+    [Theory]
+    [InlineData("allOf", 100, null)]
+    [InlineData("oneOf", 200, null)]
+    [InlineData("$ref", 200, null)]
+    [InlineData("allOf", 6_000, ErrorCodes.InvalidSchema)]
+    [InlineData("oneOf", 12_000, ErrorCodes.InvalidSchema)]
+    [InlineData("anyOf", 6_000, ErrorCodes.InvalidSchema)]
+    [InlineData("$ref", 6_000, ErrorCodes.InvalidSchema)]
+    public async Task Check_OfALongChainOfReferences_NeverOverflowsTheStack(string wrapper, int levels, string expectedCode)
+    {
+        var definitions = new JObject { [$"d{levels}"] = new JObject { ["type"] = "string" } };
+
+        for (var level = 0; level < levels; level++)
+        {
+            var reference = new JObject { ["$ref"] = $"#/definitions/d{level + 1}" };
+            definitions[$"d{level}"] = wrapper == "$ref" ? reference : new JObject { [wrapper] = new JArray(reference) };
+        }
+
+        var schemaContent = new JObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JObject { ["x"] = new JObject { ["$ref"] = "#/definitions/d0" } },
+            ["definitions"] = definitions,
+        };
+        Exception failure = null;
+
+        var thread = new Thread(
+            () =>
+            {
+                try
+                {
+                    var checker = Checker();
+                    var schema = checker.ParseAsync(schemaContent).GetAwaiter().GetResult();
+                    checker.Validate(schema, new JObject());
+                    checker.Validate(schema, JObject.Parse("""{ "x": "a" }"""));
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                }
+            },
+            maxStackSize: 1536 * 1024);
+        thread.Start();
+        thread.Join();
+        await Task.CompletedTask;
+
+        if (expectedCode is null)
+        {
+            failure.Should().BeNull();
+        }
+        else
+        {
+            var exception = failure.Should().BeOfType<InvalidInputException>().Which;
+            exception.ErrorCode.Should().Be(expectedCode);
+            exception.Message.Should().Contain("chains more than 512 schemas through references");
         }
     }
 

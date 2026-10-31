@@ -38,6 +38,12 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
     // then overflow in NJsonSchema.
     private const int MaxNullabilityDepth = 256;
 
+    // Far longer than any chain of references a schema needs, in schemas: a $ref, or an allOf, oneOf or anyOf of one
+    // entry, points to the next, so a wrapped reference is two (about 256 levels). NJsonSchema follows such a chain
+    // recursively in ActualSchema and HasReference, within one step and before any guard of the validator runs, so a
+    // long one would overflow the stack.
+    private const int MaxReferenceChain = 512;
+
     public static bool IsCheckFailure(InvalidInputException exception)
     {
         return exception.ErrorCode
@@ -60,11 +66,15 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
 
         try
         {
-            return await JsonSchema.FromJsonAsync(
+            var schema = await JsonSchema.FromJsonAsync(
                 schemaContent.ToString(Formatting.None),
                 LocalReferenceResolver.DocumentPath,
                 LocalReferenceResolver.Factory,
                 budget.Token);
+
+            // before any getter of NJsonSchema follows the references
+            EnsureReferenceChainsFit(schema);
+            return schema;
         }
         catch (Exception exception) when (budget.IsCancellationRequested && Find<OperationCanceledException>(exception) is not null)
         {
@@ -113,6 +123,80 @@ internal sealed class ConfigurationSchemaChecker(ConfigurationSchemaOptions opti
         }
 
         return errors.Select(error => $"{error.Path}: {error.Kind}").ToList();
+    }
+
+    // Every schema of the document, found without recursion, and the length of the reference chain from each, counted
+    // without NJsonSchema's recursive getters. A wrapper of one entry counts even where NJsonSchema would not take it as
+    // a reference, and a cycle ends a chain (NJsonSchema refuses it as "Cyclic references detected.").
+    private static void EnsureReferenceChainsFit(JsonSchema root)
+    {
+        var schemas = new HashSet<JsonSchema>(ReferenceEqualityComparer.Instance) { root };
+        var pending = new Stack<JsonSchema>([root]);
+
+        while (pending.TryPop(out var schema))
+        {
+            foreach (var child in ChildrenOf(schema))
+            {
+                if (child is not null && schemas.Add(child))
+                {
+                    pending.Push(child);
+                }
+            }
+        }
+
+        var lengths = new Dictionary<JsonSchema, int>(ReferenceEqualityComparer.Instance);
+        var chain = new List<JsonSchema>();
+        var onChain = new HashSet<JsonSchema>(ReferenceEqualityComparer.Instance);
+
+        foreach (var start in schemas)
+        {
+            chain.Clear();
+            onChain.Clear();
+            var current = start;
+
+            while (current is not null && !lengths.ContainsKey(current) && onChain.Add(current))
+            {
+                chain.Add(current);
+                current = NextInChain(current);
+            }
+
+            var length = current is not null && lengths.TryGetValue(current, out var known) ? known : 0;
+
+            for (var index = chain.Count - 1; index >= 0; index--)
+            {
+                lengths[chain[index]] = ++length;
+
+                if (length > MaxReferenceChain)
+                {
+                    throw new InvalidOperationException(
+                        $"the schema chains more than {MaxReferenceChain} schemas through references ($ref, or allOf, oneOf or anyOf of one entry), which is too deep to be checked.");
+                }
+            }
+        }
+    }
+
+    private static JsonSchema? NextInChain(JsonSchema schema)
+    {
+        return schema.Reference
+            ?? (schema.AllOf.Count == 1 ? schema.AllOf.First()
+                : schema.OneOf.Count == 1 ? schema.OneOf.First()
+                : schema.AnyOf.Count == 1 ? schema.AnyOf.First()
+                : null);
+    }
+
+    private static IEnumerable<JsonSchema?> ChildrenOf(JsonSchema schema)
+    {
+        yield return schema.Reference;
+        yield return schema.Item;
+        yield return schema.Not;
+        yield return schema.AdditionalPropertiesSchema;
+        yield return schema.AdditionalItemsSchema;
+
+        foreach (var child in schema.Items.Concat(schema.AllOf).Concat(schema.OneOf).Concat(schema.AnyOf)
+            .Concat(schema.Definitions.Values).Concat(schema.Properties.Values).Concat(schema.PatternProperties.Values))
+        {
+            yield return child;
+        }
     }
 
     private static InvalidInputException InvalidSchema(string reason)
