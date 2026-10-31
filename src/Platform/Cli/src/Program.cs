@@ -82,7 +82,7 @@ public class Program
             CurrentRun.Exception = parsingException;
             CurrentRun.Command = CommandPath.Of(parsingException.Command);
             // On standard error, so a redirected standard output stays empty.
-            WriteError(parsingException.Message);
+            WriteError(PlainOutputExtensions.ToPlainLine(parsingException.Message));
             WriteError($"  What happened, {ParsingErrorResponseMessages.GetRandom()}?");
 
             // Neither the arguments nor the message, which quotes a value: it may be a value of a key/value pair.

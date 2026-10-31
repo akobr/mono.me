@@ -103,7 +103,7 @@ public class SecretToolsTests
     [Fact]
     public async Task GetResolvedConfiguration_ReadsTheResolvedDocument()
     {
-        _configurations.Setup(api => api.GetResolvedConfigurationAsync("house", "main", "default", "sbt.northwind", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        _configurations.Setup(api => api.GetResolvedConfigurationAsync("house", "main", "default", "sbt.northwind", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = "sbt.northwind", Version = 2, Content = new JObject { ["host"] = "sql.internal" } });
 
         var result = await Tools().GetResolvedConfiguration("house", "main", "sbt.northwind");

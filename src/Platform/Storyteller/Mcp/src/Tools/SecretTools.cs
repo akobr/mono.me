@@ -71,6 +71,6 @@ public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigur
         CancellationToken cancellationToken = default)
     {
         var annotationKey = AnnotationKeys.Parse(key).ToString();
-        return ToolResults.Json(await configurations.GetResolvedConfigurationAsync(organization, project, view, annotationKey, null, cancellationToken));
+        return ToolResults.Json(await configurations.GetResolvedConfigurationAsync(organization, project, view, annotationKey, null, null, cancellationToken));
     }
 }

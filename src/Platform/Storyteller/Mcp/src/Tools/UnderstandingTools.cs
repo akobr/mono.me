@@ -122,7 +122,7 @@ public sealed class UnderstandingTools(
         var keyText = annotationKey.ToString();
 
         var composition = await configurations.GetConfigurationCompositionAsync(organization, project, view, keyText, null, cancellationToken);
-        var effective = await configurations.GetConfigurationAsync(organization, project, view, keyText, null, cancellationToken);
+        var effective = await configurations.GetConfigurationAsync(organization, project, view, keyText, null, null, cancellationToken);
 
         var lookups = ConfigurationExplainer.ValuesStoreKeys(ConfigurationExplainer.BindingsOf(composition, path))
             .Take(ConfigurationExplainer.MaxKeyValueLookups)
