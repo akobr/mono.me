@@ -106,11 +106,23 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
     private async Task ProcessBindingEvaluationExceptionAsync(FunctionContext context, BindingEvaluationException exception)
     {
         // The binding's own content cannot be evaluated: a client error. No exception details leave the API.
-        _logger.LogWarning(
-            "Binding evaluation failed ({ErrorCode}) at {Path}: {Message}",
-            exception.TryGetErrorCode(),
-            exception.Path,
-            exception.Message);
+        // The log carries metadata only: an engine's message can hold an evaluated value, even a secret.
+        if (exception is EvaluationLimitExceededException limit)
+        {
+            _logger.LogWarning(
+                "Binding limit {Kind} ({Limit}) exceeded ({ErrorCode}) at {Path}.",
+                limit.Kind,
+                limit.Limit,
+                exception.TryGetErrorCode(),
+                exception.Path);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Binding evaluation failed ({ErrorCode}) at {Path}.",
+                exception.TryGetErrorCode(),
+                exception.Path);
+        }
         var httpReqData = await context.GetHttpRequestDataAsync();
 
         if (httpReqData is null)

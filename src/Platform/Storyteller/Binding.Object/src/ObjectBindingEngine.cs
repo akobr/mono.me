@@ -29,7 +29,7 @@ internal static class ObjectBindingEngine
     /// Evaluates one envelope. The engine call is metered by the read's <paramref name="meter"/>. The conversions around it
     /// are linear in data that is already bounded (the stored document and the checked result) and are not metered.
     /// Every failure is a <see cref="BindingException"/>; anything thrown by an engine for author-supplied input becomes
-    /// <see cref="BindingEvaluationException"/>.
+    /// <see cref="BindingEvaluationException"/>, with a message that quotes no evaluated value (see <see cref="EngineMessages"/>).
     /// </summary>
     public static JToken Evaluate(string kind, JToken definition, JObject context, EvaluationMeter meter)
     {
@@ -69,11 +69,11 @@ internal static class ObjectBindingEngine
         }
         catch (JsonEException exception)
         {
-            throw new BindingEvaluationException(exception.Message, exception);
+            throw new BindingEvaluationException(EngineMessages.ForJsonE(exception.Message, definition), exception);
         }
         catch (JsonLogicException exception)
         {
-            throw new BindingEvaluationException(exception.Message, exception);
+            throw new BindingEvaluationException(EngineMessages.JsonLogicFailed, exception);
         }
         catch (InsufficientExecutionStackException exception)
         {
@@ -87,7 +87,7 @@ internal static class ObjectBindingEngine
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             // The input is author-supplied, so an engine failure is a client error, not a server fault.
-            throw new BindingEvaluationException($"Object binding evaluation failed: {exception.Message}", exception);
+            throw new BindingEvaluationException(EngineMessages.ForUnexpected(exception), exception);
         }
     }
 }

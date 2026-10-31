@@ -124,6 +124,24 @@ public class JsonQueryTests
         act.Should().Throw<BindingEvaluationException>();
     }
 
+    [Theory]
+    [InlineData("SECRET_SENTINEL", "The query is neither a JSON Pointer (must start with '/') nor a JSONPath expression (must start with '$').")]
+    [InlineData("$.SECRET_SENTINEL[", "The JSONPath query is not valid: *")]
+    [InlineData("$.items[99999999999999999999]", "The JSONPath query is not valid*")]
+    [InlineData("$.items[?(@.name =~ /SECRET_SENTINEL(/)]", "The JSONPath query is not valid.")]
+    [InlineData("/SECRET~2", "Invalid JSON Pointer escape at offset 7 of the query: '~' must be followed by '0' or '1'.")]
+    [InlineData("/a/SECRET~", "Invalid JSON Pointer escape at offset 9 of the query: '~' must be followed by '0' or '1'.")]
+    public void Resolve_Invalid_MessageDoesNotQuoteTheQuery(string expression, string message)
+    {
+        // The query can be the value of a nested statement, such as @config(@secret(name)).
+        var document = JObject.Parse("""{ "items": [ { "name": "a" } ], "a": { "SECRET": 1 } }""");
+
+        var act = () => JsonQuery.Resolve(document, expression);
+
+        var thrown = act.Should().Throw<BindingEvaluationException>().WithMessage(message).Which;
+        thrown.Message.Should().NotContain("SECRET").And.NotContain("99999999999999999999");
+    }
+
     [Fact]
     public void Resolve_NullRoot_Throws()
     {

@@ -100,6 +100,23 @@ public class AnnotationBindingFunctionTests
         await act.Should().ThrowAsync<BindingEvaluationException>();
     }
 
+    [Theory]
+    [InlineData("SECRET_SENTINEL")]
+    [InlineData("424242")]
+    public async Task InvokeAsync_InvalidAnnotationTypeName_MessageNamesTheTypesOnly(string typeName)
+    {
+        // The type can be the value of a nested statement, so the message must not quote it.
+        var service = new FakeAnnotationService();
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
+
+        var act = () => function.InvokeAsync(CreateRequest(ExecutionKey, "/title", typeName)).AsTask();
+
+        var thrown = await act.Should().ThrowAsync<BindingEvaluationException>();
+        thrown.Which.Message.Should()
+            .Be("The second argument of 'annotation' is not a known annotation type (Responsibility, Unit, Subject, Usage, Context, Execution, UnitOfExecution).")
+            .And.NotContain(typeName);
+    }
+
     [Fact]
     public async Task InvokeAsync_TypeNotAnAncestor_Throws()
     {
