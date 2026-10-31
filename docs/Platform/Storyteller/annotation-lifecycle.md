@@ -170,7 +170,12 @@ All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Func
 
 Machines have no role: their [scopes](authentication.md#scopes-of-machines) decide, each stored on the machine and carried by its credentials; without one, a route answers `403 AccessDenied`, also in Debug builds. The rows marked `Annotation.Manage` need that management scope on top of `Annotation.Write`; a single `PUT` or `POST` of `…/{key}` needs `Annotation.Write` alone. The permanent delete refuses every machine with `403` ("A permanent delete needs a user with the Administrator role.").
 
-The literal segments `deleted` and `history` win over `{key}` and `{descendants}`; an annotation key always starts with a type code and a dot, so it can't be `deleted`, `lookup`, or `restore`.
+The Functions host doesn't rank a literal segment above a parameter: it runs the first function, in the order of the function names, whose route matches. So the routes constrain their parameters (`Definitions.Routes.Constraints`), and the routes of one method never meet:
+
+- `{key}` takes only a text with a `.`. Every annotation key has one after its type code; the literal segments beside it (`simple`, `deleted`, `lookup`, `restore`, `history`) have none.
+- `{descendants}` takes only `usages`, `contexts`, `executions`, `units`, `units-of-execution` or `all`.
+
+A key without a dot (`…/annotations/nope`) or another kind of descendants (`…/{key}/bogus`) matches no route and gets the host's `404` without a body. A key with a dot that doesn't parse (`…/annotations/boots.app`) reaches the function and gets `400 InvalidKey`.
 
 `GET …/{key}/{descendants}` follows the inheritance graph: the descendants of a context are its executions and their units of execution, and the descendants of a unit are its units of execution across executions.
 
