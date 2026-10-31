@@ -155,7 +155,7 @@ public class ConfigurationToolsTests
     [Fact]
     public async Task PatchConfiguration_NothingStored_IsRefused_NamingTheFirstWrites()
     {
-        // an effective read caches an item with Version 0 and the inherited values; the API would patch it as stored
+        // an effective read caches an item with Version 0 and the inherited values; nothing is stored, the API answers 404
         _configurations.Setup(api => api.GetConfigurationAsync(Organization, Project, ViewName, Key, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Version = 0, Content = JObject.Parse("""{"inherited":1}""") });
 

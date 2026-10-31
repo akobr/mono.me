@@ -46,6 +46,8 @@ public interface IConfigurationService
     // The actor stamps the new version and is recorded in the annotation's audit (best effort, after the write).
     Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force = false);
 
+    // Throws ConfigurationNotFoundException when no version is stored: no item, or only the cache of an effective read.
+    // Every written version is patched, an empty one too.
     Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, AuditActor actor, bool force = false);
 
     // True when stored content was cleared. Every clear first finishes the cache invalidation an earlier one left
