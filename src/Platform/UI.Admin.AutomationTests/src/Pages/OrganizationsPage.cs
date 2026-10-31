@@ -5,7 +5,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // /orgs: one card per organization of the user, with the organization's link and the links of its projects, whose
 // accessible names end in the user's role ("billing Owner").
-public sealed class OrganizationsPage(App app)
+public sealed class OrganizationsPage(App app, AppRoutes routes)
 {
     public ILocator Heading => app.Page.GetByRole(AriaRole.Heading, new() { Name = "Organizations", Exact = true, Level = 1 });
 
@@ -27,7 +27,7 @@ public sealed class OrganizationsPage(App app)
 
     public async Task OpenAsync()
     {
-        await app.GotoAsync("orgs");
+        await app.GotoAsync(routes.Organizations);
         await app.WaitForReadyAsync();
     }
 }

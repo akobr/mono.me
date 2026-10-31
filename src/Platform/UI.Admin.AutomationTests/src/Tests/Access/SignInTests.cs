@@ -13,7 +13,7 @@ public sealed class SignInTests : PlatformTest
     [Elementary]
     public async Task SignIn_ShowsOrganizations()
     {
-        var organizations = new OrganizationsPage(App);
+        var organizations = new OrganizationsPage(App, Routes);
         await organizations.OpenAsync();
 
         await Expect(organizations.Heading).ToBeVisibleAsync();

@@ -10,13 +10,22 @@
     "SignIn": "None",
     "MockScenario": "default"
   },
+  "Execution": {
+    // The dev server serves the app unbundled: with 4 parallel tests a page load in Firefox takes about 10 s (a cold
+    // Firefox start more than the default 30 s) and the first render after it up to 6 s, near the default 10 s. A
+    // deployed (bundled) build needs no more than the defaults.
+    "NavigationTimeoutMs": 60000,
+    "ExpectTimeoutMs": 15000
+  },
   "Users": {
-    // Placeholders: with SignIn None the pool only bounds the parallelism.
+    // Placeholders: with SignIn None the pool only bounds the parallelism. Each stands for Ada Lovelace, the Owner of
+    // acme and acme/billing in the default dataset, so a test that requires an Owner or an editing role gets any of
+    // them.
     "Pool": [
-      { "Email": "mock-user-1@example.com" },
-      { "Email": "mock-user-2@example.com" },
-      { "Email": "mock-user-3@example.com" },
-      { "Email": "mock-user-4@example.com" }
+      { "Email": "mock-user-1@example.com", "Roles": [ "Owner" ] },
+      { "Email": "mock-user-2@example.com", "Roles": [ "Owner" ] },
+      { "Email": "mock-user-3@example.com", "Roles": [ "Owner" ] },
+      { "Email": "mock-user-4@example.com", "Roles": [ "Owner" ] }
     ]
   }
 }

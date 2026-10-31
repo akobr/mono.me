@@ -6,12 +6,17 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // The admin UI's shell around every page. The user menu ("User menu for <name>") renders once the first route resolved
 // and the user is signed in, so it is the sign that the app is ready. Below the lg breakpoint (1024 px) the sidebar is
-// a slideover behind "Open navigation". Every navigation of a test goes through GotoAsync, relative to Target:BaseUrl;
-// the first one carries ?mock-scenario=<name> when Target:MockScenario is set.
+// a slideover behind "Open navigation"; below sm (640 px) some actions of the navbar move to the command palette.
+// Every page load of a test goes through GotoAsync, relative to Target:BaseUrl (links, NavigateAsync and palette
+// actions route inside the loaded app); the first one carries ?mock-scenario=<name> when Target:MockScenario is set,
+// the later ones keep the tab's mock data.
 public sealed partial class App
 {
     // The sidebar is docked from this width; below it, it opens from "Open navigation".
     public const int DockedSidebarWidth = 1024;
+
+    // Below this width (the sm breakpoint) the app has its phone layout.
+    public const int PhoneWidth = 640;
 
     private readonly string? mockScenario;
     private bool navigated;
@@ -33,7 +38,23 @@ public sealed partial class App
     // The slideover of the sidebar (named "Open sidebar" while the sidebar is pinned, "Navigation" otherwise).
     public ILocator NavigationDialog => Page.GetByRole(AriaRole.Dialog);
 
+    // The docked sidebar: the nav with the Organizations link.
+    public ILocator Sidebar => Page.Locator("nav").Filter(new() { Has = Page.GetByRole(AriaRole.Link, new() { Name = "Organizations", Exact = true }) });
+
+    public ILocator SearchButton => Page.GetByRole(AriaRole.Button, new() { Name = "Search…", Exact = true });
+
+    public ILocator CommandPalette => Page.GetByRole(AriaRole.Dialog, new() { Name = "Search…", Exact = true });
+
+    public ILocator CommandInput => CommandPalette.GetByPlaceholder("Search annotations, pages, projects and actions…");
+
+    // The toaster (bottom right). While a modal is open the rest of the page is aria-hidden, so the region is found
+    // with IncludeHidden and the toast by its text; a toast closes after about 5 seconds, so assert it right after the
+    // action.
+    public ILocator Notifications => Page.GetByRole(AriaRole.Region, new() { Name = "Notifications (F8)", Exact = true, IncludeHidden = true });
+
     public bool HasDockedSidebar => Page.ViewportSize is not { Width: < DockedSidebarWidth };
+
+    public bool IsPhone => Page.ViewportSize is { Width: < PhoneWidth };
 
     public static ILocator UserMenuOf(IPage page)
     {
@@ -41,7 +62,17 @@ public sealed partial class App
         return page.GetByRole(AriaRole.Button, new() { NameRegex = UserMenuName() });
     }
 
-    // path: a path of the app without the base, e.g. "orgs" or "acme/billing/default/annotations".
+    public ILocator Toast(string title)
+    {
+        return Notifications.GetByText(title, new() { Exact = true });
+    }
+
+    public ILocator Toast(Regex title)
+    {
+        return Notifications.GetByText(title);
+    }
+
+    // path: a path of the app without the base, e.g. "orgs" or "acme/billing/default/annotations" (AppRoutes).
     public async Task GotoAsync(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -61,12 +92,53 @@ public sealed partial class App
         await Expect(UserMenu).ToBeVisibleAsync();
     }
 
+    // The current page is the path (AppRoutes), whatever its query and hash.
+    public async Task ExpectAtAsync(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        await Expect(Page).ToHaveURLAsync(new Regex($"/{Regex.Escape(path.Trim('/'))}/?(?:[?#].*)?$"));
+    }
+
     // Opens the slideover of the sidebar on a narrow viewport and returns it; its links navigate and close it.
     public async Task<ILocator> OpenNavigationAsync()
     {
         await OpenNavigationButton.ClickAsync();
         await Expect(NavigationDialog).ToBeVisibleAsync();
         return NavigationDialog;
+    }
+
+    // Follows a link of the navigation by its name ("Configurations", "Values store", "Settings", …): in the docked
+    // sidebar, or in the slideover behind "Open navigation", which closes once the route changed. Two links are named
+    // "Members"; the first is the project's.
+    public async Task NavigateAsync(string link)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(link);
+
+        if (HasDockedSidebar)
+        {
+            await Sidebar.GetByRole(AriaRole.Link, new() { Name = link, Exact = true }).First.ClickAsync();
+            return;
+        }
+
+        var navigation = await OpenNavigationAsync();
+        await navigation.GetByRole(AriaRole.Link, new() { Name = link, Exact = true }).First.ClickAsync();
+        await Expect(navigation).ToBeHiddenAsync();
+    }
+
+    // Runs an action of the command palette (search box "Search…", or ControlOrMeta+K): types its name and picks the
+    // option. An option's accessible name ends in its group (e.g. "SettingsProject"), so the name is matched at the
+    // start. The palette filters its options about 100 ms after the input: until then the unfiltered list is shown and
+    // its options move under the pointer, so the option is clicked once it is the first, the best match.
+    public async Task RunCommandAsync(string command)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+
+        await SearchButton.ClickAsync();
+        await CommandInput.FillAsync(command);
+        var best = CommandPalette.GetByRole(AriaRole.Option).First;
+        await Expect(best).ToHaveAccessibleNameAsync(new Regex($"^{Regex.Escape(command)}"));
+        await best.ClickAsync();
+        await Expect(CommandPalette).ToBeHiddenAsync();
     }
 
     // Adds name=value to the query of a path, before its #fragment.
