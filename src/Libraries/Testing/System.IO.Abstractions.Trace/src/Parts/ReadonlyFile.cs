@@ -444,11 +444,13 @@ public class ReadonlyFile : IFile
         FileOptions options = FileOptions.None,
         long preallocationSize = 0)
     {
-        // a handle cannot be simulated in memory as the streams are, so only a handle to read an existing file is given
+        // a handle cannot be simulated in memory as the streams are, so only a handle to read an existing file is given,
+        // and never one that deletes the file when it is closed
         if (access != FileAccess.Read
+            || (options & FileOptions.DeleteOnClose) != 0
             || (mode != FileMode.Open && !(mode == FileMode.OpenOrCreate && _executingFile.Exists(path))))
         {
-            throw new NotSupportedException("A read-only file system opens a handle only to read an existing file.");
+            throw new NotSupportedException("A read-only file system opens a handle only to read an existing file, without DeleteOnClose.");
         }
 
         return _executingFile.OpenHandle(path, FileMode.Open, FileAccess.Read, share, options);
