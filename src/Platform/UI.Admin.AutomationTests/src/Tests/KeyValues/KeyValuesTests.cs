@@ -16,7 +16,7 @@ public sealed class KeyValuesTests : PlatformTest
     // value, and its Versions tab has the first version as the current one.
     [Test]
     [Elementary]
-    [TestCase("4")]
+    [TestCase(4)]
     public async Task KeyValues_CreateAndRead()
     {
         var key = PlatformData.KeyValueKey();

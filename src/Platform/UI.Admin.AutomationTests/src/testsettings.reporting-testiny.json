@@ -10,7 +10,7 @@
     "Testiny": {
       "BaseUrl": "https://app.testiny.io/api/v1/",
       "ApiKey": "",
-      "ProjectId": 0,
+      "ProjectId": 1,
       "TestPlanId": null,
       "Mode": "TestRun",
       "PlanCasesAsNotRun": true,

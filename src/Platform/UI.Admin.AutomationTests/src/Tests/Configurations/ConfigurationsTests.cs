@@ -19,7 +19,7 @@ public sealed class ConfigurationsTests : PlatformTest
     // usually, no type schema or template, so the test depends on none of the target's modeling.
     [Test]
     [Elementary]
-    [TestCase("3")]
+    [TestCase(3)]
     public async Task Configurations_SetDocument_EffectiveShowsIt()
     {
         var key = PlatformData.AnnotationKey(PlatformData.Responsibility);

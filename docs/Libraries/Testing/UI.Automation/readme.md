@@ -239,7 +239,7 @@ A lease that times out and a browser that is not available make the test **Block
 | `[Serial]` (`Order = n`) | test, class | Runs alone, after every parallel test, in `Order`; adds the category `Serial` |
 | `[RequiresProvider(BrowserProviderKind.BrowserStack)]` | test, class | Skipped unless the run uses that provider |
 | `[RequiresEngine(BrowserEngine.Chromium, …)]` | test, class | Skipped unless the browsers run one of the engines |
-| `[TestCase("1234")]` (`System = "Testiny"`) | test, class | Links the test to a case of the test case management system; several per test, several tests per case |
+| `[TestCase(1234)]` (`System = "Testiny"`) | test, class | Links the test to a case of the test case management system; several per test, several tests per case |
 
 Select with TUnit's `--treenode-filter` (not `--filter`), one `[...]` per path segment:
 

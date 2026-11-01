@@ -12,7 +12,7 @@ public sealed class SignInTests : PlatformTest
     // organization with its default project.
     [Test]
     [Elementary]
-    [TestCase("1")]
+    [TestCase(1)]
     public async Task SignIn_ShowsOrganizations()
     {
         var organizations = new OrganizationsPage(App, Routes);
