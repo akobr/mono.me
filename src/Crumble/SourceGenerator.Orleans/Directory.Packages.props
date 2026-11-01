@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)..\'))" />
+  <ItemGroup>
+
+    <!-- Roslyn of the source generator: a generator loads only in compilers at least as new as the Roslyn it is built
+         against, so it stays on 5.3 (SDK 10.0.2xx, Visual Studio 18.3) while the tools take the newest Roslyn. It uses
+         only Roslyn 4.x APIs (IIncrementalGenerator, CreateSyntaxProvider, RegisterSourceOutput). -->
+    <PackageVersion Update="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0" />
+    <PackageVersion Update="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
+
+  </ItemGroup>
+</Project>
