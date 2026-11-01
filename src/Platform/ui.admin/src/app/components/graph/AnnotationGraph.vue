@@ -344,12 +344,15 @@ watch(
 const nodeKeys = computed(() => graph.value.nodes.map((node) => node.key))
 
 function onFrame(event: MessageEvent<SimulationFrame>) {
-  // A graph without nodes (while the catalog reloads, or with every type hidden) is not remembered: the next layout
-  // seeds from the frame before it and keeps its zoom (424-130).
-  if (event.data.generation !== generation || graph.value.nodes.length === 0) {
+  if (event.data.generation !== generation) {
     return
   }
   positions.value = event.data.positions
+  // A graph without nodes (while the catalog reloads, or with every type hidden) clears the canvas, but is neither
+  // remembered nor fitted: the next layout seeds from the frame before it and keeps its zoom (424-130).
+  if (graph.value.nodes.length === 0) {
+    return
+  }
   // Every frame is remembered by reference: the worker transfers a new buffer each time and never reuses it.
   memory.value.frame = markRaw({
     layout: layout.value,

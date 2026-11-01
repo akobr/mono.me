@@ -7,6 +7,7 @@ import { setupServer } from 'msw/node'
 import type { Annotation } from '@42for.net/2splatform.sdk'
 import EmptyState from '@/components/common/EmptyState.vue'
 import AnnotationGraph from '@/components/graph/AnnotationGraph.vue'
+import GraphCanvas from '@/components/graph/GraphCanvas.vue'
 import {
   buildGraph,
   countDescendants,
@@ -415,6 +416,9 @@ describe('graph screen', () => {
     await nextTick()
     expect(worker.inits().at(-1)!.tiers).toHaveLength(0)
     worker.frame(new Float32Array(0))
+    await nextTick()
+    // The canvas is cleared, but the empty frame is not remembered.
+    expect(host.findComponent(GraphCanvas).props('positions')).toHaveLength(0)
     expect(usePageMemoryStore().page({ org: 'acme', project: 'billing', view: 'default' }, 'graph').frame).toBe(frame)
 
     await reload
