@@ -15,6 +15,7 @@
     "dev:mock:legacy": "node build/dev-mock.ts --legacy",
     "dev:mock:large": "node build/dev-mock.ts --large",
     "dev:aspire": "vite --strictPort",
+    "prepare:local": "node build/prepare-local.mjs",
     "build": "vue-tsc --build && vite build",
     "build:e2e": "vite build --mode e2e",
     "preview": "vite preview",
