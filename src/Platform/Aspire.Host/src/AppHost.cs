@@ -22,11 +22,11 @@ IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvar
         .AddAzureCosmosDB("cosmos")
         .RunAsEmulator(emulator =>
         {
+            // Aspire's own vNext image (mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest): RunAsEmulator
+            // sets the resource up for vNext (its /ready health check, connection string and Data Explorer), which the
+            // classic image of the tag "latest" does not serve.
             emulator.WithDataExplorer();
             emulator.WithLifetime(ContainerLifetime.Persistent);
-            emulator.WithImageRegistry("mcr.microsoft.com");
-            emulator.WithImage("cosmosdb/linux/azure-cosmos-emulator");
-            emulator.WithImageTag("latest");
         }),
     "local" => builder.AddConnectionString("cosmos"),
     _ => throw new InvalidOperationException($"Unknown Cosmos:Mode '{cosmosMode}', use 'container' or 'local'."),
