@@ -6,7 +6,9 @@ run-name: Admin UI automation (${{ inputs.use_mock_ui && 'mock UI' || inputs.tar
 # no secret and runs on any branch. Run by hand or called by another workflow; it has no push or pull request trigger
 # (gating pull requests on the Elementary set is a follow-up). Spec: docs/Platform/UI.Admin.AutomationTests/specs/
 # 2026-10-31 UI Automation Testing Project.md, section 9; usage: docs/Platform/UI.Admin.AutomationTests/
-# automation-tests.md.
+# automation-tests.md. Restrict the environment ui-admin-automation (Settings > Environments > Deployment branches and
+# tags) to main: its secrets are the pool users' passwords and the BrowserStack and Testiny keys, and a workflow run of
+# another branch could otherwise read them.
 on:
   workflow_dispatch:
     inputs:
@@ -35,11 +37,6 @@ on:
         required: false
         type: boolean
         default: false
-      upload_traces:
-        description: Keep the trace files (they hold the pool users' session tokens) in the artifact of a failed run against a deployed target
-        required: false
-        type: boolean
-        default: false
   workflow_call:
     inputs:
       profile:
@@ -59,10 +56,6 @@ on:
         type: boolean
         default: false
       use_mock_ui:
-        required: false
-        type: boolean
-        default: false
-      upload_traces:
         required: false
         type: boolean
         default: false
@@ -220,7 +213,9 @@ jobs:
 
       # The settings: the profiles, the target and its pool users (only the variables that are set, so a profile's
       # values stay), the BrowserStack credentials (with a browserstack profile) and the Testiny ones (with
-      # report_testiny); then the run, its log in the results. The only step with the secrets.
+      # report_testiny); then the run, its log in the results. The only step with the secrets, and only with those its
+      # path needs: no password or BrowserStack key for the mock UI, no Testiny key without report_testiny, also when
+      # a caller passes every secret (secrets: inherit); the CI_* copies are unset before the tests start.
       - name: Run
         env:
           CI_TARGET_ORGANIZATION: ${{ vars.UITESTS_TARGET_ORGANIZATION }}
@@ -229,28 +224,28 @@ jobs:
           CI_TARGET_EMAIL_DOMAIN: ${{ vars.UITESTS_TARGET_EMAIL_DOMAIN }}
           CI_USER_0_EMAIL: ${{ vars.UITESTS_USER_0_EMAIL }}
           CI_USER_0_ROLES: ${{ vars.UITESTS_USER_0_ROLES }}
-          CI_USER_0_PASSWORD: ${{ secrets.UITESTS_USER_0_PASSWORD }}
+          CI_USER_0_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_0_PASSWORD || '' }}
           CI_USER_1_EMAIL: ${{ vars.UITESTS_USER_1_EMAIL }}
           CI_USER_1_ROLES: ${{ vars.UITESTS_USER_1_ROLES }}
-          CI_USER_1_PASSWORD: ${{ secrets.UITESTS_USER_1_PASSWORD }}
+          CI_USER_1_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_1_PASSWORD || '' }}
           CI_USER_2_EMAIL: ${{ vars.UITESTS_USER_2_EMAIL }}
           CI_USER_2_ROLES: ${{ vars.UITESTS_USER_2_ROLES }}
-          CI_USER_2_PASSWORD: ${{ secrets.UITESTS_USER_2_PASSWORD }}
+          CI_USER_2_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_2_PASSWORD || '' }}
           CI_USER_3_EMAIL: ${{ vars.UITESTS_USER_3_EMAIL }}
           CI_USER_3_ROLES: ${{ vars.UITESTS_USER_3_ROLES }}
-          CI_USER_3_PASSWORD: ${{ secrets.UITESTS_USER_3_PASSWORD }}
+          CI_USER_3_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_3_PASSWORD || '' }}
           CI_USER_4_EMAIL: ${{ vars.UITESTS_USER_4_EMAIL }}
           CI_USER_4_ROLES: ${{ vars.UITESTS_USER_4_ROLES }}
-          CI_USER_4_PASSWORD: ${{ secrets.UITESTS_USER_4_PASSWORD }}
+          CI_USER_4_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_4_PASSWORD || '' }}
           CI_USER_5_EMAIL: ${{ vars.UITESTS_USER_5_EMAIL }}
           CI_USER_5_ROLES: ${{ vars.UITESTS_USER_5_ROLES }}
-          CI_USER_5_PASSWORD: ${{ secrets.UITESTS_USER_5_PASSWORD }}
-          CI_BROWSERSTACK_USERNAME: ${{ secrets.UITESTS_BROWSERSTACK_USERNAME }}
-          CI_BROWSERSTACK_ACCESS_KEY: ${{ secrets.UITESTS_BROWSERSTACK_ACCESS_KEY }}
+          CI_USER_5_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_5_PASSWORD || '' }}
+          CI_BROWSERSTACK_USERNAME: ${{ !inputs.use_mock_ui && contains(inputs.profile, 'browserstack') && secrets.UITESTS_BROWSERSTACK_USERNAME || '' }}
+          CI_BROWSERSTACK_ACCESS_KEY: ${{ !inputs.use_mock_ui && contains(inputs.profile, 'browserstack') && secrets.UITESTS_BROWSERSTACK_ACCESS_KEY || '' }}
           CI_BROWSERSTACK_MAX_PARALLEL_SESSIONS: ${{ vars.UITESTS_BROWSERSTACK_MAX_PARALLEL_SESSIONS }}
           CI_TESTINY_PROJECT_ID: ${{ vars.UITESTS_TESTINY_PROJECT_ID }}
           CI_TESTINY_TEST_PLAN_ID: ${{ vars.UITESTS_TESTINY_TEST_PLAN_ID }}
-          CI_TESTINY_API_KEY: ${{ secrets.UITESTS_TESTINY_API_KEY }}
+          CI_TESTINY_API_KEY: ${{ inputs.report_testiny && secrets.UITESTS_TESTINY_API_KEY || '' }}
         run: |
           results="$GITHUB_WORKSPACE/$RESULTS_DIR"
           mkdir -p "$results"
@@ -308,6 +303,10 @@ jobs:
           fi
           set_if UITESTS_PROFILE "$profiles"
 
+          # The test process gets the secrets only as the UITESTS_* settings set above.
+          unset CI_USER_0_PASSWORD CI_USER_1_PASSWORD CI_USER_2_PASSWORD CI_USER_3_PASSWORD CI_USER_4_PASSWORD CI_USER_5_PASSWORD \
+            CI_BROWSERSTACK_USERNAME CI_BROWSERSTACK_ACCESS_KEY CI_TESTINY_API_KEY
+
           arguments=(--report-trx --results-directory "$results")
           if [ -n "$FILTER" ]; then
             arguments=(--treenode-filter "$FILTER" "${arguments[@]}")
@@ -330,11 +329,11 @@ jobs:
           exit "$code"
 
       # A trace holds the session cookies and tokens of the pool user; artifacts of this public repository are readable
-      # by anyone, so a deployed target's traces stay out unless upload_traces asks for them (the mock UI's user is
-      # fake). Every .zip goes: the TRX copies of a retried test's traces are trace_1.zip and so on. Also after a
+      # by anyone, so a deployed target's traces never go into the artifact (the mock UI's user is fake, so its traces
+      # stay). Every .zip goes: the TRX copies of a retried test's traces are trace_1.zip and so on. Also after a
       # cancelled run (timeout-minutes included), on the same condition as the upload.
       - name: Keep the traces private
-        if: (failure() || cancelled()) && !inputs.use_mock_ui && !inputs.upload_traces
+        if: (failure() || cancelled()) && !inputs.use_mock_ui
         run: |
           if [ -d "$RESULTS_DIR" ]; then
             find "$RESULTS_DIR" -type f -name '*.zip' -print -delete

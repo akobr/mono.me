@@ -207,9 +207,8 @@ dotnet run --project src/Platform/UI.Admin.AutomationTests/src -c Release --no-b
 | `target_url` | empty | The admin UI to test; empty for the environment's `UITESTS_TARGET_BASE_URL` |
 | `report_testiny` | `false` | Adds the `reporting-testiny` profile with the environment's project and API key |
 | `use_mock_ui` | `false` | Builds the TypeScript SDK and the admin UI's e2e build (`npm run build:e2e` with `VITE_MOCK_DATASET=default`), serves it with `vite preview` on port 4174 and runs with `UITESTS_PROFILE=mock` (plus `profile`) and `UITESTS_Target__BaseUrl=http://localhost:4174`. Needs no secret, so it runs on any branch; a `browserstack*` profile is refused with it (BrowserStack's browsers would need BrowserStack Local) |
-| `upload_traces` | `false` | Keeps the traces (every `.zip` of the results) in the artifact of a failed or cancelled run against a deployed target |
 
-A run against a deployed target (and a mock run with `report_testiny`) uses the GitHub environment **`ui-admin-automation`**; a mock run without reporting uses none, so none of its protection rules apply. Only the variables that are set reach the run, so a profile's values stay where a variable is empty:
+A run against a deployed target (and a mock run with `report_testiny`) uses the GitHub environment **`ui-admin-automation`**; a mock run without reporting uses none, so none of its protection rules apply. **Restrict the environment to `main`** (Settings, Environments, `ui-admin-automation`, Deployment branches and tags: Selected branches, `main`): its secrets are the pool users' passwords and the BrowserStack and Testiny keys, and without the rule a run of any branch, with that branch's version of the workflow, could read them; branch runs then use `use_mock_ui` (without `report_testiny`). Only the variables that are set reach the run, so a profile's values stay where a variable is empty:
 
 | Variable | Becomes |
 |---|---|
@@ -225,7 +224,7 @@ A run against a deployed target (and a mock run with `report_testiny`) uses the 
 | `UITESTS_BROWSERSTACK_USERNAME` / `UITESTS_BROWSERSTACK_ACCESS_KEY` | `BrowserStack:Username` / `AccessKey` when a profile starts with `browserstack` |
 | `UITESTS_TESTINY_API_KEY` | `Reporting:Testiny:ApiKey` (with `report_testiny`) |
 
-A caller passes the secrets explicitly (or `secrets: inherit`); a secret of the environment wins over the passed one.
+A caller passes the secrets explicitly (or `secrets: inherit`); a secret of the environment wins over the passed one. The `Run` step gets only the secrets of its path (the passwords for a deployed target, the BrowserStack ones with a `browserstack*` profile, the Testiny key with `report_testiny`; none for a mock run without reporting), and unsets its copies before the tests start, which see them only as their `UITESTS_*` settings.
 
 ```bash
 # once the workflow is on main; --ref runs a branch's version of it
@@ -251,8 +250,8 @@ jobs:
 ```
 
 - The job's **step summary** gets TUnit's results (failures grouped by cause) and, with reporting, the Testiny run's link.
-- A failed or cancelled run (`timeout-minutes` 60 included) uploads `TestResults/ui-admin-automation/` (TRX, TUnit's HTML and JSON reports, `run.log`, the artifacts with `results.jsonl`) as `ui-admin-automation-<mock|target>-<profile>-<attempt>` for 7 days. Artifacts of this public repository are readable by anyone, so the traces of a deployed target (every `.zip` under the results: the TRX keeps a retried test's traces as `trace.zip`, `trace_1.zip`, …) are removed first unless `upload_traces` is set; the mock's user is fake, so its traces stay.
-- Runs against a deployed target share its pool users, so every deployed target shares one concurrency group, `ui-admin-automation-target`; mock runs share one per branch. One run of a group runs at a time and up to 100 wait in order (`queue: max`); a running run is never cancelled. A caller that starts several target runs can also chain them with `needs:`.
+- A failed or cancelled run (`timeout-minutes` 60 included) uploads `TestResults/ui-admin-automation/` (TRX, TUnit's HTML and JSON reports, `run.log`, the artifacts with `results.jsonl`) as `ui-admin-automation-<mock|target>-<profile>-<attempt>` for 7 days. Artifacts of this public repository are readable by anyone, so the traces of a deployed target (every `.zip` under the results: the TRX keeps a retried test's traces as `trace.zip`, `trace_1.zip`, …) are always removed first; the mock's user is fake, so its traces stay. Run a deployed target's failing test locally to get its trace.
+- Runs against a deployed target share its pool users, so every deployed target shares one concurrency group, `ui-admin-automation-target`; mock runs share one per branch. One run of a group runs at a time and up to 100 wait in order (`queue: max`; without it GitHub keeps one pending run per group, and a newer one cancels it); a running run is never cancelled. A caller that starts several target runs can also chain them with `needs:`.
 - The inputs and variables reach the scripts only through `env:`, the secrets only the `Run` step's `env:` (no npm install script, action or build step sees them; `dotnet run --no-build` runs no build targets there). The settings dump shows secrets as `***`, the runtime redacts them in every message, and GitHub masks them in its log view (not in uploaded files).
 
 ## Troubleshooting
