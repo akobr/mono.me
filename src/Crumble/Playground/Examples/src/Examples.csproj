@@ -26,8 +26,17 @@
     </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Examples.Crumble\src\obj\Generated\42.Crumble.SourceGenerator*\**\*.cs" AutoGen="true" />
     <Compile Include="..\..\Examples.Crumble\src\*.cs" />
   </ItemGroup>
+
+  <!-- The files the Crumble source generator emits into the obj of Examples.Crumble exist only after that project has
+       built, so they are collected after the project references are built, not by a static glob that a clean build
+       evaluates before they exist. -->
+  <Target Name="IncludeCrumbleGeneratedFiles" AfterTargets="ResolveProjectReferences" BeforeTargets="BeforeCompile;CompileDesignTime">
+    <ItemGroup>
+      <Compile Remove="..\..\Examples.Crumble\src\obj\Generated\42.Crumble.SourceGenerator*\**\*.cs" />
+      <Compile Include="..\..\Examples.Crumble\src\obj\Generated\42.Crumble.SourceGenerator*\**\*.cs" AutoGen="true" />
+    </ItemGroup>
+  </Target>
 
 </Project>
