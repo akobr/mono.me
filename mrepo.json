@@ -39,7 +39,7 @@
       "custom": {
         "filePattern": "*.*?proj",
         "useFullProjectName": false,
-        "dotnetVersion": 9
+        "dotnetVersion": 10
       },
       "scripts": {
         "build": "dotnet build src",
