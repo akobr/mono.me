@@ -157,6 +157,8 @@ Used when `Browser:Provider` is `BrowserStack`; see "Browser providers".
 | `CloseRunOnComplete` | `true` | |
 | `Attachments` / `Comments` | `Failures` / `Failures` | `None`, `Failures` (every outcome but passed and skipped) or `All` |
 | `AttachTraces` | `false` | Uploads `trace.zip` too. A trace holds the cookies and storage of the signed-in pool user (a live session until it expires) and every request of the test: turning it on shares that session with Testiny and everyone who can read the project |
+| `SlowTestSeconds` | `60` | The run description counts the tests that took at least this long (`0`: no count). The run's own duration is always there. |
+| `VerySlowTestSeconds` | `120` | Each test that took at least this long becomes a warning of the run, slowest first (`0`: none). |
 | `MaxAttachmentBytes` | `26214400` (25 MB) | Larger files are listed in the comment instead |
 | `ResultForSkipped` / `ResultForBlocked` | `SKIPPED` / `BLOCKED` | The result status of a skipped and a blocked test (a custom status works too) |
 | `RequestTimeoutSeconds` | `30` | Per request; a timeout counts as a transient failure (see below for what is sent again) |

@@ -57,6 +57,12 @@ public sealed partial class TestinyOptions
     // Writes the markdown comment (duration, environment, stack trace) of these results to each linked case.
     public TestinyContentPolicy Comments { get; set; } = TestinyContentPolicy.Failures;
 
+    // The run's description counts the tests that took at least this long (0: no count).
+    public int SlowTestSeconds { get; set; } = 60;
+
+    // Each test that took at least this long becomes a warning of the run (0: none).
+    public int VerySlowTestSeconds { get; set; } = 120;
+
     // The result status of a skipped and of a blocked test; a project may use BLOCKED for skips, or a custom status.
     public string ResultForSkipped { get; set; } = TestinyResultStatus.Skipped;
 
@@ -155,6 +161,11 @@ public sealed partial class TestinyOptions
         if (MaxAttachmentBytes < 1)
         {
             errors.Add("MaxAttachmentBytes must be positive.");
+        }
+
+        if (SlowTestSeconds < 0 || VerySlowTestSeconds < 0)
+        {
+            errors.Add("SlowTestSeconds and VerySlowTestSeconds must not be negative.");
         }
 
         if (RequestTimeoutSeconds < 1)

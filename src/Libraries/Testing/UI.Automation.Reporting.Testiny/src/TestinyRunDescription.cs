@@ -25,7 +25,9 @@ internal static class TestinyRunDescription
         IReadOnlyDictionary<string, int> casesByStatus,
         int attachments,
         int comments,
-        IReadOnlyList<string> warnings)
+        IReadOnlyList<string> warnings,
+        int? slowTests = null,
+        int slowTestSeconds = 0)
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(summary);
@@ -40,6 +42,11 @@ internal static class TestinyRunDescription
             .Append(CultureInfo.InvariantCulture, $" ({TestinyMarkdown.Duration(summary.FinishedAt - run.StartedAt)}). ")
             .Append(CultureInfo.InvariantCulture, $"Test cases in the run: {Cases(casesByStatus)}; ")
             .Append(CultureInfo.InvariantCulture, $"{attachments} attachment(s), {comments} comment(s).");
+
+        if (slowTests is { } slow)
+        {
+            builder.Append(CultureInfo.InvariantCulture, $" Tests that took {slowTestSeconds} s or longer: {slow}.");
+        }
 
         AppendWarnings(builder, warnings);
         return TestinyMarkdown.Document(builder.ToString().TrimEnd('\n'));

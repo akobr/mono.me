@@ -655,6 +655,28 @@ public sealed class TestinyTestRunReporterTests
     }
 
     [Fact]
+    public async Task CompleteAsync_CountsSlowTests_AndWarnsOfVerySlowOnes()
+    {
+        var quick = Test("Quick", Case("1"));
+        var slow = Test("Slow", Case("2"));
+        var verySlow = Test("VerySlow", Case("3"));
+        await using var reporter = await Started(quick, slow, verySlow);
+        await reporter.ReportAsync(
+            [
+                Result(quick, TestOutcome.Passed),
+                Result(slow, TestOutcome.Passed) with { Duration = TimeSpan.FromSeconds(75) },
+                Result(verySlow, TestOutcome.Passed) with { Duration = TimeSpan.FromSeconds(150) },
+            ],
+            CancellationToken.None);
+
+        await reporter.CompleteAsync(new TestRunSummary(Start.AddMinutes(4), 3, 0, 0, 0, []), CancellationToken.None);
+
+        var description = testiny.Requests[^1].Json.GetProperty("description").GetString().ShouldNotBeNull();
+        description.ShouldContain("Tests that took 60 s or longer: 2.");
+        description.ShouldContain("### Warnings (1)\n\n- SampleTests.VerySlow took 2 min 30.0 s (Reporting:Testiny:VerySlowTestSeconds is 120 s).");
+    }
+
+    [Fact]
     public async Task CompleteAsync_OnAnUpdateConflict_FetchesTheEtagOnceMore()
     {
         await using var reporter = await Started();
