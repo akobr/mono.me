@@ -36,8 +36,8 @@ public static class BasicOptionsExtensions
             return version;
         }
 
-        // Default to .NET 9 if not specified
-        return 9;
+        // Default to .NET 10 if not specified
+        return 10;
     }
 
     public static bool IsVersioned(this IBasicOptions options)

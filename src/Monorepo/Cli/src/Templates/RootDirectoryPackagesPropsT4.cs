@@ -22,12 +22,12 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<Project xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\r\n  <ItemGroup>\r\n\r\n    <!-- Please create any groups of dependencies if you need -->\r\n    <!-- <PackageVersion Include=\"package-name\" Version=\"package-version\" /> -->\r\n\r\n    <!-- abstractions for .NET libraries -->\r\n    <PackageVersion Include=\"Microsoft.Extensions.Configuration.Abstractions\" Version=\"9.0.8\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.DependencyInjection.Abstractions\" Version=\"9.0.8\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.Hosting.Abstractions\" Version=\"9.0.8\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.Logging.Abstractions\" Version=\"9.0.8\" />\r\n\r\n    <!-- .NET libraries -->\r\n    <PackageVersion Include=\"Microsoft.Extensions.Configuration\" Version=\"9.0.8\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.DependencyInjection\" Version=\"9.0.8\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.Hosting\" Version=\"9.0.8\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.Logging\" Version=\"9.0.8\" />\r\n\r\n    <!-- unit testing -->\r\n    <PackageVersion Include=\"coverlet.collector\" Version=\"6.0.4\" />\r\n    <PackageVersion Include=\"Microsoft.NET.Test.Sdk\" Version=\"17.14.1\" />\r\n    <PackageVersion Include=\"Moq\" Version=\"4.20.72\" />\r\n");
+            this.Write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<Project xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">\r\n  <ItemGroup>\r\n\r\n    <!-- Please create any groups of dependencies if you need -->\r\n    <!-- <PackageVersion Include=\"package-name\" Version=\"package-version\" /> -->\r\n\r\n    <!-- abstractions for .NET libraries -->\r\n    <PackageVersion Include=\"Microsoft.Extensions.Configuration.Abstractions\" Version=\"10.0.14\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.DependencyInjection.Abstractions\" Version=\"10.0.14\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.Hosting.Abstractions\" Version=\"10.0.14\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.Logging.Abstractions\" Version=\"10.0.14\" />\r\n\r\n    <!-- .NET libraries -->\r\n    <PackageVersion Include=\"Microsoft.Extensions.Configuration\" Version=\"10.0.14\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.DependencyInjection\" Version=\"10.0.14\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.Hosting\" Version=\"10.0.14\" />\r\n    <PackageVersion Include=\"Microsoft.Extensions.Logging\" Version=\"10.0.14\" />\r\n\r\n    <!-- unit testing -->\r\n    <PackageVersion Include=\"coverlet.collector\" Version=\"10.1.0\" />\r\n    <PackageVersion Include=\"Microsoft.NET.Test.Sdk\" Version=\"18.11.0\" />\r\n    <PackageVersion Include=\"Moq\" Version=\"4.21.0\" />\r\n");
  if (_featureProvider.IsEnabled("tests-tunit")) { 
-            this.Write("    <PackageVersion Include=\"TUnit\" Version=\"0.52.56\" />\r\n");
+            this.Write("    <PackageVersion Include=\"TUnit\" Version=\"1.78.0\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("tests-xunit")) { 
-            this.Write("    <PackageVersion Include=\"xunit\" Version=\"2.9.3\" />\r\n    <PackageVersion Include=\"xunit.runner.visualstudio\" Version=\"3.1.3\" />\r\n");
+            this.Write("    <PackageVersion Include=\"xunit\" Version=\"2.9.3\" />\r\n    <PackageVersion Include=\"xunit.runner.visualstudio\" Version=\"4.0.1\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("tests-nunit")) { 
             this.Write("    <PackageVersion Include=\"NUnit\" Version=\"4.3.2\" />\r\n    <PackageVersion Include=\"NUnit3TestAdapter\" Version=\"5.0.0\" />\r\n");
@@ -37,7 +37,7 @@ namespace _42.Monorepo.Cli.Templates
  } 
             this.Write("\r\n    <!-- code analysis -->\r\n");
  if (_featureProvider.IsEnabled("stylecop")) { 
-            this.Write("    <PackageVersion Include=\"StyleCop.Analyzers\" Version=\"1.2.0-beta.556\" />\r\n");
+            this.Write("    <PackageVersion Include=\"StyleCop.Analyzers\" Version=\"1.3.151-beta\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("sonar")) { 
             this.Write("    <PackageVersion Include=\"SonarAnalyzer.CSharp\" Version=\"10.15.0.120848\" />\r\n");

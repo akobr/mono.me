@@ -35,7 +35,7 @@ All configuration for the monorepo, his behaviour and CLI toolset is done by one
       "custom": {
         "filePattern": "*.*?proj",
         "useFullProjectName": false,
-        "dotnetVersion": 8
+        "dotnetVersion": 10
       },
       "scripts": {
         "build": "dotnet build src",
