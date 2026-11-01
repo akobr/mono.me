@@ -268,6 +268,5 @@ jobs:
 | The sign-in fails (`sign-in-failure.png` in the test's folder) | The AuthKit hosted page changed or a checklist item is missing ("AuthKit checklist") |
 | Exit code `8` | The filter matched no test; check the category (`Area-Access`, not `Access`) or add `--ignore-exit-code 8` |
 | `dotnet test` on the project: "Testing with VSTest target is no longer supported …" | Run it with `dotnet run` ("Run") |
-| `dotnet build src/Platform` fails in `Supervisor/Abstraction/test` | An unrelated project on net6.0, which its `Microsoft.NET.Test.Sdk` 18.3 refuses; build `src/Platform/UI.Admin.AutomationTests/src` directly |
 | Page loads time out in Firefox on the mock, or the first Firefox run fails at once in the target check (`The annotations of acme/billing/default did not show …`) | The unbundled dev server is slow in Firefox on a cold start (the first Firefox run after the dev server started took over 2 minutes for the check's first page); run again, use `--maximum-parallel-tests 2`, or the e2e build on 4174 |
 | The admin UI's TypeScript e2e suite cannot find its browsers | The 1.63 browsers replaced its 1.64 ones in the shared cache: `npx playwright install` in `src/Platform/ui.admin/src` |
