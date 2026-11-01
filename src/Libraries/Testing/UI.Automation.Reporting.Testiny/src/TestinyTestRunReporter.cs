@@ -65,6 +65,7 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
     private readonly HashSet<long> missingCases = [];
     private readonly HashSet<long> rejectedCases = [];
     private readonly Dictionary<long, Dictionary<string, CaseResult>> resultsByCase = [];
+    private readonly Dictionary<string, TestDuration> durations = new(StringComparer.Ordinal);
     private readonly Dictionary<long, string> sentStatus = [];
     private readonly Dictionary<string, int> handledAttempts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TestinyArtifactState> uploads = new(StringComparer.Ordinal);
@@ -179,6 +180,13 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
         {
             var id = runId ?? throw new InvalidOperationException("The Testiny run was not created: StartAsync did not succeed.");
             var latest = LatestAttempts(results);
+            foreach (var report in latest)
+            {
+                if (!durations.TryGetValue(report.Test.Id, out var known) || report.Attempt >= known.Attempt)
+                {
+                    durations[report.Test.Id] = new TestDuration(TestinyResultComment.ShortName(report.Test), report.Attempt, report.Duration);
+                }
+            }
 
             // The status of every case the batch touches, over all results so far: a later passing test of a case does
             // not hide an earlier failure.
@@ -246,7 +254,14 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
                 return;
             }
 
-            var description = TestinyRunDescription.Completed(run!, summary, CasesByStatus(), attachmentCount, commentCount, [.. summary.Warnings.Concat(Warnings).Distinct(StringComparer.Ordinal)]);
+            var slow = options.SlowTestSeconds > 0 ? durations.Values.Count(test => test.Duration >= TimeSpan.FromSeconds(options.SlowTestSeconds)) : (int?)null;
+            var verySlow = options.VerySlowTestSeconds > 0
+                ? durations.Values
+                    .Where(test => test.Duration >= TimeSpan.FromSeconds(options.VerySlowTestSeconds))
+                    .OrderByDescending(test => test.Duration)
+                    .Select(test => $"{test.Name} took {TestinyMarkdown.Duration(test.Duration)} (Reporting:Testiny:VerySlowTestSeconds is {options.VerySlowTestSeconds} s).")
+                : [];
+            var description = TestinyRunDescription.Completed(run!, summary, CasesByStatus(), attachmentCount, commentCount, [.. summary.Warnings.Concat(Warnings).Concat(verySlow).Distinct(StringComparer.Ordinal)], slow, options.SlowTestSeconds);
 
             try
             {
@@ -863,6 +878,8 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
     }
 
     private sealed record CaseResult(int Attempt, TestOutcome Outcome);
+
+    private sealed record TestDuration(string Name, int Attempt, TimeSpan Duration);
 
     private sealed record PendingComment(string Key, long CaseId, string Test, string Text);
 }
