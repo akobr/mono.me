@@ -6,7 +6,9 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // The admin UI's shell around every page. The user menu ("User menu for <name>") renders once the first route resolved
 // and the user is signed in, so it is the sign that the app is ready. Below the lg breakpoint (1024 px) the sidebar is
-// a slideover behind "Open navigation"; below sm (640 px) some actions of the navbar move to the command palette.
+// a slideover behind "Open navigation"; between lg and xl (1024 to 1279 px) it is docked but starts as an icon rail,
+// whose links have no accessible name until "Expand sidebar" widens it; below sm (640 px) some actions of the navbar
+// move to the command palette.
 // Every page load of a test goes through GotoAsync, relative to Target:BaseUrl (links, NavigateAsync and palette
 // actions route inside the loaded app); the first one carries ?mock-scenario=<name> when Target:MockScenario is set,
 // the later ones keep the tab's mock data.
@@ -14,6 +16,9 @@ public sealed partial class App
 {
     // The sidebar is docked from this width; below it, it opens from "Open navigation".
     public const int DockedSidebarWidth = 1024;
+
+    // Below this width (the xl breakpoint) the docked sidebar starts as an icon rail.
+    public const int ExpandedSidebarWidth = 1280;
 
     // Below this width (the sm breakpoint) the app has its phone layout.
     public const int PhoneWidth = 640;
@@ -40,6 +45,9 @@ public sealed partial class App
 
     // The docked sidebar: the nav with the Organizations link.
     public ILocator Sidebar => Page.Locator("nav").Filter(new() { Has = Page.GetByRole(AriaRole.Link, new() { Name = "Organizations", Exact = true }) });
+
+    // In the footer of the icon rail; "Collapse sidebar" once it is expanded.
+    public ILocator ExpandSidebarButton => Page.GetByRole(AriaRole.Button, new() { Name = "Expand sidebar", Exact = true });
 
     public ILocator SearchButton => Page.GetByRole(AriaRole.Button, new() { Name = "Search…", Exact = true });
 
@@ -111,15 +119,26 @@ public sealed partial class App
         return NavigationDialog;
     }
 
+    // Widens the docked sidebar when it is the icon rail (1024 to 1279 px, or collapsed with "["); nothing otherwise.
+    public async Task ExpandSidebarAsync()
+    {
+        if (HasDockedSidebar && await ExpandSidebarButton.IsVisibleAsync())
+        {
+            await ExpandSidebarButton.ClickAsync();
+            await Expect(Sidebar).ToBeVisibleAsync();
+        }
+    }
+
     // Follows a link of the navigation by its name ("Configurations", "Values store", "Settings", …): in the docked
-    // sidebar, or in the slideover behind "Open navigation", which closes once the route changed. Two links are named
-    // "Members"; the first is the project's.
+    // sidebar (expanded first when it is the icon rail), or in the slideover behind "Open navigation", which closes
+    // once the route changed. Two links are named "Members"; the first is the project's.
     public async Task NavigateAsync(string link)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(link);
 
         if (HasDockedSidebar)
         {
+            await ExpandSidebarAsync();
             await Sidebar.GetByRole(AriaRole.Link, new() { Name = link, Exact = true }).First.ClickAsync();
             return;
         }
