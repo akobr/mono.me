@@ -27,6 +27,9 @@
 
   <ItemGroup>
     <Compile Include="..\..\Examples.Crumble\src\*.cs" />
+    <!-- for the fast up-to-date check of Visual Studio, which sees only evaluated items: the generated files below change
+         whenever this assembly of Examples.Crumble is compiled again -->
+    <UpToDateCheckInput Include="..\..\Examples.Crumble\src\obj\$(Configuration)\$(TargetFramework)\42.Crumble.Playground.Examples.Crumble.dll" />
   </ItemGroup>
 
   <!-- The files the Crumble source generator emits into the obj of Examples.Crumble exist only after that project has
