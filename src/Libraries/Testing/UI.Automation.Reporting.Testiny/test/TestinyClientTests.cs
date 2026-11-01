@@ -52,7 +52,7 @@ public sealed class TestinyClientTests
         var request = testiny.Requests.ShouldHaveSingleItem();
         request.Path.ShouldBe("testrun/mapping/bulk/testcase:testrun");
         request.Query["op"].ShouldBe("add_or_update");
-        request.Text.ShouldBe("""[{"ids":{"testcase_id":1234,"testrun_id":7},"mapped":{"result_status":"PASSED"}}]""");
+        request.Text.ShouldBe("""[{"ids":{"testcase_id":1234,"testrun_id":7},"mapped":{"result_status":"PASSED","assigned_to":"ANY"}}]""");
     }
 
     [Fact]
