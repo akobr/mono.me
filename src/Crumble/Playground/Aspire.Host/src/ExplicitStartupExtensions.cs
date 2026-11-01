@@ -13,7 +13,7 @@ public static class ExplicitStartupExtensions
 
             // This is possibly the last safe place to update the resource's annotations
             // we need to do it this late because the built in lifecycle annotations are added *very* late
-            var startCommand = evt.Resource.Annotations.OfType<ResourceCommandAnnotation>().FirstOrDefault(c => c.Name == "resource-start");
+            var startCommand = evt.Resource.Annotations.OfType<ResourceCommandAnnotation>().FirstOrDefault(c => c.Name == KnownResourceCommands.StartCommand);
 
             if (startCommand is null)
             {
@@ -22,15 +22,15 @@ public static class ExplicitStartupExtensions
 
             evt.Resource.Annotations.Remove(startCommand);
 
-            // This will block the resource from starting until the "resource-start" command is executed
+            // This will block the resource from starting until the start command is executed
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             // Create a new command that clones the start command
             var newCommand = new ResourceCommandAnnotation(
-                startCommand.Name,
-                startCommand.DisplayName,
-                context => !tcs.Task.IsCompleted ? ResourceCommandState.Enabled : startCommand.UpdateState(context),
-                context =>
+                name: startCommand.Name,
+                displayName: startCommand.DisplayName,
+                updateState: context => !tcs.Task.IsCompleted ? ResourceCommandState.Enabled : startCommand.UpdateState(context),
+                executeCommand: context =>
                 {
                     if (tcs.Task.IsCompleted)
                         return startCommand.ExecuteCommand(context);
@@ -38,12 +38,14 @@ public static class ExplicitStartupExtensions
                     tcs.SetResult();
                     return Task.FromResult(CommandResults.Success());
                 },
-                startCommand.DisplayDescription,
-                startCommand.Parameter,
-                startCommand.ConfirmationMessage,
-                startCommand.IconName,
-                startCommand.IconVariant,
-                startCommand.IsHighlighted);
+                displayDescription: startCommand.DisplayDescription,
+                arguments: startCommand.Arguments,
+                confirmationMessage: startCommand.ConfirmationMessage,
+                iconName: startCommand.IconName,
+                iconVariant: startCommand.IconVariant,
+                isHighlighted: startCommand.IsHighlighted,
+                visibility: startCommand.Visibility,
+                validateArguments: startCommand.ValidateArguments);
 
             evt.Resource.Annotations.Add(newCommand);
 

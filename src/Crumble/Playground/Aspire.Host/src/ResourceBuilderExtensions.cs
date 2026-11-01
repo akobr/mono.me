@@ -8,10 +8,12 @@ public static class ResourceBuilderExtensions
             name: "openDashboard",
             displayName: "Open Dashboard",
             executeCommand: context => OnOpenTabCommandAsync(builder, context),
-            updateState: _ => ResourceCommandState.Enabled,
-            iconName: "Board",
-            iconVariant: IconVariant.Regular
-        );
+            commandOptions: new CommandOptions
+            {
+                UpdateState = _ => ResourceCommandState.Enabled,
+                IconName = "Board",
+                IconVariant = IconVariant.Regular,
+            });
 
         return builder;
     }
@@ -24,7 +26,7 @@ public static class ResourceBuilderExtensions
         return new ExecuteCommandResult
         {
             Success = false,
-            ErrorMessage = url,
+            Message = url,
         };
     }
 }
