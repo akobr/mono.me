@@ -20,6 +20,8 @@
     <PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.OpenApi" />
+    <!-- The custom OpenApi.Core of the worker extension above; without it the public 1.0.0 resolves, with ASP.NET Core 2.1 packages -->
+    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.OpenApi.Core" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" />
     <PackageReference Include="Microsoft.ApplicationInsights.WorkerService" />
   </ItemGroup>
