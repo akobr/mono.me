@@ -213,7 +213,7 @@ Use the Aspire host for Platform development:
 ```bash
 dotnet run --project src/Platform/Aspire.Host/src
 ```
-This orchestrates: Azure Functions API, CosmosDB emulator, Azure Storage emulator.
+This orchestrates: Azure Functions API, CosmosDB emulator, Azure Storage emulator, and the admin UI (`ui-admin`, which installs and builds its npm packages and the TypeScript SDK itself through `npm run prepare:local`, skipping what is up to date; its `Clean reinstall` command redoes both).
 
 ### CLI Tools (dotnet global tools)
 - `mrepo` — monorepo management (`src/Monorepo/Cli`)

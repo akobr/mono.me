@@ -13,14 +13,14 @@ The npm package lives in `src/`. Node 22.18 or newer is required; Node 24 LTS is
 
 ```bash
 # the SDK is a file: dependency and is installed as a packed copy (src/.npmrc install-links=true)
-cd src/Platform/Storyteller/sdk.typescript/src && npm ci && npm run build
-cd ../../../ui.admin/src && npm ci
+cd src/Platform/Storyteller/sdk.typescript/src && npm run prepare:local   # npm ci + npm run build, when needed
+cd ../../../ui.admin/src && npm run prepare:local                           # npm ci, or a reinstall of a rebuilt SDK
 
 npm run dev:mock   # http://localhost:5174, API served by MSW in the browser, fake signed-in user, showcase data
 npm run dev        # http://localhost:5173, real API (VITE_API_BASE_URL) and AuthKit
 ```
 
-After a change of the SDK, rebuild it and reinstall it here: `rm -rf node_modules/@42for.net && npm install`. The SDK is a file: dependency, so a rebuilt SDK changes neither the lockfile nor the version, and the dev server would keep pre-bundling the old copy (two instances of `@tanstack/vue-query`: `client.defaultQueryOptions is not a function`). `build/sdk-freshness.ts` stamps the installed `dist`: a changed stamp forces the re-optimization at the start, and a running dev server re-optimizes and restarts when the reinstall lands.
+`prepare:local` keeps a stamp of what it installed and skips what is up to date (`--force` redoes everything); the plain `npm ci` and `npm run build` work as well. After a change of the SDK, rebuild it and reinstall it here: `npm run prepare:local` in both folders, or by hand `rm -rf node_modules/@42for.net && npm install`. The SDK is a file: dependency, so a rebuilt SDK changes neither the lockfile nor the version, and the dev server would keep pre-bundling the old copy (two instances of `@tanstack/vue-query`: `client.defaultQueryOptions is not a function`). `build/sdk-freshness.ts` stamps the installed `dist`: a changed stamp forces the re-optimization at the start, and a running dev server re-optimizes and restarts when the reinstall lands.
 
 The dev server pre-bundles every package imported in `app/` when it starts (`optimizeDeps.entries` in `vite.config.ts`), so moving to another page never re-optimizes the dependencies and reloads the app. A package that only a virtual module imports, like `vue-router/experimental` from the generated routes, goes into `optimizeDeps.include`. `test/unit/build/dependency-prebundling.test.ts` checks both.
 
@@ -122,7 +122,8 @@ Fonts render differently per platform, so the visual baselines in `test/e2e/__sc
 
 - It runs `npm run dev:aspire` on port 5173 (the WorkOS redirect URI).
 - It sets `VITE_API_BASE_URL` to the `api-functions` endpoint.
-- It does not install packages. Run `npm ci` here, and build the SDK, once before the first start.
+- It prepares itself first: `ui-admin-sdk` runs the SDK's `prepare:local`, then `ui-admin-installer` runs `npm run prepare:local` here; both skip what is up to date.
+- Its **Clean reinstall** command redoes both from scratch and restarts the dev server. Details in [Local Development with the Aspire Host](../../../docs/Platform/Aspire.Host/local-development.md#admin-ui).
 
 ## Configuration
 
