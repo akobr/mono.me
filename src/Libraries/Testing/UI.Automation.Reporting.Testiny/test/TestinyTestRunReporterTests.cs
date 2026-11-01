@@ -174,6 +174,73 @@ public sealed class TestinyTestRunReporterTests
     }
 
     [Fact]
+    public async Task StartAsync_RetriedAfterACreationWhoseAnswerWasLost_AdoptsTheCreatedRun()
+    {
+        testiny.Fail("POST", "testrun", HttpStatusCode.BadGateway, when: request => request.Path == "testrun", afterCommit: true);
+        await using var reporter = Reporter();
+        var planned = new[] { Test("A", Case("1")) };
+
+        await Should.ThrowAsync<TestinyTransientException>(() => reporter.StartAsync(Run(), planned, CancellationToken.None));
+        await reporter.StartAsync(Run(), planned, CancellationToken.None);
+
+        testiny.RunIds.ShouldBe([7L]);
+        reporter.RunId.ShouldBe(7);
+        var find = testiny.To("POST", "testrun/find").ShouldHaveSingleItem();
+        find.Json.GetProperty("filter").GetProperty("project_id").GetInt64().ShouldBe(42);
+        find.Json.GetProperty("filter").GetProperty("title").GetString().ShouldBe("UI automation 2026-10-31 15:25 mock");
+        find.Json.GetProperty("omitLargeValues").GetBoolean().ShouldBeFalse();
+        PlannedIds().ShouldBe([1L]);
+    }
+
+    [Fact]
+    public async Task StartAsync_RetriedAfterAnUncommittedCreation_CreatesTheRun_IgnoringOtherRunsOfTheTitle()
+    {
+        await using (var earlier = Reporter())
+        {
+            await earlier.StartAsync(Run() with { RunId = "earlier-run" }, [], CancellationToken.None);
+        }
+
+        testiny.Fail("POST", "testrun", HttpStatusCode.GatewayTimeout, when: request => request.Path == "testrun");
+        await using var reporter = Reporter();
+
+        await Should.ThrowAsync<TestinyTransientException>(() => reporter.StartAsync(Run(), [], CancellationToken.None));
+        await reporter.StartAsync(Run(), [], CancellationToken.None);
+
+        testiny.RunIds.ShouldBe([7L, 8L]);
+        reporter.RunId.ShouldBe(8);
+        testiny.To("POST", "testrun/find").ShouldHaveSingleItem();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task StartAsync_RetriedAfterACreationRefusedBeforeTheWork_CreatesWithoutALookup(HttpStatusCode status)
+    {
+        testiny.Fail("POST", "testrun", status, when: request => request.Path == "testrun");
+        await using var reporter = Reporter();
+
+        await Should.ThrowAsync<TestinyTransientException>(() => reporter.StartAsync(Run(), [], CancellationToken.None));
+        await reporter.StartAsync(Run(), [], CancellationToken.None);
+
+        testiny.RunIds.ShouldBe([7L]);
+        testiny.To("POST", "testrun/find").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DisposeAsync_ClosesARunWhoseCreationAnswerWasLost_AndThatWasNotTriedAgain()
+    {
+        testiny.Fail("POST", "testrun", HttpStatusCode.InternalServerError, when: request => request.Path == "testrun", afterCommit: true);
+        var reporter = Reporter();
+
+        await Should.ThrowAsync<TestinyTransientException>(() => reporter.StartAsync(Run(), [], CancellationToken.None));
+        await reporter.DisposeAsync();
+
+        testiny.Requests.Select(request => request.ToString()).ShouldBe(["POST testrun", "POST testrun/find", "GET testrun/7", "PUT testrun/7"]);
+        testiny.Run(7)["is_closed"]!.GetValue<bool>().ShouldBeTrue();
+        testiny.Run(7)["description"]!.GetValue<string>().ShouldContain("because its start failed: TestinyTransientException: Testiny POST /testrun answered 500");
+    }
+
+    [Fact]
     public async Task ReportAsync_TheWorstStatusOfACaseWins_OverTestsAndBatches()
     {
         var first = Test("First", Case("1"));
@@ -241,7 +308,7 @@ public sealed class TestinyTestRunReporterTests
     {
         var failing = Test("Fails", Case("1"), Case("2"));
         var passing = Test("Passes", Case("3"));
-        await using var reporter = await Started(failing, passing);
+        await using var reporter = await Started(options => options.AttachTraces = true, failing, passing);
 
         await reporter.ReportAsync(
             [
@@ -283,7 +350,13 @@ public sealed class TestinyTestRunReporterTests
     public async Task ReportAsync_ListsAFileOverTheLimit_AndAMissingOne_InsteadOfUploadingThem()
     {
         var failing = Test("Fails", Case("1"));
-        await using var reporter = await Started(options => options.MaxAttachmentBytes = 4, failing);
+        await using var reporter = await Started(
+            options =>
+            {
+                options.MaxAttachmentBytes = 4;
+                options.AttachTraces = true;
+            },
+            failing);
         var gone = new TestArtifact("video.webm", files.Path.Combine(ArtifactsDirectory, "Fails", "video.webm"), "video/webm", ArtifactKind.Video, 9);
 
         await reporter.ReportAsync(
@@ -421,7 +494,7 @@ public sealed class TestinyTestRunReporterTests
     public async Task ReportAsync_AnUploadThatFailsTransientlyTwice_IsGivenUp_AndTheCommentStillGoesOut()
     {
         var failing = Test("Fails", Case("1"));
-        await using var reporter = await Started(failing);
+        await using var reporter = await Started(options => options.AttachTraces = true, failing);
         testiny.Fail("POST", "testrun/upload-attachment/", HttpStatusCode.ServiceUnavailable, times: 2);
         IReadOnlyList<TestResultReport> batch = [Result(failing, TestOutcome.Failed, failure: Failure(), artifacts: [Artifact("trace.zip", 5, ArtifactKind.Trace), Artifact("console.log", 2, ArtifactKind.ConsoleLog)])];
 
@@ -434,10 +507,73 @@ public sealed class TestinyTestRunReporterTests
     }
 
     [Fact]
-    public async Task ReportAsync_ALongArtifactName_IsCutBeforeItsExtension()
+    public async Task ReportAsync_LeavesTheTraceOut_WithoutAttachTraces()
     {
         var failing = Test("Fails", Case("1"));
         await using var reporter = await Started(failing);
+
+        await reporter.ReportAsync([Result(failing, TestOutcome.Failed, failure: Failure(), artifacts: [Artifact("failure.png", 3, ArtifactKind.Screenshot), Artifact("trace.zip", 5, ArtifactKind.Trace)])], CancellationToken.None);
+
+        testiny.To("POST", "testrun/upload-attachment/").ShouldHaveSingleItem().Query["filename"].ShouldBe("failure.png");
+        CommentTexts().ShouldHaveSingleItem().ShouldContain("`trace.zip` (not attached)");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    public async Task ReportAsync_AnUploadThatMayHaveReachedTestiny_IsNotSentAgain(HttpStatusCode status)
+    {
+        var failing = Test("Fails", Case("1"));
+        await using var reporter = await Started(failing);
+        testiny.Fail("POST", "testrun/upload-attachment/", status, afterCommit: true);
+        IReadOnlyList<TestResultReport> batch = [Result(failing, TestOutcome.Failed, failure: Failure(), artifacts: [Artifact("failure.png", 3, ArtifactKind.Screenshot), Artifact("console.log", 2, ArtifactKind.ConsoleLog)])];
+
+        await reporter.ReportAsync(batch, CancellationToken.None);
+        await reporter.ReportAsync(batch, CancellationToken.None);
+
+        testiny.To("POST", "testrun/upload-attachment/").Select(upload => upload.Query["filename"]).ShouldBe(["failure.png", "console.log"]);
+        CommentTexts().ShouldHaveSingleItem().ShouldContain("`failure.png` (the upload failed)");
+        reporter.Warnings.ShouldHaveSingleItem().ShouldStartWith("Uploading failure.png of SampleTests.Fails to test case 1 failed (it may have reached Testiny, so it is not sent again):");
+    }
+
+    [Fact]
+    public async Task ReportAsync_CommentsThatMayHaveReachedTestiny_AreNotCreatedAgain()
+    {
+        var failing = Test("Fails", Case("1"));
+        await using var reporter = await Started(failing);
+        testiny.Fail("POST", "comment/bulk", HttpStatusCode.InternalServerError, afterCommit: true);
+        IReadOnlyList<TestResultReport> batch = [Result(failing, TestOutcome.Failed, failure: Failure())];
+
+        await reporter.ReportAsync(batch, CancellationToken.None);
+        await reporter.ReportAsync(batch, CancellationToken.None);
+
+        testiny.To("POST", "comment/bulk").ShouldHaveSingleItem();
+        testiny.To("POST", "comment/mapping").ShouldBeEmpty();
+        reporter.Warnings.ShouldHaveSingleItem().ShouldStartWith("Creating 1 comment(s) on the results of test case(s) 1 failed, and they may have reached Testiny unmapped, so they are not sent again:");
+    }
+
+    [Fact]
+    public async Task ReportAsync_CommentsRefusedWith503_AreCreatedOnTheRetry()
+    {
+        var failing = Test("Fails", Case("1"));
+        await using var reporter = await Started(failing);
+        testiny.Fail("POST", "comment/bulk", HttpStatusCode.ServiceUnavailable);
+        IReadOnlyList<TestResultReport> batch = [Result(failing, TestOutcome.Failed, failure: Failure())];
+
+        await Should.ThrowAsync<TestinyTransientException>(() => reporter.ReportAsync(batch, CancellationToken.None));
+        await reporter.ReportAsync(batch, CancellationToken.None);
+
+        testiny.To("POST", "comment/bulk").Count.ShouldBe(2);
+        testiny.To("POST", "comment/mapping").ShouldHaveSingleItem();
+        reporter.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ReportAsync_ALongArtifactName_IsCutBeforeItsExtension()
+    {
+        var failing = Test("Fails", Case("1"));
+        await using var reporter = await Started(options => options.AttachTraces = true, failing);
         var name = $"Configurations-SetDocument-{new string('x', 130)}.trace.zip";
 
         await reporter.ReportAsync([Result(failing, TestOutcome.Failed, failure: Failure(), artifacts: [Artifact(name, 3, ArtifactKind.Trace)])], CancellationToken.None);

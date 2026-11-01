@@ -13,6 +13,8 @@ namespace _42.Testing.UI.Automation.Reporting.Testiny.Api;
 [JsonSerializable(typeof(TestinyApiError))]
 [JsonSerializable(typeof(TestinyFindRequest))]
 [JsonSerializable(typeof(TestinyFindResult))]
+[JsonSerializable(typeof(TestinyTestRunFindRequest))]
+[JsonSerializable(typeof(TestinyTestRunFindResult))]
 internal sealed partial class TestinyJsonContext : JsonSerializerContext
 {
 }

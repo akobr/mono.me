@@ -114,6 +114,28 @@ public sealed class TestinyReporterProviderTests
         await using var reporter = TestinyReporterProvider.Instance.Create(new Services(factory: factory), configuration.GetSection(TestinyOptions.SectionName), TestData.Run());
 
         factory.Names.ShouldBe(["Testiny"]);
+        factory.Clients.ShouldHaveSingleItem().Timeout.ShouldBe(Timeout.InfiniteTimeSpan);
+    }
+
+    [Theory]
+    [InlineData("https://testiny.example.test/api/v1/", true)]
+    [InlineData("http://localhost:5199/api/v1/", true)]
+    [InlineData("http://127.0.0.1:5199/api/v1/", true)]
+    [InlineData("http://[::1]:5199/api/v1/", true)]
+    [InlineData("http://testiny.example.test/api/v1/", false)]
+    [InlineData("http://10.0.0.5/api/v1/", false)]
+    public void Validate_AllowsPlainHttp_ForALoopbackHostOnly(string baseUrl, bool valid)
+    {
+        var errors = new TestinyOptions { BaseUrl = baseUrl, ApiKey = "k", ProjectId = 1 }.Validate();
+
+        if (valid)
+        {
+            errors.ShouldBeEmpty();
+        }
+        else
+        {
+            errors.ShouldHaveSingleItem().ShouldStartWith("BaseUrl must be an absolute https URL");
+        }
     }
 
     [Fact]
@@ -135,7 +157,7 @@ public sealed class TestinyReporterProviderTests
 
         options.Validate().ShouldBe(
         [
-            "BaseUrl must be an absolute http or https URL such as https://app.testiny.io/api/v1/; it is 'ftp://testiny'.",
+            "BaseUrl must be an absolute https URL such as https://app.testiny.io/api/v1/ (http only for a loopback host such as localhost); it is 'ftp://testiny'.",
             "TestPlanId must be a positive test plan id, or null for no plan.",
             "MaxAttachmentBytes must be positive.",
             "RequestTimeoutSeconds must be at least 1.",
@@ -156,6 +178,7 @@ public sealed class TestinyReporterProviderTests
         options.PlanCasesAsNotRun.ShouldBeTrue();
         options.CloseRunOnComplete.ShouldBeTrue();
         options.Attachments.ShouldBe(TestinyContentPolicy.Failures);
+        options.AttachTraces.ShouldBeFalse();
         options.MaxAttachmentBytes.ShouldBe(26_214_400);
         options.Comments.ShouldBe(TestinyContentPolicy.Failures);
         options.ResultForSkipped.ShouldBe("SKIPPED");
@@ -200,10 +223,14 @@ public sealed class TestinyReporterProviderTests
     {
         public List<string> Names { get; } = [];
 
+        public List<HttpClient> Clients { get; } = [];
+
         public HttpClient CreateClient(string name)
         {
             Names.Add(name);
-            return new HttpClient(new FakeTestiny());
+            var client = new HttpClient(new FakeTestiny());
+            Clients.Add(client);
+            return client;
         }
     }
 }

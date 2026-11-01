@@ -55,6 +55,24 @@ public sealed class TestinyClient
         return SendAsync(HttpMethod.Post, "testrun", Json(run, TestinyJsonContext.Default.TestinyTestRun), TestinyJsonContext.Default.TestinyTestRun, cancellationToken);
     }
 
+    // POST /testrun/find: the runs of the project with exactly this title, newest first, with their descriptions; at
+    // most limit of them.
+    public async Task<IReadOnlyList<TestinyTestRun>> FindTestRunsAsync(long projectId, string title, int limit = 20, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        var request = new TestinyTestRunFindRequest
+        {
+            Filter = new TestinyTestRunFilter(projectId, title),
+            Order = [new TestinySortOrder("id", "desc")],
+            OmitLargeValues = false,
+            Pagination = new TestinyPagination(0, limit),
+        };
+
+        var result = await SendAsync(HttpMethod.Post, "testrun/find", Json(request, TestinyJsonContext.Default.TestinyTestRunFindRequest), TestinyJsonContext.Default.TestinyTestRunFindResult, cancellationToken);
+        return result.Data;
+    }
+
     // GET /testrun/{id}, for the current _etag.
     public Task<TestinyTestRun> GetTestRunAsync(long id, CancellationToken cancellationToken = default)
     {

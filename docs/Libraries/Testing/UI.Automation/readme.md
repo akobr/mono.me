@@ -148,7 +148,7 @@ Used when `Browser:Provider` is `BrowserStack`; see "Browser providers".
 
 | Key | Default | Meaning |
 |---|---|---|
-| `BaseUrl` | `https://app.testiny.io/api/v1/` | The API root |
+| `BaseUrl` | `https://app.testiny.io/api/v1/` | The API root; `https`, plain `http` only for a loopback host (a local fake or proxy), as every request carries the API key |
 | `ApiKey` | empty | Sent as `X-Api-Key` (a secret, required); best restricted to the project |
 | `ProjectId` | `0` | The numeric Testiny project id (required) |
 | `TestPlanId` | `null` | A test plan the run is added to; Testiny refusing it is a warning and the run goes on outside the plan |
@@ -156,9 +156,10 @@ Used when `Browser:Provider` is `BrowserStack`; see "Browser providers".
 | `PlanCasesAsNotRun` | `true` | Every linked case of the planned tests goes into the run as `NOTRUN` at the start |
 | `CloseRunOnComplete` | `true` | |
 | `Attachments` / `Comments` | `Failures` / `Failures` | `None`, `Failures` (every outcome but passed and skipped) or `All` |
+| `AttachTraces` | `false` | Uploads `trace.zip` too. A trace holds the cookies and storage of the signed-in pool user (a live session until it expires) and every request of the test: turning it on shares that session with Testiny and everyone who can read the project |
 | `MaxAttachmentBytes` | `26214400` (25 MB) | Larger files are listed in the comment instead |
 | `ResultForSkipped` / `ResultForBlocked` | `SKIPPED` / `BLOCKED` | The result status of a skipped and a blocked test (a custom status works too) |
-| `RequestTimeoutSeconds` | `30` | Per request; a timeout is retried like a `429` or a `5xx` |
+| `RequestTimeoutSeconds` | `30` | Per request; a timeout counts as a transient failure (see below for what is sent again) |
 | `MinUploadBytesPerSecond` | `262144` (256 KiB/s) | The slowest upload expected: an upload may take its size at this rate when that is longer than `RequestTimeoutSeconds` |
 | `RunUrlTemplate` | `{AppUrl}/{ProjectId}/testruns/{RunId}` | The browser link of the run printed at the end; `{AppUrl}` is `BaseUrl` without its `/api/…` path. **Not verified** against Testiny's app: set the form its "Copy link to test run" shows |
 
@@ -280,9 +281,9 @@ The records: `TestRunDescriptor` (run id, name, description, start, properties: 
 `42.Testing.UI.Automation.Reporting.Testiny` reports a run as a classic Testiny **test run** whose test cases are the `[TestCase]` ids (`"1234"`, or `"TC-1234"` whose digits are taken):
 
 - **Start**: the run (title `Reporting:RunName`, the description under Testiny's `<!--markdown-->` header), added to `TestPlanId`; with `Reporting:UnmappedTests` `Warn` or `Fail` the ids are checked once (`POST /testcase/find`; unknown ids are warnings and left out); every linked case planned as `NOTRUN`, 200 per request.
-- **Results**: each linked case gets the worst result over the tests that link it (`FAILED` > `BLOCKED` > `SKIPPED` > `PASSED`; a retried test counts its last attempt); per `Attachments` the artifacts are uploaded to each linked case (`MaxAttachmentBytes`; an upload that fails transiently twice is listed in the comment instead); per `Comments` one markdown comment per test and linked case: test, outcome, **duration** (Testiny has no duration field), attempt, browser, OS, seed, remote session, run, build, artifacts, exception and stack trace.
+- **Results**: each linked case gets the worst result over the tests that link it (`FAILED` > `BLOCKED` > `SKIPPED` > `PASSED`; a retried test counts its last attempt); per `Attachments` the artifacts but the trace (see `AttachTraces`) are uploaded to each linked case (`MaxAttachmentBytes`; an upload that fails transiently twice is listed in the comment instead); per `Comments` one markdown comment per test and linked case: test, outcome, **duration** (Testiny has no duration field), attempt, browser, OS, seed, remote session, run, build, artifacts, exception and stack trace.
 - **Complete**: the totals, the cases by status and the run's warnings go into the description, then the run is closed. A run whose reporting stopped early is still closed, with why in its description.
-- Every step remembers what Testiny accepted, so a retried call repeats only what is missing; Testiny refusing one case, upload, comment, the plan or the id check is a warning and the rest goes on. Rate limits (per account: writes 270 / 6 min, bulk writes 960 / 12 min, uploads 3200 / 30 min) are met by batching and back-off; a long throttle can outlast `MaxAttempts`, and the batch can then be replayed.
+- Every step remembers what Testiny accepted, so a retried call repeats only what is missing. A failure after which Testiny may have done the work anyway (a timeout, a network failure once connected, a `5xx` other than `503`) is never blindly sent again: the retried start (or the reporter's disposal) first looks the run up (`POST /testrun/find` by project and title, the one whose description names the run id) and creates one only when there is none, and an upload or a comment is given up as a warning; `429`, `408` and `503` are sent again. Testiny refusing one case, upload, comment, the plan or the id check is a warning and the rest goes on. Rate limits (per account: writes 270 / 6 min, bulk writes 960 / 12 min, uploads 3200 / 30 min) are met by batching and back-off; a long throttle can outlast `MaxAttempts`, and the batch can then be replayed.
 - With an `IHttpClientFactory` in the setup's `Services` the provider uses its client named `Testiny`; otherwise it creates its own.
 
 ### Add a reporter
