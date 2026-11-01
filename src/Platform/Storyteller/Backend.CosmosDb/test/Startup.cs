@@ -41,8 +41,7 @@ public class Startup : IAsyncLifetime, ITestContext
     {
         // Built only when used: building it needs a running Docker, the local emulator does not.
         DbContainer = UseContainer
-            ? new CosmosDbBuilder()
-                .WithImage("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
+            ? new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
                 .WithReuse(true)
                 .Build()
             : null!;
