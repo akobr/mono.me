@@ -16,6 +16,7 @@ public class DiagnosticFileSystem : IFileSystem
         FileSystemWatcher = new DiagnosticFileSystemWatcherFactory(executingSystem.FileSystemWatcher, this, processor);
         FileVersionInfo = new DiagnosticFileVersionInfoFactory(executingSystem.FileVersionInfo, this, processor);
         Path = new DiagnosticPath(executingSystem.Path, this, processor);
+        RandomAccess = new DiagnosticRandomAccess(executingSystem.RandomAccess, this, processor);
     }
 
     public IDirectory Directory { get; }
@@ -35,4 +36,6 @@ public class DiagnosticFileSystem : IFileSystem
     public IFileVersionInfoFactory FileVersionInfo { get; }
 
     public IPath Path { get; }
+
+    public IRandomAccess RandomAccess { get; }
 }

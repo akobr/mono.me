@@ -17,6 +17,7 @@ public class ReadonlyFileSystem : IFileSystem
         FileSystemWatcher = executingSystem.FileSystemWatcher;
         FileVersionInfo = executingSystem.FileVersionInfo;
         Path = executingSystem.Path;
+        RandomAccess = new ReadonlyRandomAccess(executingSystem.RandomAccess, this);
     }
 
     public IDirectory Directory { get; }
@@ -36,4 +37,6 @@ public class ReadonlyFileSystem : IFileSystem
     public IFileVersionInfoFactory FileVersionInfo { get; }
 
     public IPath Path { get; }
+
+    public IRandomAccess RandomAccess { get; }
 }
