@@ -81,6 +81,11 @@ internal static class SettingsValidator
     // Lowers what cannot work and warns about what may wait.
     public static void Adjust(UiAutomationSettings settings)
     {
+        foreach (var key in SettingsRedaction.ShortSecretKeys(settings))
+        {
+            settings.AddWarning($"{key} has fewer than {SecretRedactor.MinimumLength} characters, too few to be redacted from logs and reports; use a longer secret.");
+        }
+
         var poolSize = settings.Users.Pool.Count;
         if (poolSize == 0)
         {

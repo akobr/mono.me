@@ -18,9 +18,10 @@ namespace _42.Testing.UI.Automation.Runtime;
 // the user pool, the cached sign-ins and the reporting dispatcher. Start fails fast: unknown sign-in flow, a pool that
 // cannot lease, browsers that do not launch, an unknown device, a reporter that refuses its settings or a target the
 // setup's check refuses (AutomationSessionOptions.TargetCheck) stop the run before any test, and before a reporter
-// creates a run; a failure after the reporters started completes their runs and disposes them. No static state: the
-// adapter keeps the current session. Every report it creates, and the message of a failed target check, shows the
-// settings' secrets and the pool users' e-mails as *** (Redact).
+// creates a run; a failure after the reporters started completes their runs and disposes them. No static state of its
+// own (the adapter keeps the current session), but Playwright's Expect timeout is process-wide: run one session per
+// process at a time. Every report it creates, and the message of a failed target check, shows the settings' secrets and
+// the pool users' e-mails as *** (Redact).
 public sealed class AutomationSession : IAsyncDisposable
 {
     private const string RunIdCharacters = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -147,6 +148,8 @@ public sealed class AutomationSession : IAsyncDisposable
         try
         {
             var contextOptions = new ContextOptionsFactory(settings, browserProvider.Devices);
+
+            // Process-wide in Playwright: a second session of the same process at the same time would overwrite it.
             Assertions.SetDefaultExpectTimeout(settings.Execution.ExpectTimeoutMs);
 
             var run = CreateRun(settings, runId, seed, startedAt, environment, values, browserProvider, contextOptions, options.TestEngine);
@@ -343,13 +346,19 @@ public sealed class AutomationSession : IAsyncDisposable
         }
     }
 
-    // Once: drains and completes the reporters (with the settings' warnings first), then closes the browsers.
+    // Once: drains and completes the reporters (with the settings' warnings first), then closes the browsers, also when
+    // the reporting failed. The stop itself is bounded by Reporting:CompleteTimeoutSeconds, not by a caller's token:
+    // cancellationToken only ends the wait of this caller, so one caller's cancellation cannot cut the stop short for
+    // the others.
     public Task<TestRunSummary> StopAsync(CancellationToken cancellationToken = default)
     {
+        Task<TestRunSummary> stop;
         lock (stopGate)
         {
-            return stopping ??= StopCoreAsync(cancellationToken);
+            stop = stopping ??= StopCoreAsync();
         }
+
+        return stop.WaitAsync(cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -522,17 +531,23 @@ public sealed class AutomationSession : IAsyncDisposable
         }
     }
 
-    private async Task<TestRunSummary> StopCoreAsync(CancellationToken cancellationToken)
+    private async Task<TestRunSummary> StopCoreAsync()
     {
-        var summary = await Reporting.CompleteAsync([.. Settings.Warnings, .. ContextOptions.Warnings], cancellationToken);
-
+        TestRunSummary summary;
         try
         {
-            await BrowserProvider.DisposeAsync();
+            summary = await Reporting.CompleteAsync([.. Settings.Warnings, .. ContextOptions.Warnings], CancellationToken.None);
         }
-        catch (Exception exception)
+        finally
         {
-            Logger.LogWarning(exception, "The browser provider did not close cleanly.");
+            try
+            {
+                await BrowserProvider.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                Logger.LogWarning(exception, "The browser provider did not close cleanly.");
+            }
         }
 
         Logger.LogInformation(

@@ -143,8 +143,10 @@ public static class UiAutomationSession
         {
             session = await AutomationSession.StartAsync(settings, options, context.SessionCancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException || !context.SessionCancellationToken.IsCancellationRequested)
         {
+            // Only the end of the test session itself is a cancellation; any other one (a timeout inside the start) is
+            // a start that failed.
             failure = exception;
             lock (Gate)
             {

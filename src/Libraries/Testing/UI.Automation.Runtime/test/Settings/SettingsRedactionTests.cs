@@ -88,6 +88,53 @@ public sealed class SettingsRedactionTests
     }
 
     [Fact]
+    public void SecretValues_HoldThePasswordOfTheTargetUrl_AndDescribeMasksIt()
+    {
+        var directory = MockUnixSupport.Path(@"C:\suite\bin");
+        var files = new MockFileSystem();
+        files.AddFile(files.Path.Combine(directory, "testsettings.json"), new MockFileData("""
+            { "Target": { "BaseUrl": "https://basic:p%40ss-word@admin.example.test/" } }
+            """));
+
+        var settings = UiAutomationSettingsLoader.Load(new UiAutomationSettingsOptions
+        {
+            BaseDirectory = directory,
+            FileSystem = files,
+            EnvironmentVariables = new Dictionary<string, string?>(),
+        });
+
+        SettingsRedaction.SecretValues(settings).ShouldBe(["p%40ss-word", "p@ss-word"]);
+        SettingsRedaction.CreateRedactor(settings)("typed p@ss-word into https://basic:p%40ss-word@admin.example.test/").ShouldBe("typed *** into https://basic:***@admin.example.test/");
+        var description = settings.Describe();
+        description.ShouldContain("Target:BaseUrl = https://basic:***@admin.example.test/");
+        description.ShouldNotContain("ss-word");
+    }
+
+    [Fact]
+    public void ASecretOfFewerThanFourCharacters_IsNotRedacted_AndTheSettingsWarn()
+    {
+        var directory = MockUnixSupport.Path(@"C:\suite\bin");
+        var files = new MockFileSystem();
+        files.AddFile(files.Path.Combine(directory, "testsettings.json"), new MockFileData("""
+            {
+              "Target": { "BaseUrl": "https://admin.example.test" },
+              "Users": { "Pool": [ { "Email": "ui-01@example.test", "Password": "abc" } ] }
+            }
+            """));
+
+        var settings = UiAutomationSettingsLoader.Load(new UiAutomationSettingsOptions
+        {
+            BaseDirectory = directory,
+            FileSystem = files,
+            EnvironmentVariables = new Dictionary<string, string?>(),
+        });
+
+        SettingsRedaction.CreateRedactor(settings)("a b c abc").ShouldBe("a b c abc");
+        settings.Warnings.ShouldContain("Users:Pool:0:Password has fewer than 4 characters, too few to be redacted from logs and reports; use a longer secret.");
+        settings.Describe().ShouldContain("Users:Pool:0:Password = ***");
+    }
+
+    [Fact]
     public void StartBudget_CoversTheLease_ABrowserStackConnection_AndTheFirstSignIn()
     {
         var local = new UiAutomationSettings();
