@@ -14,8 +14,8 @@ The code is in `src/Platform/Storyteller/Aspire.Hosting/src/`. The design and it
 | | `Aspire.Hosting.ApplicationModel` | `StorytellerResource` |
 
 - **No `using`.** The types are in Aspire's own namespaces, as Aspire's integrations are, and an AppHost imports them already.
-- **Aspire 13.1.2.** The package references `Aspire.Hosting` 13.1.2 and nothing else. It does not reference the C# SDK, so an AppHost does not depend on the SDK's version or pull in its dependencies. The variable names and the rules of keys and endpoints are copied from the SDK, and tests compare the copies with it.
-- **Restore warnings.** Restoring `Aspire.Hosting` 13.1.2 reports the audit warnings `NU1902` and `NU1903` for its `MessagePack` 2.5.192 dependency, as the platform's own AppHost does.
+- **Aspire 13.6.4.** The package references `Aspire.Hosting` 13.6.4 and nothing else. It does not reference the C# SDK, so an AppHost does not depend on the SDK's version or pull in its dependencies. The variable names and the rules of keys and endpoints are copied from the SDK, and tests compare the copies with it.
+- **No restore warnings.** `Aspire.Hosting` 13.6.4 depends on `MessagePack` 2.5.307 and `StreamJsonRpc` 2.25.29, which have no known vulnerabilities; the `MessagePack` 2.5.192 audit warnings of 13.1.2 are gone.
 
 ## An AppHost
 

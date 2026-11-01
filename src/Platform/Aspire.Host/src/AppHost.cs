@@ -16,12 +16,11 @@ var storage = builder
 // "local" uses the Windows emulator installed on the machine (ConnectionStrings:cosmos), which also supports stored
 // procedures, triggers and UDFs. The launch profiles *-local-cosmos set the local mode.
 var cosmosMode = builder.Configuration["Cosmos:Mode"] ?? "container";
-#pragma warning disable ASPIRECOSMOSDB001
 IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvariant() switch
 {
     "container" => builder
         .AddAzureCosmosDB("cosmos")
-        .RunAsPreviewEmulator(emulator =>
+        .RunAsEmulator(emulator =>
         {
             emulator.WithDataExplorer();
             emulator.WithLifetime(ContainerLifetime.Persistent);
@@ -32,7 +31,6 @@ IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvar
     "local" => builder.AddConnectionString("cosmos"),
     _ => throw new InvalidOperationException($"Unknown Cosmos:Mode '{cosmosMode}', use 'container' or 'local'."),
 };
-#pragma warning restore ASPIRECOSMOSDB001
 
 var dbCreator = builder.AddProject<Projects.DbCreator>("db-creator")
     .WithReference(cosmos)
