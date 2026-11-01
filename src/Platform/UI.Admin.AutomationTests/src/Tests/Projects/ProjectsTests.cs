@@ -1,4 +1,5 @@
 using _42.Platform.UI.Admin.AutomationTests.Pages;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 using _42.Testing.UI.Automation.Runtime.Users;
 using static Microsoft.Playwright.Assertions;
@@ -15,6 +16,7 @@ public sealed class ProjectsTests : PlatformTest
     // through the navigation, show the description.
     [Test]
     [Elementary]
+    [TestCase("5")]
     public async Task Project_Create_OpensSettings()
     {
         var project = PlatformData.ProjectKey();

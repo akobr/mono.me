@@ -1,4 +1,5 @@
 using _42.Platform.UI.Admin.AutomationTests.Pages;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
@@ -13,6 +14,7 @@ public sealed class NavigationTests : PlatformTest
     // route and its own content.
     [Test]
     [Elementary]
+    [TestCase("6")]
     public async Task Navigation_MobileMenu_OpensPages()
     {
         var annotations = new AnnotationsPage(App, Routes);

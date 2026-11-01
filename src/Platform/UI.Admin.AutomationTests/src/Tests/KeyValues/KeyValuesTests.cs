@@ -1,4 +1,5 @@
 using _42.Platform.UI.Admin.AutomationTests.Pages;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 using _42.Testing.UI.Automation.Runtime.Users;
 using static Microsoft.Playwright.Assertions;
@@ -15,6 +16,7 @@ public sealed class KeyValuesTests : PlatformTest
     // value, and its Versions tab has the first version as the current one.
     [Test]
     [Elementary]
+    [TestCase("4")]
     public async Task KeyValues_CreateAndRead()
     {
         var key = PlatformData.KeyValueKey();

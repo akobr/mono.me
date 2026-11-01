@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 using _42.Testing.UI.Automation.Runtime.Users;
 using static Microsoft.Playwright.Assertions;
@@ -18,6 +19,7 @@ public sealed class ConfigurationsTests : PlatformTest
     // usually, no type schema or template, so the test depends on none of the target's modeling.
     [Test]
     [Elementary]
+    [TestCase("3")]
     public async Task Configurations_SetDocument_EffectiveShowsIt()
     {
         var key = PlatformData.AnnotationKey(PlatformData.Responsibility);
