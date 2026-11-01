@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <Sdk Name="Aspire.AppHost.Sdk" Version="13.1.2" />
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.4" />
 
   <PropertyGroup>
     <AssemblyName>42.Platform.Aspire.Host</AssemblyName>
@@ -11,12 +11,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>3e6a5eda-f87c-4f00-be83-caf66e106ccd</UserSecretsId>
+    <!-- ASPIRE010: the AppHost takes the DCP and the Dashboard from their NuGet packages, not from the Aspire CLI bundle -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" />
-    <!-- Pin vulnerable transitive MessagePack (via StreamJsonRpc) to a patched 2.5.x; remove after Aspire upgrade to 13.6+. -->
-    <PackageReference Include="MessagePack" />
     <PackageReference Include="Aspire.Hosting.Azure.Storage" />
     <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" />
     <PackageReference Include="Aspire.Hosting.Azure.Functions" />
