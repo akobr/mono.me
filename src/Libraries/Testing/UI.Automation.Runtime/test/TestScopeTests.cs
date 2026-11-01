@@ -52,6 +52,16 @@ public sealed class TestScopeTests
         });
     }
 
+    [Theory]
+    [InlineData("[requestfailed] GET https://auth.example.test/callback?code=abc&state=xyz: net::ERR_ABORTED", "[requestfailed] GET https://auth.example.test/callback?***: net::ERR_ABORTED")]
+    [InlineData("[log] redirect to http://localhost:5174/#access_token=t0k3n (app.js)", "[log] redirect to http://localhost:5174/#*** (app.js)")]
+    [InlineData("[error] failed: \"https://api.example.test/v1/x?key=1\"", "[error] failed: \"https://api.example.test/v1/x?***\"")]
+    [InlineData("[log] https://admin.example.test/organizations stays", "[log] https://admin.example.test/organizations stays")]
+    public void WithoutUrlQueries_DropsTheQueryAndFragmentOfEveryUrl(string line, string expected)
+    {
+        TestScope.WithoutUrlQueries(line).ShouldBe(expected);
+    }
+
     [Fact]
     public async Task EndAsync_HandsTheRefreshedSignIn_ToTheUsersNextTest()
     {

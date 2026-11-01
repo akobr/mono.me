@@ -214,6 +214,28 @@ public sealed class ReportingDispatcherTests
     }
 
     [Fact]
+    public async Task CompleteAsync_ACancelledCaller_StopsOnlyItsOwnWait_AndTheDrainGoesOn()
+    {
+        var reporter = new FakeReporter("Testiny") { ReportGate = new TaskCompletionSource() };
+        await using var dispatcher = Dispatcher([reporter], options => options.BatchSize = 1);
+        await dispatcher.StartAsync(TestData.Run(), []);
+        dispatcher.Report(TestData.Report("Test"));
+        await Eventually.TrueAsync(() => reporter.ReportCalls == 1, "the reporter is in ReportAsync");
+
+        using var cancelled = new CancellationTokenSource();
+        var first = dispatcher.CompleteAsync(cancellationToken: cancelled.Token);
+        await cancelled.CancelAsync();
+        await Should.ThrowAsync<OperationCanceledException>(() => first);
+
+        reporter.ReportGate.SetResult();
+        var summary = await dispatcher.CompleteAsync().WaitAsync(TimeSpan.FromSeconds(5));
+
+        summary.Warnings.ShouldBeEmpty();
+        reporter.Results.ShouldHaveSingleItem();
+        reporter.CompletedSummary.ShouldNotBeNull();
+    }
+
+    [Fact]
     public async Task ResultsFile_RoundTrips_ThroughRead()
     {
         var files = new MockFileSystem();

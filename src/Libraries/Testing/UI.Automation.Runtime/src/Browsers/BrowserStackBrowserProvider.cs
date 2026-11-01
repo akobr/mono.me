@@ -116,7 +116,10 @@ public sealed class BrowserStackBrowserProvider : IBrowserProvider
     public async ValueTask<BrowserLease> AcquireAsync(TestIdentity test, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(test);
-        ObjectDisposedException.ThrowIf(disposed, this);
+        lock (gate)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+        }
 
         var (session, browser) = settings.SessionPerTest
             ? await ConnectForTestAsync(test, cancellationToken)
@@ -128,8 +131,22 @@ public sealed class BrowserStackBrowserProvider : IBrowserProvider
         };
 
         var lease = new BrowserLease(browser, session.Name, properties);
-        leases[lease] = new Holder(test, session);
-        return lease;
+        lock (gate)
+        {
+            // Under the gate, so a session that connected while the provider was disposed is closed, not left open.
+            if (!disposed)
+            {
+                leases[lease] = new Holder(test, session);
+                return lease;
+            }
+        }
+
+        if (settings.SessionPerTest)
+        {
+            await CloseAsync(session, null);
+        }
+
+        throw new ObjectDisposedException(GetType().FullName);
     }
 
     // Never throws: a mark or a close that fails is a warning.
@@ -424,6 +441,19 @@ public sealed class BrowserStackBrowserProvider : IBrowserProvider
         {
             closing.Add(task);
         }
+
+        // A finished close leaves the list, so a long run does not keep every one of them.
+        _ = task.ContinueWith(
+            done =>
+            {
+                lock (gate)
+                {
+                    closing.Remove(done);
+                }
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
         return task;
     }

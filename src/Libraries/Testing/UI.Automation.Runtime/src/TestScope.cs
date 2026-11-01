@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using _42.Testing.UI.Automation.Runtime.Artifacts;
 using _42.Testing.UI.Automation.Runtime.Browsers;
 using _42.Testing.UI.Automation.Runtime.Data;
@@ -21,7 +22,10 @@ namespace _42.Testing.UI.Automation.Runtime;
 // The cached sign-in is never redone on the test's page: that page is traced, and a trace keeps the parameters of
 // every action, the typed password included. A test that signs in itself (TestScopeOptions.SignedIn false) has that
 // exposure in its trace.zip; turn its trace off (Execution:Trace Off) when it types a real password.
-public sealed class TestScope : IAsyncDisposable
+//
+// console.log goes through the session's Redact, and every URL in it loses its query and fragment (as ?*** or #***):
+// the URLs of a sign-in carry its code, state or tokens.
+public sealed partial class TestScope : IAsyncDisposable
 {
     private readonly TestScopeOptions options;
     private readonly ConcurrentQueue<string> consoleLines = new();
@@ -170,7 +174,6 @@ public sealed class TestScope : IAsyncDisposable
                     Title = Test.DisplayName,
                     Screenshots = true,
                     Snapshots = true,
-                    Sources = true,
                 });
                 tracing = true;
             }
@@ -261,6 +264,12 @@ public sealed class TestScope : IAsyncDisposable
         await ReleaseAsync(null);
     }
 
+    // Every http(s) URL of the text without its query and fragment, which may carry the codes and tokens of a sign-in.
+    internal static string WithoutUrlQueries(string text)
+    {
+        return UrlQueryPattern().Replace(text, match => $"{match.Groups["url"].Value}{match.Groups["rest"].Value[0]}{SettingsRedaction.Mask}");
+    }
+
     private static bool Keeps(ArtifactPolicy policy, bool failed)
     {
         return policy == ArtifactPolicy.Always || (policy == ArtifactPolicy.OnFailure && failed);
@@ -270,6 +279,9 @@ public sealed class TestScope : IAsyncDisposable
     {
         return new InvalidOperationException("The test scope has not begun (BeginAsync) or its start failed.");
     }
+
+    [GeneratedRegex(@"(?<url>\bhttps?://[^\s?#""'<>]+)(?<rest>[?#][^\s""'<>]*?)(?=[:,.;)]?(?:[\s""'<>]|$))", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
+    private static partial Regex UrlQueryPattern();
 
     private Exception OutOfTime(BeginStep step, OperationCanceledException exception)
     {
@@ -299,7 +311,7 @@ public sealed class TestScope : IAsyncDisposable
 
     private void Log(string line)
     {
-        consoleLines.Enqueue($"{Session.TimeProvider.GetUtcNow().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture)} {line}");
+        consoleLines.Enqueue($"{Session.TimeProvider.GetUtcNow().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture)} {Session.Redact(WithoutUrlQueries(line))}");
     }
 
     private async Task<TestResultReport> EndCoreAsync(TestOutcome outcome, Exception? exception, string? output, bool reportResult)

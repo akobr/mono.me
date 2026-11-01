@@ -43,7 +43,8 @@ public static class SettingsRedaction
     }
 
     // The values of the settings' secrets: of every configuration key IsSecret finds (Users:Pool:<n>:Password,
-    // BrowserStack:AccessKey, Reporting:Testiny:ApiKey, a consumer's own), and the bound pool passwords and access key.
+    // BrowserStack:AccessKey, Reporting:Testiny:ApiKey, a consumer's own), the bound pool passwords and access key, and
+    // the password in the user info of Target:BaseUrl (https://user:password@host/), as written and URL-decoded.
     public static IReadOnlyList<string> SecretValues(UiAutomationSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -61,6 +62,13 @@ public static class SettingsRedaction
         if (settings.BrowserStack.AccessKey is { } accessKey)
         {
             values.Add(accessKey);
+        }
+
+        if (Uri.TryCreate(settings.Target.BaseUrl?.Trim(), UriKind.Absolute, out var target) && target.UserInfo.IndexOf(':', StringComparison.Ordinal) is var colon and >= 0)
+        {
+            var password = target.UserInfo[(colon + 1)..];
+            values.Add(password);
+            values.Add(Uri.UnescapeDataString(password));
         }
 
         return values.Where(value => value.Trim().Length > 0).Distinct(StringComparer.Ordinal).ToArray();
@@ -82,9 +90,20 @@ public static class SettingsRedaction
         return new SecretRedactor(values).Redact;
     }
 
-    // Every key of the configuration and every effective value of the six sections (defaults included), sorted.
+    // The secret keys of the configuration whose value is too short to be redacted (SecretRedactor.MinimumLength).
+    internal static IEnumerable<string> ShortSecretKeys(UiAutomationSettings settings)
+    {
+        return settings.Configuration.AsEnumerable()
+            .Where(pair => IsSecret(pair.Key) && pair.Value?.Trim().Length is > 0 and < SecretRedactor.MinimumLength)
+            .Select(pair => pair.Key)
+            .Order(StringComparer.OrdinalIgnoreCase);
+    }
+
+    // Every key of the configuration and every effective value of the six sections (defaults included), sorted; a
+    // secret key shows ***, and a secret value elsewhere (the password in Target:BaseUrl) too.
     internal static string Describe(UiAutomationSettings settings)
     {
+        var redactor = new SecretRedactor(SecretValues(settings));
         var values = new SortedDictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (key, value) in settings.Configuration.AsEnumerable())
@@ -102,7 +121,7 @@ public static class SettingsRedaction
         Flatten(values, "BrowserStack", settings.BrowserStack);
         Flatten(values, "Reporting", settings.Reporting);
 
-        return string.Join(Environment.NewLine, values.Select(pair => $"{pair.Key} = {Redact(pair.Key, pair.Value)}"));
+        return string.Join(Environment.NewLine, values.Select(pair => $"{pair.Key} = {redactor.Redact(Redact(pair.Key, pair.Value))}"));
     }
 
     private static void Flatten(IDictionary<string, string?> values, string section, object value)

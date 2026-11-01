@@ -109,11 +109,15 @@ public sealed class ReportingDispatcher : IAsyncDisposable
 
         foreach (var channel in channels.Where(channel => channel.IsActive))
         {
+            // Counted before it is queued, so the consumer never takes the count below zero.
+            channel.AddPending(1);
             if (channel.Queue.Writer.TryWrite(ForSystem(report, channel.System)))
             {
-                channel.AddPending(1);
+                continue;
             }
-            else if (Volatile.Read(ref completing) != 0 && Interlocked.Increment(ref lateReports) == 1)
+
+            channel.AddPending(-1);
+            if (Volatile.Read(ref completing) != 0 && Interlocked.Increment(ref lateReports) == 1)
             {
                 AddWarning($"{channel.System}: a result arrived after the run was completed and was not sent ({report.Test.DisplayName}).");
             }
@@ -129,12 +133,17 @@ public sealed class ReportingDispatcher : IAsyncDisposable
     }
 
     // Once; later calls return the same summary. extraWarnings (e.g. the settings' warnings) come first in the summary.
+    // The completion is bounded by CompleteTimeout, not by a caller's token: cancellationToken only ends the wait of
+    // this caller, so the first caller's cancellation cannot cut the drain short for the others.
     public Task<TestRunSummary> CompleteAsync(IEnumerable<string>? extraWarnings = null, CancellationToken cancellationToken = default)
     {
+        Task<TestRunSummary> current;
         lock (completionGate)
         {
-            return completion ??= CompleteCoreAsync(extraWarnings?.ToArray() ?? [], cancellationToken);
+            current = completion ??= CompleteCoreAsync(extraWarnings?.ToArray() ?? []);
         }
+
+        return current.WaitAsync(cancellationToken);
     }
 
     // Completes the run when CompleteAsync was not called. The stopping source is not disposed: a consumer abandoned at
@@ -318,7 +327,7 @@ public sealed class ReportingDispatcher : IAsyncDisposable
         return TransientFailures.RetryAfter(exception) is { } retryAfter && retryAfter > delay ? retryAfter : delay;
     }
 
-    private async Task<TestRunSummary> CompleteCoreAsync(IReadOnlyList<string> extraWarnings, CancellationToken cancellationToken)
+    private async Task<TestRunSummary> CompleteCoreAsync(IReadOnlyList<string> extraWarnings)
     {
         leadingWarnings = extraWarnings;
         Volatile.Write(ref completing, 1);
@@ -328,7 +337,7 @@ public sealed class ReportingDispatcher : IAsyncDisposable
             channel.Queue.Writer.TryComplete();
         }
 
-        await DrainAsync(cancellationToken);
+        await DrainAsync();
         CollectUnmappedTests();
 
         var summary = BuildSummary();
@@ -352,7 +361,7 @@ public sealed class ReportingDispatcher : IAsyncDisposable
         return summary with { Warnings = Warnings };
     }
 
-    private async Task DrainAsync(CancellationToken cancellationToken)
+    private async Task DrainAsync()
     {
         var consumers = channels.Select(channel => channel.Consumer).OfType<Task>().ToArray();
         if (consumers.Length == 0)
@@ -362,9 +371,9 @@ public sealed class ReportingDispatcher : IAsyncDisposable
 
         try
         {
-            await Task.WhenAll(consumers).WaitAsync(options.CompleteTimeout, timeProvider, cancellationToken);
+            await Task.WhenAll(consumers).WaitAsync(options.CompleteTimeout, timeProvider);
         }
-        catch (Exception exception) when (exception is TimeoutException or OperationCanceledException)
+        catch (TimeoutException)
         {
             await stopping.CancelAsync();
             foreach (var channel in channels.Where(channel => channel.IsActive && channel.Pending > 0))

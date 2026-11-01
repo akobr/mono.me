@@ -167,7 +167,7 @@
     <PackageVersion Include="Testcontainers.CosmosDb" Version="4.11.0" />
     <PackageVersion Include="Testcontainers.LowkeyVault" Version="4.11.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.11.0" />
-    <PackageVersion Include="TUnit" Version="1.76.45" />
+    <PackageVersion Include="TUnit" Version="1.76.45" /><!-- RetryPolicy.WillRetryAsync of UI.Automation.Runtime.TUnit copies the retry decision of TUnit 1.76.x: recheck it on an upgrade. -->
     <PackageVersion Include="TUnit.Core" Version="1.76.45" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />

@@ -175,7 +175,9 @@ public sealed class StorageStateCache
         try
         {
             var path = artifacts.GetPath("sign-in-failure.png");
-            await page.ScreenshotAsync(new PageScreenshotOptions { Path = path, FullPage = true, Timeout = 10_000 });
+
+            // The inputs are masked: the form may still show the typed e-mail (or a password field shown as text).
+            await page.ScreenshotAsync(new PageScreenshotOptions { Path = path, FullPage = true, Timeout = 10_000, Mask = [page.Locator("input, textarea")] });
             artifacts.Add(path, ArtifactKind.Screenshot);
         }
         catch (Exception exception) when (exception is PlaywrightException or IOException or TimeoutException)
