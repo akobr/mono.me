@@ -65,7 +65,7 @@ All items of an annotation live in the annotation's partition of the organizatio
 
 `Deletion` holds `DeletionId` (shared by everything one delete removed), `RootKey`, `DeletedAt`, `DeletedBy`, `IsRoot`, and `DescendantCount` on the requested root. `PurgeAt` is computed on read as `_ts + ttl`, which is when Cosmos removes the item.
 
-Every stored annotation also carries the server-owned [audit stamps](audit-stamps.md) `Created` and `Modified` (`{ At, By }`); the annotations DbCreator seeds are stamped by the `System` actor. A write ignores them in its body, and so it ignores `Deletion` and the relation arrays (`UnitNames`, `ResponsibilityNames`, `ContextNames`): the server keeps those. A client can send an annotation back as it read it. A member it sends must still have its type: a relation array is an array of strings or `null` (as empty), and anything else answers `400`.
+Every stored annotation also carries the server-owned [audit stamps](audit-stamps.md) `Created` and `Modified` (`{ At, By }`); the annotations DbCreator seeds are stamped by the `System` actor. A write ignores them in its body, and so it ignores `Deletion` and the relation arrays (`UnitNames`, `ResponsibilityNames`, `ContextNames`): the server keeps those. A client can send an annotation back as it read it. `PUT`/`POST …/{key}` still checks the type of a member it sends: a relation array is an array of strings or `null` (as empty), and anything else answers `400`. The bulk create skips the relation arrays.
 
 ## Delete
 
@@ -155,7 +155,7 @@ All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Func
 
 | Method | Route | Role | Result |
 | --- | --- | --- | --- |
-| PUT, POST | `…/{key}` | Contributor; machines `Annotation.Write` | Creates, updates, or re-creates; `200` with the stored annotation, so the client receives the stamps. `400 InvalidAnnotation` or `InvalidKey`, and `400` for a body that is not a JSON object, has no known `AnnotationType` or is not UTF-8; `400 "Invalid annotation object in body: …"` for a body without a type-specific member of its type (`SubjectKey`, `UnitType`, …) or with a member of the wrong type, with the JSON path; `409` after three concurrent changes. |
+| PUT, POST | `…/{key}` | Contributor; machines `Annotation.Write` | Creates, updates, or re-creates; `200` with the stored annotation, so the client receives the stamps. `400 InvalidAnnotation` or `InvalidKey`, and `400` for a body that is not a JSON object, has no known `AnnotationType` or is not UTF-8; `400 "Invalid annotation object in body: …"` for a body without a type-specific member of its type (`SubjectKey`, `UnitType`, …), naming the missing members, or with a member of the wrong type, naming its JSON path (`Path: $.ContextNames`); `409` after three concurrent changes. |
 | POST | `…` and `…/simple` | Contributor; machines `Annotation.Write` and `Annotation.Manage` | Bulk create (at most 100); deleted keys and deleted ancestors are re-created. `400` for a missing list (an empty body or `null`), and on `…` for a `null` entry; an empty list answers `200 []`. |
 | DELETE | `…/{key}` | Contributor; machines `Annotation.Write` and `Annotation.Manage` | Soft delete with the descendants; `200 AnnotationDeletionResult`. A repeated delete returns the existing deletion. `404` when missing. |
 | GET | `…` and the per-type lists | Reader; machines `Annotation.Read` | `AnnotationsResponse` of active annotations; `?includeInactive=true` and `?includeDeleted=true` add the others ([Active annotations](#active-annotations)); `?continuationToken=`. |
