@@ -97,7 +97,7 @@ The configuration itself is edited on its own page (see Configuration). The head
 
 The breadcrumb and **Lineage** show its ancestors in merge order.
 
-**New** creates an annotation from its type and names. Its time zone (the zone of **Valid from** and **Expires**) starts as the project's default time zone from **Settings**, and the dialog lets you pick another one. Missing ancestors created with it get the same zone.
+**New** creates an annotation from its type and names. Its time zone (the zone of **Valid from** and **Expires**) starts as the project's default time zone from **Settings**, and the dialog lets you pick another one. Missing ancestors created with it get the same zone. **New** and **Bulk create** are on **Graph** too.
 
 **Bulk create** creates many annotations from a list of keys, typed or pasted, one per line. A line that starts with a type code is that key (`rst.invoicing`). A line without a code is a [compact line](using-the-platform#writing-the-catalog), read by its number of parts: `northwind` is a subject, `northwind.invoicing` a usage, `northwind.invoicing.production` an execution, and four parts a unit of execution. Responsibilities, contexts and units need their code.
 
@@ -105,7 +105,7 @@ The breadcrumb and **Lineage** show its ancestors in merge order.
 - The missing ancestors are created with the keys, and keys that already exist are skipped, so the same list can be sent again, for example after an error.
 - The new annotations get only their key and name: no title and no time zone. Add those, labels and configurations afterwards.
 - One run takes at most 1,000 keys, sent 100 per request.
-- On a phone, open it from the command palette (**Bulk create annotations**), or from the empty view.
+- On a phone, open it from the command palette (**Bulk create annotations**), or from the empty view on Annotations or Graph.
 
 ### Deleting and restoring
 
@@ -164,6 +164,10 @@ Saving sends only your changes. Two situations stop a save:
   - The filter box adds matches to the focus, or dims the rest when the whole view is shown.
 - **Keyboard:** the arrow keys move between connected annotations, and `Enter` opens one.
 - **Toolbar:** Fit, Reheat (runs the layout again), the layered, force and radial layouts, **Export PNG**, and **Open as list**.
+- **Legend:** the types with their counts. A click hides or shows a type. When every type is hidden, the graph says so below the legend, and **All types** shows them again.
+- **Creating:** **New** and **Bulk create** are in the top bar, as on Annotations (Contributor or a higher role). A new annotation opens its detail next to the graph. The graph draws it when it shows it: not outside the neighbourhood of a focus, and not when its type is hidden.
+- **Empty view:** a view without annotations has no legend. Its empty state offers **New annotation** and **Bulk create** to Contributors and higher roles.
+- **Reloads:** **Reload the catalog** keeps the layout, the zoom and the dragged nodes. After **Bulk create**, or a **New** that also created missing ancestors, the catalog reloads too: the annotations already drawn keep their places, and the dragged nodes are released, as when the graph gets new nodes.
 
 ## Modeling
 

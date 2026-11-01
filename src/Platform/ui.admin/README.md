@@ -86,7 +86,7 @@ To add a showcase project, write `app/mock/showcase/projects/<project>.ts` (a `S
 
 `npm run test:e2e` builds the app in the `e2e` mode, serves it with `vite preview` on port 4174 and runs `test/e2e/*.spec.ts`:
 
-- sign-in and onboarding, with the description of the first project on the organization overview;
+- sign-in and onboarding, with the description of the first project on the organization overview, and the empty Graph of the new view (no legend, **New annotation** and **Bulk create**);
 - grid filter, detail edit and save;
 - a schema violation saved anyway;
 - the conflict dialog;
@@ -98,6 +98,7 @@ To add a showcase project, write `app/mock/showcase/projects/<project>.ts` (a `S
 - a trusted issuer from a template (what the templates fill in), and one deleted: its rules flagged on the machine detail, and New machine's link to the section, which keeps the focus;
 - a federated machine created by a Contributor (its setup instead of a secret, no Reset) and its rules edited on the detail, where an audience other than the token endpoint is flagged and kept by new rules;
 - a graph node opened by mouse and by keyboard;
+- the Graph of an empty view: **Bulk create**, and the first annotation from **New annotation** opened in the graph; "Every type is hidden" below the legend, whose chips (the **Types** button on a phone) stay clickable; `Enter` on a legend chip with a node selected; **New** in the Graph top bar; a create dialog left open on Graph not opening again on Annotations after **Back**; and no create buttons for a Reader, also in an empty view;
 - delete and Undo, restore from Deleted (with and without descendants), create over a deleted key, permanent delete for Administrators only, the history and the configuration link;
 - bulk create from a list of keys, with the missing ancestors, and its absence for a Reader;
 - a new configuration from **New** on Configurations, which offers only the annotations without one, and its absence for a Reader;
