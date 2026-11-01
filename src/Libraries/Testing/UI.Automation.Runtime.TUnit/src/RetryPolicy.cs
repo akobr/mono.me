@@ -19,7 +19,7 @@ public static class RetryPolicy
 
     // The engine's rule: a failed attempt below the retry limit runs again when the test's retry predicate (of
     // [ConfiguredRetry] or [Retry]) agrees, or when it has none. A copy of TUnit's internal retry decision as of TUnit
-    // 1.76.x (TUnit.Core 1.76.45, pinned in Directory.Packages.props): check it against the engine's source on every
+    // 1.78.x (TUnit.Core 1.78.0, pinned in Directory.Packages.props): check it against the engine's source on every
     // upgrade of TUnit, as a drift reports a retried attempt as final, or a final one not at all. failure: an exception an After(Test) hook is about to
     // throw, which fails (and may retry) an attempt whose result still says Passed.
     public static async Task<bool> WillRetryAsync(TestContext context, Exception? failure = null)
