@@ -37,6 +37,7 @@
   },
   "scripts": {
     "generate": "node scripts/generate.mjs",
+    "prepare:local": "node scripts/prepare-local.mjs",
     "build": "tsup",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "typecheck": "tsc --noEmit",
