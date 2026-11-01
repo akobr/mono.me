@@ -15,6 +15,15 @@ test('a new user is sent to sign in, creates an organization and lands in the pr
 
   await expect(page).toHaveURL(/\/globex\/portal\/default\/annotations/)
   await expect(page.getByText('No annotations in this view')).toBeVisible()
+
+  // The graph of the new view (424-130): no type legend over the empty state, and the actions of Annotations.
+  await goto(page, '/globex/portal/default/graph')
+  const graph = page.getByRole('application')
+  await expect(graph.getByRole('heading', { name: 'No annotations in this view' })).toBeVisible()
+  await expect(page.getByRole('group', { name: 'Annotation types' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Types/ })).toHaveCount(0)
+  await expect(graph.getByRole('button', { name: 'New annotation', exact: true })).toBeVisible()
+  await expect(graph.getByRole('button', { name: 'Bulk create', exact: true })).toBeVisible()
 })
 
 // The description of a project (424-78): onboarding sends it trimmed, and the overview shows it on the project's card.
