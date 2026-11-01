@@ -88,7 +88,11 @@ public class MessageActionPoolingGrain : IGrainBase, IMessageActionPoolingGrain,
         if (isCancelled)
         {
             _reminder ??= await _reminders.GetReminder(GrainContext.GrainId, reminderName);
-            _reminders.UnregisterReminder(GrainContext.GrainId, _reminder);
+            if (_reminder is not null)
+            {
+                _reminders.UnregisterReminder(GrainContext.GrainId, _reminder);
+            }
+
             GrainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ActivationIdle, "There is no receiver."));
             _logger.LogWarning("There is no receiver for a message from queue '{QueueKey}'.", _queueKey);
         }
