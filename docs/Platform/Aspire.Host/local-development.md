@@ -13,8 +13,24 @@ dotnet run --project src/Platform/Aspire.Host/src
 | `db-creator` | Creates the database and containers, and seeds the organization `42dotnet` with its owner; explicit start, run it from the dashboard. `BaseAccount:Id` in the user secrets of the host names the owner's account id: the lower-case `{tid}:{oid}` under Entra ID, the `sub` under AuthKit or Keycloak. Without it, DbCreator seeds its legacy Entra ID `sub`, which matches no account |
 | `keyvault` | Lowkey Vault, the Key Vault emulator of key/value protection |
 | `api-functions` | The Storyteller Azure Functions API |
-| `ui-admin` | The Vite dev server of the admin UI on port 5173 |
+| `ui-admin` | The Vite dev server of the admin UI on port 5173; it waits for its two preparation steps below, see [Admin UI](#admin-ui) |
+| `ui-admin-sdk` | Installs and builds the TypeScript SDK the admin UI depends on (`node scripts/prepare-local.mjs`), then finishes |
+| `ui-admin-installer` | Installs the admin UI's packages (`npm run prepare:local`), then finishes |
 | `mcp` | The [MCP server](../Storyteller/mcp.md) for AI assistants; explicit start, see [MCP server](#mcp-server) |
+
+## Admin UI
+
+The admin UI prepares itself, so a clean clone needs nothing but Node 22.18 or newer on `PATH`:
+
+1. `ui-admin-sdk` runs `src/Platform/Storyteller/sdk.typescript/src/scripts/prepare-local.mjs`: `npm ci` when `package-lock.json` changed, `npm run build` when a build input changed (the entry files, `lib/`, `generated/`, the tsup and TypeScript configs, `package.json`, the lockfile).
+2. `ui-admin-installer` (Aspire's own installer of the Vite app) runs `npm run prepare:local` in `src/Platform/ui.admin/src`: `npm ci` when the lockfile changed, or only a reinstall of the SDK's packed copy when just the SDK was rebuilt.
+3. `ui-admin` starts Vite.
+
+Each step keeps a SHA-256 of its inputs in a stamp file (`node_modules/.prepare-local-install`, `dist/.prepare-local-build`) and skips what is up to date. The first start of a clean clone takes a minute or two while npm downloads packages; later starts take seconds. A failed step keeps `ui-admin` waiting; the step's console log says why.
+
+Changes made while the host runs (a new lockfile, SDK sources) are picked up when `ui-admin` restarts. The **Clean reinstall** command of `ui-admin` stops it, deletes the stamps, runs both steps in full and starts it again; use it when `node_modules` is broken. A full `npm ci` replaces `node_modules`, so stop `npm run dev:mock` of the same folder first.
+
+Without Aspire, `npm run prepare:local` in the SDK folder and then in the admin UI folder does the same.
 
 ## Cosmos DB modes
 

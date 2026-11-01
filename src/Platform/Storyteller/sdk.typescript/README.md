@@ -75,6 +75,7 @@ npm run typecheck
 npm run lint           # oxlint
 npm test               # vitest
 npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
+npm run prepare:local  # npm ci and npm run build, each only when its inputs changed (--force: always)
 ```
 
 To generate from a specific document: `SPEC=../open.api.v0.10.15.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.15.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.15.29126` → `0.10.15`).

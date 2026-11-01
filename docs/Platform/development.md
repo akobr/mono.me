@@ -8,7 +8,7 @@ A cookbook for running the Storyteller API, the admin UI and the MCP server on o
 | --- | --- | --- |
 | Storyteller API (`api-functions`) | Aspire, Azure Functions host | `http://localhost:7071/api` |
 | MCP server (`mcp`) | Aspire, explicit start | `https://localhost:7180/mcp` (Aspire's proxy; the process itself listens on a random port) |
-| Admin UI (`ui-admin`) | Aspire, Vite | `http://localhost:5173` |
+| Admin UI (`ui-admin`) | Aspire, Vite; installs and builds its packages and the TypeScript SDK itself | `http://localhost:5173` |
 | Cosmos DB, Azurite, Lowkey Vault | Aspire (containers) or the local Windows emulator | see the Aspire page |
 | Sign-in | WorkOS AuthKit staging | `https://voluntary-entry-98-staging.authkit.app` |
 
