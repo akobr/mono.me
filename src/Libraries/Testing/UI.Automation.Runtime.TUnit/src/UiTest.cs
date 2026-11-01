@@ -105,8 +105,9 @@ public abstract class UiTest
             exception = UiAutomationSession.SkipReasonOf(context, exception);
         }
 
-        // Claimed also when TUnit runs the attempt again: the end receiver runs after this hook and before TUnit turns a
-        // failed cleanup into the attempt's failure, so it would report the attempt as passed.
+        // Claimed also when TUnit runs the attempt again, so the end receiver, which runs after this hook, does not report
+        // the attempt a second time: this report, with the cleanup's failure, is the one that counts (since TUnit 1.78 the
+        // receiver sees a failed cleanup as the attempt's failure too, before 1.78 it saw the attempt as passed).
         var final = !await RetryPolicy.WillRetryAsync(context, failsAttempt ? cleanupFailure : null);
         var claimed = UiAutomationSession.TryClaim(current.Test, current.Attempt);
         if (!claimed)

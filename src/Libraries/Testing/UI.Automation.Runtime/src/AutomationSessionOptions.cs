@@ -21,7 +21,7 @@ public sealed class AutomationSessionOptions
     // Handed to the reporter providers; an empty provider when unset.
     public IServiceProvider? Services { get; set; }
 
-    // The test engine and its version, e.g. "TUnit 1.76.45", for the run description.
+    // The test engine and its version, e.g. "TUnit 1.78.0", for the run description.
     public string? TestEngine { get; set; }
 
     // Silent when unset.

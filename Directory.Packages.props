@@ -25,10 +25,10 @@
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="Colorful.Console" Version="1.2.15" />
     <PackageVersion Include="ConsoleTableExt" Version="3.3.0" />
-    <PackageVersion Include="coverlet.collector" Version="8.0.0" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
     <PackageVersion Include="Cronos" Version="0.13.0" />
     <PackageVersion Include="DiffPlex" Version="1.9.0" />
-    <PackageVersion Include="FluentAssertions" Version="[7.2.0]" />
+    <PackageVersion Include="FluentAssertions" Version="[7.2.2]" /><!-- 8.x is under the Xceed Community License (paid for commercial use); 7.x is the last Apache-2.0 line. -->
     <PackageVersion Include="Humanizer" Version="3.0.10" />
     <PackageVersion Include="Json.More.Net" Version="3.0.1" />
     <PackageVersion Include="JsonE.Net" Version="3.0.1" />
@@ -37,7 +37,7 @@
     <PackageVersion Include="LibGit2Sharp" Version="0.32.0" />
     <PackageVersion Include="McMaster.Extensions.CommandLineUtils" Version="5.1.0" />
     <PackageVersion Include="McMaster.Extensions.Hosting.CommandLine" Version="5.1.0" />
-    <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" />
+    <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="2.23.0" /><!-- 2.x: the Application Insights integration of the Functions worker is built on Application Insights 2.x and does not run with 3.x. -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />
@@ -49,13 +49,13 @@
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.DurableTask" Version="1.21.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.3.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.1" />
-    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.OpenApi" Version="2.0.0-preview-prop-naming" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.OpenApi" Version="2.0.0-preview-prop-naming" /><!-- a custom build of the unmerged naming-strategy change (azure-functions-openapi-extension PR 646); NuGet sorts the public 2.0.0-preview2 above it, which is not newer. -->
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Storage.Queues" Version="5.5.5" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.1.0" />
     <PackageVersion Include="Microsoft.Azure.WebJobs.Extensions.OpenApi.Core" Version="2.0.0-preview-prop-naming" />
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.Build" Version="18.9.6" /><!-- Microsoft.Build, .Framework and Microsoft.NET.StringTools: 18.10+ ship only net11.0 and net472 (the MSBuild of the .NET 11 SDK); 18.9 is the MSBuild of the .NET 10.0.4xx SDK. -->
+    <PackageVersion Include="Microsoft.Build" Version="18.9.6" /><!-- 18.10+ ships only net11.0 and net472 (the MSBuild of the .NET 11 SDK); its Framework and StringTools packages stay on the same 18.9.x, the MSBuild of the .NET 10.0.4xx SDK that the Locator loads at run time. -->
     <PackageVersion Include="Microsoft.Build.Framework" Version="18.9.6" />
     <PackageVersion Include="Microsoft.Build.Locator" Version="1.11.2" />
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="5.9.0" />
@@ -101,7 +101,7 @@
     <PackageVersion Include="Microsoft.IdentityModel.Protocols" Version="8.23.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.23.0" />
     <PackageVersion Include="Microsoft.NET.StringTools" Version="18.9.6" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.4.2" />
@@ -113,7 +113,7 @@
     <PackageVersion Include="Microsoft.Orleans.Serialization.Abstractions" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.4.2" />
-    <PackageVersion Include="Microsoft.Playwright" Version="1.63.0" />
+    <PackageVersion Include="Microsoft.Playwright" Version="1.63.0" /><!-- the newest version BrowserStack runs; the CI image and the browsers follow it (docs/Libraries/Testing/UI.Automation/readme.md). -->
     <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
     <PackageVersion Include="Moq" Version="4.21.0" />
@@ -147,12 +147,8 @@
     <PackageVersion Include="StyleCop.Analyzers" Version="1.3.151-beta" />
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.3.1" />
     <PackageVersion Include="System.CodeDom" Version="10.0.14" />
-    <PackageVersion Include="System.Collections.Immutable" Version="10.0.14" />
-    <PackageVersion Include="System.Diagnostics.DiagnosticSource" Version="10.0.14" />
     <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
-    <PackageVersion Include="System.Linq.Async" Version="7.0.1" />
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
-    <PackageVersion Include="System.Text.Json" Version="10.0.14" />
     <PackageVersion Include="TestableIO.System.IO.Abstractions" Version="22.3.0" />
     <PackageVersion Include="TestableIO.System.IO.Abstractions.Analyzers" Version="2022.0.0" />
     <PackageVersion Include="TestableIO.System.IO.Abstractions.TestingHelpers" Version="22.3.0" />
@@ -162,10 +158,10 @@
     <PackageVersion Include="Testcontainers.CosmosDb" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.LowkeyVault" Version="4.16.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
-    <PackageVersion Include="TUnit" Version="1.76.45" /><!-- RetryPolicy.WillRetryAsync of UI.Automation.Runtime.TUnit copies the retry decision of TUnit 1.76.x: recheck it on an upgrade. -->
-    <PackageVersion Include="TUnit.Core" Version="1.76.45" />
-    <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="TUnit" Version="1.78.0" /><!-- RetryPolicy.WillRetryAsync of UI.Automation.Runtime.TUnit copies the retry decision of TUnit 1.78.x: recheck it on an upgrade. -->
+    <PackageVersion Include="TUnit.Core" Version="1.78.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" /><!-- the last xUnit v2; the move to xUnit v3 on the new test platform is Linear 424-151. -->
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 </Project>

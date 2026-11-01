@@ -65,7 +65,7 @@ public static class UiAutomationSession
 
     internal static ILogger Logger => ConsoleSessionLogger.Instance;
 
-    // "TUnit 1.76.45", for the run description.
+    // "TUnit 1.78.0", for the run description.
     private static string EngineVersion { get; } = "TUnit " + (typeof(TestContext).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
         ?? typeof(TestContext).Assembly.GetName().Version?.ToString()
         ?? "unknown");
