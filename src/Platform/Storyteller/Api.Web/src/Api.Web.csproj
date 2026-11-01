@@ -21,6 +21,8 @@
     <PackageReference Include="Microsoft.Identity.Web.UI" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
     <PackageReference Include="NSwag.AspNetCore" />
+    <!-- Microsoft.Identity.Web.TokenCache 4.16.1 brings the vulnerable 10.0.10 (CVE-2026-84008, CVE-2026-70162; fixed in 10.0.13) -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
 
   <ItemGroup>
