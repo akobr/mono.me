@@ -12,20 +12,17 @@ var storage = builder
         emulator.WithLifetime(ContainerLifetime.Persistent);
     });
 
-// Local Cosmos DB emulator, picked by Cosmos:Mode. "container" (default) runs the Linux vNext emulator in a container;
-// "local" uses the Windows emulator installed on the machine (ConnectionStrings:cosmos), which also supports stored
-// procedures, triggers and UDFs. The launch profiles *-local-cosmos set the local mode.
+// Local Cosmos DB emulator, picked by Cosmos:Mode. "container" (default) runs the classic Linux emulator in a container,
+// which supports the stored procedures the backend registers (the vNext emulator does not); "local" uses the Windows
+// emulator installed on the machine (ConnectionStrings:cosmos). The launch profiles *-local-cosmos set the local mode.
 var cosmosMode = builder.Configuration["Cosmos:Mode"] ?? "container";
 IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvariant() switch
 {
     "container" => builder
         .AddAzureCosmosDB("cosmos")
-        .RunAsEmulator(emulator =>
+        .RunAsClassicEmulator(emulator =>
         {
-            // Aspire's own vNext image (mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest): RunAsEmulator
-            // sets the resource up for vNext (its /ready health check, connection string and Data Explorer), which the
-            // classic image of the tag "latest" does not serve.
-            emulator.WithDataExplorer();
+            // Data Explorer is only available with the vNext emulator.
             emulator.WithLifetime(ContainerLifetime.Persistent);
         }),
     "local" => builder.AddConnectionString("cosmos"),
