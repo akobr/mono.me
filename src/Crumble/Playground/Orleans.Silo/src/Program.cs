@@ -1,5 +1,6 @@
 using _42.Crumble;
 using _42.Crumble.Playground.Examples;
+using Orleans.Dashboard;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,7 +10,7 @@ builder.AddKeyedRedisClient("redis");
 builder.UseOrleans(siloBuilder =>
 {
     siloBuilder.AddActivityPropagation();
-    siloBuilder.UseDashboard(options => { options.HostSelf = false; });
+    siloBuilder.AddDashboard();
 });
 
 /*builder.Services.AddSingleton<IIncomingGrainCallFilter, TelemetryIncomingGrainCallFilter>();
@@ -19,7 +20,7 @@ builder.Services.AddCrumble().AddCrumbs();
 
 var app = builder.Build();
 
-app.Map("/dashboard", x => x.UseOrleansDashboard());
+app.MapOrleansDashboard(routePrefix: "/dashboard");
 app.UseHttpsRedirection();
 app.MapDefaultEndpoints();
 

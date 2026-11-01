@@ -16,7 +16,7 @@
     <PackageReference Include="Microsoft.Orleans.Persistence.Redis" />
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Streaming" />
-    <PackageReference Include="OrleansDashboard" />
+    <PackageReference Include="Microsoft.Orleans.Dashboard" />
   </ItemGroup>
 
   <ItemGroup>
