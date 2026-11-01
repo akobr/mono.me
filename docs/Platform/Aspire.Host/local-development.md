@@ -22,8 +22,8 @@ The configuration value `Cosmos:Mode` picks the emulator:
 
 | Mode | Emulator | Use it when |
 |---|---|---|
-| `container` (default) | Linux vNext emulator in a persistent container, with Data Explorer | Everyday work; nothing to install besides Docker |
-| `local` | Windows Cosmos DB Emulator installed on the machine, reached through `ConnectionStrings:cosmos` | Stored procedures, triggers or UDFs are needed; the container emulator does not support them |
+| `container` (default) | Classic Linux emulator in a persistent container (it supports the stored procedures the backend registers) | Everyday work; nothing to install besides Docker |
+| `local` | Windows Cosmos DB Emulator installed on the machine, reached through `ConnectionStrings:cosmos` | The Windows emulator is preferred, or triggers or UDFs are needed |
 
 The launch profiles `https-local-cosmos` and `http-local-cosmos` set the local mode and point at `https://localhost:8081/` with the well-known emulator key:
 
