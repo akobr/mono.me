@@ -47,7 +47,9 @@ public sealed class TestinyReporterProvider : ITestRunReporterProvider
 
         if (services.GetService(typeof(IHttpClientFactory)) is IHttpClientFactory factory)
         {
+            // TestinyClient bounds every request itself (an upload by its size), so the client's 100 s default must not.
             var shared = factory.CreateClient(HttpClientName);
+            shared.Timeout = Timeout.InfiniteTimeSpan;
             return new TestinyTestRunReporter(new TestinyClient(shared, options), options, validateCaseIds, fileSystem, logger);
         }
 

@@ -24,7 +24,11 @@ namespace _42.Testing.UI.Automation.Reporting.Testiny;
 //   dispatcher sends it nothing more, or its completion failed), best effort, with why in its description.
 // The calls are serialized, so concurrent batches keep the state consistent, and every step remembers what Testiny has
 // accepted: a call the dispatcher retries after a transient failure (429, 5xx, a timeout) repeats only what is
-// missing, never a run, an upload or a comment. Testiny refusing one case, upload or comment (a 4xx about the data)
+// missing, never a run, an upload or a comment. A failure after which Testiny may have done the work anyway (a timeout,
+// a network failure, a 5xx other than 503: TestinyTransientException.MayHaveBeenApplied) is never blindly sent again:
+// the retried start (and DisposeAsync) looks the run up first (POST /testrun/find by title, the one whose description
+// names the descriptor's RunId) and creates it only when there is none, and an upload or a comment is given up as a
+// warning; only 429, 408 and 503 are sent again. Testiny refusing one case, upload or comment (a 4xx about the data)
 // becomes a warning and the rest goes on, and so does an upload that failed transiently twice; any other failure
 // surfaces to the dispatcher, which logs it as a run warning and never fails a test.
 public sealed class TestinyTestRunReporter : ITestRunReporter
@@ -41,6 +45,9 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
     private const int MaxFileNameLength = 120;
     private const int MaxExtensionLength = 16;
     private const int MaxListedIds = 20;
+
+    // The newest runs of the title looked at for the one an uncertain creation may have made.
+    private const int MaxFoundRuns = 20;
 
     // How long DisposeAsync tries to close a run that was never completed; less than the 10 s the dispatcher gives it.
     private static readonly TimeSpan AbandonTimeout = TimeSpan.FromSeconds(8);
@@ -72,6 +79,9 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
     private bool validated;
     private bool planAttached;
     private bool completed;
+
+    // The last POST /testrun failed in a way after which the run may exist anyway.
+    private bool creationUncertain;
     private int attachmentCount;
     private int commentCount;
     private volatile Uri? runUrl;
@@ -347,6 +357,11 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
         return TestinyMarkdown.Truncate($"{TestinyResultComment.ShortName(report.Test)}: {artifact.Name}{attempt}", MaxTitleLength);
     }
 
+    private static string Title(TestRunDescriptor descriptor)
+    {
+        return TestinyMarkdown.Truncate(descriptor.Name, MaxTitleLength);
+    }
+
     private string StatusOf(TestOutcome outcome)
     {
         return Rank(outcome) switch
@@ -434,20 +449,56 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
             return existing;
         }
 
-        var created = await client.CreateTestRunAsync(
-            new TestinyTestRun
-            {
-                Title = TestinyMarkdown.Truncate(descriptor.Name, MaxTitleLength),
-                ProjectId = options.ProjectId,
-                Description = TestinyRunDescription.Started(descriptor),
-            },
-            cancellationToken);
+        // The previous POST /testrun may have created the run before its answer was lost, and a second run would stay
+        // open forever. A failed lookup surfaces: transiently, so the dispatcher tries again, or for good, so no run is
+        // made at all.
+        if (creationUncertain && await FindCreatedRunAsync(descriptor, cancellationToken) is { } found)
+        {
+            var adopted = Adopt(found);
+            logger.LogInformation("Testiny run {RunId} was created by an earlier try whose answer was lost; it is used: {Url}", adopted, runUrl?.ToString() ?? "(no RunUrlTemplate)");
+            return adopted;
+        }
 
+        TestinyTestRun created;
+        try
+        {
+            created = await client.CreateTestRunAsync(
+                new TestinyTestRun
+                {
+                    Title = Title(descriptor),
+                    ProjectId = options.ProjectId,
+                    Description = TestinyRunDescription.Started(descriptor),
+                },
+                cancellationToken);
+        }
+        catch (TestinyTransientException exception) when (exception.MayHaveBeenApplied)
+        {
+            creationUncertain = true;
+            stopReason = $"its start failed: {Describe(exception)}";
+            throw;
+        }
+
+        var id = Adopt(created);
+        logger.LogInformation("Testiny run {RunId} '{Title}' created in project {ProjectId}: {Url}", id, created.Title ?? descriptor.Name, options.ProjectId, runUrl?.ToString() ?? "(no RunUrlTemplate)");
+        return id;
+    }
+
+    // The run of the project with the descriptor's title whose description names its RunId (TestinyRunDescription
+    // writes it as code), or null.
+    private async Task<TestinyTestRun?> FindCreatedRunAsync(TestRunDescriptor descriptor, CancellationToken cancellationToken)
+    {
+        var marker = TestinyMarkdown.Code(descriptor.RunId);
+        var runs = await client.FindTestRunsAsync(options.ProjectId, Title(descriptor), MaxFoundRuns, cancellationToken);
+        return runs.FirstOrDefault(candidate => candidate.Id is > 0 && candidate.Description?.Contains(marker, StringComparison.Ordinal) == true);
+    }
+
+    private long Adopt(TestinyTestRun created)
+    {
         var id = created.Id is > 0 ? created.Id.Value : throw new InvalidDataException("Testiny answered POST /testrun without the id of the run.");
         runId = id;
         etag = created.ETag;
         runUrl = options.FormatRunUrl(id);
-        logger.LogInformation("Testiny run {RunId} '{Title}' created in project {ProjectId}: {Url}", id, created.Title ?? descriptor.Name, options.ProjectId, runUrl?.ToString() ?? "(no RunUrlTemplate)");
+        creationUncertain = false;
         return id;
     }
 
@@ -563,7 +614,7 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
 
         foreach (var artifact in report.Artifacts)
         {
-            if (!attach)
+            if (!attach || (artifact.Kind == ArtifactKind.Trace && !options.AttachTraces))
             {
                 notes.Add(new TestinyArtifactNote(artifact, TestinyArtifactState.NotAttached, artifact.SizeBytes));
                 continue;
@@ -600,11 +651,17 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
                     attachmentCount++;
                 }
                 catch (Exception exception) when (exception is TestinyApiException { IsDataError: true } or TestinyApiException { StatusCode: HttpStatusCode.RequestEntityTooLarge } or IOException or UnauthorizedAccessException
-                    || (exception is TestinyTransientException && GivesUp(key)))
+                    || (exception is TestinyTransientException transient && (transient.MayHaveBeenApplied || GivesUp(key))))
                 {
+                    // A file that may have been stored anyway is not sent again, so it is never there twice.
                     uploads[key] = TestinyArtifactState.UploadFailed;
                     state = TestinyArtifactState.UploadFailed;
-                    var attempts = exception is TestinyTransientException ? string.Create(CultureInfo.InvariantCulture, $" {MaxUploadAttempts} times") : string.Empty;
+                    var attempts = exception switch
+                    {
+                        TestinyTransientException { MayHaveBeenApplied: true } => " (it may have reached Testiny, so it is not sent again)",
+                        TestinyTransientException => string.Create(CultureInfo.InvariantCulture, $" {MaxUploadAttempts} times"),
+                        _ => string.Empty,
+                    };
                     AddWarning(string.Create(CultureInfo.InvariantCulture, $"Uploading {artifact.Name} of {TestinyResultComment.ShortName(report.Test)} to test case {caseId} failed{attempts}: {exception.Message}"));
                 }
             }
@@ -626,6 +683,10 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
             {
                 await CreateCommentsAsync(chunk, cancellationToken);
             }
+            catch (TestinyTransientException exception) when (exception.MayHaveBeenApplied)
+            {
+                GiveUpComments(chunk, exception);
+            }
             catch (TestinyApiException exception) when (exception.IsDataError)
             {
                 if (chunk.Length == 1)
@@ -643,6 +704,10 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
                     catch (TestinyApiException single) when (single.IsDataError)
                     {
                         RefuseComment(comment, single);
+                    }
+                    catch (TestinyTransientException single) when (single.MayHaveBeenApplied)
+                    {
+                        GiveUpComments([comment], single);
                     }
                 }
             }
@@ -685,6 +750,14 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
         commentCount += chunk.Count;
     }
 
+    // POST /comment/bulk failed in a way after which the comments may exist anyway: they are not created again (they
+    // would be there twice) and, without their ids, not mapped either.
+    private void GiveUpComments(IReadOnlyList<PendingComment> chunk, TestinyTransientException exception)
+    {
+        refusedComments.UnionWith(chunk.Select(comment => comment.Key));
+        AddWarning(string.Create(CultureInfo.InvariantCulture, $"Creating {chunk.Count} comment(s) on the results of test case(s) {string.Join(", ", chunk.Select(comment => comment.CaseId).Distinct())} failed, and they may have reached Testiny unmapped, so they are not sent again: {exception.Message}"));
+    }
+
     private void RefuseComment(PendingComment comment, TestinyApiException exception)
     {
         refusedComments.Add(comment.Key);
@@ -716,6 +789,12 @@ public sealed class TestinyTestRunReporter : ITestRunReporter
 
         try
         {
+            // A creation whose answer was lost and that was never tried again: the run may exist, and is closed then.
+            if (runId is null && creationUncertain && run is not null && await FindCreatedRunAsync(run, timeout.Token) is { } found)
+            {
+                Adopt(found);
+            }
+
             if (completed || runId is not { } id || run is null)
             {
                 return;

@@ -38,17 +38,29 @@ internal sealed class FakeTestiny : HttpMessageHandler
         }
     }
 
+    public IReadOnlyList<long> RunIds
+    {
+        get
+        {
+            lock (gate)
+            {
+                return [.. runs.Keys.Order()];
+            }
+        }
+    }
+
     public IReadOnlyList<RecordedRequest> To(string method, string pathPrefix)
     {
         return Requests.Where(request => request.Method == method && request.Path.StartsWith(pathPrefix, StringComparison.Ordinal)).ToArray();
     }
 
-    // The next times matching requests get status (and body, Retry-After) instead of their answer.
-    public void Fail(string method, string pathPrefix, HttpStatusCode status, int times = 1, string? body = null, TimeSpan? retryAfter = null, Func<RecordedRequest, bool>? when = null)
+    // The next times matching requests get status (and body, Retry-After) instead of their answer; with afterCommit the
+    // request is carried out first, as when its answer is lost.
+    public void Fail(string method, string pathPrefix, HttpStatusCode status, int times = 1, string? body = null, TimeSpan? retryAfter = null, Func<RecordedRequest, bool>? when = null, bool afterCommit = false)
     {
         lock (gate)
         {
-            faults.Add(new Fault(method, pathPrefix, status, body, retryAfter, when) { Remaining = times });
+            faults.Add(new Fault(method, pathPrefix, status, body, retryAfter, when, afterCommit) { Remaining = times });
         }
     }
 
@@ -92,6 +104,11 @@ internal sealed class FakeTestiny : HttpMessageHandler
             if (fault is not null)
             {
                 fault.Remaining--;
+                if (fault.AfterCommit)
+                {
+                    Route(recorded).Dispose();
+                }
+
                 var response = new HttpResponseMessage(fault.Status) { Content = new StringContent(fault.Body ?? string.Empty, Encoding.UTF8, "application/json") };
                 if (fault.RetryAfter is { } delay)
                 {
@@ -190,6 +207,19 @@ internal sealed class FakeTestiny : HttpMessageHandler
                 return Json(created);
             }
 
+            case ("POST", ["testrun", "find"]):
+            {
+                var filter = request.Json.GetProperty("filter");
+                var projectId = filter.GetProperty("project_id").GetInt64();
+                var title = filter.GetProperty("title").GetString();
+                var data = new JsonArray(runs.Values
+                    .Where(run => run["project_id"]?.GetValue<long>() == projectId && run["title"]?.GetValue<string>() == title)
+                    .OrderByDescending(run => run["id"]!.GetValue<long>())
+                    .Select(run => (JsonNode)run.DeepClone())
+                    .ToArray());
+                return Json(new JsonObject { ["data"] = data, ["meta"] = new JsonObject { ["count"] = data.Count, ["offset"] = 0 } });
+            }
+
             case ("POST", ["testcase", "find"]):
             {
                 var ids = request.Json.GetProperty("ids").EnumerateArray().Select(id => id.GetInt64()).Where(KnownCases.Contains).ToArray();
@@ -207,7 +237,7 @@ internal sealed class FakeTestiny : HttpMessageHandler
         return string.Create(CultureInfo.InvariantCulture, $"e{nextEtag++}");
     }
 
-    private sealed record Fault(string Method, string PathPrefix, HttpStatusCode Status, string? Body, TimeSpan? RetryAfter, Func<RecordedRequest, bool>? When)
+    private sealed record Fault(string Method, string PathPrefix, HttpStatusCode Status, string? Body, TimeSpan? RetryAfter, Func<RecordedRequest, bool>? When, bool AfterCommit)
     {
         public int Remaining { get; set; }
     }

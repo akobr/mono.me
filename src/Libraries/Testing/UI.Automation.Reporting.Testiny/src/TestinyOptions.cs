@@ -42,8 +42,14 @@ public sealed partial class TestinyOptions
 
     public bool CloseRunOnComplete { get; set; } = true;
 
-    // Uploads the artifacts (failure.png, trace.zip, console.log, video.webm) of these results to each linked case.
+    // Uploads the artifacts (failure.png, console.log, video.webm; trace.zip only with AttachTraces) of these results to
+    // each linked case.
     public TestinyContentPolicy Attachments { get; set; } = TestinyContentPolicy.Failures;
+
+    // Uploads the Playwright traces as well. Off by default: a trace holds the cookies and storage of the signed-in
+    // pool user (a live session until it expires) and every request of the test, so turning it on shares that session
+    // with Testiny and everyone who can read the project.
+    public bool AttachTraces { get; set; }
 
     // Larger files are not uploaded; the comment lists them instead.
     public long MaxAttachmentBytes { get; set; } = DefaultMaxAttachmentBytes;
@@ -115,9 +121,11 @@ public sealed partial class TestinyOptions
     {
         var errors = new List<string>();
 
-        if (!Uri.TryCreate(BaseUrl?.Trim(), UriKind.Absolute, out var baseUri) || (baseUri.Scheme != Uri.UriSchemeHttps && baseUri.Scheme != Uri.UriSchemeHttp))
+        // The API key goes in a header of every request, so plain http is for a local fake or proxy only.
+        if (!Uri.TryCreate(BaseUrl?.Trim(), UriKind.Absolute, out var baseUri)
+            || (baseUri.Scheme != Uri.UriSchemeHttps && !(baseUri.Scheme == Uri.UriSchemeHttp && baseUri.IsLoopback)))
         {
-            errors.Add($"BaseUrl must be an absolute http or https URL such as {DefaultBaseUrl}; it is '{BaseUrl}'.");
+            errors.Add($"BaseUrl must be an absolute https URL such as {DefaultBaseUrl} (http only for a loopback host such as localhost); it is '{BaseUrl}'.");
         }
 
         if (string.IsNullOrWhiteSpace(ApiKey))
