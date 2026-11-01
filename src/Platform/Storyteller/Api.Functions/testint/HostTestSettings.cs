@@ -37,7 +37,7 @@ internal sealed record HostTestSettings(string BaseUrl, string Token, string Org
 
     public HttpClient CreateClient()
     {
-        var client = new HttpClient { BaseAddress = new Uri($"{BaseUrl}/") };
+        var client = new HttpClient { BaseAddress = new Uri($"{BaseUrl}/"), Timeout = TimeSpan.FromSeconds(30) };
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token);
         return client;
     }

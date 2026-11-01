@@ -116,6 +116,23 @@ public class RouteDispatchTests
             .ShouldBeEmpty();
     }
 
+    // The alternation of the constraint is the list of GetDescendants.
+    [Fact]
+    public void DescendantsConstraint_ListsTheKeysOfDescendantTypes()
+    {
+        var alternation = Definitions.Routes.Constraints.Descendants.Split('(', ')')[2].Split('|');
+
+        alternation.ShouldBe(AnnotationsHttp.DescendantTypes.Keys, ignoreOrder: true);
+    }
+
+    // The routes have only simple segments, the only ones CrosswisePaths and SamplePath compare: no optional, catch-all
+    // or multi-part parameter.
+    [Fact]
+    public void Routes_HaveOnlySimpleSegments()
+    {
+        Functions.Where(function => !function.HasOnlySimpleSegments).Select(function => function.Name).ShouldBeEmpty();
+    }
+
     // The constraint and GetDescendants accept the same values; the literal "history" of the sibling route is not one.
     [Theory]
     [InlineData("usages", true)]
@@ -201,6 +218,9 @@ public class RouteDispatchTests
         }
 
         public string Name { get; }
+
+        public bool HasOnlySimpleSegments => _template.Segments.All(segment => segment.Parts.Count == 1
+            && (!segment.Parts[0].IsParameter || (!segment.Parts[0].IsOptional && !segment.Parts[0].IsCatchAll)));
 
         public IReadOnlyList<string> Methods { get; }
 
