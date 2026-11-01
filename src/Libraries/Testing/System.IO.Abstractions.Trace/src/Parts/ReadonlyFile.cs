@@ -436,6 +436,24 @@ public class ReadonlyFile : IFile
         return new InMemoryStream();
     }
 
+    public SafeFileHandle OpenHandle(
+        string path,
+        FileMode mode = FileMode.Open,
+        FileAccess access = FileAccess.Read,
+        FileShare share = FileShare.Read,
+        FileOptions options = FileOptions.None,
+        long preallocationSize = 0)
+    {
+        // a handle cannot be simulated in memory as the streams are, so only a handle to read an existing file is given
+        if (access != FileAccess.Read
+            || (mode != FileMode.Open && !(mode == FileMode.OpenOrCreate && _executingFile.Exists(path))))
+        {
+            throw new NotSupportedException("A read-only file system opens a handle only to read an existing file.");
+        }
+
+        return _executingFile.OpenHandle(path, FileMode.Open, FileAccess.Read, share, options);
+    }
+
     public FileSystemStream OpenRead(string path)
     {
         return _executingFile.OpenRead(path);

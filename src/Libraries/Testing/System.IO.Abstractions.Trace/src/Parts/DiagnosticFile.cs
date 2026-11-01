@@ -462,6 +462,18 @@ public class DiagnosticFile : IFile
         return _executingFile.Open(path, options);
     }
 
+    public SafeFileHandle OpenHandle(
+        string path,
+        FileMode mode = FileMode.Open,
+        FileAccess access = FileAccess.Read,
+        FileShare share = FileShare.Read,
+        FileOptions options = FileOptions.None,
+        long preallocationSize = 0)
+    {
+        _processor.Process(new object?[] { path, mode, access, share, options, preallocationSize });
+        return _executingFile.OpenHandle(path, mode, access, share, options, preallocationSize);
+    }
+
     public FileSystemStream OpenRead(string path)
     {
         _processor.Process(new object?[] { path });
