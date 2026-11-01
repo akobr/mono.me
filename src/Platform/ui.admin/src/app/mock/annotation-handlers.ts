@@ -558,6 +558,7 @@ export const annotationHandlers: HttpHandler[] = [
 
       // the API's answers, as it reads a List<string>: a blank body or JSON null has no list, an entry that is neither a
       // string nor null is refused with its JSON path, and null entries are skipped like blank lines
+      // (the path of a body that isn't JSON at all is approximated with $; don't assert on it)
       const text = await request.text()
       let body: unknown
       try {

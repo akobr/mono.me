@@ -162,6 +162,18 @@ public partial class AnnotationsHttp
         return new OkObjectResult(annotation);
     }
 
+    // The kinds of descendants and their types. The route takes only these values (Definitions.Routes.Constraints.Descendants);
+    // RouteDispatchTests checks that both lists are the same.
+    internal static readonly IReadOnlyDictionary<string, AnnotationType[]> DescendantTypes = new Dictionary<string, AnnotationType[]>(StringComparer.Ordinal)
+    {
+        ["usages"] = [AnnotationType.Usage],
+        ["contexts"] = [AnnotationType.Context],
+        ["executions"] = [AnnotationType.Execution],
+        ["units"] = [AnnotationType.Unit],
+        ["units-of-execution"] = [AnnotationType.UnitOfExecution],
+        ["all"] = [AnnotationType.Unit, AnnotationType.Usage, AnnotationType.Context, AnnotationType.Execution, AnnotationType.UnitOfExecution],
+    };
+
     [Function(nameof(GetDescendants))]
     [OpenApiOperation(Definitions.RouteIds.Annotations.GetDescendants, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
@@ -258,19 +270,7 @@ public partial class AnnotationsHttp
                 return InvalidKey(key);
         }
 
-        // the route takes only these values (Definitions.Routes.Constraints.Descendants); keep both lists the same
-        AnnotationType[]? types = descendants switch
-        {
-            "usages" => [AnnotationType.Usage],
-            "contexts" => [AnnotationType.Context],
-            "executions" => [AnnotationType.Execution],
-            "units" => [AnnotationType.Unit],
-            "units-of-execution" => [AnnotationType.UnitOfExecution],
-            "all" => [AnnotationType.Unit, AnnotationType.Usage, AnnotationType.Context, AnnotationType.Execution, AnnotationType.UnitOfExecution],
-            _ => null,
-        };
-
-        if (types is null)
+        if (!DescendantTypes.TryGetValue(descendants, out var types))
         {
             return new BadRequestObjectResult(new ErrorResponse("Invalid type of descendants, allowed types are: usages, contexts, executions, units, units-of-execution, or all."));
         }

@@ -10,13 +10,14 @@ public static class Definitions
         // and takes the first that matches; it doesn't rank a literal segment above a parameter like ASP.NET Core does
         // (azure-functions-host#9876). Routes of one method must therefore exclude each other, and these constraints keep
         // a parameter off its literal siblings. Keep them free of braces and slashes (the template syntax and the OpenAPI
-        // path filter) and of "):" and ")=" (they end a constraint in the template parser).
+        // path filter) and of "):" and ")=" (they end a constraint in the template parser). The host matches them ignoring
+        // case, so the lookaheads refuse "USAGE" and "ACCESS" too.
         public static class Constraints
         {
             // An annotation key always has a '.' after its type code; the literal segments beside {key} have none.
             public const string AnnotationKey = ":regex(\\.)";
 
-            // The values GetDescendants accepts (AnnotationsHttp.GetDescendants); keep both lists the same.
+            // The values GetDescendants accepts (AnnotationsHttp.DescendantTypes); RouteDispatchTests checks both are the same.
             public const string Descendants = ":regex(^(usages|contexts|executions|units|units-of-execution|all)$)";
 
             // "usage" is a reserved view name, the literal of the project's key/value usage report.
