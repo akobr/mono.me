@@ -1,3 +1,5 @@
+using _42.Platform.Aspire.Host;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 // Local Azure Storage via Azurite, on the default ports, so AzureWebJobsStorage=UseDevelopmentStorage=true of the
@@ -61,9 +63,11 @@ var apiFunctions = builder.AddProject<Projects.Api_Functions>("api-functions")
     .WaitFor(storage);
 
 // Administration UI (src/Platform/ui.admin): the Vite dev server on the fixed port 5173, which is the redirect URI
-// registered in the WorkOS staging environment. Run `npm ci` in ui.admin/src (and build the TypeScript SDK) first.
+// registered in the WorkOS staging environment. It prepares itself: ui-admin-sdk installs and builds the TypeScript
+// SDK, then ui-admin-installer installs the UI's packages (both `npm run prepare:local`, skipped when up to date). The
+// "Clean reinstall" command redoes both from scratch. Node 22.18 or newer must be on PATH.
 builder.AddViteApp("ui-admin", "../../ui.admin/src", "dev:aspire")
-    .WithNpm(install: false)
+    .WithLocalPreparation(Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../..")))
     .WithEndpoint("http", endpoint =>
     {
         endpoint.Port = 5173;
