@@ -15,6 +15,19 @@ const deleted = (key: string) => async (page: Page, path: string) => {
   await goto(page, path)
 }
 
+/** Registers the view `empty` in acme/billing through the mock API, then shows `path` again. */
+const emptyView = async (page: Page, path: string) => {
+  await page.waitForFunction(() => !!navigator.serviceWorker?.controller)
+  await page.evaluate(() =>
+    fetch('/api/v1/acme/billing/views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ Name: 'empty' }),
+    }),
+  )
+  await goto(page, path)
+}
+
 const screens: {
   name: string
   path: string
@@ -29,6 +42,7 @@ const screens: {
     path: '/acme/billing/default/annotations/exe.northwind.invoicing.prod/history',
   },
   { name: 'configurations', path: '/acme/billing/default/configurations' },
+  { name: 'graph-empty', path: '/acme/billing/empty/graph', prepare: emptyView },
   { name: 'deleted', path: '/acme/billing/default/modeling/deleted', prepare: deleted('sbt.contoso') },
   { name: 'template', path: '/acme/billing/default/modeling/templates/exe' },
   { name: 'schemas', path: '/acme/billing/default/modeling/schemas' },
