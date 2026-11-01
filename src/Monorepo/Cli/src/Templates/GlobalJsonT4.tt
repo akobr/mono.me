@@ -1,7 +1,7 @@
 <#@ template language="C#" linePragmas="false" #>
 {
   "sdk": {
-    "version": "9.0.300",
+    "version": "10.0.401",
     "rollForward": "latestMajor",
     "allowPrerelease": false
   }<# if (_featureProvider.IsEnabled("build-traversal")) { #>,

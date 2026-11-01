@@ -53,7 +53,7 @@ namespace _42.Monorepo.Repo.Generator.Templates
             
             #line default
             #line hidden
-            this.Write("\r\n    <TargetFramework>net6.0</TargetFramework>\r\n    <LangVersion>latest</LangVer" +
+            this.Write("\r\n    <TargetFramework>net10.0</TargetFramework>\r\n    <LangVersion>latest</LangVer" +
                     "sion>\r\n    <Nullable>enable</Nullable>\r\n  </PropertyGroup>\r\n\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
         }

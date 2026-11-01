@@ -22,7 +22,7 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("{\r\n  \"sdk\": {\r\n    \"version\": \"9.0.300\",\r\n    \"rollForward\": \"latestMajor\",\r\n    " +
+            this.Write("{\r\n  \"sdk\": {\r\n    \"version\": \"10.0.401\",\r\n    \"rollForward\": \"latestMajor\",\r\n    " +
                     "\"allowPrerelease\": false\r\n  }");
  if (_featureProvider.IsEnabled("build-traversal")) { 
             this.Write(",\r\n  \"msbuild-sdks\": {\r\n    \"Microsoft.Build.Traversal\": \"4.1.82\"\r\n  }");
