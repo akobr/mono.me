@@ -153,7 +153,7 @@ Tests create what they act on, in the target's view (or a new project in its org
 
 ## Write a test
 
-- Derive from `PlatformTest` (`Page`, `App`, `Target`, `Routes`, `PlatformData`, `User`, `Data`); mark it `[Test]`, `[Area(Area.<area>)]` (`Access`, `Annotations`, `Configurations`, `KeyValues`, `Modeling`, `Navigation`, `Projects`, `Settings`), `[Elementary]` for the PR gate set, `[Serial]` for a test that must run alone (after the parallel ones, restoring what it changes), and `[TestCase("<id>")]` once its Testiny case exists.
+- Derive from `PlatformTest` (`Page`, `App`, `Target`, `Routes`, `PlatformData`, `User`, `Data`); mark it `[Test]`, `[Area(Area.<area>)]` (`Access`, `Annotations`, `Configurations`, `KeyValues`, `Modeling`, `Navigation`, `Projects`, `Settings`), `[Elementary]` for the PR gate set, `[Serial]` for a test that must run alone (after the parallel ones, restoring what it changes), and `[TestCase(<id>)]` with its Testiny case id (a number; a string such as `"TC-1234"` works too).
 - Override `RequiredUser` for a role: `EditingUser` for anything that creates or edits.
 - Restore what a test changed in an override of `CleanUpAsync`, not in an own `[After(Test)]` hook.
 - Navigate with `App.GotoAsync(Routes.<page>)` or a page object's `OpenAsync`, relative to `Target:BaseUrl` (the first navigation carries the mock scenario); follow links with `App.NavigateAsync("<link>")`; locate by role, label and text.
@@ -166,7 +166,7 @@ Tests create what they act on, in the target's view (or a new project in its org
 
 The Testiny reporter is registered by `PlatformAutomationSetup` and turned on by the `reporting-testiny` profile (`UITESTS_PROFILE=<target>,reporting-testiny`). The project id goes into `testsettings.local.json` (`{ "Reporting": { "Testiny": { "ProjectId": 12, "TestPlanId": null } } }`) or `UITESTS_Reporting__Testiny__ProjectId`, the API key (best restricted to the project) into the user secrets or `UITESTS_Reporting__Testiny__ApiKey`. Every key and what lands in Testiny: the library's [Reporting:Testiny](../../Libraries/Testing/UI.Automation/readme.md#reportingtestiny) and [Testiny](../../Libraries/Testing/UI.Automation/readme.md#testiny) sections.
 
-The committed tests carry **no `[TestCase]` ids yet**: the Testiny project and its cases are still to be created. Until then a reported run is an empty Testiny run (the totals in its description only). Add each test's case id (`[TestCase("1234")]` on `SignInTests.SignIn_ShowsOrganizations`, …) and run with `--test-parameter Reporting:UnmappedTests=Warn` to list the tests that still have none. The default run URL template is not verified against Testiny's app; set `Reporting:Testiny:RunUrlTemplate` to the form "Copy link to test run" shows.
+The Elementary tests are linked to cases 1–6 of the Testiny project `2SA` (numeric id 1, folder Elementary). Give a new test its case id (`[TestCase(1234)]`) and run with `--test-parameter Reporting:UnmappedTests=Warn` to list the tests that still have none. The default run URL template is not verified against Testiny's app; set `Reporting:Testiny:RunUrlTemplate` to the form "Copy link to test run" shows.
 
 ```bash
 UITESTS_PROFILE=mock,reporting-testiny dotnet run --project src/Platform/UI.Admin.AutomationTests/src

@@ -18,7 +18,7 @@ public sealed class AnnotationsTests : PlatformTest
     // virtualized, so the test looks at the filtered result only.
     [Test]
     [Elementary]
-    [TestCase("2")]
+    [TestCase(2)]
     public async Task Annotations_CreateResponsibility_AppearsInGrid()
     {
         var key = PlatformData.AnnotationKey(PlatformData.Responsibility);

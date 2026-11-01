@@ -64,17 +64,17 @@ public sealed class TestIdentityFactoryTests
         TestIdentityFactory.FindCases(typeof(TestIdentityFactoryTests), nameof(FindCases_IsEmpty_WithoutTestCase)).ShouldBeEmpty();
     }
 
-    [TestCase("78")]
+    [TestCase(78)]
     public abstract class LinkedTestsBase
     {
     }
 
-    [TestCase("56")]
+    [TestCase(56)]
     public sealed class LinkedTests : LinkedTestsBase
     {
-        [TestCase("12")]
+        [TestCase(12)]
         [TestCase("TC-34", System = "Testiny")]
-        [TestCase("12")]
+        [TestCase(12)]
         public void Linked()
         {
         }

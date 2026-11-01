@@ -16,7 +16,7 @@ public sealed class ProjectsTests : PlatformTest
     // through the navigation, show the description.
     [Test]
     [Elementary]
-    [TestCase("5")]
+    [TestCase(5)]
     public async Task Project_Create_OpensSettings()
     {
         var project = PlatformData.ProjectKey();

@@ -2,14 +2,14 @@
 
 The engine-neutral contracts of the 42 UI automation framework (Playwright, TUnit, Testiny, BrowserStack):
 
-- `[TestCase("1234")]` links a test (or a test class) to a case of a test case management system; `System = "Testiny"` restricts the link to one reporter.
+- `[TestCase(1234)]` links a test (or a test class) to a case of a test case management system; `System = "Testiny"` restricts the link to one reporter.
 - `AutomationCategories`: the category names every engine adapter uses (`Elementary`, `Serial`, `Maintenance`, `Area-<area>`).
 - The records of a run: `TestRunDescriptor`, `TestIdentity`, `TestResultReport` with `TestOutcome`, `TestFailure` and `TestArtifact`, `TestRunSummary`, and the property names in `TestRunProperties`.
 - The reporter contract: `ITestRunReporter` (`StartAsync`, `ReportAsync` with batches, `CompleteAsync`, `RunUrl`), `ITestRunReporterProvider` and `TransientReporterException` for failures worth another attempt.
 
 ```csharp
 [Test]
-[TestCase("1234")]
+[TestCase(1234)]
 public async Task SignIn_ShowsOrganizations() { … }
 ```
 
