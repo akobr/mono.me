@@ -30,7 +30,7 @@ namespace _42.Monorepo.Cli.Templates
             this.Write("    <PackageVersion Include=\"xunit\" Version=\"2.9.3\" />\r\n    <PackageVersion Include=\"xunit.runner.visualstudio\" Version=\"4.0.1\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("tests-nunit")) { 
-            this.Write("    <PackageVersion Include=\"NUnit\" Version=\"4.3.2\" />\r\n    <PackageVersion Include=\"NUnit3TestAdapter\" Version=\"5.0.0\" />\r\n");
+            this.Write("    <PackageVersion Include=\"NUnit\" Version=\"5.0.0\" />\r\n    <PackageVersion Include=\"NUnit3TestAdapter\" Version=\"6.3.1\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("git-version")) { 
             this.Write("\r\n    <!-- versioning -->\r\n    <PackageVersion Include=\"42.Monorepo.GitVersioning\" Version=\"1.2.3\" />\r\n");
@@ -40,7 +40,7 @@ namespace _42.Monorepo.Cli.Templates
             this.Write("    <PackageVersion Include=\"StyleCop.Analyzers\" Version=\"1.3.151-beta\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("sonar")) { 
-            this.Write("    <PackageVersion Include=\"SonarAnalyzer.CSharp\" Version=\"10.15.0.120848\" />\r\n");
+            this.Write("    <PackageVersion Include=\"SonarAnalyzer.CSharp\" Version=\"10.35.0.4138\" />\r\n");
  } 
             this.Write("  </ItemGroup>\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
