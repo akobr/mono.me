@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\Storyteller\Api.Functions\src\Api.Functions.csproj" />
     <ProjectReference Include="..\..\Storyteller\DbCreator\src\DbCreator.csproj" />
     <ProjectReference Include="..\..\Storyteller\Mcp\src\Mcp.csproj" />
+    <ProjectReference Include="..\..\UI.Admin.AutomationTests\src\UI.Admin.AutomationTests.csproj" />
   </ItemGroup>
 
 </Project>

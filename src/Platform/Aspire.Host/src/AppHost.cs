@@ -72,7 +72,7 @@ var apiFunctions = builder.AddProject<Projects.Api_Functions>("api-functions")
 // registered in the WorkOS staging environment. It prepares itself: ui-admin-sdk installs and builds the TypeScript
 // SDK, then ui-admin-installer installs the UI's packages (both `npm run prepare:local`, skipped when up to date). The
 // "Clean reinstall" command redoes both from scratch. Node 22.18 or newer must be on PATH.
-builder.AddViteApp("ui-admin", "../../ui.admin/src", "dev:aspire")
+var uiAdmin = builder.AddViteApp("ui-admin", "../../ui.admin/src", "dev:aspire")
     .WithLocalPreparation(Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../..")))
     .WithEndpoint("http", endpoint =>
     {
@@ -98,4 +98,34 @@ builder.AddProject<Projects.Mcp>("mcp")
     .WithEnvironment("Storyteller__BaseUrl", ReferenceExpression.Create($"{apiFunctions.GetEndpoint("http")}/api"))
     .WithExplicitStart();
 
+// UI automation tests of the admin UI (src/Platform/UI.Admin.AutomationTests), run by hand from the dashboard against
+// ui-admin with the dev profile (the pool passwords in the test project's user secrets), grouped under ui-automation.
+// ui-tests-elementary: the Elementary set, one test at a time, in a visible Chromium slowed down by 200 ms per action;
+// ui-tests-all: every test, headless and in parallel. Each run exits when the tests end; start it again to rerun.
+var uiAutomation = builder.AddResource(new UiAutomationGroupResource("ui-automation"))
+    .WithInitialState(new()
+    {
+        ResourceType = "Group",
+        State = KnownResourceStates.Running,
+        Properties = [],
+    })
+    .ExcludeFromManifest();
+
+builder.AddProject<Projects.UI_Admin_AutomationTests>("ui-tests-elementary")
+    .WithEnvironment("UITESTS_PROFILE", "dev")
+    .WithArgs("--maximum-parallel-tests", "1", "--test-parameter", "Browser:Headless=false", "--test-parameter", "Browser:SlowMoMs=200", "--treenode-filter", "/**[Category=Elementary]")
+    .WithParentRelationship(uiAutomation)
+    .WaitFor(uiAdmin)
+    .WithExplicitStart();
+
+builder.AddProject<Projects.UI_Admin_AutomationTests>("ui-tests-all")
+    .WithEnvironment("UITESTS_PROFILE", "dev")
+    .WithArgs("--test-parameter", "Browser:Headless=true")
+    .WithParentRelationship(uiAutomation)
+    .WaitFor(uiAdmin)
+    .WithExplicitStart();
+
 builder.Build().Run();
+
+// The dashboard group of the UI automation tests: a resource of its own that runs nothing.
+internal sealed class UiAutomationGroupResource(string name) : Resource(name);
