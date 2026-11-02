@@ -66,7 +66,9 @@ var apiFunctions = builder.AddProject<Projects.Api_Functions>("api-functions")
     .WithEnvironment("KeyValues__Protection__Emulator", "true")
     .WaitFor(keyVault)
     .WithEnvironment("AzureWebJobsStorage", "UseDevelopmentStorage=true")
-    .WaitFor(storage);
+    .WaitFor(storage)
+    // The Functions host answers its landing page once it is up, so WaitFor(apiFunctions) means ready, not just started.
+    .WithHttpHealthCheck("/", endpointName: "http");
 
 // Administration UI (src/Platform/ui.admin): the Vite dev server on the fixed port 5173, which is the redirect URI
 // registered in the WorkOS staging environment. It prepares itself: ui-admin-sdk installs and builds the TypeScript
@@ -81,7 +83,8 @@ var uiAdmin = builder.AddViteApp("ui-admin", "../../ui.admin/src", "dev:aspire")
         endpoint.IsProxied = false;
     })
     .WithEnvironment("VITE_API_BASE_URL", ReferenceExpression.Create($"{apiFunctions.GetEndpoint("http")}/api"))
-    .WithReference(apiFunctions);
+    .WithReference(apiFunctions)
+    .WaitFor(apiFunctions);
 
 // MCP server (Storyteller/Mcp), started from the dashboard. Its user secrets need Mcp:ResourceUrl (its own URL ending
 // in /mcp, for example https://localhost:7180/mcp), Mcp:Provider and Mcp:Authentication:* (the same provider as the
@@ -102,6 +105,8 @@ builder.AddProject<Projects.Mcp>("mcp")
 // ui-admin with the dev profile (the pool passwords in the test project's user secrets), grouped under ui-automation.
 // ui-tests-elementary: the Elementary set, one test at a time, in a visible Chromium slowed down by 200 ms per action;
 // ui-tests-all: every test, headless and in parallel. Each run exits when the tests end; start it again to rerun.
+// Target:BaseUrl is passed as a parameter, so a run targets this ui-admin whatever the user secrets or UITESTS_* say.
+var uiTestsTarget = ReferenceExpression.Create($"Target:BaseUrl={uiAdmin.GetEndpoint("http")}");
 var uiAutomation = builder.AddResource(new UiAutomationGroupResource("ui-automation"))
     .WithInitialState(new()
     {
@@ -113,15 +118,19 @@ var uiAutomation = builder.AddResource(new UiAutomationGroupResource("ui-automat
 
 builder.AddProject<Projects.UI_Admin_AutomationTests>("ui-tests-elementary")
     .WithEnvironment("UITESTS_PROFILE", "dev")
+    .WithArgs("--test-parameter", uiTestsTarget)
     .WithArgs("--maximum-parallel-tests", "1", "--test-parameter", "Browser:Headless=false", "--test-parameter", "Browser:SlowMoMs=200", "--treenode-filter", "/**[Category=Elementary]")
     .WithParentRelationship(uiAutomation)
+    .WaitFor(apiFunctions)
     .WaitFor(uiAdmin)
     .WithExplicitStart();
 
 builder.AddProject<Projects.UI_Admin_AutomationTests>("ui-tests-all")
     .WithEnvironment("UITESTS_PROFILE", "dev")
+    .WithArgs("--test-parameter", uiTestsTarget)
     .WithArgs("--test-parameter", "Browser:Headless=true")
     .WithParentRelationship(uiAutomation)
+    .WaitFor(apiFunctions)
     .WaitFor(uiAdmin)
     .WithExplicitStart();
 
