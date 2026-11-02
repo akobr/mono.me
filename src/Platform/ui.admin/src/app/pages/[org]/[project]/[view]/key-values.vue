@@ -59,7 +59,8 @@ const rows = computed<KeyValueSummary[]>(() => {
 
 const selected = ref<Set<string>>(new Set())
 // The switcher keeps this page through a project switch too, often to the same view name (424-68).
-watch([state, () => context.projectKey, () => context.view], () => (selected.value = new Set()))
+// The level filter too: the bulk state of the All state reads the loaded rows, which a filter change replaces (424-159).
+watch([state, levelFilter, () => context.projectKey, () => context.view], () => (selected.value = new Set()))
 
 function toggle(key: string, on: boolean) {
   const next = new Set(selected.value)
@@ -317,7 +318,9 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
               <UBadge v-if="state === 'All' && row.IsDeleted" label="Deleted" icon="i-lucide-trash-2" color="warning" variant="subtle" size="sm" />
               <KeyValueLevelBadge :level="row.Protection" :reference="row.IsReference" class="ms-auto" />
             </span>
-            <span class="truncate font-mono text-xs text-muted">{{ isSecretLevel(row.Protection) ? maskedValue : valuePreview(row.Value) }} · v{{ row.Version }}</span>
+            <span class="truncate font-mono text-xs text-muted">
+              {{ isSecretLevel(row.Protection) ? maskedValue : valuePreview(row.Value) }} · v{{ row.Version }}<template v-if="state === 'All' && row.IsDeleted"> · expires in {{ daysUntil(row.ExpiresAt) ?? '?' }} days</template>
+            </span>
           </button>
         </li>
       </ul>
