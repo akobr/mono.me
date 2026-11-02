@@ -23,6 +23,22 @@ public sealed partial class ConfigurationsPage
     public const int AuthorColumn = 4;
     public const int UpdatedColumn = 5;
 
+    // One poll of ExpectListedAsync on the grid's table: true once a rendered row has the key in its Key cell, else it
+    // scrolls the table's scroll container (UTable's root, the table's parent) a page down, or back to the top from the
+    // end, for the virtualizer to render the next rows before the next poll.
+    private const string ScrollTowardsKey = """
+        ([table, key, column]) => {
+          const listed = [...table.tBodies]
+            .flatMap(body => [...body.rows])
+            .some(row => row.cells[column]?.textContent?.replace(/\s+/g, '') === key);
+          if (listed) return true;
+          const scroller = table.parentElement;
+          const end = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+          scroller.scrollTop = end ? 0 : scroller.scrollTop + scroller.clientHeight;
+          return false;
+        }
+        """;
+
     public ILocator EmptyStateHeading => app.Page.GetByRole(AriaRole.Heading, new() { NameRegex = EmptyStateTitle() });
 
     public ILocator NoMatchHeading => app.Page.GetByRole(AriaRole.Heading, new() { Name = NoMatchTitle, Exact = true });
@@ -52,6 +68,37 @@ public sealed partial class ConfigurationsPage
         ArgumentOutOfRangeException.ThrowIfNegative(column);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(column, UpdatedColumn);
         return Item(key).GetByRole(AriaRole.Cell).Nth(column);
+    }
+
+    // Expects the key's row (grid) or item (list) to be listed. The grid is virtualized (rows of about 40 px plus an
+    // overscan of 12, sorted by key), so under a filter that many configurations match (the run's slug on a deployed
+    // target) the row may be outside the rendered window: the grid is scrolled a page at a time, from its position to
+    // the end and then from the top, until the row is rendered, up to Execution:ActionTimeoutMs. A phone's list renders
+    // every item.
+    public async Task ExpectListedAsync(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var item = Item(key);
+        if (HasGrid)
+        {
+            var table = app.Page.GetByRole(AriaRole.Table).First;
+            await Expect(table).ToBeVisibleAsync();
+            var handle = await table.ElementHandleAsync();
+            try
+            {
+                await app.Page.WaitForFunctionAsync(
+                    ScrollTowardsKey,
+                    new object[] { handle, key, KeyColumn },
+                    new() { PollingInterval = 100 });
+            }
+            catch (TimeoutException exception)
+            {
+                throw new TimeoutException($"No row of the configurations grid has the key {key} at any scroll position.", exception);
+            }
+        }
+
+        await Expect(item).ToBeVisibleAsync();
     }
 
     // Opens the list with a filter in its URL (?q=) and waits until the filter box shows it.

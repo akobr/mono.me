@@ -17,6 +17,17 @@ internal static class ConfigurationSteps
         return key;
     }
 
+    // Bulk creates a new unit, which creates its new responsibility (the unit's only parent); returns both keys.
+    public static async Task<(string Unit, string Parent)> CreateUnitAsync(App app, AppRoutes routes, PlatformData data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+
+        var unit = data.AnnotationKey(PlatformData.Unit);
+        var parent = PlatformData.AncestorKey(unit, PlatformData.Responsibility);
+        await BulkCreateAsync(app, routes, unit);
+        return (unit, parent);
+    }
+
     // Bulk creates new annotations (with their missing ancestors) on the annotations page of the routes.
     public static async Task BulkCreateAsync(App app, AppRoutes routes, params string[] keys)
     {

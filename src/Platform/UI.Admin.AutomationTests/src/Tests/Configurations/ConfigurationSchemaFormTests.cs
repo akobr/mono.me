@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
@@ -42,7 +41,7 @@ public sealed partial class ConfigurationSchemaFormTests : PlatformTest
     public async Task Configurations_SchemaForm_SavesValue()
     {
         var key = await ConfigurationSteps.CreateResponsibilityAsync(App, Routes, PlatformData);
-        await CreateAnnotationSchemaAsync(key, RetriesAndEnabledSchema);
+        await ConfigurationSteps.CreateAnnotationSchemaAsync(App, Routes, key, RetriesAndEnabledSchema);
 
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenAsync(key);
@@ -89,7 +88,7 @@ public sealed partial class ConfigurationSchemaFormTests : PlatformTest
     public async Task Configurations_SchemaViolation_SaveAnywayStoresIt()
     {
         var key = await ConfigurationSteps.CreateResponsibilityAsync(App, Routes, PlatformData);
-        await CreateAnnotationSchemaAsync(key, RetriesMaximumSchema);
+        await ConfigurationSteps.CreateAnnotationSchemaAsync(App, Routes, key, RetriesMaximumSchema);
 
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenAsync(key);
@@ -131,20 +130,17 @@ public sealed partial class ConfigurationSchemaFormTests : PlatformTest
     [UserRole(Role.Editor)]
     public async Task Configurations_InheritedValue_OverrideAndReset()
     {
-        var unit = PlatformData.AnnotationKey(PlatformData.Unit);
-        var parent = PlatformData.AncestorKey(unit, PlatformData.Responsibility);
-        await ConfigurationSteps.BulkCreateAsync(App, Routes, unit);
+        var (unit, parent) = await ConfigurationSteps.CreateUnitAsync(App, Routes, PlatformData);
 
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenAsync(parent);
         await ConfigurationSteps.StoreVersionsAsync(App, configuration, """{"retries": 2}""");
-        await CreateAnnotationSchemaAsync(unit, RetriesSchema);
+        await ConfigurationSteps.CreateAnnotationSchemaAsync(App, Routes, unit, RetriesSchema);
 
         await configuration.OpenAsync(unit);
         await configuration.CreateEmptyAsync();
         await Expect(App.Toast("Configuration created")).ToBeVisibleAsync();
-        await configuration.FormMode.ClickAsync();
-        await App.ExpectQueryAsync("format", "form");
+        await Expect(configuration.FormMode).ToBeCheckedAsync();
 
         var form = configuration.Form;
         var retries = form.NumberInput("/retries");
@@ -184,7 +180,7 @@ public sealed partial class ConfigurationSchemaFormTests : PlatformTest
     public async Task Configurations_FormListsAndMaps_SaveNestedValues()
     {
         var key = await ConfigurationSteps.CreateResponsibilityAsync(App, Routes, PlatformData);
-        await CreateAnnotationSchemaAsync(key, TiersAndHeadersSchema);
+        await ConfigurationSteps.CreateAnnotationSchemaAsync(App, Routes, key, TiersAndHeadersSchema);
 
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenAsync(key);
@@ -236,13 +232,4 @@ public sealed partial class ConfigurationSchemaFormTests : PlatformTest
     // server's (a humanized NJsonSchema kind, "Number too big" on the mock).
     [GeneratedRegex(@"^The configuration will be stored with 1 schema violation\(s\): \/retries .+\.$")]
     private static partial Regex OneViolation();
-
-    // Creates the annotation schema of the key in Modeling (toast "Schema saved (v1)"); it applies to that annotation
-    // and its descendants only.
-    private async Task CreateAnnotationSchemaAsync(string key, string schema)
-    {
-        var schemas = new ModelingSchemaPage(App, Routes);
-        await schemas.OpenAnnotationAsync(key);
-        await schemas.CreateAsync(schema);
-    }
 }

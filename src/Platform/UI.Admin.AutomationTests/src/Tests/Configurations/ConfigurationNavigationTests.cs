@@ -47,9 +47,10 @@ public sealed partial class ConfigurationNavigationTests : PlatformTest
         }
         else
         {
-            await Expect(item).ToContainTextAsync(name);
-            await Expect(item).ToContainTextAsync("v2");
-            await Expect(item).ToContainTextAsync(key);
+            // The item's own spans, matched exactly: its key line ("rst.<name>") contains the name and maybe "v2" too.
+            await Expect(item.GetByText(name, new() { Exact = true })).ToBeVisibleAsync();
+            await Expect(item.GetByText("v2", new() { Exact = true })).ToBeVisibleAsync();
+            await Expect(item.GetByText(key, new() { Exact = true })).ToBeVisibleAsync();
         }
 
         await list.OpenItemAsync(item);
@@ -76,8 +77,8 @@ public sealed partial class ConfigurationNavigationTests : PlatformTest
     // CFG-NAV-02: The tabs keep the filter, and Close returns to the list.
     // Opened with the run's filter, every tab link (Effective, Resolved, Versions, Schema, back to Edit) keeps ?q= and
     // shows its content; Close returns to the list with the filter in its box and the key's row. The run's filter is
-    // shared by the run's tests, so the count is not checked. The mock has no Responsibility type schema; a deployed
-    // target may have one.
+    // shared by the run's tests, so the count is not checked, and the virtualized grid is scrolled to the key's row
+    // (ExpectListedAsync). The mock has no Responsibility type schema; a deployed target may have one.
     [Test]
     [TestCase(229)]
     [UserRole(Role.Editor)]
@@ -125,7 +126,7 @@ public sealed partial class ConfigurationNavigationTests : PlatformTest
         await ExpectAtFilteredAsync(Routes.Configurations, filter);
         var list = new ConfigurationsPage(App, Routes);
         await Expect(list.Filter).ToHaveValueAsync(filter);
-        await Expect(list.Item(key)).ToBeVisibleAsync();
+        await list.ExpectListedAsync(key);
     }
 
     // CFG-NAV-03: Returning to Configurations reopens the last configuration and tab.

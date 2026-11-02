@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
@@ -25,7 +24,7 @@ public sealed class ConfigurationInheritanceTests : PlatformTest
     [UserRole(Role.Editor)]
     public async Task Configurations_Effective_MergesParentConfiguration()
     {
-        var (unit, parent) = await CreateUnitAsync();
+        var (unit, parent) = await ConfigurationSteps.CreateUnitAsync(App, Routes, PlatformData);
         var shared = $"\"shared\": \"{PlatformData.RunSlug}\"";
 
         var configuration = new ConfigurationDetail(App, Routes);
@@ -53,12 +52,10 @@ public sealed class ConfigurationInheritanceTests : PlatformTest
         await Expect(App.Toast("Own configuration deleted; inherited values remain")).ToBeVisibleAsync();
         await Expect(configuration.NoConfigurationHeading).ToBeVisibleAsync();
 
-        // The editor counts as changed after the delete (it puts {} into the draft while nothing is stored), so another
-        // tab asks "Discard changes?" first; Discard leaves.
+        // Admin UI bug (424-152 review): ConfigurationEditor.vue remove() leaves the draft {} while nothing is stored, so
+        // another tab may ask "Discard changes?" after Delete own; discard it only when it shows.
         await configuration.EffectiveTab.ClickAsync();
-        var discard = new DiscardChangesDialog(App);
-        await discard.ExpectOpenAsync();
-        await discard.DiscardAsync();
+        await new DiscardChangesDialog(App).DiscardIfShownAsync(effective.Document.Content);
         await App.ExpectAtAsync(Routes.ConfigurationTab(unit, "effective"));
         await Expect(effective.Document.Content).ToContainTextAsync(shared);
         await Expect(effective.Document.Content).ToContainTextAsync("\"limit\": 1");
@@ -74,7 +71,7 @@ public sealed class ConfigurationInheritanceTests : PlatformTest
     [UserRole(Role.Editor)]
     public async Task Configurations_Composition_ShowsStepOfEachLine()
     {
-        var (unit, parent) = await CreateUnitAsync();
+        var (unit, parent) = await ConfigurationSteps.CreateUnitAsync(App, Routes, PlatformData);
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenAsync(parent);
         await ConfigurationSteps.StoreVersionsAsync(App, configuration, ParentDocument());
@@ -124,7 +121,7 @@ public sealed class ConfigurationInheritanceTests : PlatformTest
     [UserRole(Role.Editor)]
     public async Task Configurations_BreadcrumbAndLineage_OpenParent()
     {
-        var (unit, parent) = await CreateUnitAsync();
+        var (unit, parent) = await ConfigurationSteps.CreateUnitAsync(App, Routes, PlatformData);
         var parentName = parent.Split('.')[^1];
         var unitName = unit.Split('.')[^1];
 
@@ -165,15 +162,6 @@ public sealed class ConfigurationInheritanceTests : PlatformTest
     private string ParentDocument()
     {
         return $$"""{"shared": "{{PlatformData.RunSlug}}", "limit": 1}""";
-    }
-
-    // Bulk creates a new unit with its new responsibility (the unit's parent); returns both keys.
-    private async Task<(string Unit, string Parent)> CreateUnitAsync()
-    {
-        var unit = PlatformData.AnnotationKey(PlatformData.Unit);
-        var parent = PlatformData.AncestorKey(unit, PlatformData.Responsibility);
-        await ConfigurationSteps.BulkCreateAsync(App, Routes, unit);
-        return (unit, parent);
     }
 
     // The responsibility's Edit tab opened, with the run's filter.
