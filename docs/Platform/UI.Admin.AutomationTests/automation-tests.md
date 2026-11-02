@@ -25,7 +25,7 @@ dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --list-tests
 ```
 
 - **Not `dotnet test`**: TUnit runs on Microsoft.Testing.Platform 2.5, which refuses the VSTest mode of `dotnet test` on the .NET 10 SDK, and the repository stays in VSTest mode for its xUnit projects. `dotnet build src` builds the project and `dotnet test src` leaves it out (`Test="false"` in `src/Directory.Build.proj` and `src/Platform/Directory.Build.proj`).
-- **Without a target** (`Target:BaseUrl` empty, the committed default) every test is skipped with a reason and the run exits `0`. A filter that matches nothing exits `8`.
+- **The committed target** is `http://localhost:5173`, the local admin UI (`npm run dev` or Aspire); a run against it needs the passwords of the committed pool in the user secrets (`Users:Pool:<n>:Password`). **Without a target** (an empty `Target:BaseUrl`, e.g. `UITESTS_Target__BaseUrl=`) every test is skipped with a reason and the run exits `0`. A filter that matches nothing exits `8`.
 - The terminal shows the session's lines prefixed `ui-automation:`: the run id, the data seed, the effective settings (secrets as `***`), the target check, warnings, and at the end the totals, every reporter's run URL and the path of `results.jsonl`.
 - Results go to `src/Platform/UI.Admin.AutomationTests/src/bin/<configuration>/net10.0/TestResults/` (git-ignored): TUnit's HTML report (and the TRX), and `artifacts/<runId>/` with `results.jsonl` and a folder per test (`Tests.Access.SignInTests/SignIn_ShowsOrganizations/`) with `failure.png`, `trace.zip` (`pwsh …/playwright.ps1 show-trace <file>`) and `console.log`. The target check has its own folder, `TargetCheck/CheckTarget/`.
 - **Keep traces private**: a `trace.zip` holds the network log and the context's storage state, so the pool user's session cookies and tokens (never a password: the sign-in runs untraced). Do not publish traces of a deployed target; the CI workflow leaves them (every `.zip` of the results) out of its artifact.
@@ -40,7 +40,7 @@ The Platform's keys of `Target` (`PlatformTarget`, read with `Settings.Bind<Plat
 
 | Key | `testsettings.json` | Meaning |
 |---|---|---|
-| `BaseUrl` | empty | The admin UI, e.g. `https://admin.staging.example.com`; empty skips every test |
+| `BaseUrl` | `http://localhost:5173` | The admin UI, by default the local dev server (`npm run dev` / Aspire), e.g. `https://admin.staging.example.com`; empty skips every test |
 | `SignIn` | `AuthKit` | `AuthKit` (deployed environments) or `None` (a target that is signed in already: the mock build) |
 | `Organization` / `Project` / `View` | `ui-tests` / `automation` / `default` | The pre-provisioned organization, project and view the tests work in (placeholders until the environment exists); Platform names: 2 to 63 of `a-z`, `0-9` and `-` |
 | `MockScenario` | `null` | Mock build only: `?mock-scenario=<name>` (`default`, `new-user`, `invited`, `large`, `showcase`) on the first navigation of each test |
@@ -88,7 +88,7 @@ dotnet user-secrets set "Reporting:Testiny:ApiKey" "…"                        
 - `UserRequirement.WithRole("Owner")` for `Project_Create_OpensSettings` ("New project" is enabled only for an Owner of the organization);
 - any user for the sign-in and navigation tests.
 
-A pool of six suits the default 4 parallel tests: 2 Owners, 1 Administrator, 2 Contributors, 1 Reader. A lease that waits longer than `Users:LeaseTimeoutSeconds` (120 s) blocks the test (`No user of Users:Pool has role …` when none could ever match).
+The committed `testsettings.json` holds a pool of 8 users (their e-mails and roles; the passwords go to the user secrets as `Users:Pool:<n>:Password`), enough for the default 4 parallel tests. A pool set in a higher layer (a profile such as `mock`, `testsettings.local.json`, `UITESTS_*` variables) replaces it entirely: the highest layer that sets any `Users:Pool:<n>:Email` defines the pool, and passwords of any layer apply to it by index. A lease that waits longer than `Users:LeaseTimeoutSeconds` (120 s) blocks the test (`No user of Users:Pool has role …` when none could ever match).
 
 ## AuthKit checklist
 
@@ -214,13 +214,13 @@ A run against a deployed target (and a mock run with `report_testiny`) uses the 
 |---|---|
 | `UITESTS_TARGET_BASE_URL` | `Target:BaseUrl` when `target_url` is empty |
 | `UITESTS_TARGET_ORGANIZATION` / `_PROJECT` / `_VIEW` / `_EMAIL_DOMAIN` | `Target:Organization` / `Project` / `View` / `EmailDomain` |
-| `UITESTS_USER_<n>_EMAIL`, `UITESTS_USER_<n>_ROLES` (n = 0…5; roles comma-separated, e.g. `Owner` or `Contributor, Reader`) | `Users:Pool:<n>:Email` and `Users:Pool:<n>:Roles`; a slot without an e-mail is skipped |
+| `UITESTS_USER_<n>_EMAIL`, `UITESTS_USER_<n>_ROLES` (n = 0…7; roles comma-separated, e.g. `Owner` or `Contributor, Reader`) | `Users:Pool:<n>:Email` and `Users:Pool:<n>:Roles`; a slot without an e-mail is skipped; any e-mail makes these slots replace the committed pool entirely |
 | `UITESTS_BROWSERSTACK_MAX_PARALLEL_SESSIONS` | `BrowserStack:MaxParallelSessions` (with a `browserstack*` profile) |
 | `UITESTS_TESTINY_PROJECT_ID` / `UITESTS_TESTINY_TEST_PLAN_ID` | `Reporting:Testiny:ProjectId` / `TestPlanId` (with `report_testiny`) |
 
 | Secret | Becomes |
 |---|---|
-| `UITESTS_USER_<n>_PASSWORD` (n = 0…5) | `Users:Pool:<n>:Password` |
+| `UITESTS_USER_<n>_PASSWORD` (n = 0…7) | `Users:Pool:<n>:Password`, applied by index to the pool (the committed one when no slot has an e-mail) |
 | `UITESTS_BROWSERSTACK_USERNAME` / `UITESTS_BROWSERSTACK_ACCESS_KEY` | `BrowserStack:Username` / `AccessKey` when a profile starts with `browserstack` |
 | `UITESTS_TESTINY_API_KEY` | `Reporting:Testiny:ApiKey` (with `report_testiny`) |
 
