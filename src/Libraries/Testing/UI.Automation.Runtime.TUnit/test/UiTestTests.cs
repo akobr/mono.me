@@ -35,7 +35,7 @@ public sealed class UiTestTests
     // The hook's arguments are not read by these tests' overrides, so they get null.
     private sealed class SkippingTest(string? reason) : UiTest
     {
-        protected override string? GetSkipReason(TestContext context, AutomationSession session)
+        protected override string? GetSkipReason(global::TUnit.Core.TestContext context, AutomationSession session)
         {
             return reason;
         }
