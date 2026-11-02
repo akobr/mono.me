@@ -60,6 +60,9 @@ public sealed partial class KeyValuesPage
     // The confirmation of the bulk bar's Purge (ConfirmDialog: type the view's name; its button "Purge").
     public ConfirmDialog PurgeDialog => new(app, "Purge the selected keys?");
 
+    // Every option of the open select (the New key dialog's or the Import's levels).
+    public ILocator SelectOptions => app.Page.GetByRole(AriaRole.Option);
+
     // An option of the open select or a level's item of an open menu, by its exact name.
     public ILocator SelectOption(string name)
     {
