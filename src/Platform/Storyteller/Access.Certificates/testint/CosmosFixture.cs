@@ -1,5 +1,6 @@
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.DbCreator.Logic;
+using DotNet.Testcontainers.Builders;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +29,14 @@ public class CosmosFixture : IAsyncLifetime
     {
         DbContainer = new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
             .WithReuse(true)
+            // Its own label, so its own reused emulator: the cleanup deletes every database, and Testcontainers' reuse
+            // is not safe when two test modules start the same container at once (two containers, one hash).
+            .WithLabel("net.42for.tests.cosmos", "access-certificates-integrationtests")
+            // 8 partitions instead of the default 10 start faster and need less memory; 5 are too few for the containers the tests create (503).
+            .WithEnvironment("AZURE_COSMOS_EMULATOR_PARTITION_COUNT", "8")
+            // The port opens before the partitions start: wait for the emulator's "Started" line, or the first
+            // requests fail with "The SSL connection could not be established".
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(@"(?m)^Started\s*$"))
             .Build();
 
         var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5));

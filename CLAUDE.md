@@ -162,11 +162,11 @@ dotnet build src
 # Build a specific project area
 dotnet build src/Platform
 
-# Run all tests: the solution (in Microsoft.Testing.Platform mode dotnet test takes no traversal until .NET 11), one
-# module at a time: the Cosmos DB suites share one emulator and delete its databases, and two suites share Lowkey Vault.
-# The UI automation tests skip without a target (the committed default).
-dotnet test --solution 42.mono.slnx --max-parallel-test-modules 1
-dotnet test --solution 42.mono.slnx   # every module at once: faster, but the Cosmos DB and Lowkey Vault suites can fail each other
+# Run all tests: the solution (in Microsoft.Testing.Platform mode dotnet test takes no traversal until .NET 11). The UI
+# automation tests skip without a target (the committed default). With STORYTELLER_TESTS_USE_CONTAINER=true each Cosmos DB
+# suite starts its own emulator container (about 1.5 GB each): give Docker 4+ CPUs and 10+ GB, or run one module at a time.
+dotnet test --solution 42.mono.slnx
+dotnet test --solution 42.mono.slnx --max-parallel-test-modules 1   # one module at a time: slower, for a small Docker VM
 
 # One test project, and xUnit's filters (only with --project: the TUnit project refuses them)
 dotnet test --project src/Platform/Storyteller/Backend.Core/test
