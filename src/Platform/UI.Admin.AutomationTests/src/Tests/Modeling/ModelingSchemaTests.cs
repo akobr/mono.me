@@ -19,11 +19,6 @@ public sealed partial class ModelingSchemaTests : PlatformTest
     // An object schema with one titled string property, which the form preview renders as the field "Ticket".
     private const string TicketSchema = """{"type":"object","properties":{"ticket":{"type":"string","title":"Ticket"}}}""";
 
-    // Admin UI bug (424-152 review): SchemaDetail.vue remove() + CodeEditor.vue echo {} back before the 404, so the
-    // starter document does not return; the fixed app shows the starter document. What the editor holds after a delete
-    // with the bug.
-    private const string DeletedSchemaDocument = "{}";
-
     // MOD-SCH-01: Create an annotation schema for a new annotation.
     // The schema of a new responsibility does not exist yet: its editor names the annotation, applies to none of the
     // view's configurations and offers Create, not Delete. A valid document saves as v1 with Ctrl+S, after which the
@@ -148,10 +143,8 @@ public sealed partial class ModelingSchemaTests : PlatformTest
     // A new project has no schemas: seven type rows, Responsibility without a schema, and two empty sections (on a
     // deployed target; the mock gives every view its base documents). The Responsibility schema starts with the starter
     // document and Create; saved as v1 its row shows v1. The typed delete ("delete") removes it, and the editor offers
-    // Create with the starter document again; the row shows "No schema" again. A type schema validates every
-    // configuration of the type in the view, hence the disposable project.
-    // Admin UI bug (424-152 review): SchemaDetail.vue remove() + CodeEditor.vue echo {} back before the 404, so the
-    // starter document does not return; the fixed app shows the starter document. The test accepts both.
+    // Create with the starter document again, unchanged, so closing asks nothing; the row shows "No schema" again. A
+    // type schema validates every configuration of the type in the view, hence the disposable project.
     [Test]
     [TestCase(96)]
     [UserRole(Role.Owner)]
@@ -199,9 +192,9 @@ public sealed partial class ModelingSchemaTests : PlatformTest
         await delete.ConfirmAsync("Delete");
         await Expect(App.Toast("Schema deleted")).ToBeVisibleAsync();
 
-        // Create shows once the schema's 404 arrived (Save until then), and with it the document of a missing schema.
+        // Create shows once the schema's 404 arrived (Save until then), and with it the starter document (424-158).
         await Expect(schema.CreateButton).ToBeVisibleAsync();
-        await schema.Document.ExpectTextAsync(ModelingSchemaPage.StarterDocument, DeletedSchemaDocument);
+        await schema.Document.ExpectTextAsync(ModelingSchemaPage.StarterDocument);
 
         await LeaveDeletedSchemaAsync(schema);
         await Expect(schema.TypeSchemaRow(PlatformData.Responsibility)).ToContainTextAsync("No schema");
@@ -346,7 +339,7 @@ public sealed partial class ModelingSchemaTests : PlatformTest
     // An annotation schema saved twice (maximum 5, then 9) lists v2 as current above v1; v1 shows read-only, and v2
     // compared with v1 differs in one line. The typed delete stays disabled until "delete" is typed and confirms with
     // Enter; then nothing is left: no history, and no row in "Annotation schemas". The editor of the deleted schema holds
-    // an unsaved document, so leaving it may ask "Discard changes?" (LeaveDeletedSchemaAsync).
+    // the unchanged starter document, so leaving it asks nothing (LeaveDeletedSchemaAsync).
     [Test]
     [TestCase(105)]
     [UserRole(Role.Editor)]
@@ -429,13 +422,13 @@ public sealed partial class ModelingSchemaTests : PlatformTest
         return new Regex($"\"maximum\":\\s*{maximum}\\b");
     }
 
-    // A deleted schema's editor holds an unsaved document (the starter document, or {} with the Admin UI bug (424-152
-    // review)), so leaving may ask "Discard changes?"; Discard, if asked, returns to the list.
+    // A deleted schema's editor holds the starter document, unchanged (424-158): the editor is clean, and leaving
+    // returns to the list without "Discard changes?".
     private async Task LeaveDeletedSchemaAsync(ModelingSchemaPage schema)
     {
-        await schema.Panel.LeaveButton.ClickAsync();
-        await new DiscardChangesDialog(App).DiscardIfShownAsync(schema.Panel.Gone);
-        await Expect(schema.Panel.Root).ToBeHiddenAsync();
+        await Expect(Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
+        await schema.Panel.CloseAsync();
+        await Expect(new DiscardChangesDialog(App).Root).ToHaveCountAsync(0);
         await Expect(schema.SchemaListSection("Type schemas")).ToBeVisibleAsync();
     }
 

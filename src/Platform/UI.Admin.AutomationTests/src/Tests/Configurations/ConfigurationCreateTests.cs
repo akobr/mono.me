@@ -226,13 +226,12 @@ public sealed class ConfigurationCreateTests : PlatformTest
         await Expect(configuration.NoConfigurationHeading).ToBeVisibleAsync();
         await Expect(configuration.CreateEmptyButton).ToBeVisibleAsync();
 
-        // Admin UI bug (424-152 review): ConfigurationEditor.vue remove() leaves the draft {} while nothing is stored, so
-        // leaving after Delete own may ask "Discard changes?"; discard it only when it shows. The outcome is the detail
-        // gone, not the list's empty state: from 768 px the list beside the detail shows it already after the delete.
+        // Nothing was edited, so leaving asks nothing: the editor no longer takes the echo of the {} it shows after the
+        // delete for an edit (424-158).
         var list = new ConfigurationsPage(App, Routes);
-        await configuration.ConfigurationPanel.LeaveButton.ClickAsync();
-        await new DiscardChangesDialog(App).DiscardIfShownAsync(configuration.ConfigurationPanel.Gone);
-        await Expect(configuration.ConfigurationPanel.Root).ToBeHiddenAsync();
+        await Expect(Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
+        await configuration.ConfigurationPanel.CloseAsync();
+        await Expect(new DiscardChangesDialog(App).Root).ToHaveCountAsync(0);
         await App.ExpectAtAsync(Routes.Configurations);
         await App.ExpectQueryAsync("q", filter);
         await Expect(list.NoMatchHeading).ToBeVisibleAsync();

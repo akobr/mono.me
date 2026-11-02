@@ -21,11 +21,8 @@ public sealed class ModelingTemplateTests : PlatformTest
     // MOD-TPL-01: Create, edit, version and delete a template.
     // A new project lists the seven types; Responsibility has no template and no configuration. Create template saves
     // a document as v1, a changed value counts as one change and saves as v2, and the Versions compare v2 with v1 in one
-    // changed line. The typed delete asks for the type's code; the detail then shows "No responsibility template", and
-    // the list "No template" again.
-    // Admin UI bug (424-152 review): TemplateDetail.vue remove() + CodeEditor.vue echo {} back before the 404, so the
-    // editor stays with {} and Create instead of the empty state, and leaving it asks "Discard changes?"; the fixed app
-    // shows "No responsibility template". The test accepts both.
+    // changed line. The typed delete asks for the type's code; the detail then shows "No responsibility template",
+    // closing it asks nothing (424-158), and the list shows "No template" again.
     [Test]
     [TestCase(147)]
     [UserRole(Role.Owner)]
@@ -86,25 +83,14 @@ public sealed class ModelingTemplateTests : PlatformTest
         await delete.ConfirmAsync("Delete");
         await Expect(App.Toast("Template deleted")).ToBeVisibleAsync();
 
-        // Until the template's 404 arrives the editor still shows Save; then either the empty state (the case) or the
-        // editor's Create.
-        await Expect(template.NoTemplate.Or(template.CreateButton)).ToBeVisibleAsync();
+        // Until the template's 404 arrives the editor still shows Save; then the empty state replaces it.
+        await Expect(template.NoTemplate).ToHaveTextAsync("No responsibility template");
+        await Expect(template.CreateTemplateButton).ToBeVisibleAsync();
         await Expect(template.DeleteButton).ToHaveCountAsync(0);
-        if (await template.NoTemplate.IsVisibleAsync())
-        {
-            await Expect(template.NoTemplate).ToHaveTextAsync("No responsibility template");
-            await Expect(template.CreateTemplateButton).ToBeVisibleAsync();
-            await template.Panel.CloseAsync();
-        }
-        else
-        {
-            // Admin UI bug (424-152 review): TemplateDetail.vue remove() + CodeEditor.vue echo {} back before the 404,
-            // so the editor keeps {} with Create, a change of its own; the fixed app shows "No responsibility template".
-            await template.Document.ExpectTextAsync("{}");
-            await template.Panel.LeaveButton.ClickAsync();
-            await new DiscardChangesDialog(App).DiscardIfShownAsync(template.Panel.Gone);
-            await Expect(template.Panel.Root).ToBeHiddenAsync();
-        }
+        await Expect(template.CreateButton).ToHaveCountAsync(0);
+        await Expect(Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
+        await template.Panel.CloseAsync();
+        await Expect(new DiscardChangesDialog(App).Root).ToHaveCountAsync(0);
 
         await App.ExpectAtAsync(project.ModelingTab("templates"));
         await Expect(template.ListRow(PlatformData.Responsibility)).ToContainTextAsync("No template");
