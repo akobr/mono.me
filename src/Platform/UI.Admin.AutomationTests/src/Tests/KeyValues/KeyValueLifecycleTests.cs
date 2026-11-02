@@ -18,6 +18,9 @@ public sealed partial class KeyValueLifecycleTests : PlatformTest
     private const string EmptyDeleted = "No deleted keys";
     private const string EmptyDeletedDescription = "Deleted keys can be restored here for 90 days.";
 
+    // The description of the toast "'<key>' deleted".
+    private const string DeletedToastDescription = "Restore it from the Deleted keys.";
+
     // KV-LIF-01: Delete a key from the row menu and restore it from the Deleted keys.
     // The row menu's Delete asks first (Cancel keeps the key), then moves the key to the Deleted keys for 90 days; there
     // its detail is read-only with the alert "This key is deleted", and Restore brings back the latest version without
@@ -49,7 +52,7 @@ public sealed partial class KeyValueLifecycleTests : PlatformTest
         await keyValues.RowActionAsync(key, "Delete");
         await delete.ConfirmAsync("Delete");
         await Expect(App.Toast($"'{detail.Key}' deleted")).ToBeVisibleAsync();
-        await Expect(ToastText("Restore it from the Deleted keys.")).ToBeVisibleAsync();
+        await Expect(App.ToastDescriptionOf($"'{detail.Key}' deleted")).ToHaveTextAsync(DeletedToastDescription);
         await Expect(keyValues.EmptyState(EmptyActive)).ToBeVisibleAsync();
 
         await keyValues.DeletedButton.ClickAsync();
@@ -234,7 +237,7 @@ public sealed partial class KeyValueLifecycleTests : PlatformTest
         await detail.CloseAsync();
 
         await keyValues.DeleteFromRowMenuAsync(key);
-        await Expect(ToastText("Restore it from the Deleted keys.")).ToBeVisibleAsync();
+        await Expect(App.ToastDescriptionOf($"'{detail.Key}' deleted")).ToHaveTextAsync(DeletedToastDescription);
         await Expect(keyValues.EmptyState(EmptyActive)).ToBeVisibleAsync();
 
         await keyValues.CreateAsync(key, second);
@@ -263,12 +266,6 @@ public sealed partial class KeyValueLifecycleTests : PlatformTest
         await keyValues.DeletedButton.ClickAsync();
         await Expect(keyValues.EmptyState(EmptyDeleted)).ToBeVisibleAsync();
         await Expect(Page.GetByText(EmptyDeletedDescription, new() { Exact = true })).ToBeVisibleAsync();
-    }
-
-    // A description of a toast (the newest of that text).
-    private ILocator ToastText(string text)
-    {
-        return App.Notifications.GetByText(text, new() { Exact = true }).Last;
     }
 
     // A date in the Expires column of an older version.

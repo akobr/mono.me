@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
+using _42.Platform.UI.Admin.AutomationTests.Support;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 using Microsoft.Playwright;
@@ -26,9 +27,6 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
     // A download of a whole format can take a while on a live view with many keys.
     private const int DownloadTimeoutMs = 30_000;
 
-    // The toasts of the toaster (reka-ui's li elements); a toast closes after about 5 seconds.
-    private ILocator Toasts => App.Notifications.Locator("li");
-
     // KV-IEX-01: Import .env lines and mark the password key as a secret.
     // .env lines become keys ('__' is '.', lower case) that all start Public; Mark keys matching "*password*" gives the
     // password the Standard level and masks its value. The dry run plans two creates, Import writes version 1 of each,
@@ -49,11 +47,11 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         var import = new KeyValueImportDialog(App);
         await import.OpenAsync();
         await Expect(import.Root).ToHaveAccessibleDescriptionAsync($"Into {Routes.Organization}/{Routes.Project}, view {Routes.View}.");
-        await Expect(import.Step("1. Source")).ToBeVisibleAsync();
+        await Expect(import.CurrentStep).ToHaveTextAsync("1. Source");
         await Expect(import.NextButton).ToBeDisabledAsync();
 
         await import.PasteAndReviewAsync($"{env}__HOST=redis.internal\n{env}__PASSWORD={secret}");
-        await Expect(import.Step("2. Review")).ToBeVisibleAsync();
+        await Expect(import.CurrentStep).ToHaveTextAsync("2. Review");
         await Expect(import.Label(".env")).ToBeVisibleAsync();
         await Expect(import.Label("2 row(s)")).ToBeVisibleAsync();
         await Expect(import.Level(host)).ToHaveTextAsync("Public");
@@ -75,7 +73,7 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         await Expect(import.ImportButton).ToBeEnabledAsync();
 
         await import.ImportAsync();
-        await Expect(import.Step("3. Result")).ToBeVisibleAsync();
+        await Expect(import.CurrentStep).ToHaveTextAsync("3. Result");
         await Expect(import.ResultCounts).ToHaveTextAsync("2 create");
         await ExpectVersionAsync(import.Line("Create", host), 1);
         await ExpectVersionAsync(import.Line("Create", password), 1);
@@ -196,6 +194,7 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         await import.Text.FillAsync("hello world");
         await import.NextButton.ClickAsync();
         await Expect(import.Label(KeyValueImportDialog.UnreadableText)).ToBeVisibleAsync();
+        await Expect(import.CurrentStep).ToHaveTextAsync("1. Source");
         await Expect(import.Text).ToBeVisibleAsync();
         await Expect(import.CheckButton).ToHaveCountAsync(0);
 
@@ -208,6 +207,7 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         await Expect(import.ImportButton).ToBeDisabledAsync();
 
         await import.BackAsync();
+        await Expect(import.CurrentStep).ToHaveTextAsync("1. Source");
         await Expect(import.Text).ToHaveValueAsync(withInvalid);
 
         await import.Text.FillAsync($"{env}__OK=1");
@@ -338,27 +338,22 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         await Expect(export.FormatItems).ToHaveTextAsync(KeyValueExportMenu.Formats);
         await Expect(export.IncludeSecretValues).ToHaveAttributeAsync("aria-checked", "false");
 
-        var env = await DownloadAsync(() => export.Format(KeyValueExportMenu.DotEnv).ClickAsync(), DownloadTimeoutMs);
-        await Expect(App.Toast(SecretsLeftOut())).ToBeVisibleAsync();
-        await Expect(ToastText(LeftOutDescription)).ToBeVisibleAsync();
+        var env = await DownloadExportAsync(() => export.Format(KeyValueExportMenu.DotEnv).ClickAsync(), ExpectSecretsLeftOutToastAsync);
         ExpectFileName(env, $"{fileName}.env");
         ExpectEnvLine(env, $"{PlatformData.ToEnvKey(key)}={value}");
         ExpectNoEnvLine(env, PlatformData.ToEnvKey(secretKey));
         ExpectAbsent(env, secret);
 
         // The .env's warning has to close first: after the document's export no toast at all may show.
-        await Expect(Toasts).ToHaveCountAsync(0);
-        var json = await DownloadAsync(() => export.ExportAsync(KeyValueExportMenu.Document), DownloadTimeoutMs);
-        await Expect(Toasts).ToHaveCountAsync(0);
+        await Expect(App.ShownToasts).ToHaveCountAsync(0);
+        var json = await DownloadExportAsync(() => export.ExportAsync(KeyValueExportMenu.Document), () => Expect(App.ShownToasts).ToHaveCountAsync(0));
         ExpectFileName(json, $"{fileName}.key-values.json");
         var items = DocumentItems(json);
         ExpectItem(items, key, "Public", value);
         ExpectItem(items, secretKey, "Standard", null);
         ExpectAbsent(json, secret);
 
-        var flat = await DownloadAsync(() => export.ExportAsync(KeyValueExportMenu.FlatJson), DownloadTimeoutMs);
-        await Expect(App.Toast(SecretsLeftOut())).ToBeVisibleAsync();
-        await Expect(ToastText(LeftOutDescription)).ToBeVisibleAsync();
+        var flat = await DownloadExportAsync(() => export.ExportAsync(KeyValueExportMenu.FlatJson), ExpectSecretsLeftOutToastAsync);
         ExpectFileName(flat, $"{fileName}.flat.json");
         var values = FlatValues(flat);
         ExpectFlatValue(values, key, value);
@@ -396,25 +391,22 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         await Expect(export.IncludeSecretValues).ToHaveAttributeAsync("aria-checked", "true");
         await Expect(export.Menu).ToBeVisibleAsync();
 
-        var flat = await DownloadAsync(() => export.Format(KeyValueExportMenu.FlatJson).ClickAsync(), DownloadTimeoutMs);
-        await ExpectWithSecretsToastAsync();
+        var flat = await DownloadExportAsync(() => export.Format(KeyValueExportMenu.FlatJson).ClickAsync(), ExpectWithSecretsToastAsync);
         ExpectFileName(flat, $"{fileName}.flat.json");
         var values = FlatValues(flat);
         ExpectFlatValue(values, secretKey, secret);
         ExpectFlatValue(values, key, value);
 
         // Each export's toast is awaited alone: the one before closes first.
-        await Expect(Toasts).ToHaveCountAsync(0);
+        await Expect(App.ShownToasts).ToHaveCountAsync(0);
         await export.OpenAsync();
         await Expect(export.IncludeSecretValues).ToHaveAttributeAsync("aria-checked", "true");
-        var env = await DownloadAsync(() => export.Format(KeyValueExportMenu.DotEnv).ClickAsync(), DownloadTimeoutMs);
-        await ExpectWithSecretsToastAsync();
+        var env = await DownloadExportAsync(() => export.Format(KeyValueExportMenu.DotEnv).ClickAsync(), ExpectWithSecretsToastAsync);
         ExpectFileName(env, $"{fileName}.env");
         ExpectEnvLine(env, $"{PlatformData.ToEnvKey(secretKey)}={secret}");
 
-        await Expect(Toasts).ToHaveCountAsync(0);
-        var json = await DownloadAsync(() => export.ExportAsync(KeyValueExportMenu.Document), DownloadTimeoutMs);
-        await ExpectWithSecretsToastAsync();
+        await Expect(App.ShownToasts).ToHaveCountAsync(0);
+        var json = await DownloadExportAsync(() => export.ExportAsync(KeyValueExportMenu.Document), ExpectWithSecretsToastAsync);
         ExpectFileName(json, $"{fileName}.key-values.json");
         ExpectItem(DocumentItems(json), secretKey, "Standard", secret);
 
@@ -424,16 +416,32 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         await Expect(export.IncludeSecretValues).ToHaveAttributeAsync("aria-checked", "false");
     }
 
-    // The newest toast's description by its exact text.
-    private ILocator ToastText(string text)
+    // Runs the action of an export, checks the toasts it shows as soon as the download starts and then reads the file
+    // over the browser's connection (as PlatformTest.DownloadAsync does): a toast closes after about 5 seconds, and
+    // reading a download can take longer than that on a loaded machine. The file is not kept as an artifact.
+    private async Task<DownloadedFile> DownloadExportAsync(Func<Task> action, Func<Task> expectToasts)
     {
-        return App.Notifications.GetByText(text, new() { Exact = true }).Last;
+        var download = await Page.RunAndWaitForDownloadAsync(action, new() { Timeout = DownloadTimeoutMs });
+        await expectToasts();
+        await using var stream = await download.CreateReadStreamAsync()
+            ?? throw new InvalidOperationException($"The download of {download.SuggestedFilename} has no content: {await download.FailureAsync()}");
+        using var content = new MemoryStream();
+        await stream.CopyToAsync(content);
+        return new DownloadedFile(download.SuggestedFilename, content.ToArray());
+    }
+
+    // The warning "<n> secret(s) left out" and its own description.
+    private async Task ExpectSecretsLeftOutToastAsync()
+    {
+        await Expect(App.Toast(SecretsLeftOut())).ToBeVisibleAsync();
+        var toast = App.ShownToasts.Filter(new() { Has = Page.GetByText(SecretsLeftOut()) }).Last;
+        await Expect(toast.Locator("[data-slot='description']")).ToHaveTextAsync(LeftOutDescription);
     }
 
     private async Task ExpectWithSecretsToastAsync()
     {
         await Expect(App.Toast(WithSecretsTitle)).ToBeVisibleAsync();
-        await Expect(ToastText(WithSecretsDescription)).ToBeVisibleAsync();
+        await Expect(App.ToastDescriptionOf(WithSecretsTitle)).ToHaveTextAsync(WithSecretsDescription);
     }
 
     // The import's line (plan or result) shows the version it wrote, "v<n>".

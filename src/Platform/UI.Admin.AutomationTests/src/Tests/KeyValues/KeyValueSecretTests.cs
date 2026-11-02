@@ -19,6 +19,12 @@ public sealed partial class KeyValueSecretTests : PlatformTest
     // What the API answers a policy with HSM where the deployment has no HSM provider (501 ProtectionNotConfigured).
     private const string HsmNotConfigured = "The protection level 'Hsm' is not configured in this deployment.";
 
+    // The warning toast of the secret's copy button.
+    private const string SecretCopiedTitle = "The clipboard contains a secret";
+
+    // The warning toast of the bulk Change protection of KV-SEC-06; its description lists "<key>: <message>".
+    private const string NotDoneTitle = "1 of 2 keys were not done";
+
     // KV-SEC-01: Create a Standard secret, reveal, copy and hide it.
     // A Standard secret is masked in its detail until Reveal, which shows it for 60 seconds with a copy button that
     // warns about the secret in the clipboard; Hide and a page load mask it again, and the value is never on the page
@@ -51,6 +57,7 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await Expect(detail.Containing(secret)).ToHaveCountAsync(0);
         await Expect(detail.RevealButton).ToBeVisibleAsync();
         await Expect(detail.SetNewValueButton).ToBeVisibleAsync();
+        await Expect(detail.SecretCopyButton).ToHaveCountAsync(0);
 
         var revealed = await detail.RevealAsync();
         await Expect(revealed).ToHaveTextAsync(secret);
@@ -59,8 +66,8 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await Expect(detail.SecretCopyButton).ToBeVisibleAsync();
 
         await detail.SecretCopyButton.ClickAsync();
-        await Expect(App.Toast("The clipboard contains a secret")).ToBeVisibleAsync();
-        await Expect(App.Notifications.GetByText("Paste it where it belongs, then clear the clipboard.", new() { Exact = true }).Last).ToBeVisibleAsync();
+        await Expect(App.Toast(SecretCopiedTitle)).ToBeVisibleAsync();
+        await Expect(App.ToastDescriptionOf(SecretCopiedTitle)).ToHaveTextAsync("Paste it where it belongs, then clear the clipboard.");
         await WaitForCopiedTextAsync(secret);
 
         await detail.HideButton.ClickAsync();
@@ -68,6 +75,7 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await Expect(detail.Containing(secret)).ToHaveCountAsync(0);
         await Expect(detail.RevealButton).ToBeVisibleAsync();
         await Expect(detail.MaskedAgainHint).ToBeHiddenAsync();
+        await Expect(detail.SecretCopyButton).ToHaveCountAsync(0);
 
         await detail.OpenAsync();
         await Expect(detail.SecretValue).ToHaveTextAsync(KeyValuesPage.MaskedValue);
@@ -90,7 +98,12 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await keyValues.OpenAsync();
         await keyValues.CreateSecretAsync(key, secret, "Standard");
 
+        // The clock is paused (a second ahead of the page's time) before Reveal, so the 60-second timer counts only the
+        // fast-forwards, not the real time of the reveal's round trips and of the assertions (the reveal itself, a fetch
+        // and Vue's microtasks, needs no timer).
         var detail = new KeyValueDetail(App, Routes, key);
+        var now = await Page.EvaluateAsync<long>("() => Date.now()");
+        await Page.Clock.PauseAtAsync(DateTimeOffset.FromUnixTimeMilliseconds(now + 1000).UtcDateTime);
         var revealed = await detail.RevealAsync();
         await Expect(revealed).ToHaveTextAsync(secret);
         await Expect(detail.MaskedAgainHint).ToBeVisibleAsync();
@@ -330,13 +343,13 @@ public sealed partial class KeyValueSecretTests : PlatformTest
 
         await keyValues.SelectKey(publicKey).CheckAsync();
         await keyValues.SelectKey(secretKey).CheckAsync();
-        await Expect(keyValues.BulkActions.GetByText("2 selected", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(keyValues.BulkSelected(2)).ToBeVisibleAsync();
         await Expect(keyValues.BulkActionButton("Delete")).ToBeVisibleAsync();
         await Expect(keyValues.BulkActionButton("Change protection")).ToBeVisibleAsync();
         await Expect(keyValues.BulkActionButton("Clear selection")).ToBeVisibleAsync();
 
         await keyValues.BulkActionButton("Change protection").ClickAsync();
-        var levels = App.Page.GetByRole(AriaRole.Menu).GetByRole(AriaRole.Menuitem);
+        var levels = keyValues.OpenMenuItems;
         await Expect(levels).ToHaveTextAsync(["Standard"]);
 
         await levels.First.ClickAsync();
@@ -344,9 +357,9 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await move.ExpectOpenAsync();
         await Expect(move.Description).ToHaveTextAsync("Each value is encrypted again under the new level as a new version; older versions keep their level until they expire. Public and HYOK keys are skipped.");
         await move.ConfirmAsync("Change protection");
-        await Expect(App.Toast("1 of 2 keys were not done")).ToBeVisibleAsync();
-        await Expect(App.Toast(new Regex($"^{Regex.Escape(publicKey)}: "))).ToBeVisibleAsync();
-        await Expect(keyValues.BulkActions.GetByText("1 selected", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(App.Toast(NotDoneTitle)).ToBeVisibleAsync();
+        await Expect(App.ToastDescriptionOf(NotDoneTitle)).ToHaveTextAsync(new Regex($"^{Regex.Escape(publicKey)}: "));
+        await Expect(keyValues.BulkSelected(1)).ToBeVisibleAsync();
         await Expect(keyValues.SelectKey(publicKey)).ToBeCheckedAsync();
         await Expect(keyValues.SelectKey(secretKey)).Not.ToBeCheckedAsync();
 
