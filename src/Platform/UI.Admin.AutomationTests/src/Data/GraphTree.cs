@@ -25,6 +25,7 @@ public sealed record GraphTree(string Execution)
     // {c}, the name of the context and of the execution.
     public string ContextName => Execution.Split('.')[3];
 
-    // The five keys, roots first.
-    public IReadOnlyList<string> Keys => [Responsibility, Subject, Usage, Context, Execution];
+    // The execution's four ancestors, roots first: its lineage, and what the graph draws of the tree with Executions
+    // hidden.
+    public IReadOnlyList<string> Ancestors => [Responsibility, Subject, Usage, Context];
 }

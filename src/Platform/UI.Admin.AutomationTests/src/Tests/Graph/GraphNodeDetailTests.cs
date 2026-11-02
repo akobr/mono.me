@@ -79,7 +79,7 @@ public sealed class GraphNodeDetailTests : PlatformTest
         await Expect(detail.Identity).ToHaveTextAsync(tree.Execution);
 
         await detail.OpenLineageAsync();
-        foreach (var ancestor in new[] { tree.Responsibility, tree.Subject, tree.Usage, tree.Context })
+        foreach (var ancestor in tree.Ancestors)
         {
             await Expect(detail.LineageLink(ancestor)).ToBeVisibleAsync();
         }

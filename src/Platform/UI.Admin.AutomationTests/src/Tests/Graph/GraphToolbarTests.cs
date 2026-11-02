@@ -3,6 +3,7 @@ using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 using Microsoft.Playwright;
+using TUnit.Assertions.Enums;
 using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Graph;
@@ -52,7 +53,7 @@ public sealed class GraphToolbarTests : PlatformTest
         await Expect(graph.ExportFailedToast).ToHaveCountAsync(0);
         await Assert.That(png.SuggestedFilename).IsEqualTo($"graph-{Routes.Organization}-{Routes.Project}-{Routes.View}.png");
         await Assert.That(png.Content.Length).IsGreaterThan(PngSignature.Length);
-        await Assert.That(png.Content.Take(PngSignature.Length).ToArray()).IsEquivalentTo(PngSignature);
+        await Assert.That(png.Content.Take(PngSignature.Length).ToArray()).IsEquivalentTo(PngSignature, CollectionOrdering.Matching);
     }
 
     // GRA-TBR-02: Open as list shows the drawn annotations in the grid.
@@ -77,16 +78,15 @@ public sealed class GraphToolbarTests : PlatformTest
         await App.ExpectAtAsync(Routes.Annotations);
         await Page.WaitForFunctionAsync("() => (new URLSearchParams(location.search).get('q') ?? '').startsWith('key:')", null, new() { PollingInterval = 100 });
         var query = await Page.EvaluateAsync<string>("() => new URLSearchParams(location.search).get('q')");
-        string[] drawn = [tree.Responsibility, tree.Subject, tree.Usage, tree.Context];
 
-        // The order of the keys follows the graph's nodes.
-        await Assert.That(query["key:".Length..].Split(',').Order(StringComparer.Ordinal).ToArray()).IsEquivalentTo(drawn.Order(StringComparer.Ordinal).ToArray());
+        // The drawn keys are the execution's ancestors, in the order of the graph's nodes.
+        await Assert.That(query["key:".Length..].Split(',')).IsEquivalentTo(tree.Ancestors, CollectionOrdering.Any);
 
         var annotations = new AnnotationsPage(App, Routes);
         await annotations.WaitForCatalogAsync();
         await Expect(annotations.Filter).ToHaveValueAsync(query);
-        await Expect(annotations.FilterBarCount).ToHaveTextAsync(GraphPage.FilterCountText(4));
-        foreach (var key in drawn)
+        await Expect(annotations.FilterCount).ToHaveTextAsync(GraphPage.FilterCountText(4));
+        foreach (var key in tree.Ancestors)
         {
             await Expect(annotations.Item(key)).ToBeVisibleAsync();
         }

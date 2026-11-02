@@ -111,8 +111,9 @@ public sealed class GraphCreateTests : PlatformTest
     }
 
     // GRA-CRE-03: A Reader has no create actions on Graph.
-    // A Reader sees the graph (its summary, or the empty state) without New, New annotation or Bulk create in the
-    // navbar, and the empty graph of a view that was never used has neither buttons nor a legend. Nothing is written.
+    // A Reader sees the graph (its summary, which an empty view shows too, as "0 annotations" beside the empty state)
+    // without New, New annotation or Bulk create in the navbar, and the empty graph of a view that was never used has
+    // neither buttons nor a legend. Nothing is written.
     [Test]
     [TestCase(133)]
     [UserRole(Role.Reader)]
@@ -121,7 +122,11 @@ public sealed class GraphCreateTests : PlatformTest
         var graph = new GraphPage(App, Routes);
         await graph.OpenAsync();
         await Expect(graph.ReloadCatalogButton).ToBeEnabledAsync();
-        await Expect(graph.SummaryText.Or(graph.EmptyState)).ToBeVisibleAsync();
+        await Expect(graph.SummaryText).ToBeVisibleAsync();
+        if (await graph.TotalAsync() == 0)
+        {
+            await Expect(graph.EmptyState).ToBeVisibleAsync();
+        }
 
         await Expect(graph.HeaderNewButton).ToHaveCountAsync(0);
         await Expect(graph.HeaderNewAnnotationButton).ToHaveCountAsync(0);
