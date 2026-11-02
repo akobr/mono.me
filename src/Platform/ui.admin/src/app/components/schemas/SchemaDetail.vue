@@ -60,11 +60,17 @@ watch(
   },
   { immediate: true },
 )
-watch(missing, (value) => {
-  if (value && draft.value === undefined) {
-    draft.value = cloneJson(starterSchema)
-  }
-})
+// A missing schema starts with the starter document, which is not a change until it is edited.
+watch(
+  missing,
+  (value) => {
+    if (value && JSON.stringify(draft.value) === JSON.stringify(original.value)) {
+      original.value = cloneJson(starterSchema)
+      draft.value = cloneJson(starterSchema)
+    }
+  },
+  { immediate: true },
+)
 
 const dirty = computed(() => JSON.stringify(draft.value ?? null) !== JSON.stringify(original.value ?? null))
 useUnsavedChanges(dirty)
@@ -129,6 +135,7 @@ async function remove() {
   try {
     await api.value.remove()
     confirmDelete.value = false
+    // Both together, so the editor stays clean; the 404 of the refetch puts the starter document in both.
     original.value = undefined
     draft.value = undefined
     await invalidateSchemas(queryClient, context.scope)

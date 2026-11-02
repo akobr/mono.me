@@ -157,6 +157,7 @@ async function remove() {
   try {
     await deleteTemplate(org, project, view, props.type)
     confirmDelete.value = false
+    // Both together, so the editor stays clean; the 404 of the refetch then shows the empty state.
     original.value = undefined
     draft.value = undefined
     await afterSave()

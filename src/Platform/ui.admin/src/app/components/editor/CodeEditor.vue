@@ -105,8 +105,10 @@ onMounted(() => {
         lintSlot.of(lintExtension()),
         extraSlot.of(props.extensions),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            emit('update:modelValue', update.state.doc.toString())
+          // A dispatch of an external value (below) is a change too; only a text other than the prop is an edit.
+          const text = update.docChanged ? update.state.doc.toString() : undefined
+          if (text !== undefined && text !== props.modelValue) {
+            emit('update:modelValue', text)
           }
         }),
       ],
