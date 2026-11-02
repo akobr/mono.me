@@ -34,8 +34,9 @@ public sealed partial class AnnotationsPage
     // The popover of "Filter syntax": its title, the qualifiers and the example buttons.
     public ILocator FilterSyntaxPopover => app.Page.GetByRole(AriaRole.Dialog).Filter(new() { Has = app.Page.GetByText("Filter syntax", new() { Exact = true }) });
 
-    // The popover's paragraph of the qualifiers ("Qualifiers: type, label, is, …").
-    public ILocator FilterSyntaxQualifiers => FilterSyntaxPopover.GetByText(new Regex("^Qualifiers: "));
+    // The popover's paragraph of the qualifiers ("Qualifiers: type, label, is, …"); its text starts with a space of the
+    // template, so a substring.
+    public ILocator FilterSyntaxQualifiers => FilterSyntaxPopover.GetByText("Qualifiers: ");
 
     // The tabs "Grid" and "Tree" of the grid (from 768 px); Tree adds ?mode=tree.
     public ILocator ListModeTabs => app.Page.GetByRole(AriaRole.Tablist, new() { Name = "List mode", Exact = true });
