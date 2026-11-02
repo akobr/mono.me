@@ -10,8 +10,6 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Projects;
 [Area(Area.Projects)]
 public sealed partial class ProjectTests : PlatformTest
 {
-    private const string PatternMessage = "Use 2 to 63 lower-case letters, digits or hyphens, starting with a letter or a digit.";
-
     // ORG-PRJ-01: New project opens its annotations and its Settings show the description.
     // Only an Owner of the organization may create a project. A new project with a description, in the target's
     // organization, opens its annotations; its Settings, reached through the navigation, show the description.
@@ -61,7 +59,7 @@ public sealed partial class ProjectTests : PlatformTest
 
         await overview.ProjectName.FillAsync("Bad_Name");
         await overview.CreateProjectButton.ClickAsync();
-        await Expect(overview.ProjectName).ToHaveAccessibleDescriptionAsync(PatternMessage);
+        await Expect(overview.ProjectName).ToHaveAccessibleDescriptionAsync(NameRules.PatternMessage);
 
         await overview.ProjectName.FillAsync("settings");
         await overview.CreateProjectButton.ClickAsync();
