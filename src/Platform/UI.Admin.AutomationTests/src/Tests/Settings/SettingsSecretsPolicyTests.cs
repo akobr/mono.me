@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
@@ -13,7 +12,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Settings;
 // writer changed meanwhile. The mock and a deployed API word some refusals differently; each test expects the exact
 // message of its target (a deployed API may add its hint).
 [Area(Area.Settings)]
-public sealed partial class SettingsSecretsPolicyTests : PlatformTest
+public sealed class SettingsSecretsPolicyTests : PlatformTest
 {
     // SET-SEC-01: Turning off the mTLS rule asks first; Cancel keeps it and the confirmed change is kept.
     // A new project requires mTLS for secret delivery. Turning the rule off asks on Save; Cancel puts the switch back
@@ -125,7 +124,7 @@ public sealed partial class SettingsSecretsPolicyTests : PlatformTest
         var project = await CreateDisposableProjectAsync();
         var keyUri = PlatformData.CustomerKeyUri();
         var tenantId = PlatformData.TenantId();
-        var refusal = Refusal("Set and verify the customer key before allowing Byok.", "Set and verify the customer key before enabling the Byok level.");
+        var refusal = TargetMessage("Set and verify the customer key before allowing Byok.", "Set and verify the customer key before enabling the Byok level.");
 
         var settings = new ProjectSettingsPage(App, project);
         var levels = new AllowedLevelsCard(App, project);
@@ -183,7 +182,7 @@ public sealed partial class SettingsSecretsPolicyTests : PlatformTest
         var project = await CreateDisposableProjectAsync();
         var name = PlatformData.Title();
         var id = PlatformData.RecipientId();
-        var refusal = Refusal("Add an enabled recipient before allowing Hyok.", "Add at least one enabled recipient before enabling client-side encryption (Hyok).");
+        var refusal = TargetMessage("Add an enabled recipient before allowing Hyok.", "Add at least one enabled recipient before enabling client-side encryption (Hyok).");
         const string liveLastRecipient = "Client-side encryption (Hyok) is allowed and needs at least one enabled recipient; disable the level first.";
 
         var settings = new ProjectSettingsPage(App, project);
@@ -222,14 +221,14 @@ public sealed partial class SettingsSecretsPolicyTests : PlatformTest
         await recipients.RowButton(id, "Disable").ClickAsync();
         await Expect(App.Toast("The recipient was not changed")).ToBeVisibleAsync();
         await Expect(App.ToastDescriptionOf("The recipient was not changed"))
-            .ToHaveTextAsync(Refusal("The last enabled recipient cannot be disabled while Hyok is allowed.", liveLastRecipient));
+            .ToHaveTextAsync(TargetMessage("The last enabled recipient cannot be disabled while Hyok is allowed.", liveLastRecipient));
         await Expect(recipients.Cell(id, "State")).ToHaveTextAsync("enabled");
 
         await recipients.RowButton(id, "Remove").ClickAsync();
         await recipients.RemoveDialog(name).ConfirmAsync("Remove");
         await Expect(App.Toast("The recipient was not removed")).ToBeVisibleAsync();
         await Expect(App.ToastDescriptionOf("The recipient was not removed"))
-            .ToHaveTextAsync(Refusal("The last enabled recipient cannot be removed while Hyok is allowed.", liveLastRecipient));
+            .ToHaveTextAsync(TargetMessage("The last enabled recipient cannot be removed while Hyok is allowed.", liveLastRecipient));
         await Expect(recipients.Row(id)).ToBeVisibleAsync();
         await Expect(recipients.Cell(id, "State")).ToHaveTextAsync("enabled");
     }
@@ -286,13 +285,5 @@ public sealed partial class SettingsSecretsPolicyTests : PlatformTest
             () => settings.ReloadAsync("secrets"),
             async () => await Expect(recipients.Row(otherId)).ToBeVisibleAsync());
         await Expect(levels.MtlsSwitch).ToBeCheckedAsync();
-    }
-
-    // The exact refusal of the target: the mock's message, or a deployed API's, which may be followed by its hint.
-    private Regex Refusal(string mock, string live)
-    {
-        return Target.IsMock
-            ? new Regex($"^{Regex.Escape(mock)}$")
-            : new Regex($"^{Regex.Escape(live)}(?: .+)?$");
     }
 }
