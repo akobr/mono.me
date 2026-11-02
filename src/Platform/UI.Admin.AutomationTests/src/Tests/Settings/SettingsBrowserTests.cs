@@ -80,7 +80,7 @@ public sealed partial class SettingsBrowserTests : PlatformTest
         await keyValues.OpenAsync();
         await keyValues.CreateAsync(key, PlatformData.Slug("value"));
         var updated = keyValues.DetailValue(key, "Updated");
-        await Expect(updated).ToHaveTextAsync(IsoDateTime());
+        await Expect(updated).ToHaveTextAsync(DateFormatSelect.IsoDateTime());
         var shown = await updated.InnerTextAsync();
 
         var settings = new ProjectSettingsPage(App, Routes);
@@ -194,8 +194,4 @@ public sealed partial class SettingsBrowserTests : PlatformTest
     // "Asia/Tokyo GMT+9": the zone and its offset (Japan has no daylight saving time).
     [GeneratedRegex(@"^Asia\/Tokyo\s*GMT\+9$")]
     private static partial Regex TokyoOption();
-
-    // "2026-11-02 10:15 GMT+1": the date as yyyy-mm-dd, the 24-hour time and the zone.
-    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \S+$")]
-    private static partial Regex IsoDateTime();
 }

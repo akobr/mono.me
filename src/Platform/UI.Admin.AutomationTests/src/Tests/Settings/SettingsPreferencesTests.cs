@@ -73,7 +73,7 @@ public sealed partial class SettingsPreferencesTests : PlatformTest
         await keyValues.OpenAsync();
         await keyValues.CreateAsync(key, PlatformData.Slug("value"));
         var updated = keyValues.DetailValue(key, "Updated");
-        await Expect(updated).ToHaveTextAsync(IsoDateTime());
+        await Expect(updated).ToHaveTextAsync(DateFormatSelect.IsoDateTime());
         var shown = await updated.InnerTextAsync();
 
         var settings = new ProjectSettingsPage(App, Routes);
@@ -164,10 +164,6 @@ public sealed partial class SettingsPreferencesTests : PlatformTest
         await Expect(account.PreferredDateFormat.Combobox).ToHaveTextAsync(DateFormatSelect.ProjectDefault);
         await Expect(account.ResetTypesButton).ToBeDisabledAsync();
     }
-
-    // "2026-11-02 10:15 GMT+1": the date as yyyy-mm-dd, the 24-hour time and the zone.
-    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \S+$")]
-    private static partial Regex IsoDateTime();
 
     // The link "Open Preferences" goes to /account.
     [GeneratedRegex("/account$")]

@@ -64,8 +64,8 @@ public sealed class SettingsSecretsPolicyTests : PlatformTest
 
     // SET-SEC-02: Disabling a level that keys still use shows the counts per view.
     // A Standard secret in the default view of a new project keeps Standard allowed: the save shows the warning with
-    // "1 in default", whose link opens the values store at ?level=Standard&state=All, where the Active keys of the
-    // level list the secret, and nothing is saved.
+    // "1 in default", whose link opens the values store at ?level=Standard&state=All, which lists the secret, and
+    // nothing is saved.
     [Test]
     [TestCase(170)]
     [UserRole(Role.Owner)]
@@ -93,18 +93,21 @@ public sealed class SettingsSecretsPolicyTests : PlatformTest
         await Expect(levels.InUseLink(1, AppRoutes.DefaultView)).ToBeVisibleAsync();
         await Expect(App.ShownToasts).ToHaveCountAsync(0);
 
-        // The values store reads state=All as the Deleted keys (key-values.vue), so it shows none at first; the
-        // secret is listed once Active is picked, with the level filter kept.
+        // Admin UI bug (424-152 review): key-values.vue reads state=All as the Deleted keys, so the link shows "No
+        // deleted keys" until Active is picked; once fixed, the link lists the secret at once. Both are accepted.
         await levels.InUseLink(1, AppRoutes.DefaultView).ClickAsync();
         await App.ExpectAtAsync(project.KeyValues);
         await App.ExpectQueryAsync("level", "Standard");
         await App.ExpectQueryAsync("state", "All");
         await Expect(keyValues.ListLevelFilter).ToHaveTextAsync("Standard");
-        await Expect(keyValues.NoDeletedKeys).ToBeVisibleAsync();
+        await Expect(keyValues.Item(key).Or(keyValues.NoDeletedKeys)).ToBeVisibleAsync();
+        if (await keyValues.NoDeletedKeys.IsVisibleAsync())
+        {
+            await keyValues.ListStateButton("Active").ClickAsync();
+            await App.ExpectQueryAsync("state", null);
+            await App.ExpectQueryAsync("level", "Standard");
+        }
 
-        await keyValues.ListStateButton("Active").ClickAsync();
-        await App.ExpectQueryAsync("state", null);
-        await App.ExpectQueryAsync("level", "Standard");
         await Expect(keyValues.Item(key)).ToBeVisibleAsync();
 
         await settings.OpenAsync("secrets");
@@ -204,10 +207,7 @@ public sealed class SettingsSecretsPolicyTests : PlatformTest
         await Expect(recipients.Cell(id, "State")).ToHaveTextAsync("enabled");
 
         await settings.AllowLevelAsync("HYOK");
-        await levels.DefaultSecretLevel.ClickAsync();
-        await Expect(levels.DefaultSecretLevelOption("HYOK")).ToBeVisibleAsync();
-        await levels.DefaultSecretLevelOption("HYOK").ClickAsync();
-        await Expect(levels.DefaultSecretLevel).ToHaveTextAsync("HYOK");
+        await levels.SelectDefaultSecretLevelAsync("HYOK");
         await levels.SaveAsync();
 
         await OpenUntilPolicyShowsAsync(
