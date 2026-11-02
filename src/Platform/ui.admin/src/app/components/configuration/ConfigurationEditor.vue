@@ -57,11 +57,7 @@ const theirs = ref<unknown>()
 const confirmDelete = ref(false)
 const creating = ref(false)
 
-// Nothing stored (or no annotation) means nothing to save: the editor is hidden and a patch would fail (424-157).
-const dirty = computed(
-  () =>
-    !noOwn.value && !missing.value && JSON.stringify(draft.value ?? null) !== JSON.stringify(original.value ?? null),
-)
+const dirty = computed(() => JSON.stringify(draft.value ?? null) !== JSON.stringify(original.value ?? null))
 const patch = computed(() => (dirty.value ? buildPatch(original.value, draft.value) : []))
 
 // The own content becomes the editor's base whenever it is (re)loaded and nothing is being edited.
@@ -114,7 +110,8 @@ async function refreshOwn(): Promise<unknown> {
 }
 
 async function save(force = false): Promise<void> {
-  if (!context.scope || saving.value || patch.value.length === 0) {
+  // Nothing stored (or no annotation): a patch would fail with 404, the first content is created instead.
+  if (!context.scope || noOwn.value || missing.value || saving.value || patch.value.length === 0) {
     return
   }
 
