@@ -1,7 +1,10 @@
+using System.Globalization;
+
 namespace _42.Platform.UI.Admin.AutomationTests.Data;
 
 // The generators of the Annotations section: a single key part (a name for a compact line of Bulk create or a field of
-// "New annotation") and a set of keys that share a prefix, which one key: filter lists together.
+// "New annotation"), a set of keys that share a prefix, which one key: filter lists together, and the instants of an
+// annotation's validity dates.
 public sealed partial class PlatformData
 {
     // A set's prefix leaves room for "-<n>" within a part's 40 characters.
@@ -36,5 +39,13 @@ public sealed partial class PlatformData
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
 
         return [.. Enumerable.Range(1, count).Select(index => $"{prefix}-{index}")];
+    }
+
+    // An instant days from now (negative: ago) as ISO 8601 text in UTC to the minute, e.g. "2026-11-12T09:41:00Z": a
+    // ValidFrom or ExpiresAt of an annotation's JSON document. The form enters dates to the minute too.
+    public static string AnnotationInstant(double days)
+    {
+        var instant = DateTimeOffset.UtcNow.AddDays(days);
+        return instant.ToString("yyyy'-'MM'-'dd'T'HH':'mm':00Z'", CultureInfo.InvariantCulture);
     }
 }
