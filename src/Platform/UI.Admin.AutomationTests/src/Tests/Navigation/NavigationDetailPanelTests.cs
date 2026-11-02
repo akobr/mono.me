@@ -1,7 +1,6 @@
 using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
-using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Navigation;
