@@ -18,6 +18,12 @@ public sealed partial class ConfigurationDetail
     // The detail's region, named by the annotation key.
     public DetailPanel ConfigurationPanel => new(app, "configuration-detail");
 
+    // The page once the detail is gone (Close, Back to the list): the body while no section#configuration-detail is in
+    // it. Unlike ToBeHiddenAsync of the panel it combines with Or, e.g. as the outcome of
+    // DiscardChangesDialog.DiscardIfShownAsync; the list's own state cannot be that outcome, because from 768 px the list
+    // stays shown beside the detail.
+    public ILocator DetailGone => app.Page.Locator("body:not(:has(section#configuration-detail))");
+
     // The empty state's heading (an h2) of an annotation without an own configuration.
     public ILocator NoConfigurationHeading => ConfigurationPanel.Root.GetByRole(AriaRole.Heading, new() { Name = "No configuration yet", Exact = true });
 

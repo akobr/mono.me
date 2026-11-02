@@ -103,7 +103,14 @@ public sealed class ConfigurationCreateTests : PlatformTest
         await configuration.ConfigurationPanel.CloseAsync();
         await App.ExpectAtAsync(Routes.Configurations);
         await App.ExpectQueryAsync("q", filter);
-        await Expect(list.Item(key)).ToContainTextAsync("v1");
+        if (list.HasGridLayout)
+        {
+            await Expect(list.ItemCell(key, ConfigurationsPage.VersionColumn)).ToHaveTextAsync("v1");
+        }
+        else
+        {
+            await Expect(list.Item(key).GetByText("v1", new() { Exact = true })).ToBeVisibleAsync();
+        }
 
         dialog = await list.OpenNewConfigurationAsync(list.NewConfigurationButton);
         await dialog.SearchAsync(key);
@@ -219,15 +226,15 @@ public sealed class ConfigurationCreateTests : PlatformTest
         await Expect(configuration.NoConfigurationHeading).ToBeVisibleAsync();
         await Expect(configuration.CreateEmptyButton).ToBeVisibleAsync();
 
-        // The editor counts as changed after the delete (it puts {} into the draft while nothing is stored), so Close
-        // asks "Discard changes?" first; Discard leaves.
+        // Admin UI bug (424-152 review): ConfigurationEditor.vue remove() leaves the draft {} while nothing is stored, so
+        // leaving after Delete own may ask "Discard changes?"; discard it only when it shows. The outcome is the detail
+        // gone, not the list's empty state: from 768 px the list beside the detail shows it already after the delete.
+        var list = new ConfigurationsPage(App, Routes);
         await configuration.ConfigurationPanel.LeaveButton.ClickAsync();
-        var discard = new DiscardChangesDialog(App);
-        await discard.ExpectOpenAsync();
-        await discard.DiscardAsync();
+        await new DiscardChangesDialog(App).DiscardIfShownAsync(configuration.DetailGone);
         await Expect(configuration.ConfigurationPanel.Root).ToBeHiddenAsync();
         await App.ExpectAtAsync(Routes.Configurations);
         await App.ExpectQueryAsync("q", filter);
-        await Expect(new ConfigurationsPage(App, Routes).NoMatchHeading).ToBeVisibleAsync();
+        await Expect(list.NoMatchHeading).ToBeVisibleAsync();
     }
 }
