@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using _42.Platform.UI.Admin.AutomationTests.Support;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
@@ -108,6 +109,42 @@ public sealed partial class AuditTrail(App app, AppRoutes routes)
         await Expect(OperationFilter).ToContainTextAsync(operation);
     }
 
+    // Opens the Audit tab, types the key (in lower case, as the store keeps it) into Key filter and waits until the
+    // counter shows count events, all of the key. On a deployed target the audit is eventually consistent, so this
+    // repeats with a page load (the audit query is cached for 15 s, and the filters reset) until timeout (a minute by
+    // default); on the mock the first attempt passes.
+    public async Task WaitForKeyEventsAsync(string key, int count, TimeSpan? timeout = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var stored = key.ToLowerInvariant();
+        await Eventually.UntilAsync(
+            async _ =>
+            {
+                await OpenAsync();
+                await KeyFilter.FillAsync(stored);
+                await ExpectEventsAsync(count, KeyColumn, stored, exact: true);
+            },
+            timeout);
+    }
+
+    // Opens the Audit tab, picks the operation in Operation filter and waits until the counter shows count events, all
+    // of the operation; repeats with a page load until timeout like WaitForKeyEventsAsync (the filters reset on reload,
+    // so it picks the operation again).
+    public async Task WaitForOperationEventsAsync(string operation, int count, TimeSpan? timeout = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operation);
+
+        await Eventually.UntilAsync(
+            async _ =>
+            {
+                await OpenAsync();
+                await PickOperationAsync(operation);
+                await ExpectEventsAsync(count, OperationColumn, operation, exact: false);
+            },
+            timeout);
+    }
+
     // The start of the correlation id that the row shows before its "…".
     public static async Task<string> CorrelationPrefixAsync(ILocator row)
     {
@@ -116,6 +153,27 @@ public sealed partial class AuditTrail(App app, AppRoutes routes)
         return match.Success
             ? match.Groups["prefix"].Value
             : throw new InvalidOperationException($"The correlation cell shows '{text}', not the start of an id and '…'.");
+    }
+
+    // The counter shows count events and every row has the text in the column (exactly, or within it for the
+    // Operation, which has the detail as its second line), with the short timeout of one attempt.
+    private async Task ExpectEventsAsync(int count, int column, string text, bool exact)
+    {
+        var timeout = new LocatorAssertionsToHaveTextOptions { Timeout = Eventually.AttemptTimeoutMs };
+        await Expect(Counter).ToHaveTextAsync(CounterOf(count), timeout);
+        await Expect(Rows).ToHaveCountAsync(count, new() { Timeout = Eventually.AttemptTimeoutMs });
+        for (var index = 0; index < count; index++)
+        {
+            var cell = Cell(Rows.Nth(index), column);
+            if (exact)
+            {
+                await Expect(cell).ToHaveTextAsync(text, timeout);
+            }
+            else
+            {
+                await Expect(cell).ToContainTextAsync(text, new() { Timeout = Eventually.AttemptTimeoutMs });
+            }
+        }
     }
 
     [GeneratedRegex(@"^\d+ event\(s\)$")]
