@@ -275,8 +275,7 @@ public sealed partial class AnnotationDetailTests : PlatformTest
         await annotations.BulkCreateAsync(execution);
 
         await App.GotoAsync(Routes.AnnotationHistory(responsibility));
-        await Expect(history.Region).ToBeVisibleAsync();
-        await Expect(AnnotationHistory.ActionBadge(history.Region, "Created")).ToBeVisibleAsync();
+        await history.WaitForEntryAsync(Routes.AnnotationHistory(responsibility), "Created");
         await Expect(history.Region).ToContainTextAsync($"by {user}");
         await Expect(history.Region).ToContainTextAsync($"for {execution}");
 
@@ -289,6 +288,7 @@ public sealed partial class AnnotationDetailTests : PlatformTest
         await detail.StampsLink.ClickAsync();
         await App.ExpectAtAsync(Routes.AnnotationHistory(execution));
         await Expect(detail.HistoryTabLink).ToHaveAttributeAsync("aria-current", "page");
+        await history.WaitForEntryAsync(Routes.AnnotationHistory(execution), "Updated");
         await Expect(history.Entries).ToHaveCountAsync(2);
 
         await Expect(AnnotationHistory.ActionBadge(history.NewestEntry, "Updated")).ToBeVisibleAsync();
@@ -307,7 +307,7 @@ public sealed partial class AnnotationDetailTests : PlatformTest
 
     // ANN-DET-06: Old annotation tab URLs open the configuration tabs.
     // The annotation detail's old tabs (configuration with cfg=effective or resolved, schema, versions) redirect to the
-    // same tab of the configuration detail, keeping only the list's filter and the version (v); the key needs not exist,
+    // same tab of the configuration detail, keeping only the list's filter and the version (v); the key need not exist,
     // and nothing is written.
     [Test]
     [TestCase(180)]

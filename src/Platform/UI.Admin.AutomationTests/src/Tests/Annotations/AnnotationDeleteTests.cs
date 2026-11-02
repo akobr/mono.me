@@ -73,9 +73,8 @@ public sealed partial class AnnotationDeleteTests : PlatformTest
         }
 
         await App.GotoAsync(Routes.AnnotationHistory(responsibility));
-        await Expect(history.Region).ToBeVisibleAsync();
+        await history.WaitForEntryAsync(Routes.AnnotationHistory(responsibility), "Restored");
         await Expect(AnnotationHistory.ActionBadge(history.Region, "Deleted")).ToBeVisibleAsync();
-        await Expect(AnnotationHistory.ActionBadge(history.Region, "Restored")).ToBeVisibleAsync();
     }
 
     // ANN-DEL-02: A deleted key's detail shows the banner and restores with or without descendants.
