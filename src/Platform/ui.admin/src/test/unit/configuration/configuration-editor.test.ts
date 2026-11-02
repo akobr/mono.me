@@ -7,6 +7,7 @@ import { loadDb, saveDb } from '@/mock/db'
 import { annotationsOf, loadDb as loadMockDb } from '@/mock/db'
 import { documentIds, putVersion } from '@/mock/documents'
 import { ownContent } from '@/mock/configuration-handlers'
+import { hasUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { mountScreen, settle } from '../../helpers'
 
 // The editor against the mock API of the e2e mode: the same handlers the browser uses, served by msw/node.
@@ -168,6 +169,31 @@ describe('ConfigurationEditor (JSON Patch saves)', () => {
 
     expect(document.body.textContent).toContain('Someone else changed this configuration')
     expect(document.body.querySelector('[data-diff]')?.textContent).toContain('"retries": 9')
+    view.host.unmount()
+  })
+
+  it('has no unsaved changes after deleting the own content (424-157)', async () => {
+    const key = configuredExecution()
+    const view = await mountEditor(key)
+    expect(hasUnsavedChanges()).toBe(false)
+
+    await view.host
+      .findAll('button')
+      .find((button) => button.text().includes('Delete own'))!
+      .trigger('click')
+    await settle()
+    const input = document.body.querySelector<HTMLInputElement>(`[role="dialog"] input[placeholder="${key}"]`)!
+    input.value = key
+    input.dispatchEvent(new Event('input'))
+    await settle()
+    ;[...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
+      .find((button) => button.textContent?.trim() === 'Delete')!
+      .click()
+    await settle(12)
+
+    expect(ownContent(loadDb(), scope, key)).toBeUndefined()
+    expect(view.host.text()).toContain('No configuration yet')
+    expect(hasUnsavedChanges()).toBe(false)
     view.host.unmount()
   })
 })
