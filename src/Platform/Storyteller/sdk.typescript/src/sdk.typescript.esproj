@@ -12,7 +12,8 @@
   <!-- The SDK's GeneratePackageJsonProps task writes '$(IntermediateOutputPath)\package.g.props' as it is, so on Linux and
        macOS the restore creates a folder literally named 'obj\Debug', and the '**' globs of the traversals then return their
        pattern instead of the projects ('dotnet build src': MSB3202). A normalized path keeps the file in obj/Debug/.
-       A checkout restored before this target has the folder already: delete it once (rm -rf 'obj\Debug' here). -->
+       A checkout restored before this target has such a folder already, one per configuration: delete them once
+       (rm -rf 'obj\Debug' 'obj\Release' here). -->
   <Target Name="_NormalizePackagePropsPath" BeforeTargets="GeneratePackageJsonProps">
     <PropertyGroup>
       <PackagePropsPath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'package.g.props'))</PackagePropsPath>

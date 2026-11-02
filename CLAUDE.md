@@ -162,9 +162,12 @@ dotnet build src
 # Build a specific project area
 dotnet build src/Platform
 
-# Run all tests: the solution (in Microsoft.Testing.Platform mode dotnet test takes no traversal until .NET 11);
-# the UI automation tests skip without a target
-dotnet test --solution 42.mono.slnx
+# Run all tests: the solution (in Microsoft.Testing.Platform mode dotnet test takes no traversal until .NET 11), one
+# module at a time: the Cosmos DB suites share one emulator and delete its databases, and two suites share Lowkey Vault.
+# The UI automation tests run against the committed local admin UI (http://localhost:5173); a blank target skips them.
+dotnet test --solution 42.mono.slnx --max-parallel-test-modules 1
+UITESTS_Target__BaseUrl= dotnet test --solution 42.mono.slnx --max-parallel-test-modules 1   # without the local admin UI (PowerShell: $env:UITESTS_Target__BaseUrl = ' ')
+dotnet test --solution 42.mono.slnx   # every module at once: faster, but the Cosmos DB and Lowkey Vault suites can fail each other
 
 # One test project, and xUnit's filters (only with --project: the TUnit project refuses them)
 dotnet test --project src/Platform/Storyteller/Backend.Core/test
