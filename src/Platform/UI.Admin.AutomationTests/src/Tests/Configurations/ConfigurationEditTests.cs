@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
@@ -22,10 +21,10 @@ public sealed partial class ConfigurationEditTests : PlatformTest
     [UserRole(Role.Editor)]
     public async Task Configurations_UnsavedChanges_AskBeforeLeaving()
     {
-        var key = await CreateResponsibilityAsync();
+        var key = await ConfigurationSteps.CreateResponsibilityAsync(App, Routes, PlatformData);
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenFilteredAsync(key, $"key:{key}");
-        await StoreVersionsAsync(configuration, """{"count": 1}""");
+        await ConfigurationSteps.StoreVersionsAsync(App, configuration, """{"count": 1}""");
 
         await configuration.Document.ReplaceAsync("""{"count": 2, "extra": true}""");
         await Expect(configuration.Changes(2)).ToBeVisibleAsync();
@@ -76,7 +75,7 @@ public sealed partial class ConfigurationEditTests : PlatformTest
     [UserRole(Role.Editor)]
     public async Task Configurations_SyntaxError_BlocksSaveAndFormatSwitch()
     {
-        var key = await CreateResponsibilityAsync();
+        var key = await ConfigurationSteps.CreateResponsibilityAsync(App, Routes, PlatformData);
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenAsync(key);
         await configuration.CreateEmptyAsync();
@@ -110,10 +109,10 @@ public sealed partial class ConfigurationEditTests : PlatformTest
     [UserRole(Role.Editor)]
     public async Task Configurations_YamlMode_SavesAndKeepsFormat()
     {
-        var key = await CreateResponsibilityAsync();
+        var key = await ConfigurationSteps.CreateResponsibilityAsync(App, Routes, PlatformData);
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenAsync(key);
-        await StoreVersionsAsync(configuration, """{"count": 1}""");
+        await ConfigurationSteps.StoreVersionsAsync(App, configuration, """{"count": 1}""");
 
         await configuration.YamlMode.ClickAsync();
         await App.ExpectQueryAsync("format", "yaml");
@@ -143,10 +142,10 @@ public sealed partial class ConfigurationEditTests : PlatformTest
     [UserRole(Role.Editor)]
     public async Task Configurations_Versions_CompareShowsDiff()
     {
-        var key = await CreateResponsibilityAsync();
+        var key = await ConfigurationSteps.CreateResponsibilityAsync(App, Routes, PlatformData);
         var configuration = new ConfigurationDetail(App, Routes);
         await configuration.OpenAsync(key);
-        await StoreVersionsAsync(configuration, """{"count": 1}""", """{"count": 2}""");
+        await ConfigurationSteps.StoreVersionsAsync(App, configuration, """{"count": 1}""", """{"count": 2}""");
 
         await configuration.OpenTabAsync("Versions");
         var versions = configuration.Versions;
@@ -210,26 +209,4 @@ public sealed partial class ConfigurationEditTests : PlatformTest
     // The diff of {"count": 1} and {"count": 2}: one line added, one removed (the minus is U+2212).
     [GeneratedRegex(@"^\+1 −1 · \d+ changes?$")]
     private static partial Regex OneLineChanged();
-
-    // Bulk creates a new responsibility (no ancestors, usually no type schema or template) and returns its key.
-    private async Task<string> CreateResponsibilityAsync()
-    {
-        var key = PlatformData.AnnotationKey(PlatformData.Responsibility);
-        var annotations = new AnnotationsPage(App, Routes);
-        await annotations.OpenAsync();
-        await annotations.BulkCreateAsync(key);
-        return key;
-    }
-
-    // Create empty (v1), then saves each document in the JSON editor as the next version (v2, v3, …).
-    private async Task StoreVersionsAsync(ConfigurationDetail configuration, params string[] documents)
-    {
-        await configuration.CreateEmptyAsync();
-        await Expect(App.Toast("Configuration created")).ToBeVisibleAsync();
-        for (var index = 0; index < documents.Length; index++)
-        {
-            await configuration.SetDocumentAsync(documents[index]);
-            await configuration.SaveAsync(index + 2);
-        }
-    }
 }
