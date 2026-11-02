@@ -12,7 +12,8 @@ namespace _42.Testing.UI.Automation.Runtime.TUnit;
 // (signed in as the user from the cached storage state) and a page; after it, the TestScope keeps the screenshot,
 // trace and video per the Execution policies, writes console.log, closes everything, returns the users, and reports
 // the result unless TUnit runs the test again. Its artifacts are attached to TUnit's result (HTML and TRX reports).
-// Without Target:BaseUrl every UI test is skipped with the README hint of the setup. TUnit creates an instance per
+// Without Target:BaseUrl every UI test is skipped with the README hint of the setup, and a derived class skips a test
+// that does not run in the session (GetSkipReason) before the lease and the context. TUnit creates an instance per
 // attempt, so the scope belongs to one attempt; the hooks run before a derived class's own Before(Test) hooks.
 //
 // Clean up in CleanUpAsync, not in an After(Test) hook of a derived class (or an AfterEvery(Test) hook): TUnit runs
@@ -55,6 +56,11 @@ public abstract class UiTest
         ArgumentNullException.ThrowIfNull(context);
 
         var session = UiAutomationSession.Require();
+
+        // A test that does not run in this session is skipped before it costs a lease, a browser context or a page; the
+        // scope stays null, so the end receiver reports the skip with its reason.
+        SkipWhenAsked(context, session);
+
         scope = TestScope.Create(session, TestIdentityFactory.Create(context), new TestScopeOptions
         {
             User = RequiredUser,
@@ -132,6 +138,15 @@ public abstract class UiTest
         }
     }
 
+    // Skips the test (Skip.Test) with the reason of GetSkipReason, when it has one.
+    internal void SkipWhenAsked(TestContext context, AutomationSession session)
+    {
+        if (GetSkipReason(context, session) is { } reason)
+        {
+            Skip.Test(reason);
+        }
+    }
+
     // The derived class's cleanup of an attempt (e.g. a [Serial] test restoring a project setting through the UI), on
     // the still open page, before the result is decided. Its exception fails an attempt that passed, is reported as the
     // failure and decides a retry like a failure of the test body. Not called when the scope did not begin.
@@ -145,6 +160,16 @@ public abstract class UiTest
     {
         ArgumentNullException.ThrowIfNull(requirement);
         return Scope.LeaseAnotherUserAsync(requirement, TestContext.Current?.Execution.CancellationToken ?? CancellationToken.None);
+    }
+
+    // Why the test does not run in this session, e.g. a layout the session's viewport (session.ContextOptions.Viewport)
+    // does not have, or a role that no user of the pool (session.Users) holds; null runs it. BeginUiTest asks before the
+    // lease, the browser context and the page, so such a skip costs nothing, and the reason is the skip's reason in the
+    // reports and results.jsonl. It runs before the scope reads RequiredUser (it may read it itself); the test's
+    // categories and attributes are in context.Metadata.TestDetails.
+    protected virtual string? GetSkipReason(TestContext context, AutomationSession session)
+    {
+        return null;
     }
 
     private async Task<Exception?> CleanUpCoreAsync()
