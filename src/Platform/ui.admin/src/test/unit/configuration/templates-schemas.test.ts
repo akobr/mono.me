@@ -12,10 +12,13 @@ import { validateSchemaDocument } from '@/utils/schema-validation'
 import SchemaCreateDialog from '@/components/schemas/SchemaCreateDialog.vue'
 import SchemaDetail from '@/components/schemas/SchemaDetail.vue'
 import TemplateDetail from '@/components/templates/TemplateDetail.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import DocumentEditor from '@/components/editor/DocumentEditor.vue'
+import { starterSchema } from '@/utils/schema-targets'
 import { mockHandlers } from '@/mock/all-handlers'
 import { loadDb } from '@/mock/db'
 import { getDocument, latest } from '@/mock/documents'
-import { mountScreen, settle } from '../../helpers'
+import { EchoingCodeEditorStub, mountInApp, mountScreen, settle } from '../../helpers'
 
 const server = setupServer(...mockHandlers)
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
@@ -266,6 +269,90 @@ describe('TemplateDetail', () => {
     const stored = latest(getDocument(loadDb(), scope, 'template:exe'))
     expect(stored?.Version).toBe(4)
     expect(stored?.Content?.retries).toBe(6)
+    view.host.unmount()
+  })
+})
+
+// 424-158: a delete resets the editor consistently. The echoing stub reports every external value back, as CodeMirror
+// does for its own dispatch; without the guards the editor took the echoed {} for an edit, kept it instead of the
+// starter document or the empty state, and asked "Discard changes?".
+describe('deleting a schema or a template', () => {
+  const echo = { stubs: { CodeEditor: EchoingCodeEditorStub } }
+  const button = (view: { host: VueWrapper }, label: string) =>
+    view.host.findAll('button').find((candidate) => candidate.text() === label)
+
+  async function confirmDelete(view: { host: VueWrapper }) {
+    await button(view, 'Delete')!.trigger('click')
+    await settle()
+    view.host.findComponent(ConfirmDialog).vm.$emit('confirm')
+    await settle(10)
+  }
+
+  it('does not emit an external value back from an echoing editor', async () => {
+    const view = mountInApp(DocumentEditor, { modelValue: { a: 1 }, format: 'json' }, [], {
+      CodeEditor: EchoingCodeEditorStub,
+    })
+    await view.setProps({ modelValue: {} })
+    await view.setProps({ modelValue: { b: 2 } })
+
+    expect(view.inner().emitted('update:modelValue')).toBeUndefined()
+    await view.host.find('textarea').setValue('{ "c": 3 }')
+    expect(view.inner().emitted('update:modelValue')).toEqual([[{ c: 3 }]])
+    view.host.unmount()
+  })
+
+  it('shows the starter document of a missing schema as unchanged', async () => {
+    const view = await mountScreen(
+      SchemaDetail,
+      { target: { kind: 'type', type: 'res' } },
+      { path: '/acme/billing/default/modeling/schemas/type/res', ...echo },
+    )
+    await settle(10)
+
+    expect(JSON.parse(view.host.find('textarea').element.value)).toEqual(starterSchema)
+    expect(view.host.text()).toContain('This schema does not exist yet')
+    expect(button(view, 'Create')!.attributes('disabled')).toBeUndefined()
+    expect(button(view, 'Revert')!.attributes('disabled')).toBeDefined()
+    view.host.unmount()
+  })
+
+  it('returns a deleted schema to the starter document with Create and nothing to discard', async () => {
+    const view = await mountScreen(
+      SchemaDetail,
+      { target: { kind: 'type', type: 'uxe' } },
+      { path: '/acme/billing/default/modeling/schemas/type/uxe', ...echo },
+    )
+    await settle(10)
+    expect(button(view, 'Save')).toBeDefined()
+
+    await confirmDelete(view)
+
+    expect(view.host.text()).toContain('Schema deleted')
+    expect(getDocument(loadDb(), scope, 'schema:type:uxe')).toBeUndefined()
+    expect(JSON.parse(view.host.find('textarea').element.value)).toEqual(starterSchema)
+    expect(button(view, 'Create')!.attributes('disabled')).toBeUndefined()
+    expect(button(view, 'Delete')).toBeUndefined()
+    expect(button(view, 'Revert')!.attributes('disabled')).toBeDefined()
+    expect(view.host.text()).toContain('This schema does not exist yet')
+    view.host.unmount()
+  })
+
+  it('returns a deleted template to the empty state', async () => {
+    const view = await mountScreen(
+      TemplateDetail,
+      { type: 'exe' },
+      { path: '/acme/billing/default/modeling/templates/exe', ...echo },
+    )
+    await settle(10)
+    expect(button(view, 'Save')).toBeDefined()
+
+    await confirmDelete(view)
+
+    expect(view.host.text()).toContain('Template deleted')
+    expect(getDocument(loadDb(), scope, 'template:exe')).toBeUndefined()
+    expect(view.host.text()).toContain('No execution template')
+    expect(button(view, 'Create template')).toBeDefined()
+    expect(view.host.find('textarea').exists()).toBe(false)
     view.host.unmount()
   })
 })

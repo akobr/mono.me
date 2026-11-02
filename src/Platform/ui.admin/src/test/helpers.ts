@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file -- test helpers define small wrapper components */
-import { defineComponent, h, nextTick, type Component } from 'vue'
+import { defineComponent, h, nextTick, watch, type Component } from 'vue'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ui from '@nuxt/ui/vue-plugin'
 import { createMemoryHistory, createRouter, type Router, type RouteRecordRaw } from 'vue-router'
@@ -15,6 +15,28 @@ export const CodeEditorStub = defineComponent({
   props: { modelValue: { type: String, required: true }, language: { type: String, required: true } },
   emits: ['update:modelValue', 'save'],
   setup(props, { emit }) {
+    return () =>
+      h('textarea', {
+        'data-language': props.language,
+        value: props.modelValue,
+        onInput: (event: Event) => emit('update:modelValue', (event.target as HTMLTextAreaElement).value),
+      })
+  },
+})
+
+/**
+ * The text editor as CodeMirror behaves without its echo guard: an external value is a document change too, and the
+ * change is reported back. The editors above it must not take that echo for an edit.
+ */
+export const EchoingCodeEditorStub = defineComponent({
+  name: 'CodeEditor',
+  props: { modelValue: { type: String, required: true }, language: { type: String, required: true } },
+  emits: ['update:modelValue', 'save'],
+  setup(props, { emit }) {
+    watch(
+      () => props.modelValue,
+      (value) => emit('update:modelValue', value),
+    )
     return () =>
       h('textarea', {
         'data-language': props.language,
@@ -48,6 +70,7 @@ export function mountInApp<T extends Component>(
   component: T,
   props: Record<string, unknown> = {},
   plugins: unknown[] = [],
+  stubs: Record<string, Component> = {},
 ) {
   const Host = defineComponent({
     setup(_, { attrs }) {
@@ -58,7 +81,7 @@ export function mountInApp<T extends Component>(
   const host = mount(Host, {
     attrs: props,
     attachTo: document.body,
-    global: { plugins: [ui, ...(plugins as [])], stubs: { CodeEditor: CodeEditorStub, DiffEditor: DiffEditorStub } },
+    global: { plugins: [ui, ...(plugins as [])], stubs: { CodeEditor: CodeEditorStub, DiffEditor: DiffEditorStub, ...stubs } },
   })
 
   return {
@@ -84,6 +107,8 @@ export interface AppMountOptions {
   accessMap?: Record<string, string>
   /** The routes of the router; one catch-all route (no params) by default. */
   routes?: RouteRecordRaw[]
+  /** Replaces the default stubs (`CodeEditor`, `DiffEditor`) or adds others. */
+  stubs?: Record<string, Component>
 }
 
 /**
@@ -110,6 +135,6 @@ export async function mountScreen<T extends Component>(
   })
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
-  const view = mountInApp(component, props, [router, [VueQueryPlugin, { queryClient }]])
+  const view = mountInApp(component, props, [router, [VueQueryPlugin, { queryClient }]], options.stubs)
   return { ...view, router, queryClient }
 }
