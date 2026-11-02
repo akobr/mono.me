@@ -80,7 +80,7 @@ dotnet user-secrets set "Reporting:Testiny:ApiKey" "…"                        
 | Profile | What it changes |
 |---|---|
 | `dev` | The local admin UI on `http://localhost:5173` (`npm run dev` or Aspire), with the committed pool and the AuthKit sign-in |
-| `mock` | The mock build on `http://localhost:5174` (`npm run dev:mock`), `acme` / `billing` / `default`, `SignIn` `None`, `MockScenario` `default`, four placeholder pool users with the role `Owner`, and longer timeouts for the unbundled dev server (`NavigationTimeoutMs` 60000, `ExpectTimeoutMs` 15000) |
+| `mock` | The mock build on `http://localhost:5174` (`npm run dev:mock`), `acme` / `billing` / `default`, `SignIn` `None`, `MockScenario` `default`, `Target:RoleProjects` `Contributor` → `acme/shipping` and `Reader` → `northwind/portal`, eight placeholder pool users with the role `Owner`, and longer timeouts for the unbundled dev server (`NavigationTimeoutMs` 60000, `ExpectTimeoutMs` 15000) |
 | `mobile` | `Browser:Device` `Pixel 7` (412×839, scale 2.625, touch, mobile user agent; the TypeScript suite narrows it to 390×844, the same layout below 640 px) |
 | `firefox` / `webkit` | `Browser:Engine` |
 | `browserstack-win-chrome` | BrowserStack, Chrome `latest` on Windows 11, 1920×1080 |
