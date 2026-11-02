@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
+using System.Net;
+using System.Text.Json;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
+using _42.Testing.UI.Automation.Runtime.Access;
 using _42.Testing.UI.Automation.Runtime.Settings;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
@@ -50,8 +53,13 @@ public abstract partial class PlatformTest
     // On a deployed target, once the app handed a sign-in over to AuthKit (Continue with AuthKit, or a protected page
     // opened signed out): waits until the browser left the app's host, signs in on the hosted page as the leased user,
     // with WorkOS' labels like AuthKitSignIn (Email, Continue, Password, Sign in), and returns once the browser is back
-    // on the app past /callback. The trace leaves the hosted page out: the chunk recorded so far is dropped and a new one
-    // starts after the sign-in, so no trace.zip keeps the password (a failure still has its screenshot and console.log).
+    // on the app past /callback. The steps on the hosted page are not traced: the chunk recorded so far is dropped, and
+    // a new one starts once the steps ended. A browser that is not back on the app by then (a step failed: a wrong
+    // password, an MFA or Radar prompt, a renamed button) first has the value of every input and text area of its
+    // frames emptied, or goes to about:blank when that fails, so the snapshots of the new chunk (the failure screenshot
+    // takes one) hold no typed value; when neither works, the trace is not started again. A failed step throws a
+    // SignInException with the type and the message of Playwright's error, the e-mail and the password as *** (its call
+    // log keeps a typed value) and no inner exception, as the runtime's StorageStateCache does for AuthKitSignIn.
     protected async Task SignInOnHostedPageAsync()
     {
         var password = User.Password;
@@ -77,9 +85,13 @@ public abstract partial class PlatformTest
             await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
             await Page.WaitForURLAsync(url => IsOnHost(url, app));
         }
+        catch (Exception exception) when (exception is PlaywrightException or TimeoutException)
+        {
+            throw new SignInException($"The AuthKit sign-in on the hosted page failed for {User}: {exception.GetType().Name}: {Redact(exception.Message, password, User.Email)}");
+        }
         finally
         {
-            if (traced)
+            if (traced && (IsOnHost(Page.Url, app) || await TryEmptyHostedPageAsync()))
             {
                 await Context.Tracing.StartChunkAsync(new() { Title = $"{TestContext.Current?.Metadata.TestDetails.MethodName} after the AuthKit sign-in" });
             }
@@ -103,10 +115,71 @@ public abstract partial class PlatformTest
         await field.PressSequentiallyAsync(value);
     }
 
+    // The text with the password and the e-mail as ***, each as is, JSON-escaped and URL-encoded (a URL in the message
+    // may carry the e-mail), the longest form first; the e-mail in any case.
+    private static string Redact(string text, string password, string email)
+    {
+        foreach (var (secret, comparison) in new[] { (password, StringComparison.Ordinal), (email, StringComparison.OrdinalIgnoreCase) })
+        {
+            if (string.IsNullOrEmpty(secret))
+            {
+                continue;
+            }
+
+            var forms = new[] { secret, JsonEncodedText.Encode(secret).ToString(), Uri.EscapeDataString(secret), WebUtility.UrlEncode(secret) }
+                .Distinct(StringComparer.Ordinal)
+                .OrderByDescending(form => form.Length);
+            foreach (var form in forms)
+            {
+                text = text.Replace(form, SettingsRedaction.Mask, comparison);
+            }
+        }
+
+        return text;
+    }
+
     private static bool IsOnHost(string url, Uri app)
     {
         return Uri.TryCreate(url, UriKind.Absolute, out var current)
             && string.Equals(current.GetLeftPart(UriPartial.Authority), app.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Untraced, after a failed step on the hosted page: empties the value of every input and text area of the page's
+    // frames (their shadow roots too), else leaves for about:blank. Returns whether one of them worked.
+    private async Task<bool> TryEmptyHostedPageAsync()
+    {
+        try
+        {
+            foreach (var frame in Page.Frames)
+            {
+                await frame.EvaluateAsync(
+                    """
+                    () => {
+                      const empty = (root) => root.querySelectorAll('*').forEach((element) => {
+                        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) element.value = '';
+                        if (element.shadowRoot) empty(element.shadowRoot);
+                      });
+                      empty(document);
+                    }
+                    """);
+            }
+
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            // A frame navigated or went away meanwhile: leave the hosted page instead.
+        }
+
+        try
+        {
+            await Page.GotoAsync("about:blank");
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
     }
 
     private Uri AppUri()
