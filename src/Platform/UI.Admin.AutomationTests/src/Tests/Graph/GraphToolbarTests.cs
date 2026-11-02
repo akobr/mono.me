@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
@@ -10,7 +9,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Graph;
 
 // Toolbar: Layout (Layered, Force, Radial), Fit, Reheat, Export PNG, and Open as list with the drawn annotations.
 [Area(Area.Graph)]
-public sealed partial class GraphToolbarTests : PlatformTest
+public sealed class GraphToolbarTests : PlatformTest
 {
     // The first 8 bytes of every PNG file.
     private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
@@ -86,7 +85,7 @@ public sealed partial class GraphToolbarTests : PlatformTest
         var annotations = new AnnotationsPage(App, Routes);
         await annotations.WaitForCatalogAsync();
         await Expect(annotations.Filter).ToHaveValueAsync(query);
-        await Expect(annotations.FilterBarCount).ToHaveTextAsync(FourMatchesCount());
+        await Expect(annotations.FilterBarCount).ToHaveTextAsync(GraphPage.FilterCountText(4));
         foreach (var key in drawn)
         {
             await Expect(annotations.Item(key)).ToBeVisibleAsync();
@@ -94,8 +93,4 @@ public sealed partial class GraphToolbarTests : PlatformTest
 
         await Expect(annotations.Item(tree.Execution)).ToHaveCountAsync(0);
     }
-
-    // The filter's count with the four drawn keys: "4 of T".
-    [GeneratedRegex(@"^\s*4 of [\d,]+\s*$")]
-    private static partial Regex FourMatchesCount();
 }

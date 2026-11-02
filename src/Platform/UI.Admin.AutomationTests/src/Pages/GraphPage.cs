@@ -176,6 +176,20 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
         await Expect(Application).ToHaveAccessibleNameAsync(new Regex($"^Annotation graph, {count} annotations\\. "));
     }
 
+    // The filter's count: the view's total T without a filter (matches null), "<matches> of T" with one, T any number.
+    public async Task ExpectFilterCountAsync(int? matches = null)
+    {
+        await Expect(FilterCount).ToHaveTextAsync(FilterCountText(matches));
+    }
+
+    // The text of a filter bar's count (also the annotations page's): "T", or "<matches> of T", T any number.
+    public static Regex FilterCountText(int? matches = null)
+    {
+        return matches is { } count
+            ? new Regex(string.Create(CultureInfo.InvariantCulture, $@"^\s*{count:N0} of [\d,]+\s*$"))
+            : TotalCountText();
+    }
+
     // The view's total from the filter count: "T" without a filter, the T of "N of T" with one.
     public async Task<int> TotalAsync()
     {
@@ -251,6 +265,9 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
 
     [GeneratedRegex(@"^\s*(?:[\d,]+ of )?[\d,]+\s*$")]
     private static partial Regex CountText();
+
+    [GeneratedRegex(@"^\s*[\d,]+\s*$")]
+    private static partial Regex TotalCountText();
 
     [GeneratedRegex(@"^Show all [\d,]+ annotations\?$")]
     private static partial Regex ShowAllTitle();
