@@ -133,4 +133,30 @@ public sealed partial class ProjectSettingsPage
         ArgumentNullException.ThrowIfNull(path);
         await app.ExpectStoredSettingAsync(BrowserSettingsKey, [$"{routes.Organization}.{routes.Project}", .. path], expected);
     }
+
+    // Loads the settings again, at the section when given, and waits like OpenAsync. Where the page shows them already,
+    // this reloads the page: a navigation to the same address with another #section only scrolls, and keeps what the
+    // page read before.
+    public async Task ReloadAsync(string? section = null)
+    {
+        var url = new Uri(app.Page.Url);
+        if (!string.Equals(url.AbsolutePath.Trim('/'), routes.Settings().Trim('/'), StringComparison.Ordinal))
+        {
+            await OpenAsync(section);
+            return;
+        }
+
+        await app.Page.ReloadAsync();
+        if (section is not null && url.Fragment != $"#{section}")
+        {
+            await app.GotoAsync(routes.Settings(section));
+        }
+
+        await app.WaitForReadyAsync();
+        await Expect(ProjectHeading).ToBeVisibleAsync();
+        if (section is not null)
+        {
+            await Expect(app.Page.Locator($"#{section}")).ToBeVisibleAsync();
+        }
+    }
 }

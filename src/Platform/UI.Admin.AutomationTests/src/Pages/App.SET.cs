@@ -11,6 +11,18 @@ public sealed partial class App
     // Every toast on screen; none while nothing was announced.
     public ILocator ShownToasts => Notifications.Locator("li");
 
+    // The description of the newest toast of the title (Nuxt UI's description slot), e.g. the API's message under "The
+    // recipient was not changed"; assert it right after the action, like the toast.
+    public ILocator ToastDescriptionOf(string title)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        return ShownToasts
+            .Filter(new() { Has = Page.GetByText(title, new() { Exact = true }) })
+            .Last
+            .Locator("[data-slot='description']");
+    }
+
     // Waits until the JSON that localStorage keeps under the key has the text value at the path ("acme.billing",
     // "defaultTimeZone"), or none for null, up to Execution:ActionTimeoutMs; the error shows what is stored.
     public async Task ExpectStoredSettingAsync(string key, IReadOnlyList<string> path, string? expected)
