@@ -24,9 +24,6 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
     // Above this many annotations the graph opens in focus mode, and Show everything asks first.
     public const int LargeViewSize = 5_000;
 
-    // The graph's summary in its accessible name: the whole view's "<shown> annotations".
-    private static readonly Regex WholeViewName = WholeViewNameRegex();
-
     public ILocator Application => app.Page.GetByRole(AriaRole.Application);
 
     // The live region of the keyboard cursor: "<Type label> <name>, <n> connection(s)".
@@ -174,14 +171,6 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
         await Expect(Application).ToHaveAccessibleNameAsync(new Regex($"^Annotation graph, {count} annotations\\. "));
     }
 
-    // The number of the whole view's summary ("<shown> annotations"), once it shows one.
-    public async Task<int> WholeViewShownAsync()
-    {
-        await ExpectWholeViewSummaryAsync();
-        var name = await Application.GetAttributeAsync("aria-label") ?? string.Empty;
-        return ParseCount(WholeViewName.Match(name).Groups["shown"].Value);
-    }
-
     // The view's total from the filter count: "T" without a filter, the T of "N of T" with one.
     public async Task<int> TotalAsync()
     {
@@ -251,9 +240,6 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
     {
         return int.Parse(text, NumberStyles.AllowThousands, CultureInfo.GetCultureInfo("en-US"));
     }
-
-    [GeneratedRegex(@"^Annotation graph, (?<shown>[\d,]+) annotations\. ")]
-    private static partial Regex WholeViewNameRegex();
 
     [GeneratedRegex(@"^\s*(?:[\d,]+ of )?[\d,]+\s*$")]
     private static partial Regex CountText();
