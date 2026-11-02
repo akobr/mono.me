@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
@@ -86,8 +87,24 @@ public sealed partial class ViewsPage
         return EditViewDialog(view).GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true });
     }
 
-    // Hovers the view's Compare link, which opens the default row's tooltip. The tooltip's node is aria-hidden; its text
-    // is the link's accessible description while it is open. Needs a pointer: not on a phone.
+    // The href of a view's Compare: Compare views of the project's default view with ?to=<view>, at the end of the href
+    // (which starts with the app's base).
+    public Regex CompareHref(string view)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(view);
+        return new Regex($"/{Regex.Escape((routes with { View = AppRoutes.DefaultView }).Compare(view))}$");
+    }
+
+    // The view's Compare is disabled: aria-disabled and without href (the default view's own row).
+    public async Task ExpectCompareDisabledAsync(string view)
+    {
+        await Expect(ViewCompareLink(view)).ToBeDisabledAsync();
+        await Expect(ViewCompareLink(view)).Not.ToHaveAttributeAsync("href", AnyValue());
+    }
+
+    // Hovers the view's Compare link. Only the default row's Compare has a tooltip (whether the project has another
+    // view); its node is aria-hidden, so its text is the link's accessible description while it is open. Needs a
+    // pointer: not on a phone.
     public async Task HoverCompareAsync(string view)
     {
         await ViewCompareLink(view).HoverAsync();
@@ -113,4 +130,9 @@ public sealed partial class ViewsPage
         await EditViewSaveButton(view).ClickAsync();
         await Expect(EditViewDialog(view)).ToBeHiddenAsync();
     }
+
+    // Any value: Not.ToHaveAttributeAsync(name, AnyValue()) passes only while the attribute is absent (Playwright .NET
+    // has no overload without a value).
+    [GeneratedRegex(".*")]
+    private static partial Regex AnyValue();
 }

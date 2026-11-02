@@ -10,8 +10,6 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Projects;
 [Area(Area.Projects)]
 public sealed partial class OrganizationTests : PlatformTest
 {
-    private const string PatternMessage = "Use 2 to 63 lower-case letters, digits or hyphens, starting with a letter or a digit.";
-
     // ORG-ORG-01: New organization creates the organization with its first project and lists it.
     // Every user may create an organization. New organization on /orgs creates it with its first project and the
     // project's description and opens the project's empty annotations; /orgs then lists the organization and the
@@ -89,7 +87,7 @@ public sealed partial class OrganizationTests : PlatformTest
 
         await organizations.NewOrganizationName.FillAsync("Bad_Name");
         await organizations.CreateOrganizationButton.ClickAsync();
-        await Expect(organizations.NewOrganizationName).ToHaveAccessibleDescriptionAsync(PatternMessage);
+        await Expect(organizations.NewOrganizationName).ToHaveAccessibleDescriptionAsync(NameRules.PatternMessage);
 
         await organizations.NewOrganizationName.FillAsync("orgs");
         await organizations.CreateOrganizationButton.ClickAsync();

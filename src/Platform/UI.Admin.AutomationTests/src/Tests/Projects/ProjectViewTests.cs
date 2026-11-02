@@ -11,8 +11,6 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Projects;
 [Area(Area.Projects)]
 public sealed partial class ProjectViewTests : PlatformTest
 {
-    private const string PatternMessage = "Use 2 to 63 lower-case letters, digits or hyphens, starting with a letter or a digit.";
-
     // ORG-VEW-01: New view creates a view that Compare links to and the list opens.
     // In a new project the default view is the only one, so its Compare is disabled and its tooltip says there is
     // nothing to compare with. New view creates a registered view with its description; the default row's tooltip then
@@ -32,8 +30,7 @@ public sealed partial class ProjectViewTests : PlatformTest
         await views.OpenAsync();
         var defaultCompare = views.ViewCompareLink(AppRoutes.DefaultView);
         await Expect(views.ViewProductionBadge(AppRoutes.DefaultView)).ToBeVisibleAsync();
-        await Expect(defaultCompare).ToBeDisabledAsync();
-        await Expect(defaultCompare).Not.ToHaveAttributeAsync("href", AnyValue());
+        await views.ExpectCompareDisabledAsync(AppRoutes.DefaultView);
         await Expect(views.NewViewButton).ToBeVisibleAsync();
 
         if (!App.IsPhone)
@@ -69,7 +66,7 @@ public sealed partial class ProjectViewTests : PlatformTest
 
         // Only the href: Compare views itself belongs to Modeling.
         await Expect(views.ViewCompareLink(view)).ToBeEnabledAsync();
-        await Expect(views.ViewCompareLink(view)).ToHaveAttributeAsync("href", CompareHref(project, view));
+        await Expect(views.ViewCompareLink(view)).ToHaveAttributeAsync("href", views.CompareHref(view));
 
         var created = project with { View = view };
         await views.View(view).ClickAsync();
@@ -147,7 +144,7 @@ public sealed partial class ProjectViewTests : PlatformTest
 
         await views.NewViewName.FillAsync("Bad Name");
         await views.CreateViewButton.ClickAsync();
-        await Expect(views.NewViewName).ToHaveAccessibleDescriptionAsync(PatternMessage);
+        await Expect(views.NewViewName).ToHaveAccessibleDescriptionAsync(NameRules.PatternMessage);
 
         await views.NewViewName.FillAsync("members");
         await views.CreateViewButton.ClickAsync();
@@ -178,6 +175,8 @@ public sealed partial class ProjectViewTests : PlatformTest
         await views.OpenAsync();
         await Expect(views.ViewProductionBadge(AppRoutes.DefaultView)).ToBeVisibleAsync();
 
+        // The absence checks look in the list, so the list itself must be there.
+        await Expect(views.ViewList).ToBeVisibleAsync();
         await Expect(views.NewViewButton).ToHaveCountAsync(0);
         await Expect(views.CompareLinks).ToHaveCountAsync(0);
         await Expect(views.RegisterButtons).ToHaveCountAsync(0);
@@ -200,19 +199,20 @@ public sealed partial class ProjectViewTests : PlatformTest
         await views.OpenAsync();
         var defaultCompare = views.ViewCompareLink(AppRoutes.DefaultView);
         await Expect(views.ViewProductionBadge(AppRoutes.DefaultView)).ToBeVisibleAsync();
-        await Expect(defaultCompare).ToBeDisabledAsync();
-        await Expect(defaultCompare).Not.ToHaveAttributeAsync("href", AnyValue());
+        await views.ExpectCompareDisabledAsync(AppRoutes.DefaultView);
 
+        // Compare in every row, which also proves that the list the absence checks look in is there.
+        await Expect(views.ViewList).ToBeVisibleAsync();
+        var listed = await views.ListedAsync();
+        await Expect(views.CompareLinks).ToHaveCountAsync(listed.Count);
         await Expect(views.NewViewButton).ToHaveCountAsync(0);
         await Expect(views.RegisterButtons).ToHaveCountAsync(0);
         await Expect(views.EditButtons).ToHaveCountAsync(0);
 
-        var listed = await views.ListedAsync();
-        var project = Routes with { View = AppRoutes.DefaultView };
         foreach (var view in listed.Where(view => !string.Equals(view, AppRoutes.DefaultView, StringComparison.Ordinal)))
         {
             await Expect(views.ViewCompareLink(view)).ToBeEnabledAsync();
-            await Expect(views.ViewCompareLink(view)).ToHaveAttributeAsync("href", CompareHref(project, view));
+            await Expect(views.ViewCompareLink(view)).ToHaveAttributeAsync("href", views.CompareHref(view));
         }
 
         if (!App.IsPhone)
@@ -221,17 +221,6 @@ public sealed partial class ProjectViewTests : PlatformTest
             await Expect(defaultCompare).ToHaveAccessibleDescriptionAsync(listed.Count > 1 ? ViewsPage.OtherViewsHint : ViewsPage.NoOtherViewHint);
         }
     }
-
-    // The href of a view's Compare: Compare views of the project's default view with ?to=<view>, at the end of the
-    // href (which starts with the app's base).
-    private static Regex CompareHref(AppRoutes project, string view)
-    {
-        return new Regex($"/{Regex.Escape((project with { View = AppRoutes.DefaultView }).Compare(view))}$");
-    }
-
-    // Any value: Not.ToHaveAttributeAsync(name, AnyValue()) passes only while the attribute is absent.
-    [GeneratedRegex(".*")]
-    private static partial Regex AnyValue();
 
     [GeneratedRegex("^View .+ created$")]
     private static partial Regex ViewCreatedToast();
