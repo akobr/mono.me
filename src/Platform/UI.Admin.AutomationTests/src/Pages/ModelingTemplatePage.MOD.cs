@@ -1,14 +1,18 @@
 using System.Globalization;
 using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
-// The Modeling section's members of ModelingTemplatePage: the empty state's description, the version badge in the
-// editor's actions, the typed delete "Delete the <type> template?" (the confirmation is the type's code), the empty
-// state of an unknown type in the URL, and an edit of a value in the document.
+// The Modeling section's members of ModelingTemplatePage: the rows of the list, the empty state's description, the
+// version badge in the editor's actions, the typed delete "Delete the <type> template?" (the confirmation is the type's
+// code), the empty states of an unknown type in the URL and of the Versions of a missing template.
 public sealed partial class ModelingTemplatePage
 {
+    // The rows of the list, one link per type: the list's items (the list that holds the Responsibility row).
+    public ILocator TemplateListRows => app.Page.GetByRole(AriaRole.List)
+        .Filter(new() { Has = app.Page.Locator("a[href$=\"/modeling/templates/rst\"]") })
+        .GetByRole(AriaRole.Listitem);
+
     public ILocator NoTemplateDescription => Panel.Root.GetByText("Configurations of this type inherit only from their ancestors.", new() { Exact = true });
 
     // The detail of a type code the app does not know (…/modeling/templates/foo).
@@ -29,30 +33,5 @@ public sealed partial class ModelingTemplatePage
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(typeLabel);
         return new ConfirmDialog(app, $"Delete the {typeLabel} template?");
-    }
-
-    // Replaces the first occurrence of a text in the template (e.g. "\"retries\":2" by "\"retries\":3"), as one insertion
-    // of the whole changed document; the editor then counts the change ("1 change(s)").
-    public async Task ReplaceInDocumentAsync(string oldText, string newText)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(oldText);
-        ArgumentNullException.ThrowIfNull(newText);
-
-        var text = await Document.TextAsync();
-        var index = text.IndexOf(oldText, StringComparison.Ordinal);
-        if (index < 0)
-        {
-            throw new InvalidOperationException($"The template has no '{oldText}': {text}");
-        }
-
-        await Document.ReplaceAsync(string.Concat(text.AsSpan(0, index), newText, text.AsSpan(index + oldText.Length)));
-    }
-
-    // Leaves the detail and waits for the list's rows again.
-    public async Task CloseToListAsync()
-    {
-        await Panel.CloseAsync();
-        await app.ExpectAtAsync(routes.ModelingTab("templates"));
-        await Expect(ListRow("rst")).ToBeVisibleAsync();
     }
 }
