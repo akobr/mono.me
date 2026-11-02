@@ -105,7 +105,7 @@ env:
   SDK_DIR: src/Platform/Storyteller/sdk.typescript/src
   UI_DIR: src/Platform/ui.admin/src
   RESULTS_DIR: TestResults/ui-admin-automation
-  MOCK_UI_URL: http://localhost:4174
+  MOCK_UI_URL: http://127.0.0.1:4174
 
 defaults:
   run:
@@ -200,7 +200,7 @@ jobs:
         if: inputs.use_mock_ui
         working-directory: ${{ env.UI_DIR }}
         run: |
-          nohup npx vite preview --port 4174 --strictPort > "$RUNNER_TEMP/vite-preview.log" 2>&1 &
+          nohup npx vite preview --host 127.0.0.1 --port 4174 --strictPort > "$RUNNER_TEMP/vite-preview.log" 2>&1 &
           for _ in $(seq 1 60); do
             if curl --silent --fail --output /dev/null "$MOCK_UI_URL"; then
               echo "The mock UI answers at $MOCK_UI_URL."
