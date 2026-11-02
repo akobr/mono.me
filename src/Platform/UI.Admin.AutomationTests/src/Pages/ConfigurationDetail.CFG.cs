@@ -76,6 +76,78 @@ public sealed partial class ConfigurationDetail
     // The Schema tab's applied schemas and the combined schema.
     public CombinedSchemaView CombinedSchema => new(app, ConfigurationPanel.Root);
 
+    // The Effective tab's views (Document, Composition) and the Resolved tab.
+    public ConfigurationEffective EffectiveView => new(app, ConfigurationPanel.Root);
+
+    public ConfigurationResolved ResolvedView => new(app, ConfigurationPanel.Root);
+
+    // The tab link of the Edit tab (the detail's own path, no suffix).
+    public ILocator EditTab => TabLink("Edit");
+
+    // The empty state's description, for every role.
+    public ILocator NoConfigurationDescription => ConfigurationPanel.Root.GetByText(
+        "This annotation has no own configuration. It still inherits values from its ancestors and the type template.",
+        new() { Exact = true });
+
+    // The Versions tab of an annotation that does not exist.
+    public ILocator NoHistoryHeading => ConfigurationPanel.Root.GetByRole(AriaRole.Heading, new() { Name = "No configuration, no history", Exact = true });
+
+    // The toolbar's badge of a user below Contributor, instead of Delete own and the footer.
+    public ILocator ReadOnlyBadge => ConfigurationPanel.Root.GetByText("Read-only", new() { Exact = true });
+
+    // The header's chain of parents, "<Type> <name>" each (the built-in type names: a renamed type is a preference of
+    // the browser, and every test has a fresh one); the parents are links to their configurations with the list's q,
+    // the annotation itself is the current item.
+    public ILocator Breadcrumb => ConfigurationPanel.Root.GetByRole(AriaRole.Navigation, new() { Name = "Annotation ancestors", Exact = true });
+
+    public ILocator BreadcrumbCurrent => Breadcrumb.Locator("[aria-current=\"page\"]");
+
+    // Disabled without ancestors (a subject or a responsibility).
+    public ILocator LineageButton => ConfigurationPanel.Root.GetByRole(AriaRole.Button, new() { Name = "Lineage", Exact = true });
+
+    // The popover of Lineage (teleported to the body): a numbered item per level of ancestors in merge order, each
+    // ancestor a link named by its key, and last the annotation's own key.
+    public ILocator LineagePopover => app.Page.GetByRole(AriaRole.Dialog)
+        .Filter(new() { Has = app.Page.GetByText("Ancestors, applied top to bottom", new() { Exact = true }) });
+
+    public ILocator LineageLevels => LineagePopover.GetByRole(AriaRole.Listitem);
+
+    // The Edit toolbar's binding reference, "fx Bindings" (not insertable: no Use).
+    public ILocator BindingsButton => ConfigurationPanel.Root.GetByRole(AriaRole.Button, new() { NameRegex = BindingsName() });
+
+    public BindingReferencePopover BindingReference => new(app);
+
+    // The detail's region, named by the key.
+    public ILocator Region(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return app.Page.GetByRole(AriaRole.Region, new() { Name = key, Exact = true });
+    }
+
+    // A tab link of the detail: "Edit", "Effective", "Resolved", "Versions" or "Schema" (a phone cuts their labels, not
+    // their names).
+    public ILocator TabLink(string tab)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tab);
+        return ConfigurationPanel.Root.GetByRole(AriaRole.Link, new() { Name = tab, Exact = true });
+    }
+
+    // A parent's link in the breadcrumb, by its exact text, e.g. "Responsibility <name>".
+    public ILocator BreadcrumbLink(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return Breadcrumb.GetByRole(AriaRole.Link, new() { Name = name, Exact = true });
+    }
+
+    // Opens the Edit tab by its link and waits for the detail's own path (OpenTabAsync is for the other tabs).
+    public async Task OpenEditTabAsync(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        await EditTab.ClickAsync();
+        await app.ExpectAtAsync(routes.Configuration(key));
+    }
+
     // The badge of the shown version in the Edit tab's toolbar, "v<n>".
     public ILocator VersionBadge(int version)
     {
@@ -141,4 +213,8 @@ public sealed partial class ConfigurationDetail
 
     [GeneratedRegex(@"^\s*Line \d+: ")]
     private static partial Regex ParseErrorText();
+
+    // The name ends in the label after the italic "fx".
+    [GeneratedRegex("Bindings$")]
+    private static partial Regex BindingsName();
 }
