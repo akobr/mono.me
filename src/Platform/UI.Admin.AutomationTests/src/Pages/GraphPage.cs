@@ -116,10 +116,11 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
         await WaitForCatalogAsync();
     }
 
-    // The catalog loaded: "Reload the catalog" is enabled again.
+    // The catalog loaded: "Reload the catalog" is enabled again, also while a full-screen detail hides the graph's
+    // navbar (below md).
     public async Task WaitForCatalogAsync()
     {
-        await Expect(ReloadCatalogButton).ToBeEnabledAsync();
+        await Expect(app.Page.GetByRole(AriaRole.Button, new() { Name = "Reload the catalog", Exact = true, IncludeHidden = true })).ToBeEnabledAsync();
     }
 
     // The graph has its first layout frame: no status in the graph, so the arrow keys and Export PNG work.
