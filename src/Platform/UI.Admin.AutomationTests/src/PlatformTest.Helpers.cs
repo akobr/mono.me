@@ -81,7 +81,8 @@ public abstract partial class PlatformTest
         catch (TimeoutException exception)
         {
             var copied = await Page.EvaluateAsync<string[]?>("() => window.__copied ?? null");
-            var what = copied is null ? "the clipboard recorder is not installed (InstallClipboardRecorderAsync before the first navigation)"
+            var what = copied is null
+                ? "the clipboard recorder is not installed (InstallClipboardRecorderAsync before the first navigation)"
                 : copied.Length == 0 ? "the page copied nothing"
                 : $"the page copied {string.Join(", ", copied.Select(text => $"'{text}'"))}";
             throw new TimeoutException($"The page did not copy '{expected}': {what}.", exception);
@@ -131,7 +132,8 @@ public abstract partial class PlatformTest
         {
             var installed = await Page.EvaluateAsync<bool>("() => Array.isArray(window.__requests)");
             IReadOnlyList<RecordedRequest> requests = installed ? await RecordedRequestsAsync() : [];
-            var what = !installed ? "the request recorder is not installed (InstallRequestRecorderAsync before the first navigation)"
+            var what = !installed
+                ? "the request recorder is not installed (InstallRequestRecorderAsync before the first navigation)"
                 : requests.Count == 0 ? "the page sent nothing"
                 : $"the page sent {string.Join(", ", requests.Select(request => $"{request.Method} {request.Url}"))}";
             throw new TimeoutException($"The page did not request …{pathEnd} with {parameter} matching '{pattern}': {what}.", exception);
