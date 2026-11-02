@@ -27,7 +27,9 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
         var key = PlatformData.AnnotationKey(PlatformData.Responsibility);
         var annotations = new AnnotationsPage(App, Routes);
         await annotations.OpenAsync();
-        await Expect(Page.ViewportSize is { Width: < AnnotationsPage.GridWidth } ? annotations.AnnotationList : annotations.AnnotationGrid).ToBeVisibleAsync();
+        // An empty view (a fresh local target) shows its empty state instead of the grid.
+        var items = Page.ViewportSize is { Width: < AnnotationsPage.GridWidth } ? annotations.AnnotationList : annotations.AnnotationGrid;
+        await Expect(items.Or(annotations.EmptyState)).ToBeVisibleAsync();
         await Expect(annotations.Filter).ToBeVisibleAsync();
 
         var bulkCreate = await annotations.OpenBulkCreateAsync();
