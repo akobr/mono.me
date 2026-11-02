@@ -27,12 +27,17 @@
   "Users": {
     // Placeholders: with SignIn None the pool only bounds the parallelism. Each stands for Ada Lovelace, the Owner of
     // acme and acme/billing in the default dataset, so a test that requires an Owner or an editing role gets any of
-    // them.
+    // them. Eight of them, so that the user secrets of a deployed pool of up to eight users (Users:Pool:<n>:Password)
+    // still give every entry an e-mail here, and a second lease (LeaseAnotherUserAsync) never waits for a free user.
     "Pool": [
       { "Email": "mock-user-1@example.com", "Roles": [ "Owner" ] },
       { "Email": "mock-user-2@example.com", "Roles": [ "Owner" ] },
       { "Email": "mock-user-3@example.com", "Roles": [ "Owner" ] },
-      { "Email": "mock-user-4@example.com", "Roles": [ "Owner" ] }
+      { "Email": "mock-user-4@example.com", "Roles": [ "Owner" ] },
+      { "Email": "mock-user-5@example.com", "Roles": [ "Owner" ] },
+      { "Email": "mock-user-6@example.com", "Roles": [ "Owner" ] },
+      { "Email": "mock-user-7@example.com", "Roles": [ "Owner" ] },
+      { "Email": "mock-user-8@example.com", "Roles": [ "Owner" ] }
     ]
   }
 }
