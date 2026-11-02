@@ -16,7 +16,7 @@ public sealed partial class MonitorTests : PlatformTest
     // MON-PAG-01: Monitor opens on Usage and switches to Audit through the tabs.
     // Monitor opens on Usage without a tab in the URL, with this month's report (From the first day of the month, To
     // today, in UTC); the tab Audit adds ?tab=audit and shows the audit's filters, its counter and its events or the
-    // empty state, and stays selected after a reload; the tab Usage drops ?tab= again.
+    // empty state, and stays selected after a reload, which clears a typed Key filter; the tab Usage drops ?tab= again.
     [Test]
     [Elementary]
     [TestCase(7)]
@@ -46,6 +46,11 @@ public sealed partial class MonitorTests : PlatformTest
         await Expect(audit.To).ToHaveValueAsync(string.Empty);
         await Expect(audit.Table.Or(audit.NoEvents)).ToBeVisibleAsync();
         await Expect(audit.Counter).ToBeVisibleAsync();
+
+        // A key without events in Key filter, so that the reload has a filter to clear.
+        await audit.KeyFilter.FillAsync(PlatformData.KeyValueKey());
+        await Expect(audit.NoEvents).ToBeVisibleAsync();
+        await Expect(audit.Counter).ToHaveTextAsync(AuditTrail.CounterOf(0));
 
         await Page.ReloadAsync();
         await App.WaitForReadyAsync();
@@ -104,9 +109,7 @@ public sealed partial class MonitorTests : PlatformTest
         var (monthFrom, today) = await ExpectCurrentMonthAsync(usage, dates);
         await Expect(usage.TotalsHeading(monthFrom, today)).ToBeVisibleAsync();
 
-        await usage.From.FillAsync(from);
-        await usage.To.FillAsync(to);
-        await Expect(usage.TotalsHeading(from, to)).ToBeVisibleAsync();
+        await usage.SetRangeAsync(from, to);
 
         // Branch on what the report shows, never on the target: the meters are not under the test's control.
         await Expect(usage.MeterLabels.First.Or(usage.NoUsage)).ToBeVisibleAsync();
@@ -190,16 +193,27 @@ public sealed partial class MonitorTests : PlatformTest
         await Expect(monitor.Usage.ChargesHeading).ToBeVisibleAsync();
     }
 
-    // The default range of the usage report: To is today in UTC (or tomorrow, when midnight passed since the clock was
-    // read) and From the first day of To's month. Returns both as the inputs show them.
+    // The default range of the usage report: To is today in UTC, or tomorrow only when midnight UTC has passed since
+    // the clock was read (the clock then says so too), and From the first day of To's month. Returns both as the
+    // inputs show them.
     private static async Task<(string From, string To)> ExpectCurrentMonthAsync(UsageReport usage, UtcDates dates)
     {
-        await Expect(usage.To).ToHaveValueAsync(new Regex($"^({UtcDates.Iso(dates.Today)}|{UtcDates.Iso(dates.Tomorrow)})$"));
+        await Expect(usage.To).ToHaveValueAsync(IsoDay());
         var to = UtcDates.ParseIso(await usage.To.InputValueAsync());
+        if (to != dates.Today)
+        {
+            await Assert.That(to).IsEqualTo(dates.Tomorrow);
+            await Assert.That(UtcDates.Now().Today).IsEqualTo(dates.Tomorrow);
+        }
+
         var from = UtcDates.Iso(new DateOnly(to.Year, to.Month, 1));
         await Expect(usage.From).ToHaveValueAsync(from);
         return (from, UtcDates.Iso(to));
     }
+
+    // A day as the date inputs hold it, yyyy-MM-dd.
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}$")]
+    private static partial Regex IsoDay();
 
     // A meter's number as Intl.NumberFormat writes it (grouped, at most 2 decimals; the browser's locale).
     [GeneratedRegex(@"^\d[\d,.  ]*$")]
