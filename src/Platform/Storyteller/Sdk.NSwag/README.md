@@ -28,7 +28,7 @@ The OpenAPI document comes from the API test `OpenApiExportTests`: it renders th
 
 ```powershell
 $env:STORYTELLER_OPENAPI_EXPORT = "$PWD/open.api.v<version>.json"
-dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTests"
+dotnet test --project ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTests"
 ```
 
 Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (`npm run generate`), then add the new `{controller}ApiClient` to `src/ApiSdk.partial.cs` and `src/ServicesCollectionExtensions.cs`.

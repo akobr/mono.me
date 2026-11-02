@@ -50,5 +50,5 @@ No other behavior is changed. With a `null` meter the code behaves like `JsonE.N
 1. Copy upstream `src/JsonE/**/*.cs` from the new commit over `src` (keep `Metering.cs`, `Binding.JsonE.csproj`, `LICENSE`, `VENDORED.md`; delete `assembly.cs`).
 2. Re-apply the patch above (the previous diff of this folder is the reference).
 3. Repeat both audits.
-4. Run `dotnet test src/Platform/Storyteller/Binding.JsonE/test` (JSON-e specification suite) and the `Binding.Object` tests.
+4. Run `dotnet test --project src/Platform/Storyteller/Binding.JsonE/test` (JSON-e specification suite) and the `Binding.Object` tests.
 5. Update the commit in this file and in the JSON-e specification file header.

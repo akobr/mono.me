@@ -142,7 +142,7 @@ The routing of the Functions host (it runs the first function, in the order of t
 $env:STORYTELLER_TEST_API_BASE_URL = "http://localhost:7071/api"
 $env:STORYTELLER_TEST_TOKEN = "<access token of a Contributor>"
 $env:STORYTELLER_TEST_ORGANIZATION = "<organization>"; $env:STORYTELLER_TEST_PROJECT = "<project>"   # STORYTELLER_TEST_VIEW: default
-dotnet test src/Platform/Storyteller/Api.Functions/testint
+dotnet test --project src/Platform/Storyteller/Api.Functions/testint
 ```
 
 ## 7. Connect an MCP client

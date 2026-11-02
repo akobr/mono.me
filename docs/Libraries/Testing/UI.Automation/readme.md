@@ -336,7 +336,7 @@ Test it against a fake `HttpMessageHandler`, as `UI.Automation.Reporting.Testiny
    </ItemGroup>
    ```
 
-   No `Microsoft.NET.Test.Sdk`, `xunit` or `coverlet`. Git-ignore `testsettings.local.json` and `TestResults/`. In this repository, add `<ProjectReference Update="**\<Project>.csproj" Test="false" />` to every traversal (`Directory.Build.proj`) whose glob includes it: TUnit on Microsoft.Testing.Platform refuses the VSTest-mode `dotnet test` of the .NET 10 SDK, so the traversal builds the project and `dotnet run` runs it.
+   No `Microsoft.NET.Test.Sdk`, `xunit` or `coverlet`. Git-ignore `testsettings.local.json` and `TestResults/`. In this repository, add it to `42.mono.slnx`: `dotnet test --solution 42.mono.slnx` runs it with the xUnit projects, all of them on Microsoft.Testing.Platform (`global.json`).
 2. **The setup and the assembly attributes** (one file, no session class: the library's hooks run):
 
    ```csharp
@@ -374,7 +374,7 @@ Test it against a fake `HttpMessageHandler`, as `UI.Automation.Reporting.Testiny
 3. **The sign-in**: an `ISignInFlow` that drives the application's real sign-in page (no bypass in the application), or none with `Target:SignIn` `None`.
 4. **The target extension**: `public sealed class ShopTarget : TargetSettings { public string Store { get; set; } = ""; }`, read with `Settings.Bind<ShopTarget>("Target")`, its defaults in `testsettings.json`.
 5. **The tests**: a base class over `UiTest` with the project's page objects; tests with `[Test]`, `[Elementary]`, `[Area(…)]`, `[TestCase(…)]`; data from `Data` (or a project generator on top of it), nothing shared between tests.
-6. **Run** it with `dotnet run --project <path>` (options after `--`): `testsettings.json` without a `Target:BaseUrl` skips every test; a `testsettings.local.json`, user secrets (`dotnet user-secrets set "Users:Pool:0:Password" "…"`) and `UITESTS_*` variables configure a real run.
+6. **Run** it with `dotnet test --project <path> <options>` or `dotnet run --project <path>` (options after `--`): `testsettings.json` without a `Target:BaseUrl` skips every test; a `testsettings.local.json`, user secrets (`dotnet user-secrets set "Users:Pool:0:Password" "…"`) and `UITESTS_*` variables configure a real run.
 
 ## Running
 
@@ -385,11 +385,12 @@ UITESTS_PROFILE=mobile,webkit dotnet run --project <test project>               
 dotnet run --project <test project> -- --test-parameter Browser:Headless=false --test-parameter Browser:SlowMoMs=200 --maximum-parallel-tests 1
 dotnet run --project <test project> -- --report-trx --results-directory <dir>         # TRX besides TUnit's HTML report
 dotnet run --project <test project> -- --list-tests
+dotnet test --project <test project> --treenode-filter "/**[Category=Elementary]"     # dotnet test on Microsoft.Testing.Platform: no --
 ```
 
 - In GitHub Actions TUnit writes its summary into the job's step summary (`GITHUB_STEP_SUMMARY`); the run URLs are on the terminal as `ui-automation: <System> run: <url>`.
 - IDE: Visual Studio "Use testing platform server mode", Rider "Enable Testing Platform support", VS Code C# Dev Kit "Use Testing Platform Protocol".
-- `dotnet test` does not run a TUnit project in this repository (VSTest mode for the xUnit projects; see step 1 of the recipe).
+- `dotnet test` runs it only on Microsoft.Testing.Platform (`"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json`, as in this repository); the VSTest mode of the .NET 10 SDK refuses it ("Testing with VSTest target is no longer supported"). With a solution, TUnit's options reach every test project, so give them with `--project`.
 
 ## Limits
 

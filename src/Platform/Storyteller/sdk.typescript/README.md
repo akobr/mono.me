@@ -98,7 +98,7 @@ await patchConfiguration(org, project, view, key, [
 
 A new API version:
 
-1. Export the OpenAPI document into `open.api.v{version}.json` here and in `../Sdk.NSwag`. The API test `OpenApiExportTests` renders it with the engine of the Functions host, so no host has to run: `STORYTELLER_OPENAPI_EXPORT=<path> dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTests"` (the running host serves the same document at `/api/openapi/v3.json`). Remove the superseded `open.api.v*.json` here; `../Sdk.NSwag` keeps its history.
+1. Export the OpenAPI document into `open.api.v{version}.json` here and in `../Sdk.NSwag`. The API test `OpenApiExportTests` renders it with the engine of the Functions host, so no host has to run: `STORYTELLER_OPENAPI_EXPORT=<path> dotnet test --project ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTests"` (the running host serves the same document at `/api/openapi/v3.json`). Remove the superseded `open.api.v*.json` here; `../Sdk.NSwag` keeps its history.
 2. `npm run generate`, review the diff of `src/generated`, run the tests, commit.
 3. A new tag (a new folder under `src/generated/vue-query`) also goes into `src/msw.ts` by hand: its `get<Tag>Mock()` into `getStorytellerMock()`, and an `export *` of its `.msw` file. `test/msw.test.ts` fails until it is there. The other entries pick a new tag up through the generated `index.ts` files.
 

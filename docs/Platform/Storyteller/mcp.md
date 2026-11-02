@@ -250,7 +250,7 @@ export MCP_TEST_STORYTELLER_BASE_URL=https://api.example.com/api MCP_TEST_ACTOR_
 # or MCP_TEST_ACTOR_CERTIFICATE_PATH with MCP_TEST_ACTOR_CERTIFICATE_PASSWORD (and MCP_TEST_ACTOR_ASSERTION_AUDIENCE).
 export MCP_TEST_ACTOR_CERTIFICATE_PATH=… MCP_TEST_ACTOR_CERTIFICATE_PASSWORD=…
 export MCP_TEST_USER_TOKEN=…
-dotnet test src/Platform/Storyteller/Mcp/testint --logger "console;verbosity=detailed"
+dotnet test --project src/Platform/Storyteller/Mcp/testint --output Detailed
 ```
 
 With an account, the test checks that the issued token has `token_use` `user`, the actor id as `act.sub` and the scope `User.Impersonation`, and that `GET v1/access/account` with it returns the account its `sub` names. With `MCP_TEST_EXPECT_NO_ACCOUNT=true` and the token of a person without an account, it expects the refusal text above. Without the variables, both tests print `Skipped:` and pass.
