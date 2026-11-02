@@ -110,39 +110,36 @@ public sealed partial class AuditTrail(App app, AppRoutes routes)
     }
 
     // Opens the Audit tab, types the key (in lower case, as the store keeps it) into Key filter and waits until the
-    // counter shows count events, all of the key. On a deployed target the audit is eventually consistent, so this
-    // repeats with a page load (the audit query is cached for 15 s, and the filters reset) until timeout (a minute by
-    // default); on the mock the first attempt passes.
-    public async Task WaitForKeyEventsAsync(string key, int count, TimeSpan? timeout = null)
+    // counter shows count events, all of the key. On a deployed target the audit is eventually consistent, so polling
+    // (Eventually.On(Target.IsMock)) repeats this with a page load (the audit query is cached for 15 s, and the filters
+    // reset) for up to a minute; on the mock it is one attempt.
+    public async Task WaitForKeyEventsAsync(string key, int count, Eventually polling)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        ArgumentNullException.ThrowIfNull(polling);
 
         var stored = key.ToLowerInvariant();
-        await Eventually.UntilAsync(
-            async _ =>
-            {
-                await OpenAsync();
-                await KeyFilter.FillAsync(stored);
-                await ExpectEventsAsync(count, KeyColumn, stored, exact: true);
-            },
-            timeout);
+        await polling.UntilAsync(async _ =>
+        {
+            await OpenAsync();
+            await KeyFilter.FillAsync(stored);
+            await ExpectEventsAsync(count, KeyColumn, stored, exact: true, polling.AttemptTimeoutMs);
+        });
     }
 
     // Opens the Audit tab, picks the operation in Operation filter and waits until the counter shows count events, all
-    // of the operation; repeats with a page load until timeout like WaitForKeyEventsAsync (the filters reset on reload,
-    // so it picks the operation again).
-    public async Task WaitForOperationEventsAsync(string operation, int count, TimeSpan? timeout = null)
+    // of the operation; polls like WaitForKeyEventsAsync (the filters reset on reload, so it picks the operation again).
+    public async Task WaitForOperationEventsAsync(string operation, int count, Eventually polling)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);
+        ArgumentNullException.ThrowIfNull(polling);
 
-        await Eventually.UntilAsync(
-            async _ =>
-            {
-                await OpenAsync();
-                await PickOperationAsync(operation);
-                await ExpectEventsAsync(count, OperationColumn, operation, exact: false);
-            },
-            timeout);
+        await polling.UntilAsync(async _ =>
+        {
+            await OpenAsync();
+            await PickOperationAsync(operation);
+            await ExpectEventsAsync(count, OperationColumn, operation, exact: false, polling.AttemptTimeoutMs);
+        });
     }
 
     // The start of the correlation id that the row shows before its "…".
@@ -156,12 +153,12 @@ public sealed partial class AuditTrail(App app, AppRoutes routes)
     }
 
     // The counter shows count events and every row has the text in the column (exactly, or within it for the
-    // Operation, which has the detail as its second line), with the short timeout of one attempt.
-    private async Task ExpectEventsAsync(int count, int column, string text, bool exact)
+    // Operation, which has the detail as its second line), with the timeout of one attempt (null: Expect's own).
+    private async Task ExpectEventsAsync(int count, int column, string text, bool exact, float? timeoutMs)
     {
-        var timeout = new LocatorAssertionsToHaveTextOptions { Timeout = Eventually.AttemptTimeoutMs };
+        var timeout = new LocatorAssertionsToHaveTextOptions { Timeout = timeoutMs };
         await Expect(Counter).ToHaveTextAsync(CounterOf(count), timeout);
-        await Expect(Rows).ToHaveCountAsync(count, new() { Timeout = Eventually.AttemptTimeoutMs });
+        await Expect(Rows).ToHaveCountAsync(count, new() { Timeout = timeoutMs });
         for (var index = 0; index < count; index++)
         {
             var cell = Cell(Rows.Nth(index), column);
@@ -171,7 +168,7 @@ public sealed partial class AuditTrail(App app, AppRoutes routes)
             }
             else
             {
-                await Expect(cell).ToContainTextAsync(text, new() { Timeout = Eventually.AttemptTimeoutMs });
+                await Expect(cell).ToContainTextAsync(text, new() { Timeout = timeoutMs });
             }
         }
     }
