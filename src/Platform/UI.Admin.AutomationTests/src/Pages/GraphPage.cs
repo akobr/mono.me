@@ -26,6 +26,10 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
 
     public ILocator Application => app.Page.GetByRole(AriaRole.Application);
 
+    // The visible summary at the bottom left: "<shown> annotations", or in focus mode "<shown> of <T> annotations
+    // around <key> (depth <n>)" (also the start of the graph's name); not the loading label "Laying out … annotations…".
+    public ILocator SummaryText => Application.GetByText(SummaryTextRegex());
+
     // The live region of the keyboard cursor: "<Type label> <name>, <n> connection(s)".
     public ILocator CursorAnnouncement => Application.Locator("p[aria-live=polite]");
 
@@ -241,6 +245,9 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
     {
         return int.Parse(text, NumberStyles.AllowThousands, CultureInfo.GetCultureInfo("en-US"));
     }
+
+    [GeneratedRegex(@"^\s*[\d,]+ (?:annotations|of [\d,]+ annotations around .+)\s*$")]
+    private static partial Regex SummaryTextRegex();
 
     [GeneratedRegex(@"^\s*(?:[\d,]+ of )?[\d,]+\s*$")]
     private static partial Regex CountText();
