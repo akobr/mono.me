@@ -37,9 +37,18 @@
   },
   "Users": {
     "LeaseTimeoutSeconds": 120,
-    // { "Email": "...", "DisplayName": "...", "Roles": [ "Owner" ] } per pre-provisioned user, in testsettings.local.json
-    // or UITESTS_Users__Pool__<n>__Email; the passwords in the user secrets.
-    "Pool": []
+    // The pre-provisioned AuthKit users of the automation (their roles in the target's organization and project); the
+    // passwords are in the user secrets (Users:Pool:<n>:Password) or UITESTS_Users__Pool__<n>__Password.
+    "Pool": [
+      { "Email": "ui-test-owner-1@42for.software", "DisplayName": "Auto Owner1", "Roles": [ "Owner" ] },
+      { "Email": "ui-test-owner-2@42for.software", "DisplayName": "Auto Owner2", "Roles": [ "Owner" ] },
+      { "Email": "ui-test-admin-1@42for.software", "DisplayName": "Auto Admin1", "Roles": [ "Administrator" ] },
+      { "Email": "ui-test-admin-2@42for.software", "DisplayName": "Auto Admin2", "Roles": [ "Administrator" ] },
+      { "Email": "ui-test-contributor-1@42for.software", "DisplayName": "Auto Contributor1", "Roles": [ "Contributor" ] },
+      { "Email": "ui-test-contributor-2@42for.software", "DisplayName": "Auto Contributor2", "Roles": [ "Contributor" ] },
+      { "Email": "ui-test-reader-1@42for.software", "DisplayName": "Auto Reader1", "Roles": [ "Reader" ] },
+      { "Email": "ui-test-reader-2@42for.software", "DisplayName": "Auto Reader2", "Roles": [ "Reader" ] }
+    ]
   },
   "BrowserStack": {
     "Username": "",
