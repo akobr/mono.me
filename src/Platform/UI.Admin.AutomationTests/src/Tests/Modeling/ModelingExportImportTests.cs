@@ -17,7 +17,12 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Modeling;
 // no template or type schema is written): Check, Import, Import now, Overwrite (the default) and Skip, force, refused
 // and faulty files, the result with its summary, documents, chips and links, its restore after a reload, and the toast
 // of an import that ended after the page was left.
+// The tests of the class run one at a time among themselves, while the other classes go on in parallel: each starts
+// view transfers (an export, a Check, an import) in the target project, and a deployed API refuses a new one with 409
+// TransferLimit once the project has MaxActiveTransfers (3 by default) active (ViewTransferService.EnsureCapacityAsync,
+// which counts a queued job for up to an hour); the mock has no such limit.
 [Area(Area.Modeling)]
+[NotInParallel(nameof(ModelingExportImportTests))]
 public sealed partial class ModelingExportImportTests : PlatformTest
 {
     private const string FolderFormat = "Folder of JSON files";
