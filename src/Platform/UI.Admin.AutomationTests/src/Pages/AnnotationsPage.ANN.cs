@@ -38,8 +38,9 @@ public sealed partial class AnnotationsPage
     // template, so a substring.
     public ILocator FilterSyntaxQualifiers => FilterSyntaxPopover.GetByText("Qualifiers: ");
 
-    // The tabs "Grid" and "Tree" of the grid (from 768 px); Tree adds ?mode=tree.
-    public ILocator ListModeTabs => app.Page.GetByRole(AriaRole.Tablist, new() { Name = "List mode", Exact = true });
+    // The tabs "Grid" and "Tree" of the grid (from 768 px); Tree adds ?mode=tree. Its "List mode" label stays on the
+    // tabs' root, so the tablist itself is found by its tab "Grid".
+    public ILocator ListModeTabs => app.Page.GetByRole(AriaRole.Tablist).Filter(new() { Has = app.Page.GetByRole(AriaRole.Tab, new() { Name = "Grid", Exact = true }) });
 
     // "By subject" or "By responsibility" (?by=responsibility), in tree mode only.
     public ILocator TreePerspective => app.Page.GetByRole(AriaRole.Combobox, new() { Name = "Tree perspective", Exact = true });
