@@ -41,10 +41,11 @@ public sealed partial class KeyValuesPage(App app, AppRoutes routes)
 
     public ILocator VersionsTab => app.Page.GetByRole(AriaRole.Link, new() { Name = "Versions", Exact = true });
 
-    // The row of the current version in the Versions table ("v1(current)" … View, Compare).
+    // The row of the current version in the Versions table ("v1(current)" … View, Compare), the table with the column
+    // "Created" (the list's table has "Expires" too, in the Deleted state).
     public ILocator CurrentVersion => app.Page
         .GetByRole(AriaRole.Table)
-        .Filter(new() { Has = app.Page.GetByRole(AriaRole.Columnheader, new() { Name = "Expires", Exact = true }) })
+        .Filter(new() { Has = app.Page.GetByRole(AriaRole.Columnheader, new() { Name = "Created", Exact = true }) })
         .GetByRole(AriaRole.Row)
         .Filter(new() { HasText = "(current)" });
 
