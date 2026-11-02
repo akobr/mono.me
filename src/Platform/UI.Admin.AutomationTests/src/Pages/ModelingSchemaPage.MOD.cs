@@ -65,7 +65,7 @@ public sealed partial class ModelingSchemaPage
     // The summary of the details "Sample data"; the sample's JSON is the pre inside them (SampleData).
     public ILocator SampleDataSummary => Panel.Root.GetByText("Sample data", new() { Exact = true });
 
-    public ILocator SampleData => Panel.Root.Locator("details").Filter(new() { Has = SampleDataSummary }).Locator("pre");
+    public ILocator SampleData => Panel.Root.Locator("details").Filter(new() { Has = app.Page.GetByText("Sample data", new() { Exact = true }) }).Locator("pre");
 
     public ILocator NoPreview => Panel.Root.GetByRole(AriaRole.Heading, new() { Name = "No preview", Exact = true });
 
@@ -87,11 +87,17 @@ public sealed partial class ModelingSchemaPage
         return SchemaListSection(title).GetByRole(AriaRole.Listitem);
     }
 
+    // "None." of an empty section of the list.
+    public ILocator NoSchemasIn(string title)
+    {
+        return SchemaListSection(title).GetByText("None.", new() { Exact = true });
+    }
+
     // The row of a type's schema in "Type schemas", by its code: "v<n>" or "No schema".
     public ILocator TypeSchemaRow(string type)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
-        return SchemaRowLinking($"/modeling/schemas/type/{type}");
+        return SchemaRowLinking("Type schemas", $"/modeling/schemas/type/{type}");
     }
 
     // The link of a type's schema in its row, named by the type's label.
@@ -105,7 +111,7 @@ public sealed partial class ModelingSchemaPage
     public ILocator AnnotationSchemaRow(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return SchemaRowLinking($"/modeling/schemas/annotation/{Uri.EscapeDataString(key)}");
+        return SchemaRowLinking("Annotation schemas", $"/modeling/schemas/annotation/{Uri.EscapeDataString(key)}");
     }
 
     // The link of an annotation's schema, named by the key.
@@ -121,7 +127,14 @@ public sealed partial class ModelingSchemaPage
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
-        return SchemaRowLinking($"/modeling/schemas/annotation/{Uri.EscapeDataString(key)}/type/{type}");
+        return SchemaRowLinking("Descendant-type schemas", $"/modeling/schemas/annotation/{Uri.EscapeDataString(key)}/type/{type}");
+    }
+
+    // A field of the form preview by its exact label: the property's title, or its humanized name.
+    public ILocator PreviewField(string label)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(label);
+        return Panel.Root.GetByLabel(label, new() { Exact = true });
     }
 
     // The typed delete of the open schema, "Delete the <title>?" ("Delete the Schema of <key>?", "Delete the
@@ -194,9 +207,10 @@ public sealed partial class ModelingSchemaPage
         return string.Create(CultureInfo.InvariantCulture, $"Applies to {count} configuration{(count == 1 ? string.Empty : "s")} of this view.");
     }
 
-    private ILocator SchemaRowLinking(string hrefEnd)
+    // The row of a section whose link's href ends with the path.
+    private ILocator SchemaRowLinking(string section, string hrefEnd)
     {
-        return app.Page.GetByRole(AriaRole.Listitem).Filter(new() { Has = app.Page.Locator($"a[href$=\"{hrefEnd}\"]") });
+        return SchemaListRows(section).Filter(new() { Has = app.Page.Locator($"a[href$=\"{hrefEnd}\"]") });
     }
 
     [GeneratedRegex(@"^\s*Applies to \d+ configurations? of this view\.\s*$")]
