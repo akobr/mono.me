@@ -30,6 +30,8 @@ public sealed class LowkeyVaultFixture : IAsyncLifetime
 
         _container = new LowkeyVaultBuilder(Image)
             .WithReuse(true)
+            // Its own label, so its own reused vault (Backend.CosmosDb's KeyValueEndToEndTests reuse another).
+            .WithLabel("net.42for.tests.lowkey-vault", "keyvalues-azure-keyvault-integrationtests")
             .Build();
 
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(3));

@@ -38,7 +38,12 @@ public class KeyValueEndToEndTests(Startup startup)
             return;
         }
 
-        _vault = new LowkeyVaultBuilder("nagyesta/lowkey-vault:7.3.112").WithReuse(true).Build();
+        // Its own label, so its own reused vault: disposing a reused container stops it, which would cut off the
+        // KeyValues.Azure.KeyVault integration tests running at the same time.
+        _vault = new LowkeyVaultBuilder("nagyesta/lowkey-vault:7.3.112")
+            .WithReuse(true)
+            .WithLabel("net.42for.tests.lowkey-vault", "backend-cosmosdb-unittests")
+            .Build();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         await _vault.StartAsync(cancellation.Token);
         _vaultUri = new Uri(_vault.GetBaseAddress());
