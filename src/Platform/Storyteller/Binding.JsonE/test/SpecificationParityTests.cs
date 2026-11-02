@@ -6,7 +6,6 @@ using System.Text.Json.Nodes;
 using FluentAssertions;
 using Json.JsonE;
 using Xunit;
-using Xunit.Abstractions;
 using UpstreamJsonE = upstream::Json.JsonE.JsonE;
 
 namespace _42.Platform.Storyteller.Binding.JsonE.UnitTests;

@@ -38,7 +38,7 @@ public sealed class StorytellerUserTokenValidationTests
 
     public static TheoryData<string?> ActsThatAreNotOneObjectWithAStringSub => new()
     {
-        { null },
+        { (string?)null },
         { "\"mcp\"" },
         { "[{\"sub\":\"mcp\"}]" },
         { "{}" },
@@ -49,7 +49,7 @@ public sealed class StorytellerUserTokenValidationTests
 
     public static TheoryData<string?> RestrictionsThatAreNotKnown => new()
     {
-        { null },
+        { (string?)null },
         { "null" },
         { "\"NoSecretReveal\"" },
         { "[\"NoSecretReveal\",\"NoWrites\"]" },

@@ -37,7 +37,7 @@ public class Startup : IAsyncLifetime, ITestContext
 
     public CosmosDbContainer DbContainer { get; private set; }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // Built only when used: building it needs a running Docker, the local emulator does not.
         DbContainer = UseContainer
@@ -63,9 +63,9 @@ public class Startup : IAsyncLifetime, ITestContext
         await dbBuilder.BuildAsync();
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     private async Task CleanupDatabaseAsync()

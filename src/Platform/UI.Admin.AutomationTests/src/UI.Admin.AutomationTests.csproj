@@ -9,8 +9,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <!-- TUnit on Microsoft.Testing.Platform supplies the entry point. The traversals build the project but do not test it:
-         run it with 'dotnet run' (see docs/Platform/UI.Admin.AutomationTests/automation-tests.md). -->
+    <!-- TUnit on Microsoft.Testing.Platform supplies the entry point. 'dotnet test' runs it with the solution or on its own,
+         and so does 'dotnet run' (see docs/Platform/UI.Admin.AutomationTests/automation-tests.md). -->
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>

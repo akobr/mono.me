@@ -197,3 +197,8 @@ dotnet_diagnostic.CA2012.severity = suggestion
 dotnet_diagnostic.IDE0044.severity = suggestion
 # CA2016: Forward the 'CancellationToken' parameter to methods that take one
 dotnet_diagnostic.CA2016.severity = suggestion
+
+[**/{test,testint}/**.cs]
+# xUnit1051: Calls to methods which accept CancellationToken should use TestContext.Current.CancellationToken
+# (xUnit v3; the tests pass no token yet, and moving them to the test's token is a separate change)
+dotnet_diagnostic.xUnit1051.severity = suggestion

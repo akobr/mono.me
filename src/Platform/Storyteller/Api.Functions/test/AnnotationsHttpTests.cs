@@ -407,7 +407,7 @@ public class AnnotationsHttpTests
     public async Task SetMany_AnnotationsAsTheyWereRead_AreCreated()
     {
         var annotations = new RecordingAnnotations();
-        var keys = TypesWithRelationArrays.Select(row => (string)row[1]).Distinct().ToList();
+        var keys = TypesWithRelationArrays.Select(row => row.Data.Item2).Distinct().ToList();
         var body = new JsonArray([.. keys.Select(AsRead).Select(read => JsonSerializer.SerializeToNode(read, read.GetType(), FunctionTestDoubles.ApiJsonSerializerOptions))]);
 
         var result = await Http(annotations).SetAnnotations(Request("POST", body.ToJsonString()), "acme", "billing", "default");

@@ -18,7 +18,7 @@ public sealed class LowkeyVaultFixture : IAsyncLifetime
         return KeyVaultClients.CreateKeyClient(VaultUri, emulator: true, isProduction: false);
     }
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var configured = Environment.GetEnvironmentVariable("LOWKEY_VAULT_URL");
 
@@ -37,7 +37,7 @@ public sealed class LowkeyVaultFixture : IAsyncLifetime
         VaultUri = new Uri(_container.GetBaseAddress());
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_container is not null)
         {

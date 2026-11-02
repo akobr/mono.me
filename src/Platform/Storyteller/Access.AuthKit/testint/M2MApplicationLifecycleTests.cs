@@ -7,8 +7,6 @@ using _42.Platform.Storyteller.Accessing.Model;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
-using Xunit.Abstractions;
-
 namespace _42.Platform.Storyteller.Access.AuthKit.IntegrationTests;
 
 // Against a real WorkOS staging environment. Creates one M2M application and deletes it again.
