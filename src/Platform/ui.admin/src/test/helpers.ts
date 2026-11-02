@@ -1,5 +1,5 @@
 /* eslint-disable vue/one-component-per-file -- test helpers define small wrapper components */
-import { defineComponent, h, nextTick, type Component } from 'vue'
+import { defineComponent, h, nextTick, watch, type Component } from 'vue'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ui from '@nuxt/ui/vue-plugin'
 import { createMemoryHistory, createRouter, type Router, type RouteRecordRaw } from 'vue-router'
@@ -15,6 +15,11 @@ export const CodeEditorStub = defineComponent({
   props: { modelValue: { type: String, required: true }, language: { type: String, required: true } },
   emits: ['update:modelValue', 'save'],
   setup(props, { emit }) {
+    // Like CodeMirror, an external change of the document is reported back as an update (424-157).
+    watch(
+      () => props.modelValue,
+      (value) => emit('update:modelValue', value),
+    )
     return () =>
       h('textarea', {
         'data-language': props.language,
