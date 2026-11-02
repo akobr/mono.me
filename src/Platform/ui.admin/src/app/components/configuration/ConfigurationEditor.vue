@@ -57,7 +57,11 @@ const theirs = ref<unknown>()
 const confirmDelete = ref(false)
 const creating = ref(false)
 
-const dirty = computed(() => JSON.stringify(draft.value ?? null) !== JSON.stringify(original.value ?? null))
+// Nothing stored (or no annotation) means nothing to save: the editor is hidden and a patch would fail (424-157).
+const dirty = computed(
+  () =>
+    !noOwn.value && !missing.value && JSON.stringify(draft.value ?? null) !== JSON.stringify(original.value ?? null),
+)
 const patch = computed(() => (dirty.value ? buildPatch(original.value, draft.value) : []))
 
 // The own content becomes the editor's base whenever it is (re)loaded and nothing is being edited.
@@ -222,8 +226,9 @@ async function remove() {
   try {
     await deleteConfiguration(org, project, view, props.annotationKey)
     confirmDelete.value = false
-    original.value = undefined
-    draft.value = undefined
+    // The same value in both: the editor shows {} and echoes it back, which must not count as a change (424-157).
+    original.value = {}
+    draft.value = {}
     catalog.setConfiguration(props.annotationKey, undefined)
     await invalidateConfiguration(queryClient, context.scope, props.annotationKey)
     toast.add({
