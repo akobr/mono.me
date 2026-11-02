@@ -318,9 +318,8 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
               <UBadge v-if="state === 'All' && row.IsDeleted" label="Deleted" icon="i-lucide-trash-2" color="warning" variant="subtle" size="sm" />
               <KeyValueLevelBadge :level="row.Protection" :reference="row.IsReference" class="ms-auto" />
             </span>
-            <span class="truncate font-mono text-xs text-muted">
-              {{ isSecretLevel(row.Protection) ? maskedValue : valuePreview(row.Value) }} · v{{ row.Version }}<template v-if="state === 'All' && row.IsDeleted"> · expires in {{ daysUntil(row.ExpiresAt) ?? '?' }} days</template>
-            </span>
+            <span class="truncate font-mono text-xs text-muted">{{ isSecretLevel(row.Protection) ? maskedValue : valuePreview(row.Value) }} · v{{ row.Version }}</span>
+            <span v-if="state === 'All' && row.IsDeleted" class="text-xs text-muted">expires in {{ daysUntil(row.ExpiresAt) ?? '?' }} days</span>
           </button>
         </li>
       </ul>

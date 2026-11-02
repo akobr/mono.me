@@ -47,6 +47,24 @@ function report(title: string, items: KeyValueBulkItemResult[] | undefined): str
   return failed.map((item) => item.Key ?? '').filter(Boolean)
 }
 
+// The API takes at most 100 keys per bulk call; a batch that fails as a whole reports each of its keys as failed.
+const bulkLimit = 100
+
+async function inBatches(call: (keys: string[]) => Promise<{ Items?: KeyValueBulkItemResult[] }>): Promise<KeyValueBulkItemResult[]> {
+  // the keys selected when the action started: the selection may change while the batches run
+  const keys = [...props.keys]
+  const items: KeyValueBulkItemResult[] = []
+  for (let offset = 0; offset < keys.length; offset += bulkLimit) {
+    const batch = keys.slice(offset, offset + bulkLimit)
+    try {
+      items.push(...((await call(batch)).Items ?? []))
+    } catch (error) {
+      items.push(...batch.map((key): KeyValueBulkItemResult => ({ Key: key, Outcome: 'Failed', Message: errorMessage(error) })))
+    }
+  }
+  return items
+}
+
 async function run(action: () => Promise<string[]>) {
   busy.value = true
   try {
@@ -99,7 +117,7 @@ async function protect(level: KeyValueProtection) {
     return
   }
   const { org, project, view } = context.scope
-  await run(async () => report(`${count.value} key(s) moved to ${levelMeta[level].label}`, (await protectKeyValues(org, project, view, { Keys: props.keys, Protection: level })).Items))
+  await run(async () => report(`${count.value} key(s) moved to ${levelMeta[level].label}`, await inBatches((keys) => protectKeyValues(org, project, view, { Keys: keys, Protection: level }))))
 }
 
 async function restore() {
@@ -107,7 +125,7 @@ async function restore() {
     return
   }
   const { org, project, view } = context.scope
-  await run(async () => report(`${count.value} key(s) restored`, (await restoreKeyValues(org, project, view, { Keys: props.keys })).Items))
+  await run(async () => report(`${count.value} key(s) restored`, await inBatches((keys) => restoreKeyValues(org, project, view, { Keys: keys }))))
 }
 
 async function purge() {
@@ -116,7 +134,7 @@ async function purge() {
   }
   const { org, project, view } = context.scope
   purging.value = false
-  await run(async () => report(`${count.value} key(s) purged`, (await purgeKeyValues(org, project, view, { Keys: props.keys })).Items))
+  await run(async () => report(`${count.value} key(s) purged`, await inBatches((keys) => purgeKeyValues(org, project, view, { Keys: keys }))))
 }
 
 const protectItems = computed(() =>
