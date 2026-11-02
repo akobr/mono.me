@@ -77,6 +77,7 @@ namespace _42.Platform.Storyteller.DbCreator
         {
             services.Configure<LoggingOptions>(configuration.GetSection(LoggingOptions.SECTION));
             services.Configure<BaseAccountOptions>(configuration.GetSection(BaseAccountOptions.SECTION));
+            services.Configure<StagingSeedOptions>(configuration.GetSection(StagingSeedOptions.SECTION));
         }
     }
 }

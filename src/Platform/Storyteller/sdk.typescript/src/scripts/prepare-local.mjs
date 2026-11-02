@@ -34,7 +34,9 @@ if (force || read(installStamp) !== lockHash) {
 }
 
 const buildHash = hashPaths(inputs)
-const distComplete = entries.every((entry) => existsSync(join(root, 'dist', `${entry}.js`)))
+const distComplete = entries.every(
+  (entry) => existsSync(join(root, 'dist', `${entry}.js`)) && existsSync(join(root, 'dist', `${entry}.d.ts`)),
+)
 if (force || !distComplete || read(buildStamp) !== buildHash) {
   run('npm', ['run', 'build'])
   writeFileSync(buildStamp, buildHash)
@@ -50,7 +52,8 @@ function checkNode(minimum) {
 }
 
 function versionNumber(version) {
-  const [major, minor, patch] = version.split('.').map(Number)
+  // parseInt drops a prerelease suffix (24.0.0-pre → 24, 0, 0)
+  const [major, minor, patch] = version.split('.').map((part) => Number.parseInt(part, 10) || 0)
   return (major * 1000 + minor) * 1000 + patch
 }
 

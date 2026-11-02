@@ -194,51 +194,6 @@ public static class Create
         };
     }
 
-    public static AccountEntity BaseAccount(
-        string organizationName,
-        string accountId,
-        string accountUserName,
-        string accountName)
-    {
-        return new AccountEntity
-        {
-            Id = accountId,
-            UserName = accountUserName,
-            Name = accountName,
-            AccessMap = new Dictionary<string, AccountRole>
-            {
-                { organizationName, AccountRole.Owner },
-                { $"{organizationName}.{Constants.DefaultProjectName}", AccountRole.Owner },
-            },
-        };
-    }
-
-    public static AccessPointEntity[] BaseAccessPoints(
-        string organizationName,
-        string userId,
-        string projectName = Constants.DefaultProjectName)
-    {
-        return
-        [
-            new AccessPointEntity
-            {
-                Key = organizationName,
-                AccessMap = new Dictionary<string, AccountRole>
-                {
-                    { userId, AccountRole.Owner },
-                },
-            },
-            new AccessPointEntity
-            {
-                Key = $"{organizationName}.{projectName}",
-                AccessMap = new Dictionary<string, AccountRole>
-                {
-                    { userId, AccountRole.Owner },
-                },
-            }
-        ];
-    }
-
     // The seed is written by the system; like every stored annotation it carries both stamps.
     private static AuditStamp SystemStamp()
     {
