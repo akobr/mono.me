@@ -39,8 +39,6 @@ public sealed partial class RecipientsCard(App app, AppRoutes routes)
 
     public ILocator AddButton => settings.AddButton;
 
-    public ILocator CancelButton => Root.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true });
-
     // The error alert of the add form: the API's refusal of the input (and its hint).
     public ILocator FormError => Root.Locator("form [data-slot='description']");
 

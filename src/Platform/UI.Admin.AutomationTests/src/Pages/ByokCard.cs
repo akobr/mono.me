@@ -1,5 +1,4 @@
 using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
@@ -38,17 +37,5 @@ public sealed partial class ByokCard(App app, AppRoutes routes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(term);
         return Root.Locator($"dt:text-is(\"{term}\") + dd");
-    }
-
-    // Fills the key URI and the tenant id, saves the key and waits for the toast "Customer key saved; verify it next".
-    public async Task SaveKeyAsync(string keyUri, string tenantId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(keyUri);
-        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
-
-        await KeyUri.FillAsync(keyUri);
-        await TenantId.FillAsync(tenantId);
-        await SaveKeyButton.ClickAsync();
-        await Expect(app.Toast("Customer key saved; verify it next")).ToBeVisibleAsync();
     }
 }

@@ -101,7 +101,8 @@ public sealed partial class DateFormatSelect(App app, ILocator combobox)
         await Expect(combobox).ToHaveTextAsync(ProjectDefault);
     }
 
-    // A date and time shown as yyyy-mm-dd HH:mm and the zone: "2026-11-02 10:15 GMT+1".
+    // A date and time shown as yyyy-mm-dd, the 24-hour time HH:mm and the zone: "2026-11-02 10:15 GMT+1". The tests
+    // expect it of a date shown before any format is picked; ReformatIsoDateTime reads it.
     [GeneratedRegex(@"^(?<date>\d{4}-\d{2}-\d{2}) (?<rest>\d{2}:\d{2} \S+)$")]
-    private static partial Regex IsoDateTime();
+    public static partial Regex IsoDateTime();
 }

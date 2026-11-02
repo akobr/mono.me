@@ -4,17 +4,19 @@ using Microsoft.Playwright;
 
 namespace _42.Platform.UI.Admin.AutomationTests;
 
-// The Settings section's helpers: a page load that shows a change of the secrets policy (a deployed API caches the
-// policy per instance for up to a minute; the instance that saved it knows the change, but a reload served by another
-// instance can show the policy before it), and the message of a refusal that the mock words differently.
+// The Settings section's helpers: a page load that shows a change of a project policy, secrets or machine
+// authentication (a deployed API caches each policy per instance for up to a minute; the instance that saved it knows
+// the change, but a reload served by another instance can show the policy before it), and the message of a refusal
+// that the mock words differently.
 public abstract partial class PlatformTest
 {
-    // How long a deployed API may serve a policy from an instance's cache, with a margin.
+    // How long a deployed API may serve a project policy (secrets or machine authentication) from an instance's cache,
+    // with a margin.
     private static readonly TimeSpan PolicyCacheTime = TimeSpan.FromSeconds(75);
 
-    // Opens the page (open) and checks it (expectation, with the usual Expect timeouts). On the mock that is it; on a
-    // deployed target a failed check opens the page again until PolicyCacheTime is over, and the last failure is the
-    // test's.
+    // Opens the page (open) and checks that it shows a saved project policy, secrets or machine authentication
+    // (expectation, with the usual Expect timeouts). On the mock that is it; on a deployed target a failed check opens
+    // the page again until PolicyCacheTime is over, and the last failure is the test's.
     protected async Task OpenUntilPolicyShowsAsync(Func<Task> open, Func<Task> expectation)
     {
         ArgumentNullException.ThrowIfNull(open);

@@ -86,12 +86,14 @@ public sealed partial class AllowedLevelsCard(App app, AppRoutes routes)
         return Root.GetByRole(AriaRole.Link, new() { Name = $"{count} in {view}", Exact = true });
     }
 
-    // Picks the default secret level by its label among the allowed ones and waits until the select shows it; save it
-    // with SaveAsync.
+    // Picks the default secret level by its label: expects it among the offered (allowed) levels, picks it and waits
+    // until the select shows it; save it with SaveAsync.
     public async Task SelectDefaultSecretLevelAsync(string label)
     {
         await DefaultSecretLevel.ClickAsync();
-        await DefaultSecretLevelOption(label).ClickAsync();
+        var option = DefaultSecretLevelOption(label);
+        await Expect(option).ToBeVisibleAsync();
+        await option.ClickAsync();
         await Expect(DefaultSecretLevel).ToHaveTextAsync(label);
     }
 

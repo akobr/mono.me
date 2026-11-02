@@ -54,10 +54,15 @@ public sealed partial class SettingsMachineAuthenticationTests : PlatformTest
         await settings.SetCertificateLifetimeAsync(30);
         await settings.SaveMachinePolicyAsync();
 
-        await settings.OpenAsync();
-        await ExpectEnabledKindsAsync(settings, "ApiKey", "Certificate");
-        await Expect(settings.DefaultCredentialKind).ToHaveTextAsync("Certificate");
-        await Expect(settings.CertificateLifetime).ToHaveValueAsync("30");
+        // A deployed API caches the policy per instance, so a reload may at first show the policy from before the save.
+        await OpenUntilPolicyShowsAsync(
+            () => settings.ReloadAsync(),
+            async () =>
+            {
+                await ExpectEnabledKindsAsync(settings, "ApiKey", "Certificate");
+                await Expect(settings.DefaultCredentialKind).ToHaveTextAsync("Certificate");
+                await Expect(settings.CertificateLifetime).ToHaveValueAsync("30");
+            });
     }
 
     // SET-MAC-02: Anyone downloads the CA certificate as PEM.

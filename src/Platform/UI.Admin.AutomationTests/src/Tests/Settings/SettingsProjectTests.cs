@@ -52,8 +52,8 @@ public sealed partial class SettingsProjectTests : PlatformTest
 
     // SET-PRJ-02: Administrator changes the project description and it shows on the organization overview.
     // In a disposable project without a description: 501 characters are refused by the form, exactly 500 are saved and
-    // kept after a reload, the organization overview's card carries the whole text in its title, and clearing the
-    // description saves an empty one.
+    // kept after a reload, the organization overview's card shows the text and carries the whole of it in its title,
+    // and clearing the description saves an empty one.
     [Test]
     [TestCase(39)]
     [UserRole(Role.Owner)]
@@ -84,7 +84,9 @@ public sealed partial class SettingsProjectTests : PlatformTest
 
         var overview = new OrganizationOverview(App, project);
         await overview.OpenAsync();
-        await Expect(overview.ProjectCardDescription(project.Project)).ToBeVisibleAsync();
+
+        // The card clamps the text to two lines by CSS only, so its text is the whole description.
+        await Expect(overview.ProjectCardDescription(project.Project)).ToHaveTextAsync(description);
         await Expect(overview.ProjectCardDescription(project.Project)).ToHaveAttributeAsync("title", description);
 
         // A page load in between, so the toast of the first save is gone.
