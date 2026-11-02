@@ -10,12 +10,13 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // (Contributors and up: "Unsaved changes", Revert, and Save, whose name ends in its shortcut).
 public sealed partial class AnnotationDetail
 {
-    // The status of the header, beside the Name: "Active", "Disabled", "Scheduled" or "Expired" (the form's switch
-    // "Disabled" follows it, so the first match is the badge).
-    public ILocator StatusBadge => Panel.Root.GetByText(StatusName()).First;
+    // The status of the header, beside the Name: "Active", "Disabled", "Scheduled" or "Expired". Only in the Name's row,
+    // not the form's switch "Disabled".
+    public ILocator StatusBadge => HeadingRow.GetByText(StatusName());
 
-    // The header's badge of a deleted key, beside the Name (instead of the status).
-    public ILocator DeletedBadge => Panel.Root.GetByText("Deleted", new() { Exact = true }).First;
+    // The header's badge of a deleted key, beside the Name (instead of the status). Only in the Name's row, not the
+    // badge "Deleted" of an entry of the History below.
+    public ILocator DeletedBadge => HeadingRow.GetByText("Deleted", new() { Exact = true });
 
     // The header's "Copy to clipboard" of the key under the Name; the form's identity line has no copy button.
     public ILocator HeaderKeyCopyButton => Panel.Root.GetByRole(AriaRole.Button, new() { Name = "Copy to clipboard", Exact = true });
@@ -69,6 +70,9 @@ public sealed partial class AnnotationDetail
     // "Save" with its shortcut (⌘/Ctrl S) in the name.
     public ILocator SaveButton => Panel.Root.GetByRole(AriaRole.Button, new() { NameRegex = SaveName() });
 
+    // The header's row of the Name (the h2) and its badges: the status, or "Deleted".
+    private ILocator HeadingRow => Heading.Locator("xpath=..");
+
     // The row of an ancestor in Relations, by its key: its field ("Responsibility", "Subject", "Unit", "Usage",
     // "Context", "Execution") and the link.
     public ILocator RelationsAncestorRow(string key)
@@ -117,14 +121,11 @@ public sealed partial class AnnotationDetail
         return AncestorLineage;
     }
 
-    // Saves the form's changes with Ctrl/Cmd+S once Save is enabled (a toast can cover the save bar), and returns once
-    // the toast "Annotation saved" showed.
-    public async Task SaveFormAsync()
+    // Saves the form's changes with Ctrl/Cmd+S, and returns once the save finished: its toast "Annotation saved"
+    // showed and the form is clean again (AnnotationForm.SaveAsync).
+    public Task SaveFormAsync()
     {
-        await Expect(SaveButton).ToBeEnabledAsync();
-        await Title.PressAsync("ControlOrMeta+s");
-        await Expect(app.Toast("Annotation saved")).ToBeVisibleAsync();
-        await Expect(SaveButton).ToBeDisabledAsync();
+        return new AnnotationForm(app, section).SaveAsync();
     }
 
     [GeneratedRegex("^(Active|Disabled|Scheduled|Expired)$")]

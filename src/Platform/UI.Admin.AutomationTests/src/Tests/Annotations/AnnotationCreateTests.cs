@@ -60,7 +60,7 @@ public sealed class AnnotationCreateTests : PlatformTest
         await detail.CloseAsync();
         await annotations.WaitForCatalogAsync();
         await annotations.FilterAsync($"subject:{parts[1]}");
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(4));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(4));
     }
 
     // ANN-NEW-02: New annotation rejects dotted names and existing keys.
@@ -125,6 +125,7 @@ public sealed class AnnotationCreateTests : PlatformTest
         await annotations.BulkCreateAsync(restored, recreated);
 
         var detail = new AnnotationDetail(App, Routes);
+        var history = new AnnotationHistory(App);
         await detail.OpenAsync(restored);
         await Expect(detail.Identity).ToHaveTextAsync(restored);
         await detail.Title.FillAsync(title);
@@ -134,7 +135,7 @@ public sealed class AnnotationCreateTests : PlatformTest
         await Expect(detail.Identity).ToHaveTextAsync(recreated);
         await detail.DeleteAsync(recreated);
 
-        await Page.EvaluateAsync("() => { if (window.__requests) { window.__requests.length = 0; } }");
+        await ClearRecordedRequestsAsync();
         var dialog = await annotations.OpenNewAnnotationAsync();
         await dialog.SelectTypeAsync("Subject");
         await dialog.FillPartAsync("Name", restored.Split('.')[1]);
@@ -149,7 +150,8 @@ public sealed class AnnotationCreateTests : PlatformTest
         await deleted.CancelAsync();
         await Expect(dialog.Root).ToBeVisibleAsync();
         await Expect(dialog.KeyPreview).ToHaveTextAsync(restored);
-        await ExpectNothingWrittenAsync(restored);
+        await ExpectRequestAsync(IsDeletedKeyLookup, "the lookup of deleted keys (POST …/annotations/deleted/lookup)");
+        await ExpectNoRequestAsync(request => IsWriteOf(restored)(request) || IsDeletedKeyRestore(request), $"a write of {restored} or a restore (…/annotations/deleted/restore) after Cancel");
 
         deleted = await dialog.CreateOverDeletedAsync();
         await deleted.RestoreAsync(DeletedKeysDialog.RestoreAndUpdateLabel);
@@ -159,6 +161,7 @@ public sealed class AnnotationCreateTests : PlatformTest
         await Expect(detail.Title).ToHaveValueAsync(title);
 
         await detail.OpenHistoryTabAsync(restored);
+        await history.WaitForEntryAsync(Routes.AnnotationHistory(restored), "Restored");
         await Expect(detail.History).ToContainTextAsync("Deleted");
         await Expect(detail.History).ToContainTextAsync("Restored");
 
@@ -175,30 +178,7 @@ public sealed class AnnotationCreateTests : PlatformTest
         await Expect(detail.Title).ToHaveValueAsync(string.Empty);
 
         await detail.OpenHistoryTabAsync(recreated);
+        await history.WaitForEntryAsync(Routes.AnnotationHistory(recreated), "Re-created");
         await Expect(detail.History).ToContainTextAsync(new Regex(@"New lifetime\s*Re-created"));
-    }
-
-    // "<n> of <total>" of the filter count, whatever the view's total.
-    private static Regex CountOf(int shown)
-    {
-        return new Regex($@"^{shown} of [\d,]+$");
-    }
-
-    // The create sent the deleted-key lookup and wrote nothing: no SetAnnotation (POST …/annotations/<key>) and no
-    // restore.
-    private async Task ExpectNothingWrittenAsync(string key)
-    {
-        var requests = await RecordedRequestsAsync();
-        var sent = string.Join(", ", requests.Select(request => $"{request.Method} {request.Url}"));
-        if (!requests.Any(request => request.Method == "POST" && request.Url.EndsWith("/annotations/deleted/lookup", StringComparison.Ordinal)))
-        {
-            Assert.Fail($"The create did not look up the deleted keys (POST …/annotations/deleted/lookup); it sent: {sent}.");
-        }
-
-        if (requests.Any(request => (request.Method == "POST" && new Uri(request.Url).AbsolutePath.EndsWith($"/annotations/{key}", StringComparison.Ordinal))
-            || request.Url.Contains("/annotations/deleted/restore", StringComparison.Ordinal)))
-        {
-            Assert.Fail($"Cancel in \"Deleted annotations\" still wrote {key}: {sent}.");
-        }
     }
 }

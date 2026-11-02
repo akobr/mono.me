@@ -33,16 +33,16 @@ public sealed partial class AnnotationFilterTests : PlatformTest
         await annotations.WaitForCatalogAsync();
 
         await annotations.FilterAsync($"subject:{subject}");
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(7));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(7));
         await Expect(annotations.FilterChip($"subject:{subject}")).ToHaveTextAsync($"subject: {subject}");
 
         await annotations.FilterAsync($"subject:{subject} type:exe");
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(2));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(2));
         await Expect(annotations.FilterChip($"subject:{subject}")).ToHaveTextAsync($"subject: {subject}");
         await Expect(annotations.FilterChip("type:exe")).ToHaveTextAsync("type: exe");
 
         await annotations.FilterAsync($"subject:{subject} -type:exe,cnt");
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(3));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(3));
         await Expect(annotations.FilterChip("-type:exe,cnt")).ToHaveTextAsync("not type: exe or cnt");
         await ExpectRowsAsync(
             annotations,
@@ -77,7 +77,7 @@ public sealed partial class AnnotationFilterTests : PlatformTest
         await annotations.RemoveFilterTermButton("type:exe").ClickAsync();
         await Expect(annotations.Filter).ToHaveValueAsync($"subject:{subject}");
         await App.ExpectQueryAsync("q", $"subject:{subject}");
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(7));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(7));
 
         await annotations.ClearFilterButton.ClickAsync();
         await Expect(annotations.Filter).ToHaveValueAsync(string.Empty);
@@ -109,7 +109,7 @@ public sealed partial class AnnotationFilterTests : PlatformTest
 
         await annotations.FilterAsync($"zz:{PlatformData.AnnotationPart()}");
         await Expect(annotations.FilterNotice("Unknown qualifier zz: (searched as text).")).ToBeVisibleAsync();
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(0));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(0));
 
         const string example = "key:exe.*.payments.*";
         await annotations.FilterSyntaxButton.ClickAsync();
@@ -160,12 +160,6 @@ public sealed partial class AnnotationFilterTests : PlatformTest
         await sheet.DoneAsync();
         await App.ExpectQueryAsync("q", null);
         await Expect(annotations.Filter).ToHaveValueAsync(string.Empty);
-    }
-
-    // "<n> of <total>" of the filter count, whatever the view's total.
-    private static Regex CountOf(int shown)
-    {
-        return new Regex($@"^{shown} of [\d,]+$");
     }
 
     // The rows (the phone's items) of the filtered catalog are exactly the keys, each once.
