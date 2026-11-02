@@ -93,17 +93,19 @@ public sealed class SettingsSecretsPolicyTests : PlatformTest
         await Expect(levels.InUseLink(1, AppRoutes.DefaultView)).ToBeVisibleAsync();
         await Expect(App.ShownToasts).ToHaveCountAsync(0);
 
-        // Admin UI bug (424-152 review): key-values.vue reads state=All as the Deleted keys, so the link shows "No
-        // deleted keys" until Active is picked; once fixed, the link lists the secret at once. Both are accepted.
+        // Admin UI bug (424-152 review): key-values.vue reads ?state=All as the Deleted keys, like ?state=Deleted, so
+        // the link (?level=<API level>&state=All) shows "No deleted keys" until Active is picked; once fixed, the link
+        // lists the secret at once. Both are accepted.
         await levels.InUseLink(1, AppRoutes.DefaultView).ClickAsync();
         await App.ExpectAtAsync(project.KeyValues);
         await App.ExpectQueryAsync("level", "Standard");
         await App.ExpectQueryAsync("state", "All");
-        await Expect(keyValues.ListLevelFilter).ToHaveTextAsync("Standard");
-        await Expect(keyValues.Item(key).Or(keyValues.NoDeletedKeys)).ToBeVisibleAsync();
-        if (await keyValues.NoDeletedKeys.IsVisibleAsync())
+        await Expect(keyValues.LevelFilter).ToHaveTextAsync("Standard");
+        var noDeletedKeys = keyValues.EmptyState("No deleted keys");
+        await Expect(keyValues.Item(key).Or(noDeletedKeys)).ToBeVisibleAsync();
+        if (await noDeletedKeys.IsVisibleAsync())
         {
-            await keyValues.ListStateButton("Active").ClickAsync();
+            await keyValues.ActiveButton.ClickAsync();
             await App.ExpectQueryAsync("state", null);
             await App.ExpectQueryAsync("level", "Standard");
         }

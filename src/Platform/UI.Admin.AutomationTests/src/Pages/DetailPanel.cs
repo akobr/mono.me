@@ -28,6 +28,11 @@ public sealed partial class DetailPanel(App app, string id)
 
     public ILocator Root => app.Page.Locator($"section#{id}");
 
+    // The page once the detail is gone (Close, Back to the list): the body while no section#<id> is in it. Unlike
+    // ToBeHiddenAsync of Root it combines with Or, e.g. as the outcome of DiscardChangesDialog.DiscardIfShownAsync; a
+    // list's own state cannot be that outcome when the list stays shown beside the detail.
+    public ILocator Gone => app.Page.Locator($"body:not(:has(section#{id}))");
+
     public ILocator PinButton => Root.GetByRole(AriaRole.Button, new() { Name = "Pin the detail", Exact = true });
 
     public ILocator UnpinButton => Root.GetByRole(AriaRole.Button, new() { Name = "Unpin the detail", Exact = true });

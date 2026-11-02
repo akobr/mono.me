@@ -1,9 +1,12 @@
+using System.Text.RegularExpressions;
+
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // The admin UI's routes (the file-based routes of src/Platform/ui.admin/src/app/pages), relative to Target:BaseUrl, for
 // an organization, a project and a view: the target's from AppRoutes.For(Target), another project's with "routes with
 // { Project = … }". App.GotoAsync opens them and App.ExpectAtAsync checks the current one. Keys are escaped as one path
-// segment; WithQuery adds a query. Sections add their own routes in AppRoutes.<Section>.cs.
+// segment; WithQuery adds a query, and HrefEndingWith matches a link to a route. Sections add their own routes in
+// AppRoutes.<Section>.cs.
 public sealed partial record AppRoutes(string Organization, string Project, string View)
 {
     // The view every new project starts with.
@@ -243,6 +246,14 @@ public sealed partial record AppRoutes(string Organization, string Project, stri
     public string Compare(string? to = null)
     {
         return WithQuery(ModelingTab("compare"), ("to", to));
+    }
+
+    // An href that ends with the route (a path of the app, e.g. Routes.AnnotationSchema(key)), wherever the app is
+    // served.
+    public static Regex HrefEndingWith(string route)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(route);
+        return new Regex($"/{Regex.Escape(route.Trim('/'))}$");
     }
 
     // An old page of the view, which redirects to its Modeling tab: schemas, templates, export-import, deleted or

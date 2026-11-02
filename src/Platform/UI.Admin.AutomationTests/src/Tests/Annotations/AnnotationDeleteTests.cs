@@ -52,7 +52,7 @@ public sealed partial class AnnotationDeleteTests : PlatformTest
         var deleted = $"{responsibility} deleted";
         await confirm.ConfirmAsync("Delete");
         await Expect(App.Toast(deleted)).ToBeVisibleAsync();
-        await Expect(ToastOf(deleted)).ToContainTextAsync(DeletionDescription());
+        await Expect(App.ToastItem(deleted)).ToContainTextAsync(DeletionDescription());
         await Expect(App.ToastAction(deleted, "Undo")).ToBeVisibleAsync();
         await App.ExpectAtAsync(Routes.Annotations);
 
@@ -131,13 +131,7 @@ public sealed partial class AnnotationDeleteTests : PlatformTest
 
         await detail.OpenAsync(missing);
         await Expect(detail.NotFound).ToBeVisibleAsync();
-        await Expect(detail.Panel.Root.GetByText($"{missing} does not exist in this view. It may have been deleted permanently.", new() { Exact = true })).ToBeVisibleAsync();
-    }
-
-    // The newest toast of the title, with its description and its actions.
-    private ILocator ToastOf(string title)
-    {
-        return App.Notifications.Locator("li").Filter(new() { Has = Page.GetByText(title, new() { Exact = true }) }).Last;
+        await Expect(detail.NotFoundDescription(missing)).ToBeVisibleAsync();
     }
 
     // The description of a detail's delete with two descendants.

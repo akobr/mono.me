@@ -119,7 +119,7 @@ public sealed partial class KeyValueDetailTests : PlatformTest
         var detail = new KeyValueDetail(App, Routes, key);
         await detail.Value.FillAsync(draft);
         await Expect(detail.UnsavedChanges).ToBeVisibleAsync();
-        await Expect(App.Page).ToHaveTitleAsync(DirtyTitle());
+        await Expect(App.Page).ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
 
         var discard = new DiscardChangesDialog(App);
         await detail.VersionsTab.ClickAsync();
@@ -136,7 +136,7 @@ public sealed partial class KeyValueDetailTests : PlatformTest
         await detail.VersionsTab.ClickAsync();
         await discard.DiscardAsync();
         await App.ExpectAtAsync(Routes.KeyValueVersions(key));
-        await Expect(App.Page).Not.ToHaveTitleAsync(DirtyTitle());
+        await Expect(App.Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
 
         await detail.OpenValueAsync();
         await Expect(detail.Value).ToHaveValueAsync(saved);
@@ -210,7 +210,7 @@ public sealed partial class KeyValueDetailTests : PlatformTest
         {
             var response = await MockApi.FetchAsync(
                 "PUT",
-                $"v1/{Routes.Organization}/{Routes.Project}/{Routes.View}/key-values/{key}",
+                MockApi.ViewPath($"key-values/{key}"),
                 new Dictionary<string, string> { ["Value"] = value });
             var version = response.IsSuccess ? response.Json()?["Version"]?.GetValue<int>() : null;
             if (version != expectedVersion)
@@ -231,9 +231,6 @@ public sealed partial class KeyValueDetailTests : PlatformTest
 
     [GeneratedRegex(@"\d")]
     private static partial Regex Digit();
-
-    [GeneratedRegex("^● ")]
-    private static partial Regex DirtyTitle();
 
     [GeneratedRegex("^Saved as version ")]
     private static partial Regex SavedToast();

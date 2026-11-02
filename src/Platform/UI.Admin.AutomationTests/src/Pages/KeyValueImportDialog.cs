@@ -22,7 +22,6 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 public sealed partial class KeyValueImportDialog(App app)
 {
     public const string ReplaceMode = "Replace: also delete the other keys";
-    public const string MergeMode = "Merge: write the listed keys";
 
     // The error under the textarea for text of no known format.
     public const string UnreadableText = "The text is neither a key/value document, a JSON object nor .env lines.";
@@ -170,19 +169,8 @@ public sealed partial class KeyValueImportDialog(App app)
             await MarkPattern.FillAsync(pattern);
         }
 
-        await PickAsync(MarkLevel, level);
+        await app.PickOptionAsync(MarkLevel, level);
         await MarkButton.ClickAsync();
-    }
-
-    // Picks the option of a select of the dialog by its exact label and waits until the select shows it.
-    public async Task PickAsync(ILocator select, string option)
-    {
-        ArgumentNullException.ThrowIfNull(select);
-        ArgumentException.ThrowIfNullOrWhiteSpace(option);
-
-        await select.ClickAsync();
-        await app.Page.GetByRole(AriaRole.Option, new() { Name = option, Exact = true }).ClickAsync();
-        await Expect(select).ToHaveTextAsync(option);
     }
 
     // Check (the dry run); returns once the plan shows.

@@ -58,11 +58,9 @@ public sealed partial class AccountPage(App app, AppRoutes routes)
         await Expect(tab).ToHaveAttributeAsync("aria-selected", "true");
     }
 
-    // A card of the page by its heading (h2): Nuxt UI's card is the heading's nearest data-slot="root".
+    // A card of the page by its heading (h2).
     private ILocator Card(string heading)
     {
-        return app.Page
-            .GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true, Level = 2 })
-            .Locator("xpath=ancestor::*[@data-slot='root'][1]");
+        return NuxtLocators.Card(app.Page.Locator(":root"), heading, 2);
     }
 }

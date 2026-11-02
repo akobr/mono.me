@@ -9,8 +9,8 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // ContributorWithSecrets, SecretsLeftOutText below). Then "Evaluating bindings…", the error "A binding could not be
 // evaluated" with the server's message and hint (a 422), "No configuration" (a 404), or the read-only editor "Resolved
 // configuration", blurred and aria-hidden (so out of the accessibility tree) until "Reveal". Reveal only uncovers what
-// was read; another visit of the tab covers it again. A Nuxt UI alert has no alert role, so an alert is the innermost
-// component root (data-slot) with its title.
+// was read; another visit of the tab covers it again. A Nuxt UI alert has no alert role, so an alert is the nearest
+// component root (data-slot) of its title (NuxtLocators.Alert).
 public sealed partial class ConfigurationResolved(App app, ILocator scope)
 {
     public const string SecretsTitle = "May contain secrets";
@@ -60,8 +60,6 @@ public sealed partial class ConfigurationResolved(App app, ILocator scope)
 
     private ILocator Alert(string title)
     {
-        return scope.Locator("[data-slot=\"root\"]")
-            .Filter(new() { Has = app.Page.GetByText(title, new() { Exact = true }) })
-            .Last;
+        return NuxtLocators.Alert(scope, title);
     }
 }

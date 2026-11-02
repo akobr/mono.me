@@ -38,23 +38,23 @@ public sealed partial class TrustedIssuerDialog
 
     public ILocator Name => Root.GetByRole(AriaRole.Textbox, new() { NameRegex = NameLabel() });
 
-    public ILocator NameError => AccessLocators.FieldError(Root, "Name");
+    public ILocator NameError => NuxtLocators.FieldError(Root, "Name");
 
     public ILocator KeySource => Root.GetByRole(AriaRole.Combobox, new() { Name = "Key source", Exact = true });
 
-    public ILocator KeySourceHelp => AccessLocators.FieldHelp(Root, "Key source");
+    public ILocator KeySourceHelp => NuxtLocators.FieldHelp(Root, "Key source");
 
     public ILocator Issuer => Root.GetByRole(AriaRole.Textbox, new() { NameRegex = IssuerLabel() });
 
-    public ILocator IssuerHelp => AccessLocators.FieldHelp(Root, "Issuer");
+    public ILocator IssuerHelp => NuxtLocators.FieldHelp(Root, "Issuer");
 
-    public ILocator IssuerError => AccessLocators.FieldError(Root, "Issuer");
+    public ILocator IssuerError => NuxtLocators.FieldError(Root, "Issuer");
 
     public ILocator JwksUri => Root.GetByRole(AriaRole.Textbox, new() { NameRegex = JwksUriLabel() });
 
     public ILocator Jwks => Root.GetByRole(AriaRole.Textbox, new() { NameRegex = JwksLabel() });
 
-    public ILocator JwksHelp => AccessLocators.FieldHelp(Root, "JWKS");
+    public ILocator JwksHelp => NuxtLocators.FieldHelp(Root, "JWKS");
 
     public ILocator MaxTokenLifetime => Root.GetByLabel("Max token lifetime (seconds)", new() { Exact = true });
 
@@ -64,15 +64,11 @@ public sealed partial class TrustedIssuerDialog
 
     public ILocator CancelButton => Root.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true });
 
-    // The info alert of a template, titled by its label ("GitHub Actions", "Kubernetes", "Custom", …).
-    public ILocator TemplateAlert(string label)
-    {
-        return AccessLocators.Alert(Root, label);
-    }
-
+    // The description of a template's info alert, which is titled by the template's label ("GitHub Actions",
+    // "Kubernetes", "Custom", …).
     public ILocator TemplateHelp(string label)
     {
-        return AccessLocators.AlertDescription(Root, label);
+        return NuxtLocators.AlertDescription(Root, label);
     }
 
     // The textbox of a required claim's name: "Claim <n>".
@@ -97,18 +93,14 @@ public sealed partial class TrustedIssuerDialog
     // The error alert of a refused save, by the API's message.
     public ILocator Failure(string message)
     {
-        return AccessLocators.Message(Root, message);
+        return NuxtLocators.Message(Root, message);
     }
 
     // Picks a template by its exact label; the name, the issuer, the key source, the lifetime and the required claims
     // follow it.
     public async Task PickTemplateAsync(string label)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(label);
-
-        await Template.ClickAsync();
-        await app.Page.GetByRole(AriaRole.Option, new() { Name = label, Exact = true }).ClickAsync();
-        await Expect(Template).ToHaveTextAsync(label);
+        await app.PickOptionAsync(Template, label);
     }
 
     // Picks a key source by its label ("Discovery", "JWKS URI", "Pasted JWKS"); an option's name continues with its

@@ -15,8 +15,9 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 //   other page opens the default view's annotations.
 // - The view menu lists the project's views, then "Manage views"; a view keeps the view section without the detail.
 // While a menu is open or closing, reka-ui hides the rest of the page from the accessibility tree, so the pick helpers
-// wait for the new URL and for the menu to be gone.
-public sealed partial class ContextSwitcher(App app, AppRoutes routes)
+// wait for the new URL and for the menu to be gone. A test that checks a menu's items before it picks one opens it with
+// OpenSwitcherMenuAsync and picks with PickOpenMenuItemAsync.
+public sealed class ContextSwitcher(App app, AppRoutes routes)
 {
     public ILocator Root => app.Page.GetByRole(AriaRole.Navigation, new() { Name = "Context", Exact = true });
 
@@ -55,8 +56,8 @@ public sealed partial class ContextSwitcher(App app, AppRoutes routes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(organization);
 
-        await OrganizationButton.ClickAsync();
-        await PickAsync(MenuItem(organization));
+        await OpenSwitcherMenuAsync(OrganizationButton);
+        await PickOpenMenuItemAsync(MenuItem(organization));
         await app.ExpectAtAsync(organization);
     }
 
@@ -66,8 +67,8 @@ public sealed partial class ContextSwitcher(App app, AppRoutes routes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(project);
 
-        await ProjectButton.ClickAsync();
-        await PickAsync(MenuItem(project));
+        await OpenSwitcherMenuAsync(ProjectButton);
+        await PickOpenMenuItemAsync(MenuItem(project));
         await Expect(app.Page).ToHaveURLAsync(new Regex($@"/{Regex.Escape(routes.Organization)}/{Regex.Escape(project)}(?:[/?#].*)?$"));
     }
 
@@ -77,13 +78,32 @@ public sealed partial class ContextSwitcher(App app, AppRoutes routes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(view);
 
-        await ViewButton.ClickAsync();
-        await PickAsync(ViewItem(view));
+        await OpenSwitcherMenuAsync(ViewButton);
+        await PickOpenMenuItemAsync(ViewItem(view));
         await Expect(app.Page).ToHaveURLAsync(new Regex($@"/{Regex.Escape(routes.Organization)}/{Regex.Escape(routes.Project)}/{Regex.Escape(view)}(?:[/?#].*)?$"));
     }
 
-    private async Task PickAsync(ILocator item)
+    // Opens the menu of a button of the switcher (OrganizationButton, ProjectButton or ViewButton) and returns it. The
+    // button is clicked near its start: a long name is truncated, and on a phone the actions of a page's navbar (the
+    // Values store's Export and Import) cover the rest of the button.
+    public async Task<ILocator> OpenSwitcherMenuAsync(ILocator button)
     {
+        ArgumentNullException.ThrowIfNull(button);
+
+        await Expect(button).ToBeVisibleAsync();
+        var box = await button.BoundingBoxAsync()
+            ?? throw new InvalidOperationException("The button of the context switcher has no box.");
+        await button.ClickAsync(new() { Position = new() { X = 8, Y = box.Height / 2 } });
+        await Expect(Menu).ToBeVisibleAsync();
+        return Menu;
+    }
+
+    // Picks an item of the open menu (OpenSwitcherMenuAsync) and waits for the menu to close; the caller checks where
+    // the item led, before any role query on the page (reka-ui hides the page while a menu closes).
+    public async Task PickOpenMenuItemAsync(ILocator item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
         await Expect(Menu).ToBeVisibleAsync();
         await item.ClickAsync();
         await Expect(Menu).ToBeHiddenAsync();

@@ -219,11 +219,7 @@ public sealed partial class AnnotationForm(App app, string section = AnnotationD
     // Picks a type of a Values row (string, number, boolean, null, object, array); it resets the row's value.
     public async Task SetValueTypeAsync(int row, string type)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(type);
-
-        await ValueType(row).ClickAsync();
-        await app.Page.GetByRole(AriaRole.Option, new() { Name = type, Exact = true }).ClickAsync();
-        await Expect(ValueType(row)).ToHaveTextAsync(type);
+        await app.PickOptionAsync(ValueType(row), type);
     }
 
     // Saves with Ctrl/Cmd+S (in every mode); returns once the save finished (SaveWithAsync).

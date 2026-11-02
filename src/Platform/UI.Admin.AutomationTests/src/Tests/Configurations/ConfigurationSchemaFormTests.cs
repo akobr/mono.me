@@ -74,7 +74,7 @@ public sealed partial class ConfigurationSchemaFormTests : PlatformTest
         var schema = configuration.CombinedSchema;
         await Expect(schema.AppliedSchemasHeading).ToBeVisibleAsync();
         await Expect(schema.LayerText(key, "Annotation")).ToBeVisibleAsync();
-        await Expect(schema.LayerLink(key)).ToHaveAttributeAsync("href", new Regex($@"\/modeling\/schemas\/annotation\/{Regex.Escape(key)}$"));
+        await Expect(schema.LayerLink(key)).ToHaveAttributeAsync("href", AppRoutes.HrefEndingWith(Routes.AnnotationSchema(key)));
         await Expect(schema.LayerText(key, "v1")).ToBeVisibleAsync();
         await Expect(schema.Combined.Content).ToContainTextAsync("retries");
     }

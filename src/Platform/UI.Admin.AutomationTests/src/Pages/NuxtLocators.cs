@@ -3,12 +3,12 @@ using Microsoft.Playwright;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
-// Locators of Nuxt UI parts that the machine dialogs and sections of the Access section share. A form field (UFormField)
-// and an alert (UAlert) have no role of their own: a field is its label's nearest data-slot="root" (with its
-// data-slot="help" and data-slot="error"), an alert its title's nearest data-slot="root" (with its
-// data-slot="description"). A modal's own title and description use the same slot names, so an alert is found by its
-// title text.
-internal static class AccessLocators
+// Locators of Nuxt UI parts that the page objects share. A form field (UFormField), an alert (UAlert) and a card
+// (UCard) have no role of their own: a field is its label's nearest data-slot="root" (with its data-slot="help" and
+// data-slot="error"), an alert its title's nearest data-slot="root" (with its data-slot="description"), a card its
+// heading's nearest data-slot="root". A modal's own title and description use the same slot names, so an alert is
+// found by its title text.
+internal static class NuxtLocators
 {
     // The whole text of an element, with the spaces Vue's template leaves around it; '/' is escaped as well, because
     // Playwright puts the regex between slashes.
@@ -54,6 +54,17 @@ internal static class AccessLocators
     public static ILocator AlertDescription(ILocator scope, string title)
     {
         return Alert(scope, title).Locator("[data-slot='description']");
+    }
+
+    // The card of the scope around its heading, by the heading's exact name and level (h2, or h3 inside a section).
+    public static ILocator Card(ILocator scope, string heading, int level)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        ArgumentException.ThrowIfNullOrWhiteSpace(heading);
+
+        return scope
+            .GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true, Level = level })
+            .Locator("xpath=ancestor::*[@data-slot='root'][1]");
     }
 
     // An alert without a title (an API refusal in a dialog), by its exact description.

@@ -6,10 +6,13 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // The Annotations section's members of the annotation detail: the header's status badge, key, copy button,
 // configuration link and stamps, the breadcrumb with Lineage, the tab links Annotation and History with the History
-// region, the Relations block of the form (ancestors and the descendant groups), and the form's Time zone and save bar
-// (Contributors and up: "Unsaved changes", Revert, and Save, whose name ends in its shortcut).
+// region, the Relations block of the form (ancestors and the descendant groups), and the form's Time zone. The form's
+// save bar is AnnotationForm's.
 public sealed partial class AnnotationDetail
 {
+    // The heading of the Lineage popover, of an annotation's and of a configuration's detail.
+    public const string LineageHeadingText = "Ancestors, applied top to bottom";
+
     // The status of the header, beside the Name: "Active", "Disabled", "Scheduled" or "Expired". Only in the Name's row,
     // not the form's switch "Disabled".
     public ILocator StatusBadge => HeadingRow.GetByText(StatusName());
@@ -42,7 +45,7 @@ public sealed partial class AnnotationDetail
 
     // The popover of "Lineage": "Ancestors, applied top to bottom" and a numbered level per line, the farthest
     // ancestors first (each level in merge order, the keys as links), the annotation itself last.
-    public ILocator AncestorLineage => app.Page.GetByRole(AriaRole.Dialog).Filter(new() { Has = app.Page.GetByText("Ancestors, applied top to bottom", new() { Exact = true }) });
+    public ILocator AncestorLineage => LineagePopoverOf(app.Page);
 
     public ILocator AncestorLineageLevels => AncestorLineage.GetByRole(AriaRole.Listitem);
 
@@ -54,9 +57,13 @@ public sealed partial class AnnotationDetail
     // execution for a subject): the type, its count, up to 5 key links and "Show all <n>" beyond.
     public ILocator DescendantGroups => RelationsBlock.GetByTestId("descendant-group");
 
-    // The form's time zone: the zone, or "Browser time zone (<zone>)" for an annotation without one (a key that Bulk
-    // create or the API created as an ancestor).
+    // The form's time zone: the zone the annotation was saved with, or the placeholder "Browser time zone (<zone>)" for
+    // an annotation without one (a key that Bulk create or the API created as an ancestor); its help is "Dates are
+    // entered and shown in this zone.".
     public ILocator TimeZoneButton => Panel.Root.GetByRole(AriaRole.Button, new() { Name = "Time zone", Exact = true });
+
+    // The form's time zone as a select (TimeZoneSelect) over TimeZoneButton.
+    public TimeZoneSelect FormTimeZone => new(app, TimeZoneButton);
 
     // The tab links of the detail, which keep the list's query.
     public ILocator AnnotationTabLink => Panel.Root.GetByRole(AriaRole.Link, new() { Name = "Annotation", Exact = true });
@@ -66,9 +73,6 @@ public sealed partial class AnnotationDetail
     // The History tab's timeline, newest first: an entry per change ("Created", "Re-created" below the separator "New
     // lifetime", "Updated", "Deleted", "Restored", …) with "by <actor>". A deleted key's detail shows it too.
     public ILocator History => app.Page.GetByRole(AriaRole.Region, new() { Name = "History", Exact = true });
-
-    // "Save" with its shortcut (⌘/Ctrl S) in the name.
-    public ILocator SaveButton => Panel.Root.GetByRole(AriaRole.Button, new() { NameRegex = SaveName() });
 
     // The header's row of the Name (the h2) and its badges: the status, or "Deleted".
     private ILocator HeadingRow => Heading.Locator("xpath=..");
@@ -95,6 +99,14 @@ public sealed partial class AnnotationDetail
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(typeLabel);
         return DescendantGroups.Filter(new() { Has = app.Page.GetByText(typeLabel, new() { Exact = true }) });
+    }
+
+    // The popover of a detail's "Lineage" (teleported to the body, so found on the page): the dialog with the heading
+    // LineageHeadingText. An annotation's and a configuration's detail open the same popover.
+    public static ILocator LineagePopoverOf(IPage page)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        return page.GetByRole(AriaRole.Dialog).Filter(new() { Has = page.GetByText(LineageHeadingText, new() { Exact = true }) });
     }
 
     // Opens the History tab with its link and waits for the timeline.
@@ -130,7 +142,4 @@ public sealed partial class AnnotationDetail
 
     [GeneratedRegex("^(Active|Disabled|Scheduled|Expired)$")]
     private static partial Regex StatusName();
-
-    [GeneratedRegex("^Save")]
-    private static partial Regex SaveName();
 }

@@ -269,7 +269,7 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         await import.OpenAsync();
         await import.PasteAndReviewAsync(JsonSerializer.Serialize(new Dictionary<string, string>(StringComparer.Ordinal) { [keep] = "1" }));
         await Expect(import.Label("Flat JSON")).ToBeVisibleAsync();
-        await import.PickAsync(import.Mode, KeyValueImportDialog.ReplaceMode);
+        await App.PickOptionAsync(import.Mode, KeyValueImportDialog.ReplaceMode);
         await import.Prefix.FillAsync($"{prefix}.");
         await Expect(import.Prefix).ToHaveValueAsync($"{prefix}.");
 
@@ -416,26 +416,19 @@ public sealed partial class KeyValueImportExportTests : PlatformTest
         await Expect(export.IncludeSecretValues).ToHaveAttributeAsync("aria-checked", "false");
     }
 
-    // Runs the action of an export, checks the toasts it shows as soon as the download starts and then reads the file
-    // over the browser's connection (as PlatformTest.DownloadAsync does): a toast closes after about 5 seconds, and
-    // reading a download can take longer than that on a loaded machine. The file is not kept as an artifact.
-    private async Task<DownloadedFile> DownloadExportAsync(Func<Task> action, Func<Task> expectToasts)
+    // Runs the action of an export and checks the toasts it shows as soon as the download starts, before the file is
+    // read (PlatformTest.DownloadAsync): a toast closes after about 5 seconds, and reading a download can take longer
+    // than that on a loaded machine.
+    private Task<DownloadedFile> DownloadExportAsync(Func<Task> action, Func<Task> expectToasts)
     {
-        var download = await Page.RunAndWaitForDownloadAsync(action, new() { Timeout = DownloadTimeoutMs });
-        await expectToasts();
-        await using var stream = await download.CreateReadStreamAsync()
-            ?? throw new InvalidOperationException($"The download of {download.SuggestedFilename} has no content: {await download.FailureAsync()}");
-        using var content = new MemoryStream();
-        await stream.CopyToAsync(content);
-        return new DownloadedFile(download.SuggestedFilename, content.ToArray());
+        return DownloadAsync(action, _ => expectToasts(), DownloadTimeoutMs);
     }
 
     // The warning "<n> secret(s) left out" and its own description.
     private async Task ExpectSecretsLeftOutToastAsync()
     {
         await Expect(App.Toast(SecretsLeftOut())).ToBeVisibleAsync();
-        var toast = App.ShownToasts.Filter(new() { Has = Page.GetByText(SecretsLeftOut()) }).Last;
-        await Expect(toast.Locator("[data-slot='description']")).ToHaveTextAsync(LeftOutDescription);
+        await Expect(App.ToastDescriptionOf(SecretsLeftOut())).ToHaveTextAsync(LeftOutDescription);
     }
 
     private async Task ExpectWithSecretsToastAsync()

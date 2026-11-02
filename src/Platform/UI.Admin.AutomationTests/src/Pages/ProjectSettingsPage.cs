@@ -22,16 +22,6 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // Machine policy, secrets policy and recipients are project-wide: change them only in a disposable project.
 public sealed partial class ProjectSettingsPage(App app, AppRoutes routes)
 {
-    // The labels of the protection levels in the switches, by the level's label or its API name (Hsm, Byok, Hyok).
-    private static readonly Dictionary<string, string> LevelLabels = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Public"] = "Public",
-        ["Standard"] = "Standard",
-        ["Hsm"] = "HSM",
-        ["Byok"] = "BYOK",
-        ["Hyok"] = "HYOK",
-    };
-
     public ILocator ProjectHeading => app.Page.GetByRole(AriaRole.Heading, new() { Name = "Project", Exact = true, Level = 2 });
 
     public ILocator Description => app.Page.GetByRole(AriaRole.Textbox, new() { Name = "Description", Exact = true });
@@ -83,12 +73,7 @@ public sealed partial class ProjectSettingsPage(App app, AppRoutes routes)
     // name (Hsm, Byok, Hyok).
     public ILocator AllowLevel(string level)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(level);
-
-        var label = LevelLabels.TryGetValue(level, out var known)
-            ? known
-            : throw new ArgumentException($"'{level}' is not a protection level; use one of {string.Join(", ", LevelLabels.Keys)}.", nameof(level));
-        return AllowedLevelsCard.GetByRole(AriaRole.Switch, new() { Name = $"Allow {label}", Exact = true });
+        return AllowedLevelsCard.GetByRole(AriaRole.Switch, new() { Name = $"Allow {ProtectionLevels.Label(level)}", Exact = true });
     }
 
     // The row of a recipient in the Recipients table, by its exact id.
@@ -176,13 +161,10 @@ public sealed partial class ProjectSettingsPage(App app, AppRoutes routes)
         await Expect(AddButton).ToBeHiddenAsync();
     }
 
-    // A card of the page by its heading (level 2, or 3 inside Secrets): Nuxt UI's card is the heading's nearest
-    // data-slot="root".
+    // A card of the page by its heading (level 2, or 3 inside Secrets).
     private ILocator Card(string heading, int level)
     {
-        return app.Page
-            .GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true, Level = level })
-            .Locator("xpath=ancestor::*[@data-slot='root'][1]");
+        return NuxtLocators.Card(app.Page.Locator(":root"), heading, level);
     }
 
     [GeneratedRegex(@"^Name\*?$")]

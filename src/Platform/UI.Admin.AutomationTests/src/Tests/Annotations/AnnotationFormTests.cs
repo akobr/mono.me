@@ -44,7 +44,7 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await form.Title.FillAsync(title);
         await form.Description.FillAsync(MarkdownDescription);
         await Expect(form.UnsavedChanges).ToBeVisibleAsync();
-        await Expect(Page).ToHaveTitleAsync(DirtyTitle());
+        await Expect(Page).ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
 
         await form.DescriptionTab("Preview").ClickAsync();
         var preview = form.DescriptionPreview;
@@ -60,7 +60,7 @@ public sealed partial class AnnotationFormTests : PlatformTest
 
         await form.SaveAsync();
         await Expect(form.UnsavedChanges).ToBeHiddenAsync();
-        await Expect(Page).Not.ToHaveTitleAsync(DirtyTitle());
+        await Expect(Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
 
         await detail.OpenFormAsync(key);
         await Expect(form.Title).ToHaveValueAsync(title);
@@ -474,10 +474,6 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await Expect(editor.Content).ToBeVisibleAsync();
         return await editor.TextAsync();
     }
-
-    // The document title while the form has unsaved changes.
-    [GeneratedRegex("^● ")]
-    private static partial Regex DirtyTitle();
 
     // The description's count hint, "<n> / 10,000", shown above 9,000 characters.
     [GeneratedRegex(@"^[\d,]+ / 10,000$")]

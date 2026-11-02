@@ -126,7 +126,7 @@ public sealed partial class KeyValueVersionTests : PlatformTest
     {
         var path = $"/key-values/{key}/versions";
         var count = (await RecordedRequestsAsync())
-            .Count(request => request.Method == "GET" && new Uri(request.Url).AbsolutePath.EndsWith(path, StringComparison.Ordinal));
+            .Count(request => request.Method == "GET" && request.Path.EndsWith(path, StringComparison.Ordinal));
         if (count != expected)
         {
             throw new InvalidOperationException($"The page requested the versions of '{key}' {count} time(s), not {expected}.");

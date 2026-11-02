@@ -215,7 +215,7 @@ public sealed partial class KeyValueDetail
     // Picks the binding source ("default source", "public only" or "secret only").
     public async Task PickBindingSourceAsync(string source)
     {
-        await keyValues.PickAsync(BindingSource, source);
+        await app.PickOptionAsync(BindingSource, source);
     }
 
     // Clicks Save and waits for the toast "Saved as version <n>".
@@ -244,7 +244,7 @@ public sealed partial class KeyValueDetail
         await SetNewValueButton.ClickAsync();
         if (level is not null)
         {
-            await keyValues.PickAsync(NewLevel, level);
+            await app.PickOptionAsync(NewLevel, level);
         }
 
         await NewValue.FillAsync(value);
@@ -257,9 +257,9 @@ public sealed partial class KeyValueDetail
         return await keyValues.RevealAsync(Key);
     }
 
-    // A Nuxt UI alert of the region by its title: the title's nearest data-slot="root".
+    // A Nuxt UI alert of the region by its title.
     private ILocator Alert(string title)
     {
-        return Region.GetByText(title, new() { Exact = true }).Locator("xpath=ancestor::*[@data-slot='root'][1]");
+        return NuxtLocators.Alert(Region, title);
     }
 }

@@ -12,9 +12,6 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // control aria-invalid and is its accessible description.
 public sealed partial class KeyValuesPage
 {
-    // The help of the Key field while it has no error.
-    public const string NewKeyHelp = "Dot-separated, for example db.password.";
-
     // The columns of the list's table, in their order: the selection, Key, Level, Value, Version, Author, Updated (or
     // Expires in the Deleted state) and the row menu.
     private static readonly string[] ListColumns = ["select", "Key", "Level", "Value", "Version", "Author", "Updated", "actions"];
@@ -112,16 +109,6 @@ public sealed partial class KeyValuesPage
         await Expect(NewKeyDialog).ToBeVisibleAsync();
     }
 
-    // Picks the option of a select of the page (its exact label) and waits until the select shows it.
-    public async Task PickAsync(ILocator select, string option)
-    {
-        ArgumentNullException.ThrowIfNull(select);
-
-        await select.ClickAsync();
-        await SelectOption(option).ClickAsync();
-        await Expect(select).ToHaveTextAsync(option);
-    }
-
     // The field of the open New key dialog shows the error: the control is aria-invalid, the message is its
     // accessible description, and it is shown in the dialog.
     public async Task ExpectNewKeyErrorAsync(ILocator field, string message)
@@ -161,7 +148,7 @@ public sealed partial class KeyValuesPage
 
         await OpenNewKeyAsync();
         await NewKeyName.FillAsync(key);
-        await PickAsync(NewKeyContentType, contentType);
+        await app.PickOptionAsync(NewKeyContentType, contentType);
         await NewKeyValue.FillAsync(value);
         await CreateButton.ClickAsync();
         await Expect(NewKeyDialog).ToBeHiddenAsync();
@@ -235,8 +222,8 @@ public sealed partial class KeyValuesPage
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(label);
 
-        await PickAsync(LevelFilter, label);
-        await app.ExpectQueryAsync("level", label == "All levels" ? null : ApiLevelOf(label));
+        await app.PickOptionAsync(LevelFilter, label);
+        await app.ExpectQueryAsync("level", label == "All levels" ? null : ProtectionLevels.ApiName(label));
     }
 
     // Opens the detail of a listed key with a click on its Key cell (a click on the row could hit the Author's link) or
@@ -278,18 +265,6 @@ public sealed partial class KeyValuesPage
         await dialog.ExpectOpenAsync();
         await dialog.ConfirmAsync("Delete");
         await Expect(app.Toast($"'{key.ToLowerInvariant()}' deleted")).ToBeVisibleAsync();
-    }
-
-    // The API name of a level's label, as the URL and the API spell it.
-    private static string ApiLevelOf(string label)
-    {
-        return label switch
-        {
-            "HSM" => "Hsm",
-            "BYOK" => "Byok",
-            "HYOK" => "Hyok",
-            _ => label,
-        };
     }
 
     [GeneratedRegex(@"^\s*\d+ of \d+\s*$")]

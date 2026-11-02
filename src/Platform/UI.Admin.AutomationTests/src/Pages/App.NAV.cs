@@ -81,25 +81,6 @@ public sealed partial class App
         }
     }
 
-    // Picks the first option of the open command palette (OpenPaletteAsync, then the search filled) once its whole name
-    // is the expected one: the palette filters about 100 ms after the input, and until then the unfiltered options move
-    // under the pointer. Returns once the palette closed.
-    public async Task PickFirstPaletteOptionAsync(string name)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        await PickFirstPaletteOptionAsync(new Regex($"^{Regex.Escape(name)}$"));
-    }
-
-    public async Task PickFirstPaletteOptionAsync(Regex name)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-
-        var first = CommandPalette.GetByRole(AriaRole.Option).First;
-        await Expect(first).ToHaveAccessibleNameAsync(name);
-        await first.ClickAsync();
-        await Expect(CommandPalette).ToBeHiddenAsync();
-    }
-
     // A link of a navigation menu (MenuAsync) by its exact address below the base, e.g. "acme/billing/members": two
     // links are named "Members", and the icon rail's links have no name at all.
     public ILocator NavigationMenuLink(ILocator menu, string path)

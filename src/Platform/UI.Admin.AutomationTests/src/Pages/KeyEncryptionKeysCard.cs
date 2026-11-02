@@ -20,13 +20,6 @@ public sealed partial class KeyEncryptionKeysCard(App app)
 
     public const string NoHsmKey = "Created when the HSM level is allowed.";
 
-    // The labels of the rows' badges, by the level's label or its API name.
-    private static readonly Dictionary<string, string> RowLabels = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Standard"] = "Standard",
-        ["Hsm"] = "HSM",
-    };
-
     public ILocator Root => app.Page
         .GetByRole(AriaRole.Heading, new() { Name = "Key-encryption keys", Exact = true, Level = 3 })
         .Locator("xpath=ancestor::*[@data-slot='root'][1]");
@@ -90,10 +83,11 @@ public sealed partial class KeyEncryptionKeysCard(App app)
         return (await CurrentVersion(level).InnerTextAsync()).Trim();
     }
 
+    // The label of a row's badge, by the level's label or its API name: only Standard and HSM have a key.
     private static string Label(string level)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(level);
-        return RowLabels.TryGetValue(level, out var label)
+        var label = ProtectionLevels.Label(level);
+        return label is "Standard" or "HSM"
             ? label
             : throw new ArgumentException($"'{level}' has no key of the platform; use Standard or HSM.", nameof(level));
     }

@@ -127,11 +127,19 @@ public sealed partial class PlatformData
             }
             else
             {
-                all[index] = Cut(Data.Slug($"{RunSlug}-{Data.Hex(HexLength)}"), MaxPartLength);
+                all[index] = AnnotationPart();
             }
         }
 
         return $"{code}.{string.Join('.', all)}";
+    }
+
+    // One generated key part, "at-<runId>-<hex4>-<word>-<word>" (cut to 40), as AnnotationKey generates them: also a
+    // name for a compact line of Bulk create ("<s>.<r>" is a usage) or a field of "New annotation". Without '.', '/',
+    // '\', '?', '#' or spaces, so it is also one free-text word of the filter.
+    public string AnnotationPart()
+    {
+        return Cut(Data.Slug($"{RunSlug}-{Data.Hex(HexLength)}"), MaxPartLength);
     }
 
     // The key of an ancestor of the key's type made of the key's own parts, e.g. cnt.{s}.{c} of exe.{s}.{r}.{c}, the
@@ -242,23 +250,6 @@ public sealed partial class PlatformData
             DocumentOptions);
     }
 
-    // A small indented JSON object that starts with "run": "<RunSlug>", then the given values in their order, e.g.
-    // TaggedDocument(("retries", 3), ("url", "{{ $config.endpoint }}")) for a document with a binding; strings are
-    // escaped as JSON needs, nothing more.
-    public string TaggedDocument(params (string Name, object? Value)[] values)
-    {
-        ArgumentNullException.ThrowIfNull(values);
-
-        var document = new Dictionary<string, object?>(StringComparer.Ordinal) { ["run"] = RunSlug };
-        foreach (var (name, value) in values)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(name, nameof(values));
-            document[name] = value;
-        }
-
-        return JsonSerializer.Serialize(document, DocumentOptions);
-    }
-
     // A new RSA public key as PEM (SubjectPublicKeyInfo, "-----BEGIN PUBLIC KEY-----"), e.g. of a HYOK recipient, which
     // needs 3072 bits or more. Random, not from the seed: nothing holds or needs its private key.
     public static string RsaPublicKeyPem(int bits = 3072)
@@ -271,14 +262,7 @@ public sealed partial class PlatformData
     // recipient takes.
     public static string RsaPublicJwk(int bits = 3072)
     {
-        using var rsa = RSA.Create(bits);
-        var key = rsa.ExportParameters(includePrivateParameters: false);
-        return JsonSerializer.Serialize(new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["kty"] = "RSA",
-            ["n"] = Base64Url.EncodeToString(key.Modulus),
-            ["e"] = Base64Url.EncodeToString(key.Exponent),
-        });
+        return JsonSerializer.Serialize(RsaJwk(bits, kid: null));
     }
 
     // The id of a HYOK recipient, "at-<runId>-rcp-<hex4>-<word>-<word>": 1 to 64 of letters, digits, '_' and '-'.
@@ -292,6 +276,23 @@ public sealed partial class PlatformData
     {
         const string local = "ui-tests+";
         return $"{local}{Cut(Slug(), MaxEmailLocalLength - local.Length)}@{emailDomain}";
+    }
+
+    // A new RSA public key of the bits as the members of a JWK: kty, the kid when given, then n and e (base64url),
+    // without any private member. Random, not from the seed.
+    private static Dictionary<string, string> RsaJwk(int bits, string? kid)
+    {
+        using var rsa = RSA.Create(bits);
+        var key = rsa.ExportParameters(includePrivateParameters: false);
+        var jwk = new Dictionary<string, string>(StringComparer.Ordinal) { ["kty"] = "RSA" };
+        if (kid is not null)
+        {
+            jwk["kid"] = kid;
+        }
+
+        jwk["n"] = Base64Url.EncodeToString(key.Modulus);
+        jwk["e"] = Base64Url.EncodeToString(key.Exponent);
+        return jwk;
     }
 
     // paramName: the argument of the public method that holds the code.

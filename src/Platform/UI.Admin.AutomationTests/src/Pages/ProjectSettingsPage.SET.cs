@@ -109,11 +109,7 @@ public sealed partial class ProjectSettingsPage
     // it; save it with SaveMachinePolicyAsync.
     public async Task SelectDefaultCredentialKindAsync(string kind)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
-
-        await DefaultCredentialKind.ClickAsync();
-        await app.Page.GetByRole(AriaRole.Option, new() { Name = kind, Exact = true }).ClickAsync();
-        await Expect(DefaultCredentialKind).ToHaveTextAsync(kind);
+        await app.PickOptionAsync(DefaultCredentialKind, kind);
     }
 
     // Types the default certificate lifetime (1 to 3650 days) and leaves the field with Tab, which commits the number;

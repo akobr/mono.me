@@ -165,7 +165,7 @@ public sealed partial class KeyValueCreateTests : PlatformTest
         var keyValues = new KeyValuesPage(App, Routes);
         await keyValues.OpenAsync();
         await keyValues.OpenNewKeyAsync();
-        await keyValues.PickAsync(keyValues.NewKeyContentType, "Secret reference");
+        await App.PickOptionAsync(keyValues.NewKeyContentType, "Secret reference");
         await Expect(keyValues.NewKeyText("kv://<vault>/<name> or https://<vault>.vault.azure.net/secrets/<name>")).ToBeVisibleAsync();
         await Expect(keyValues.NewKeyValue).ToHaveAttributeAsync("placeholder", "kv://my-vault/db-password");
 

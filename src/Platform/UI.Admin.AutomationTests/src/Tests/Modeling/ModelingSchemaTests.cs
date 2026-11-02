@@ -434,7 +434,7 @@ public sealed partial class ModelingSchemaTests : PlatformTest
     private async Task LeaveDeletedSchemaAsync(ModelingSchemaPage schema)
     {
         await schema.Panel.LeaveButton.ClickAsync();
-        await new DiscardChangesDialog(App).DiscardIfAskedAsync();
+        await new DiscardChangesDialog(App).DiscardIfShownAsync(schema.Panel.Gone);
         await Expect(schema.Panel.Root).ToBeHiddenAsync();
         await Expect(schema.SchemaListSection("Type schemas")).ToBeVisibleAsync();
     }

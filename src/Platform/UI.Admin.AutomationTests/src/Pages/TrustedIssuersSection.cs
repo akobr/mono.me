@@ -22,7 +22,7 @@ public sealed partial class TrustedIssuersSection(App app)
 
     public ILocator AddButton => Root.GetByRole(AriaRole.Button, new() { Name = "Add trusted issuer", Exact = true });
 
-    public ILocator FederationDisabled => AccessLocators.Alert(Root, "Federated machines are disabled");
+    public ILocator FederationDisabled => NuxtLocators.Alert(Root, "Federated machines are disabled");
 
     public ILocator NoTrustedIssuers => Root.GetByRole(AriaRole.Heading, new() { Name = "No trusted issuers", Exact = true });
 

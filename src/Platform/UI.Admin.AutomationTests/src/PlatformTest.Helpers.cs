@@ -106,15 +106,57 @@ public abstract partial class PlatformTest
         return JsonSerializer.Deserialize<RecordedRequest[]>(json, WebJson) ?? [];
     }
 
+    // Waits until the page sent a request whose path ends with pathEnd and whose query parameter matches the pattern (a
+    // JavaScript regular expression), among the fetches the request recorder (InstallRequestRecorderAsync) holds since
+    // the last page load, up to Execution:ActionTimeoutMs; the error tells what the page sent instead.
+    protected async Task WaitForRequestAsync(string pathEnd, string parameter, string pattern)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pathEnd);
+        ArgumentException.ThrowIfNullOrWhiteSpace(parameter);
+        ArgumentNullException.ThrowIfNull(pattern);
+
+        try
+        {
+            await Page.WaitForFunctionAsync(
+                """
+                ([pathEnd, parameter, pattern]) => (window.__requests ?? []).some((request) => {
+                  const url = new URL(request.url);
+                  return url.pathname.endsWith(pathEnd) && new RegExp(pattern).test(url.searchParams.get(parameter) ?? '');
+                })
+                """,
+                new[] { pathEnd, parameter, pattern },
+                new() { PollingInterval = 100 });
+        }
+        catch (TimeoutException exception)
+        {
+            var installed = await Page.EvaluateAsync<bool>("() => Array.isArray(window.__requests)");
+            IReadOnlyList<RecordedRequest> requests = installed ? await RecordedRequestsAsync() : [];
+            var what = !installed ? "the request recorder is not installed (InstallRequestRecorderAsync before the first navigation)"
+                : requests.Count == 0 ? "the page sent nothing"
+                : $"the page sent {string.Join(", ", requests.Select(request => $"{request.Method} {request.Url}"))}";
+            throw new TimeoutException($"The page did not request …{pathEnd} with {parameter} matching '{pattern}': {what}.", exception);
+        }
+    }
+
     // Runs the action (e.g. the click on a download button) and returns the file it downloads, read over the browser's
     // connection (never Download.PathAsync, which a remote browser does not have), within timeoutMs. The file is not
     // kept as an artifact.
-    protected async Task<DownloadedFile> DownloadAsync(Func<Task> action, int timeoutMs = 60_000)
+    protected Task<DownloadedFile> DownloadAsync(Func<Task> action, int timeoutMs = 60_000)
+    {
+        return DownloadAsync(action, _ => Task.CompletedTask, timeoutMs);
+    }
+
+    // Like DownloadAsync(action, timeoutMs), but runs started with the suggested file name as soon as the download
+    // begins, before its bytes are read: a toast that confirms the download lasts about 5 seconds, and reading a large
+    // file over a remote browser's connection can take longer.
+    protected async Task<DownloadedFile> DownloadAsync(Func<Task> action, Func<string, Task> started, int timeoutMs = 60_000)
     {
         ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(started);
         ArgumentOutOfRangeException.ThrowIfLessThan(timeoutMs, 1);
 
         var download = await Page.RunAndWaitForDownloadAsync(action, new() { Timeout = timeoutMs });
+        await started(download.SuggestedFilename);
         await using var stream = await download.CreateReadStreamAsync()
             ?? throw new InvalidOperationException($"The download of {download.SuggestedFilename} has no content: {await download.FailureAsync()}");
         using var content = new MemoryStream();

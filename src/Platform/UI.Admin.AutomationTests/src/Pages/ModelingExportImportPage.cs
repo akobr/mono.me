@@ -200,11 +200,7 @@ public sealed partial class ModelingExportImportPage(App app, AppRoutes routes)
     // failed"), a link to this page.
     public ILocator ToastShowResult(string title)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(title);
-        return app.Notifications.Locator("li")
-            .Filter(new() { Has = app.Page.GetByText(title, new() { Exact = true }) })
-            .Last
-            .GetByRole(AriaRole.Link, new() { Name = "Show the result", Exact = true, IncludeHidden = true });
+        return app.ToastItem(title).GetByRole(AriaRole.Link, new() { Name = "Show the result", Exact = true, IncludeHidden = true });
     }
 
     // Opens the tab by its URL and waits for the app; the page shows the cards or a lock.

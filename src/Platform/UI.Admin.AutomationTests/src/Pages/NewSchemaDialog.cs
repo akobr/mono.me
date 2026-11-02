@@ -18,10 +18,6 @@ public sealed partial class NewSchemaDialog(App app)
 
     public ILocator TypeSchemaKind => Kind("Type schema");
 
-    public ILocator AnnotationSchemaKind => Kind("Annotation schema");
-
-    public ILocator DescendantSchemaKind => Kind("Descendant-type schema");
-
     // The selected type's label is its text.
     public ILocator TypeSelect => Root.GetByRole(AriaRole.Combobox, new() { Name = "Annotation type", Exact = true });
 

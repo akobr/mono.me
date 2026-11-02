@@ -10,13 +10,10 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // "Compare <view> with" (?to=, the project's other views; the only other one is preselected, and a ?to= of the view
 // itself is replaced). The tab is disabled in a project with one view, whose page says "No other view to compare with";
 // without a key or a target it says "Compare a configuration across views". Ready, the DiffEditor shows the summary
-// "+<a> −<d> · <k> change(s)" and the two documents: side by side from lg (1024 px) under the labels <view> and <other
-// view>, unified (one editor) below.
+// "+<a> −<d> · <k> change(s)" and the two documents: side by side from lg (VersionsView.SplitDiffWidth) under the
+// labels <view> and <other view>, unified (one editor) below.
 public sealed partial class ModelingComparePage(App app, AppRoutes routes)
 {
-    // From this width the diff is side by side with the views' labels above it.
-    public const int SplitDiffWidth = 1024;
-
     public const string NoOtherViewDescriptionText = "The project has only this view. An Administrator can create another one on the Views page.";
 
     // The trigger of the key's select menu: a button named by its label, whose text is the key or "Pick a key".
