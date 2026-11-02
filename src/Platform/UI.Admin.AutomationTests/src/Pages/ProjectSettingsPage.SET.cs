@@ -1,4 +1,6 @@
+using System.Globalization;
 using Microsoft.Playwright;
+using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
@@ -101,6 +103,27 @@ public sealed partial class ProjectSettingsPage
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(format);
         return DatesCard.GetByText($"Your own Preferences show dates as {format}.", new() { Exact = true });
+    }
+
+    // Picks the default kind of new machines among the enabled kinds (their API names) and waits until the select shows
+    // it; save it with SaveMachinePolicyAsync.
+    public async Task SelectDefaultCredentialKindAsync(string kind)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+
+        await DefaultCredentialKind.ClickAsync();
+        await app.Page.GetByRole(AriaRole.Option, new() { Name = kind, Exact = true }).ClickAsync();
+        await Expect(DefaultCredentialKind).ToHaveTextAsync(kind);
+    }
+
+    // Types the default certificate lifetime (1 to 3650 days) and leaves the field with Tab, which commits the number;
+    // save it with SaveMachinePolicyAsync.
+    public async Task SetCertificateLifetimeAsync(int days)
+    {
+        var text = days.ToString(CultureInfo.InvariantCulture);
+        await CertificateLifetime.FillAsync(text);
+        await CertificateLifetime.PressAsync("Tab");
+        await Expect(CertificateLifetime).ToHaveValueAsync(text);
     }
 
     // Waits until this browser keeps the value at the path of the project's entry ("defaultTimeZone"; "types", "exe",
