@@ -73,6 +73,10 @@ on:
         required: false
       UITESTS_USER_5_PASSWORD:
         required: false
+      UITESTS_USER_6_PASSWORD:
+        required: false
+      UITESTS_USER_7_PASSWORD:
+        required: false
       UITESTS_BROWSERSTACK_USERNAME:
         required: false
       UITESTS_BROWSERSTACK_ACCESS_KEY:
@@ -240,6 +244,12 @@ jobs:
           CI_USER_5_EMAIL: ${{ vars.UITESTS_USER_5_EMAIL }}
           CI_USER_5_ROLES: ${{ vars.UITESTS_USER_5_ROLES }}
           CI_USER_5_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_5_PASSWORD || '' }}
+          CI_USER_6_EMAIL: ${{ vars.UITESTS_USER_6_EMAIL }}
+          CI_USER_6_ROLES: ${{ vars.UITESTS_USER_6_ROLES }}
+          CI_USER_6_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_6_PASSWORD || '' }}
+          CI_USER_7_EMAIL: ${{ vars.UITESTS_USER_7_EMAIL }}
+          CI_USER_7_ROLES: ${{ vars.UITESTS_USER_7_ROLES }}
+          CI_USER_7_PASSWORD: ${{ !inputs.use_mock_ui && secrets.UITESTS_USER_7_PASSWORD || '' }}
           CI_BROWSERSTACK_USERNAME: ${{ !inputs.use_mock_ui && contains(inputs.profile, 'browserstack') && secrets.UITESTS_BROWSERSTACK_USERNAME || '' }}
           CI_BROWSERSTACK_ACCESS_KEY: ${{ !inputs.use_mock_ui && contains(inputs.profile, 'browserstack') && secrets.UITESTS_BROWSERSTACK_ACCESS_KEY || '' }}
           CI_BROWSERSTACK_MAX_PARALLEL_SESSIONS: ${{ vars.UITESTS_BROWSERSTACK_MAX_PARALLEL_SESSIONS }}
@@ -267,15 +277,17 @@ jobs:
             set_if UITESTS_Target__Project "$CI_TARGET_PROJECT"
             set_if UITESTS_Target__View "$CI_TARGET_VIEW"
             set_if UITESTS_Target__EmailDomain "$CI_TARGET_EMAIL_DOMAIN"
-            for index in 0 1 2 3 4 5; do
+            # A password applies by index to the pool; any UITESTS_USER_<n>_EMAIL makes the variables' entries replace
+            # the committed pool of testsettings.json entirely (the highest layer with an e-mail defines the pool).
+            for index in 0 1 2 3 4 5 6 7; do
               email_name="CI_USER_${index}_EMAIL"
               roles_name="CI_USER_${index}_ROLES"
               password_name="CI_USER_${index}_PASSWORD"
+              set_if "UITESTS_Users__Pool__${index}__Password" "${!password_name}"
               if [ -z "${!email_name}" ]; then
                 continue
               fi
               export "UITESTS_Users__Pool__${index}__Email=${!email_name}"
-              set_if "UITESTS_Users__Pool__${index}__Password" "${!password_name}"
               role_index=0
               IFS=',' read -ra roles <<< "${!roles_name}"
               for role in "${roles[@]}"; do
@@ -304,7 +316,7 @@ jobs:
           set_if UITESTS_PROFILE "$profiles"
 
           # The test process gets the secrets only as the UITESTS_* settings set above.
-          unset CI_USER_0_PASSWORD CI_USER_1_PASSWORD CI_USER_2_PASSWORD CI_USER_3_PASSWORD CI_USER_4_PASSWORD CI_USER_5_PASSWORD \
+          unset CI_USER_0_PASSWORD CI_USER_1_PASSWORD CI_USER_2_PASSWORD CI_USER_3_PASSWORD CI_USER_4_PASSWORD CI_USER_5_PASSWORD \n            CI_USER_6_PASSWORD CI_USER_7_PASSWORD \
             CI_BROWSERSTACK_USERNAME CI_BROWSERSTACK_ACCESS_KEY CI_TESTINY_API_KEY
 
           arguments=(--report-trx --results-directory "$results")
