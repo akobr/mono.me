@@ -32,7 +32,7 @@ All four are `net10.0`, packable, StyleCop-clean, and versioned with the reposit
 5. **Tests that do not report themselves** (not derived from `UiTest`, skipped by an attribute, which runs no hooks, or by `GetSkipReason`, before their scope existed) are reported by `[assembly: ReportResults]`.
 6. **After the last test** (`[After(TestSession)]`): the dispatcher drains and completes every reporter, the browsers close, the totals and every reporter's run URL go to the terminal (`ui-automation: Testiny run: https://…`), and `results.jsonl` is attached to the session's result. With `Reporting:UnmappedTests` `Fail` and a test without a case, the session fails.
 
-The terminal shows the session's lines with the prefix `ui-automation:` (standard output; standard error under `--list-tests`; nothing under `--server`, where an IDE drives the process).
+The terminal shows the session's lines with the prefix `ui-automation:` (standard output; standard error under `--list-tests`; nothing under `--server`, where an IDE or `dotnet test` drives the process: `dotnet test` passes `--server dotnettestcli` and prints a module's output only when it exits with an error, so the run URLs and the seed of a passing run are in `results.jsonl`, or on the terminal of `dotnet run`).
 
 ## Settings
 
@@ -390,7 +390,7 @@ dotnet test --project <test project> --treenode-filter "/**[Category=Elementary]
 
 - In GitHub Actions TUnit writes its summary into the job's step summary (`GITHUB_STEP_SUMMARY`); the run URLs are on the terminal as `ui-automation: <System> run: <url>`.
 - IDE: Visual Studio "Use testing platform server mode", Rider "Enable Testing Platform support", VS Code C# Dev Kit "Use Testing Platform Protocol".
-- `dotnet test` runs it only on Microsoft.Testing.Platform (`"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json`, as in this repository); the VSTest mode of the .NET 10 SDK refuses it ("Testing with VSTest target is no longer supported"). With a solution, TUnit's options reach every test project, so give them with `--project`.
+- `dotnet test` runs it only on Microsoft.Testing.Platform (`"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json`, as in this repository); the VSTest mode of the .NET 10 SDK refuses it ("Testing with VSTest target is no longer supported"). With a solution, TUnit's options reach every test project, so give them with `--project`. The `ui-automation:` lines of a passing run do not show under `dotnet test` (see "How a run works"); use `dotnet run` to watch a run.
 
 ## Limits
 
