@@ -57,6 +57,9 @@ public sealed partial class MachineCreateDialog(App app, AppRoutes routes)
     // The alert of a Federated machine in a project without a trusted issuer.
     public ILocator NoTrustedIssuers => AccessLocators.Alert(Root, "No trusted issuers");
 
+    // What NoTrustedIssuers asks for: to add one (an Administrator), or to ask an Administrator (a Contributor).
+    public ILocator NoTrustedIssuersHint => AccessLocators.AlertDescription(Root, "No trusted issuers");
+
     // The action of NoTrustedIssuers for an Administrator: the link to machines#trusted-issuers.
     public ILocator AddTrustedIssuerLink => Root.GetByRole(AriaRole.Link, new() { Name = "Add a trusted issuer", Exact = true });
 
