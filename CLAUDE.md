@@ -60,7 +60,7 @@ The flagship **2S Platform** — a serverless annotation/metadata platform.
 | `Storyteller/conformance/` | Language-neutral conformance suite (JSON vectors, `suite.json` manifest and version, JSON Schemas) of flattening, formats, error mapping and refresh; run by the .NET tests and the TypeScript SDK (see `docs/Platform/Storyteller/conformance.md`) |
 | `GitHubAction/` | Composite GitHub Action that runs `sform story config <key> --resolved --github-env` to export a configuration to the job environment or a file (no .NET code) |
 | `ui.admin/` | Vue 3 admin UI (SPA, uses the TypeScript SDK) |
-| `UI.Admin.AutomationTests/` | TUnit + Playwright tests of the deployed admin UI with the real API and AuthKit sign-in (`42.Platform.UI.Admin.AutomationTests`); run with `dotnet test` (also as part of the solution) or `dotnet run`, skipped without `Target:BaseUrl`; a check of the target's organization, project and view runs before the first test; a mock profile targets `npm run dev:mock`; CI in `.github/workflows/ui-admin-automation.yml` (docs in `docs/Platform/UI.Admin.AutomationTests/automation-tests.md`) |
+| `UI.Admin.AutomationTests/` | TUnit + Playwright tests of the deployed admin UI with the real API and AuthKit sign-in (`42.Platform.UI.Admin.AutomationTests`); run with `dotnet test` (also as part of the solution) or `dotnet run`, skipped without `Target:BaseUrl` (the committed default), with the `dev` profile against `http://localhost:5173` (`npm run dev` / Aspire) and the committed 8-user pool (passwords in the user secrets); a check of the target's organization, project and view runs before the first test; a mock profile targets `npm run dev:mock`; CI in `.github/workflows/ui-admin-automation.yml` (docs in `docs/Platform/UI.Admin.AutomationTests/automation-tests.md`) |
 | `Aspire.Host/` | .NET Aspire orchestrator for local dev |
 | `Aspire.ServiceDefaults/` | Shared Aspire service defaults |
 | `Storyteller/` | Core annotation service (see below) |
@@ -164,9 +164,8 @@ dotnet build src/Platform
 
 # Run all tests: the solution (in Microsoft.Testing.Platform mode dotnet test takes no traversal until .NET 11), one
 # module at a time: the Cosmos DB suites share one emulator and delete its databases, and two suites share Lowkey Vault.
-# The UI automation tests run against the committed local admin UI (http://localhost:5173); a blank target skips them.
+# The UI automation tests skip without a target (the committed default).
 dotnet test --solution 42.mono.slnx --max-parallel-test-modules 1
-UITESTS_Target__BaseUrl= dotnet test --solution 42.mono.slnx --max-parallel-test-modules 1   # without the local admin UI (PowerShell: $env:UITESTS_Target__BaseUrl = ' ')
 dotnet test --solution 42.mono.slnx   # every module at once: faster, but the Cosmos DB and Lowkey Vault suites can fail each other
 
 # One test project, and xUnit's filters (only with --project: the TUnit project refuses them)
@@ -176,7 +175,7 @@ dotnet test --project src/Platform/Storyteller/Backend.Core/test --filter-class 
 # UI automation tests of the admin UI (TUnit; see docs/Platform/UI.Admin.AutomationTests/automation-tests.md)
 dotnet test --project src/Platform/UI.Admin.AutomationTests/src --treenode-filter "/**[Category=Elementary]"
 dotnet run --project src/Platform/UI.Admin.AutomationTests/src
-dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"
+UITESTS_PROFILE=dev dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"   # against the local admin UI (port 5173)
 UITESTS_PROFILE=mock dotnet run --project src/Platform/UI.Admin.AutomationTests/src   # against npm run dev:mock (port 5174)
 
 # Pack NuGet packages (debug)
@@ -316,7 +315,7 @@ When a spec is large and delivered in phases, create one review file per phase. 
 - **UI automation (`src/Platform/UI.Admin.AutomationTests`)** is the exception to the framework and folder rules above (Bogus, Moq and the `IFileSystem` rule still apply):
   - **TUnit on Microsoft.Testing.Platform**, an executable (`OutputType Exe`) referencing `TUnit`, not `Microsoft.NET.Test.Sdk`, `xunit` or `coverlet`; its folder is `src/` because the project is the tests.
   - It is part of `dotnet test --solution 42.mono.slnx`; on its own `dotnet test --project src/Platform/UI.Admin.AutomationTests/src <options>` or `dotnet run --project … -- <options>`: filters are `--treenode-filter "/**[Category=Elementary]"` (not `--filter`), settings `--test-parameter Section:Key=value`.
-  - Without `Target:BaseUrl` (the committed default) every test is skipped with a reason and the run exits 0; settings come from `testsettings*.json`, user secrets and `UITESTS_*` variables. With a target, the setup's target check runs before the first test; when it fails (e.g. the configured organization, project or view does not exist), every test fails at once with its message.
+  - Without `Target:BaseUrl` (the committed default) every test is skipped with a reason and the run exits 0, also in `dotnet test --solution 42.mono.slnx`; the `dev` profile (`UITESTS_PROFILE=dev`) targets the local admin UI (`http://localhost:5173`, `npm run dev` / Aspire) and needs the pool passwords (`Users:Pool:<n>:Password`) in the user secrets; settings come from `testsettings*.json`, user secrets and `UITESTS_*` variables. With a target, the setup's target check runs before the first test; when it fails (e.g. the configured organization, project or view does not exist), every test fails at once with its message.
   - `[TestCase("<id>")]` on a test (or its class) links it to its case in the test case management system; libraries of the framework reference `TUnit.Core` only, never the `TUnit` package.
 
 Run a specific test project:

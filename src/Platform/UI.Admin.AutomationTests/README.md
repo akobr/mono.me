@@ -8,12 +8,13 @@ Browser tests of the integrated 2S Platform: the deployed admin UI (`src/Platfor
 dotnet build src/Platform/UI.Admin.AutomationTests/src
 pwsh src/Platform/UI.Admin.AutomationTests/src/bin/Debug/net10.0/playwright.ps1 install chromium firefox webkit   # once: Playwright 1.63's browsers
 
-dotnet run --project src/Platform/UI.Admin.AutomationTests/src                                                   # against the local dev server (port 5173); UITESTS_Target__BaseUrl= skips
+dotnet run --project src/Platform/UI.Admin.AutomationTests/src                                                   # skipped without Target:BaseUrl
+UITESTS_PROFILE=dev dotnet run --project src/Platform/UI.Admin.AutomationTests/src                               # against the local dev server (port 5173)
 dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"   # the PR gate set
 UITESTS_PROFILE=mock dotnet run --project src/Platform/UI.Admin.AutomationTests/src                              # against npm run dev:mock (:5174)
 ```
 
-Run it with `dotnet run` (options after `--`) or `dotnet test --project src/Platform/UI.Admin.AutomationTests/src` (options without `--`); `dotnet test --solution 42.mono.slnx` runs it with the rest of the repository's tests on Microsoft.Testing.Platform, skipped without `Target:BaseUrl`.
+Run it with `dotnet run` (options after `--`) or `dotnet test --project src/Platform/UI.Admin.AutomationTests/src` (options without `--`); `dotnet test --solution 42.mono.slnx` runs it with the rest of the repository's tests on Microsoft.Testing.Platform, skipped without `Target:BaseUrl` (the committed default).
 
 | Path | Contents |
 |---|---|
