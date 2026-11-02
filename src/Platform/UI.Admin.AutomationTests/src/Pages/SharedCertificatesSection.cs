@@ -66,6 +66,27 @@ public sealed partial class SharedCertificatesSection(App app)
         await Expect(CertificatesTable.Or(NoSharedCertificates)).ToBeVisibleAsync();
     }
 
+    // Revokes a certificate through its row: "Revoke", the first 8 characters of the thumbprint (the placeholder of the
+    // typed confirmation), "Revoke"; returns once the toast "Certificate revoked" showed and the row is Revoked.
+    public async Task RevokeCertificateAsync(string label)
+    {
+        await RevokeButton(label).ClickAsync();
+        await RevokeDialog(label).TypeAndConfirmAsync("Revoke");
+        await Expect(app.Toast("Certificate revoked")).ToBeVisibleAsync();
+        await Expect(CertificateCell(label, "Status")).ToHaveTextAsync("Revoked");
+    }
+
+    // For a cleanup: revokes the certificate when the section lists it unrevoked, else nothing (a revoked certificate
+    // stays listed; it cannot be deleted).
+    public async Task RevokeCertificateIfValidAsync(string label)
+    {
+        await WaitForCertificatesAsync();
+        if (await RevokeButton(label).CountAsync() > 0)
+        {
+            await RevokeCertificateAsync(label);
+        }
+    }
+
     // Opens "Issue a shared certificate".
     public async Task<IssueCertificateDialog> OpenIssueDialogAsync()
     {

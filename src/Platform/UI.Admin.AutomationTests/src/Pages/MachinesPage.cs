@@ -83,7 +83,7 @@ public sealed partial class MachinesPage(App app, AppRoutes routes)
     // The badge of a machine's certificate: "<n> d" (days left), "expired" or "shared".
     public ILocator CertificateBadge(string id)
     {
-        return MachineCell(id, "Certificate").Locator("[data-slot='base']");
+        return MachineCell(id, "Certificate").Locator("[data-slot='label']");
     }
 
     public ILocator ResetButton(string id)
