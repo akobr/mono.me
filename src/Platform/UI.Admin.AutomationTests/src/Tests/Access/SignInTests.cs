@@ -220,14 +220,6 @@ public sealed partial class SignInTests : PlatformTest
         await Expect(overview.ProjectCardDescription(project)).ToHaveAttributeAsync("title", description);
     }
 
-    // The sign-in passed /callback, where AuthKit (and the mock's sign-in) returns to the app.
-    private static async Task ExpectSignedInThroughCallbackAsync(IReadOnlyCollection<string> navigations)
-    {
-        await Assert.That(SignedInThroughCallback(navigations))
-            .IsTrue()
-            .Because($"the sign-in returns through /callback; the page went to {string.Join(", ", navigations)}");
-    }
-
     [GeneratedRegex(@"^[^@\s]+@[^@\s]+$")]
     private static partial Regex EmailAddress();
 

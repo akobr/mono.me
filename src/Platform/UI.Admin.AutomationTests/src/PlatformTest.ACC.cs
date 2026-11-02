@@ -15,7 +15,7 @@ public abstract partial class PlatformTest
 
     // Records the URL of every navigation of the page's main frame from now on, oldest first: page loads (location
     // assign, a redirect of AuthKit) and the router's same-document navigations. Read it after the action, e.g. to show
-    // that a sign-in passed /callback (SignedInThroughCallback).
+    // that a sign-in passed /callback (ExpectSignedInThroughCallbackAsync).
     protected IReadOnlyCollection<string> RecordMainFrameNavigations()
     {
         var urls = new ConcurrentQueue<string>();
@@ -36,6 +36,15 @@ public abstract partial class PlatformTest
         ArgumentNullException.ThrowIfNull(navigations);
         return navigations.Any(url => Uri.TryCreate(url, UriKind.Absolute, out var parsed)
             && string.Equals(parsed.AbsolutePath.TrimEnd('/'), CallbackPath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // Asserts that one of the recorded navigations (RecordMainFrameNavigations) opened /callback: the sign-in returned
+    // through it.
+    protected static async Task ExpectSignedInThroughCallbackAsync(IReadOnlyCollection<string> navigations)
+    {
+        await Assert.That(SignedInThroughCallback(navigations))
+            .IsTrue()
+            .Because($"the sign-in returns through /callback; the page went to {string.Join(", ", navigations)}");
     }
 
     // On a deployed target, once the app handed a sign-in over to AuthKit (Continue with AuthKit, or a protected page

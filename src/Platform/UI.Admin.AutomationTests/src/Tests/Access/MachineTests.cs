@@ -90,8 +90,7 @@ public sealed class MachineTests : PlatformTest
     {
         var machines = new MachinesPage(App, Routes);
         await machines.OpenAsync();
-        var (id, key) = await machines.CreateApiKeyMachineAsync();
-        createdMachines.Add((Routes, id));
+        var (id, key) = await machines.CreateApiKeyMachineAsync(created => createdMachines.Add((Routes, created)));
 
         var reset = machines.ResetDialog(id);
         await machines.ResetButton(id).ClickAsync();
@@ -357,6 +356,7 @@ public sealed class MachineTests : PlatformTest
         await Expect(create.AnnotationKeyOptions).ToHaveTextAsync(key);
         await Expect(create.AnnotationKeyHelp).ToBeVisibleAsync();
 
+        // Typed text alone is not sent: the key counts once its option is picked.
         await create.AnnotationKeyOptions.ClickAsync();
         await Expect(create.AnnotationKey).ToHaveValueAsync(key);
         await create.PickCredentialKindAsync("ApiKey");

@@ -86,13 +86,26 @@ public sealed partial class InviteDialog(App app)
             text);
     }
 
-    // Picks a role by its exact (raw) name and waits until the select shows it.
+    // An option of the open Role select, by its exact (raw) name.
+    public ILocator RoleOption(string role)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(role);
+        return app.Page.GetByRole(AriaRole.Option, new() { Name = role, Exact = true });
+    }
+
+    // Picks a role by its exact (raw) name, opening the select unless its options show already (e.g. a test checked
+    // them first), and waits until the select shows it. While the options are open, the rest of the page is hidden from
+    // the accessibility tree, the select too.
     public async Task SelectRoleAsync(string role)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(role);
 
-        await RoleSelect.ClickAsync();
-        await app.Page.GetByRole(AriaRole.Option, new() { Name = role, Exact = true }).ClickAsync();
+        if (!await RoleOption(role).IsVisibleAsync())
+        {
+            await RoleSelect.ClickAsync();
+        }
+
+        await RoleOption(role).ClickAsync();
         await Expect(RoleSelect).ToHaveTextAsync(role);
     }
 
@@ -104,14 +117,15 @@ public sealed partial class InviteDialog(App app)
         await SendButton.ClickAsync(new() { Position = new() { X = 8, Y = 3 } });
     }
 
-    // Invites the addresses (Enter after each) with the dialog's role and expiry: opens the dialog, sends, and returns
-    // once the toast "<n> invitation(s) sent" showed and the dialog closed.
+    // Invites the addresses in the open dialog (Enter after each) with the role and expiry it shows: sends, and returns
+    // once the toast "<n> invitation(s) sent" showed and the dialog closed. Open it first (OpenAsync), e.g. to check or
+    // change the role.
     public async Task InviteAsync(params string[] emails)
     {
         ArgumentNullException.ThrowIfNull(emails);
         ArgumentOutOfRangeException.ThrowIfZero(emails.Length);
 
-        await OpenAsync();
+        await Expect(Root).ToBeVisibleAsync();
         foreach (var email in emails)
         {
             await AddEmailAsync(email);

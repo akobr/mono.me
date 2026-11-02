@@ -33,9 +33,9 @@ public sealed partial class MachineCertificateTests : PlatformTest
         var settings = new ProjectSettingsPage(App, project);
         await settings.OpenAsync();
         await settings.EnableCredentialKindAsync("Certificate");
-        await Expect(settings.MachinePolicyCertificateLifetime).ToBeVisibleAsync();
+        await Expect(settings.CertificateLifetime).ToBeVisibleAsync();
         await settings.SaveMachinePolicyAsync();
-        var lifetime = await settings.MachinePolicyCertificateLifetime.InputValueAsync();
+        var lifetime = await settings.CertificateLifetime.InputValueAsync();
 
         var machines = new MachinesPage(App, project);
         await machines.OpenAsync();

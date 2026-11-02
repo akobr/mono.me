@@ -30,7 +30,11 @@ public sealed partial class MyInvitationTests : PlatformTest
         var members = new MembersPage(App, Routes);
 
         await mine.OpenAsync();
-        var email = await mine.SignedInEmailAsync();
+
+        // The intro shows the e-mail as the sign-in has it; the API stores an invitation's e-mail in lower case, as the
+        // invitations table lists it.
+        var shown = await mine.SignedInEmailAsync();
+        var email = shown.ToLowerInvariant();
         if (!Target.IsMock && await mine.Entry(key).CountAsync() > 0)
         {
             // A leftover of an aborted run on a deployed target.
@@ -39,11 +43,25 @@ public sealed partial class MyInvitationTests : PlatformTest
             await mine.OpenAsync();
         }
 
-        await Expect(mine.Intro).ToHaveTextAsync($"Organizations and projects that invited {email}.");
+        // A deployed target names the leased user; the mock's user (ada@example.com) is not a pool user.
+        if (Target.IsMock)
+        {
+            await Expect(mine.Intro).ToHaveTextAsync($"Organizations and projects that invited {shown}.");
+        }
+        else
+        {
+            await Expect(mine.Intro).ToHaveTextAsync(new Regex($@"^Organizations and projects that invited {Regex.Escape(User.Email)}\.$", RegexOptions.IgnoreCase));
+        }
+
         await Expect(mine.Entry(key)).ToHaveCountAsync(0);
         await Expect(mine.GoToMyOrganizationsLink).ToBeVisibleAsync();
 
+        // The API lists every invitation for good: on a deployed target, earlier runs left Declined and Accepted ones of
+        // the own e-mail, so the test counts its own on top of them.
         await members.OpenAsync();
+        await Expect(members.Invitations.Table).ToBeVisibleAsync();
+        var declined = await members.Invitations.Row(email, "Declined").CountAsync();
+        var accepted = await members.Invitations.Row(email, "Accepted").CountAsync();
         var name = await App.SignedInNameAsync();
         await InviteAsReaderAsync(members, email);
 
@@ -65,7 +83,7 @@ public sealed partial class MyInvitationTests : PlatformTest
         pendingSelfInvitations.Remove(email);
 
         await members.OpenAsync();
-        await Expect(members.Invitations.Row(email, "Declined")).ToHaveCountAsync(1);
+        await Expect(members.Invitations.Row(email, "Declined")).ToHaveCountAsync(declined + 1);
         await InviteAsReaderAsync(members, email);
 
         await mine.OpenAsync();
@@ -77,8 +95,8 @@ public sealed partial class MyInvitationTests : PlatformTest
 
         await members.OpenAsync();
         await Expect(members.Members.OwnRoleSelect).ToHaveTextAsync(AdminRole());
-        await Expect(members.Invitations.Row(email, "Declined")).ToHaveCountAsync(1);
-        await Expect(members.Invitations.Row(email, "Accepted")).ToHaveCountAsync(1);
+        await Expect(members.Invitations.Row(email, "Declined")).ToHaveCountAsync(declined + 1);
+        await Expect(members.Invitations.Row(email, "Accepted")).ToHaveCountAsync(accepted + 1);
     }
 
     // ACC-MYI-02: An invited user without an account joins through Invitations.
@@ -141,9 +159,7 @@ public sealed partial class MyInvitationTests : PlatformTest
 
         await App.ExpectAtAsync(Routes.MyInvitations);
         await Expect(new MyInvitationsPage(App, Routes).Heading).ToBeVisibleAsync();
-        await Assert.That(SignedInThroughCallback(navigations))
-            .IsTrue()
-            .Because($"the sign-in returns through /callback; the page went to {string.Join(", ", navigations)}");
+        await ExpectSignedInThroughCallbackAsync(navigations);
     }
 
     // Revokes the self-invitation the test left pending: a pending one would block the next run's invitation.
@@ -166,11 +182,8 @@ public sealed partial class MyInvitationTests : PlatformTest
         var invite = members.Invite;
         await invite.OpenAsync();
         await Expect(invite.RoleSelect).ToHaveTextAsync("Reader");
-        await invite.AddEmailAsync(email);
         pendingSelfInvitations.Add(email);
-        await invite.SendAsync();
-        await Expect(App.Toast("1 invitation sent")).ToBeVisibleAsync();
-        await Expect(invite.Root).ToBeHiddenAsync();
+        await invite.InviteAsync(email);
     }
 
     // "Invited by <inviter> · expires <relative time>", whatever the time and the template's line breaks around it;

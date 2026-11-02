@@ -2,7 +2,6 @@ using System.Text.RegularExpressions;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
-using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Access;
@@ -39,11 +38,8 @@ public sealed partial class InvitationTests : PlatformTest
         await Expect(invite.RoleSelect).ToHaveTextAsync("Reader");
         await Expect(invite.ExpiresField).ToHaveValueAsync("7");
 
-        await invite.AddEmailAsync(email);
         projectInvitations.Add(email);
-        await invite.SendAsync();
-        await Expect(App.Toast("1 invitation sent")).ToBeVisibleAsync();
-        await Expect(invite.Root).ToBeHiddenAsync();
+        await invite.InviteAsync(email);
 
         var invitations = members.Invitations;
         var row = invitations.Row(email);
@@ -109,8 +105,7 @@ public sealed partial class InvitationTests : PlatformTest
 
         await invite.RoleSelect.ClickAsync();
         await Expect(invite.RoleOptions).ToHaveTextAsync(["Reader", "Contributor", "ContributorWithSecrets", "Administrator", "Owner"]);
-        await Page.GetByRole(AriaRole.Option, new() { Name = "Contributor", Exact = true }).ClickAsync();
-        await Expect(invite.RoleSelect).ToHaveTextAsync("Contributor");
+        await invite.SelectRoleAsync("Contributor");
         await invite.ExpiresField.FillAsync("14");
         await Expect(invite.ExpiresField).ToHaveValueAsync("14");
         await Expect(invite.EmailsInput).ToHaveValueAsync(emails[2]);
@@ -213,10 +208,7 @@ public sealed partial class InvitationTests : PlatformTest
         await Expect(invite.EmailsError).ToHaveCountAsync(0);
 
         projectInvitations.AddRange([first, second]);
-        await invite.AddEmailAsync(first);
-        await invite.SendAsync();
-        await Expect(App.Toast("1 invitation sent")).ToBeVisibleAsync();
-        await Expect(invite.Root).ToBeHiddenAsync();
+        await invite.InviteAsync(first);
 
         // The same title follows: wait for the first toast to close.
         await Expect(App.Toast("1 invitation sent")).ToBeHiddenAsync();

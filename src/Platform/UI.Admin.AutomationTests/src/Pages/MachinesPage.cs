@@ -142,13 +142,15 @@ public sealed partial class MachinesPage(App app, AppRoutes routes)
 
     // Creates an API key machine with the preset scopes (Runtime reader), stores its credentials and returns its id and
     // its API key, once the dialog closed and the row is listed: the setup of a test that acts on a machine. The project
-    // must enable ApiKey.
-    public async Task<(string Id, string ApiKey)> CreateApiKeyMachineAsync()
+    // must enable ApiKey. created gets the id as soon as the machine exists, before the steps that may still fail, so
+    // that the test's cleanup deletes it.
+    public async Task<(string Id, string ApiKey)> CreateApiKeyMachineAsync(Action<string>? created = null)
     {
         var create = await OpenCreateDialogAsync();
         await create.PickCredentialKindAsync("ApiKey");
         var secret = await create.CreateAsync();
         var id = await secret.IdAsync();
+        created?.Invoke(id);
         var key = await secret.ApiKeyAsync();
         await secret.AcknowledgeAsync();
         await Expect(MachineRow(id)).ToBeVisibleAsync();

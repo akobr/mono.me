@@ -134,20 +134,6 @@ public sealed partial class MachineCreateDialog(App app, AppRoutes routes)
         await Expect(CredentialKind).ToHaveTextAsync(kind);
     }
 
-    // Types a unique part of the key into "Annotation key" and picks its option: typed text alone is not sent.
-    public async Task PickAnnotationKeyAsync(string key, string typed)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        ArgumentException.ThrowIfNullOrWhiteSpace(typed);
-
-        await AnnotationKey.ClickAsync();
-        await AnnotationKey.PressSequentiallyAsync(typed);
-        var option = AnnotationKeyOptions.Filter(new() { HasTextRegex = AccessLocators.Exactly(key) });
-        await Expect(option).ToHaveCountAsync(1);
-        await option.ClickAsync();
-        await Expect(AnnotationKey).ToHaveValueAsync(key);
-    }
-
     // Clicks Create and returns the credentials' dialog "Machine access created" once it showed (not for Federated).
     public async Task<OneTimeSecretDialog> CreateAsync()
     {
@@ -174,8 +160,9 @@ public sealed partial class MachineCreateDialog(App app, AppRoutes routes)
     // The setup of a test that acts on a Federated machine: opens New machine, picks Federated, keeps the preset
     // scopes and the trusted issuer that Rule 1 preselects (the project has exactly this one) with the prefilled
     // audience, types the subject, creates the machine and closes its setup with Done. Returns the machine's id once
-    // its row is listed. Skipped on a deployment without Federated machine access.
-    public async Task<string> CreateFederatedMachineAsync(MachinesPage machines, string issuer, string subject)
+    // its row is listed. Skipped on a deployment without Federated machine access. created gets the id as soon as the
+    // machine exists, before the steps that may still fail, so that the test's cleanup deletes it.
+    public async Task<string> CreateFederatedMachineAsync(MachinesPage machines, string issuer, string subject, Action<string>? created = null)
     {
         ArgumentNullException.ThrowIfNull(machines);
         ArgumentException.ThrowIfNullOrWhiteSpace(issuer);
@@ -188,6 +175,7 @@ public sealed partial class MachineCreateDialog(App app, AppRoutes routes)
         await rule.Subject.FillAsync(subject);
         var setup = await CreateFederatedAsync();
         var id = await setup.MachineIdAsync();
+        created?.Invoke(id);
         await setup.DoneAsync();
         await Expect(machines.MachineRow(id)).ToBeVisibleAsync();
         return id;
