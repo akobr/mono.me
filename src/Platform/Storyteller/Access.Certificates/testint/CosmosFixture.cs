@@ -24,7 +24,7 @@ public class CosmosFixture : IAsyncLifetime
 
     public CosmosDbContainer DbContainer { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         DbContainer = new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
             .WithReuse(true)
@@ -89,9 +89,9 @@ public class CosmosFixture : IAsyncLifetime
         await dbBuilder.BuildAsync();
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     private async Task CleanupDatabaseAsync()

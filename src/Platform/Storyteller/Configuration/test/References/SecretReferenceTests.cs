@@ -112,7 +112,7 @@ public class SecretReferenceTests
             "Password=kv://vault/name",
             "kv://vault/name and more",
             "see https://vault.vault.azure.net/secrets/name",
-            null,
+            (string?)null,
             string.Empty,
             "   ",
         };

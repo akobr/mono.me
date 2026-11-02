@@ -28,7 +28,7 @@ public class KeyValueEndToEndTests(Startup startup)
     private LowkeyVaultContainer? _vault;
     private Uri _vaultUri = new("https://localhost:8443/");
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var configured = Environment.GetEnvironmentVariable("LOWKEY_VAULT_URL");
 
@@ -44,7 +44,7 @@ public class KeyValueEndToEndTests(Startup startup)
         _vaultUri = new Uri(_vault.GetBaseAddress());
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_vault is not null)
         {

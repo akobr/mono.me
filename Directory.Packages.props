@@ -25,7 +25,6 @@
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="Colorful.Console" Version="1.2.15" />
     <PackageVersion Include="ConsoleTableExt" Version="3.3.0" />
-    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
     <PackageVersion Include="Cronos" Version="0.13.0" />
     <PackageVersion Include="DiffPlex" Version="1.9.0" />
     <PackageVersion Include="FluentAssertions" Version="[7.2.2]" /><!-- 8.x is under the Xceed Community License (paid for commercial use); 7.x is the last Apache-2.0 line. -->
@@ -101,7 +100,6 @@
     <PackageVersion Include="Microsoft.IdentityModel.Protocols" Version="8.23.0" />
     <PackageVersion Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.23.0" />
     <PackageVersion Include="Microsoft.NET.StringTools" Version="18.9.6" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.4.2" />
@@ -114,6 +112,7 @@
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.4.2" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.63.0" /><!-- the newest version BrowserStack runs; the CI image and the browsers follow it (docs/Libraries/Testing/UI.Automation/readme.md). -->
+    <PackageVersion Include="Microsoft.Testing.Extensions.TrxReport" Version="2.5.2" />
     <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
     <PackageVersion Include="Moq" Version="4.21.0" />
@@ -160,8 +159,7 @@
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
     <PackageVersion Include="TUnit" Version="1.78.0" /><!-- RetryPolicy.WillRetryAsync of UI.Automation.Runtime.TUnit copies the retry decision of TUnit 1.78.x: recheck it on an upgrade. -->
     <PackageVersion Include="TUnit.Core" Version="1.78.0" />
-    <PackageVersion Include="xunit" Version="2.9.3" /><!-- the last xUnit v2; the move to xUnit v3 on the new test platform is Linear 424-151. -->
-    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
     <PackageVersion Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 </Project>

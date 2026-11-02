@@ -33,7 +33,7 @@ public class RelationNamesJsonTests
 
             foreach (var row in RelationArrays)
             {
-                var (key, member) = ((string)row[0], (string)row[1]);
+                var (key, member) = row.Data;
 
                 foreach (var value in new[] { "\"prod\"", "5", "true", "{}", "[1]", "[null]", "[{}]", "[[\"prod\"]]", "[\"prod\",false]" })
                 {
@@ -169,7 +169,7 @@ public class RelationNamesJsonTests
             .ToList();
 
         sets.Select(property => $"{property.DeclaringType!.Name}.{property.Name}").ShouldBe(
-            RelationArrays.Select(row => $"{RuntimeType((string)row[0]).Name}.{row[1]}"),
+            RelationArrays.Select(row => $"{RuntimeType(row.Data.Item1).Name}.{row.Data.Item2}"),
             ignoreOrder: true);
         sets.ShouldAllBe(property => property.GetCustomAttribute<JsonConverterAttribute>() != null
             && property.GetCustomAttribute<JsonConverterAttribute>()!.ConverterType!.Name == "RelationNamesJsonConverter");

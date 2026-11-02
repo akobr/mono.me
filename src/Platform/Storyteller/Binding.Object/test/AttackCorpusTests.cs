@@ -5,7 +5,6 @@ using _42.Platform.Storyteller.Binding;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace _42.Platform.Storyteller.Binding.Object.UnitTests;
 

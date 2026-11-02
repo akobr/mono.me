@@ -8,8 +8,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-using Xunit.Abstractions;
-
 namespace _42.Platform.Storyteller.Mcp.IntegrationTests;
 
 // The token exchange end to end, against a configured environment (ExchangeTestSettings), with the server's own

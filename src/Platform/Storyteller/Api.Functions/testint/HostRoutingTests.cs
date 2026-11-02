@@ -2,8 +2,6 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 
-using Xunit.Abstractions;
-
 namespace _42.Platform.Storyteller.Api.Functions.IntegrationTests;
 
 // The routing of a running Functions host (HostTestSettings). The host runs the first function, in the order of the
