@@ -24,6 +24,9 @@ public sealed partial class KeyValueVersions(App app, ILocator scope)
     // The rows of the versions (the header's row has no cell).
     public ILocator Rows => Table.GetByRole(AriaRole.Row).Filter(new() { Has = app.Page.GetByRole(AriaRole.Cell) });
 
+    // The first cell of every row, newest first: "v<n>(current)", "v<n-1>", ….
+    public ILocator VersionCells => Table.GetByRole(AriaRole.Cell, new() { NameRegex = VersionCellName() });
+
     public ILocator ClientEncryptedNotice => scope.GetByText("The values are encrypted on the client; the platform cannot show or compare them.", new() { Exact = true });
 
     // The buttons of every row, for a check that a HYOK key has none.
@@ -108,4 +111,7 @@ public sealed partial class KeyValueVersions(App app, ILocator scope)
     {
         return Row(version).GetByRole(AriaRole.Button, new() { Name = label, Exact = true });
     }
+
+    [GeneratedRegex(@"^v\d+\s*(\(current\))?$")]
+    private static partial Regex VersionCellName();
 }
