@@ -22,6 +22,12 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // "Enter a unit definition.", "Duplicate keys: <keys>".
 public sealed partial class AnnotationForm(App app, string section = AnnotationDetail.AnnotationsSection)
 {
+    // The toast of a successful save.
+    public const string SavedToast = "Annotation saved";
+
+    // How long an earlier save's toast (about 5 seconds) is waited out before the next save.
+    private const int EarlierToastTimeoutMs = 10_000;
+
     // As the app writes a document (JSON.stringify(value, null, 2)): indented, nothing escaped that JSON allows.
     private static readonly JsonSerializerOptions DocumentOptions = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
@@ -77,9 +83,11 @@ public sealed partial class AnnotationForm(App app, string section = AnnotationD
 
     public ILocator AddValueButton => Panel.Root.GetByRole(AriaRole.Button, new() { Name = "Add value", Exact = true });
 
-    // The switch "Edit all as JSON/YAML" (its own label): the field's label "Values" is its aria-label, so its
-    // accessible name is "Values".
-    public ILocator ValuesEditAllSwitch => Panel.Root.GetByRole(AriaRole.Switch, new() { Name = "Values", Exact = true });
+    // The switch "Edit all as JSON/YAML" of Values.
+    // Admin UI bug (424-152 review): the UFormField "Values" names the switch "Values" instead of its label "Edit all
+    // as JSON/YAML" (ValuesEditor.vue: the USwitch is the field's first control); both names are accepted.
+    public ILocator ValuesEditAllSwitch => Panel.Root.GetByRole(AriaRole.Switch, new() { Name = "Values", Exact = true })
+        .Or(Panel.Root.GetByRole(AriaRole.Switch, new() { Name = "Edit all as JSON/YAML", Exact = true }));
 
     // The visible label of ValuesEditAllSwitch.
     public ILocator ValuesEditAllLabel => Panel.Root.GetByText("Edit all as JSON/YAML", new() { Exact = true });
@@ -218,13 +226,29 @@ public sealed partial class AnnotationForm(App app, string section = AnnotationD
         await Expect(ValueType(row)).ToHaveTextAsync(type);
     }
 
-    // Saves with Ctrl/Cmd+S once Save is enabled (in every mode; a toast can cover the save bar) and returns once the
-    // toast "Annotation saved" showed and the form is clean again.
-    public async Task SaveAsync()
+    // Saves with Ctrl/Cmd+S (in every mode); returns once the save finished (SaveWithAsync).
+    public Task SaveAsync()
+    {
+        return SaveWithAsync(() => app.Page.Keyboard.PressAsync("ControlOrMeta+s"));
+    }
+
+    // Saves with a click on Save, as a user does; returns once the save finished (SaveWithAsync).
+    public Task ClickSaveAsync()
+    {
+        return SaveWithAsync(() => SaveButton.ClickAsync());
+    }
+
+    // Saves once Save is enabled and returns when the API answered: the toast "Annotation saved" of this save showed
+    // and the form is clean again. A toast lasts about 5 seconds, so an earlier save's one (which would satisfy the
+    // check at once, and can cover Save) is waited out first. Save is disabled while the request runs too, so the end
+    // is "Unsaved changes" gone: only the saved draft clears it (resetForm after the API answered).
+    private async Task SaveWithAsync(Func<Task> save)
     {
         await Expect(SaveButton).ToBeEnabledAsync();
-        await app.Page.Keyboard.PressAsync("ControlOrMeta+s");
-        await Expect(app.Toast("Annotation saved")).ToBeVisibleAsync();
+        await Expect(app.Notifications.GetByText(SavedToast, new() { Exact = true })).ToHaveCountAsync(0, new() { Timeout = EarlierToastTimeoutMs });
+        await save();
+        await Expect(app.Toast(SavedToast)).ToBeVisibleAsync();
+        await Expect(UnsavedChanges).ToHaveCountAsync(0);
         await Expect(SaveButton).ToBeDisabledAsync();
     }
 

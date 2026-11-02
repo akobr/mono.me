@@ -82,8 +82,7 @@ public sealed partial class AnnotationRoleTests : PlatformTest
         await Expect(detail.Identity).ToHaveTextAsync(key);
         await Expect(form.ReadOnlyBadge).ToHaveCountAsync(0);
         await form.Title.FillAsync(title);
-        await form.SaveButton.ClickAsync();
-        await Expect(App.Toast("Annotation saved")).ToBeVisibleAsync();
+        await form.ClickSaveAsync();
 
         await detail.DeleteAsync(key);
         await Expect(annotations.Item(key)).ToHaveCountAsync(0);

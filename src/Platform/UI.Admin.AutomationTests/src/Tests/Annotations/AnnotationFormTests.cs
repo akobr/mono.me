@@ -96,7 +96,7 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await form.SaveButton.ClickAsync();
         await Expect(form.FieldMessage("At most 200 characters.")).ToBeVisibleAsync();
         await Expect(App.Notifications.GetByText("Annotation saved", new() { Exact = true })).ToHaveCountAsync(0);
-        await ExpectNoWriteAsync(key);
+        await ExpectNoRequestAsync(IsWriteOf(key), $"a write of {key}");
 
         await form.Title.FillAsync(title);
         await form.DocumentationLink.FillAsync($"example.com/{name}");
@@ -112,8 +112,7 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await Expect(form.FieldMessage("At most 10,000 characters.")).ToBeVisibleAsync();
 
         await form.Description.FillAsync(PlatformData.Text(9_000));
-        await form.SaveButton.ClickAsync();
-        await Expect(App.Toast("Annotation saved")).ToBeVisibleAsync();
+        await form.ClickSaveAsync();
         await Expect(form.Panel.Root.GetByText(DescriptionCount())).ToHaveCountAsync(0);
         await Expect(form.FieldMessage("At most 10,000 characters.")).ToHaveCountAsync(0);
 
@@ -143,8 +142,7 @@ public sealed partial class AnnotationFormTests : PlatformTest
 
         await form.DisabledSwitch.ClickAsync();
         await Expect(form.DisabledSwitch).ToBeCheckedAsync();
-        await form.SaveButton.ClickAsync();
-        await Expect(App.Toast("Annotation saved")).ToBeVisibleAsync();
+        await form.ClickSaveAsync();
         await Expect(detail.StatusBadge).ToHaveTextAsync("Disabled");
 
         await form.SelectModeAsync("JSON");
@@ -169,14 +167,13 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await form.SaveButton.ClickAsync();
         await Expect(form.DocumentAlerts.Filter(new() { HasText = "Expires must be after Valid from." })).ToHaveTextAsync("ExpiresAt Expires must be after Valid from.");
         await Expect(detail.StatusBadge).ToHaveTextAsync("Expired");
-        await ExpectNoWriteAsync(key);
+        await ExpectNoRequestAsync(IsWriteOf(key), $"a write of {key}");
 
         await form.RevertButton.ClickAsync();
         await form.SelectModeAsync("Form");
         await form.ExpiresClearButton.ClickAsync();
         await Expect(form.ExpiresClearButton).ToHaveCountAsync(0);
-        await form.SaveButton.ClickAsync();
-        await Expect(App.Toast("Annotation saved")).ToBeVisibleAsync();
+        await form.ClickSaveAsync();
         await Expect(form.ExpiresDate.GetByRole(AriaRole.Spinbutton, new() { NameRegex = YearSegment() })).ToHaveTextAsync("yyyy");
         await Expect(detail.StatusBadge).ToHaveTextAsync("Active");
 
@@ -210,8 +207,7 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await Expect(form.Document.Content).ToContainTextAsync($"\"AnnotationKey\": \"{key}\"");
 
         await form.EditDocumentAsync(document => document["Title"] = title);
-        await form.SaveButton.ClickAsync();
-        await Expect(App.Toast("Annotation saved")).ToBeVisibleAsync();
+        await form.ClickSaveAsync();
 
         await form.EditDocumentAsync(document => document["AnnotationKey"] = $"{key}-changed");
         await Expect(form.DocumentAlerts.Filter(new() { HasText = "is part of the key" })).ToHaveTextAsync("AnnotationKey is part of the key and cannot change.");
@@ -261,12 +257,12 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await annotations.OpenAnnotationFromListAsync(first);
         await Expect(form.Panel.Root.GetByTestId("annotation-identity")).ToHaveTextAsync(first);
         await form.AddLabelAsync(label, existing: false);
-        await form.SaveAsync();
+        await form.ClickSaveAsync();
         await Expect(form.LabelTag(label)).ToBeVisibleAsync();
 
         await detail.CloseAsync();
         await annotations.FilterAsync($"label:{label}");
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(1));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(1));
         await Expect(annotations.Item(first)).ToBeVisibleAsync();
         if (Page.ViewportSize is not { Width: < AnnotationsPage.GridWidth })
         {
@@ -283,11 +279,11 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await form.LabelOption(label, 1).ClickAsync();
         await Expect(form.LabelTag(label)).ToBeVisibleAsync();
         await form.Panel.Root.GetByTestId("annotation-identity").ClickAsync();
-        await form.SaveAsync();
+        await form.ClickSaveAsync();
 
         await detail.CloseAsync();
         await annotations.FilterAsync($"label:{label}");
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(2));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(2));
     }
 
     // ANN-FRM-06: Values editor: typed rows, duplicate keys and Edit all as JSON.
@@ -330,8 +326,7 @@ public sealed partial class AnnotationFormTests : PlatformTest
 
         await form.RemoveValueButton("retries").Last.ClickAsync();
         await Expect(form.DuplicateKeys).ToHaveCountAsync(0);
-        await form.SaveButton.ClickAsync();
-        await Expect(App.Toast("Annotation saved")).ToBeVisibleAsync();
+        await form.ClickSaveAsync();
 
         await detail.OpenFormAsync(key);
         await Expect(form.ValuesEditAllLabel).ToBeVisibleAsync();
@@ -387,8 +382,7 @@ public sealed partial class AnnotationFormTests : PlatformTest
 
         await form.UnitDefinition.FillAsync("0 2 * * *");
         await Expect(form.FieldMessage("Enter a unit definition.")).ToHaveCountAsync(0);
-        await form.SaveButton.ClickAsync();
-        await Expect(App.Toast("Annotation saved")).ToBeVisibleAsync();
+        await form.ClickSaveAsync();
         await Expect(form.UnitCronHint).ToHaveCountAsync(0);
 
         await form.SelectModeAsync("JSON");
@@ -474,36 +468,11 @@ public sealed partial class AnnotationFormTests : PlatformTest
         await Expect(form.Title).ToHaveValueAsync(string.Empty);
     }
 
-    // "<n> of <total>" of the filter count, whatever the view's total.
-    private static Regex CountOf(int shown)
-    {
-        return new Regex($@"^{shown} of [\d,]+$");
-    }
-
     // The whole text of an editor once it shows.
     private static async Task<string> TextOfAsync(CodeEditor editor)
     {
         await Expect(editor.Content).ToBeVisibleAsync();
         return await editor.TextAsync();
-    }
-
-    // Empties the request recorder, so the next check sees only what follows.
-    private async Task ClearRecordedRequestsAsync()
-    {
-        await Page.EvaluateAsync("() => { if (window.__requests) { window.__requests.length = 0; } }");
-    }
-
-    // Nothing was written to the annotation since the recorder was emptied: no POST of …/annotations/<key>.
-    private async Task ExpectNoWriteAsync(string key)
-    {
-        var path = $"/annotations/{Uri.EscapeDataString(key)}";
-        var writes = (await RecordedRequestsAsync())
-            .Where(request => !string.Equals(request.Method, "GET", StringComparison.OrdinalIgnoreCase) && request.Url.Contains(path, StringComparison.Ordinal))
-            .ToList();
-        if (writes.Count > 0)
-        {
-            Assert.Fail($"The form should not write {key}, but it sent {string.Join(", ", writes.Select(request => $"{request.Method} {request.Url}"))}.");
-        }
     }
 
     // The document title while the form has unsaved changes.

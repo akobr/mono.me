@@ -14,9 +14,10 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Annotations;
 public sealed partial class AnnotationBulkCreateTests : PlatformTest
 {
     // ANN-BLK-01: Bulk create a responsibility and find it in the grid.
-    // Bulk create (the toolbar on a wide screen, the command palette on a phone) creates a new responsibility; the grid
-    // (the list on a phone) filtered by its key shows it, and its detail, opened by the URL, names it. Both are
-    // virtualized, so the test looks at the filtered result only.
+    // The loaded page shows the grid (the list on a phone) and the filter. Bulk create (the toolbar on a wide screen,
+    // the command palette on a phone) creates a new responsibility, whose result replaces the form without a toast; the
+    // grid filtered by its key shows it, and its detail, opened by the URL, names it. Both are virtualized, so the test
+    // looks at the filtered result only.
     [Test]
     [Elementary]
     [TestCase(2)]
@@ -26,6 +27,8 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
         var key = PlatformData.AnnotationKey(PlatformData.Responsibility);
         var annotations = new AnnotationsPage(App, Routes);
         await annotations.OpenAsync();
+        await Expect(Page.ViewportSize is { Width: < AnnotationsPage.GridWidth } ? annotations.AnnotationList : annotations.AnnotationGrid).ToBeVisibleAsync();
+        await Expect(annotations.Filter).ToBeVisibleAsync();
 
         var bulkCreate = await annotations.OpenBulkCreateAsync();
         await bulkCreate.EnterKeysAsync(key);
@@ -33,6 +36,8 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
         await Expect(bulkCreate.ReviewRow(key)).ToContainTextAsync("New");
         await bulkCreate.CreateAsync(1);
         await Expect(bulkCreate.Result).ToHaveTextAsync("Created 1 annotation.");
+        await Expect(bulkCreate.Keys).ToHaveCountAsync(0);
+        await Expect(App.Notifications.Locator("li")).ToHaveCountAsync(0);
         await bulkCreate.CloseAsync();
 
         await annotations.FilterAsync($"key:{key}");
@@ -98,7 +103,7 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
         await bulkCreate.CancelAsync();
         await annotations.WaitForCatalogAsync();
         await annotations.FilterAsync($"subject:{subject}");
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(5));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(5));
 
         var detail = new AnnotationDetail(App, Routes);
         await detail.OpenAsync(execution);
@@ -203,7 +208,8 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
         await deleted.CancelAsync();
         await Expect(bulkCreate.Keys).ToHaveValueAsync(key);
         await Expect(bulkCreate.CreateButton(1)).ToBeVisibleAsync();
-        await ExpectOnlyLookupAsync();
+        await ExpectRequestAsync(IsDeletedKeyLookup, "the lookup of deleted keys (POST …/annotations/deleted/lookup)");
+        await ExpectNoRequestAsync(request => IsBulkCreate(request) || IsDeletedKeyRestore(request), "a bulk create (…/annotations/simple) or a restore (…/annotations/deleted/restore) after Cancel");
 
         deleted = await bulkCreate.CreateOverDeletedAsync(1);
         await deleted.RestoreAsync(DeletedKeysDialog.RestoreLabel);
@@ -214,37 +220,10 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
         await annotations.FilterAsync($"key:{key}");
         await Expect(annotations.Item(key)).ToBeVisibleAsync();
 
+        var history = new AnnotationHistory(App);
         await App.GotoAsync(Routes.AnnotationHistory(key));
-        await Expect(detail.History).ToContainTextAsync("Deleted");
-        await Expect(detail.History).ToContainTextAsync("Restored");
-    }
-
-    // "<n> of <total>" of the filter count, whatever the view's total.
-    private static Regex CountOf(int shown)
-    {
-        return new Regex($@"^{shown} of [\d,]+$");
-    }
-
-    // The create sent the deleted-key lookup and wrote nothing: no bulk create (…/annotations/simple) and no restore.
-    private async Task ExpectOnlyLookupAsync()
-    {
-        var requests = await RecordedRequestsAsync();
-        var sent = string.Join(", ", requests.Select(request => $"{request.Method} {request.Url}"));
-        if (!requests.Any(request => request.Method == "POST" && request.Url.EndsWith("/annotations/deleted/lookup", StringComparison.Ordinal)))
-        {
-            Assert.Fail($"The create did not look up the deleted keys (POST …/annotations/deleted/lookup); it sent: {sent}.");
-        }
-
-        if (requests.Any(request => request.Url.Contains("/annotations/simple", StringComparison.Ordinal) || request.Url.Contains("/annotations/deleted/restore", StringComparison.Ordinal)))
-        {
-            Assert.Fail($"Cancel in \"Deleted annotations\" still wrote: {sent}.");
-        }
-    }
-
-    // The fetches recorded so far are dropped: what the next step sends is all the recorder holds.
-    private async Task ClearRecordedRequestsAsync()
-    {
-        await Page.EvaluateAsync("() => { if (window.__requests) { window.__requests.length = 0; } }");
+        await history.WaitForEntryAsync(Routes.AnnotationHistory(key), "Restored");
+        await Expect(AnnotationHistory.ActionBadge(history.Region, "Deleted")).ToBeVisibleAsync();
     }
 
     // The placeholder of an empty time zone, "Browser time zone (<zone>)": the zone of the browser differs by profile.

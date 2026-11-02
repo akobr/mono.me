@@ -121,10 +121,11 @@ public sealed partial class AnnotationCatalogTests : PlatformTest
             "The 2 annotations and their descendants move to Deleted, with their configuration. You can restore them from Deleted for 90 days.");
         await Expect(confirm.Button("Delete 2")).ToBeVisibleAsync();
 
-        // The case expects "2 annotations deleted". The app counts the rows still selected after the deletion
-        // (AnnotationBulkBar.deleteSelected reads its keys after removeMany took them out of the catalog, and the bar
-        // re-rendered with one key before it unmounted), so it shows "1 annotations deleted"; both are accepted until it
-        // counts the deleted rows. Undo restores both deletions either way.
+        // Admin UI bug (424-152 review): AnnotationBulkBar.vue deleteSelected() reads props.keys after removeMany, so the
+        // toast says "1 annotations deleted" instead of "2 annotations deleted"; both are accepted. The bar re-rendered
+        // with one key fewer after each removal before it unmounted, so it counts the rows still selected, not the
+        // deleted ones. The outcome is checked strictly: both rows are gone, and Undo restores both ("2 annotations
+        // restored").
         await confirm.ConfirmAsync("Delete 2");
         var deletedToast = App.Toast(BulkDeletedToast());
         await Expect(deletedToast).ToBeVisibleAsync();
@@ -213,12 +214,12 @@ public sealed partial class AnnotationCatalogTests : PlatformTest
 
         await annotations.FilterAsync($"key:{key}");
         await Expect(annotations.NoMatchingAnnotations).ToBeVisibleAsync();
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(0));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(0));
 
         await annotations.ReloadCatalogButton.ClickAsync();
         await annotations.WaitForCatalogAsync();
         await Expect(annotations.Item(key)).ToBeVisibleAsync();
-        await Expect(annotations.FilterCount).ToHaveTextAsync(CountOf(1));
+        await Expect(annotations.FilterCount).ToHaveTextAsync(AnnotationsPage.FilterCountOf(1));
     }
 
     // ANN-CAT-05: Returning from another section restores the filter, detail, tab, selection and sorting.
@@ -278,12 +279,6 @@ public sealed partial class AnnotationCatalogTests : PlatformTest
         await Expect(annotations.Filter).ToHaveValueAsync(string.Empty);
     }
 
-    // "<n> of <total>" of the filter count, whatever the view's total.
-    private static Regex CountOf(int shown)
-    {
-        return new Regex($@"^{shown} of [\d,]+$");
-    }
-
     // The tree rows of the filter: the dimmed root once (kept for its matching descendants), and each key the number
     // of times it is listed (0: not at all), every one undimmed.
     private static async Task ExpectTreeAsync(AnnotationsPage annotations, string dimmed, params (string Key, int Copies)[] rows)
@@ -326,8 +321,8 @@ public sealed partial class AnnotationCatalogTests : PlatformTest
         await Expect(annotations.AnnotationRows.First.GetByRole(AriaRole.Checkbox)).ToHaveAccessibleNameAsync($"Select {key}");
     }
 
-    // The toast of the bulk delete of two rows: "2 annotations deleted", or "1 annotations deleted" of the app's count
-    // of the rows still selected (no singular form either way).
+    // The toast of the bulk delete of two rows: "2 annotations deleted", or "1 annotations deleted" of the Admin UI bug
+    // (424-152 review) that counts the rows still selected (no singular form either way).
     [GeneratedRegex("^[12] annotations deleted$")]
     private static partial Regex BulkDeletedToast();
 

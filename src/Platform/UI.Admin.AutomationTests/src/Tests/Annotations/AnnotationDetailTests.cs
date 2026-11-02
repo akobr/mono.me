@@ -269,6 +269,7 @@ public sealed partial class AnnotationDetailTests : PlatformTest
         var title = PlatformData.Title();
         var annotations = new AnnotationsPage(App, Routes);
         var detail = new AnnotationDetail(App, Routes);
+        var form = new AnnotationForm(App);
         var history = new AnnotationHistory(App);
         await annotations.OpenAsync();
         var user = await App.SignedInNameAsync();
@@ -280,9 +281,8 @@ public sealed partial class AnnotationDetailTests : PlatformTest
         await Expect(history.Region).ToContainTextAsync($"for {execution}");
 
         await detail.OpenFormAsync(execution);
-        await detail.Title.FillAsync(title);
-        await detail.SaveButton.ClickAsync();
-        await Expect(App.Toast("Annotation saved")).ToBeVisibleAsync();
+        await form.Title.FillAsync(title);
+        await form.ClickSaveAsync();
         await Expect(detail.StampsLink).ToHaveTextAsync(new Regex($@"^Created .+·\s*Updated .+ by {Regex.Escape(user)}$"));
 
         await detail.StampsLink.ClickAsync();

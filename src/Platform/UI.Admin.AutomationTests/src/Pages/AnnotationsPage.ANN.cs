@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
@@ -70,6 +71,13 @@ public sealed partial class AnnotationsPage
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return EmptyStateBlock.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
+    }
+
+    // FilterCount's "<shown> of <total>" with a filter term, whatever the view's total.
+    public static Regex FilterCountOf(int shown)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(shown);
+        return new Regex(string.Create(CultureInfo.InvariantCulture, $@"^{shown:N0} of [\d,]+$"));
     }
 
     // The chip of a filter term ("subject: <s>", "not type: exe or cnt"), found by its button "Remove <raw term>".
