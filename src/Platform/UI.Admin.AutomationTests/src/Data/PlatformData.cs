@@ -1,3 +1,5 @@
+using System.Buffers.Text;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -255,6 +257,34 @@ public sealed partial class PlatformData
         }
 
         return JsonSerializer.Serialize(document, DocumentOptions);
+    }
+
+    // A new RSA public key as PEM (SubjectPublicKeyInfo, "-----BEGIN PUBLIC KEY-----"), e.g. of a HYOK recipient, which
+    // needs 3072 bits or more. Random, not from the seed: nothing holds or needs its private key.
+    public static string RsaPublicKeyPem(int bits = 3072)
+    {
+        using var rsa = RSA.Create(bits);
+        return rsa.ExportSubjectPublicKeyInfoPem();
+    }
+
+    // A new RSA public key as a JWK, {"kty":"RSA","n":"…","e":"AQAB"} with base64url numbers, the other form a HYOK
+    // recipient takes.
+    public static string RsaPublicJwk(int bits = 3072)
+    {
+        using var rsa = RSA.Create(bits);
+        var key = rsa.ExportParameters(includePrivateParameters: false);
+        return JsonSerializer.Serialize(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["kty"] = "RSA",
+            ["n"] = Base64Url.EncodeToString(key.Modulus),
+            ["e"] = Base64Url.EncodeToString(key.Exponent),
+        });
+    }
+
+    // The id of a HYOK recipient, "at-<runId>-rcp-<hex4>-<word>-<word>": 1 to 64 of letters, digits, '_' and '-'.
+    public string RecipientId()
+    {
+        return Slug("rcp");
     }
 
     // ui-tests+<slug>@<Target:EmailDomain>: a sub-address, so the mailbox of the domain receives every invitation.

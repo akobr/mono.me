@@ -92,6 +92,19 @@ public sealed partial class App
         return Notifications.GetByText(title).Last;
     }
 
+    // A button of the newest toast of the title, e.g. "Undo" of "<key> deleted" (a deletion's toast stays 10 seconds,
+    // others about 5): click it right after the action.
+    public ILocator ToastAction(string title, string action)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(action);
+
+        return Notifications.Locator("li")
+            .Filter(new() { Has = Page.GetByText(title, new() { Exact = true }) })
+            .Last
+            .GetByRole(AriaRole.Button, new() { Name = action, Exact = true, IncludeHidden = true });
+    }
+
     // An item of the open user menu (OpenUserMenuAsync) by the start of its name: an item's name may end in its
     // shortcut ("Keyboard shortcuts?").
     public ILocator UserMenuItem(string name)

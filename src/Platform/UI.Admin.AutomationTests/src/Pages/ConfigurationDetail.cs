@@ -18,15 +18,20 @@ public sealed partial class ConfigurationDetail(App app, AppRoutes routes)
 
     public ILocator JsonMode => app.Page.GetByRole(AriaRole.Radio, new() { Name = "JSON", Exact = true });
 
-    // CodeMirror's content element, a textbox named by the editor.
-    public ILocator Editor => app.Page.GetByRole(AriaRole.Textbox, new() { Name = "Own configuration", Exact = true });
+    // The editor of the own document (JSON or YAML mode), and its CodeMirror content element.
+    public CodeEditor Document => new(app, "Own configuration");
+
+    public ILocator Editor => Document.Content;
 
     // Its name ends in the shortcut's keys (CTRL S), hence the regex; not the schema errors' "Save anyway".
     public ILocator SaveButton => app.Page.GetByRole(AriaRole.Button, new() { NameRegex = SaveName() });
 
     public ILocator EffectiveTab => app.Page.GetByRole(AriaRole.Link, new() { Name = "Effective", Exact = true });
 
-    public ILocator EffectiveDocument => app.Page.GetByRole(AriaRole.Textbox, new() { Name = "Effective configuration", Exact = true });
+    // The read-only editor of the Effective tab, and its content element.
+    public CodeEditor Effective => new(app, "Effective configuration");
+
+    public ILocator EffectiveDocument => Effective.Content;
 
     // Opens the Edit tab by its URL and waits for the empty state or the editing mode (JSON is there in every mode).
     // On a phone the detail is full screen and hides the navbar, so this does not wait for the app's user menu.
@@ -53,9 +58,7 @@ public sealed partial class ConfigurationDetail(App app, AppRoutes routes)
         ArgumentNullException.ThrowIfNull(json);
 
         await JsonMode.ClickAsync();
-        await Editor.ClickAsync();
-        await app.Page.Keyboard.PressAsync("ControlOrMeta+A");
-        await app.Page.Keyboard.InsertTextAsync(json);
+        await Document.ReplaceAsync(json);
     }
 
     // Saves the edited document once Save is enabled (the document changed and parses) and waits for the toast that
@@ -68,7 +71,7 @@ public sealed partial class ConfigurationDetail(App app, AppRoutes routes)
         ArgumentOutOfRangeException.ThrowIfLessThan(expectedVersion, 1);
 
         await Expect(SaveButton).ToBeEnabledAsync();
-        await Editor.PressAsync("ControlOrMeta+S");
+        await Document.PressSaveAsync();
         await Expect(app.Toast(string.Create(CultureInfo.InvariantCulture, $"Configuration saved (v{expectedVersion})"))).ToBeVisibleAsync();
     }
 

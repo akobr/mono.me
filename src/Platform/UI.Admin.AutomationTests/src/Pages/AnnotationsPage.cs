@@ -17,6 +17,10 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
     // The catalog loaded: "Reload the catalog" is enabled again.
     public ILocator CatalogLoaded => app.Page.GetByRole(AriaRole.Button, new() { Name = "Reload the catalog", Exact = true, Disabled = false });
 
+    // The heading of the empty state of a view without annotations (a new project's or view's), with "New annotation"
+    // and "Bulk create" for Contributors and up.
+    public ILocator EmptyState => app.Page.GetByRole(AriaRole.Heading, new() { Name = "No annotations in this view", Exact = true });
+
     // The heading of the error state of a catalog the API refused; the API's message follows it.
     public ILocator CatalogError => app.Page.GetByRole(AriaRole.Heading, new() { Name = "The catalog could not be loaded", Exact = true });
 
@@ -79,6 +83,16 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
 
         var dialog = new BulkCreateDialog(app.Page);
         await Expect(dialog.Root).ToBeVisibleAsync();
+        return dialog;
+    }
+
+    // Opens "New annotation" from the navbar ("New", or "New annotation" on a phone) once the catalog loaded, which the
+    // dialog's suggestions and its exists check read.
+    public async Task<NewAnnotationDialog> OpenNewAnnotationAsync()
+    {
+        await WaitForCatalogAsync();
+        var dialog = new NewAnnotationDialog(app);
+        await dialog.OpenAsync();
         return dialog;
     }
 
