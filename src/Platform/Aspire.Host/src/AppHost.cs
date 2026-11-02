@@ -33,10 +33,15 @@ IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvar
     _ => throw new InvalidOperationException($"Unknown Cosmos:Mode '{cosmosMode}', use 'container' or 'local'."),
 };
 
+// The fixed AuthKit staging accounts DbCreator seeds: on by default for the container emulator; in the local mode,
+// whose ConnectionStrings:cosmos can point anywhere, only with an explicit StagingSeed:Enabled (the *-local-cosmos profiles).
+var seedStagingAccounts = cosmosMode.Equals("container", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(builder.Configuration["StagingSeed:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
+
 var dbCreator = builder.AddProject<Projects.DbCreator>("db-creator")
     .WithReference(cosmos)
     .WaitFor(cosmos)
-    .WithEnvironment("stagingSeed__enabled", "true") // the AuthKit staging accounts, only into the local emulator
+    .WithEnvironment("stagingSeed__enabled", seedStagingAccounts ? "true" : "false")
     .WithExplicitStart();
 
 // The owner account DbCreator seeds (BaseAccount:Id in the user secrets of this host): under Entra ID the owner's
