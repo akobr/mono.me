@@ -22,8 +22,10 @@ The configuration value `Cosmos:Mode` picks the emulator:
 
 | Mode | Emulator | Use it when |
 |---|---|---|
-| `container` (default) | Classic Linux emulator in a persistent container (it supports the stored procedures the backend registers) | Everyday work; nothing to install besides Docker |
+| `container` (default) | Classic Linux emulator in a persistent container with the named data volume `platform-cosmos-data` (it supports the stored procedures the backend registers); x64 hosts only, it does not run on Apple silicon or Windows on Arm | Everyday work on an x64 machine; nothing to install besides Docker |
 | `local` | Windows Cosmos DB Emulator installed on the machine, reached through `ConnectionStrings:cosmos` | The Windows emulator is preferred, or triggers or UDFs are needed |
+
+The data volume was added with the .NET 10 upgrade (424-143): data of a `cosmos` container created before it is not in the volume. If you need that data, export it from the old container first (for example with the Data Migration Tool or your own queries); otherwise run `db-creator` once after the first start to seed the database again.
 
 The launch profiles `https-local-cosmos` and `http-local-cosmos` set the local mode and point at `https://localhost:8081/` with the well-known emulator key:
 
