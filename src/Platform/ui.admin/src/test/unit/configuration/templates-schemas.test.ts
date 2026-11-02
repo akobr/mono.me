@@ -304,8 +304,8 @@ describe('deleting a schema or a template', () => {
   it('shows the starter document of a missing schema as unchanged', async () => {
     const view = await mountScreen(
       SchemaDetail,
-      { target: { kind: 'type', type: 'res' } },
-      { path: '/acme/billing/default/modeling/schemas/type/res', ...echo },
+      { target: { kind: 'type', type: 'rst' } },
+      { path: '/acme/billing/default/modeling/schemas/type/rst', ...echo },
     )
     await settle(10)
 
