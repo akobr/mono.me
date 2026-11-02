@@ -15,10 +15,16 @@ const toast = useToast()
 const label = ref<string>()
 const confirmDelete = ref(false)
 const busy = ref(false)
+// The number being deleted: the catalog drops the keys (and the page the selection) while the delete runs.
+const deleting = ref<number>()
 
 const labelItems = computed(() => [...catalog.labelCounts.keys()])
 const formatter = new Intl.NumberFormat()
 const count = computed(() => formatter.format(props.keys.length))
+const deleteCount = computed(() => deleting.value ?? props.keys.length)
+
+/** "1 annotation", "2 annotations". */
+const annotations = (value: number) => `${formatter.format(value)} ${value === 1 ? 'annotation' : 'annotations'}`
 
 async function run(title: string, action: () => Promise<unknown>) {
   busy.value = true
@@ -34,25 +40,29 @@ async function run(title: string, action: () => Promise<unknown>) {
 }
 
 async function deleteSelected() {
+  // A snapshot: removeMany drops each deleted key from the catalog, so the keys prop shrinks while it runs.
+  const keys = [...props.keys]
   busy.value = true
+  deleting.value = keys.length
   try {
-    const { failed, deletions } = await actions.removeMany(props.keys)
+    const { failed, deletions } = await actions.removeMany(keys)
     confirmDelete.value = false
     if (failed.length) {
       toast.add({
-        title: `${failed.length} annotations could not be deleted`,
+        title: `${annotations(failed.length)} could not be deleted`,
         description: failed.slice(0, 5).join(', '),
         color: 'warning',
       })
     }
     // Undo restores every root of the batch with its descendants, 100 keys per request.
-    const deleted = props.keys.length - failed.length
+    const deleted = keys.length - failed.length
     if (deleted > 0) {
-      notifyDeleted(`${formatter.format(deleted)} annotations deleted`, deletions)
+      notifyDeleted(`${annotations(deleted)} deleted`, deletions)
     }
     emit('clear')
   } finally {
     busy.value = false
+    deleting.value = undefined
   }
 }
 </script>
@@ -132,9 +142,13 @@ async function deleteSelected() {
 
     <ConfirmDialog
       v-model:open="confirmDelete"
-      :title="`Delete ${count} annotations?`"
-      :description="`The ${count} annotations and their descendants move to Deleted, with their configuration. You can restore them from Deleted for 90 days.`"
-      :confirm-label="`Delete ${count}`"
+      :title="`Delete ${annotations(deleteCount)}?`"
+      :description="
+        deleteCount === 1
+          ? 'The annotation and its descendants move to Deleted, with their configuration. You can restore them from Deleted for 90 days.'
+          : `The ${annotations(deleteCount)} and their descendants move to Deleted, with their configuration. You can restore them from Deleted for 90 days.`
+      "
+      :confirm-label="`Delete ${formatter.format(deleteCount)}`"
       :loading="busy"
       @confirm="deleteSelected"
     />
