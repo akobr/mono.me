@@ -2,7 +2,7 @@
 {
   "sdk": {
     "version": "10.0.401",
-    "rollForward": "latestMajor",
+    "rollForward": "latestFeature",
     "allowPrerelease": false
   }<# if (_featureProvider.IsEnabled("build-traversal")) { #>,
   "msbuild-sdks": {

@@ -20,6 +20,7 @@ builder.Services.AddCrumble().AddCrumbs();
 
 var app = builder.Build();
 
+// No authorization: a local playground only; chain .RequireAuthorization() anywhere else.
 app.MapOrleansDashboard(routePrefix: "/dashboard");
 app.UseHttpsRedirection();
 app.MapDefaultEndpoints();
