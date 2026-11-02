@@ -14,9 +14,10 @@ import { levelMeta, serverSideLevels } from '@/utils/key-values'
 
 /**
  * Actions for the selected keys (spec 29.2): Delete and Change protection in the Active state, Restore and Purge
- * in the Deleted state. One bulk call each; the outcome is reported per key and the failed keys stay selected.
+ * in the Deleted state. One bulk call each; the outcome is reported per key and the failed keys stay selected. A
+ * selection of active and deleted keys (the All state of the list) has no actions, as a bulk call takes one state.
  */
-const props = defineProps<{ keys: string[]; state: 'Active' | 'Deleted'; allowedLevels: KeyValueProtection[]; retentionDays?: number }>()
+const props = defineProps<{ keys: string[]; state: 'Active' | 'Deleted' | 'Mixed'; allowedLevels: KeyValueProtection[]; retentionDays?: number }>()
 const emit = defineEmits<{ done: [failed: string[]] }>()
 
 const context = useContextStore()
@@ -134,6 +135,7 @@ const protectItems = computed(() =>
         <UButton label="Change protection" icon="i-lucide-arrow-right-left" color="neutral" variant="soft" size="sm" :loading="busy" />
       </UDropdownMenu>
     </template>
+    <span v-else-if="state === 'Mixed'" class="text-muted">Select only active or only deleted keys for bulk actions.</span>
     <template v-else>
       <UButton label="Restore" icon="i-lucide-undo-2" color="primary" variant="soft" size="sm" :loading="busy" @click="restore" />
       <UButton v-if="canAdmin" label="Purge" icon="i-lucide-flame" color="error" variant="soft" size="sm" :loading="busy" @click="purging = true" />

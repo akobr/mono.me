@@ -108,3 +108,60 @@ describe('Values store through the switcher', () => {
     }
   })
 })
+
+// The links of the Secrets policy open the All state, as the counts of a level in use include the deleted keys (424-159).
+describe('Values store in the All state', () => {
+  async function mountAt(path: string, expectedKey: string) {
+    const view = await mountScreen(RouterView, {}, { path, accessMap: { 'acme.billing': 'Owner' }, routes })
+    mounted.push(view)
+    await vi.waitFor(() => expect(document.body.querySelector(`[aria-label="Select ${expectedKey}"]`)).toBeTruthy())
+    return view
+  }
+
+  const row = (key: string) => document.body.querySelector(`[aria-label="Select ${key}"]`)?.closest('tr')
+  const button = (label: string) => [...document.body.querySelectorAll('button')].find((item) => item.textContent?.trim() === label)
+  const bulkBar = () => document.body.querySelector('[role="toolbar"][aria-label="Bulk actions"]')
+
+  it('lists the active and the deleted keys and marks the deleted ones', async () => {
+    await mountAt('/acme/billing/default/key-values?state=All', 'legacy.endpoint')
+
+    expect(row('db.host')).toBeTruthy()
+    expect(row('legacy.endpoint')?.textContent).toContain('Deleted')
+    expect(row('db.host')?.textContent).not.toContain('Deleted')
+    expect(row('legacy.endpoint')?.textContent).toContain('expires in')
+    // the pressed state is the solid variant; Active and Deleted stay outlined
+    expect(button('All')?.className).not.toBe(button('Active')?.className)
+    expect(button('Active')?.className).toBe(button('Deleted')?.className)
+  })
+
+  it('opens the keys of a level from the link of the Secrets policy', async () => {
+    await mountAt('/acme/billing/default/key-values?level=Standard&state=All', 'db.password')
+
+    expect(document.body.textContent).not.toContain('No deleted keys')
+    expect(row('db.host')).toBeFalsy()
+  })
+
+  it('offers no bulk action for a selection of active and deleted keys', async () => {
+    await mountAt('/acme/billing/default/key-values?state=All', 'legacy.endpoint')
+
+    document.body.querySelector<HTMLElement>('[aria-label="Select db.host"]')!.click()
+    await settle()
+    expect(bulkBar()?.textContent).toContain('Delete')
+
+    document.body.querySelector<HTMLElement>('[aria-label="Select legacy.endpoint"]')!.click()
+    await settle()
+    expect(bulkBar()?.textContent).toContain('Select only active or only deleted keys')
+    expect(bulkBar()?.textContent).not.toContain('Restore')
+    expect(bulkBar()?.textContent).not.toContain('Change protection')
+
+    document.body.querySelector<HTMLElement>('[aria-label="Select db.host"]')!.click()
+    await settle()
+    expect(bulkBar()?.textContent).toContain('Restore')
+  })
+
+  it('keeps the Deleted state to the deleted keys', async () => {
+    await mountAt('/acme/billing/default/key-values?state=Deleted', 'legacy.endpoint')
+
+    expect(row('db.host')).toBeFalsy()
+  })
+})

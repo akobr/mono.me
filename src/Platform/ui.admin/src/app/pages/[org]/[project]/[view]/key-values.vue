@@ -15,7 +15,7 @@ import AuditActorLink from '@/components/common/AuditActorLink.vue'
 import RelativeTime from '@/components/common/RelativeTime.vue'
 
 /**
- * The key/value pairs of the view (spec 29.2): search, a level filter, the Active or Deleted state, New, Import and
+ * The key/value pairs of the view (spec 29.2): search, a level filter, the Active, Deleted or All state, New, Import and
  * Export, row actions and bulk actions on the selection; the detail is a nested route.
  */
 const route = useRoute()
@@ -29,7 +29,8 @@ const canEdit = useCan('edit')
 const canSecrets = useCan('secrets')
 const canAdmin = useCan('manageAccess')
 
-const state = computed<'Active' | 'Deleted'>(() => (route.query.state === 'Deleted' || route.query.state === 'All' ? 'Deleted' : 'Active'))
+// All lists the active and the deleted keys: the links of the Secrets policy open it, as its counts include both (424-159).
+const state = computed<'Active' | 'Deleted' | 'All'>(() => (route.query.state === 'Deleted' || route.query.state === 'All' ? route.query.state : 'Active'))
 // 'all' stands for no level filter: a Select item must not have an empty-string value (reka-ui reserves it for "cleared").
 const levelFilter = computed<KeyValueProtection | 'all'>(() =>
   typeof route.query.level === 'string' && levels.includes(route.query.level as KeyValueProtection) ? (route.query.level as KeyValueProtection) : 'all',
@@ -41,7 +42,7 @@ watch(
 )
 
 const params = computed(() => ({
-  state: state.value === 'Deleted' ? 'Deleted' : undefined,
+  state: state.value === 'Active' ? undefined : state.value,
   protection: levelFilter.value === 'all' ? undefined : levelFilter.value,
   includeValues: true,
 }))
@@ -69,6 +70,21 @@ function toggle(key: string, on: boolean) {
   }
   selected.value = next
 }
+
+const isDeletedRow = (row: KeyValueSummary) => state.value === 'Deleted' || (state.value === 'All' && !!row.IsDeleted)
+
+// The bulk calls work on the keys of one state: in the All state the selection decides, and a mixed one has no actions.
+const bulkState = computed<'Active' | 'Deleted' | 'Mixed'>(() => {
+  if (state.value !== 'All') {
+    return state.value
+  }
+  const deleted = new Set((list.data.value?.Items ?? []).filter((item) => item.IsDeleted).map((item) => item.Key ?? ''))
+  const keys = [...selected.value]
+  if (keys.every((key) => deleted.has(key))) {
+    return 'Deleted'
+  }
+  return keys.some((key) => deleted.has(key)) ? 'Mixed' : 'Active'
+})
 
 const allSelected = computed(() => rows.value.length > 0 && rows.value.every((row) => selected.value.has(row.Key ?? '')))
 
@@ -182,7 +198,14 @@ const columns = computed<TableColumn<KeyValueSummary>[]>(() => [
       }),
     meta: { style: { th: 'width: 40px', td: 'width: 40px' } },
   },
-  { id: 'key', header: 'Key', cell: ({ row }) => h('code', { class: 'font-mono text-xs text-highlighted' }, row.original.Key) },
+  {
+    id: 'key',
+    header: 'Key',
+    cell: ({ row }) =>
+      state.value === 'All' && row.original.IsDeleted
+        ? h('span', { class: 'flex items-center gap-2' }, [h('code', { class: 'font-mono text-xs text-highlighted' }, row.original.Key), deletedBadge()])
+        : h('code', { class: 'font-mono text-xs text-highlighted' }, row.original.Key),
+  },
   { id: 'level', header: 'Level', cell: ({ row }) => h(KeyValueLevelBadge, { level: row.original.Protection, reference: row.original.IsReference }) },
   {
     id: 'value',
@@ -194,10 +217,10 @@ const columns = computed<TableColumn<KeyValueSummary>[]>(() => [
   { id: 'author', header: 'Author', cell: ({ row }) => h(AuditActorLink, { actor: row.original.Modified?.By, subtle: true }) },
   {
     id: 'updated',
-    header: state.value === 'Deleted' ? 'Expires' : 'Updated',
+    header: state.value === 'Deleted' ? 'Expires' : state.value === 'All' ? 'Updated / expires' : 'Updated',
     cell: ({ row }) =>
-      state.value === 'Deleted'
-        ? h('span', { class: 'text-muted' }, `in ${daysUntil(row.original.ExpiresAt) ?? '?'} days`)
+      isDeletedRow(row.original)
+        ? h('span', { class: 'text-muted' }, `${state.value === 'All' ? 'expires ' : ''}in ${daysUntil(row.original.ExpiresAt) ?? '?'} days`)
         : h(RelativeTime, { value: row.original.Modified?.At }),
   },
   {
@@ -215,6 +238,8 @@ const columns = computed<TableColumn<KeyValueSummary>[]>(() => [
 const resolveCheckbox = () => resolveComponent('UCheckbox') as Component
 const resolveDropdown = () => resolveComponent('UDropdownMenu') as Component
 const resolveButton = () => resolveComponent('UButton') as Component
+const resolveBadge = () => resolveComponent('UBadge') as Component
+const deletedBadge = () => h(resolveBadge(), { label: 'Deleted', icon: 'i-lucide-trash-2', color: 'warning', variant: 'subtle', size: 'sm' })
 
 const rowClass = (row: { original: KeyValueSummary }) =>
   row.original.Key === selectedKey.value ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_10%,var(--ui-bg))]' : ''
@@ -247,6 +272,7 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
           <UFieldGroup>
             <UButton label="Active" :color="state === 'Active' ? 'primary' : 'neutral'" :variant="state === 'Active' ? 'solid' : 'outline'" size="sm" @click="setQuery({ state: undefined })" />
             <UButton label="Deleted" :color="state === 'Deleted' ? 'primary' : 'neutral'" :variant="state === 'Deleted' ? 'solid' : 'outline'" size="sm" @click="setQuery({ state: 'Deleted' })" />
+            <UButton label="All" :color="state === 'All' ? 'primary' : 'neutral'" :variant="state === 'All' ? 'solid' : 'outline'" size="sm" @click="setQuery({ state: 'All' })" />
           </UFieldGroup>
           <span class="ms-auto text-xs text-muted">{{ rows.length }} of {{ list.data.value?.Items?.length ?? 0 }}</span>
         </div>
@@ -258,7 +284,7 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
       <KeyValueBulkBar
         v-if="selected.size"
         :keys="[...selected]"
-        :state="state"
+        :state="bulkState"
         :allowed-levels="allowedLevels"
         @done="(failed) => ((selected = new Set(failed)), refresh())"
       />
@@ -270,7 +296,7 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
         :title="search ? 'No key matches the search' : state === 'Deleted' ? 'No deleted keys' : 'No key values in this view'"
         :description="state === 'Deleted' ? 'Deleted keys can be restored here for 90 days.' : 'Key values are the configuration values and secrets that bindings (@key) insert into configurations.'"
       >
-        <UButton v-if="canEdit && state === 'Active' && !search" label="New key" icon="i-lucide-plus" @click="creating = true" />
+        <UButton v-if="canEdit && state !== 'Deleted' && !search" label="New key" icon="i-lucide-plus" @click="creating = true" />
       </EmptyState>
       <UTable
         v-else-if="desktop"
@@ -288,6 +314,7 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
           <button type="button" class="flex w-full flex-col gap-1 px-4 py-3 text-start" :aria-current="row.Key === selectedKey ? 'true' : undefined" @click="open(row.Key ?? '')">
             <span class="flex items-center gap-2">
               <code class="min-w-0 truncate font-mono text-sm font-medium">{{ row.Key }}</code>
+              <UBadge v-if="state === 'All' && row.IsDeleted" label="Deleted" icon="i-lucide-trash-2" color="warning" variant="subtle" size="sm" />
               <KeyValueLevelBadge :level="row.Protection" :reference="row.IsReference" class="ms-auto" />
             </span>
             <span class="truncate font-mono text-xs text-muted">{{ isSecretLevel(row.Protection) ? maskedValue : valuePreview(row.Value) }} · v{{ row.Version }}</span>
