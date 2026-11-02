@@ -30,6 +30,8 @@ public sealed partial class ConfigurationResolved(App app, ILocator scope)
     // The 422 of a binding the server cannot evaluate; its description is the server's message and hint.
     public ILocator BindingError => Alert(BindingErrorTitle);
 
+    public ILocator BindingErrorDescription => BindingError.Locator("[data-slot=\"description\"]");
+
     public ILocator RevealButton => scope.GetByRole(AriaRole.Button, new() { Name = "Reveal", Exact = true });
 
     // The resolved document; in the accessibility tree only once revealed.

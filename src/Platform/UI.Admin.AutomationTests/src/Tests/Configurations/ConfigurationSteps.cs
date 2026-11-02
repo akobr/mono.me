@@ -25,6 +25,16 @@ internal static class ConfigurationSteps
         await annotations.BulkCreateAsync(keys);
     }
 
+    // Creates the annotation schema of the key in Modeling (toast "Schema saved (v1)"); it applies to that annotation
+    // and its descendants only, so nothing project-wide changes. The app keeps a combined schema for 5 minutes: open
+    // the configuration with a page load afterwards.
+    public static async Task CreateAnnotationSchemaAsync(App app, AppRoutes routes, string key, string schema)
+    {
+        var schemas = new ModelingSchemaPage(app, routes);
+        await schemas.OpenAnnotationAsync(key);
+        await schemas.CreateAsync(schema);
+    }
+
     // On the open Edit tab of an annotation without an own configuration: Create empty (v1, the toast "Configuration
     // created"), then each document saved in the JSON editor as the next version (v2, v3, …).
     public static async Task StoreVersionsAsync(App app, ConfigurationDetail configuration, params string[] documents)

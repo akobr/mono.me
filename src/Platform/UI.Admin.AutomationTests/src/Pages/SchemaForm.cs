@@ -67,6 +67,37 @@ public sealed partial class SchemaForm(ILocator scope)
         return Field(pointer).GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
     }
 
+    // The frame's "fx" (not on a binding value): turns the value into a binding, "@" and the text it had.
+    public ILocator FxButton(string pointer)
+    {
+        return Button(pointer, "fx");
+    }
+
+    // The leading "fx" of a binding value's input, named "Binding reference": it opens the reference with "Use".
+    public ILocator BindingReferenceButton(string pointer)
+    {
+        return Button(pointer, "Binding reference");
+    }
+
+    // The line under a binding value that explains it ("Function config: Reads a value …") or warns of a likely
+    // mistake. A data attribute: the line has no role or name.
+    public ILocator BindingExplanation(string pointer)
+    {
+        return Field(pointer).Locator("[data-binding-explanation]");
+    }
+
+    // The note under every binding value.
+    public ILocator BindingNote(string pointer)
+    {
+        return Field(pointer).GetByText("Evaluated by the server; schema checks run after evaluation.", new() { Exact = true });
+    }
+
+    // Turns a binding value back into a literal: the text without its leading "@".
+    public ILocator ConvertToValueButton(string pointer)
+    {
+        return Button(pointer, "Convert to value");
+    }
+
     // Fills the input and leaves it with Tab, so a number control commits its value.
     public async Task FillAsync(ILocator input, string value)
     {
