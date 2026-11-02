@@ -5,9 +5,12 @@ using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Access;
 
+// Sign In and Account: signing in and out, the login, callback and unsupported pages, the Account page and a new
+// user's onboarding.
 [Area(Area.Access)]
 public sealed class SignInTests : PlatformTest
 {
+    // ACC-SGN-01: A signed-in user sees the organizations and the target project.
     // The context starts signed in (the cached sign-in of the pool user, or the mock's user): /orgs lists the default
     // organization with its default project.
     [Test]

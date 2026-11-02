@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
@@ -30,12 +29,16 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
 
     private bool HasGrid => app.Page.ViewportSize is not { Width: < GridWidth };
 
-    // The row (grid) or the item (list) of an annotation; only rows in view exist, so filter first.
+    // The row (grid) or the item (list) of an annotation, by the exact key in its Key cell (the grid) or its key line
+    // (the list): not a row of a longer key that starts with it. Only rows in view exist, so filter first.
     public ILocator Item(string key)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var keyText = app.Page.GetByText(key, new() { Exact = true });
         return HasGrid
-            ? app.Page.GetByRole(AriaRole.Grid, new() { Name = "Annotations", Exact = true }).GetByRole(AriaRole.Row).Filter(new() { HasText = key })
-            : app.Page.GetByRole(AriaRole.List, new() { Name = "Annotations", Exact = true }).GetByRole(AriaRole.Listitem).Filter(new() { HasText = key });
+            ? app.Page.GetByRole(AriaRole.Grid, new() { Name = "Annotations", Exact = true }).GetByRole(AriaRole.Row).Filter(new() { Has = keyText })
+            : app.Page.GetByRole(AriaRole.List, new() { Name = "Annotations", Exact = true }).GetByRole(AriaRole.Listitem).Filter(new() { Has = keyText });
     }
 
     public async Task OpenAsync()
@@ -50,12 +53,14 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
         await Expect(ReloadCatalogButton).ToBeEnabledAsync();
     }
 
+    // Types the query into the filter and waits until it applied: the debounced URL has exactly ?q=<query>, or no q for
+    // an empty query, so a second filter or a page opened with ?q= does not return early.
     public async Task FilterAsync(string query)
     {
         ArgumentNullException.ThrowIfNull(query);
 
         await Filter.FillAsync(query);
-        await Expect(app.Page).ToHaveURLAsync(FilterApplied());
+        await app.ExpectQueryAsync("q", query.Length == 0 ? null : query);
     }
 
     // The toolbar button on a wide screen, the command palette's "Bulk create annotations" on a phone; both wait for
@@ -93,7 +98,4 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
 
         await dialog.CloseAsync();
     }
-
-    [GeneratedRegex(@"[?&]q=")]
-    private static partial Regex FilterApplied();
 }

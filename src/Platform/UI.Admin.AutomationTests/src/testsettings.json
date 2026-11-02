@@ -10,7 +10,10 @@
     "View": "default",
     "SignIn": "AuthKit",
     "MockScenario": null,
-    "EmailDomain": "example.com"
+    "EmailDomain": "example.com",
+    // { "<Role>": "<org>/<project>[/<view>]" }: a project where every pool user holds the role, for the tests of that
+    // role ([UserRole]); a role without an entry leases a pool user who holds it in Target:Project.
+    "RoleProjects": {}
   },
   "Browser": {
     "Provider": "Local",

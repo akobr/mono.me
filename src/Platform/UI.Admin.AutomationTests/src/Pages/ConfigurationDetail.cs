@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
@@ -58,15 +59,17 @@ public sealed partial class ConfigurationDetail(App app, AppRoutes routes)
     }
 
     // Saves the edited document once Save is enabled (the document changed and parses) and waits for the toast that
-    // names the new version, the only sign of the save; the test asserts the version it expects. With the editor's
-    // shortcut, not a click: the toast of the step before ("Configuration created") covers the Save button at the
-    // bottom right for its 5 seconds, and a pointer on a toast keeps it open. A document its schema rejects gets no
-    // toast but the panel "The configuration does not match its schema".
-    public async Task SaveAsync()
+    // names exactly the expected new version, the only sign of the save: the toast of an earlier save, still on screen,
+    // does not count. With the editor's shortcut, not a click: the toast of the step before ("Configuration created")
+    // covers the Save button at the bottom right for its 5 seconds, and a pointer on a toast keeps it open. A document
+    // its schema rejects gets no toast but the panel "The configuration does not match its schema".
+    public async Task SaveAsync(int expectedVersion)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(expectedVersion, 1);
+
         await Expect(SaveButton).ToBeEnabledAsync();
         await Editor.PressAsync("ControlOrMeta+S");
-        await Expect(app.Toast(SavedToast())).ToBeVisibleAsync();
+        await Expect(app.Toast(string.Create(CultureInfo.InvariantCulture, $"Configuration saved (v{expectedVersion})"))).ToBeVisibleAsync();
     }
 
     public async Task<ILocator> OpenEffectiveAsync()
@@ -78,9 +81,6 @@ public sealed partial class ConfigurationDetail(App app, AppRoutes routes)
 
     [GeneratedRegex("^Save(?! anyway)")]
     private static partial Regex SaveName();
-
-    [GeneratedRegex(@"^Configuration saved \(v\d+\)$")]
-    private static partial Regex SavedToast();
 
     [GeneratedRegex(@"/effective(?:[?#].*)?$")]
     private static partial Regex EffectivePath();
