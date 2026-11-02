@@ -16,9 +16,6 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.KeyValues;
 [Area(Area.KeyValues)]
 public sealed partial class KeyValueSecretTests : PlatformTest
 {
-    // What the API answers a policy with HSM where the deployment has no HSM provider (501 ProtectionNotConfigured).
-    private const string HsmNotConfigured = "The protection level 'Hsm' is not configured in this deployment.";
-
     // The warning toast of the secret's copy button.
     private const string SecretCopiedTitle = "The clipboard contains a secret";
 
@@ -42,7 +39,7 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await keyValues.OpenAsync();
         await keyValues.OpenNewKeyAsync();
         await keyValues.NewKeySecret.SetCheckedAsync(true);
-        await keyValues.PickAsync(keyValues.NewKeyLevel, "Standard");
+        await App.PickOptionAsync(keyValues.NewKeyLevel, "Standard");
         await Expect(keyValues.NewKeyText("Encrypted in the database with a software key of the project in Azure Key Vault.")).ToBeVisibleAsync();
 
         await keyValues.NewKeyName.FillAsync(key);
@@ -158,7 +155,7 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await Expect(revealed).ToHaveTextAsync(second);
 
         await detail.SetNewValueButton.ClickAsync();
-        await keyValues.PickAsync(detail.NewLevel, "Public");
+        await App.PickOptionAsync(detail.NewLevel, "Public");
         await Expect(detail.Text("Older versions keep their Standard level until they expire. The secret becomes public for every reader.")).ToBeVisibleAsync();
 
         await detail.NewValue.FillAsync(publicValue);
@@ -194,18 +191,8 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         var secret = PlatformData.Slug("secret");
         var project = await CreateDisposableProjectAsync();
 
-        var settings = new ProjectSettingsPage(App, project);
-        await settings.OpenAsync("secrets");
-        await settings.AllowLevelAsync("HSM");
-        var refusal = await settings.SaveSecretsPolicyOrReadRefusalAsync();
-        if (refusal == HsmNotConfigured)
-        {
-            Skip.Test(refusal);
-        }
-        else if (refusal is not null)
-        {
-            throw new InvalidOperationException($"The secrets policy with HSM of the project {project.Project} was refused: {refusal}");
-        }
+        await new ProjectSettingsPage(App, project).OpenAsync("secrets");
+        await new AllowedLevelsCard(App, project).AllowLevelOrSkipAsync("HSM");
 
         var keyValues = new KeyValuesPage(App, project);
         await keyValues.OpenAsync();
@@ -271,7 +258,7 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await keyValues.OpenAsync();
         await keyValues.OpenNewKeyAsync();
         await keyValues.NewKeySecret.SetCheckedAsync(true);
-        await keyValues.PickAsync(keyValues.NewKeyLevel, "HYOK");
+        await App.PickOptionAsync(keyValues.NewKeyLevel, "HYOK");
         await Expect(keyValues.NewKeyText(oneRecipient)).ToBeVisibleAsync();
 
         await keyValues.NewKeyName.FillAsync(key);
@@ -287,7 +274,7 @@ public sealed partial class KeyValueSecretTests : PlatformTest
         await Expect(detail.Text(recipient)).ToBeVisibleAsync();
 
         var puts = (await RecordedRequestsAsync())
-            .Where(request => request.Method == "PUT" && new Uri(request.Url).AbsolutePath.EndsWith($"/key-values/{detail.Key}", StringComparison.Ordinal))
+            .Where(request => request.Method == "PUT" && request.Path.EndsWith($"/key-values/{detail.Key}", StringComparison.Ordinal))
             .ToList();
         if (puts.Count != 1)
         {

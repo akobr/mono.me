@@ -1,5 +1,3 @@
-using System.Buffers.Text;
-using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Data;
@@ -34,15 +32,7 @@ public sealed partial class PlatformData
     // RSA key of 2048 bits and its kid, without any private member (d, p, q, dp, dq, qi), which the API refuses.
     public string PublicRsaJwks()
     {
-        using var rsa = RSA.Create(2048);
-        var key = rsa.ExportParameters(includePrivateParameters: false);
-        var jwk = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["kty"] = "RSA",
-            ["kid"] = Slug("kid"),
-            ["n"] = Base64Url.EncodeToString(key.Modulus),
-            ["e"] = Base64Url.EncodeToString(key.Exponent),
-        };
+        var jwk = RsaJwk(2048, Slug("kid"));
         return JsonSerializer.Serialize(new Dictionary<string, object>(StringComparer.Ordinal) { ["keys"] = new[] { jwk } });
     }
 }

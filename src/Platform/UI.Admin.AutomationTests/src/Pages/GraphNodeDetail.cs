@@ -18,30 +18,29 @@ public sealed partial class GraphNodeDetail(App app, AppRoutes routes)
 
     public ILocator Identity => Detail.Identity;
 
-    public ILocator AnnotationTab => Panel.Root.GetByRole(AriaRole.Link, new() { Name = "Annotation", Exact = true });
+    public ILocator AnnotationTab => Detail.AnnotationTabLink;
 
-    public ILocator HistoryTab => Panel.Root.GetByRole(AriaRole.Link, new() { Name = "History", Exact = true });
+    public ILocator HistoryTab => Detail.HistoryTabLink;
 
     // The content of the History tab.
     public ILocator HistoryRegion => Panel.Root.GetByRole(AriaRole.Region, new() { Name = "History", Exact = true });
 
-    public ILocator Breadcrumb => Panel.Root.GetByRole(AriaRole.Navigation, new() { Name = "Annotation ancestors", Exact = true });
+    public ILocator Breadcrumb => Detail.AncestorsBreadcrumb;
 
     // The breadcrumb's last item, the annotation itself ("Execution <c>").
-    public ILocator BreadcrumbCurrent => Breadcrumb.Locator("[aria-current=page]");
+    public ILocator BreadcrumbCurrent => Detail.AncestorsBreadcrumbCurrent;
 
-    public ILocator LineageButton => Panel.Root.GetByRole(AriaRole.Button, new() { Name = "Lineage", Exact = true });
+    public ILocator LineageButton => Detail.AncestorLineageButton;
 
-    // The open popover of Lineage, a dialog named by its button.
-    public ILocator Lineage => app.Page.GetByRole(AriaRole.Dialog, new() { Name = "Lineage", Exact = true });
+    // The open popover of Lineage.
+    public ILocator Lineage => Detail.AncestorLineage;
 
-    public ILocator LineageHeading => Lineage.GetByText("Ancestors, applied top to bottom", new() { Exact = true });
+    public ILocator LineageHeading => Lineage.GetByText(AnnotationDetail.LineageHeadingText, new() { Exact = true });
 
     // "<key> does not exist in this view. It may have been deleted permanently."
     public ILocator NotFoundDescription(string key)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return Panel.Root.GetByText($"{key} does not exist in this view. It may have been deleted permanently.", new() { Exact = true });
+        return Detail.NotFoundDescription(key);
     }
 
     // A link of the breadcrumb by its text, the type label and the last key part: "Subject <s>", "Context <c>".

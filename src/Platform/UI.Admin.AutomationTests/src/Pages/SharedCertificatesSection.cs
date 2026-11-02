@@ -22,7 +22,7 @@ public sealed partial class SharedCertificatesSection(App app)
 
     public ILocator IssueButton => Root.GetByRole(AriaRole.Button, new() { Name = "Issue certificate", Exact = true });
 
-    public ILocator CertificatesDisabled => AccessLocators.Alert(Root, "Shared certificates are disabled");
+    public ILocator CertificatesDisabled => NuxtLocators.Alert(Root, "Shared certificates are disabled");
 
     public ILocator NoSharedCertificates => Root.GetByRole(AriaRole.Heading, new() { Name = "No shared certificates", Exact = true });
 

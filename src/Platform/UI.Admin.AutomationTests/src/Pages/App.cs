@@ -66,6 +66,9 @@ public sealed partial class App
     // action.
     public ILocator Notifications => Page.GetByRole(AriaRole.Region, new() { Name = "Notifications (F8)", Exact = true, IncludeHidden = true });
 
+    // Every toast on screen (an li of the toaster); none while nothing was announced.
+    public ILocator ShownToasts => Notifications.Locator("li");
+
     // Shown instead of the page of an organization or a project the user has no role in (or that does not exist: the
     // app tells them apart only by the user's memberships).
     public ILocator NoAccessHeading => Page.GetByRole(AriaRole.Heading, new() { Name = "You have no access here", Exact = true });
@@ -92,17 +95,38 @@ public sealed partial class App
         return Notifications.GetByText(title).Last;
     }
 
+    // The newest whole toast (its li: the title, the description and the actions) that has the text, its title or its
+    // description (e.g. the downloaded file's name).
+    public ILocator ToastItem(string title)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        return ShownToasts.Filter(new() { Has = Page.GetByText(title, new() { Exact = true }) }).Last;
+    }
+
+    public ILocator ToastItem(Regex title)
+    {
+        ArgumentNullException.ThrowIfNull(title);
+        return ShownToasts.Filter(new() { Has = Page.GetByText(title) }).Last;
+    }
+
+    // The description of the newest toast of the title (Nuxt UI's description slot), e.g. the API's message under "The
+    // recipient was not changed"; assert it right after the action, like the toast.
+    public ILocator ToastDescriptionOf(string title)
+    {
+        return ToastItem(title).Locator("[data-slot='description']");
+    }
+
+    public ILocator ToastDescriptionOf(Regex title)
+    {
+        return ToastItem(title).Locator("[data-slot='description']");
+    }
+
     // A button of the newest toast of the title, e.g. "Undo" of "<key> deleted" (a deletion's toast stays 10 seconds,
     // others about 5): click it right after the action.
     public ILocator ToastAction(string title, string action)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
-
-        return Notifications.Locator("li")
-            .Filter(new() { Has = Page.GetByText(title, new() { Exact = true }) })
-            .Last
-            .GetByRole(AriaRole.Button, new() { Name = action, Exact = true, IncludeHidden = true });
+        return ToastItem(title).GetByRole(AriaRole.Button, new() { Name = action, Exact = true, IncludeHidden = true });
     }
 
     // An item of the open user menu (OpenUserMenuAsync) by the start of its name: an item's name may end in its
@@ -125,6 +149,18 @@ public sealed partial class App
     {
         ArgumentNullException.ThrowIfNull(name);
         return CommandPalette.GetByRole(AriaRole.Option, new() { NameRegex = name });
+    }
+
+    // Picks the option of a select (a Nuxt UI select or select menu: a button or a combobox that opens a listbox) by
+    // its exact name and waits until the select shows it.
+    public async Task PickOptionAsync(ILocator select, string option)
+    {
+        ArgumentNullException.ThrowIfNull(select);
+        ArgumentException.ThrowIfNullOrWhiteSpace(option);
+
+        await select.ClickAsync();
+        await Page.GetByRole(AriaRole.Option, new() { Name = option, Exact = true }).ClickAsync();
+        await Expect(select).ToHaveTextAsync(option);
     }
 
     // path: a path of the app without the base, e.g. "orgs" or "acme/billing/default/annotations" (AppRoutes).
@@ -278,9 +314,26 @@ public sealed partial class App
 
         var input = await OpenPaletteAsync();
         await input.FillAsync(command);
-        var best = CommandPalette.GetByRole(AriaRole.Option).First;
-        await Expect(best).ToHaveAccessibleNameAsync(new Regex($"^{Regex.Escape(command)}"));
-        await best.ClickAsync();
+        await PickFirstPaletteOptionAsync(new Regex($"^{Regex.Escape(command)}"));
+    }
+
+    // Picks the first option of the open command palette (OpenPaletteAsync, then the search filled) once its whole name
+    // is the expected one: the palette filters about 100 ms after the input, and until then the unfiltered options move
+    // under the pointer. Returns once the palette closed.
+    public async Task PickFirstPaletteOptionAsync(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        await PickFirstPaletteOptionAsync(new Regex($"^{Regex.Escape(name)}$"));
+    }
+
+    // Picks the first option of the open command palette once its name matches.
+    public async Task PickFirstPaletteOptionAsync(Regex name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        var first = CommandPalette.GetByRole(AriaRole.Option).First;
+        await Expect(first).ToHaveAccessibleNameAsync(name);
+        await first.ClickAsync();
         await Expect(CommandPalette).ToBeHiddenAsync();
     }
 

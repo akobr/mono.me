@@ -72,7 +72,7 @@ public sealed class ModelingCompareTests : PlatformTest
     private async Task ExpectDiffAsync(ModelingComparePage compare, string view, string otherView, string here, string there)
     {
         await Expect(compare.DiffSummary).ToHaveTextAsync(OneChange);
-        if (Page.ViewportSize is not { Width: < ModelingComparePage.SplitDiffWidth })
+        if (Page.ViewportSize is not { Width: < VersionsView.SplitDiffWidth })
         {
             await Expect(compare.DiffEditors).ToHaveCountAsync(2);
             await Expect(compare.DiffEditors.Nth(0)).ToContainTextAsync($"\"atCompare\": \"{here}\"");

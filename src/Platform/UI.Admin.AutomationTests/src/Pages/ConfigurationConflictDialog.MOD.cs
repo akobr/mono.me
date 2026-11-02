@@ -8,15 +8,12 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // which shows the diff side by side with its labels also below lg, where "Auto" is unified.
 public sealed partial class ConfigurationConflictDialog
 {
-    // From this width (lg) the diff is side by side with its labels.
-    public const int SplitDiffWidth = 1024;
-
     public ILocator SplitLayoutTab => Root.GetByRole(AriaRole.Tab, new() { Name = "Split", Exact = true });
 
     // Shows the diff side by side with its labels: "Split" below lg; nothing from lg.
     public async Task ShowSplitDiffAsync()
     {
-        if (app.Page.ViewportSize is { Width: < SplitDiffWidth })
+        if (app.Page.ViewportSize is { Width: < VersionsView.SplitDiffWidth })
         {
             await SplitLayoutTab.ClickAsync();
             await Expect(SplitLayoutTab).ToHaveAttributeAsync("aria-selected", "true");

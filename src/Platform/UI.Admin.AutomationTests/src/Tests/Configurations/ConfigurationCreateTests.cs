@@ -231,7 +231,7 @@ public sealed class ConfigurationCreateTests : PlatformTest
         // gone, not the list's empty state: from 768 px the list beside the detail shows it already after the delete.
         var list = new ConfigurationsPage(App, Routes);
         await configuration.ConfigurationPanel.LeaveButton.ClickAsync();
-        await new DiscardChangesDialog(App).DiscardIfShownAsync(configuration.DetailGone);
+        await new DiscardChangesDialog(App).DiscardIfShownAsync(configuration.ConfigurationPanel.Gone);
         await Expect(configuration.ConfigurationPanel.Root).ToBeHiddenAsync();
         await App.ExpectAtAsync(Routes.Configurations);
         await App.ExpectQueryAsync("q", filter);

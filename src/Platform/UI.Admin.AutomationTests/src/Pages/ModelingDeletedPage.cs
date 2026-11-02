@@ -25,8 +25,6 @@ public sealed partial class ModelingDeletedPage(App app, AppRoutes routes)
 
     public ILocator ShowCascaded => app.Page.GetByRole(AriaRole.Switch, new() { Name = "Show cascaded", Exact = true });
 
-    public ILocator NothingDeleted => app.Page.GetByRole(AriaRole.Heading, new() { Name = "Nothing is deleted", Exact = true });
-
     // The column of the roots, there with Show cascaded.
     public ILocator RootColumn => app.Page.GetByRole(AriaRole.Columnheader, new() { Name = "Root", Exact = true });
 

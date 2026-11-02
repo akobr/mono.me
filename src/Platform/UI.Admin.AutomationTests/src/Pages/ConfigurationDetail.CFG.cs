@@ -18,12 +18,6 @@ public sealed partial class ConfigurationDetail
     // The detail's region, named by the annotation key.
     public DetailPanel ConfigurationPanel => new(app, "configuration-detail");
 
-    // The page once the detail is gone (Close, Back to the list): the body while no section#configuration-detail is in
-    // it. Unlike ToBeHiddenAsync of the panel it combines with Or, e.g. as the outcome of
-    // DiscardChangesDialog.DiscardIfShownAsync; the list's own state cannot be that outcome, because from 768 px the list
-    // stays shown beside the detail.
-    public ILocator DetailGone => app.Page.Locator("body:not(:has(section#configuration-detail))");
-
     // The empty state's heading (an h2) of an annotation without an own configuration.
     public ILocator NoConfigurationHeading => ConfigurationPanel.Root.GetByRole(AriaRole.Heading, new() { Name = "No configuration yet", Exact = true });
 
@@ -39,10 +33,6 @@ public sealed partial class ConfigurationDetail
     // The header's "Annotation" button, a link to the annotation (without the list's q); not the sidebar's
     // "Annotations".
     public ILocator AnnotationLink => ConfigurationPanel.Root.GetByRole(AriaRole.Link, new() { Name = "Annotation", Exact = true });
-
-    public ILocator VersionsTab => ConfigurationPanel.Root.GetByRole(AriaRole.Link, new() { Name = "Versions", Exact = true });
-
-    public ILocator SchemaTab => ConfigurationPanel.Root.GetByRole(AriaRole.Link, new() { Name = "Schema", Exact = true });
 
     public ILocator DeleteOwnButton => ConfigurationPanel.Root.GetByRole(AriaRole.Button, new() { Name = "Delete own", Exact = true });
 
@@ -113,8 +103,7 @@ public sealed partial class ConfigurationDetail
 
     // The popover of Lineage (teleported to the body): a numbered item per level of ancestors in merge order, each
     // ancestor a link named by its key, and last the annotation's own key.
-    public ILocator LineagePopover => app.Page.GetByRole(AriaRole.Dialog)
-        .Filter(new() { Has = app.Page.GetByText("Ancestors, applied top to bottom", new() { Exact = true }) });
+    public ILocator LineagePopover => AnnotationDetail.LineagePopoverOf(app.Page);
 
     public ILocator LineageLevels => LineagePopover.GetByRole(AriaRole.Listitem);
 
@@ -210,7 +199,7 @@ public sealed partial class ConfigurationDetail
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tab);
 
-        await ConfigurationPanel.Root.GetByRole(AriaRole.Link, new() { Name = tab, Exact = true }).ClickAsync();
+        await TabLink(tab).ClickAsync();
         await Expect(app.Page).ToHaveURLAsync(new Regex($"/{Regex.Escape(tab.ToLowerInvariant())}(?:[?#].*)?$"));
     }
 

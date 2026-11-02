@@ -92,7 +92,7 @@ public sealed partial class ViewsPage
     public Regex CompareHref(string view)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(view);
-        return new Regex($"/{Regex.Escape((routes with { View = AppRoutes.DefaultView }).Compare(view))}$");
+        return AppRoutes.HrefEndingWith((routes with { View = AppRoutes.DefaultView }).Compare(view));
     }
 
     // The view's Compare is disabled: aria-disabled and without href (the default view's own row).

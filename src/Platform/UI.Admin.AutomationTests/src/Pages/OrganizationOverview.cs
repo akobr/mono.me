@@ -52,14 +52,20 @@ public sealed partial class OrganizationOverview(App app, AppRoutes routes)
         await Expect(Heading).ToBeVisibleAsync();
     }
 
+    // Opens "New project" and returns once its dialog shows; only an Owner of the organization has it enabled.
+    public async Task OpenNewProjectAsync()
+    {
+        await NewProjectButton.ClickAsync();
+        await Expect(NewProjectDialog).ToBeVisibleAsync();
+    }
+
     // Fills and submits "New project"; the dialog closes once the project exists, and the app opens its annotations
     // (the toast "Project <name> created" says so).
     public async Task CreateProjectAsync(string project, string? description = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(project);
 
-        await NewProjectButton.ClickAsync();
-        await Expect(NewProjectDialog).ToBeVisibleAsync();
+        await OpenNewProjectAsync();
         await ProjectName.FillAsync(project);
         if (description is not null)
         {

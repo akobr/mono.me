@@ -65,13 +65,6 @@ public sealed partial class OrganizationsPage
         await Expect(NewOrganizationDialog).ToBeHiddenAsync();
     }
 
-    // Creates an organization with its first project through "New organization"; returns once the dialog closed.
-    public async Task CreateOrganizationAsync(string organization, string project, string? description = null)
-    {
-        await OpenNewOrganizationAsync();
-        await SubmitNewOrganizationAsync(organization, project, description);
-    }
-
     [GeneratedRegex("^Organization")]
     private static partial Regex OrganizationLabel();
 

@@ -18,6 +18,14 @@ public sealed partial class MockApi(App app, AppRoutes routes)
 
     private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
 
+    // A path of the API below the view of the routes, for FetchAsync: ViewPath("annotations/simple") is
+    // "v1/<organization>/<project>/<view>/annotations/simple".
+    public string ViewPath(string rest)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rest);
+        return $"v1/{routes.Organization}/{routes.Project}/{routes.View}/{rest.TrimStart('/')}";
+    }
+
     // Sends a request to the mock API with the page's fetch and returns the answer. path: below the API base, e.g.
     // "v1/access/account" or "v1/acme/billing/default/annotations/simple"; body: serialized as JSON when not a string.
     // Waits until the service worker controls the page, so the page must show the app (any App.GotoAsync) first.

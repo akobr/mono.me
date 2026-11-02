@@ -1,5 +1,4 @@
 using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
@@ -44,12 +43,5 @@ public sealed partial class OrganizationOverview
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         return NewProjectDialog.GetByText(message, new() { Exact = true });
-    }
-
-    // Opens "New project" and returns once its dialog shows; only an Owner of the organization has it enabled.
-    public async Task OpenNewProjectAsync()
-    {
-        await NewProjectButton.ClickAsync();
-        await Expect(NewProjectDialog).ToBeVisibleAsync();
     }
 }

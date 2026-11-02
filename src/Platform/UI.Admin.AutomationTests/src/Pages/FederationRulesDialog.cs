@@ -21,13 +21,13 @@ public sealed partial class FederationRulesDialog(App app, string machineId)
 
     public FederationRuleGroup Rule(int number)
     {
-        return new FederationRuleGroup(app, Root, number);
+        return new FederationRuleGroup(Root, number);
     }
 
     // The error alert of a refused save, by the API's message.
     public ILocator Failure(string message)
     {
-        return AccessLocators.Message(Root, message);
+        return NuxtLocators.Message(Root, message);
     }
 
     public async Task WaitForOpenAsync()

@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
@@ -11,7 +10,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Modeling;
 // old URLs of the merged pages, the locks of a Reader and of a Contributor, the remembered tab and the Discard changes?
 // guard of a dirty editor.
 [Area(Area.Modeling)]
-public sealed partial class ModelingTabsTests : PlatformTest
+public sealed class ModelingTabsTests : PlatformTest
 {
     // MOD-TAB-01: Modeling opens on Schemas and every tab opens its own page.
     // The plain …/modeling opens Schemas, and an Administrator gets the five tabs in their order. Each click opens its
@@ -299,10 +298,10 @@ public sealed partial class ModelingTabsTests : PlatformTest
         await schema.OpenAnnotationAsync(key);
         await schema.CreateAsync("""{"type":"object","properties":{"note":{"type":"string"}}}""");
         await Expect(schema.SaveButton).ToBeDisabledAsync();
-        await Expect(Page).Not.ToHaveTitleAsync(DirtyTitle());
+        await Expect(Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
 
         await schema.ReplaceInDocumentAsync("\"string\"", "\"number\"");
-        await Expect(Page).ToHaveTitleAsync(DirtyTitle());
+        await Expect(Page).ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
         await Expect(schema.SaveButton).ToBeEnabledAsync();
 
         var discard = new DiscardChangesDialog(App);
@@ -319,7 +318,7 @@ public sealed partial class ModelingTabsTests : PlatformTest
         await discard.DiscardAsync();
         await App.ExpectAtAsync(Routes.ModelingTab("templates"));
         await modeling.ExpectSelectedAsync("Templates");
-        await Expect(Page).Not.ToHaveTitleAsync(DirtyTitle());
+        await Expect(Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
 
         await schema.OpenAnnotationAsync(key);
         await Expect(schema.Document.Content).ToContainTextAsync("\"string\"");
@@ -332,8 +331,4 @@ public sealed partial class ModelingTabsTests : PlatformTest
         await Expect(modeling.ContributorsOnlyDescription).ToBeVisibleAsync();
         await Expect(modeling.AllTabs).ToHaveCountAsync(0);
     }
-
-    // The page title of an editor with unsaved changes starts with "● " (U+25CF and a space).
-    [GeneratedRegex("^● ")]
-    private static partial Regex DirtyTitle();
 }

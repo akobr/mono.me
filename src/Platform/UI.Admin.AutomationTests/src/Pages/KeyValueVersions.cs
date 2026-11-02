@@ -99,12 +99,10 @@ public sealed partial class KeyValueVersions(App app, ILocator scope)
         });
     }
 
-    // Nuxt UI's card around a heading (h3) of the tab: the heading's nearest data-slot="root".
+    // Nuxt UI's card around a heading (h3) of the tab.
     private ILocator Card(string heading)
     {
-        return scope
-            .GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true, Level = 3 })
-            .Locator("xpath=ancestor::*[@data-slot='root'][1]");
+        return NuxtLocators.Card(scope, heading, 3);
     }
 
     private ILocator RowButton(int version, string label)

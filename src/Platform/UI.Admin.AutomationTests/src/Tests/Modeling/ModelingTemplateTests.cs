@@ -102,7 +102,7 @@ public sealed class ModelingTemplateTests : PlatformTest
             // so the editor keeps {} with Create, a change of its own; the fixed app shows "No responsibility template".
             await template.Document.ExpectTextAsync("{}");
             await template.Panel.LeaveButton.ClickAsync();
-            await new DiscardChangesDialog(App).DiscardIfAskedAsync();
+            await new DiscardChangesDialog(App).DiscardIfShownAsync(template.Panel.Gone);
             await Expect(template.Panel.Root).ToBeHiddenAsync();
         }
 
@@ -193,9 +193,10 @@ public sealed class ModelingTemplateTests : PlatformTest
     {
         if (Target.IsMock)
         {
-            var answer = await new MockApi(App, project).FetchAsync(
+            var mock = new MockApi(App, project);
+            var answer = await mock.FetchAsync(
                 "PUT",
-                $"v1/{project.Organization}/{project.Project}/{project.View}/template/{PlatformData.Responsibility}",
+                mock.ViewPath($"template/{PlatformData.Responsibility}"),
                 new Dictionary<string, int> { ["retries"] = retries });
             await Assert.That(answer.Status).IsEqualTo(200);
             await Assert.That(answer.Json()?["Version"]?.GetValue<int>()).IsEqualTo(expectedVersion);

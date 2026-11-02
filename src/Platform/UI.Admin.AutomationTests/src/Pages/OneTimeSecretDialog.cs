@@ -20,15 +20,15 @@ public sealed partial class OneTimeSecretDialog(App app, string title)
 
     public ILocator Root => app.Page.GetByRole(AriaRole.Dialog, new() { Name = title, Exact = true });
 
-    public ILocator ShownOnlyOnce => AccessLocators.Alert(Root, "Shown only once");
+    public ILocator ShownOnlyOnce => NuxtLocators.Alert(Root, "Shown only once");
 
     // What closing the dialog discards, the description of ShownOnlyOnce.
-    public ILocator DiscardHint => AccessLocators.AlertDescription(Root, "Shown only once");
+    public ILocator DiscardHint => NuxtLocators.AlertDescription(Root, "Shown only once");
 
     // The id after "Id": the machine id, or a shared certificate's thumbprint.
     public ILocator Id => Root.GetByText("Id", new() { Exact = true }).Locator("xpath=following-sibling::code[1]");
 
-    public ILocator ApiKeyField => AccessLocators.Field(Root, "API key");
+    public ILocator ApiKeyField => NuxtLocators.Field(Root, "API key");
 
     public ILocator ApiKey => ApiKeyField.Locator("code");
 
@@ -36,9 +36,9 @@ public sealed partial class OneTimeSecretDialog(App app, string title)
 
     public ILocator DownloadPfxButton => Root.GetByRole(AriaRole.Button, new() { Name = "Download .pfx", Exact = true });
 
-    public ILocator CertificatePasswordField => AccessLocators.Field(Root, "Certificate password");
+    public ILocator CertificatePasswordField => NuxtLocators.Field(Root, "Certificate password");
 
-    public ILocator SharedCertificateAlert => AccessLocators.Alert(Root, "Uses a shared certificate");
+    public ILocator SharedCertificateAlert => NuxtLocators.Alert(Root, "Uses a shared certificate");
 
     public ILocator SnippetsSummary => Root.GetByText("Ready-to-paste snippets", new() { Exact = true });
 

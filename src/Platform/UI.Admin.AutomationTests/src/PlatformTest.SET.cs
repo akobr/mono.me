@@ -1,6 +1,5 @@
-using System.Diagnostics;
 using System.Text.RegularExpressions;
-using Microsoft.Playwright;
+using _42.Platform.UI.Admin.AutomationTests.Support;
 
 namespace _42.Platform.UI.Admin.AutomationTests;
 
@@ -15,27 +14,19 @@ public abstract partial class PlatformTest
     private static readonly TimeSpan PolicyCacheTime = TimeSpan.FromSeconds(75);
 
     // Opens the page (open) and checks that it shows a saved project policy, secrets or machine authentication
-    // (expectation, with the usual Expect timeouts). On the mock that is it; on a deployed target a failed check opens
-    // the page again until PolicyCacheTime is over, and the last failure is the test's.
+    // (expectation, with the usual Expect timeouts). On the mock that is it; on a deployed target a failed attempt (an
+    // instance with the old policy answered) opens the page again until PolicyCacheTime is over (Eventually), and the
+    // last failure is the test's.
     protected async Task OpenUntilPolicyShowsAsync(Func<Task> open, Func<Task> expectation)
     {
         ArgumentNullException.ThrowIfNull(open);
         ArgumentNullException.ThrowIfNull(expectation);
 
-        var clock = Stopwatch.StartNew();
-        while (true)
+        await new Eventually(Target.IsMock ? TimeSpan.Zero : PolicyCacheTime, null).UntilAsync(async _ =>
         {
             await open();
-            try
-            {
-                await expectation();
-                return;
-            }
-            catch (Exception exception) when (exception is PlaywrightException or TimeoutException && !Target.IsMock && clock.Elapsed < PolicyCacheTime)
-            {
-                // An instance with the old policy answered: load the page again.
-            }
-        }
+            await expectation();
+        });
     }
 
     // The exact message of a refusal on this target: the mock's, or a deployed API's, which the page may follow with

@@ -30,7 +30,7 @@ public sealed partial class ConfigurationEditTests : PlatformTest
         await Expect(configuration.Changes(2)).ToBeVisibleAsync();
         await Expect(configuration.RevertButton).ToBeEnabledAsync();
         await Expect(configuration.SaveButton).ToBeEnabledAsync();
-        await Expect(App.Page).ToHaveTitleAsync(DirtyTitle());
+        await Expect(App.Page).ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
 
         await configuration.EffectiveTab.ClickAsync();
         var discard = new DiscardChangesDialog(App);
@@ -55,7 +55,7 @@ public sealed partial class ConfigurationEditTests : PlatformTest
         await Expect(configuration.ChangeCounter).ToHaveCountAsync(0);
         await Expect(configuration.RevertButton).ToBeDisabledAsync();
         await Expect(configuration.SaveButton).ToBeDisabledAsync();
-        await Expect(App.Page).Not.ToHaveTitleAsync(DirtyTitle());
+        await Expect(App.Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
 
         await configuration.Document.ReplaceAsync("count: 3");
         await Expect(configuration.Changes(1)).ToBeVisibleAsync();
@@ -63,7 +63,7 @@ public sealed partial class ConfigurationEditTests : PlatformTest
         await discard.DiscardAsync();
         await App.ExpectAtAsync(Routes.Annotation(key));
         await App.ExpectQueryAsync("q", null);
-        await Expect(App.Page).Not.ToHaveTitleAsync(DirtyTitle());
+        await Expect(App.Page).Not.ToHaveTitleAsync(DiscardChangesDialog.DirtyTitle());
     }
 
     // CFG-EDT-02: A syntax error disables Save and blocks the format switch.
@@ -168,7 +168,7 @@ public sealed partial class ConfigurationEditTests : PlatformTest
         await App.ExpectQueryAsync("from", "2");
         await Expect(versions.CompareHeader(2, 3)).ToBeVisibleAsync();
         await Expect(versions.DiffSummary).ToHaveTextAsync(OneLineChanged());
-        if (App.HasDockedSidebar)
+        if (Page.ViewportSize is not { Width: < VersionsView.SplitDiffWidth })
         {
             await Expect(versions.CompareSideLabel(2)).ToBeVisibleAsync();
             await Expect(versions.CompareSideLabel(3)).ToBeVisibleAsync();
@@ -201,10 +201,6 @@ public sealed partial class ConfigurationEditTests : PlatformTest
         await App.ExpectQueryAsync("from", "1");
         await Expect(versions.CompareHeader(1, 3)).ToBeVisibleAsync();
     }
-
-    // The title of a page with unsaved changes.
-    [GeneratedRegex("^● ")]
-    private static partial Regex DirtyTitle();
 
     // The diff of {"count": 1} and {"count": 2}: one line added, one removed (the minus is U+2212).
     [GeneratedRegex(@"^\+1 −1 · \d+ changes?$")]

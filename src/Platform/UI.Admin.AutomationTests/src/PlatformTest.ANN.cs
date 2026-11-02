@@ -43,21 +43,21 @@ public abstract partial class PlatformTest
     protected static bool IsDeletedKeyLookup(RecordedRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return request.Method == "POST" && PathOf(request).EndsWith("/annotations/deleted/lookup", StringComparison.Ordinal);
+        return request.Method == "POST" && request.Path.EndsWith("/annotations/deleted/lookup", StringComparison.Ordinal);
     }
 
     // A restore of deleted keys (…/annotations/deleted/restore).
     protected static bool IsDeletedKeyRestore(RecordedRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return PathOf(request).EndsWith("/annotations/deleted/restore", StringComparison.Ordinal);
+        return request.Path.EndsWith("/annotations/deleted/restore", StringComparison.Ordinal);
     }
 
     // A bulk create (…/annotations/simple).
     protected static bool IsBulkCreate(RecordedRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return PathOf(request).EndsWith("/annotations/simple", StringComparison.Ordinal);
+        return request.Path.EndsWith("/annotations/simple", StringComparison.Ordinal);
     }
 
     // A write of the annotation: any method but GET of …/annotations/<key> (SetAnnotation is its POST) or below it.
@@ -67,12 +67,7 @@ public abstract partial class PlatformTest
 
         var path = $"/annotations/{Uri.EscapeDataString(key)}";
         return request => request.Method != "GET"
-            && (PathOf(request).EndsWith(path, StringComparison.Ordinal) || PathOf(request).Contains($"{path}/", StringComparison.Ordinal));
-    }
-
-    private static string PathOf(RecordedRequest request)
-    {
-        return Uri.TryCreate(request.Url, UriKind.Absolute, out var url) ? url.AbsolutePath : request.Url;
+            && (request.Path.EndsWith(path, StringComparison.Ordinal) || request.Path.Contains($"{path}/", StringComparison.Ordinal));
     }
 
     private static string Describe(IReadOnlyCollection<RecordedRequest> requests)

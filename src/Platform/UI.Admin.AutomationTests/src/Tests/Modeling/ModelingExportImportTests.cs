@@ -471,7 +471,7 @@ public sealed partial class ModelingExportImportTests : PlatformTest
             () => transfer.ExportButton.ClickAsync(),
             async fileName =>
             {
-                var exported = App.ShownToasts.Filter(new() { Has = Page.GetByText(fileName, new() { Exact = true }) }).Last;
+                var exported = App.ToastItem(fileName);
                 await Expect(exported.GetByText(toast ?? ExportedToast())).ToBeVisibleAsync();
             },
             (int)ModelingExportImportPage.TransferTimeoutMs);

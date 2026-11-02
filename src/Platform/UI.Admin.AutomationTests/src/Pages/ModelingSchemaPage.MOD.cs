@@ -97,28 +97,21 @@ public sealed partial class ModelingSchemaPage
     public ILocator TypeSchemaRow(string type)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
-        return SchemaRowLinking("Type schemas", $"/modeling/schemas/type/{type}");
+        return SchemaRowLinking("Type schemas", routes.TypeSchema(type));
     }
 
     // The link of a type's schema in its row, named by the type's label.
     public ILocator TypeSchemaLink(string type)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
-        return app.Page.Locator($"a[href$=\"/modeling/schemas/type/{type}\"]");
+        return LinkTo(routes.TypeSchema(type));
     }
 
     // The row of an annotation's schema in "Annotation schemas".
     public ILocator AnnotationSchemaRow(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return SchemaRowLinking("Annotation schemas", $"/modeling/schemas/annotation/{Uri.EscapeDataString(key)}");
-    }
-
-    // The link of an annotation's schema, named by the key.
-    public ILocator AnnotationSchemaLink(string key)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return app.Page.Locator($"a[href$=\"/modeling/schemas/annotation/{Uri.EscapeDataString(key)}\"]");
+        return SchemaRowLinking("Annotation schemas", routes.AnnotationSchema(key));
     }
 
     // The row of a descendant-type schema in "Descendant-type schemas": the link "<Type> below", the key's link and
@@ -127,7 +120,7 @@ public sealed partial class ModelingSchemaPage
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(type);
-        return SchemaRowLinking("Descendant-type schemas", $"/modeling/schemas/annotation/{Uri.EscapeDataString(key)}/type/{type}");
+        return SchemaRowLinking("Descendant-type schemas", routes.DescendantSchema(key, type));
     }
 
     // A field of the form preview by its exact label: the property's title, or its humanized name.
@@ -207,10 +200,16 @@ public sealed partial class ModelingSchemaPage
         return string.Create(CultureInfo.InvariantCulture, $"Applies to {count} configuration{(count == 1 ? string.Empty : "s")} of this view.");
     }
 
-    // The row of a section whose link's href ends with the path.
-    private ILocator SchemaRowLinking(string section, string hrefEnd)
+    // The row of a list section that links to the route (a path of the app, AppRoutes).
+    private ILocator SchemaRowLinking(string section, string route)
     {
-        return SchemaListRows(section).Filter(new() { Has = app.Page.Locator($"a[href$=\"{hrefEnd}\"]") });
+        return SchemaListRows(section).Filter(new() { Has = LinkTo(route) });
+    }
+
+    // A link of the page whose href ends with the route (a path of the app, AppRoutes), wherever the app is served.
+    private ILocator LinkTo(string route)
+    {
+        return app.Page.Locator($"a[href$=\"/{route.Trim('/')}\"]");
     }
 
     [GeneratedRegex(@"^\s*Applies to \d+ configurations? of this view\.\s*$")]

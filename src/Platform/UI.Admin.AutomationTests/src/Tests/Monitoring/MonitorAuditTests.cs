@@ -287,17 +287,9 @@ public sealed partial class MonitorAuditTests : PlatformTest
 
     // Waits until the page has read the audit with the filter: a request whose query parameter matches the pattern (a
     // JavaScript regular expression), among the requests the recorder holds since the last page load.
-    private async Task WaitForAuditReadAsync(string parameter, string pattern)
+    private Task WaitForAuditReadAsync(string parameter, string pattern)
     {
-        await Page.WaitForFunctionAsync(
-            """
-            ([parameter, pattern]) => (window.__requests ?? []).some((request) => {
-              const url = new URL(request.url);
-              return url.pathname.endsWith('/key-values/audit') && new RegExp(pattern).test(url.searchParams.get(parameter) ?? '');
-            })
-            """,
-            new[] { parameter, pattern },
-            new() { PollingInterval = 100 });
+        return WaitForRequestAsync("/key-values/audit", parameter, pattern);
     }
 
     // The mock lists the allowed levels, the API the changes of the save.

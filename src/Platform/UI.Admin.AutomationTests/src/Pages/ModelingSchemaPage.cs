@@ -51,18 +51,6 @@ public sealed partial class ModelingSchemaPage(App app, AppRoutes routes)
         await OpenAsync(routes.AnnotationSchema(key));
     }
 
-    // Opens the schema of a type (its code, e.g. exe) and waits for its editor.
-    public async Task OpenTypeAsync(string type)
-    {
-        await OpenAsync(routes.TypeSchema(type));
-    }
-
-    // Opens the schema of an annotation for its descendants of a type and waits for its editor.
-    public async Task OpenDescendantAsync(string key, string type)
-    {
-        await OpenAsync(routes.DescendantSchema(key, type));
-    }
-
     // Replaces the schema document as JSON.
     public async Task SetDocumentAsync(string json)
     {

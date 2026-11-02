@@ -20,6 +20,10 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // The key values have a simpler table of their own (KeyValuesPage).
 public sealed partial class VersionsView
 {
+    // From this width (lg) a DiffEditor (a comparison of versions, the conflict dialog, Compare views) is side by side
+    // with its labels on Auto; below it is unified, without them.
+    public const int SplitDiffWidth = 1024;
+
     private readonly App app;
 
     // scope: the detail that shows the history (its region), the page by default.
@@ -52,14 +56,6 @@ public sealed partial class VersionsView
     // The summary of a comparison, e.g. "+1 −1 · 1 change".
     public ILocator DiffSummary => Scope.GetByText(DiffSummaryText());
 
-    public ILocator PreviousChangeButton => Scope.GetByRole(AriaRole.Button, new() { Name = "Previous change", Exact = true });
-
-    public ILocator NextChangeButton => Scope.GetByRole(AriaRole.Button, new() { Name = "Next change", Exact = true });
-
-    public ILocator CollapseUnchanged => Scope.GetByRole(AriaRole.Switch, new() { Name = "Collapse unchanged", Exact = true });
-
-    public ILocator UnavailableVersion => Scope.GetByText("This version is not available", new() { Exact = true });
-
     // The row of a version in the timeline, by its "v<n>" ("v1" is not "v10").
     public ILocator Row(int version)
     {
@@ -82,13 +78,6 @@ public sealed partial class VersionsView
     public ILocator CompareHeader(int from, int to)
     {
         return Scope.GetByText($"{Label(from)} → {Label(to)}", new() { Exact = true });
-    }
-
-    // A tab of the diff's layout: "Auto", "Split" or "Unified".
-    public ILocator LayoutTab(string layout)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(layout);
-        return Scope.GetByRole(AriaRole.Tab, new() { Name = layout, Exact = true });
     }
 
     // Waits until the timeline lists the versions.
@@ -114,17 +103,6 @@ public sealed partial class VersionsView
         await Row(version).GetByRole(AriaRole.Button, new() { Name = "Compare with previous", Exact = true }).ClickAsync();
         await app.ExpectQueryAsync("v", Number(version));
         await Expect(Scope.GetByText(CompareHeaderText())).ToBeVisibleAsync();
-    }
-
-    // Picks two versions in "Compare" and "with" and compares them: ?v=<to>&from=<from>, then "v<from> → v<to>".
-    public async Task CompareAsync(int from, int to)
-    {
-        await PickAsync(FromSelect, from);
-        await PickAsync(ToSelect, to);
-        await CompareButton.ClickAsync();
-        await app.ExpectQueryAsync("v", Number(to));
-        await app.ExpectQueryAsync("from", Number(from));
-        await Expect(CompareHeader(from, to)).ToBeVisibleAsync();
     }
 
     // "Back to history": the shown version or comparison closes, ?v and ?from are gone.

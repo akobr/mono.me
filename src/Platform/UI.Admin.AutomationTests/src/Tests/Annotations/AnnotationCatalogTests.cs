@@ -193,7 +193,7 @@ public sealed partial class AnnotationCatalogTests : PlatformTest
 
         if (Target.IsMock)
         {
-            var response = await MockApi.FetchAsync("POST", $"v1/{Routes.Organization}/{Routes.Project}/{Routes.View}/annotations/simple", new[] { key });
+            var response = await MockApi.FetchAsync("POST", MockApi.ViewPath("annotations/simple"), new[] { key });
             var created = response.Json()?.AsArray().Select(annotation => annotation?["AnnotationKey"]?.GetValue<string>()).ToArray() ?? [];
             if (response.Status != 200 || created is not [var only] || only != key)
             {

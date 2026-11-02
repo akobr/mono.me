@@ -77,8 +77,8 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
 
         await bulkCreate.CreateAsync(2);
         await Expect(bulkCreate.Result).ToHaveTextAsync("Created 7 annotations: 2 from the list and 5 missing ancestors.");
-        await Expect(bulkCreate.CreatedKeyRow(execution)).ToContainTextAsync("From the list");
-        await Expect(bulkCreate.CreatedKeyRow(usage)).ToContainTextAsync("From the list");
+        await Expect(bulkCreate.CreatedRow(execution)).ToContainTextAsync("From the list");
+        await Expect(bulkCreate.CreatedRow(usage)).ToContainTextAsync("From the list");
         string[] ancestors =
         [
             PlatformData.AncestorKey(execution, PlatformData.Usage),
@@ -89,7 +89,7 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
         ];
         foreach (var ancestor in ancestors)
         {
-            await Expect(bulkCreate.CreatedKeyRow(ancestor)).ToContainTextAsync("Missing ancestor");
+            await Expect(bulkCreate.CreatedRow(ancestor)).ToContainTextAsync("Missing ancestor");
         }
 
         // Seven created keys and the header row.
@@ -169,7 +169,7 @@ public sealed partial class AnnotationBulkCreateTests : PlatformTest
         await bulkCreate.CreateAsync(1);
         await Expect(bulkCreate.Result).ToHaveTextAsync("Created 1 annotation.");
         await Expect(bulkCreate.ResultDescription).ToHaveTextAsync("1 key already existed and was skipped. 1 repeated line was left out.");
-        await Expect(bulkCreate.CreatedKeyRow(created)).ToContainTextAsync("From the list");
+        await Expect(bulkCreate.CreatedRow(created)).ToContainTextAsync("From the list");
     }
 
     // ANN-BLK-04: Bulk create over a deleted key offers Restore.

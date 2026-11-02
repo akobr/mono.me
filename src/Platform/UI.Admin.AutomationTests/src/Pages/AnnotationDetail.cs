@@ -41,6 +41,13 @@ public sealed partial class AnnotationDetail(App app, AppRoutes routes, string s
     // The list of the section, where the detail returns to.
     private string ListPath => section == GraphSection ? routes.Graph : routes.Annotations;
 
+    // The description of NotFound: "<key> does not exist in this view. It may have been deleted permanently."
+    public ILocator NotFoundDescription(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return Panel.Root.GetByText($"{key} does not exist in this view. It may have been deleted permanently.", new() { Exact = true });
+    }
+
     // An item of the open "More actions" menu: "Show in graph", "Show in list", "Copy link", "Copy key", "Delete".
     public ILocator MenuItem(string name)
     {

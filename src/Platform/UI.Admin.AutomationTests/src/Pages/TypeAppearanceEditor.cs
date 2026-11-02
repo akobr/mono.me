@@ -100,11 +100,7 @@ public sealed partial class TypeAppearanceEditor(App app, ILocator card)
     // Picks a color by its label ("Red", "Gray", …) and waits until the select shows it.
     public async Task PickColorAsync(string code, string color)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(color);
-
-        await Color(code).ClickAsync();
-        await app.Page.GetByRole(AriaRole.Option, new() { Name = color, Exact = true }).ClickAsync();
-        await Expect(Color(code)).ToHaveTextAsync(color);
+        await app.PickOptionAsync(Color(code), color);
     }
 
     // Searches an icon by its label ("Rocket", …), picks it and waits until the button shows it.

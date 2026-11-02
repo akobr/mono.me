@@ -48,17 +48,17 @@ public sealed partial class MachineCreateDialog(App app, AppRoutes routes)
     public ILocator CredentialKind => Root.GetByRole(AriaRole.Combobox, new() { Name = "Credential kind", Exact = true });
 
     // The help under "Credential kind": the description of the picked kind.
-    public ILocator CredentialKindHelp => AccessLocators.FieldHelp(Root, "Credential kind");
+    public ILocator CredentialKindHelp => NuxtLocators.FieldHelp(Root, "Credential kind");
 
     public ILocator UseSharedCertificate => Root.GetByRole(AriaRole.Checkbox, new() { Name = "Use a shared certificate of the project", Exact = true });
 
     public ILocator CertificateLifetime => Root.GetByLabel("Certificate lifetime (days)", new() { Exact = true });
 
     // The alert of a Federated machine in a project without a trusted issuer.
-    public ILocator NoTrustedIssuers => AccessLocators.Alert(Root, "No trusted issuers");
+    public ILocator NoTrustedIssuers => NuxtLocators.Alert(Root, "No trusted issuers");
 
     // What NoTrustedIssuers asks for: to add one (an Administrator), or to ask an Administrator (a Contributor).
-    public ILocator NoTrustedIssuersHint => AccessLocators.AlertDescription(Root, "No trusted issuers");
+    public ILocator NoTrustedIssuersHint => NuxtLocators.AlertDescription(Root, "No trusted issuers");
 
     // The action of NoTrustedIssuers for an Administrator: the link to machines#trusted-issuers.
     public ILocator AddTrustedIssuerLink => Root.GetByRole(AriaRole.Link, new() { Name = "Add a trusted issuer", Exact = true });
@@ -96,14 +96,14 @@ public sealed partial class MachineCreateDialog(App app, AppRoutes routes)
     // A rule of a Federated machine: the group "Rule <n>".
     public FederationRuleGroup Rule(int number)
     {
-        return new FederationRuleGroup(app, Root, number);
+        return new FederationRuleGroup(Root, number);
     }
 
     // The error alert of a refused Create, by the API's message.
     public ILocator Failure(string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        return AccessLocators.Message(Root, message);
+        return NuxtLocators.Message(Root, message);
     }
 
     public async Task WaitForOpenAsync()

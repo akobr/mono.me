@@ -24,14 +24,20 @@ public sealed partial class BulkCreateDialog(IPage page)
 
     public ILocator DoneButton => Root.GetByRole(AriaRole.Button, new() { Name = "Done", Exact = true });
 
+    // The table of the created keys (Key, "Created as"); its header row is a row too.
+    public ILocator CreatedAnnotations => Root.GetByRole(AriaRole.Region, new() { Name = "Created annotations", Exact = true });
+
     public ILocator ReviewRow(string key)
     {
         return Root.GetByRole(AriaRole.Region, new() { Name = "Review", Exact = true }).GetByRole(AriaRole.Row).Filter(new() { HasText = key });
     }
 
+    // The row of a created key by its exact key ("From the list" or "Missing ancestor"), not a row of a longer key
+    // (sbt.<p>-1 is not sbt.<p>-10).
     public ILocator CreatedRow(string key)
     {
-        return Root.GetByRole(AriaRole.Region, new() { Name = "Created annotations", Exact = true }).GetByRole(AriaRole.Row).Filter(new() { HasText = key });
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return CreatedAnnotations.GetByRole(AriaRole.Row).Filter(new() { Has = page.GetByText(key, new() { Exact = true }) });
     }
 
     // Enabled once every line is valid and at least one key is new; count is the number of new keys of the list.

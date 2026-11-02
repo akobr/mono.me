@@ -113,7 +113,7 @@ public sealed class ConfigurationConflictTests : PlatformTest
     // The diff of theirs and yours is side by side with its labels from 1024 px, unified without them below.
     private async Task ExpectSideLabelsAsync(ConfigurationConflictDialog conflict)
     {
-        if (App.HasDockedSidebar)
+        if (Page.ViewportSize is not { Width: < VersionsView.SplitDiffWidth })
         {
             await Expect(conflict.TheirsLabel).ToBeVisibleAsync();
             await Expect(conflict.YoursLabel).ToBeVisibleAsync();

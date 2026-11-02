@@ -16,9 +16,9 @@ public sealed partial class FederatedSetupDialog(App app, string title)
 
     public ILocator Root => app.Page.GetByRole(AriaRole.Dialog, new() { Name = title, Exact = true });
 
-    public ILocator MachineId => AccessLocators.Field(Root, "Machine id (client_id)").Locator("code");
+    public ILocator MachineId => NuxtLocators.Field(Root, "Machine id (client_id)").Locator("code");
 
-    public ILocator TokenEndpoint => AccessLocators.Field(Root, "Token endpoint").Locator("code");
+    public ILocator TokenEndpoint => NuxtLocators.Field(Root, "Token endpoint").Locator("code");
 
     // The items of "Accepted tokens", one per rule.
     public ILocator AcceptedTokens => Root.GetByText("Accepted tokens", new() { Exact = true }).Locator("xpath=following-sibling::ul[1]/li");
