@@ -51,9 +51,9 @@ public abstract partial class PlatformTest
             throw new InvalidOperationException($"{User} has no password for the AuthKit hosted page; set Users:Pool:{User.Index}:Password in the user secrets.");
         }
 
-        var app = new Uri(Target.BaseUrl ?? throw new InvalidOperationException("Target:BaseUrl is not set."));
-        await Page.WaitForURLAsync(url => !IsOnHost(url, app));
+        await WaitForHostedPageAsync();
 
+        var app = AppUri();
         var traced = Settings.Execution.Trace != ArtifactPolicy.Off;
         if (traced)
         {
@@ -79,6 +79,14 @@ public abstract partial class PlatformTest
         await Expect(App.UserMenu).ToBeVisibleAsync();
     }
 
+    // On a deployed target, once the app handed a sign-in over to AuthKit: waits until the browser left the app's host
+    // for the AuthKit hosted page.
+    protected async Task WaitForHostedPageAsync()
+    {
+        var app = AppUri();
+        await Page.WaitForURLAsync(url => !IsOnHost(url, app));
+    }
+
     // Typed, not filled, as AuthKitSignIn does: BrowserStack masks a typed value in its session logs.
     private static async Task TypeOnHostedPageAsync(ILocator field, string value)
     {
@@ -90,5 +98,10 @@ public abstract partial class PlatformTest
     {
         return Uri.TryCreate(url, UriKind.Absolute, out var current)
             && string.Equals(current.GetLeftPart(UriPartial.Authority), app.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private Uri AppUri()
+    {
+        return new Uri(Target.BaseUrl ?? throw new InvalidOperationException("Target:BaseUrl is not set."));
     }
 }
