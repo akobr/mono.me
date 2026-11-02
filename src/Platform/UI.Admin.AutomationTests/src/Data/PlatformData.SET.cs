@@ -19,4 +19,18 @@ public sealed partial class PlatformData
 
         return name.ToString(0, length);
     }
+
+    // The versionless URI of a customer key (BYOK), https://<RunSlug>.vault.azure.net/keys/<word>-<hex4>, without a
+    // trailing slash: the run slug is a valid vault name (3 to 24 of a-z, 0-9 and '-'), and a deployed target stores the
+    // URI as it parsed it. Nothing verifies the key: the vault does not exist.
+    public string CustomerKeyUri()
+    {
+        return $"https://{RunSlug}.vault.azure.net/keys/{Data.Word()}-{Data.Hex(HexLength)}";
+    }
+
+    // A tenant id of a customer key, a new GUID in lower case (as a deployed target stores it).
+    public string TenantId()
+    {
+        return Data.Random.Uuid().ToString("D");
+    }
 }
