@@ -15,6 +15,10 @@ namespace _42.Testing.UI.Automation.Runtime.Settings;
 //   4. the user secrets of the test assembly;
 //   5. UITESTS_* environment variables, "__" separating sections (UITESTS_Target__BaseUrl);
 //   6. the engine's parameters.
+// Users:Pool is not merged by index across the layers: the highest layer that sets any Users:Pool:<n>:Email defines
+// the pool (its entries, nothing of the lower layers' entries), and Users:Pool:<n>:Password from any layer (typically the
+// user secrets) applies by index onto it; a password of an index the pool lacks is ignored. Without any Email the
+// layers merge as usual.
 // A missing profile file or a file that is not JSON fails at once, also without a target. Without Target:BaseUrl the
 // suite is in skip mode and nothing else is validated (except Reporting for a replay); otherwise every error is
 // collected and thrown together.
@@ -78,6 +82,11 @@ public static class UiAutomationSettingsLoader
             BrowserStack = BindSection<BrowserStackSettings>(configuration, "BrowserStack", bindErrors),
             Reporting = BindSection<ReportingSettings>(configuration, "Reporting", bindErrors),
         };
+
+        if (ResolvePool(configuration) is { } pool)
+        {
+            settings.Users.Pool = BindSection<UsersSettings>(pool, "Users", bindErrors).Pool;
+        }
 
         if (settings.IsConfigured)
         {
@@ -266,6 +275,66 @@ public static class UiAutomationSettingsLoader
         }
 
         return values;
+    }
+
+    // The pool of the highest layer that sets an Email, with the passwords of every layer; null when no layer sets one.
+    private static IConfiguration? ResolvePool(IConfigurationRoot configuration)
+    {
+        const string poolPath = "Users:Pool";
+        var providers = configuration.Providers.ToList();
+        var winner = -1;
+        for (var index = providers.Count - 1; index >= 0 && winner < 0; index--)
+        {
+            if (ChildKeys(providers[index], poolPath).Any(entry => providers[index].TryGet($"{poolPath}:{entry}:Email", out _)))
+            {
+                winner = index;
+            }
+        }
+
+        if (winner < 0)
+        {
+            return null;
+        }
+
+        var entries = ChildKeys(providers[winner], poolPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < providers.Count; index++)
+        {
+            foreach (var entry in entries)
+            {
+                foreach (var key in Leaves(providers[index], $"{poolPath}:{entry}"))
+                {
+                    var isPassword = string.Equals(key, $"{poolPath}:{entry}:Password", StringComparison.OrdinalIgnoreCase);
+                    if ((index >= winner || isPassword) && providers[index].TryGet(key, out var value))
+                    {
+                        values[key] = value;
+                    }
+                }
+            }
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+
+    private static IEnumerable<string> ChildKeys(IConfigurationProvider provider, string path)
+    {
+        return provider.GetChildKeys([], path).Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string> Leaves(IConfigurationProvider provider, string path)
+    {
+        if (provider.TryGet(path, out _))
+        {
+            yield return path;
+        }
+
+        foreach (var child in ChildKeys(provider, path))
+        {
+            foreach (var leaf in Leaves(provider, $"{path}:{child}"))
+            {
+                yield return leaf;
+            }
+        }
     }
 
     private static T BindSection<T>(IConfiguration configuration, string section, List<(string Section, string Error)> errors)
