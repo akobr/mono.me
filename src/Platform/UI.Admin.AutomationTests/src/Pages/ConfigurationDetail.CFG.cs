@@ -53,8 +53,11 @@ public sealed partial class ConfigurationDetail
     // A plain paragraph under the editor, not an alert.
     public ILocator UnsafeNumberWarning => ConfigurationPanel.Root.GetByText("A number is larger than 2^53 and loses precision; store it as a string.", new() { Exact = true });
 
-    // The 409 panel of a save its schema rejects: a list item "<pointer> <message>" per error and "Save anyway".
-    public ILocator SchemaErrors => ConfigurationPanel.Root.GetByRole(AriaRole.Alert).Filter(new() { HasText = "The configuration does not match its schema" });
+    // The 409 panel of a save its schema rejects: its title, a list item "<pointer> <message>" per error and "Save
+    // anyway". A Nuxt UI alert has no alert role, so it is the innermost component root (data-slot) with the title.
+    public ILocator SchemaErrors => ConfigurationPanel.Root.Locator("[data-slot=\"root\"]")
+        .Filter(new() { Has = app.Page.GetByText("The configuration does not match its schema", new() { Exact = true }) })
+        .Last;
 
     // The panel's "Save anyway"; the confirmation has a button of the same name (SaveAnywayDialog).
     public ILocator SaveAnywayButton => SchemaErrors.GetByRole(AriaRole.Button, new() { Name = "Save anyway", Exact = true });
