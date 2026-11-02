@@ -10,9 +10,10 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // editors.
 public sealed partial class VersionsView
 {
-    // The DiffEditor of a comparison (its toolbar, the side labels and the editors).
+    // The DiffEditor of a comparison (its toolbar, the side labels and the editors). The inner locators of Has are
+    // queried inside each div, so they start from the page, not from Scope.
     public ILocator CompareDiffView => Scope.Locator("div")
-        .Filter(new() { Has = CollapseUnchanged })
+        .Filter(new() { Has = app.Page.GetByRole(AriaRole.Switch, new() { Name = "Collapse unchanged", Exact = true }) })
         .Filter(new() { Has = app.Page.GetByRole(AriaRole.Textbox) })
         .Last;
 
