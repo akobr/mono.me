@@ -10,7 +10,7 @@ dotnet run --project src/Platform/Aspire.Host/src
 |---|---|
 | `storage` | Azurite in a persistent container on the default ports (10000 blob, 10001 queue, 10002 table), so `UseDevelopmentStorage=true` works |
 | `cosmos` | Cosmos DB emulator, see [Cosmos DB modes](#cosmos-db-modes) |
-| `db-creator` | Creates the database and containers, and seeds the organization `42dotnet` with its owner; explicit start, run it from the dashboard. `BaseAccount:Id` in the user secrets of the host names the owner's account id: the lower-case `{tid}:{oid}` under Entra ID, the `sub` under AuthKit or Keycloak. Without it, DbCreator seeds its legacy Entra ID `sub`, which matches no account |
+| `db-creator` | Creates the database and containers, and seeds the organization `42dotnet` with its owner; explicit start, run it from the dashboard. `BaseAccount:Id` in the user secrets of the host names the owner's account id: the lower-case `{tid}:{oid}` under Entra ID, the `sub` under AuthKit or Keycloak. Without it, DbCreator seeds its legacy Entra ID `sub`, which matches no account. It also seeds the default AuthKit staging user (`user_01M41P6G2TTSXXMM88WNVMRQKG`) as a second owner, and the organization `ui-tests` with the project `automation` for the UI automation tests: both owners, and eight AuthKit test users (`ui-test-{owner,admin,contributor,reader}-{1,2}@42for.software`) with their roles. Access is merged into what is stored, so another run keeps members added since |
 | `keyvault` | Lowkey Vault, the Key Vault emulator of key/value protection |
 | `api-functions` | The Storyteller Azure Functions API |
 | `ui-admin` | The Vite dev server of the admin UI on port 5173; it waits for its two preparation steps below, see [Admin UI](#admin-ui) |
