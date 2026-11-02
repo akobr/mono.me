@@ -104,6 +104,9 @@
       "description": "2S platform, its serverless implementation and CLI toolkit.",
       "custom": {
         "startupProject": "src/Platform/Cli"
+      },
+      "scripts": {
+        "test": "dotnet $(if (Test-Path Directory.Build.proj) { 'build', 'Directory.Build.proj', '-t:Test', '-p:SkipNonexistentTargets=true', '-p:TestInParallel=false' } else { 'test', '--project', 'test' })"
       }
     },
     {
@@ -132,6 +135,9 @@
       "description": "List of reusable libraries served as NuGet packages.",
       "custom": {
         "isSuppressed": true
+      },
+      "scripts": {
+        "test": "dotnet $(if (Test-Path Directory.Build.proj) { 'build', 'Directory.Build.proj', '-t:Test', '-p:SkipNonexistentTargets=true', '-p:TestInParallel=false' } else { 'test', '--project', 'test' })"
       }
     },
     {
