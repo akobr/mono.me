@@ -48,3 +48,15 @@ test('a deleted template returns to the empty state and closes without a prompt'
   await expect(page).toHaveURL(`${modeling}/templates`)
   await expect(page.getByRole('dialog', { name: 'Discard changes?' })).toHaveCount(0)
 })
+
+// The untouched starter document of a missing schema is not a change, but Create and ⌘S still create it.
+test('the starter document of a missing schema saves with the shortcut', async ({ page }) => {
+  await openApp(page, `${modeling}/schemas/type/rst`)
+  await expect(page.getByText('This schema does not exist yet', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create', exact: true })).toBeEnabled()
+
+  await page.locator('.cm-content').first().click()
+  await page.keyboard.press('ControlOrMeta+S')
+  await expect(page.getByText('Schema saved (v1)', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Delete', exact: true })).toBeVisible()
+})
