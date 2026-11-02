@@ -151,7 +151,7 @@ Saving sends only your changes. Two situations stop a save:
 
 **Versions** lists the history of a configuration, a template or a schema. Any two versions can be compared side by side, or in one column on small screens. **Compare views**, a tab of **Modeling**, shows the same key in two views. When the project has only one other view, it is already selected. When it has no other view, the tab is disabled, and the page says so when a link opens it. A view is never compared with itself. **Compare** on the **Views** page opens **Compare views** of the default view with the view of its row. On the row of the default view, it is disabled, and its tooltip says why: the other views are compared with this one, or the project has no other view.
 
-**Templates** and **Schemas** are tabs of **Modeling** too. Templates hold the defaults per annotation type. Schemas define the form and the validation, for a type, for an annotation, or for the descendants of an annotation. A schema shows a form preview, and before you save a change it lists the configurations that the change would break.
+**Templates** and **Schemas** are tabs of **Modeling** too. Templates hold the defaults per annotation type. Schemas define the form and the validation, for a type, for an annotation, or for the descendants of an annotation. A schema shows a form preview, and before you save a change it lists the configurations that the change would break. A schema that does not exist yet opens with a starter document and **Create**; the starter document is not an unsaved change until you edit it. Deleting a schema returns its editor to the starter document, and deleting a template shows that the type has no template, with **Create template**.
 
 ## Graph
 
