@@ -8,7 +8,7 @@ Browser tests of the integrated 2S Platform: the deployed admin UI (`src/Platfor
 dotnet build src/Platform/UI.Admin.AutomationTests/src
 pwsh src/Platform/UI.Admin.AutomationTests/src/bin/Debug/net10.0/playwright.ps1 install chromium firefox webkit   # once: Playwright 1.63's browsers
 
-dotnet run --project src/Platform/UI.Admin.AutomationTests/src                                                   # skipped without Target:BaseUrl
+dotnet run --project src/Platform/UI.Admin.AutomationTests/src                                                   # against the local dev server (port 5173); UITESTS_Target__BaseUrl= skips
 dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"   # the PR gate set
 UITESTS_PROFILE=mock dotnet run --project src/Platform/UI.Admin.AutomationTests/src                              # against npm run dev:mock (:5174)
 ```

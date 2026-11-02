@@ -1,7 +1,8 @@
 {
   // The committed defaults; docs/Platform/UI.Admin.AutomationTests/automation-tests.md ("Configure") lists every
   // layer above them. No secrets here: passwords and keys go to the user secrets (or UITESTS_* variables in CI).
-  // Target:BaseUrl defaults to the local dev server (npm run dev / Aspire, port 5173); an empty BaseUrl skips every test.
+  // Target:BaseUrl defaults to the local dev server (npm run dev / Aspire, port 5173), which must be running (otherwise
+  // the target check times out); an empty BaseUrl skips every test.
   "Target": {
     "BaseUrl": "http://localhost:5173",
     "Organization": "ui-tests",
@@ -38,7 +39,8 @@
   "Users": {
     "LeaseTimeoutSeconds": 120,
     // The pre-provisioned AuthKit users of the automation (their roles in the target's organization and project); the
-    // passwords are in the user secrets (Users:Pool:<n>:Password) or UITESTS_Users__Pool__<n>__Password.
+    // passwords are in the user secrets (Users:Pool:<n>:Password) or UITESTS_Users__Pool__<n>__Password. Passwords pair
+    // with the users by position: reordering the list means moving the secrets with it.
     "Pool": [
       { "Email": "ui-test-owner-1@42for.software", "DisplayName": "Auto Owner1", "Roles": [ "Owner" ] },
       { "Email": "ui-test-owner-2@42for.software", "DisplayName": "Auto Owner2", "Roles": [ "Owner" ] },
