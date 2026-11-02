@@ -17,7 +17,8 @@ namespace _42.Testing.UI.Automation.Runtime.Settings;
 //   6. the engine's parameters.
 // Users:Pool is not merged by index across the layers: the highest layer that sets any Users:Pool:<n>:Email defines
 // the pool (its entries, nothing of the lower layers' entries), and Users:Pool:<n>:Password from any layer (typically the
-// user secrets) applies by index onto it; a password of an index the pool lacks is ignored. Without any Email the
+// user secrets) applies by index onto it; a password of an index the pool lacks (also one the winning layer sets alone)
+// is ignored. Without any Email the
 // layers merge as usual.
 // A missing profile file or a file that is not JSON fails at once, also without a target. Without Target:BaseUrl the
 // suite is in skip mode and nothing else is validated (except Reporting for a replay); otherwise every error is
@@ -296,7 +297,10 @@ public static class UiAutomationSettingsLoader
             return null;
         }
 
-        var entries = ChildKeys(providers[winner], poolPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // The winner's entries; an index it sets only a Password of is no entry (e.g. a CI slot without an e-mail).
+        var entries = ChildKeys(providers[winner], poolPath)
+            .Where(entry => ChildKeys(providers[winner], $"{poolPath}:{entry}").Any(key => !string.Equals(key, "Password", StringComparison.OrdinalIgnoreCase)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < providers.Count; index++)
         {
