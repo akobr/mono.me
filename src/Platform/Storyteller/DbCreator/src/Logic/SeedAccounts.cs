@@ -29,16 +29,14 @@ public static class SeedAccounts
         new("user_01M6CT0VP7F0X5689B06VZ4A60", "ui-test-reader-2@42for.software", "Auto Reader2", AccountRole.Reader),
     ];
 
-    public static IReadOnlyDictionary<string, AccountRole> Roles(AccountRole role, params string[] organizations)
+    public static IReadOnlyDictionary<string, AccountRole> Roles(AccountRole role, params string[] accessPoints)
     {
         var roles = new Dictionary<string, AccountRole>();
-        foreach (var organization in organizations)
+        foreach (var accessPoint in accessPoints)
         {
-            roles[organization] = role;
+            roles[accessPoint] = role;
         }
 
         return roles;
     }
 }
-
-public sealed record SeedAccount(string Id, string UserName, string Name, AccountRole Role);

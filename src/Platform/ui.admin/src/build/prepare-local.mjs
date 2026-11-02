@@ -19,11 +19,13 @@ const installStamp = join(root, 'node_modules', '.prepare-local-install')
 
 checkNode('22.18.0')
 
-const sdkStamp = read(sdkBuildStamp)
-if (!sdkStamp) {
+// A SDK built by hand (npm run build) has no stamp: its dist stands in, so the SDK copy is reinstalled once.
+const sdkDist = resolve(root, '../../Storyteller/sdk.typescript/src/dist')
+if (!existsSync(join(sdkDist, 'index.js'))) {
   console.error('The SDK is not built. Run `npm run prepare:local` in src/Platform/Storyteller/sdk.typescript/src.')
   process.exit(1)
 }
+const sdkStamp = read(sdkBuildStamp) || 'unstamped'
 
 const lockHash = createHash('sha256').update(readFileSync(join(root, 'package-lock.json'))).digest('hex')
 const [installedLock, installedSdk] = read(installStamp).split(/\s+/)
@@ -48,7 +50,8 @@ function checkNode(minimum) {
 }
 
 function versionNumber(version) {
-  const [major, minor, patch] = version.split('.').map(Number)
+  // parseInt drops a prerelease suffix (24.0.0-pre → 24, 0, 0)
+  const [major, minor, patch] = version.split('.').map((part) => Number.parseInt(part, 10) || 0)
   return (major * 1000 + minor) * 1000 + patch
 }
 

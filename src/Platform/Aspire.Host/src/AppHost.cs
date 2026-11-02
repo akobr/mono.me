@@ -36,6 +36,7 @@ IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvar
 var dbCreator = builder.AddProject<Projects.DbCreator>("db-creator")
     .WithReference(cosmos)
     .WaitFor(cosmos)
+    .WithEnvironment("stagingSeed__enabled", "true") // the AuthKit staging accounts, only into the local emulator
     .WithExplicitStart();
 
 // The owner account DbCreator seeds (BaseAccount:Id in the user secrets of this host): under Entra ID the owner's

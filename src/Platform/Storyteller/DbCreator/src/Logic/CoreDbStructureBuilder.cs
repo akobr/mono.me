@@ -6,7 +6,10 @@ using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller.DbCreator.Logic;
 
-public class CoreDbStructureBuilder(IContainerFactory containerFactory, IOptions<BaseAccountOptions> baseAccount)
+public class CoreDbStructureBuilder(
+    IContainerFactory containerFactory,
+    IOptions<BaseAccountOptions> baseAccount,
+    IOptions<StagingSeedOptions> stagingSeed)
 {
     public async Task BuildAsync()
     {
@@ -15,31 +18,36 @@ public class CoreDbStructureBuilder(IContainerFactory containerFactory, IOptions
         await Data.CreateCoreAnnotations(houseContainer);
         Console.WriteLine($"2S platform core structure created in container '{orgContainerName}'.");
 
-        var uiTestsContainerName = $"org.{SeedAccounts.UI_TESTS_ORGANIZATION}";
-        await containerFactory.CreateContainerIfNotExistsAsync(uiTestsContainerName);
-        Console.WriteLine($"Organization container '{uiTestsContainerName}' created.");
-
         // Access is merged into what is stored, so members and memberships added later survive another run.
         var coreContainer = await containerFactory.CreateContainerIfNotExistsAsync("core");
         var baseProject = $"{Constants.ORGANIZATION}.{Storyteller.Constants.DefaultProjectName}";
-        var uiTestsProject = $"{SeedAccounts.UI_TESTS_ORGANIZATION}.{SeedAccounts.UI_TESTS_PROJECT}";
-        var owners = new[]
-        {
-            new SeedAccount(baseAccount.Value.GetAccountId(), Constants.BASE_ACCOUNT_USER_NAME, Constants.BASE_ACCOUNT_NAME, AccountRole.Owner),
-            SeedAccounts.AuthKitOwner,
-        };
+        var baseOwner = new SeedAccount(baseAccount.Value.GetAccountId(), Constants.BASE_ACCOUNT_USER_NAME, Constants.BASE_ACCOUNT_NAME, AccountRole.Owner);
 
-        foreach (var owner in owners)
+        if (!stagingSeed.Value.Enabled)
         {
-            await SeedAsync(coreContainer, owner, Constants.ORGANIZATION, baseProject, SeedAccounts.UI_TESTS_ORGANIZATION, uiTestsProject);
+            await SeedAsync(coreContainer, baseOwner, Constants.ORGANIZATION, baseProject);
+            Console.WriteLine($"Access created in container 'core'. The AuthKit staging accounts are skipped ({StagingSeedOptions.SECTION}:enabled is not true).");
         }
-
-        foreach (var user in SeedAccounts.UiTestUsers)
+        else
         {
-            await SeedAsync(coreContainer, user, SeedAccounts.UI_TESTS_ORGANIZATION, uiTestsProject);
-        }
+            var uiTestsContainerName = $"org.{SeedAccounts.UI_TESTS_ORGANIZATION}";
+            await containerFactory.CreateContainerIfNotExistsAsync(uiTestsContainerName);
+            Console.WriteLine($"Organization container '{uiTestsContainerName}' created.");
 
-        Console.WriteLine($"Access created in container 'core': {owners.Length} owners, {SeedAccounts.UiTestUsers.Count} UI test users.");
+            var uiTestsProject = $"{SeedAccounts.UI_TESTS_ORGANIZATION}.{SeedAccounts.UI_TESTS_PROJECT}";
+            var owners = new[] { baseOwner, SeedAccounts.AuthKitOwner };
+            foreach (var owner in owners)
+            {
+                await SeedAsync(coreContainer, owner, Constants.ORGANIZATION, baseProject, SeedAccounts.UI_TESTS_ORGANIZATION, uiTestsProject);
+            }
+
+            foreach (var user in SeedAccounts.UiTestUsers)
+            {
+                await SeedAsync(coreContainer, user, SeedAccounts.UI_TESTS_ORGANIZATION, uiTestsProject);
+            }
+
+            Console.WriteLine($"Access created in container 'core': {owners.Length} owners, {SeedAccounts.UiTestUsers.Count} UI test users.");
+        }
 
         // containers created before TTL and the audit indexing existed get the settings now
         var organizations = await containerFactory.EnsureOrganizationContainersAsync();

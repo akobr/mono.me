@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
@@ -44,27 +45,6 @@ public class Data
             JObject.Parse("""{ "IsSystem": true, "Number": 42, "Text": "system" }""")));
     }
 
-    public static async Task CreateCoreAccess(
-        Container container,
-        string organizationName,
-        string accountId,
-        string accountUserName,
-        string accountName)
-    {
-        await container.UpsertItemAsync(
-            Create.BaseAccount(
-                organizationName,
-                accountId,
-                accountUserName,
-                accountName));
-
-        var accessPoints = Create.BaseAccessPoints(organizationName, accountId);
-        foreach (var accessPoint in accessPoints)
-        {
-            await container.UpsertItemAsync(accessPoint);
-        }
-    }
-
     // Grants the account the given roles and adds it to each access point with the same role, keeping what is already
     // stored: other memberships of the account, other members and settings of the access points. Missing access points
     // are created; a new organization needs its container (org.{name}) created by the caller.
@@ -75,39 +55,74 @@ public class Data
         string accountName,
         IReadOnlyDictionary<string, AccountRole> roles)
     {
-        var partitionKey = new PartitionKey("access");
-        var account = await TryReadAsync<AccountEntity>(container, accountId, partitionKey);
-        var accountMap = new Dictionary<string, AccountRole>(account?.AccessMap ?? []);
+        await MergeAsync<AccountEntity>(
+            container,
+            accountId,
+            account =>
+            {
+                var accessMap = new Dictionary<string, AccountRole>(account?.AccessMap ?? []);
+                foreach (var (key, role) in roles)
+                {
+                    accessMap[key] = role;
+                }
+
+                return account is null
+                    ? new AccountEntity { Id = accountId, UserName = accountUserName, Name = accountName, AccessMap = accessMap }
+                    : account with { AccessMap = accessMap };
+            });
+
         foreach (var (key, role) in roles)
         {
-            accountMap[key] = role;
-        }
-
-        await container.UpsertItemAsync(
-            new AccountEntity { Id = accountId, UserName = accountUserName, Name = accountName, AccessMap = accountMap },
-            partitionKey);
-
-        foreach (var (key, role) in roles)
-        {
-            var accessPoint = await TryReadAsync<AccessPointEntity>(container, $"apt.{key}", partitionKey);
-            var accessMap = new Dictionary<string, AccountRole>(accessPoint?.AccessMap ?? []) { [accountId] = role };
-            var updated = accessPoint is null
-                ? new AccessPointEntity { Key = key, AccessMap = accessMap }
-                : accessPoint with { AccessMap = accessMap };
-            await container.UpsertItemAsync(updated, partitionKey);
+            await MergeAsync<AccessPointEntity>(
+                container,
+                $"apt.{key}",
+                accessPoint =>
+                {
+                    var accessMap = new Dictionary<string, AccountRole>(accessPoint?.AccessMap ?? []) { [accountId] = role };
+                    return accessPoint is null
+                        ? new AccessPointEntity { Key = key, AccessMap = accessMap }
+                        : accessPoint with { AccessMap = accessMap };
+                });
         }
     }
 
-    private static async Task<T?> TryReadAsync<T>(Container container, string id, PartitionKey partitionKey)
+    // Read, change and write back with optimistic concurrency: a replace only with the ETag that was read, a create only
+    // when nothing is stored. When the API changed the document in between, it is read again and the change reapplied.
+    private static async Task MergeAsync<T>(Container container, string id, Func<T?, T> apply)
         where T : class
     {
-        try
+        var partitionKey = new PartitionKey("access");
+        for (var attempt = 1; ; attempt++)
         {
-            return (await container.ReadItemAsync<T>(id, partitionKey)).Resource;
-        }
-        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
-        {
-            return null;
+            T? current = null;
+            string? etag = null;
+            try
+            {
+                var response = await container.ReadItemAsync<T>(id, partitionKey);
+                (current, etag) = (response.Resource, response.ETag);
+            }
+            catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+            {
+            }
+
+            try
+            {
+                var updated = apply(current);
+                if (etag is null)
+                {
+                    await container.CreateItemAsync(updated, partitionKey);
+                }
+                else
+                {
+                    await container.ReplaceItemAsync(updated, id, partitionKey, new ItemRequestOptions { IfMatchEtag = etag });
+                }
+
+                return;
+            }
+            catch (CosmosException exception) when (attempt < 5
+                && exception.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)
+            {
+            }
         }
     }
 }

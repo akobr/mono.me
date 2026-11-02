@@ -54,7 +54,7 @@ A non-zero exit code returns a failure that names the step. The spec's second op
 
 ### 5. Out of scope
 
-Unchanged from the spec. Node must be on `PATH`, SDK regeneration stays manual, and changes made during a session are picked up when `ui-admin` restarts.
+Unchanged from the spec. Node must be on `PATH`, SDK regeneration stays manual, and changes made during a session are picked up by starting `ui-admin-sdk` and `ui-admin-installer` again before restarting `ui-admin` (a restart of `ui-admin` alone does not re-run them; their earlier completed runs satisfy its wait), or by restarting the host.
 
 ### 6. Verification
 
