@@ -129,6 +129,17 @@ public sealed partial class KeyValueDetail
 
     public ILocator ClientEncryptedDescription => ClientEncryptedAlert.Locator("[data-slot='description']");
 
+    // The header's badge of a deleted key (the list's toolbar has a button "Deleted" outside the region).
+    public ILocator DeletedBadge => Region.GetByText("Deleted", new() { Exact = true });
+
+    // The alert of a deleted key, "This key is deleted" ("Removed for good in <n> day(s), with every version. Restore
+    // it to bring back the latest version."), with Restore; the key is read-only while deleted.
+    public ILocator DeletedAlert => Alert("This key is deleted");
+
+    public ILocator DeletedDescription => DeletedAlert.Locator("[data-slot='description']");
+
+    public ILocator RestoreButton => DeletedAlert.GetByRole(AriaRole.Button, new() { Name = "Restore", Exact = true });
+
     // The compact error of a key the view does not have ("Not found", "The key '<key>' does not exist in view
     // '<view>'."), with Retry.
     public ILocator NotFoundAlert => Alert("Not found");
