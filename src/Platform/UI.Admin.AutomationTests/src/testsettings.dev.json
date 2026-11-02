@@ -1,0 +1,8 @@
+{
+  // The local admin UI: the Vite dev server of npm run dev (src/Platform/ui.admin/src) or of the Aspire host, on port
+  // 5173 (the redirect URI of AuthKit staging), with the committed pool users of AuthKit staging (passwords in the user
+  // secrets). It must be running: otherwise the target check fails every test.
+  "Target": {
+    "BaseUrl": "http://localhost:5173"
+  }
+}

@@ -1,10 +1,10 @@
 {
   // The committed defaults; docs/Platform/UI.Admin.AutomationTests/automation-tests.md ("Configure") lists every
   // layer above them. No secrets here: passwords and keys go to the user secrets (or UITESTS_* variables in CI).
-  // Target:BaseUrl defaults to the local dev server (npm run dev / Aspire, port 5173), which must be running (otherwise
-  // the target check times out); an empty BaseUrl skips every test.
+  // Without Target:BaseUrl every test is skipped, so the solution's dotnet test passes without a running admin UI; the
+  // dev profile (UITESTS_PROFILE=dev) targets the local dev server (npm run dev / Aspire, port 5173).
   "Target": {
-    "BaseUrl": "http://localhost:5173",
+    "BaseUrl": "",
     "Organization": "ui-tests",
     "Project": "automation",
     "View": "default",

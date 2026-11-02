@@ -185,7 +185,7 @@ Expect `iss` = the AuthKit domain, `aud` = `https://localhost:7180/mcp`, `sub` =
 
 ## UI automation tests
 
-The admin UI's browser tests (`src/Platform/UI.Admin.AutomationTests`) run against this local stack like against a deployed one: `Target:BaseUrl` `http://localhost:5173`, `Target:SignIn` `AuthKit` with pool users of AuthKit staging that have accounts and the configured organization, project and view in the local database. Without the stack, the admin UI's mock build (`npm run dev:mock`, the `mock` profile) needs no backend. Everything else, including the CI workflow, is in [Admin UI Automation Tests](UI.Admin.AutomationTests/automation-tests.md).
+The admin UI's browser tests (`src/Platform/UI.Admin.AutomationTests`) run against this local stack with the `dev` profile (`UITESTS_PROFILE=dev`: `Target:BaseUrl` `http://localhost:5173`), like against a deployed one: `Target:SignIn` `AuthKit` with pool users of AuthKit staging that have accounts and the configured organization, project and view in the local database. Without the stack, the admin UI's mock build (`npm run dev:mock`, the `mock` profile) needs no backend. Everything else, including the CI workflow, is in [Admin UI Automation Tests](UI.Admin.AutomationTests/automation-tests.md).
 
 ## Against a deployed API
 

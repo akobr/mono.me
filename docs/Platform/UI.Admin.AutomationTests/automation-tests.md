@@ -13,7 +13,8 @@ Specs: [2026-10-31 UI Automation Testing Project](specs/2026-10-31%20UI%20Automa
 dotnet build src/Platform/UI.Admin.AutomationTests/src
 pwsh src/Platform/UI.Admin.AutomationTests/src/bin/Debug/net10.0/playwright.ps1 install chromium firefox webkit   # Linux: install --with-deps
 
-dotnet run --project src/Platform/UI.Admin.AutomationTests/src                                                   # everything, headless Chromium
+dotnet run --project src/Platform/UI.Admin.AutomationTests/src                                                   # without a target: every test skipped
+UITESTS_PROFILE=dev dotnet run --project src/Platform/UI.Admin.AutomationTests/src                               # everything against the local admin UI, headless Chromium
 dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"   # the PR gate set
 dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Area-Access]"
 UITESTS_PROFILE=mobile dotnet run --project src/Platform/UI.Admin.AutomationTests/src                            # Pixel 7 emulation
@@ -28,7 +29,8 @@ dotnet test --solution 42.mono.slnx                                             
 ```
 
 - **`dotnet test`**: the repository runs `dotnet test` on Microsoft.Testing.Platform (`global.json`), like TUnit, so `dotnet test --solution 42.mono.slnx` runs the suite together with the xUnit projects (skipped without a target), and `dotnet test --project src/Platform/UI.Admin.AutomationTests/src <options>` runs it alone with the options of `dotnet run`, without the `--`. TUnit's options (`--treenode-filter`, `--test-parameter`, `--maximum-parallel-tests`) only go with `--project`: the xUnit modules of the solution refuse them (exit 5). `dotnet test` prints the suite's own output only when it fails, so the `ui-automation:` lines below (the seed, the run URLs) need `dotnet run`, or `results.jsonl`.
-- **Without a target** (`Target:BaseUrl` empty, the committed default) every test is skipped with a reason and the run exits `0`. A filter that matches nothing exits `8`.
+- **Without a target** (`Target:BaseUrl` empty, the committed default) every test is skipped with a reason and the run exits `0`, so the solution's `dotnet test` passes without a running admin UI. A filter that matches nothing exits `8`.
+- **The `dev` profile** (`UITESTS_PROFILE=dev`) targets the local admin UI, `http://localhost:5173` (`npm run dev` or Aspire); a run against it needs the passwords of the committed pool in the user secrets (`Users:Pool:<n>:Password`), and with nothing on the port the target check fails every test (`net::ERR_CONNECTION_REFUSED at http://localhost:5173/login`).
 - The terminal of `dotnet run` shows the session's lines prefixed `ui-automation:`: the run id, the data seed, the effective settings (secrets as `***`), the target check, warnings, and at the end the totals, every reporter's run URL and the path of `results.jsonl`.
 - Results go to `src/Platform/UI.Admin.AutomationTests/src/bin/<configuration>/net10.0/TestResults/` (git-ignored): TUnit's HTML report (and the TRX) under `dotnet run` (under `dotnet test` they go to `TestResults/` of the current directory, or to `--results-directory`), and always `artifacts/<runId>/` with `results.jsonl` and a folder per test (`Tests.Access.SignInTests/SignIn_ShowsOrganizations/`) with `failure.png`, `trace.zip` (`pwsh …/playwright.ps1 show-trace <file>`) and `console.log`. The target check has its own folder, `TargetCheck/CheckTarget/`.
 - **Keep traces private**: a `trace.zip` holds the network log and the context's storage state, so the pool user's session cookies and tokens (never a password: the sign-in runs untraced). Do not publish traces of a deployed target; the CI workflow leaves them (every `.zip` of the results) out of its artifact.
@@ -43,7 +45,7 @@ The Platform's keys of `Target` (`PlatformTarget`, read with `Settings.Bind<Plat
 
 | Key | `testsettings.json` | Meaning |
 |---|---|---|
-| `BaseUrl` | `http://localhost:5173` | The admin UI, by default the local dev server (`npm run dev` / Aspire), e.g. `https://admin.staging.example.com`; empty skips every test |
+| `BaseUrl` | empty | The admin UI, e.g. `https://admin.staging.example.com` (the `dev` profile: the local dev server, `http://localhost:5173`); empty skips every test |
 | `SignIn` | `AuthKit` | `AuthKit` (deployed environments) or `None` (a target that is signed in already: the mock build) |
 | `Organization` / `Project` / `View` | `ui-tests` / `automation` / `default` | The pre-provisioned organization, project and view the tests work in (placeholders until the environment exists); Platform names: 2 to 63 of `a-z`, `0-9` and `-` |
 | `MockScenario` | `null` | Mock build only: `?mock-scenario=<name>` (`default`, `new-user`, `invited`, `large`, `showcase`) on the first navigation of each test |
@@ -77,7 +79,8 @@ dotnet user-secrets set "Reporting:Testiny:ApiKey" "…"                        
 
 | Profile | What it changes |
 |---|---|
-| `mock` | The mock build on `http://localhost:5174` (`npm run dev:mock`), `acme` / `billing` / `default`, `SignIn` `None`, `MockScenario` `default`, `Target:RoleProjects` `Contributor` → `acme/shipping` and `Reader` → `northwind/portal`, eight placeholder pool users with the role `Owner`, and longer timeouts for the unbundled dev server (`NavigationTimeoutMs` 60000, `ExpectTimeoutMs` 15000) |
+| `dev` | The local admin UI on `http://localhost:5173` (`npm run dev` or Aspire), with the committed pool and the AuthKit sign-in |
+| `mock` | The mock build on `http://localhost:5174` (`npm run dev:mock`), `acme` / `billing` / `default`, `SignIn` `None`, `MockScenario` `default`, four placeholder pool users with the role `Owner`, and longer timeouts for the unbundled dev server (`NavigationTimeoutMs` 60000, `ExpectTimeoutMs` 15000) |
 | `mobile` | `Browser:Device` `Pixel 7` (412×839, scale 2.625, touch, mobile user agent; the TypeScript suite narrows it to 390×844, the same layout below 640 px) |
 | `firefox` / `webkit` | `Browser:Engine` |
 | `browserstack-win-chrome` | BrowserStack, Chrome `latest` on Windows 11, 1920×1080 |
@@ -314,7 +317,7 @@ jobs:
 
 | Symptom | Cause and fix |
 |---|---|
-| Every test skipped: `UITESTS_Target__BaseUrl is not configured; see docs/Platform/UI.Admin.AutomationTests/automation-tests.md.` | No target: set `Target:BaseUrl` (local settings, `UITESTS_Target__BaseUrl`) or a profile such as `mock` |
+| Every test skipped: `UITESTS_Target__BaseUrl is not configured; see docs/Platform/UI.Admin.AutomationTests/automation-tests.md.` | No target (the committed default): use the `dev` profile for the local admin UI, a profile such as `mock`, or set `Target:BaseUrl` (local settings, `UITESTS_Target__BaseUrl`) |
 | Every test fails at once: `UI automation is not available: The target check failed: …` | The target lacks the configured organization, project or view, or the pool user lacks access; the message says which ("The target check") |
 | Every test fails at once: `… The profile 'x' has no testsettings.x.json …`, `Users:Pool is empty …`, `Users:Pool:0:Password is required …` | The settings did not load; the first `ui-automation: error:` line lists every problem |
 | `Executable doesn't exist at …ms-playwright…` on start | The browsers of Playwright 1.63 are not installed: `pwsh …/bin/Debug/net10.0/playwright.ps1 install chromium` (the channel's name with `Browser:Channel`) |
