@@ -13,9 +13,6 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Modeling;
 [Area(Area.Modeling)]
 public sealed partial class ModelingTabsTests : PlatformTest
 {
-    // The project roles that see Export & Import, as Users:Pool lists them.
-    private static readonly string[] AdministratorRoles = ["Owner", "Administrator"];
-
     // MOD-TAB-01: Modeling opens on Schemas and every tab opens its own page.
     // The plain …/modeling opens Schemas, and an Administrator gets the five tabs in their order. Each click opens its
     // tab's page, browser Back returns to the tab before, and the arrow keys only move the focus until Enter opens the
@@ -116,7 +113,9 @@ public sealed partial class ModelingTabsTests : PlatformTest
         await App.GotoAsync(Routes.OldViewPage("export-import"));
         await App.WaitForReadyAsync();
         await App.ExpectAtAsync(Routes.ModelingTab("export-import"));
-        if (ActsAsAdministrator())
+
+        // The leased editor's roles in Users:Pool: an Administrator or Owner sees Export & Import.
+        if (AdminUser.IsSatisfiedBy(User))
         {
             await modeling.ExpectSelectedAsync("Export & Import");
         }
@@ -325,15 +324,6 @@ public sealed partial class ModelingTabsTests : PlatformTest
         await schema.OpenAnnotationAsync(key);
         await Expect(schema.Document.Content).ToContainTextAsync("\"string\"");
         await Expect(schema.Document.Content).Not.ToContainTextAsync("\"number\"");
-    }
-
-    // The leased user's role in the target's project, from Users:Pool: an Administrator or Owner sees Export & Import.
-    // A role of Target:RoleProjects acts with any pool user in another project, where the pool's roles do not apply.
-    private bool ActsAsAdministrator()
-    {
-        return RoleProject is null
-            ? AdministratorRoles.Any(User.HasRole)
-            : ActingRole is Role.Admin or Role.Owner;
     }
 
     private static async Task ExpectContributorsOnlyAsync(ModelingPage modeling)

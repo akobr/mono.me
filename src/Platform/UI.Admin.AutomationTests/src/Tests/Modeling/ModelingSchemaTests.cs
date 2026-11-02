@@ -19,9 +19,9 @@ public sealed partial class ModelingSchemaTests : PlatformTest
     // An object schema with one titled string property, which the form preview renders as the field "Ticket".
     private const string TicketSchema = """{"type":"object","properties":{"ticket":{"type":"string","title":"Ticket"}}}""";
 
-    // What the editor holds right after a delete: the delete empties the draft, the editor shows {} for it and reports
-    // that text back as an edit before the schema's 404 arrives, so the starter document of a missing schema does not
-    // replace it (SchemaDetail.vue, CodeEditor.vue).
+    // Admin UI bug (424-152 review): SchemaDetail.vue remove() + CodeEditor.vue echo {} back before the 404, so the
+    // starter document does not return; the fixed app shows the starter document. What the editor holds after a delete
+    // with the bug.
     private const string DeletedSchemaDocument = "{}";
 
     // MOD-SCH-01: Create an annotation schema for a new annotation.
@@ -60,7 +60,7 @@ public sealed partial class ModelingSchemaTests : PlatformTest
         await Expect(schema.SchemaListSection("Annotation schemas")).ToBeVisibleAsync();
 
         var row = schema.AnnotationSchemaRow(key);
-        await Expect(row.GetByRole(AriaRole.Link, new() { Name = key, Exact = true })).ToHaveAttributeAsync("href", EndsWith(Routes.AnnotationSchema(key)));
+        await Expect(row.GetByRole(AriaRole.Link, new() { Name = key, Exact = true })).ToHaveAttributeAsync("href", AppRoutes.HrefEndingWith(Routes.AnnotationSchema(key)));
         await Expect(row).ToContainTextAsync("v1");
     }
 
@@ -135,7 +135,7 @@ public sealed partial class ModelingSchemaTests : PlatformTest
         await App.ExpectAtAsync(Routes.ModelingTab("schemas"));
         var row = schema.DescendantSchemaRow(responsibility, PlatformData.Execution);
         await Expect(row).ToContainTextAsync("v1");
-        await Expect(row.GetByRole(AriaRole.Link, new() { Name = responsibility, Exact = true })).ToHaveAttributeAsync("href", EndsWith(Routes.Annotation(responsibility)));
+        await Expect(row.GetByRole(AriaRole.Link, new() { Name = responsibility, Exact = true })).ToHaveAttributeAsync("href", AppRoutes.HrefEndingWith(Routes.Annotation(responsibility)));
         var below = row.Locator($"a[href$=\"{Routes.DescendantSchema(responsibility, PlatformData.Execution)}\"]");
         await Expect(below).ToBeVisibleAsync();
         if (Target.IsMock)
@@ -148,8 +148,10 @@ public sealed partial class ModelingSchemaTests : PlatformTest
     // A new project has no schemas: seven type rows, Responsibility without a schema, and two empty sections (on a
     // deployed target; the mock gives every view its base documents). The Responsibility schema starts with the starter
     // document and Create; saved as v1 its row shows v1. The typed delete ("delete") removes it, and the editor offers
-    // Create with {}, a change of its own, so leaving it asks "Discard changes?"; the row shows "No schema" again. A type
-    // schema validates every configuration of the type in the view, hence the disposable project.
+    // Create with the starter document again; the row shows "No schema" again. A type schema validates every
+    // configuration of the type in the view, hence the disposable project.
+    // Admin UI bug (424-152 review): SchemaDetail.vue remove() + CodeEditor.vue echo {} back before the 404, so the
+    // starter document does not return; the fixed app shows the starter document. The test accepts both.
     [Test]
     [TestCase(96)]
     [UserRole(Role.Owner)]
@@ -196,8 +198,10 @@ public sealed partial class ModelingSchemaTests : PlatformTest
         await delete.TypeConfirmationAsync("delete");
         await delete.ConfirmAsync("Delete");
         await Expect(App.Toast("Schema deleted")).ToBeVisibleAsync();
+
+        // Create shows once the schema's 404 arrived (Save until then), and with it the document of a missing schema.
         await Expect(schema.CreateButton).ToBeVisibleAsync();
-        await schema.Document.ExpectTextAsync(DeletedSchemaDocument);
+        await schema.Document.ExpectTextAsync(ModelingSchemaPage.StarterDocument, DeletedSchemaDocument);
 
         await LeaveDeletedSchemaAsync(schema);
         await Expect(schema.TypeSchemaRow(PlatformData.Responsibility)).ToContainTextAsync("No schema");
@@ -280,7 +284,7 @@ public sealed partial class ModelingSchemaTests : PlatformTest
 
         await Expect(schema.NonCompliantTable.GetByRole(AriaRole.Columnheader)).ToHaveTextAsync(["Configuration", "View", "Errors"]);
         var link = schema.NonCompliantTable.GetByRole(AriaRole.Link, new() { Name = key, Exact = true });
-        await Expect(link).ToHaveAttributeAsync("href", EndsWith(Routes.Configuration(key)));
+        await Expect(link).ToHaveAttributeAsync("href", AppRoutes.HrefEndingWith(Routes.Configuration(key)));
         var row = schema.NonCompliantTable.GetByRole(AriaRole.Row).Filter(new() { Has = Page.GetByRole(AriaRole.Link, new() { Name = key, Exact = true }) });
         await Expect(row.GetByRole(AriaRole.Cell)).ToHaveTextAsync([key, Routes.View, "/retries Number too big"]);
 
@@ -341,8 +345,8 @@ public sealed partial class ModelingSchemaTests : PlatformTest
     // MOD-SCH-07: Schema versions show the history and a comparison, and a typed delete ends them.
     // An annotation schema saved twice (maximum 5, then 9) lists v2 as current above v1; v1 shows read-only, and v2
     // compared with v1 differs in one line. The typed delete stays disabled until "delete" is typed and confirms with
-    // Enter; then nothing is left: no history, and no row in "Annotation schemas". The editor holds {} after the delete, a
-    // change of its own, so leaving it asks "Discard changes?".
+    // Enter; then nothing is left: no history, and no row in "Annotation schemas". The editor of the deleted schema holds
+    // an unsaved document, so leaving it may ask "Discard changes?" (LeaveDeletedSchemaAsync).
     [Test]
     [TestCase(105)]
     [UserRole(Role.Editor)]
@@ -425,18 +429,12 @@ public sealed partial class ModelingSchemaTests : PlatformTest
         return new Regex($"\"maximum\":\\s*{maximum}\\b");
     }
 
-    // An href that ends with the route (a path of the app).
-    private static Regex EndsWith(string route)
-    {
-        return new Regex($"/{Regex.Escape(route.Trim('/'))}$");
-    }
-
-    // The editor of a deleted schema holds a document of its own ({}, DeletedSchemaDocument), a change against the
-    // schema that no longer exists: leaving the detail asks "Discard changes?", and Discard returns to the list.
+    // A deleted schema's editor holds an unsaved document (the starter document, or {} with the Admin UI bug (424-152
+    // review)), so leaving may ask "Discard changes?"; Discard, if asked, returns to the list.
     private async Task LeaveDeletedSchemaAsync(ModelingSchemaPage schema)
     {
         await schema.Panel.LeaveButton.ClickAsync();
-        await new DiscardChangesDialog(App).DiscardAsync();
+        await new DiscardChangesDialog(App).DiscardIfAskedAsync();
         await Expect(schema.Panel.Root).ToBeHiddenAsync();
         await Expect(schema.SchemaListSection("Type schemas")).ToBeVisibleAsync();
     }
