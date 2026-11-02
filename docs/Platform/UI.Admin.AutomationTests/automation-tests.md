@@ -4,7 +4,7 @@ Browser tests of the integrated 2S Platform: the deployed admin UI (`src/Platfor
 
 The admin UI's own TypeScript Playwright suite (`src/Platform/ui.admin/src/test/e2e`) stays the fast, hermetic regression suite of the UI alone, against the mock API; this suite covers the integrated system.
 
-Spec: [2026-10-31 UI Automation Testing Project](specs/2026-10-31%20UI%20Automation%20Testing%20Project.md); reviews of Phases 1, 2 and 5 (the Platform project, the CI workflow) in [`specs/reviews/`](specs/reviews/), of Phases 3 to 5 for the libraries (Testiny, BrowserStack, the target check) in [`docs/Libraries/Testing/UI.Automation/specs/reviews/`](../../Libraries/Testing/UI.Automation/specs/reviews/).
+Specs: [2026-10-31 UI Automation Testing Project](specs/2026-10-31%20UI%20Automation%20Testing%20Project.md) and [2026-11-02 Initial Test Cases of the Admin UI and Their Automation](specs/2026-11-02%20Initial%20Test%20Cases%20of%20the%20Admin%20UI%20and%20Their%20Automation.md) (the catalogue of 233 cases, the roles, modes and helpers; its reviews of Phases 1 to 4 in [`specs/reviews/`](specs/reviews/)); reviews of Phases 1, 2 and 5 (the Platform project, the CI workflow) in [`specs/reviews/`](specs/reviews/), of Phases 3 to 5 for the libraries (Testiny, BrowserStack, the target check) in [`docs/Libraries/Testing/UI.Automation/specs/reviews/`](../../Libraries/Testing/UI.Automation/specs/reviews/).
 
 ## Run
 
@@ -45,8 +45,9 @@ The Platform's keys of `Target` (`PlatformTarget`, read with `Settings.Bind<Plat
 | `Organization` / `Project` / `View` | `ui-tests` / `automation` / `default` | The pre-provisioned organization, project and view the tests work in (placeholders until the environment exists); Platform names: 2 to 63 of `a-z`, `0-9` and `-` |
 | `MockScenario` | `null` | Mock build only: `?mock-scenario=<name>` (`default`, `new-user`, `invited`, `large`, `showcase`) on the first navigation of each test |
 | `EmailDomain` | `example.com` | Generated e-mail addresses are `ui-tests+<slug>@<domain>` |
+| `RoleProjects` | `{}` | By role (`Contributor`, `Reader`, …; not `Any`): `<org>/<project>[/<view>]` where every pool user holds exactly that role ("Users and roles") |
 
-`PlatformAutomationSetup.Validate` checks those names, the scenario name and the domain, and requires a non-empty `Users:Pool`.
+`PlatformAutomationSetup.Validate` checks those names, the scenario name, the domain and each `Target:RoleProjects` entry, and requires a non-empty `Users:Pool`.
 
 A `testsettings.local.json` for a deployed environment, and its secrets (from `src/Platform/UI.Admin.AutomationTests/src`):
 
@@ -73,7 +74,7 @@ dotnet user-secrets set "Reporting:Testiny:ApiKey" "…"                        
 
 | Profile | What it changes |
 |---|---|
-| `mock` | The mock build on `http://localhost:5174` (`npm run dev:mock`), `acme` / `billing` / `default`, `SignIn` `None`, `MockScenario` `default`, four placeholder pool users with the role `Owner`, and longer timeouts for the unbundled dev server (`NavigationTimeoutMs` 60000, `ExpectTimeoutMs` 15000) |
+| `mock` | The mock build on `http://localhost:5174` (`npm run dev:mock`), `acme` / `billing` / `default`, `SignIn` `None`, `MockScenario` `default`, `Target:RoleProjects` `Contributor` → `acme/shipping` and `Reader` → `northwind/portal`, eight placeholder pool users with the role `Owner`, and longer timeouts for the unbundled dev server (`NavigationTimeoutMs` 60000, `ExpectTimeoutMs` 15000) |
 | `mobile` | `Browser:Device` `Pixel 7` (412×839, scale 2.625, touch, mobile user agent; the TypeScript suite narrows it to 390×844, the same layout below 640 px) |
 | `firefox` / `webkit` | `Browser:Engine` |
 | `browserstack-win-chrome` | BrowserStack, Chrome `latest` on Windows 11, 1920×1080 |
@@ -82,13 +83,20 @@ dotnet user-secrets set "Reporting:Testiny:ApiKey" "…"                        
 
 ## Users and roles
 
-`Users:Pool` lists pre-provisioned users; a test leases one for its duration, so the pool bounds the parallelism (`Execution:MaxParallelTests` is lowered to the pool size). `Roles` are the user's roles in the target's organization and project, matched by a test's `RequiredUser`:
+`Users:Pool` lists pre-provisioned users; a test leases one for its duration, so the pool bounds the parallelism (`Execution:MaxParallelTests` is lowered to the pool size). `Roles` are the user's roles in the target's organization and project. A test asks for a role with `[UserRole(Role.<role>)]` on its method (or its class), which `PlatformTest.RequiredUser` maps to the pool:
 
-- `PlatformTest.EditingUser` (Owner, Administrator, ContributorWithSecrets or Contributor; the admin UI gives a Reader no create, edit or save action) for every test that creates or edits: annotations, configurations, key values;
-- `UserRequirement.WithRole("Owner")` for `Project_Create_OpensSettings` ("New project" is enabled only for an Owner of the organization);
-- any user for the sign-in and navigation tests.
+| `Role` | Leases | Used by |
+|---|---|---|
+| `Any` (no attribute) | any user | sign-in, navigation, read-only pages (29 tests) |
+| `Editor` | Owner, Administrator, ContributorWithSecrets or Contributor (`PlatformTest.EditingUser`; a Reader has no create, edit or save action) | everything that creates or edits (100) |
+| `Admin` | Owner or Administrator (`AdminUser`) | members, invitations, transfers, monitoring, project settings (25) |
+| `Secrets` | Owner, Administrator or ContributorWithSecrets (`SecretsUser`) | secrets, imports and exports with secret values (8) |
+| `Owner` | Owner | new projects and organizations, and every `[DisposableProject]` test (48) |
+| `Contributor`, `Reader` | exactly that role, in the project `Target:RoleProjects` maps it to (any pool user there), else a pool user with that role in the target's project | what a Contributor (10) or a Reader (13) may not do |
 
-The committed `testsettings.json` holds a pool of 8 users (their e-mails and roles; the passwords go to the user secrets as `Users:Pool:<n>:Password`), enough for the default 4 parallel tests. A pool set in a higher layer (a profile such as `mock`, `testsettings.local.json`, `UITESTS_*` variables) replaces it entirely: the highest layer that sets any `Users:Pool:<n>:Email` defines the pool, and passwords of any layer apply to it by index. A lease that waits longer than `Users:LeaseTimeoutSeconds` (120 s) blocks the test (`No user of Users:Pool has role …` when none could ever match).
+`Target:RoleProjects` maps a role to `<org>/<project>[/<view>]` where every pool user holds exactly that role; `Routes` then points at that project. The mock profile maps `Contributor` to `acme/shipping` and `Reader` to `northwind/portal`, where Ada Lovelace holds exactly those roles; it is empty by default, so on a deployed target the pool needs a Contributor and a Reader of the target's project (or the mapping: `UITESTS_Target__RoleProjects__Reader=ui-tests/read-only`). The target check verifies each entry on `/orgs`: the project's link must name the role.
+
+The committed `testsettings.json` holds a pool of 8 users (their e-mails and roles; the passwords go to the user secrets as `Users:Pool:<n>:Password`), enough for the default 4 parallel tests. A pool set in a higher layer (a profile such as `mock`, `testsettings.local.json`, `UITESTS_*` variables) replaces it entirely: the highest layer that sets any `Users:Pool:<n>:Email` defines the pool, and passwords of any layer apply to it by index. A lease that waits longer than `Users:LeaseTimeoutSeconds` (120 s) blocks the test (`No user of Users:Pool has role …` when none could ever match). A pool of eight suits the catalogue: 3 Owners (of the organization and the project), 1 Administrator, 1 ContributorWithSecrets, 2 Contributors and 1 Reader. The CI workflow passes six (`UITESTS_USER_0…5`) and no `Target:RoleProjects` yet, so a CI run against a deployed target needs a Contributor and a Reader among those six. When no user could ever match, a deployed target blocks the test at once (a gap of the environment), and the mock skips it with the reason.
 
 ## AuthKit checklist
 
@@ -103,7 +111,7 @@ The committed `testsettings.json` holds a pool of 8 users (their e-mails and rol
 
 ## The target check
 
-Before the first test, `PlatformAutomationSetup.CheckTargetAsync` (`PlatformTargetCheck.cs`) opens, as a pool user on a signed-in page, the annotations of `Target:Organization` / `Project` / `View` and waits for the catalog; for a view other than `default` it also looks for the view on the project's Views page. A good target costs one page load (about 2 s on the mock dev server), two for another view. A bad target fails every test at once with one message, logged once, and no Testiny run is created:
+Before the first test, `PlatformAutomationSetup.CheckTargetAsync` (`PlatformTargetCheck.cs`) opens, as a pool user on a signed-in page, the annotations of `Target:Organization` / `Project` / `View` and waits for the catalog; for a view other than `default` it also looks for the view on the project's Views page. A good target costs one page load (about 2 s on the mock dev server), two for another view, and one more (`/orgs`) with `Target:RoleProjects`, whose entries it checks there. A bad target fails every test at once with one message, logged once, and no Testiny run is created:
 
 | Problem | Message (after `The target check failed:`) |
 |---|---|
@@ -112,6 +120,8 @@ Before the first test, `PlatformAutomationSetup.CheckTargetAsync` (`PlatformTarg
 | View not found | `Target:View 'x' was not found in acme/billing: the project's views are default, staging. Create it on the project's Views page (New view, an Administrator; …) or fix Target:View.` |
 | No access | `Users:Pool:0 (u-…) has no access to acme/billing: the project is listed for the user, but its annotations show "You have no access here". …` |
 | The catalog fails | `The annotations of acme/billing/default did not load for Users:Pool:0 (u-…): <the API's error>` |
+| Role project not found | `Target:RoleProjects:Reader 'x/y': the project is not among the projects of Users:Pool:0 (u-…) (…); …` |
+| Wrong role in a role project | `Target:RoleProjects:Reader 'acme/shipping': Users:Pool:0 (u-…) is not Reader there: its link on the organizations reads 'shipping Contributor'. …` |
 
 The admin UI shows an organization or a project outside the user's memberships as "no access" whether it exists or not, so the check reads the user's memberships on `/orgs` to tell "not found" (which also covers a missing membership) from "no access" (listed, but the role is None). The check's screenshot, trace and console log are in `artifacts/<runId>/TargetCheck/CheckTarget/`; the message names the folder.
 
@@ -127,9 +137,9 @@ The admin UI's mock build serves the API with MSW in the browser and has Ada Lov
 UITESTS_PROFILE=mock dotnet run --project src/Platform/UI.Admin.AutomationTests/src
 UITESTS_PROFILE=mock,mobile dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"
 
-# the bundled e2e build on :4174, as the CI workflow serves it
-(cd src/Platform/ui.admin/src && VITE_MOCK_DATASET=default npm run build:e2e && npx vite preview --port 4174 --strictPort)
-UITESTS_PROFILE=mock UITESTS_Target__BaseUrl=http://localhost:4174 dotnet run --project src/Platform/UI.Admin.AutomationTests/src
+# the bundled e2e build on 127.0.0.1:4174, as the CI workflow serves it
+(cd src/Platform/ui.admin/src && VITE_MOCK_DATASET=default npm run build:e2e && npx vite preview --host 127.0.0.1 --port 4174 --strictPort)
+UITESTS_PROFILE=mock UITESTS_Target__BaseUrl=http://127.0.0.1:4174 dotnet run --project src/Platform/UI.Admin.AutomationTests/src
 ```
 
 `MockScenario` `default` matters: `npm run dev:mock` starts the `showcase` dataset otherwise, which has no `acme`. In the default dataset Ada is Owner of `acme` and `acme/billing`, Contributor of `acme/shipping` and Reader of `northwind/portal` (no role on `northwind`); `acme/billing` has the views `default` and `staging`. The mock's data lives in the tab's `sessionStorage`: every test starts from the scenario's seed, and what it creates is gone with its page.
@@ -140,16 +150,59 @@ Tests create what they act on, in the target's view (or a new project in its org
 
 ## The Elementary set
 
-`--treenode-filter "/**[Category=Elementary]"`, one test per area; each creates what it acts on:
+`--treenode-filter "/**[Category=Elementary]"`: the case of priority Elementary (Critical) of each of the ten sections, the PR gate set; each creates what it acts on:
 
-| Test | Area | User | What it does |
+| Case | Test | Section | User | What it does |
+|---|---|---|---|---|
+| 1 | `SignInTests.SignIn_ShowsOrganizations` | Access | any | `/orgs` lists the target's organization and project, signed in |
+| 5 | `ProjectTests.Project_Create_OpensSettings` | Organizations and Projects | Owner | Creates a project with a description in the organization; its Settings, opened through the navigation, show the description |
+| 6 | `NavigationMenuTests.Navigation_MobileMenu_OpensPages` | Navigation | any | The sidebar (the "Open navigation" slideover below 1024 px; from 1024 to 1279 px the icon rail, expanded first) opens Configurations, Values store, Settings, Organizations and Annotations |
+| 2 | `AnnotationBulkCreateTests.Annotations_CreateResponsibility_AppearsInGrid` | Annotations | editing | Bulk create (the toolbar; the command palette on a phone) creates `rst.at-<runId>-…`; the grid (the list on a phone) filtered by `key:` shows it, and its detail, opened by its URL, shows the key in its identity line |
+| 3 | `ConfigurationCreateTests.Configurations_SetDocument_EffectiveShowsIt` | Configurations | editing | Bulk create creates a responsibility; Create empty, a generated JSON document in the editor, save (`v2`); the Effective tab shows every value |
+| 92 | `ModelingSchemaTests.Schemas_CreateAnnotationSchema_ListsVersionOne` | Modeling | editing | An annotation schema for a new responsibility, created in the schema editor, is listed with version 1 |
+| 16 | `GraphOverviewTests.Graph_FocusOnCreatedTree_OpensNodeByKeyboard` | Graph | editing | The graph focused on a bulk-created tree shows its neighbourhood, and the keyboard opens a node's detail |
+| 4 | `KeyValueCreateTests.KeyValues_CreateAndRead` | Key-Values | editing | A new key `at_<runId with '_' for '-'>.<word>_<hex4>` with a value; its detail shows the value and the Versions tab `v1(current)` |
+| 17 | `SettingsProjectTests.Settings_OpenAsAdministrator_ShowsEverySection` | Settings | Admin | The project's Settings show every section and card to an Administrator |
+| 7 | `MonitorTests.Monitor_SwitchTabs_ShowsUsageAndAudit` | Monitoring | Admin | Monitor opens on Usage, and its tabs switch to Audit and back with the `tab` query |
+
+## The catalogue
+
+The suite automates the catalogue of [2026-11-02 Initial Test Cases of the Admin UI and Their Automation](specs/2026-11-02%20Initial%20Test%20Cases%20of%20the%20Admin%20UI%20and%20Their%20Automation.md): 233 functional cases of Testiny project `2SP`, one test each. [test-cases.md](test-cases.md) lists every case with its reference, Testiny id, priority, role, mode and test. A Testiny section folder is a folder of `Tests/`, and a sub-folder is a class:
+
+| Testiny folder | `Tests/` | `[Area]` | Classes (sub-folders) |
 |---|---|---|---|
-| `SignIn_ShowsOrganizations` | Access | any | `/orgs` lists the target's organization and project, signed in |
-| `Annotations_CreateResponsibility_AppearsInGrid` | Annotations | editing | Bulk create (the toolbar; the command palette on a phone) creates `rst.at-<runId>-…`; the grid (the list on a phone) filtered by `key:` shows it, and its detail, opened by its URL, shows the key in its identity line |
-| `Configurations_SetDocument_EffectiveShowsIt` | Configurations | editing | Bulk create creates a responsibility; Create empty, a generated JSON document in the editor, save (`v2`); the Effective tab shows every value |
-| `KeyValues_CreateAndRead` | KeyValues | editing | A new key `at_<runId with '_' for '-'>.<word>_<hex4>` with a value; its detail shows the value and the Versions tab `v1(current)` |
-| `Project_Create_OpensSettings` | Projects | Owner | Creates a project with a description in the organization; its Settings, opened through the navigation, show the description |
-| `Navigation_MobileMenu_OpensPages` | Navigation | any | The sidebar (the "Open navigation" slideover below 1024 px; from 1024 to 1279 px the icon rail, expanded first) opens Configurations, Values store, Settings, Organizations and Annotations |
+| Access | `Access` | `Access` | `SignInTests`, `MemberTests`, `InvitationTests`, `MyInvitationTests`, `MachineTests`, `MachineCertificateTests`, `FederationTests` |
+| Organizations and Projects | `Projects` | `Projects` | `OrganizationTests`, `ProjectTests`, `ProjectViewTests` |
+| Navigation | `Navigation` | `Navigation` | `NavigationMenuTests`, `NavigationContextSwitcherTests`, `NavigationCommandPaletteTests`, `NavigationShortcutTests`, `NavigationRoutingTests`, `NavigationDetailPanelTests` |
+| Annotations | `Annotations` | `Annotations` | `AnnotationBulkCreateTests`, `AnnotationCreateTests`, `AnnotationFilterTests`, `AnnotationCatalogTests`, `AnnotationDetailTests`, `AnnotationFormTests`, `AnnotationDeleteTests`, `AnnotationRoleTests` |
+| Configurations | `Configurations` | `Configurations` | `ConfigurationCreateTests`, `ConfigurationEditTests`, `ConfigurationConflictTests`, `ConfigurationSchemaFormTests`, `ConfigurationInheritanceTests`, `ConfigurationBindingTests`, `ConfigurationNavigationTests`, `ConfigurationRoleTests` |
+| Modeling | `Modeling` | `Modeling` | `ModelingTabsTests`, `ModelingSchemaTests`, `ModelingTemplateTests`, `ModelingExportImportTests`, `ModelingDeletedTests`, `ModelingCompareTests` |
+| Graph | `Graph` | `Graph` | `GraphOverviewTests`, `GraphLegendTests`, `GraphFocusTests`, `GraphToolbarTests`, `GraphNodeDetailTests`, `GraphCreateTests`, `GraphMemoryTests` |
+| Key-Values | `KeyValues` | `KeyValues` | `KeyValueCreateTests`, `KeyValueDetailTests`, `KeyValueSecretTests`, `KeyValueVersionTests`, `KeyValueListTests`, `KeyValueLifecycleTests`, `KeyValueImportExportTests`, `KeyValueRoleTests` |
+| Settings | `Settings` | `Settings` | `SettingsProjectTests`, `SettingsBrowserTests`, `SettingsPreferencesTests`, `SettingsMachineAuthenticationTests`, `SettingsSecretsPolicyTests`, `SettingsKeysRecipientsTests` |
+| Monitoring | `Monitoring` | `Monitoring` | `MonitorTests`, `MonitorAuditTests` |
+
+The mode of a case decides where its test runs:
+
+| Mode | Attribute | Runs | Cases |
+|---|---|---|---|
+| B | (none) | on the mock and on a deployed target (every case that is not M), desktop and phone | 226 (170 with no other letter) |
+| D | `[DesktopOnly]` (category `DesktopOnly`) | from 1024 px; skipped before its lease below (the `mobile` profile) | 18 |
+| Ph | `[PhoneOnly]` (category `PhoneOnly`) | below 640 px; skipped before its lease from 640 px | 3 |
+| M | `[MockOnly("<why>")]` | on the mock only (another mock scenario, its seed data or a `window.storytellerMock` hook); skipped at registration on a deployed target | 7 |
+| P | `[DisposableProject]` (category `DisposableProject`) | creates its own project in `Target:Organization` (`CreateDisposableProjectAsync`, an Owner) for project-wide changes | 42 |
+
+The combinations are 170 B, 35 B,P, 11 B,D, 7 B,D,P, 3 B,Ph and 7 M; the 7 B,D,P tests count under both D and P. So a full run on the mock skips the 3 Ph tests on desktop and the 18 D tests on `mobile`; a deployed target also skips the 7 M tests. On a deployed target the P tests leave their projects in the organization (42 per desktop run, 35 per phone run); leave them out with `--treenode-filter "/**[Category!=DisposableProject]"`. Two more tests create lasting data in the organization outside that category: `OrganizationTests.Organization_Create_ListsItWithFirstProject` (an organization with its first project) and the Elementary `ProjectTests.Project_Create_OpensSettings` (a project). The Graph's whole-view checks skip once the target view holds more than 20,000 annotations, where the admin UI disables Show everything; the Export & Import tests run one at a time, because the API allows three active view transfers per project.
+
+```bash
+# the whole catalogue against the mock e2e build, desktop and phone
+UITESTS_PROFILE=mock UITESTS_Target__BaseUrl=http://127.0.0.1:4174 dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**"
+UITESTS_PROFILE=mock,mobile UITESTS_Target__BaseUrl=http://127.0.0.1:4174 dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**"
+dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Area-Modeling]"     # one section
+dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/*/*/MachineTests/*"            # one sub-folder
+```
+
+The tests use these helpers of `PlatformTest` besides the page objects: `CreateDisposableProjectAsync()`; `InstallClipboardRecorderAsync()` with `CopiedTextAsync()` and `WaitForCopiedTextAsync(text)` (an init script records what the page copies, on every engine and provider); `InstallRequestRecorderAsync()` with `RecordedRequestsAsync()` (what the page fetched); `DownloadAsync(action)` (the file name and bytes of a download, read over the browser connection and never kept as an artifact); `MockApi` (mock only: an in-page `fetch` of the MSW-served API and `window.storytellerMock.changeConfiguration`); and `OpenSecondPageAsync()`. A concurrent-edit test writes as "someone else" through `MockApi` on the mock and through a second page of the same context on a deployed target.
 
 ## Write a test
 
@@ -166,7 +219,7 @@ Tests create what they act on, in the target's view (or a new project in its org
 
 The Testiny reporter is registered by `PlatformAutomationSetup` and turned on by the `reporting-testiny` profile (`UITESTS_PROFILE=<target>,reporting-testiny`). The project id goes into `testsettings.local.json` (`{ "Reporting": { "Testiny": { "ProjectId": 12, "TestPlanId": null } } }`) or `UITESTS_Reporting__Testiny__ProjectId`, the API key (best restricted to the project) into the user secrets or `UITESTS_Reporting__Testiny__ApiKey`. Every key and what lands in Testiny: the library's [Reporting:Testiny](../../Libraries/Testing/UI.Automation/readme.md#reportingtestiny) and [Testiny](../../Libraries/Testing/UI.Automation/readme.md#testiny) sections.
 
-The Elementary tests are linked to cases 1–6 of the Testiny project `2SP` (numeric id 1, folder Elementary). These IDs are resolved within the configured project; changing `ProjectId` does not remap them. If you select another project, update each `[TestCase(...)]` attribute to a case ID from that project. With `--test-parameter Reporting:UnmappedTests=Warn`, missing IDs are listed and their results are not reported. The default `Ignore` policy skips this validation and uses the IDs unchecked. The default run URL template is not verified against Testiny's app; set `Reporting:Testiny:RunUrlTemplate` to the form "Copy link to test run" shows.
+Every test is linked to its case of the Testiny project `2SP` (numeric id 1) with `[TestCase(<id>)]` on its method: the ten section folders and their sub-folders match `Tests/` and its classes ("The catalogue"), and [test-cases.md](test-cases.md) lists every id. The cases 1–6 of the first Elementary set moved into their section folders and kept their ids; the empty folder `Elementary` can be deleted. These IDs are resolved within the configured project; changing `ProjectId` does not remap them. If you select another project, update each `[TestCase(...)]` attribute to a case ID from that project. With `--test-parameter Reporting:UnmappedTests=Warn`, missing IDs are listed and their results are not reported. The default `Ignore` policy skips this validation and uses the IDs unchecked. The default run URL template is not verified against Testiny's app; set `Reporting:Testiny:RunUrlTemplate` to the form "Copy link to test run" shows.
 
 ```bash
 UITESTS_PROFILE=mock,reporting-testiny dotnet run --project src/Platform/UI.Admin.AutomationTests/src
@@ -206,7 +259,7 @@ dotnet run --project src/Platform/UI.Admin.AutomationTests/src -c Release --no-b
 | `filter` | `/**[Category=Elementary]` | The tree node filter; empty runs every test |
 | `target_url` | empty | The admin UI to test; empty for the environment's `UITESTS_TARGET_BASE_URL` |
 | `report_testiny` | `false` | Adds the `reporting-testiny` profile with the environment's project and API key |
-| `use_mock_ui` | `false` | Builds the TypeScript SDK and the admin UI's e2e build (`npm run build:e2e` with `VITE_MOCK_DATASET=default`), serves it with `vite preview` on port 4174 and runs with `UITESTS_PROFILE=mock` (plus `profile`) and `UITESTS_Target__BaseUrl=http://localhost:4174`. Needs no secret, so it runs on any branch; a `browserstack*` profile is refused with it (BrowserStack's browsers would need BrowserStack Local) |
+| `use_mock_ui` | `false` | Builds the TypeScript SDK and the admin UI's e2e build (`npm run build:e2e` with `VITE_MOCK_DATASET=default`), serves it with `vite preview --host 127.0.0.1` on port 4174 and runs with `UITESTS_PROFILE=mock` (plus `profile`) and `UITESTS_Target__BaseUrl=http://127.0.0.1:4174`. Needs no secret, so it runs on any branch; a `browserstack*` profile is refused with it (BrowserStack's browsers would need BrowserStack Local) |
 
 A run against a deployed target (and a mock run with `report_testiny`) uses the GitHub environment **`ui-admin-automation`**; a mock run without reporting uses none, so none of its protection rules apply. **Restrict the environment to `main`** (Settings, Environments, `ui-admin-automation`, Deployment branches and tags: Selected branches, `main`): its secrets are the pool users' passwords and the BrowserStack and Testiny keys, and without the rule a run of any branch, with that branch's version of the workflow, could read them; branch runs then use `use_mock_ui` (without `report_testiny`). Only the variables that are set reach the run, so a profile's values stay where a variable is empty:
 
@@ -266,6 +319,8 @@ jobs:
 | Tests Blocked: `No free user with role …` / `No user of Users:Pool has role …` | The pool is too small for the parallelism, or no user has the role the test asks for (`Roles` in `Users:Pool`) |
 | Tests Blocked: `… before the engine's time for the start of the test ran out (e.g. its hook timeout)` | TUnit's hook timeout ended the start before the pool's or the provider's own timeout; the adapter raises it to the settings' start budget (library readme, "Tests: `UiTest`"), so another hook timeout (a `[Timeout]` on a hook) is lower than the budget |
 | The sign-in fails (`sign-in-failure.png` in the test's folder) | The AuthKit hosted page changed or a checklist item is missing ("AuthKit checklist") |
+| `Users:Pool:<n>:Email is required …` on the mock | The user secrets hold passwords of more pool users (`Users:Pool:<n>:Password`, for a deployed pool) than the profile lists: the mock profile has eight placeholders; with a larger deployed pool, add placeholders to `testsettings.mock.json` or set `UITESTS_Users__Pool__<n>__Email` |
+| A request to the mock fails with `net::ERR_CONNECTION_REFUSED` (an asset, then the user menu never shows) | `vite preview` listens on one address of `localhost` only (e.g. `::1`) and the browser asked the other: serve it with `--host 127.0.0.1` and use `UITESTS_Target__BaseUrl=http://127.0.0.1:4174` |
 | Exit code `8` | The filter matched no test; check the category (`Area-Access`, not `Access`) or add `--ignore-exit-code 8` |
 | `dotnet test` on the project: "Testing with VSTest target is no longer supported …" | Run it with `dotnet run` ("Run") |
 | Page loads time out in Firefox on the mock, or the first Firefox run fails at once in the target check (`The annotations of acme/billing/default did not show …`) | The unbundled dev server is slow in Firefox on a cold start (the first Firefox run after the dev server started took over 2 minutes for the check's first page); run again, use `--maximum-parallel-tests 2`, or the e2e build on 4174 |
