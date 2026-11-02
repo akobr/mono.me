@@ -74,6 +74,8 @@ watch(
 
 const dirty = computed(() => JSON.stringify(draft.value ?? null) !== JSON.stringify(original.value ?? null))
 useUnsavedChanges(dirty)
+// A missing schema can be created from the untouched starter document too (Create, ⌘S).
+const canSave = computed(() => (dirty.value || missing.value) && textValid.value)
 
 const metaIssues = (value: unknown) =>
   validateSchemaDocument(value).map((issue) => ({ path: issue.pointer || '/', message: issue.message }))
@@ -146,7 +148,7 @@ async function remove() {
 }
 
 defineShortcuts({
-  meta_s: { usingInput: true, handler: () => canEdit.value && dirty.value && void save() },
+  meta_s: { usingInput: true, handler: () => canEdit.value && canSave.value && void save() },
 })
 </script>
 
@@ -230,7 +232,7 @@ defineShortcuts({
               @update:model-value="(value) => (draft = value)"
               @update:format="(value) => (format = value)"
               @update:valid="(valid) => (textValid = valid)"
-              @save="canEdit && dirty && save()"
+              @save="canEdit && canSave && save()"
             />
             <SchemaFormPreview v-show="wide || pane === 'preview'" :schema="draft" />
           </div>
@@ -260,7 +262,7 @@ defineShortcuts({
           <UButton
             :label="missing ? 'Create' : 'Save'"
             :loading="saving"
-            :disabled="(!dirty && !missing) || !textValid"
+            :disabled="!canSave"
             @click="save()"
           />
         </div>
