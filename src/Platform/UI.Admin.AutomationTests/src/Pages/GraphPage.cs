@@ -18,11 +18,15 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // cursor's live region ("<Type> <name>, <n> connections"), the states (the empty view, "Every type is hidden") and,
 // while the catalog loads or the worker lays out the first frame, a status. The URL keeps q, layout, focus and depth;
 // Focus and Show everything push, the rest replaces. Above 5,000 annotations the graph focuses by itself and Show
-// everything asks "Show all <n> annotations?" first.
+// everything asks "Show all <n> annotations?" first; above 20,000 Show everything is disabled ("Available up to 20,000
+// annotations"), so a check of the whole view is skipped there.
 public sealed partial class GraphPage(App app, AppRoutes routes)
 {
     // Above this many annotations the graph opens in focus mode, and Show everything asks first.
     public const int LargeViewSize = 5_000;
+
+    // Above this many annotations Show everything is disabled: the graph cannot leave focus mode.
+    public const int ShowAllLimit = 20_000;
 
     public ILocator Application => app.Page.GetByRole(AriaRole.Application);
 
@@ -218,8 +222,8 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
     }
 
     // Focus: the keyboard cursor, else the selected node, else the last opened annotation, else the most connected
-    // subject or responsibility. In focus mode already (a large view focuses by itself) the whole view is shown first.
-    // Returns once the URL has a focus.
+    // subject or responsibility. In focus mode already (a large view focuses by itself) the whole view is shown first,
+    // so above ShowAllLimit the test is skipped (ShowEverythingAsync). Returns once the URL has a focus.
     public async Task FocusAsync()
     {
         if (await ShowEverythingButton.IsVisibleAsync())
@@ -233,10 +237,16 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
     }
 
     // Show everything: leaves focus mode (a push, so Back returns to it); a view above LargeViewSize asks "Show all <n>
-    // annotations?" first, which is confirmed (the URL then has all=1). Returns once Focus is back.
+    // annotations?" first, which is confirmed (the URL then has all=1). Returns once Focus is back. A view above
+    // ShowAllLimit (a deployed target's view only grows) has the button disabled: the test is skipped then.
     public async Task ShowEverythingAsync()
     {
-        var large = await IsLargeViewAsync();
+        var total = await TotalAsync();
+        Skip.When(
+            total > ShowAllLimit,
+            string.Create(CultureInfo.InvariantCulture, $"The view has {total:N0} annotations, and Show everything is disabled above {ShowAllLimit:N0}: the whole view cannot be shown."));
+
+        var large = total > LargeViewSize;
         await ShowEverythingButton.ClickAsync();
         if (large)
         {
