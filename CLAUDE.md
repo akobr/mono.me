@@ -306,7 +306,9 @@ When a spec is large and delivered in phases, create one review file per phase. 
   - a test project belongs in `42.mono.slnx` (`dotnet test --solution 42.mono.slnx` runs what the solution lists) and has at least one test (a module without tests exits 8 and fails the run; one whose tests all skip exits 0);
   - with a solution, the options reach every module: `--report-trx --results-directory <dir>`, `--output Detailed` (the output of passing tests), `--max-parallel-test-modules 1` (one module at a time, e.g. for the Cosmos DB emulator), `--list-tests`; framework options only with `--project`: xUnit's `--filter-class`, `--filter-method`, `--filter-namespace`, `--filter-trait`, `--filter-query` (or `--filter` in the VSTest syntax), TUnit's `--treenode-filter`; any other module stops with exit 5;
   - IDE: Visual Studio "Use testing platform server mode", Rider "Enable Testing Platform support", VS Code C# Dev Kit "Use Testing Platform Protocol";
-  - `xUnit1051` (pass `TestContext.Current.CancellationToken`) is a suggestion in `test/` and `testint/` (`.editorconfig`).
+  - `xUnit1051` (pass `TestContext.Current.CancellationToken`) is a suggestion in `test/` and `testint/` (`.editorconfig`);
+  - `mrepo build -t` in `src/Platform` or `src/Libraries` runs the tests of that area through its traversal, one module at a time (`dotnet build Directory.Build.proj -t:Test -p:SkipNonexistentTargets=true -p:TestInParallel=false`: the `test` script of the two items in `mrepo.json`); the items below them inherit the script, which runs `dotnet test --project test` in a project folder;
+  - the Cosmos DB suites delete every database of the emulator they use: by default the local Windows emulator on `https://localhost:8081`, so set `STORYTELLER_TESTS_USE_CONTAINER=true` (a Testcontainers emulator) before a run that includes them unless its data may go.
 - Test containers: `Testcontainers.CosmosDb`, `Testcontainers.Azurite`, `Testcontainers.PostgreSql`
 - Fake data: `Bogus`, `NBuilder`
 - Mocking: `Moq`
