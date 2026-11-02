@@ -22,6 +22,24 @@ public sealed partial class App
     // sidebar").
     public ILocator UnpinnedNavigationDialog => Page.GetByRole(AriaRole.Dialog, new() { Name = "Navigation", Exact = true });
 
+    // The brand's link to "/" (SidebarBrand.vue), which opens the last context: in the header of the docked sidebar and
+    // of the icon rail, outside the menu's nav, and in the slideover, so a phone opens the slideover first (MenuAsync).
+    public ILocator HomeLink => Page.GetByRole(AriaRole.Link, new() { Name = "2S Admin home", Exact = true });
+
+    // The page of an address that matches no route ([...path].vue), with "Nothing lives at <path>." and "Go home"; the
+    // navbar's title "Not found" shows only from 1536 px.
+    public ILocator NotFoundHeading => Page.GetByRole(AriaRole.Heading, new() { Name = "Page not found", Exact = true });
+
+    // "Go home" of "Page not found", a link to "/".
+    public ILocator GoHomeLink => Page.GetByRole(AriaRole.Link, new() { Name = "Go home", Exact = true });
+
+    // "Your organizations" of "You have no access here" (NoAccessHeading), a link to /orgs.
+    public ILocator YourOrganizationsLink => Page.GetByRole(AriaRole.Link, new() { Name = "Your organizations", Exact = true });
+
+    // Every detail panel on the page, whatever its section (DetailPanel.vue's data-detail-mode): none once a detail
+    // closed.
+    public ILocator DetailPanels => Page.Locator("[data-detail-mode]");
+
     // The menu of the docked sidebar, expanded or the icon rail: the nav with the link to /orgs, found by its address
     // because the rail's links have no name. The slideover's menu matches too, while it is open.
     public ILocator DockedNavigationMenu => Page.Locator("nav").Filter(new() { Has = Page.Locator("a[href$=\"/orgs\"]") });
