@@ -80,7 +80,7 @@ public abstract partial class PlatformTest
         try
         {
             await TypeOnHostedPageAsync(Page.GetByRole(AriaRole.Textbox, new() { Name = "Email" }), User.Email);
-            await Page.GetByRole(AriaRole.Button, new() { Name = "Continue", Exact = true }).ClickAsync();
+            await Page.GetByRole(AriaRole.Button, new() { NameRegex = Access.AuthKitSignIn.AuthKitContinue }).ClickAsync();
             await TypeOnHostedPageAsync(Page.GetByLabel("Password", new() { Exact = true }), password);
             await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
             await Page.WaitForURLAsync(url => IsOnHost(url, app));

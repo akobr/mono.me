@@ -25,6 +25,9 @@ public sealed class AuthKitSignIn : ISignInFlow
 {
     public const string FlowName = "AuthKit";
 
+    // The e-mail step's button: "Continue" alone, or "Continue with email" when social connections are enabled.
+    internal static readonly System.Text.RegularExpressions.Regex AuthKitContinue = new("^Continue( with email)?$");
+
     // The keys authkit-js keeps in local storage (devMode, on localhost): workos:refresh-token:<client id> and others.
     private const string StoragePrefix = "workos:";
 
@@ -50,7 +53,7 @@ public sealed class AuthKitSignIn : ISignInFlow
         // The AuthKit hosted page, on the AuthKit domain: the e-mail first, then the password.
         await page.WaitForURLAsync(url => !IsOnApp(url, app));
         await TypeAsync(page.GetByRole(AriaRole.Textbox, new() { Name = "Email" }), user.Email);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Continue", Exact = true }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = AuthKitContinue }).ClickAsync();
         await TypeAsync(page.GetByLabel("Password", new() { Exact = true }), password);
         await page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
 
