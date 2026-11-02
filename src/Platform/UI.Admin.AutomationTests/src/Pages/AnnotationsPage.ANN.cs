@@ -58,6 +58,10 @@ public sealed partial class AnnotationsPage
     // The filter's bottom sheet below 768 px.
     public AnnotationFilterSheet FilterSheet => new(app);
 
+    // The screen readers' announcement of the row under the keyboard cursor (J and K on the grid), "<Name>, <key>": the
+    // page's polite live paragraph, not the filter count (a span) nor the detail's "Counting descendants…" (a test id).
+    public ILocator ActiveRowAnnouncement => app.Page.Locator("p[aria-live=\"polite\"]:not([data-testid])");
+
     // The empty state of a view without annotations: the heading's block with its text and the buttons "New
     // annotation" and "Bulk create" for Contributors and up (the navbar has buttons of the same names).
     public ILocator EmptyStateBlock => EmptyState.Locator("xpath=..");
@@ -147,18 +151,18 @@ public sealed partial class AnnotationsPage
     // open overlay detail covers the right of the grid; the list item's button on a phone. Returns on its URL.
     public async Task OpenAnnotationFromListAsync(string key)
     {
-        var item = Item(key).First;
-        if (HasGrid)
-        {
-            // The pinned columns lead: select, Type, Name.
-            await item.GetByRole(AriaRole.Gridcell).Nth(2).ClickAsync();
-        }
-        else
-        {
-            await item.GetByRole(AriaRole.Button).ClickAsync();
-        }
-
+        await AnnotationOpener(key).ClickAsync();
         await app.ExpectAtAsync(routes.Annotation(key));
+    }
+
+    // What opens a listed key's detail: the grid's Name cell (pinned left, beside an open overlay detail), or the list
+    // item's button on a phone. Clicking it while the open detail has unsaved changes asks "Discard changes?" first.
+    public ILocator AnnotationOpener(string key)
+    {
+        var item = Item(key).First;
+
+        // The pinned columns lead: select, Type, Name.
+        return HasGrid ? item.GetByRole(AriaRole.Gridcell).Nth(2) : item.GetByRole(AriaRole.Button);
     }
 
     // "Select <key>" of a row, not "Select all rows".
