@@ -68,8 +68,12 @@ function onText(value: string) {
 
   if (result.value.ok) {
     lastValid = result.value.value
-    lastEmitted = JSON.stringify(lastValid ?? null)
-    emit('update:modelValue', lastValid)
+    // Text that parses to the value already held (an echo of an external value, a whitespace edit) changes nothing.
+    const next = JSON.stringify(lastValid ?? null)
+    if (next !== lastEmitted) {
+      lastEmitted = next
+      emit('update:modelValue', lastValid)
+    }
   }
 }
 
