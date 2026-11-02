@@ -13,7 +13,7 @@ dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-fil
 UITESTS_PROFILE=mock dotnet run --project src/Platform/UI.Admin.AutomationTests/src                              # against npm run dev:mock (:5174)
 ```
 
-Run it with `dotnet run` (options after `--`), not `dotnet test`: TUnit on Microsoft.Testing.Platform refuses the VSTest mode the repository keeps for its xUnit projects, so the traversals build this project and leave it out of `dotnet test src`.
+Run it with `dotnet run` (options after `--`) or `dotnet test --project src/Platform/UI.Admin.AutomationTests/src` (options without `--`); `dotnet test --solution 42.mono.slnx` runs it with the rest of the repository's tests on Microsoft.Testing.Platform, skipped without `Target:BaseUrl`.
 
 | Path | Contents |
 |---|---|

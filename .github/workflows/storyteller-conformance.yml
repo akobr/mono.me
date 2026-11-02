@@ -92,11 +92,12 @@ jobs:
           global-json-file: global.json
 
       # The whole test projects: the vectors run in them, and this is the repository's .NET test job.
+      # dotnet test runs on Microsoft.Testing.Platform (global.json), which takes a project with --project.
       - name: Configuration formats – flattening and format vectors
-        run: dotnet test src/Platform/Storyteller/ConfigurationFormats/test/ConfigurationFormats.UnitTests.csproj
+        run: dotnet test --project src/Platform/Storyteller/ConfigurationFormats/test/ConfigurationFormats.UnitTests.csproj
 
       - name: Configuration provider – suite, error and refresh vectors
-        run: dotnet test src/Platform/Storyteller/Configuration/test/Configuration.UnitTests.csproj
+        run: dotnet test --project src/Platform/Storyteller/Configuration/test/Configuration.UnitTests.csproj
 
   typescript:
     name: TypeScript SDK

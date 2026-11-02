@@ -43,7 +43,7 @@ All configuration for the monorepo, his behaviour and CLI toolset is done by one
         "pack": "dotnet pack src",
         "restore": "dotnet restore src",
         "run": "dotnet run src",
-        "test": "dotnet test test"
+        "test": "dotnet test --project test"
       }
     }
   },

@@ -10,7 +10,7 @@ namespace _42.Platform.Storyteller.Api.Functions.IntegrationTests;
 // nothing. RouteDispatchTests of the unit tests models the same dispatch without a host.
 //
 // Start the platform locally (dotnet run --project src/Platform/Aspire.Host/src), set the variables, and run
-// dotnet test src/Platform/Storyteller/Api.Functions/testint
+// dotnet test --project src/Platform/Storyteller/Api.Functions/testint
 public class HostRoutingTests(ITestOutputHelper output)
 {
     // SetAnnotation took it before, with the key "simple": 400 "No annotation object in body."

@@ -195,8 +195,8 @@ A runtime whose own text differs, as JavaScript's `String(1e20)` does, emulates 
 Run them:
 
 ```bash
-dotnet test src/Platform/Storyteller/ConfigurationFormats/test
-dotnet test src/Platform/Storyteller/Configuration/test --filter "FullyQualifiedName~Conformance"
+dotnet test --project src/Platform/Storyteller/ConfigurationFormats/test
+dotnet test --project src/Platform/Storyteller/Configuration/test --filter "FullyQualifiedName~Conformance"
 
 cd src/Platform/Storyteller/sdk.typescript/src
 npx vitest run test/conformance

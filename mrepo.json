@@ -47,7 +47,7 @@
         "pack": "dotnet pack src",
         "pack-publish": "dotnet pack src -c RELEASE /p:ContinuousIntegrationBuild=true",
         "restore": "dotnet restore src",
-        "test": "dotnet test test"
+        "test": "dotnet test --project test"
       }
     },
     "dotnet-azure-functions": {
@@ -61,7 +61,7 @@
         "pack": "dotnet publish $env:MREPO_PROJECT_PATH -o src/bin/publish; Compress-Archive -Path src/bin/publish/* -DestinationPath $env:MREPO_PATH_ARTIFACTS/$env:MREPO_FULL_NAME.$env:MREPO_VERSION_PACKAGE.zip -Force",
         "pack-publish": "dotnet publish $env:MREPO_PROJECT_PATH",
         "restore": "dotnet restore src",
-        "test": "dotnet test test"
+        "test": "dotnet test --project test"
       }
     }
   },
