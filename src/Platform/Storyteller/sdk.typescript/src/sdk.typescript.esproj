@@ -8,4 +8,13 @@
     <TargetPlatformIdentifier />
     <TargetPlatformMoniker />
   </PropertyGroup>
+
+  <!-- The SDK's GeneratePackageJsonProps task writes '$(IntermediateOutputPath)\package.g.props' as it is, so on Linux and
+       macOS the restore creates a folder literally named 'obj\Debug', and the '**' globs of the traversals then return their
+       pattern instead of the projects ('dotnet build src': MSB3202). A normalized path keeps the file in obj/Debug/. -->
+  <Target Name="_NormalizePackagePropsPath" BeforeTargets="GeneratePackageJsonProps">
+    <PropertyGroup>
+      <PackagePropsPath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'package.g.props'))</PackagePropsPath>
+    </PropertyGroup>
+  </Target>
 </Project>
