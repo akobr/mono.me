@@ -18,8 +18,8 @@ public sealed partial class NavigationCommandPaletteTests : PlatformTest
 
     // NAV-PAL-01: The command palette opens pages and projects, also from a text box.
     // Off a view page (where no annotation of a live catalog can rank first) the palette lists its groups, opens the
-    // remembered project's Settings, and a project with the user's role as its suffix; Ctrl/Meta+K opens it although a
-    // text box has the focus, and "Switch project" opens the organizations.
+    // remembered project's Settings, and a project with the user's role as its suffix; Ctrl/Meta+K opens it although
+    // the filter has the focus, which keeps its value after Escape, and "Switch project" opens the organizations.
     [Test]
     [TestCase(72)]
     public async Task CommandPalette_PagesAndProjects_Navigate()
@@ -47,9 +47,11 @@ public sealed partial class NavigationCommandPaletteTests : PlatformTest
         await App.PickFirstPaletteOptionAsync(new Regex($"^{Regex.Escape(project)}{ProjectRoles}$"));
         await App.ExpectAtAsync(defaultView.Annotations);
 
-        await Expect(annotations.Filter).ToBeVisibleAsync();
-        var filter = await annotations.Filter.InputValueAsync();
+        // A value that matches nothing, so the check that the filter keeps it can fail.
+        var filter = $"key:{PlatformData.Slug("pal")}";
+        await annotations.FilterAsync(filter);
         await annotations.Filter.ClickAsync();
+        await Expect(annotations.Filter).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("ControlOrMeta+K");
         await Expect(App.CommandInput).ToBeVisibleAsync();
         await Page.Keyboard.PressAsync("Escape");

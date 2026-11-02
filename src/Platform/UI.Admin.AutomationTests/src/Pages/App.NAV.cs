@@ -6,7 +6,8 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // The members of the shell that the Navigation section uses: the docked sidebar in every state (the icon rail has no
 // link names, so the Sidebar locator does not find it), its pin and collapse buttons, the slideover of an unpinned
-// sidebar, and the keyboard shortcuts, which the app ignores while a text box, a text area or an editor has the focus.
+// sidebar, the landing on a section that the address's #hash names, and the keyboard shortcuts, which the app ignores
+// while a text box, a text area or an editor has the focus.
 public sealed partial class App
 {
     // The brand's button of a pinned sidebar (hidden in the icon rail); the palette's action is "Unpin the sidebar".
@@ -43,6 +44,21 @@ public sealed partial class App
     // The menu of the docked sidebar, expanded or the icon rail: the nav with the link to /orgs, found by its address
     // because the rail's links have no name. The slideover's menu matches too, while it is open.
     public ILocator DockedNavigationMenu => Page.Locator("nav").Filter(new() { Has = Page.Locator("a[href$=\"/orgs\"]") });
+
+    // The landing on a section that the #hash of the address names (composables/useHashScroll.ts): settings#secrets,
+    // machines#shared-certificates and members#invitations, which the old project pages /secrets, /certificates and
+    // /invitations redirect to. The address ends in #<id>, and the section (section#<id>, tabindex -1) is in view and has
+    // the focus, as after a followed anchor; the page scrolls only once the content above the section loaded, which the
+    // assertions wait for.
+    public async Task ExpectHashLandedAsync(ILocator section, string id)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+
+        await Expect(Page).ToHaveURLAsync(new Regex($"#{Regex.Escape(id)}$"));
+        await Expect(section).ToBeInViewportAsync();
+        await Expect(section).ToBeFocusedAsync();
+    }
 
     // Takes the focus from the focused element (a list's filter may hold it), so the app's keyboard shortcuts apply.
     public async Task BlurAsync()

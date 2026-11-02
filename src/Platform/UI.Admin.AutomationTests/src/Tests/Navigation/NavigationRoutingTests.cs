@@ -166,24 +166,24 @@ public sealed class NavigationRoutingTests : PlatformTest
     {
         await App.GotoAsync(Routes.OldProjectPage("secrets"));
         await App.ExpectAtAsync(Routes.Settings());
-        var secrets = new HashLinkedSection(App, "secrets");
-        await secrets.ExpectLandedAsync();
-        await Expect(secrets.Heading("Secrets")).ToBeVisibleAsync();
-        await Expect(secrets.Heading("Allowed levels")).ToBeVisibleAsync();
+        var settings = new ProjectSettingsPage(App, Routes);
+        await App.ExpectHashLandedAsync(settings.SecretsSection, "secrets");
+        await Expect(settings.SecretsHeading).ToBeVisibleAsync();
+        await Expect(settings.AllowedLevelsCard).ToBeVisibleAsync();
 
         await App.GotoAsync(Routes.OldProjectPage("certificates"));
         await App.ExpectAtAsync(Routes.Machines);
-        var certificates = new HashLinkedSection(App, "shared-certificates");
-        await certificates.ExpectLandedAsync();
-        await Expect(certificates.Heading("Shared certificates")).ToBeVisibleAsync();
+        var certificates = new MachinesPage(App, Routes).SharedCertificates;
+        await App.ExpectHashLandedAsync(certificates.Root, "shared-certificates");
+        await Expect(certificates.Heading).ToBeVisibleAsync();
 
         // Disabled while the project's machine policy does not allow shared certificates, so only its presence counts.
-        await Expect(certificates.Root.GetByRole(AriaRole.Button, new() { Name = "Issue certificate", Exact = true })).ToBeVisibleAsync();
+        await Expect(certificates.IssueButton).ToBeVisibleAsync();
 
         await App.GotoAsync(Routes.OldProjectPage("invitations"));
         await App.ExpectAtAsync(Routes.Members);
-        var invitations = new HashLinkedSection(App, "invitations");
-        await invitations.ExpectLandedAsync();
-        await Expect(invitations.Heading("Invitations")).ToBeVisibleAsync();
+        var members = new MembersPage(App, Routes);
+        await App.ExpectHashLandedAsync(members.InvitationsSection, "invitations");
+        await Expect(members.InvitationsHeading).ToBeVisibleAsync();
     }
 }

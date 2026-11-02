@@ -247,6 +247,9 @@ public sealed class NavigationMenuTests : PlatformTest
     [DesktopOnly]
     public async Task Sidebar_Unpin_MovesMenuBehindButtonAndIsKept()
     {
+        // The precondition's 1440x900: [DesktopOnly] runs from 1024 px, and below 1280 px the docked sidebar starts as
+        // the icon rail, which has neither "Unpin sidebar" nor link names.
+        await Page.SetViewportSizeAsync(1440, 900);
         var annotations = new AnnotationsPage(App, Routes);
         await annotations.OpenAsync();
         await Expect(App.Sidebar).ToBeVisibleAsync();
@@ -261,9 +264,10 @@ public sealed class NavigationMenuTests : PlatformTest
         var navigation = App.UnpinnedNavigationDialog;
         await Expect(navigation).ToBeVisibleAsync();
         await Expect(navigation.GetByRole(AriaRole.Link, new() { Name = "Organizations", Exact = true })).ToBeVisibleAsync();
-        await Expect(navigation.GetByRole(AriaRole.Button, new() { Name = "Pin sidebar", Exact = true })).ToBeVisibleAsync();
+        await Expect(App.PinSidebarButton).ToBeVisibleAsync();
 
-        // Not App.NavigateAsync: at this width it would look for the docked sidebar.
+        // Not App.NavigateAsync: behind the open slideover "Open navigation" is aria-hidden, so at this width it would
+        // take the docked sidebar's branch; the step follows the dialog's own link.
         await navigation.GetByRole(AriaRole.Link, new() { Name = "Configurations", Exact = true }).ClickAsync();
         await App.ExpectAtAsync(Routes.Configurations);
         await Expect(navigation).ToBeHiddenAsync();
