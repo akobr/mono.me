@@ -90,7 +90,7 @@ public class MessageActionPoolingGrain : IGrainBase, IMessageActionPoolingGrain,
             _reminder ??= await _reminders.GetReminder(GrainContext.GrainId, reminderName);
             if (_reminder is not null)
             {
-                _reminders.UnregisterReminder(GrainContext.GrainId, _reminder);
+                await _reminders.UnregisterReminder(GrainContext.GrainId, _reminder);
             }
 
             GrainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ActivationIdle, "There is no receiver."));
