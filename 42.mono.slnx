@@ -58,6 +58,7 @@
   </Folder>
   <Folder Name="/Libraries/Testing/">
     <Project Path="src/Libraries/Testing/System.IO.Abstractions.Trace/src/System.IO.Abstractions.Trace.csproj" />
+    <Project Path="src/Libraries/Testing/System.IO.Abstractions.Trace/test/System.IO.Abstractions.Trace.UnitTests.csproj" />
     <Project Path="src/Libraries/Testing/UI.Automation.Abstractions/src/UI.Automation.Abstractions.csproj" />
     <Project Path="src/Libraries/Testing/UI.Automation.Reporting.Testiny/src/UI.Automation.Reporting.Testiny.csproj" />
     <Project Path="src/Libraries/Testing/UI.Automation.Reporting.Testiny/test/UI.Automation.Reporting.Testiny.UnitTests.csproj" />
