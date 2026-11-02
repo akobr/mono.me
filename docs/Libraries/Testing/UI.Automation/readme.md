@@ -47,7 +47,7 @@ The terminal shows the session's lines with the prefix `ui-automation:` (standar
 5. `UITESTS_*` environment variables, `__` between sections (`UITESTS_Target__BaseUrl`, `UITESTS_Users__Pool__0__Password`);
 6. `--test-parameter Section:Key=value` (TUnit cuts a value at its second `=`, so the adapter reads the raw command line: `Target:BaseUrl=https://x/?a=b` arrives whole).
 
-**`Users:Pool`** is not merged by index: the highest layer that sets any `Users:Pool:<n>:Email` defines the pool (none of the lower layers' entries survive), and `Users:Pool:<n>:Password` of any layer (typically the user secrets) applies by index onto it; a password of an index the pool lacks is ignored. Without any `Email` the layers merge as usual.
+**`Users:Pool`** is not merged by index: the highest layer that sets any `Users:Pool:<n>:Email` defines the pool (none of the lower layers' entries survive), and `Users:Pool:<n>:Password` of any layer (typically the user secrets) applies by index onto it; a password of an index the pool lacks (also one the winning layer sets alone) is ignored. Without any `Email` the layers merge as usual.
 
 JSON files may have comments and trailing commas; a file that is not a JSON object fails. The test project copies the files to its output (`<None Update="testsettings*.json" CopyToOutputDirectory="PreserveNewest" />`).
 

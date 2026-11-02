@@ -162,7 +162,7 @@ public sealed class SettingsLoaderTests
               "Target": { "BaseUrl": "ftp://files.example.test" },
               "Browser": { "Engine": "firefox", "Channel": "chrome" },
               "Execution": { "MaxParallelTests": 0, "Retries": 11 },
-              "Users": { "Pool": [ { "Email": "ui-01@example.test" }, { "Email": "UI-01@example.test" }, { "Password": "TopSecret!" } ] },
+              "Users": { "Pool": [ { "Email": "ui-01@example.test" }, { "Email": "UI-01@example.test" }, { "Roles": [ "Owner" ], "Password": "TopSecret!" } ] },
               "Reporting": { "Enabled": true, "BatchSize": 0, "RunName": "Nightly {Nope}" }
             }
             """));
@@ -435,6 +435,14 @@ public sealed class SettingsLoaderTests
     {
         var files = Files(("testsettings.json", Configured));
         var settings = Load(files, environment: new Dictionary<string, string?> { ["UITESTS_Users__Pool__1__Password"] = "pw-1" });
+        var replaced = Load(files, environment: new Dictionary<string, string?>
+        {
+            ["UITESTS_Users__Pool__0__Email"] = "ci@example.test",
+            ["UITESTS_Users__Pool__0__Password"] = "pw-0",
+            ["UITESTS_Users__Pool__1__Password"] = "pw-orphan",
+        });
+
+        replaced.Users.Pool.Select(user => user.Email).ShouldBe(["ci@example.test"]);
 
         settings.Users.Pool.Count.ShouldBe(2);
         settings.Users.Pool[0].Roles.ShouldBe(["Owner"]);
