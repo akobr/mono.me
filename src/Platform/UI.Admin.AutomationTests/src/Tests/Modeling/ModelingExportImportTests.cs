@@ -347,8 +347,7 @@ public sealed partial class ModelingExportImportTests : PlatformTest
 
         var title = $"Imported {fileName}";
         await Expect(App.Toast(title)).ToBeVisibleAsync(new() { Timeout = ModelingExportImportPage.TransferTimeoutMs });
-        await Expect(App.Notifications.Locator("li").Filter(new() { Has = Page.GetByText(title, new() { Exact = true }) }).Last)
-            .ToContainTextAsync("1 created, 0 unchanged");
+        await Expect(App.ToastDescriptionOf(title)).ToHaveTextAsync("1 created, 0 unchanged");
 
         await transfer.ToastShowResult(title).ClickAsync();
         await App.ExpectAtAsync(Routes.ModelingTab("export-import"));
@@ -393,7 +392,7 @@ public sealed partial class ModelingExportImportTests : PlatformTest
         var row = transfer.DocumentRow(key);
         await Expect(row.GetByText("Annotation", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(row.GetByText("To update", new() { Exact = true })).ToBeVisibleAsync();
-        await Expect(transfer.DocumentLink(key)).ToHaveAttributeAsync("href", EndsWith(Routes.Annotation(key)));
+        await Expect(transfer.DocumentLink(key)).ToHaveAttributeAsync("href", AppRoutes.HrefEndingWith(Routes.Annotation(key)));
 
         await transfer.ImportNowAsync(fileB);
         await Expect(transfer.ResultDescription(fileB)).ToHaveTextAsync($"{fileB}: 1 updated, 0 unchanged.");
@@ -429,11 +428,6 @@ public sealed partial class ModelingExportImportTests : PlatformTest
         return manifest["Include"]?.AsArray().Select(kind => kind?.GetValue<string>() ?? string.Empty).ToArray() ?? [];
     }
 
-    private static Regex EndsWith(string route)
-    {
-        return new Regex($"/{Regex.Escape(route.Trim('/'))}$");
-    }
-
     // The toast of an export of everything but schemas and configurations; a deployed view may have no template.
     [GeneratedRegex(@"^Exported \d+ annotations? and \d+ templates?$")]
     private static partial Regex AnnotationsAndTemplatesToast();
@@ -461,14 +455,21 @@ public sealed partial class ModelingExportImportTests : PlatformTest
         return new Regex($@"^export-{view}{(git ? "-git" : string.Empty)}-\d{{8}}-\d{{6}}Z\.zip$");
     }
 
-    // Exports with the card's kinds and format and returns the downloaded zip, after the toast that confirms it (it
-    // lasts about 5 seconds, so it is asserted right after the download).
+    // Exports with the card's kinds and format and returns the downloaded zip, after the toast that confirms it. The
+    // toast lasts about 5 seconds, so it is asserted as soon as the download starts, before the zip is read; it is the
+    // one whose description is the downloaded file's name, because the toast of an export a moment before can still
+    // show.
     private async Task<DownloadedFile> ExportAsync(ModelingExportImportPage transfer, Regex? toast = null)
     {
         await Expect(transfer.ExportButton).ToBeEnabledAsync();
-        var file = await DownloadAsync(() => transfer.ExportButton.ClickAsync(), (int)ModelingExportImportPage.TransferTimeoutMs);
-        await Expect(App.Toast(toast ?? ExportedToast())).ToBeVisibleAsync();
-        return file;
+        return await DownloadAsync(
+            () => transfer.ExportButton.ClickAsync(),
+            async fileName =>
+            {
+                var exported = App.ShownToasts.Filter(new() { Has = Page.GetByText(fileName, new() { Exact = true }) }).Last;
+                await Expect(exported.GetByText(toast ?? ExportedToast())).ToBeVisibleAsync();
+            },
+            (int)ModelingExportImportPage.TransferTimeoutMs);
     }
 
     // The summary of a kind or of "Total": the table row's cells (the counts, Excluded files, Ignored files) from md, the

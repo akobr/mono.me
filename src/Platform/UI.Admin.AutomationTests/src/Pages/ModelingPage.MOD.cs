@@ -2,8 +2,8 @@ using Microsoft.Playwright;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
-// The Modeling section's members of ModelingPage: the header's tabs in their order, the lock text of a Reader, and the
-// tab that has the focus after the arrow keys (manual activation: the arrows move the focus, Enter or Space opens).
+// The Modeling section's members of ModelingPage: the header's tabs in their order, every tab and the selected tabs of
+// the page, the description of a Reader's lock "Contributors only", and SelectTabAsync, which opens a tab with a click.
 public sealed partial class ModelingPage
 {
     // The description under "Contributors only".
