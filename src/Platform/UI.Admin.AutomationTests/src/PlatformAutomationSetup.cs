@@ -48,6 +48,11 @@ public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
             errors.Add("Target:EmailDomain must be a domain such as example.com.");
         }
 
+        foreach (var (role, project) in target.RoleProjects)
+        {
+            CheckRoleProject(role, project, errors);
+        }
+
         if (settings.Users.Pool.Count == 0)
         {
             errors.Add("Users:Pool is empty; add the pre-provisioned users to testsettings.local.json and their passwords to the user secrets (docs/Platform/UI.Admin.AutomationTests/automation-tests.md, \"Configure\").");
@@ -59,6 +64,22 @@ public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
     {
         ArgumentNullException.ThrowIfNull(context);
         return new PlatformTargetCheck(context.Page, context.Settings.Bind<PlatformTarget>(PlatformTarget.Section), context.User).RunAsync();
+    }
+
+    // A Target:RoleProjects entry: a role of [UserRole] (not Any) and "<org>/<project>[/<view>]" of Platform names.
+    private static void CheckRoleProject(string role, string project, ICollection<string> errors)
+    {
+        if (!role.All(char.IsLetter) || !Enum.TryParse<Role>(role, ignoreCase: true, out var parsed) || parsed == Role.Any)
+        {
+            var roles = string.Join(", ", Enum.GetNames<Role>().Where(name => name != nameof(Role.Any)));
+            errors.Add($"Target:RoleProjects:{role} is not a role a test acts as; use one of {roles}.");
+        }
+
+        var parts = (project ?? string.Empty).Split('/');
+        if (parts.Length is not (2 or 3) || !parts.All(part => NamePattern().IsMatch(part)))
+        {
+            errors.Add($"Target:RoleProjects:{role} '{project}' is not <organization>/<project>[/<view>] of Platform names: 2 to 63 lower-case letters, digits and hyphens each.");
+        }
     }
 
     private static void RequireName(string value, string setting, ICollection<string> errors)

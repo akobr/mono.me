@@ -12,7 +12,8 @@ namespace _42.Platform.UI.Admin.AutomationTests;
 // A bad one fails with what to fix: the organization not found, the project not found, the view not found, or no
 // access. The admin UI shows an organization or a project outside the user's memberships as "no access" whether it
 // exists or not, so the check reads the user's memberships on /orgs to tell them apart; "not found" there also means
-// that the user is not a member.
+// that the user is not a member. With Target:RoleProjects, /orgs must list each of its projects with the entry's role
+// (one more page load).
 internal sealed class PlatformTargetCheck
 {
     private readonly PlatformTarget target;
@@ -55,6 +56,11 @@ internal sealed class PlatformTargetCheck
         if (!string.Equals(target.View, AppRoutes.DefaultView, StringComparison.Ordinal))
         {
             await CheckViewAsync();
+        }
+
+        if (target.RoleProjects.Count > 0)
+        {
+            await CheckRoleProjectsAsync();
         }
     }
 
@@ -127,5 +133,53 @@ internal sealed class PlatformTargetCheck
                 $"Target:View '{target.View}' was not found in {Project}: the project's views are {List(await views.ListedAsync())}. "
                 + "Create it on the project's Views page (New view, an Administrator; a view only the data holds is listed and registered there by an Administrator) or fix Target:View.");
         }
+    }
+
+    // Every Target:RoleProjects entry is a project of the user on /orgs whose link names a role of the entry's (the
+    // links are named "<project> <role badge>", e.g. "shipping Contributor"). One user samples the mapping, as it samples
+    // the target's membership: the pool's other users are taken on trust.
+    private async Task CheckRoleProjectsAsync()
+    {
+        var organizations = new OrganizationsPage(app, routes);
+        await organizations.OpenAsync();
+        await ExpectShownAsync(organizations.Project(target.Organization, target.Project), $"The link of {Project} on the organizations");
+
+        foreach (var (role, entry) in target.RoleProjects.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var project = AppRoutes.Parse(entry);
+            var link = organizations.Project(project.Organization, project.Project);
+            var setting = $"Target:RoleProjects:{role} '{entry}'";
+            if (await link.CountAsync() == 0)
+            {
+                var listed = await organizations.ListedAsync();
+                var projects = listed.SelectMany(pair => pair.Value.Select(name => $"{pair.Key}/{name}"));
+                throw new TargetCheckException(
+                    $"{setting}: the project is not among the projects of {user} ({List(projects)}); fix the entry or the user's role in the project.");
+            }
+
+            var name = string.Join(" ", (await link.First.InnerTextAsync()).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            var badges = RoleBadges(Enum.Parse<Role>(role, ignoreCase: true));
+            if (!badges.Any(badge => name.EndsWith($" {badge}", StringComparison.Ordinal)))
+            {
+                throw new TargetCheckException(
+                    $"{setting}: {user} is not {string.Join(" or ", badges)} there: its link on the organizations reads '{name}'. "
+                    + "Every pool user must hold the role in the project; fix the entry or the users' roles.");
+            }
+        }
+    }
+
+    // The badges of the project roles a Role stands for, as the organizations page shows them (RoleBadge.vue).
+    private static string[] RoleBadges(Role role)
+    {
+        return role switch
+        {
+            Role.Editor => ["Owner", "Administrator", "Contributor + secrets", "Contributor"],
+            Role.Admin => ["Owner", "Administrator"],
+            Role.Secrets => ["Owner", "Administrator", "Contributor + secrets"],
+            Role.Owner => ["Owner"],
+            Role.Contributor => ["Contributor"],
+            Role.Reader => ["Reader"],
+            _ => [],
+        };
     }
 }

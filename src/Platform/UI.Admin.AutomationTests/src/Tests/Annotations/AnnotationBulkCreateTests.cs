@@ -2,23 +2,22 @@ using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
-using _42.Testing.UI.Automation.Runtime.Users;
 using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Annotations;
 
+// Bulk Create: the dialog "Bulk create annotations", its review and its result.
 [Area(Area.Annotations)]
-public sealed class AnnotationsTests : PlatformTest
+public sealed class AnnotationBulkCreateTests : PlatformTest
 {
-    // Bulk create is Contributor and up.
-    protected override UserRequirement RequiredUser => EditingUser;
-
+    // ANN-BLK-01: Bulk create a responsibility and find it in the grid.
     // Bulk create (the toolbar on a wide screen, the command palette on a phone) creates a new responsibility; the grid
     // (the list on a phone) filtered by its key shows it, and its detail, opened by the URL, names it. Both are
     // virtualized, so the test looks at the filtered result only.
     [Test]
     [Elementary]
     [TestCase(2)]
+    [UserRole(Role.Editor)]
     public async Task Annotations_CreateResponsibility_AppearsInGrid()
     {
         var key = PlatformData.AnnotationKey(PlatformData.Responsibility);

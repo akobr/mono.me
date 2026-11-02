@@ -8,7 +8,14 @@
     "Project": "billing",
     "View": "default",
     "SignIn": "None",
-    "MockScenario": "default"
+    "MockScenario": "default",
+    // Where the tests of an exact role act ([UserRole(Role.Contributor)], [UserRole(Role.Reader)]): the projects of the
+    // default dataset where Ada Lovelace, whom every pool user stands for, holds exactly that role. acme/shipping keeps
+    // her Owner role of the organization acme; northwind/portal has no organization role.
+    "RoleProjects": {
+      "Contributor": "acme/shipping",
+      "Reader": "northwind/portal"
+    }
   },
   "Execution": {
     // The dev server serves the app unbundled: with 4 parallel tests a page load in Firefox takes about 10 s (a cold

@@ -6,7 +6,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // /<organization>/<project>/settings. The "Project" card shows the access point and, for an Administrator or Owner,
 // the description with "Save description" (disabled until it changes; the toast "Description saved"); a Reader sees
 // the text only. The navbar's title is hidden below 2xl, so the card's heading is the sign the page is there.
-public sealed class ProjectSettingsPage(App app, AppRoutes routes)
+public sealed partial class ProjectSettingsPage(App app, AppRoutes routes)
 {
     public ILocator ProjectHeading => app.Page.GetByRole(AriaRole.Heading, new() { Name = "Project", Exact = true, Level = 2 });
 
@@ -16,7 +16,7 @@ public sealed class ProjectSettingsPage(App app, AppRoutes routes)
 
     public async Task OpenAsync()
     {
-        await app.GotoAsync(routes.Settings);
+        await app.GotoAsync(routes.Settings());
         await app.WaitForReadyAsync();
         await Expect(ProjectHeading).ToBeVisibleAsync();
     }

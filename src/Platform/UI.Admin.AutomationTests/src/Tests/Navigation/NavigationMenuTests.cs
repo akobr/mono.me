@@ -6,9 +6,11 @@ using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Navigation;
 
+// Navigation Menu: the sidebar (docked, the icon rail or the slideover), its sections and links, and their roles.
 [Area(Area.Navigation)]
-public sealed class NavigationTests : PlatformTest
+public sealed class NavigationMenuTests : PlatformTest
 {
+    // NAV-MNU-01: Navigation menu opens the pages of the view, the project and the app.
     // From the annotations, the navigation (the docked sidebar on a wide screen, the slideover behind "Open
     // navigation" on a phone or a tablet) opens pages of the view, the project and outside, and back: each with its
     // route and its own content.
@@ -24,7 +26,7 @@ public sealed class NavigationTests : PlatformTest
         [
             ("Configurations", Routes.Configurations, new ConfigurationsPage(App, Routes).Filter),
             ("Values store", Routes.KeyValues, new KeyValuesPage(App, Routes).Search),
-            ("Settings", Routes.Settings, new ProjectSettingsPage(App, Routes).ProjectHeading),
+            ("Settings", Routes.Settings(), new ProjectSettingsPage(App, Routes).ProjectHeading),
             ("Organizations", Routes.Organizations, new OrganizationsPage(App, Routes).Heading),
             ("Annotations", Routes.Annotations, annotations.Filter),
         ];

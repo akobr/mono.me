@@ -7,7 +7,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // /<organization>/<project>/views: the project's views, each a link named by the view to its annotations. The default
 // view is always listed; a view that only the project's data holds (not registered) only for an Administrator, as
 // "discovered". While the list loads the page shows a spinner, and an error state with "Retry" when the API refuses.
-public sealed class ViewsPage(App app, AppRoutes routes)
+public sealed partial class ViewsPage(App app, AppRoutes routes)
 {
     // "Retry" of the error state.
     public ILocator LoadError => app.Page.GetByRole(AriaRole.Button, new() { Name = "Retry", Exact = true });

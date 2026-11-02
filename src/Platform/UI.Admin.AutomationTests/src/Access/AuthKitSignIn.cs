@@ -41,7 +41,8 @@ public sealed class AuthKitSignIn : ISignInFlow
             throw new InvalidOperationException($"{user} has no password; set Users:Pool:{user.Index}:Password in the user secrets.");
         }
 
-        var login = new LoginPage(page);
+        // A deployed target has no mock scenario, so a plain App opens the page.
+        var login = new LoginPage(new App(page));
         await login.OpenAsync();
         var app = new Uri(page.Url);
         await login.ContinueWithAuthKit.ClickAsync();
