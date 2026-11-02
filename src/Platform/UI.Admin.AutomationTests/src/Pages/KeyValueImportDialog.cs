@@ -29,7 +29,12 @@ public sealed partial class KeyValueImportDialog(App app)
 
     public ILocator Root => app.Page.GetByRole(AriaRole.Dialog, new() { Name = "Import key values", Exact = true });
 
+    // The list of the three steps; every step's label shows in every step.
     public ILocator Steps => Root.GetByRole(AriaRole.List, new() { Name = "Steps", Exact = true });
+
+    // The current step of the list ("1. Source", "2. Review" or "3. Result"): it has no aria-current, only the classes
+    // "font-semibold text-highlighted", so it is found by the class.
+    public ILocator CurrentStep => Steps.Locator("li.font-semibold");
 
     // The native file input of step 1 (accept .json, .env, text/plain, application/json).
     public ILocator FileInput => Root.Locator("input[type=file]");
@@ -77,13 +82,6 @@ public sealed partial class KeyValueImportDialog(App app)
 
     // The confirmation of a Replace that deletes keys (type the view's name; its button "Replace").
     public ConfirmDialog ReplaceDialog => new(app, "Replace deletes keys");
-
-    // A step of the list ("1. Source", "2. Review", "3. Result").
-    public ILocator Step(string name)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return Steps.GetByText(name, new() { Exact = true });
-    }
 
     // A text of the dialog: the format's badge, "<n> row(s)", "<n> invalid key(s)", an error.
     public ILocator Label(string text)

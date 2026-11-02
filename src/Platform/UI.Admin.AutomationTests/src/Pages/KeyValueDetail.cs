@@ -93,9 +93,10 @@ public sealed partial class KeyValueDetail
 
     public ILocator MaskedAgainHint => keyValues.MaskedAgainHint(Key);
 
-    // The last "Copy to clipboard" of the region while a secret is revealed: it copies the value (and toasts "The
-    // clipboard contains a secret").
-    public ILocator SecretCopyButton => Region.GetByRole(AriaRole.Button, new() { Name = "Copy to clipboard", Exact = true }).Last;
+    // The "Copy to clipboard" of the secret's own row (the value's code element, Reveal or Hide, and this button), only
+    // while the secret is revealed: it copies the value (and toasts "The clipboard contains a secret"). The header's
+    // and the Binding's copy buttons are outside the row, so a masked secret has none.
+    public ILocator SecretCopyButton => SecretValue.Locator("xpath=..").GetByRole(AriaRole.Button, new() { Name = "Copy to clipboard", Exact = true });
 
     public ILocator SetNewValueButton => Region.GetByRole(AriaRole.Button, new() { Name = "Set new value", Exact = true });
 
