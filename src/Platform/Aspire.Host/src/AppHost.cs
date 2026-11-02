@@ -22,8 +22,10 @@ IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvar
         .AddAzureCosmosDB("cosmos")
         .RunAsClassicEmulator(emulator =>
         {
-            // Data Explorer is only available with the vNext emulator.
+            // Data Explorer is only available with the vNext emulator. The named data volume keeps the data when the
+            // container is recreated (e.g. after an Aspire upgrade).
             emulator.WithLifetime(ContainerLifetime.Persistent);
+            emulator.WithDataVolume("platform-cosmos-data");
         }),
     "local" => builder.AddConnectionString("cosmos"),
     _ => throw new InvalidOperationException($"Unknown Cosmos:Mode '{cosmosMode}', use 'container' or 'local'."),
