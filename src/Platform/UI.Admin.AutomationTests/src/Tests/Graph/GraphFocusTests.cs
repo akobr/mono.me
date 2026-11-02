@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using _42.Platform.UI.Admin.AutomationTests.Data;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation;
@@ -11,7 +10,7 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Graph;
 // Show everything and browser Back; the filter, which adds its matches in focus mode and only dims nodes in the whole
 // view.
 [Area(Area.Graph)]
-public sealed partial class GraphFocusTests : PlatformTest
+public sealed class GraphFocusTests : PlatformTest
 {
     // GRA-FOC-01: Focus starts from the last opened annotation, the depth changes the neighbourhood and Show
     // everything leaves it.
@@ -87,7 +86,7 @@ public sealed partial class GraphFocusTests : PlatformTest
         var graph = new GraphPage(App, Routes);
         await graph.OpenAsync(("focus", tree.Subject));
         await graph.ExpectFocusSummaryAsync(5, tree.Subject);
-        await Expect(graph.FilterCount).ToHaveTextAsync(TotalCount());
+        await graph.ExpectFilterCountAsync();
 
         // "/" focuses the filter from the page body.
         var query = $"key:{unconnected}";
@@ -95,7 +94,7 @@ public sealed partial class GraphFocusTests : PlatformTest
         await Expect(graph.Filter).ToBeFocusedAsync();
         await Page.Keyboard.TypeAsync(query);
         await App.ExpectQueryAsync("q", query);
-        await Expect(graph.FilterCount).ToHaveTextAsync(OneMatchCount());
+        await graph.ExpectFilterCountAsync(1);
         await graph.ExpectFocusSummaryAsync(6, tree.Subject, withFilter: true);
         await graph.Legend.OpenAsync();
         await Expect(graph.Legend.Count(PlatformData.Responsibility)).ToHaveTextAsync("2");
@@ -104,20 +103,12 @@ public sealed partial class GraphFocusTests : PlatformTest
         await graph.ShowEverythingAsync();
         await App.ExpectQueryAsync("q", query);
         await App.ExpectQueryAsync("focus", null);
-        await Expect(graph.FilterCount).ToHaveTextAsync(OneMatchCount());
+        await graph.ExpectFilterCountAsync(1);
         await graph.ExpectWholeViewSummaryAsync(await graph.TotalAsync());
 
         await graph.ClearFilterButton.ClickAsync();
         await App.ExpectQueryAsync("q", null);
-        await Expect(graph.FilterCount).ToHaveTextAsync(TotalCount());
+        await graph.ExpectFilterCountAsync();
         await graph.ExpectWholeViewSummaryAsync(await graph.TotalAsync());
     }
-
-    // The filter's count without a filter: the view's total T.
-    [GeneratedRegex(@"^\s*[\d,]+\s*$")]
-    private static partial Regex TotalCount();
-
-    // The filter's count with one match: "1 of T".
-    [GeneratedRegex(@"^\s*1 of [\d,]+\s*$")]
-    private static partial Regex OneMatchCount();
 }
