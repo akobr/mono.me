@@ -72,8 +72,12 @@ public sealed class GraphOverviewTests : PlatformTest
         var contextName = Regex.Escape(tree.ContextName);
         var usageName = Regex.Escape(tree.ResponsibilityName);
         await Expect(graph.CursorAnnouncement).ToHaveTextAsync(new Regex($"^.+ (?:{contextName}, 2|{usageName}, 3) connections$"));
+        var lower = await graph.CursorAnnouncement.TextContentAsync() ?? string.Empty;
 
+        // The execution reads like the context ("{c}, 2 connections", only the type label differs), so the cursor must
+        // have left the node of step 3 first.
         await Page.Keyboard.PressAsync("ArrowDown");
+        await Expect(graph.CursorAnnouncement).Not.ToHaveTextAsync(lower);
         await Expect(graph.CursorAnnouncement).ToHaveTextAsync(Announcement(tree.ContextName, 2));
 
         await Page.Keyboard.PressAsync("Enter");

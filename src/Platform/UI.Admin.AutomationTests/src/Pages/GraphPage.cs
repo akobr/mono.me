@@ -111,8 +111,8 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
     }
 
     // Opens the graph by its URL (a page load) with the query, e.g. ("focus", key), and waits until the catalog loaded
-    // (the catalog may show its IndexedDB snapshot first, without the test's new annotations) and the first frame is
-    // laid out.
+    // (it may show its IndexedDB snapshot first, without the test's new annotations); WaitForLayoutAsync waits for the
+    // first frame.
     public async Task OpenAsync(params (string Name, string? Value)[] query)
     {
         await app.GotoAsync(AppRoutes.WithQuery(routes.Graph, query));
