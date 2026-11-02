@@ -240,8 +240,7 @@ public sealed partial class FederationTests : PlatformTest
         await machines.OpenAsync();
         addedIssuers.Add((project, name));
         await machines.TrustedIssuers.AddGitHubIssuerAsync(name, RepositoryOwnerId);
-        var id = await machines.CreateDialog.CreateFederatedMachineAsync(machines, name, subject);
-        createdMachines.Add((project, id));
+        var id = await machines.CreateDialog.CreateFederatedMachineAsync(machines, name, subject, created => createdMachines.Add((project, created)));
 
         var detail = await machines.OpenMachineAsync(id);
         await Expect(detail.FederationRules).ToBeVisibleAsync();
