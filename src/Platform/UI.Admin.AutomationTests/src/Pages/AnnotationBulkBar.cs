@@ -64,9 +64,14 @@ public sealed partial class AnnotationBulkBar(App app)
         await Expect(LabelInput).ToBeVisibleAsync();
         await LabelInput.FillAsync(label);
 
-        var option = existing
-            ? app.Page.GetByRole(AriaRole.Option, new() { Name = label, Exact = true })
-            : app.Page.GetByRole(AriaRole.Option, new() { Name = $"Create \"{label}\"", Exact = true });
+        var create = app.Page.GetByRole(AriaRole.Option, new() { Name = $"Create \"{label}\"", Exact = true });
+        var option = existing ? app.Page.GetByRole(AriaRole.Option, new() { Name = label, Exact = true }) : create;
+        await Expect(option).ToBeVisibleAsync();
+        if (existing)
+        {
+            await Expect(create).ToHaveCountAsync(0);
+        }
+
         await option.ClickAsync();
         await Expect(LabelInput).ToHaveValueAsync(label);
 
