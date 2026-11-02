@@ -1,5 +1,6 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import type { GetKeyValueAuditParams, GetKeyValuesParams, GetKeyValueUsageParams } from '@42for.net/2splatform.sdk'
+import { getKeyValues, type KeyValuesResponse } from '@42for.net/2splatform.sdk'
 import {
   useGetAnnotation,
   useGetAnnotationHistory,
@@ -77,7 +78,22 @@ export function useTemplateTypes() {
 export function useKeyValues(params: MaybeRefOrGetter<GetKeyValuesParams>) {
   const scope = useScope()
   return useGetKeyValues(scope.org, scope.project, scope.view, () => toValue(params), {
-    query: { enabled: () => !!scope.view(), staleTime: 15_000, refetchOnWindowFocus: true },
+    query: {
+      enabled: () => !!scope.view(),
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+      // every page of the listing (up to 1,000 keys each), so no key is out of reach (424-159)
+      queryFn: async ({ signal }) => {
+        const items: NonNullable<KeyValuesResponse['Items']> = []
+        let continuationToken: string | undefined
+        do {
+          const page = await getKeyValues(scope.org(), scope.project(), scope.view(), { ...toValue(params), continuationToken }, { signal })
+          items.push(...(page.Items ?? []))
+          continuationToken = page.ContinuationToken ?? undefined
+        } while (continuationToken)
+        return { Items: items }
+      },
+    },
   })
 }
 

@@ -165,3 +165,20 @@ describe('Values store in the All state', () => {
     expect(row('db.host')).toBeFalsy()
   })
 })
+
+describe('Values store paging', () => {
+  it('follows the continuation token to the last page', async () => {
+    const { http, HttpResponse } = await import('msw')
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/key-values', ({ request }) => {
+        const token = new URL(request.url).searchParams.get('continuationToken')
+        const item = (key: string) => ({ Key: key, Protection: 'Public', Value: key, Version: 1 })
+        return HttpResponse.json(token ? { Items: [item('page.two')] } : { Items: [item('page.one')], ContinuationToken: 'next' })
+      }),
+    )
+    const view = await mountScreen(RouterView, {}, { path: '/acme/billing/default/key-values', accessMap: { 'acme.billing': 'Owner' }, routes })
+    mounted.push(view)
+    await vi.waitFor(() => expect(document.body.querySelector('[aria-label="Select page.two"]')).toBeTruthy())
+    expect(document.body.querySelector('[aria-label="Select page.one"]')).toBeTruthy()
+  })
+})
