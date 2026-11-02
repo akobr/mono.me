@@ -410,6 +410,50 @@ public sealed class SettingsLoaderTests
         settings.ResolvePath("TestResults/artifacts").ShouldBe(Path.GetFullPath("TestResults/artifacts", BaseDirectory));
     }
 
+    [Fact]
+    public void Load_TakesThePoolOfTheHighestLayerWithAnEmail_AndAppliesThePasswordsByIndex()
+    {
+        var files = Files(
+            ("testsettings.json", """
+                {
+                  "Target": { "BaseUrl": "https://admin.example.test" },
+                  "Users": { "Pool": [ { "Email": "a@example.test" }, { "Email": "b@example.test" }, { "Email": "c@example.test", "Roles": [ "Owner" ] } ] }
+                }
+                """),
+            ("testsettings.local.json", """{ "Users": { "Pool": [ { "Email": "x@example.test" }, { "Email": "y@example.test", "Roles": [ "Reader" ] } ] } }"""));
+        files.AddFile(PathHelper.GetSecretsPathFromSecretsId(SecretsId), new MockFileData("""{ "Users:Pool:0:Password": "pw-0", "Users:Pool:1:Password": "pw-1", "Users:Pool:2:Password": "pw-orphan" }"""));
+
+        var settings = Load(files, secretsId: SecretsId);
+
+        settings.Users.Pool.Select(user => user.Email).ShouldBe(["x@example.test", "y@example.test"]);
+        settings.Users.Pool.Select(user => user.Password).ShouldBe(["pw-0", "pw-1"]);
+        settings.Users.Pool[1].Roles.ShouldBe(["Reader"]);
+    }
+
+    [Fact]
+    public void Load_KeepsTheLowerPool_WhenAHigherLayerSetsOnlyPasswords()
+    {
+        var files = Files(("testsettings.json", Configured));
+        var settings = Load(files, environment: new Dictionary<string, string?> { ["UITESTS_Users__Pool__1__Password"] = "pw-1" });
+
+        settings.Users.Pool.Count.ShouldBe(2);
+        settings.Users.Pool[0].Roles.ShouldBe(["Owner"]);
+        settings.Users.Pool[1].Password.ShouldBe("pw-1");
+    }
+
+    [Fact]
+    public void Load_LetsAProfilePoolReplaceTheCommittedOne()
+    {
+        var files = Files(
+            ("testsettings.json", Configured),
+            ("testsettings.mock.json", """{ "Users": { "Pool": [ { "Email": "m1@example.test" }, { "Email": "m2@example.test" }, { "Email": "m3@example.test" }, { "Email": "m4@example.test" } ] } }"""),
+            ("testsettings.big.json", """{ "Users": { "Pool": [ { "Email": "b1@example.test" }, { "Email": "b2@example.test" }, { "Email": "b3@example.test" }, { "Email": "b4@example.test" }, { "Email": "b5@example.test" } ] } }"""));
+
+        var settings = Load(files, profile: "big,mock");
+
+        settings.Users.Pool.Select(user => user.Email).ShouldBe(["m1@example.test", "m2@example.test", "m3@example.test", "m4@example.test"]);
+    }
+
     private static MockFileSystem Files(params (string Name, string Json)[] files)
     {
         var fileSystem = new MockFileSystem();
