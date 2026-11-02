@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
@@ -11,6 +12,9 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // changed", "+label", "<key> added: <value>", …). Relative times change, so a test reads text fragments.
 public sealed partial class AnnotationHistory(App app)
 {
+    // How long one read of the timeline is waited for before the page is loaded again (WaitForEntryAsync).
+    private const int ReadTimeoutMs = 5_000;
+
     public ILocator Region => app.Page.GetByRole(AriaRole.Region, new() { Name = "History", Exact = true });
 
     // The entries of the timeline, newest first (Nuxt UI's timeline items have no role, so their data-slot).
@@ -28,5 +32,29 @@ public sealed partial class AnnotationHistory(App app)
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
         return entry.GetByText(action, new() { Exact = true });
+    }
+
+    // Waits until the timeline shows an entry of the action. The tab reads the audit trail once when it opens, and a
+    // deployed API may record a change a moment after it answered, so the history's page (path, e.g.
+    // AppRoutes.AnnotationHistory(key)) is loaded again until the entry shows, up to timeoutMs; the mock records at
+    // once.
+    public async Task WaitForEntryAsync(string path, string action, int timeoutMs = 30_000)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentOutOfRangeException.ThrowIfLessThan(timeoutMs, 1);
+
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(timeoutMs);
+        while (true)
+        {
+            try
+            {
+                await Expect(ActionBadge(Region, action).First).ToBeVisibleAsync(new() { Timeout = ReadTimeoutMs });
+                return;
+            }
+            catch (PlaywrightException) when (DateTimeOffset.UtcNow < deadline)
+            {
+                await app.GotoAsync(path);
+            }
+        }
     }
 }
