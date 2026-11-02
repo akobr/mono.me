@@ -55,7 +55,8 @@ public class DiagnosticRandomAccess : IRandomAccess
         long fileOffset,
         CancellationToken cancellationToken = default)
     {
-        _processor.Process(new object?[] { handle, buffer, fileOffset });
+        // the buffer is filled by the read, so its length is traced, as by the synchronous Read
+        _processor.Process(new object?[] { handle, buffer.Length, fileOffset });
         return _executingRandomAccess.ReadAsync(handle, buffer, fileOffset, cancellationToken);
     }
 
