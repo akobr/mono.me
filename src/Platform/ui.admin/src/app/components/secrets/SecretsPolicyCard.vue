@@ -9,7 +9,8 @@ import { isSecretLevel, levelMeta, levels, parseProtectionInUse, type Protection
 
 /**
  * Allowed levels, the default secret level and the mTLS rule (spec 29.6). Disabling a level that keys still carry
- * shows the counts of the 409 ProtectionInUse with links to the filtered lists.
+ * shows the counts of the 409 ProtectionInUse with links to the filtered lists; the counts include the deleted keys, so
+ * the links open the All state of the Values store (424-159).
  */
 const props = defineProps<{ policy: KeyValuePolicy; editable: boolean }>()
 
