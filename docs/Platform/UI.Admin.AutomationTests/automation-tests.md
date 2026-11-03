@@ -113,6 +113,7 @@ The committed `testsettings.json` holds a pool of 8 users (their e-mails and rol
 - verified e-mail addresses of the pool users;
 - each pool user a member of the default organization and project with the roles listed in `Users:Pool`;
 - the target's Redirect URI `<admin origin>/callback` and its Sign-out URI `<admin origin>/login`, set as the default one (the `dev` profile: `http://localhost:5173/callback` and `http://localhost:5173/login` in the Staging environment); without the Sign-out URI a sign-out ends on WorkOS' error page `app-homepage-url-not-found`, and cases 12, 13 and 107 fail there (the admin UI's README, "WorkOS dashboard checklist");
+- the admin origin as an allowed CORS origin of the WorkOS environment (the `dev` profile: `http://localhost:5173` in the Staging environment); authkit-js calls the WorkOS API from the browser. This is separate from the CORS settings of the Function App, which also need the admin origin;
 - a custom auth domain (`authApiHostname` in the deployment's `app-config.json`) on any host other than `localhost`.
 
 ## The target check
