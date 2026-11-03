@@ -10,7 +10,9 @@ namespace _42.Platform.Storyteller;
 // publishing) waits about 2 s for the refused IPv6 attempt, for every new pooled connection: the handler connects
 // "localhost" to 127.0.0.1 first and to ::1 only when IPv4 fails. The URI, the SNI and the Host header stay
 // "localhost" (Lowkey Vault's key ids carry the request host), so the connection strings are not rewritten.
-public static class EmulatorHttpHandler
+// Internal: it accepts any certificate, so only the emulator clients of Backend.CosmosDb and KeyValues.Azure.KeyVault
+// see it (InternalsVisibleTo). The 15 s connect timeout covers both attempts; a refused IPv4 attempt takes about 2 s.
+internal static class EmulatorHttpHandler
 {
     public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(15);
 
