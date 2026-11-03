@@ -20,6 +20,7 @@ configureStoryteller({
   baseUrl: 'https://api.2s.42for.net/api',
   getAccessToken: ({ forceRefresh }) => authkit.getAccessToken({ forceRefresh }), // bearer for user calls
   onUnauthorized: () => authkit.signIn(), // a 401 survived one token refresh
+  timeoutMs: ({ method }) => (method === 'GET' || method === 'HEAD' ? 30_000 : 120_000), // or a number; none by default
 })
 
 try {
@@ -35,8 +36,18 @@ The fetcher (`lib/fetcher.ts`, the Orval mutator):
 
 - prefixes `baseUrl` to the generated `/v1/...` paths,
 - adds `Authorization: Bearer …` when `getAccessToken` returns a token, and asks for a token once more after a `401` (with `forceRefresh: true`),
+- ends a request that takes longer than `timeoutMs`, when one is set (see below),
 - parses `application/json` and `application/*+json` bodies, returns `application/zip` and `application/octet-stream` bodies as a `Blob` (the archives of view exports), and every other content type as text (PEM certificates, unified diffs),
-- throws `StorytellerError` (`status`, `message`, `hint`, `errorCode`, `schemaErrors`) for non-2xx responses, and with `status: 0` for network failures and aborts (`aborted: true`, `isAborted(error)`). For the OAuth error bodies of the token endpoint, `errorCode` is the `error` (`invalid_request`, …) and `message` the `error_description`.
+- throws `StorytellerError` (`status`, `message`, `hint`, `errorCode`, `schemaErrors`) for non-2xx responses, and with `status: 0` for network failures ("The Storyteller API is not reachable (…)"), timeouts (`timedOut: true`, `isTimedOut(error)`, "The Storyteller API did not answer within 30 s (…)"; also when the caller's own `AbortSignal.timeout` fires, "did not answer in time") and aborts (`aborted: true`, `isAborted(error)`, "The request was aborted."). A timeout is not an abort: `aborted` stays `false`, and `isTransientError` is `true`. For the OAuth error bodies of the token endpoint, `errorCode` is the `error` (`invalid_request`, …) and `message` the `error_description`.
+
+`timeoutMs` is the longest a request may take, from the call until its body is read, the token lookup and the retry after a `401` included. A number applies to every request; a function gets `{ method, url }` (the method in upper case, the URL as `fetch` gets it) and returns the limit of that request. Undefined or `0` is no limit, the default. Every request function and composable takes a per-call `timeoutMs` in its options (`StorytellerRequestInit`), over the configured one, and `0` turns the limit off for that call; the option never reaches `fetch`:
+
+```ts
+const archive = await getViewExportArchive('acme', 'web', 'default', jobId, { timeoutMs: 10 * 60_000 }) // a large download
+const history = useGetAnnotationHistory(org, project, view, key, { request: { timeoutMs: 0 } }) // no limit
+```
+
+In a browser the limit also counts the time a request waits for a connection (six per origin over HTTP/1.1), so a page that sends many requests at once needs the headroom. The caller's `signal` keeps working: without a limit it reaches `fetch` as it is, with one it is combined with the deadline, and an abort by the caller stays an abort.
 
 With Vue Query, query keys are the path segments of the request, so cache invalidation can use paths:
 
@@ -240,7 +251,7 @@ let configuration: Configuration | undefined
 
 const result = await getResolvedConfigurationConditional('acme', 'billing', 'default', 'exe.billing.api.prod', {
   ifNoneMatch: etag,                     // no header while there is no tag
-  signal: AbortSignal.timeout(10_000),   // signal, cache and the other RequestInit fields pass through
+  timeoutMs: 10_000,                     // or signal: AbortSignal.timeout(10_000); signal, cache and the other RequestInit fields pass through
 })
 
 if (!result.notModified) {
@@ -249,7 +260,7 @@ if (!result.notModified) {
 }
 ```
 
-A timeout of `AbortSignal.timeout` rejects with a `TimeoutError`, not an `AbortError`, so it surfaces like a network failure: `StorytellerError` with `status: 0`, the "not reachable" message and `aborted: false`. A poller treats it as transient and tries again with the same tag. `isTransientError(error)` classifies a failure as the .NET configuration provider does (see [Configuration formats and errors](#configuration-formats-and-errors)).
+The options are those of the fetcher (`StorytellerRequestInit`) and `ifNoneMatch`, so a read has the configured `timeoutMs` or its own, and its limit covers the body as well. A read that runs out of time, by `timeoutMs` or by the caller's `AbortSignal.timeout` (whose `TimeoutError` is told apart from an abort), is a `StorytellerError` with `status: 0`, `timedOut: true`, `aborted: false` and the message "The Storyteller API did not answer within 10 s (…)" ("did not answer in time" for the caller's signal). A poller treats it as transient and tries again with the same tag. `isTransientError(error)` classifies a failure as the .NET configuration provider does (see [Configuration formats and errors](#configuration-formats-and-errors)).
 
 `ifNoneMatch` overrides an `If-None-Match` in `options.headers`; an empty `ifNoneMatch` removes it, and an `undefined` one leaves it as it is. An error status throws `StorytellerError`, as the fetcher does (an empty `404` for a missing configuration; a `422` with the `errorCode` `binding.evaluation` or `binding.limit.<kind>` for a binding of the resolved read that fails, or `format.<rule>` for a [format](#formatted-reads) that cannot write the document).
 
@@ -293,7 +304,7 @@ The generated `exchangeUserToken` posts the RFC 8693 exchange of an actor, such 
 | `flattenConfiguration(content, target)` | The keys and raw values of a target, in document order: `flat` (the default, `db:hosts:0`), `properties` (`db.hosts[0]`) or `env` (`DB__HOSTS__0`) |
 | `formatConfiguration(content, format)` | The exact text of `flat` or `env`, as `?format=` writes it; the API also renders `properties` and `yaml` |
 | `InvalidDocumentError` | A document the target cannot hold: `rule` (`colon-in-name`, `case-collision`, `bracket-in-name`, `array-gap`, `invalid-env-name`, …) and the JSON `path`; the message never holds a value |
-| `isTransientError(error)` | A network failure, `408`, `424`, `429`, a `5xx` other than `501` and `505`, or an unexpected `2xx`: keep the last document and poll again. Any other status gets the same answer again |
+| `isTransientError(error)` | A network failure or a timeout (`status: 0`, not aborted), `408`, `424`, `429`, a `5xx` other than `501` and `505`, or an unexpected `2xx`: keep the last document and poll again. Any other status gets the same answer again |
 
 ```ts
 import { flattenConfiguration, formatConfiguration, getResolvedConfigurationConditional, isTransientError } from '@42for.net/2splatform.sdk'

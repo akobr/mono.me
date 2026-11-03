@@ -1,6 +1,7 @@
+import { getEventListeners } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { configureStoryteller, getStorytellerConfig, storytellerFetch, type StorytellerConfig } from '../lib/fetcher'
-import { hasErrorCode, isAborted, isForbidden, isPreconditionFailed, StorytellerError } from '../lib/errors'
+import { hasErrorCode, isAborted, isForbidden, isPreconditionFailed, isTimedOut, isTransientError, StorytellerError } from '../lib/errors'
 import { deleteAnnotation } from '../generated/client/annotations/annotations'
 import { getViewExportArchive, startViewExport, startViewImport } from '../generated/client/transfers/transfers'
 
@@ -28,11 +29,70 @@ function fakeFetch(...responses: Response[]) {
 const json = (body: unknown, status = 200, contentType = 'application/json; charset=utf-8') =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': contentType } })
 
+/** Rejects with the signal's reason once it aborts, as fetch does, and never answers otherwise. */
+function untilAborted(signal: AbortSignal | null | undefined): Promise<never> {
+  return new Promise((_, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason as Error)
+      return
+    }
+
+    signal?.addEventListener('abort', () => reject(signal.reason as Error), { once: true })
+  })
+}
+
+/** A transport that answers only its signal: it rejects with the abort reason. */
+function hangingFetch() {
+  const calls: Call[] = []
+  const fetch = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ url: String(url), init: init ?? {} })
+    return untilAborted(init?.signal)
+  })
+
+  return { fetch: fetch as unknown as typeof globalThis.fetch, calls }
+}
+
+/** A transport that ignores its signal and answers after delayMs (never without a delay). */
+function deafFetch(delayMs?: number, answer: () => Response = () => json({ ok: true })) {
+  const calls: Call[] = []
+  const fetch = vi.fn((url: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ url: String(url), init: init ?? {} })
+    return new Promise<Response>((resolve) => {
+      if (delayMs !== undefined) {
+        setTimeout(() => resolve(answer()), delayMs)
+      }
+    })
+  })
+
+  return { fetch: fetch as unknown as typeof globalThis.fetch, calls }
+}
+
+/** A 200 whose body starts and never ends. */
+const stalledBody = () =>
+  new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"Id":'))
+      },
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  )
+
+/** True while the promise has not settled. */
+async function isPending(promise: Promise<unknown>): Promise<boolean> {
+  const pending = Symbol('pending')
+  return (await Promise.race([promise, Promise.resolve(pending)])) === pending
+}
+
+// Only the timers of the fetcher and of the fakes: the streams of Response keep their own scheduling.
+const useFakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
 function configure(overrides: Partial<StorytellerConfig> & Pick<StorytellerConfig, 'fetch'>) {
   configureStoryteller({ baseUrl: 'https://api.example.com/api/', ...overrides })
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   configureStoryteller({ baseUrl: 'http://unused' })
 })
 
@@ -271,5 +331,234 @@ describe('storytellerFetch', () => {
 
   it('requires configuration first', () => {
     expect(getStorytellerConfig().baseUrl).toBe('http://unused')
+  })
+})
+
+describe('storytellerFetch timeouts', () => {
+  it('ends a request that does not answer within the configured timeoutMs', async () => {
+    useFakeTimers()
+    const { fetch, calls } = hangingFetch()
+    configure({ fetch, getAccessToken: () => 'secret-token', timeoutMs: 1500 })
+
+    const pending = storytellerFetch('/v1/access/account').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1499)
+    expect(await isPending(pending)).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    const error = (await pending) as StorytellerError
+
+    expect(error).toBeInstanceOf(StorytellerError)
+    expect(error).toMatchObject({
+      status: 0,
+      timedOut: true,
+      aborted: false,
+      message: 'The Storyteller API did not answer within 1.5 s (/api/v1/access/account).',
+    })
+    expect(isTimedOut(error)).toBe(true)
+    expect(isAborted(error)).toBe(false)
+    expect(isTransientError(error)).toBe(true)
+    expect((error.cause as Error).name).toBe('TimeoutError')
+    expect(JSON.stringify({ message: error.message, body: error.body })).not.toContain('secret-token')
+    // fetch got the deadline's signal, never the option
+    expect(calls[0]?.init.signal?.aborted).toBe(true)
+    expect(calls[0]?.init).not.toHaveProperty('timeoutMs')
+  })
+
+  it('picks the limit per request with a function of the method and the URL', async () => {
+    useFakeTimers()
+    const { fetch } = deafFetch(1000)
+    const timeoutMs = vi.fn(({ method }: { method: string; url: string }) => (method === 'GET' ? 500 : undefined))
+    configure({ fetch, timeoutMs })
+
+    const read = storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+    const write = storytellerFetch('/v1/b', { method: 'post' })
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(await read).toMatchObject({ timedOut: true, message: 'The Storyteller API did not answer within 0.5 s (/api/v1/a).' })
+    // undefined: no limit
+    await expect(write).resolves.toEqual({ ok: true })
+    expect(timeoutMs.mock.calls).toEqual([
+      [{ method: 'GET', url: 'https://api.example.com/api/v1/a' }],
+      [{ method: 'POST', url: 'https://api.example.com/api/v1/b' }],
+    ])
+  })
+
+  it('takes a per-call timeoutMs over the configured one, and 0 disables the limit', async () => {
+    useFakeTimers()
+    const { fetch, calls } = deafFetch(1000)
+    const timeoutMs = vi.fn(() => 500)
+    configure({ fetch, timeoutMs })
+    const controller = new AbortController()
+
+    const longer = storytellerFetch('/v1/a', { timeoutMs: 2000 })
+    const unlimited = storytellerFetch('/v1/b', { timeoutMs: 0, signal: controller.signal })
+    await vi.advanceTimersByTimeAsync(1000)
+
+    await expect(longer).resolves.toEqual({ ok: true })
+    await expect(unlimited).resolves.toEqual({ ok: true })
+    // the configured function is not asked when the call has its own limit
+    expect(timeoutMs).not.toHaveBeenCalled()
+    // without a deadline the caller's signal reaches fetch as it is
+    expect(calls[1]?.init.signal).toBe(controller.signal)
+
+    configure({ fetch })
+    const limited = storytellerFetch('/v1/c', { timeoutMs: 250 }).catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(await limited).toMatchObject({ timedOut: true, message: 'The Storyteller API did not answer within 0.25 s (/api/v1/c).' })
+    for (const call of calls) {
+      expect(call.init).not.toHaveProperty('timeoutMs')
+    }
+  })
+
+  it('keeps an abort by the caller an abort, also with a deadline', async () => {
+    useFakeTimers()
+    const { fetch, calls } = hangingFetch()
+    configure({ fetch, timeoutMs: 1000 })
+    const controller = new AbortController()
+
+    const pending = storytellerFetch('/v1/a', { signal: controller.signal }).catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(100)
+    controller.abort()
+    const error = (await pending) as StorytellerError
+
+    // the deadline went with the request
+    expect(vi.getTimerCount()).toBe(0)
+    expect(error).toMatchObject({ status: 0, aborted: true, timedOut: false, message: 'The request was aborted.' })
+    expect(isTransientError(error)).toBe(false)
+    // fetch saw the abort through the combined signal
+    expect(calls[0]?.init.signal).not.toBe(controller.signal)
+    expect(calls[0]?.init.signal?.aborted).toBe(true)
+
+    // aborted before the call: nothing is sent
+    const early = await storytellerFetch('/v1/b', { signal: controller.signal }).catch((caught: unknown) => caught)
+    expect(isAborted(early)).toBe(true)
+    expect(calls).toHaveLength(1)
+  })
+
+  it("reports the caller's AbortSignal.timeout as timedOut, not aborted", async () => {
+    const { fetch, calls } = hangingFetch()
+    configure({ fetch })
+
+    const signal = AbortSignal.timeout(20)
+    const error = (await storytellerFetch('/v1/access/account', { signal }).catch((caught: unknown) => caught)) as StorytellerError
+
+    expect(error).toMatchObject({
+      status: 0,
+      timedOut: true,
+      aborted: false,
+      message: 'The Storyteller API did not answer in time (/api/v1/access/account).',
+    })
+    expect(isTransientError(error)).toBe(true)
+    expect(calls[0]?.init.signal).toBe(signal)
+
+    // the same under a longer deadline of its own, and with a TimeoutError of another realm (told apart by name)
+    configure({ fetch, timeoutMs: 60_000 })
+    const controller = new AbortController()
+    const pending = storytellerFetch('/v1/b', { signal: controller.signal }).catch((caught: unknown) => caught)
+    controller.abort(Object.assign(new Error('Too slow.'), { name: 'TimeoutError' }))
+
+    expect(await pending).toMatchObject({ timedOut: true, aborted: false, message: 'The Storyteller API did not answer in time (/api/v1/b).' })
+  })
+
+  it('ends a request whose body does not arrive in time', async () => {
+    useFakeTimers()
+    const { fetch } = fakeFetch(stalledBody())
+    configure({ fetch, timeoutMs: 1000 })
+
+    const pending = storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(await pending).toMatchObject({ status: 0, timedOut: true, message: 'The Storyteller API did not answer within 1 s (/api/v1/a).' })
+  })
+
+  it('ends a request whose transport ignores the signal, and discards its late answer', async () => {
+    useFakeTimers()
+    const late = json({ ok: true })
+    const cancel = vi.spyOn(late.body!, 'cancel')
+    const { fetch } = deafFetch(5000, () => late)
+    configure({ fetch, timeoutMs: 1000 })
+    const controller = new AbortController()
+
+    const timedOut = storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(isTimedOut(await timedOut)).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(4000)
+    expect(cancel).toHaveBeenCalledOnce()
+
+    const aborted = storytellerFetch('/v1/b', { signal: controller.signal }).catch((caught: unknown) => caught)
+    controller.abort()
+    expect(isAborted(await aborted)).toBe(true)
+  })
+
+  it('keeps one deadline across the retry after a 401', async () => {
+    useFakeTimers()
+    const calls: RequestInit[] = []
+    const fetch = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(init ?? {})
+      return calls.length === 1
+        ? new Promise<Response>((resolve) => setTimeout(() => resolve(new Response(null, { status: 401 })), 600))
+        : untilAborted(init?.signal)
+    }) as unknown as typeof globalThis.fetch
+    const onUnauthorized = vi.fn()
+    configure({ fetch, getAccessToken: () => 'token', onUnauthorized, timeoutMs: 1000 })
+
+    const pending = storytellerFetch('/v1/access/account').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(calls).toHaveLength(2)
+    await vi.advanceTimersByTimeAsync(399)
+    expect(await isPending(pending)).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+
+    expect(await pending).toMatchObject({ timedOut: true, message: 'The Storyteller API did not answer within 1 s (/api/v1/access/account).' })
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
+
+  it('ends a token lookup that hangs, and keeps the error of one that fails', async () => {
+    useFakeTimers()
+    const { fetch, calls } = fakeFetch(json({}))
+    configure({ fetch, getAccessToken: () => new Promise<string>(() => undefined), timeoutMs: 1000 })
+
+    const pending = storytellerFetch('/v1/access/account').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(await pending).toMatchObject({ status: 0, timedOut: true })
+    expect(calls).toHaveLength(0)
+
+    const signIn = new Error('Sign in again.')
+    configure({
+      fetch,
+      getAccessToken: () => {
+        throw signIn
+      },
+      timeoutMs: 1000,
+    })
+    await expect(storytellerFetch('/v1/access/account')).rejects.toBe(signIn)
+  })
+
+  it('leaves no timer and no listener behind', async () => {
+    useFakeTimers()
+    const { fetch, calls } = fakeFetch(json({}), json({ Message: 'Gone.' }, 404))
+    configure({ fetch, timeoutMs: 1000 })
+    const controller = new AbortController()
+
+    await storytellerFetch('/v1/a', { signal: controller.signal })
+    await storytellerFetch('/v1/b', { signal: controller.signal }).catch(() => undefined)
+
+    expect(vi.getTimerCount()).toBe(0)
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
+    for (const call of calls) {
+      expect(getEventListeners(call.init.signal!, 'abort')).toHaveLength(0)
+    }
+
+    // and after a timeout
+    const hanging = hangingFetch()
+    configure({ fetch: hanging.fetch, timeoutMs: 1000 })
+    const pending = storytellerFetch('/v1/c', { signal: controller.signal }).catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(isTimedOut(await pending)).toBe(true)
+    expect(vi.getTimerCount()).toBe(0)
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0)
   })
 })

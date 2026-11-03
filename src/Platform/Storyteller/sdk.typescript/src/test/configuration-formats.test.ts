@@ -47,8 +47,9 @@ describe('flattenConfiguration', () => {
 })
 
 describe('isTransientError', () => {
-  it('classifies a network failure as transient and an abort as not', () => {
+  it('classifies a network failure and a timeout as transient and an abort as not', () => {
     expect(isTransientError(new StorytellerError({ status: 0, message: 'The Storyteller API is not reachable.' }))).toBe(true)
+    expect(isTransientError(new StorytellerError({ status: 0, message: 'The Storyteller API did not answer within 30 s.', timedOut: true }))).toBe(true)
     expect(isTransientError(new StorytellerError({ status: 0, message: 'The request was aborted.', aborted: true }))).toBe(false)
   })
 

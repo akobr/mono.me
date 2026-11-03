@@ -3,7 +3,7 @@
 import { getGetConfigurationUrl, getGetResolvedConfigurationUrl } from '../generated/client/configurations/configurations'
 import type { Configuration } from '../generated/model'
 import { StorytellerError } from './errors'
-import { readBody, storytellerRequest } from './fetcher'
+import { readBody, runRequest, type StorytellerRequestInit } from './fetcher'
 
 export interface ConditionalResult<T> {
   status: 200 | 304
@@ -18,7 +18,8 @@ export interface ConditionalResult<T> {
   secretsWithheld?: string
 }
 
-export type ConditionalReadOptions = RequestInit & {
+/** The options of storytellerFetch (RequestInit, timeoutMs) and the tag of the last read. */
+export type ConditionalReadOptions = StorytellerRequestInit & {
   /** The ETag of the last read, sent as If-None-Match; it overrides an If-None-Match in headers, and '' removes that one. */
   ifNoneMatch?: string
 }
@@ -92,25 +93,27 @@ async function readConditional<T>(
     headers.delete('If-None-Match')
   }
 
-  const response = await storytellerRequest(url, { ...init, method: 'GET', headers })
-  // The API sends these on a 200 and a 304 alike.
-  const read = {
-    etag: response.headers.get('etag') ?? undefined,
-    cacheControl: response.headers.get('cache-control') ?? undefined,
-    secretsWithheld: response.headers.get('x-2s-secrets-withheld') ?? undefined,
-  }
+  // The body is read within the request's deadline, as storytellerFetch reads it.
+  return await runRequest(url, { ...init, method: 'GET', headers }, async (response): Promise<ConditionalResult<T>> => {
+    // The API sends these on a 200 and a 304 alike.
+    const read = {
+      etag: response.headers.get('etag') ?? undefined,
+      cacheControl: response.headers.get('cache-control') ?? undefined,
+      secretsWithheld: response.headers.get('x-2s-secrets-withheld') ?? undefined,
+    }
 
-  // Before the error mapping: for the fetcher a 304 is not ok.
-  if (response.status === 304) {
-    return { status: 304, notModified: true, ...read }
-  }
+    // Before the error mapping: for the fetcher a 304 is not ok.
+    if (response.status === 304) {
+      return { status: 304, notModified: true, ...read }
+    }
 
-  // Errors are JSON whatever was asked for, so a 422 of a format keeps its errorCode.
-  if (!response.ok) {
-    throw StorytellerError.fromResponse(response.status, response.statusText, await readBody(response))
-  }
+    // Errors are JSON whatever was asked for, so a 422 of a format keeps its errorCode.
+    if (!response.ok) {
+      throw StorytellerError.fromResponse(response.status, response.statusText, await readBody(response))
+    }
 
-  return { status: 200, notModified: false, value: await readValue(response), ...read }
+    return { status: 200, notModified: false, value: await readValue(response), ...read }
+  })
 }
 
 async function readConfiguration(response: Response): Promise<Configuration> {

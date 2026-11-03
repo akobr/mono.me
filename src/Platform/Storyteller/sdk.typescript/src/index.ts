@@ -6,6 +6,7 @@ export {
   getStorytellerConfig,
   storytellerFetch,
   type StorytellerConfig,
+  type StorytellerRequestInit,
 } from './lib/fetcher'
 export * from './lib/conditional'
 export * from './lib/configuration-formats'
