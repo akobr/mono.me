@@ -3,13 +3,17 @@
 using System;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.KeyValues;
 using _42.Platform.Storyteller.KeyValues.Audit;
 using _42.Platform.Storyteller.KeyValues.ClientEncryption;
 using _42.Platform.Storyteller.KeyValues.Policy;
+using _42.Platform.Storyteller.KeyValues.Protection;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
@@ -357,6 +361,37 @@ public class KeyValuePolicyTests(Startup startup)
         var policy = await Policies.GetAsync(Org, project);
         policy.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
         policy.Version.Should().Be(1, "the writers that lost the race read the recorded key and stop");
+    }
+
+    // Two API instances share the database, each with its own cache. After one records the key with the first Standard
+    // secret, the other shows the recorded policy and takes an Administrator's change at its version, although its cache
+    // still holds the defaults.
+    [Fact]
+    public async Task AnotherInstance_ShowsAndAcceptsTheRecordedPolicy()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("instances");
+        using var otherCache = new MemoryCache(new MemoryCacheOptions());
+        var repositories = Context.Services.GetRequiredService<IContainerRepositoryProvider>();
+        var otherStore = new CosmosKeyValuePolicyStore(repositories, Context.Services.GetRequiredService<IOptions<JsonSerializerOptions>>(), otherCache);
+        var otherPolicies = new CosmosKeyValuePolicyService(
+            otherStore,
+            Context.Services.GetServices<IKeyEncryptionProvider>(),
+            repositories,
+            Context.Services.GetRequiredService<IOptions<KeyValueOptions>>());
+        (await otherStore.GetAsync(Org, project)).Version.Should().Be(0, "the other instance caches the defaults");
+
+        await KeyValues.SetAsync(Org, project, View, "db.password", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s" }, Admin);
+        (await otherStore.GetAsync(Org, project)).Standard.Should().BeNull("the other instance's cache is stale now");
+
+        var updated = await otherPolicies.UpdateAsync(Org, project, new KeyValuePolicyUpdate { RequireMtlsForSecretDelivery = false, ExpectedVersion = 1 }, Admin);
+
+        updated.Version.Should().Be(2);
+        updated.RequireMtlsForSecretDelivery.Should().BeFalse();
+        updated.Standard!.KeyId.Should().Be(StandardProvider.KeyId, "the change keeps the recorded key");
+
+        var shown = await Policies.GetAsync(Org, project);
+        shown.Version.Should().Be(2, "the policy endpoint reads past this instance's cache, which still holds version 1");
+        shown.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
     }
 
     [Fact]

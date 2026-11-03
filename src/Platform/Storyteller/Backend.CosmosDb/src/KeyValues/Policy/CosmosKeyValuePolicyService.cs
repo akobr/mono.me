@@ -40,16 +40,17 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    // The stored policy, not an instance's cached copy: a Settings page shows, and sends back, the current version (424-167).
     public Task<KeyValuePolicy> GetAsync(string organization, string project, CancellationToken cancellationToken = default)
     {
-        return _store.GetAsync(organization, project, cancellationToken);
+        return _store.GetCurrentAsync(organization, project, cancellationToken);
     }
 
     public async Task<KeyValuePolicy> UpdateAsync(string organization, string project, KeyValuePolicyUpdate update, KeyValueCaller caller, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(update);
         ArgumentNullException.ThrowIfNull(caller);
-        var current = await _store.GetAsync(organization, project, cancellationToken);
+        var current = await _store.GetCurrentAsync(organization, project, cancellationToken);
         EnsureExpectedVersion(current, update.ExpectedVersion);
         var policy = current;
         var changes = new List<string>();
@@ -140,7 +141,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
     {
         ArgumentNullException.ThrowIfNull(caller);
         var provider = GetCustomerKeyProvider();
-        var current = await _store.GetAsync(organization, project, cancellationToken);
+        var current = await _store.GetCurrentAsync(organization, project, cancellationToken);
         var settings = current.Byok ?? throw new ConflictException("The project has no customer key (BYOK) to verify.", ErrorCodes.ByokNotConfigured);
         var now = _timeProvider.GetUtcNow();
         var verification = await provider.VerifyAsync(settings, cancellationToken);
@@ -175,7 +176,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
         }
 
         var provider = GetProvider(protection);
-        var current = await _store.GetAsync(organization, project, cancellationToken);
+        var current = await _store.GetCurrentAsync(organization, project, cancellationToken);
         var info = await provider.RotateAsync(new KeyValueScope(organization, project), current, cancellationToken);
         var policy = WithKeyInfo(current, protection, info) with
         {
@@ -197,7 +198,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
     {
         ArgumentNullException.ThrowIfNull(create);
         ArgumentNullException.ThrowIfNull(caller);
-        var current = await _store.GetAsync(organization, project, cancellationToken);
+        var current = await _store.GetCurrentAsync(organization, project, cancellationToken);
         var id = string.IsNullOrWhiteSpace(create.Id) ? Guid.NewGuid().ToString("N")[..16] : create.Id.Trim();
 
         if (!RecipientIdPattern().IsMatch(id))
@@ -254,7 +255,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
     {
         ArgumentNullException.ThrowIfNull(update);
         ArgumentNullException.ThrowIfNull(caller);
-        var current = await _store.GetAsync(organization, project, cancellationToken);
+        var current = await _store.GetCurrentAsync(organization, project, cancellationToken);
         var existing = FindRecipient(current, id);
         var updated = existing with
         {
@@ -272,7 +273,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
     public async Task RemoveRecipientAsync(string organization, string project, string id, KeyValueCaller caller, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(caller);
-        var current = await _store.GetAsync(organization, project, cancellationToken);
+        var current = await _store.GetCurrentAsync(organization, project, cancellationToken);
         FindRecipient(current, id);
         var recipients = current.Recipients.Where(recipient => recipient.Id != id).ToList();
         EnsureHyokStillPossible(current, recipients);

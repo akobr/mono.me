@@ -162,7 +162,8 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
 
         for (var attempt = 0; ; attempt++)
         {
-            var policy = await _policies.GetAsync(organization, project, cancellationToken);
+            // past the cache: the caller's copy had no key, and another instance may have recorded it meanwhile
+            var policy = await _policies.GetCurrentAsync(organization, project, cancellationToken);
 
             if (policy.Standard is not null)
             {
@@ -184,8 +185,8 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
             }
             catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.PolicyVersionMismatch && attempt < 2)
             {
-                // another first write or an Administrator was faster; the store dropped its cache, so the next attempt
-                // reads their policy and stops when it already knows the key
+                // another first write or an Administrator was faster; the next attempt reads their policy and stops when
+                // it already knows the key
             }
             catch (NotFoundException)
             {
