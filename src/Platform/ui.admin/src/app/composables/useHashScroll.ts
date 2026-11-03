@@ -9,7 +9,9 @@ import { useRoute } from 'vue-router'
  * anchor.
  *
  * `ready` turns true once the content above the section has loaded, so the section does not move after the scroll.
- * A refetch does not scroll again; another hash does.
+ * A refetch does not scroll again; another hash does. A hash whose section is not rendered stays pending: the next time
+ * `ready` turns true, the section is looked up again, so one that appears later (a role granted since, 424-164) still
+ * gets the scroll and the focus.
  */
 export function useHashScroll(ready: MaybeRefOrGetter<boolean> = true): void {
   const route = useRoute()
@@ -25,12 +27,19 @@ export function useHashScroll(ready: MaybeRefOrGetter<boolean> = true): void {
       if (!isReady || hash === scrolled) {
         return
       }
-      scrolled = hash
       await nextTick()
+      // Another hash came meanwhile, or another run scrolled to this one.
+      if (hash !== route.hash || hash === scrolled) {
+        return
+      }
       // route.hash is decoded already.
       const section = document.getElementById(hash.slice(1))
-      section?.scrollIntoView({ block: 'start' })
-      section?.focus({ preventScroll: true })
+      if (!section) {
+        return
+      }
+      scrolled = hash
+      section.scrollIntoView({ block: 'start' })
+      section.focus({ preventScroll: true })
     },
     { immediate: true },
   )
