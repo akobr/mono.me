@@ -215,10 +215,7 @@ public sealed class CustomerKeyProvider : ICustomerKeyProvider
         if (_emulator)
         {
             options.DisableChallengeResourceVerification = true;
-            options.Transport = new HttpClientTransport(new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-            });
+            options.Transport = KeyVaultClients.CreateEmulatorTransport();
         }
 
         return (new KeyClient(identifier.VaultUri, GetCredential(settings.TenantId), options), identifier);

@@ -7,6 +7,10 @@ namespace _42.Platform.Storyteller.KeyValues;
 
 public static class KeyVaultClients
 {
+    // One handler for every emulator client of the process: it connects "localhost" over IPv4 first and accepts the
+    // self-signed certificate (EmulatorHttpHandler); Lowkey Vault is published on 127.0.0.1 only.
+    private static readonly Lazy<SocketsHttpHandler> SharedEmulatorHandler = new(EmulatorHttpHandler.Create);
+
     // emulator: a dummy token, no challenge resource check, and any server certificate (Lowkey Vault is self-signed).
     public static KeyClient CreateKeyClient(Uri vaultUri, bool emulator, bool isProduction)
     {
@@ -22,10 +26,7 @@ public static class KeyVaultClients
             }
 
             options.DisableChallengeResourceVerification = true;
-            options.Transport = new HttpClientTransport(new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-            });
+            options.Transport = CreateEmulatorTransport();
             credential = new EmulatorTokenCredential();
         }
         else if (isProduction)
@@ -38,5 +39,11 @@ public static class KeyVaultClients
         }
 
         return new KeyClient(vaultUri, credential, options);
+    }
+
+    // A transport over the shared emulator handler; a key client never disposes its transport, and the handler outlives it.
+    internal static HttpPipelineTransport CreateEmulatorTransport()
+    {
+        return new HttpClientTransport(new HttpClient(SharedEmulatorHandler.Value, disposeHandler: false));
     }
 }

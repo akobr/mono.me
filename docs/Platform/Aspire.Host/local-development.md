@@ -51,6 +51,10 @@ dotnet run --project src/Platform/Aspire.Host/src --launch-profile https-local-c
 
 In the local mode Aspire does not start or watch the emulator: install the [Windows emulator](https://learn.microsoft.com/azure/cosmos-db/emulator), start it before the host, and run `db-creator` once against it. For another endpoint, override `ConnectionStrings__cosmos` (environment or user secrets). An unknown mode fails the startup of the host. The services accept the self-signed certificate of either emulator on `localhost`.
 
+On Windows `localhost` resolves to `::1` first, and the Windows emulator listens on `127.0.0.1` only, so a client that connects by the name waits about 2 s for the refused IPv6 attempt on every new connection. The API and `db-creator` connect `localhost` to `127.0.0.1` first (`EmulatorHttpHandler` of `Backend.Core`, also used for Lowkey Vault), so the connection string keeps `localhost`. The container mode is not affected: Aspire gives its emulator's IPv4 address.
+
+A Windows emulator that limits the request rate (started with `/EnableRateLimiting`) gives each container of a database without shared throughput its own 400 RU/s. Parallel UI tests exceed it: the SDK retries the `429` answers for seconds, and the API answers `500` when the retries run out. Start the emulator with `/DisableRateLimiting`, or raise the throughput of the organization's container (`org.<organization>`) in the emulator's Data Explorer.
+
 ## MCP server
 
 The host gives the `mcp` resource `Storyteller:BaseUrl`, the `http` endpoint of `api-functions` with `/api`. The MCP server signs its clients in with the deployment's identity provider and exchanges their tokens at the API, so both need settings:

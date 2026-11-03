@@ -175,6 +175,8 @@ What to try:
 | *The subject token is not accepted for this actor.* | `SubjectAudiences` does not hold the token's `aud`; the API's log names the reason |
 | *The API has the user token exchange turned off* | `Auth:TokenExchange:Enabled` is not `true`, or the API was not restarted |
 | `aspire run` ignores the profile | Use `dotnet run --project src/Platform/Aspire.Host/src --launch-profile <name>` |
+| Requests of the local API take about 2 s after a pause, with the Windows Cosmos DB emulator | A client that connects to `localhost` tries `::1` first, and the emulator listens on `127.0.0.1` only. The API connects to the emulators over IPv4 first since 424-166; update the branch. The Functions host listens on IPv4 only too: a .NET client of `http://localhost:7071` (the MCP server, `sform`) waits for the IPv6 attempt on each new connection, `http://127.0.0.1:7071` does not |
+| `500` with `TooManyRequests (429)` in the API's log, slow requests while UI tests run in parallel | The emulator limits the request rate; see [Cosmos DB modes](Aspire.Host/local-development.md#cosmos-db-modes) |
 
 Decoding a token's claims without a tool:
 

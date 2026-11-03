@@ -9,6 +9,7 @@ namespace _42.Platform.Storyteller
     {
         private readonly Lazy<CosmosClient> _client;
         private readonly CosmosDbOptions _options;
+        private SocketsHttpHandler? _emulatorHandler;
 
         public CosmosClientProvider(
             IOptions<CosmosDbOptions> options)
@@ -25,6 +26,8 @@ namespace _42.Platform.Storyteller
             {
                 _client.Value.Dispose();
             }
+
+            _emulatorHandler?.Dispose();
         }
 
         private CosmosClient BuildClient()
@@ -46,13 +49,14 @@ namespace _42.Platform.Storyteller
                 //}),
             };
 
-            // Needed when certificate on server is not valid
+            // The emulator: its certificate is self-signed, and "localhost" must connect over IPv4 first, or every new
+            // pooled connection waits about 2 s for the refused IPv6 attempt (EmulatorHttpHandler). The SDK sets its
+            // timeout and headers on the HttpClient it gets and disposes it with the CosmosClient, so each call gets a
+            // new client over the one handler, which this provider disposes.
             if (_options.ShouldAcceptAnyCertificate ?? false)
             {
-                options.HttpClientFactory = () => new HttpClient(new HttpClientHandler
-                {
-                    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
-                });
+                var handler = _emulatorHandler = EmulatorHttpHandler.Create();
+                options.HttpClientFactory = () => new HttpClient(handler, disposeHandler: false);
                 options.ConnectionMode = ConnectionMode.Gateway;
                 options.LimitToEndpoint = true;
             }
