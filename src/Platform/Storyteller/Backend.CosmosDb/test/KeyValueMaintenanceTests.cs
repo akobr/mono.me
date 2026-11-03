@@ -147,6 +147,40 @@ public class KeyValueMaintenanceTests(Startup startup)
         policy.Standard!.KeyId.Should().Be(Standard.KeyId, "the re-wrap's save never takes the key away");
     }
 
+    // A rotation while a re-wrap runs starts a re-wrap of its own; the running one does not mark it complete.
+    [Fact]
+    public async Task Rewrap_KeepsTheReWrapOfARotationDuringTheRun()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("midrotate");
+        await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "v" }, Admin);
+        var first = await Policies.RotateAsync(Org, project, KeyValueProtection.Standard, Admin);
+        string? secondTarget = null;
+        Standard.BeforeUnwrap = async () =>
+        {
+            Standard.BeforeUnwrap = null;
+            secondTarget = (await Policies.RotateAsync(Org, project, KeyValueProtection.Standard, Admin)).Rewrap!.TargetKeyVersion;
+        };
+
+        try
+        {
+            var status = await Maintenance.RewrapAsync(Org, project, KeyValueProtection.Standard);
+            status!.TargetKeyVersion.Should().Be(first.Rewrap!.TargetKeyVersion);
+        }
+        finally
+        {
+            Standard.BeforeUnwrap = null;
+        }
+
+        var policy = await Policies.GetAsync(Org, project);
+        secondTarget.Should().NotBe(first.Rewrap.TargetKeyVersion);
+        policy.Rewrap!.TargetKeyVersion.Should().Be(secondTarget);
+        policy.Rewrap.CompletedAt.Should().BeNull("the second rotation's re-wrap is still to do");
+
+        await Maintenance.RewrapAsync(Org, project, KeyValueProtection.Standard);
+        (await Policies.GetAsync(Org, project)).Rewrap!.CompletedAt.Should().NotBeNull();
+        (await KeyValues.GetAsync(Org, project, View, "s", new KeyValueReadOptions { Reveal = true }, Admin))!.Value.Should().Be("v");
+    }
+
     [Fact]
     public async Task Protect_MovesAKeyBetweenTheServerSideLevels()
     {

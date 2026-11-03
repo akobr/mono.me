@@ -40,6 +40,9 @@ internal sealed class FakeKeyEncryptionProvider : IKeyEncryptionProvider, IHsmBa
 
     public bool IsRevoked { get; set; }
 
+    // Runs before an unwrap, e.g. a rotation in the middle of a re-wrap.
+    public Func<Task>? BeforeUnwrap { get; set; }
+
     // Thrown by GetKeyInfoAsync only, e.g. a vault call that times out after a write wrapped its data key.
     public Exception? KeyInfoFailure { get; set; }
 
@@ -66,8 +69,13 @@ internal sealed class FakeKeyEncryptionProvider : IKeyEncryptionProvider, IHsmBa
         return Task.FromResult(new WrappedDataKey($"{KeyId}/{_version}", "RSA-OAEP-256", wrapped));
     }
 
-    public Task<byte[]> UnwrapAsync(KeyValueScope scope, KeyValuePolicy policy, EncryptedValue value, CancellationToken cancellationToken = default)
+    public async Task<byte[]> UnwrapAsync(KeyValueScope scope, KeyValuePolicy policy, EncryptedValue value, CancellationToken cancellationToken = default)
     {
+        if (BeforeUnwrap is { } before)
+        {
+            await before();
+        }
+
         ThrowWhenUnavailable();
         Interlocked.Increment(ref _unwrapCount);
 
@@ -77,7 +85,7 @@ internal sealed class FakeKeyEncryptionProvider : IKeyEncryptionProvider, IHsmBa
         using var aes = new AesGcm(_kek, 16);
         aes.Decrypt(wrapped.AsSpan(0, 12), wrapped.AsSpan(12, dataKey.Length), wrapped.AsSpan(12 + dataKey.Length, 16), dataKey);
 
-        return Task.FromResult(dataKey);
+        return dataKey;
     }
 
     public Task<ProtectionKeyInfo> GetKeyInfoAsync(KeyValueScope scope, KeyValuePolicy policy, CancellationToken cancellationToken = default)
