@@ -8,6 +8,8 @@ import {
   getResolvedConfigurationFormattedConditional,
   isAborted,
   isNotFound,
+  isTimedOut,
+  isTransientError,
   StorytellerError,
   type Configuration,
   type ConfigurationFormat,
@@ -73,7 +75,40 @@ const readFormattedFailure = (format: ConfigurationFormat) =>
     (caught: unknown) => caught as StorytellerError,
   )
 
+/** A transport that answers only its signal: it rejects with the abort reason, as fetch does. */
+function hangingFetch() {
+  const calls: Call[] = []
+  const fetch = vi.fn(
+    (url: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_, reject) => {
+        calls.push({ url: String(url), init: init ?? {} })
+        const signal = init?.signal
+
+        if (signal?.aborted) {
+          reject(signal.reason as Error)
+          return
+        }
+
+        signal?.addEventListener('abort', () => reject(signal.reason as Error), { once: true })
+      }),
+  )
+
+  return { fetch: fetch as unknown as typeof globalThis.fetch, calls }
+}
+
+/** A 200 with the given headers whose body starts and never ends. */
+const stalled = (contentType: string, headers: Record<string, string> = {}) =>
+  new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"AnnotationKey":'))
+      },
+    }),
+    { status: 200, headers: { 'content-type': contentType, ...headers } },
+  )
+
 afterEach(() => {
+  vi.useRealTimers()
   configureStoryteller({ baseUrl: 'http://unused' })
 })
 
@@ -207,6 +242,53 @@ describe('conditional reads', () => {
     expect((error as StorytellerError).status).toBe(0)
   })
 
+  it('ends a read after its timeoutMs, the body read included', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const hanging = hangingFetch()
+    configure({ fetch: hanging.fetch })
+
+    // a per-call limit through the options, which never reaches fetch
+    const unanswered = getConfigurationConditional('acme', 'billing', 'default', 'exe.billing.api.prod', { ifNoneMatch: tag, timeoutMs: 1000 }).catch(
+      (caught: unknown) => caught,
+    )
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(await unanswered).toMatchObject({
+      status: 0,
+      timedOut: true,
+      aborted: false,
+      message: 'The Storyteller API did not answer within 1 s (/api/v1/acme/billing/default/configuration/exe.billing.api.prod).',
+    })
+    expect(hanging.calls[0]?.init).not.toHaveProperty('timeoutMs')
+    expect(hanging.calls[0]?.init).not.toHaveProperty('ifNoneMatch')
+
+    // the configured limit covers the body of the envelope and of a format
+    const { fetch } = fakeFetch(stalled('application/json', { etag: tag }), stalled('text/plain'))
+    configure({ fetch, timeoutMs: 1000 })
+    const envelope = getResolvedConfigurationConditional('acme', 'billing', 'default', 'exe.billing.api.prod').catch((caught: unknown) => caught)
+    const formatted = getConfigurationFormattedConditional('acme', 'billing', 'default', 'exe.billing.api.prod', 'env').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(isTimedOut(await envelope)).toBe(true)
+    expect(isTimedOut(await formatted)).toBe(true)
+  })
+
+  it("reports the poller's AbortSignal.timeout as a transient timeout", async () => {
+    const { fetch } = hangingFetch()
+    configure({ fetch })
+
+    const error = await getResolvedConfigurationConditional('acme', 'billing', 'default', 'exe.billing.api.prod', {
+      ifNoneMatch: tag,
+      signal: AbortSignal.timeout(20),
+    }).catch((caught: unknown) => caught)
+
+    expect(error).toMatchObject({ status: 0, timedOut: true, aborted: false })
+    expect((error as StorytellerError).message).toBe(
+      'The Storyteller API did not answer in time (/api/v1/acme/billing/default/configuration/exe.billing.api.prod/resolved).',
+    )
+    expect(isTransientError(error)).toBe(true)
+  })
+
   it('rejects a 200 whose body is not a configuration object', async () => {
     const { fetch } = fakeFetch(
       new Response(null, { status: 200 }),
@@ -263,6 +345,8 @@ describe('conditional reads', () => {
     expect(sdk.getResolvedConfigurationConditional).toBeTypeOf('function')
     expect(sdk.getConfigurationFormattedConditional).toBeTypeOf('function')
     expect(sdk.getResolvedConfigurationFormattedConditional).toBeTypeOf('function')
+    expect(sdk.isTimedOut).toBeTypeOf('function')
+    expect(sdk).not.toHaveProperty('runRequest')
     expect(sdk).not.toHaveProperty('storytellerRequest')
     expect(sdk).not.toHaveProperty('readBody')
   })

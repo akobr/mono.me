@@ -10,11 +10,13 @@ export interface StorytellerErrorInit {
   body?: unknown
   /** True when the request was cancelled through its AbortSignal (status 0). */
   aborted?: boolean
+  /** True when the API did not answer in time (status 0). */
+  timedOut?: boolean
   cause?: unknown
 }
 
 export class StorytellerError extends Error {
-  /** HTTP status; 0 for a network failure or an aborted request. */
+  /** HTTP status; 0 for a network failure, a timeout or an aborted request. */
   readonly status: number
 
   readonly hint?: string
@@ -34,6 +36,12 @@ export class StorytellerError extends Error {
   /** True when the request was cancelled through its AbortSignal; such errors are not failures to report. */
   readonly aborted: boolean
 
+  /**
+   * True when the API did not answer in time: the request ran past its timeoutMs, or the caller's signal fired a
+   * TimeoutError (AbortSignal.timeout). Not aborted, and transient like a network failure.
+   */
+  readonly timedOut: boolean
+
   constructor(init: StorytellerErrorInit) {
     super(init.message, { cause: init.cause })
     this.name = 'StorytellerError'
@@ -43,6 +51,7 @@ export class StorytellerError extends Error {
     this.schemaErrors = init.schemaErrors
     this.body = init.body
     this.aborted = init.aborted ?? false
+    this.timedOut = init.timedOut ?? false
   }
 
   /** Builds the error from a response status and its (possibly empty or non-JSON) body. */
@@ -75,6 +84,9 @@ export const isStorytellerError = (error: unknown): error is StorytellerError =>
 /** An aborted request (status 0, cancelled through its AbortSignal), as opposed to a network failure. */
 export const isAborted = (error: unknown): error is StorytellerError => error instanceof StorytellerError && error.aborted
 
+/** A request the API did not answer in time (status 0: its timeoutMs, or the caller's AbortSignal.timeout), as opposed to a network failure. */
+export const isTimedOut = (error: unknown): error is StorytellerError => error instanceof StorytellerError && error.timedOut
+
 const hasStatus = (status: number) => (error: unknown): error is StorytellerError =>
   isStorytellerError(error) && error.status === status
 
@@ -89,10 +101,10 @@ export const hasErrorCode = (error: unknown, errorCode: string): error is Storyt
   isStorytellerError(error) && error.errorCode === errorCode
 
 /**
- * True for a failure worth trying again later, as the .NET configuration provider classifies it: a network failure,
- * 408, 424, 429, a 5xx other than 501 and 505, and a 2xx that was not the answer the SDK expected. A poller keeps its
- * last document and polls again; any other status gets the same answer again. False for an aborted request and for
- * errors that are not StorytellerError, which the SDK cannot classify.
+ * True for a failure worth trying again later, as the .NET configuration provider classifies it: a network failure or
+ * a timeout (status 0), 408, 424, 429, a 5xx other than 501 and 505, and a 2xx that was not the answer the SDK
+ * expected. A poller keeps its last document and polls again; any other status gets the same answer again. False for
+ * an aborted request and for errors that are not StorytellerError, which the SDK cannot classify.
  */
 export function isTransientError(error: unknown): boolean {
   if (!isStorytellerError(error) || error.aborted) {
