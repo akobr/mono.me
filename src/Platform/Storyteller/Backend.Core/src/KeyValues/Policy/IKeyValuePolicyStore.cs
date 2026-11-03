@@ -5,6 +5,11 @@ public interface IKeyValuePolicyStore
 {
     Task<KeyValuePolicy> GetAsync(string organization, string project, CancellationToken cancellationToken = default);
 
+    // The stored policy past the cache, which it refreshes: for the policy endpoints and every change of the policy, so an
+    // instance that still caches an older copy never answers with it, nor rejects the current version as stale.
+    Task<KeyValuePolicy> GetCurrentAsync(string organization, string project, CancellationToken cancellationToken = default)
+        => GetAsync(organization, project, cancellationToken);
+
     // Replaces the policy; a concurrent change (the stored version differs from policy.Version - 1) fails with PolicyVersionMismatch.
     Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default);
 

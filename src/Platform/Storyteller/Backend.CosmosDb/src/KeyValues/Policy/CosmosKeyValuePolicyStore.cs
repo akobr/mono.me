@@ -42,9 +42,14 @@ public class CosmosKeyValuePolicyStore : IKeyValuePolicyStore
             return cached;
         }
 
+        return await GetCurrentAsync(organization, project, cancellationToken);
+    }
+
+    public async Task<KeyValuePolicy> GetCurrentAsync(string organization, string project, CancellationToken cancellationToken = default)
+    {
         var (entity, _) = await ReadAsync(organization, project, cancellationToken);
         var policy = entity?.KeyValues ?? KeyValuePolicyDefaults.Create();
-        _cache.Set(cacheKey, policy, CacheExpiration);
+        _cache.Set(GetCacheKey(organization, project), policy, CacheExpiration);
         return policy;
     }
 
