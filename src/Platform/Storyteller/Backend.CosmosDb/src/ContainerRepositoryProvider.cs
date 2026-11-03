@@ -1,11 +1,13 @@
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace _42.Platform.Storyteller;
 
 public class ContainerRepositoryProvider : IContainerRepositoryProvider
 {
     private readonly ICosmosClientProvider _clientProvider;
-    private readonly Dictionary<string, IContainerRepository> _cache = new();
+
+    // Parallel requests of a cold worker ask for the same containers at once.
+    private readonly ConcurrentDictionary<string, IContainerRepository> _cache = new();
 
     public ContainerRepositoryProvider(ICosmosClientProvider clientProvider)
     {
@@ -24,13 +26,9 @@ public class ContainerRepositoryProvider : IContainerRepositoryProvider
 
     private IContainerRepository GetContainer(string containerName)
     {
-        if (_cache.TryGetValue(containerName, out var repository))
-        {
-            return repository;
-        }
-
-        var container = _clientProvider.Client.GetContainer(CosmosConstants.DatabaseName, containerName);
-        _cache[containerName] = repository = new ContainerRepository(container);
-        return repository;
+        return _cache.GetOrAdd(
+            containerName,
+            static (name, client) => new ContainerRepository(client.GetContainer(CosmosConstants.DatabaseName, name)),
+            _clientProvider.Client);
     }
 }
