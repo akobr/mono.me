@@ -46,6 +46,12 @@ public sealed partial class ModelingTemplatePage(App app, AppRoutes routes)
 
     public VersionsView Versions => new(app, Panel.Root);
 
+    // The newest toast of a save or a create that failed, with the API's message as its description.
+    public ILocator NotSavedToast => app.ToastItem("The template was not saved");
+
+    // Retry of the error state of a template the API refused or did not answer in time.
+    private ILocator Retry => ErrorStates.RetryButton(Panel.Root).First;
+
     // The row of a type in the Templates list, by its code (rst, unt, sbt, usg, cnt, exe, uxe).
     public ILocator ListRow(string type)
     {
@@ -61,12 +67,17 @@ public sealed partial class ModelingTemplatePage(App app, AppRoutes routes)
         await Expect(ListRow("exe")).ToBeVisibleAsync();
     }
 
-    // Opens the template of a type (its code) and waits until it loaded: the empty state or the editor. On a phone the
-    // detail is full screen and hides the navbar, so this does not wait for the user menu.
+    // Opens the template of a type (its code) and waits until it loaded, up to Target:ApiTimeoutMs: the empty state or
+    // the editor; the error state throws with its text. On a phone the detail is full screen and hides the navbar, so
+    // this does not wait for the user menu.
     public async Task OpenAsync(string type)
     {
         await app.GotoAsync(routes.Template(type));
-        await Expect(NoTemplate.Or(Document.Content).First).ToBeVisibleAsync();
+        await Expect(NoTemplate.Or(Document.Content).Or(Retry).First).ToBeVisibleAsync(new() { Timeout = app.ApiTimeoutMs });
+        if (await Retry.IsVisibleAsync())
+        {
+            throw new PlaywrightException($"The {type} template did not load: {await ErrorStates.TextAsync(ErrorStates.Around(Retry))}");
+        }
     }
 
     // Replaces the template document as JSON.
@@ -97,12 +108,19 @@ public sealed partial class ModelingTemplatePage(App app, AppRoutes routes)
     }
 
     // With the editor's shortcut once the button is enabled, not a click: the toast of an earlier save covers the save
-    // bar's button at the bottom right for its 5 seconds, and a pointer on a toast keeps it open.
+    // bar's button at the bottom right for its 5 seconds, and a pointer on a toast keeps it open. The toast is waited for
+    // up to Target:ApiWriteTimeoutMs (the admin UI ends the write after its 120 s write timeout); the toast of a failed
+    // save (NotSavedToast) throws with its text.
     private async Task SubmitAsync(ILocator button, int expectedVersion)
     {
         await Expect(button).ToBeEnabledAsync();
         await Document.PressSaveAsync();
-        await Expect(app.Toast(string.Create(CultureInfo.InvariantCulture, $"Template saved (v{expectedVersion})"))).ToBeVisibleAsync();
+        var saved = app.Toast(string.Create(CultureInfo.InvariantCulture, $"Template saved (v{expectedVersion})"));
+        await Expect(saved.Or(NotSavedToast).First).ToBeVisibleAsync(new() { Timeout = app.ApiWriteTimeoutMs });
+        if (!await saved.IsVisibleAsync())
+        {
+            throw new PlaywrightException($"The template was not saved as v{expectedVersion}: {await ErrorStates.TextAsync(NotSavedToast)}");
+        }
     }
 
     [GeneratedRegex("^No .+ template$")]

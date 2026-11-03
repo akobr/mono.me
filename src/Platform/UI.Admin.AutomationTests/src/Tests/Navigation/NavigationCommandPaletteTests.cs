@@ -82,7 +82,7 @@ public sealed partial class NavigationCommandPaletteTests : PlatformTest
 
         await App.RunCommandAsync("Bulk create annotations");
         await App.ExpectAtAsync(Routes.Annotations);
-        var bulkCreate = new BulkCreateDialog(Page);
+        var bulkCreate = new BulkCreateDialog(App);
         await Expect(bulkCreate.Root).ToBeVisibleAsync();
         await bulkCreate.EnterKeysAsync(key);
         await bulkCreate.CreateAsync(1);

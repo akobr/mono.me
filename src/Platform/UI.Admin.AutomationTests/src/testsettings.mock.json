@@ -9,6 +9,9 @@
     "View": "default",
     "SignIn": "None",
     "MockScenario": "default",
+    // MSW answers at once; a wait for the API ends with the Expect timeout of the unbundled dev server.
+    "ApiTimeoutMs": 15000,
+    "ApiWriteTimeoutMs": 15000,
     // Where the tests of an exact role act ([UserRole(Role.Contributor)], [UserRole(Role.Reader)]): the projects of the
     // default dataset where Ada Lovelace, whom every pool user stands for, holds exactly that role. acme/shipping keeps
     // her Owner role of the organization acme; northwind/portal has no organization role.

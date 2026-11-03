@@ -164,7 +164,7 @@ public sealed partial class AnnotationCatalogTests : PlatformTest
         await Expect(annotations.FilterCount).ToHaveTextAsync("0");
 
         await annotations.EmptyStateButton("Bulk create").ClickAsync();
-        var bulkCreate = new BulkCreateDialog(Page);
+        var bulkCreate = new BulkCreateDialog(App);
         await Expect(bulkCreate.Root).ToBeVisibleAsync();
         await Expect(bulkCreate.Root).ToHaveAccessibleDescriptionAsync($"In {routes.Organization}/{routes.Project}, view {view}.");
         await bulkCreate.CancelAsync();

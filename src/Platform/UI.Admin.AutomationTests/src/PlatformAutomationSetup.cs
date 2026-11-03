@@ -18,8 +18,9 @@ using _42.Testing.UI.Automation.Runtime.TUnit;
 namespace _42.Platform.UI.Admin.AutomationTests;
 
 // What the Platform adds to the UI automation runtime: the AuthKit sign-in (Target:SignIn AuthKit, the default; None
-// for the mock target), the reporters Reporting:Systems may select (Testiny), the checks of its own settings, and the
-// check of the target before the first test (the organization, project and view exist and a pool user may open them).
+// for the mock target), the reporters Reporting:Systems may select (Testiny), the checks of its own settings (Target and
+// Maintenance), and the check of the target before the first test (the organization, project and view exist and a pool
+// user may open them).
 public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
 {
     public string ReadmeHint => "docs/Platform/UI.Admin.AutomationTests/automation-tests.md";
@@ -51,6 +52,28 @@ public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
         foreach (var (role, project) in target.RoleProjects)
         {
             CheckRoleProject(role, project, errors);
+        }
+
+        if (target.ApiTimeoutMs < 1)
+        {
+            errors.Add($"Target:ApiTimeoutMs {target.ApiTimeoutMs} is not positive; it is how long a wait for the API may take, e.g. 65000 (two reads at the admin UI's 30 s read timeout).");
+        }
+
+        if (target.ApiWriteTimeoutMs < 1)
+        {
+            errors.Add($"Target:ApiWriteTimeoutMs {target.ApiWriteTimeoutMs} is not positive; it is how long a wait for a write of the API may take, e.g. 185000 (a write at the admin UI's 120 s write timeout and two reads at its 30 s read timeout).");
+        }
+
+        // At least an hour: with 0 the purge would delete the roots of another run working in the same view right now.
+        var maintenance = settings.Bind<MaintenanceSettings>(MaintenanceSettings.Section);
+        if (maintenance.OlderThanHours < 1)
+        {
+            errors.Add($"Maintenance:OlderThanHours {maintenance.OlderThanHours} is less than 1; the purge takes the automation data of earlier runs older than this many hours, e.g. 72 (not 0: another run may be working in the view).");
+        }
+
+        if (maintenance.BudgetSeconds < 1)
+        {
+            errors.Add($"Maintenance:BudgetSeconds {maintenance.BudgetSeconds} is not positive; the purge stops starting requests after this many seconds, e.g. 120.");
         }
 
         if (settings.Users.Pool.Count == 0)

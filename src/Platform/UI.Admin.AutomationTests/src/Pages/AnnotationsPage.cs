@@ -14,15 +14,21 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
 
     public ILocator ReloadCatalogButton => app.Page.GetByRole(AriaRole.Button, new() { Name = "Reload the catalog", Exact = true });
 
-    // The catalog loaded: "Reload the catalog" is enabled again.
-    public ILocator CatalogLoaded => app.Page.GetByRole(AriaRole.Button, new() { Name = "Reload the catalog", Exact = true, Disabled = false });
+    // The catalog's load ended: "Reload the catalog" is enabled again, also when it ended in an error. With
+    // IncludeHidden, like the error locators: a full-screen detail hides the list and its navbar below md.
+    public ILocator CatalogLoaded => app.Page.GetByRole(AriaRole.Button, new() { Name = "Reload the catalog", Exact = true, Disabled = false, IncludeHidden = true });
 
     // The heading of the empty state of a view without annotations (a new project's or view's), with "New annotation"
     // and "Bulk create" for Contributors and up.
     public ILocator EmptyState => app.Page.GetByRole(AriaRole.Heading, new() { Name = "No annotations in this view", Exact = true });
 
-    // The heading of the error state of a catalog the API refused; the API's message follows it.
-    public ILocator CatalogError => app.Page.GetByRole(AriaRole.Heading, new() { Name = "The catalog could not be loaded", Exact = true });
+    // The heading of the error state of a catalog the API refused (or did not answer in time) on its first load; the
+    // API's message follows it.
+    public ILocator CatalogError => app.Page.GetByRole(AriaRole.Heading, new() { Name = "The catalog could not be loaded", Exact = true, IncludeHidden = true });
+
+    // The title of the compact error above the grid of a catalog that was shown already (its IndexedDB snapshot or an
+    // earlier load) and could not be loaded again, with Retry. An alert, not a heading.
+    public ILocator CatalogRefreshError => app.Page.GetByText("The catalog could not be refreshed", new() { Exact = true });
 
     // In the navbar from sm (640 px); a phone opens Bulk create from the command palette. An empty view's empty state
     // has a second one, after the navbar's, hence the first.
@@ -52,9 +58,21 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
         await WaitForCatalogAsync();
     }
 
+    // Waits until the catalog's load ended, up to Target:ApiTimeoutMs (the admin UI ends a type list that does not
+    // answer with an error), also while a full-screen detail hides the list. A load that ended in the error state or in
+    // "The catalog could not be refreshed" enables "Reload the catalog" too, so it throws with the error's text.
     public async Task WaitForCatalogAsync()
     {
-        await Expect(ReloadCatalogButton).ToBeEnabledAsync();
+        await Expect(CatalogLoaded.Or(CatalogError).Or(CatalogRefreshError).First).ToBeAttachedAsync(new() { Timeout = app.ApiTimeoutMs });
+
+        foreach (var error in new[] { CatalogError, CatalogRefreshError })
+        {
+            // The parent of the title holds the title, the API's message and the hint.
+            if (await error.CountAsync() > 0)
+            {
+                throw new PlaywrightException($"The catalog did not load; the page at {app.Page.Url} shows: {await ErrorStates.TextAsync(error.First.Locator("xpath=.."))}");
+            }
+        }
     }
 
     // Types the query into the filter and waits until it applied: the debounced URL has exactly ?q=<query>, or no q for
@@ -81,7 +99,7 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
             await BulkCreateButton.ClickAsync();
         }
 
-        var dialog = new BulkCreateDialog(app.Page);
+        var dialog = new BulkCreateDialog(app);
         await Expect(dialog.Root).ToBeVisibleAsync();
         return dialog;
     }

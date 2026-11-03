@@ -29,7 +29,7 @@ internal sealed class PlatformTargetCheck
 
         this.target = target;
         this.user = user;
-        app = new App(page, target.MockScenario);
+        app = new App(page, target.MockScenario, target.ApiTimeoutMs, target.ApiWriteTimeoutMs);
         routes = AppRoutes.For(target);
     }
 
@@ -41,7 +41,7 @@ internal sealed class PlatformTargetCheck
     {
         var annotations = new AnnotationsPage(app, routes);
         await app.GotoAsync(routes.Annotations);
-        await ExpectShownAsync(annotations.CatalogLoaded.Or(annotations.CatalogError).Or(app.NoAccessHeading).First, $"The annotations of {View}");
+        await ExpectShownAsync(annotations.CatalogLoaded.Or(annotations.CatalogError).Or(app.NoAccessHeading).First, $"The annotations of {View}", app.ApiTimeoutMs);
 
         if (await app.NoAccessHeading.IsVisibleAsync())
         {
@@ -71,17 +71,17 @@ internal sealed class PlatformTargetCheck
     }
 
     // The text of an error state: its heading, the API's message and hint, without the Retry button's label.
-    private static async Task<string> ErrorTextAsync(ILocator heading)
+    private static Task<string> ErrorTextAsync(ILocator heading)
     {
-        var text = await heading.Locator("xpath=..").InnerTextAsync();
-        return string.Join(" ", text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(line => line != "Retry"));
+        return ErrorStates.TextAsync(heading.Locator("xpath=.."));
     }
 
-    private async Task ExpectShownAsync(ILocator shown, string what)
+    // timeoutMs: Execution:ExpectTimeoutMs when null; Target:ApiTimeoutMs for what waits for an answer of the API.
+    private async Task ExpectShownAsync(ILocator shown, string what, float? timeoutMs = null)
     {
         try
         {
-            await Expect(shown).ToBeVisibleAsync();
+            await Expect(shown).ToBeVisibleAsync(new() { Timeout = timeoutMs });
         }
         catch (PlaywrightException exception)
         {

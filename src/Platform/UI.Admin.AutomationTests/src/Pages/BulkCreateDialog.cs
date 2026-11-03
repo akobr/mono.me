@@ -9,10 +9,11 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // missing ancestors") and a review row per key (New, Exists, Duplicate or Invalid) against the loaded catalog, then
 // "Create N annotation(s)". The result replaces the form: a title ("Created 5 annotations: 1 from the list and 4
 // missing ancestors."), a row per created key ("From the list" or "Missing ancestor") and Done. The API creates the
-// missing ancestors, so a deep key is enough. No toast.
-public sealed partial class BulkCreateDialog(IPage page)
+// missing ancestors, so a deep key is enough. No toast. A run the API refused (or did not answer in time) keeps the form
+// with an alert above Keys (the API's message, and what was created before the error), and Create becomes "Try again".
+public sealed partial class BulkCreateDialog(App app)
 {
-    public ILocator Root => page.GetByRole(AriaRole.Dialog, new() { Name = "Bulk create annotations", Exact = true });
+    public ILocator Root => app.Page.GetByRole(AriaRole.Dialog, new() { Name = "Bulk create annotations", Exact = true });
 
     public ILocator Keys => Root.GetByRole(AriaRole.Textbox, new() { Name = "Keys" });
 
@@ -21,6 +22,9 @@ public sealed partial class BulkCreateDialog(IPage page)
 
     // The title of the result ("Created …" or "No annotations were created.").
     public ILocator Result => Root.GetByText(ResultTitle());
+
+    // The alert of a failed run (role alert; the result's alert has none).
+    public ILocator FailureAlert => Root.GetByRole(AriaRole.Alert).First;
 
     public ILocator DoneButton => Root.GetByRole(AriaRole.Button, new() { Name = "Done", Exact = true });
 
@@ -37,7 +41,7 @@ public sealed partial class BulkCreateDialog(IPage page)
     public ILocator CreatedRow(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        return CreatedAnnotations.GetByRole(AriaRole.Row).Filter(new() { Has = page.GetByText(key, new() { Exact = true }) });
+        return CreatedAnnotations.GetByRole(AriaRole.Row).Filter(new() { Has = app.Page.GetByText(key, new() { Exact = true }) });
     }
 
     // Enabled once every line is valid and at least one key is new; count is the number of new keys of the list.
@@ -53,11 +57,17 @@ public sealed partial class BulkCreateDialog(IPage page)
         await Keys.FillAsync(string.Join('\n', keys));
     }
 
-    // Creates the new keys of the list and waits for the result.
+    // Creates the new keys of the list and waits for the result, up to twice Target:ApiWriteTimeoutMs: the lookup of
+    // deleted keys and the create (up to 100 keys, a test's list) are two writes in a row, each of which the admin UI
+    // ends after its 120 s write timeout; the alert of a failed run throws with its text.
     public async Task CreateAsync(int count)
     {
         await CreateButton(count).ClickAsync();
-        await Expect(Result).ToBeVisibleAsync();
+        await Expect(Result.Or(FailureAlert).First).ToBeVisibleAsync(new() { Timeout = 2 * app.ApiWriteTimeoutMs });
+        if (!await Result.IsVisibleAsync())
+        {
+            throw new PlaywrightException($"Bulk create failed: {await ErrorStates.TextAsync(FailureAlert)}");
+        }
     }
 
     public async Task CloseAsync()

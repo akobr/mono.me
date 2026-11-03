@@ -125,10 +125,12 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
     }
 
     // The catalog loaded: "Reload the catalog" is enabled again, also while a full-screen detail hides the graph's
-    // navbar (below md).
+    // navbar (below md); up to Target:ApiTimeoutMs, the admin UI ends a type list that does not answer with an error.
+    // The graph shows the catalog's store with the same button and the same error titles as the annotations page, so a
+    // load that ended in "The catalog could not be loaded" or "… refreshed" throws with its text there too.
     public async Task WaitForCatalogAsync()
     {
-        await Expect(app.Page.GetByRole(AriaRole.Button, new() { Name = "Reload the catalog", Exact = true, IncludeHidden = true })).ToBeEnabledAsync();
+        await new AnnotationsPage(app, routes).WaitForCatalogAsync();
     }
 
     // The graph has its first layout frame: no status in the graph, so the arrow keys and Export PNG work.
@@ -137,9 +139,9 @@ public sealed partial class GraphPage(App app, AppRoutes routes)
         await Expect(LoadingStatus).ToHaveCountAsync(0);
     }
 
-    // Reloads the catalog with "Reload the catalog" and waits until it was disabled (loading) and is enabled again, and
-    // the graph is laid out. The mock answers within milliseconds, so the button records its own disabled state: an
-    // assertion could miss it.
+    // Reloads the catalog with "Reload the catalog" and waits until it was disabled (loading) and is enabled again (up
+    // to Target:ApiTimeoutMs, WaitForCatalogAsync), and the graph is laid out. The mock answers within milliseconds, so
+    // the button records its own disabled state: an assertion could miss it.
     public async Task ReloadCatalogAsync()
     {
         await WaitForCatalogAsync();

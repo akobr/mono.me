@@ -28,15 +28,32 @@ public sealed partial class App
     private readonly string? mockScenario;
     private bool navigated;
 
-    public App(IPage page, string? mockScenario = null)
+    public App(
+        IPage page,
+        string? mockScenario = null,
+        int apiTimeoutMs = PlatformTarget.DefaultApiTimeoutMs,
+        int apiWriteTimeoutMs = PlatformTarget.DefaultApiWriteTimeoutMs)
     {
         ArgumentNullException.ThrowIfNull(page);
+        ArgumentOutOfRangeException.ThrowIfLessThan(apiTimeoutMs, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(apiWriteTimeoutMs, 1);
 
         Page = page;
         this.mockScenario = string.IsNullOrWhiteSpace(mockScenario) ? null : mockScenario;
+        ApiTimeoutMs = apiTimeoutMs;
+        ApiWriteTimeoutMs = apiWriteTimeoutMs;
     }
 
     public IPage Page { get; }
+
+    // How long a page object waits for what the answer to a read shows (Target:ApiTimeoutMs): a loaded catalog, a
+    // history, the deleted banner, a template. The admin UI ends a request that does not answer with its error state,
+    // which the waits report; Execution:ExpectTimeoutMs stays for everything else.
+    public int ApiTimeoutMs { get; }
+
+    // How long a page object waits for what the answer to a write shows (Target:ApiWriteTimeoutMs): a save's toast,
+    // Bulk create's result. The admin UI gives a write longer than a read, and the waits report its failure too.
+    public int ApiWriteTimeoutMs { get; }
 
     public ILocator UserMenu => UserMenuOf(Page);
 
