@@ -43,6 +43,13 @@ Selecting the screen you are already on in the sidebar goes back to its start: t
 
 The catalog shows every status: active, disabled, scheduled and expired, each with its badge. The API returns only active annotations unless it is asked for the others, and the admin UI always asks; filter with `is:active` to see what services see. Deleted annotations are on the **Deleted** tab of **Modeling**.
 
+The catalog loads in the background, one list per annotation type. A strip above the list shows how far it is, for example "Loaded 1,240 annotations, 3 of 7 types…", with a bar. When you come back to a view, the catalog you saw last is shown at once while a fresh one loads ("Refreshing: …"), and **Reload the catalog** loads it again. A load always ends:
+
+- When nothing could be loaded, the page says "The catalog could not be loaded", with **Retry**. A first load that fails part-way shows this too, not the types it got: a catalog with whole types missing would mark their annotations as missing elsewhere.
+- When a refresh fails, the catalog you had stays, with "The catalog could not be refreshed" and **Retry** above it. **Graph** does the same.
+
+A request that the API does not answer in time fails instead of loading forever, and its message says how long the API was given ("The Storyteller API did not answer within 30 s"). A list or a detail that cannot load shows the error with **Retry**, titled "The API did not answer in time" unless the screen names what failed (as the catalog does above). A change that runs out of time shows the error of that change (for example "The template was not saved"), and you make it again. A read may take 30 seconds and a change 2 minutes; the upload of an import and the download of an export may take 10 minutes.
+
 The tree shows only subjects, or only responsibilities, at the root, with every path down to their descendants:
 
 | Perspective | Paths |
@@ -148,6 +155,13 @@ Saving sends only your changes. Two situations stop a save:
 
 - **Schema violation:** the server rejected the document. The errors are listed at the fields, and an Owner or Contributor can still save with **Save anyway**.
 - **Concurrent change:** someone else changed the same values in the meantime. The conflict dialog shows their version next to yours. You can reload theirs, copy yours, or overwrite.
+
+When the API does not answer a save in time, the editor reads the configuration again before it tells you anything:
+
+- **It holds your changes:** the save is done ("Configuration saved").
+- **It does not, or it cannot be read:** "The API did not answer in time; the change may have been saved. Reload before saving again." Your changes stay in the editor, but the API may still be storing them: reload the page before you save again, so a change is not applied twice.
+
+The editor shows its toast as soon as the save is stored; the version badge and the list follow a moment later.
 
 **Versions** lists the history of a configuration, a template or a schema. Any two versions can be compared side by side, or in one column on small screens. **Compare views**, a tab of **Modeling**, shows the same key in two views. When the project has only one other view, it is already selected. When it has no other view, the tab is disabled, and the page says so when a link opens it. A view is never compared with itself. **Compare** on the **Views** page opens **Compare views** of the default view with the view of its row. On the row of the default view, it is disabled, and its tooltip says why: the other views are compared with this one, or the project has no other view.
 

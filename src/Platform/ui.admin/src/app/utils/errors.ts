@@ -5,6 +5,8 @@ export interface ErrorDescription {
   message: string
   hint?: string
   status?: number
+  /** True only when the API did not answer in time (status 0 too, but not a network failure). */
+  timedOut?: true
 }
 
 /**
@@ -13,8 +15,9 @@ export interface ErrorDescription {
  */
 export function describeError(error: unknown, fallbackTitle = 'Something went wrong'): ErrorDescription {
   if (isStorytellerError(error)) {
-    const title =
-      error.status === 0
+    const title = error.timedOut
+      ? 'The API did not answer in time'
+      : error.status === 0
         ? 'The API is not reachable'
         : error.status === 403
           ? 'No access'
@@ -24,7 +27,13 @@ export function describeError(error: unknown, fallbackTitle = 'Something went wr
               ? 'The API failed'
               : fallbackTitle
 
-    return { title, message: error.message, hint: error.hint, status: error.status }
+    return {
+      title,
+      message: error.message,
+      hint: error.hint,
+      status: error.status,
+      ...(error.timedOut ? { timedOut: true as const } : {}),
+    }
   }
 
   return { title: fallbackTitle, message: error instanceof Error ? error.message : String(error ?? 'Unknown error') }

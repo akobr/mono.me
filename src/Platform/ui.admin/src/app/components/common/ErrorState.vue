@@ -6,12 +6,15 @@ const props = defineProps<{ error: unknown; title?: string; compact?: boolean }>
 defineEmits<{ retry: [] }>()
 
 const description = computed(() => describeError(props.error, props.title))
+// Literal names: the client bundle holds only the icons its scan finds in the sources.
 const icon = computed(() =>
   description.value.status === 403
     ? 'i-lucide-shield-x'
-    : description.value.status === 0
-      ? 'i-lucide-wifi-off'
-      : 'i-lucide-triangle-alert',
+    : description.value.timedOut
+      ? 'i-lucide-hourglass'
+      : description.value.status === 0
+        ? 'i-lucide-wifi-off'
+        : 'i-lucide-triangle-alert',
 )
 </script>
 

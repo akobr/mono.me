@@ -395,6 +395,25 @@ describe('pageviews and API errors', () => {
     expect(JSON.stringify(sdk.sentry.captureMessage.mock.calls)).not.toMatch(/acme|db\.password|Failed to fetch/)
   })
 
+  it('reports a timeout apart from an unreachable API, without the request path', async () => {
+    const { telemetry } = await started({ sentryDsn: dsn })
+
+    telemetry.captureApiError(
+      new StorytellerError({
+        status: 0,
+        message: 'The Storyteller API did not answer within 30 s (/api/v1/acme/billing/prod/annotations).',
+        timedOut: true,
+      }),
+    )
+
+    expect(sdk.sentry.captureMessage).toHaveBeenCalledExactlyOnceWith('Storyteller API did not answer in time', {
+      level: 'warning',
+      tags: { api_status: 0, page: '/' },
+      fingerprint: ['storyteller-api', 'timeout'],
+    })
+    expect(JSON.stringify(sdk.sentry.captureMessage.mock.calls)).not.toMatch(/acme|annotations|30 s/)
+  })
+
   it('reports any other error as an exception', async () => {
     const { telemetry } = await started({ sentryDsn: dsn })
     const error = new TypeError('Cannot read properties of undefined')

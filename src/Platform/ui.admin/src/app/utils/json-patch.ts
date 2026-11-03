@@ -33,3 +33,8 @@ export function buildPatch(original: unknown, edited: unknown): JsonPatchOperati
 export function changeCount(patch: readonly JsonPatchOperation[]): number {
   return patch.filter((operation) => operation.op !== 'test').length
 }
+
+/** True when two documents have the same content, whatever the order of their keys (an absent one is {}). */
+export function sameJson(first: unknown, second: unknown): boolean {
+  return compare((first ?? {}) as object, (second ?? {}) as object).length === 0
+}

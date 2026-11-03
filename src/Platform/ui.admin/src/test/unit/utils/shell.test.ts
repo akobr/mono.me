@@ -305,6 +305,25 @@ describe('describeError', () => {
     })
     expect(describeError(new Error('boom'), 'Failed')).toEqual({ title: 'Failed', message: 'boom' })
   })
+
+  it('tells a timeout from an unreachable API', () => {
+    const late = new StorytellerError({
+      status: 0,
+      message: 'The Storyteller API did not answer within 30 s (/api/v1/acme).',
+      timedOut: true,
+    })
+    const offline = new StorytellerError({ status: 0, message: 'The Storyteller API is not reachable (/api/v1/acme).' })
+
+    expect(describeError(late)).toEqual({
+      title: 'The API did not answer in time',
+      message: 'The Storyteller API did not answer within 30 s (/api/v1/acme).',
+      hint: undefined,
+      status: 0,
+      timedOut: true,
+    })
+    expect(describeError(offline).title).toBe('The API is not reachable')
+    expect(describeError(offline)).not.toHaveProperty('timedOut')
+  })
 })
 
 describe('detail panel', () => {

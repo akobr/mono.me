@@ -12,6 +12,7 @@ import {
   getUnitsOfExecution,
   getUsages,
   isAborted,
+  isTimedOut,
   paginate,
   type Annotation,
   type ConfigurationSummary,
@@ -39,7 +40,7 @@ type PageFetcher = (
  */
 const pageParams = (token: string | undefined) => ({ continuationToken: token, includeInactive: true })
 
-/** The seven per-type list endpoints, paged concurrently (spec section 6). */
+/** The seven per-type list endpoints, paged concurrently (spec section 6), at most four at once. */
 const typeFetchers: PageFetcher[] = [
   (s, token, signal) => getResponsibilities(s.org, s.project, s.view, pageParams(token), { signal }),
   (s, token, signal) => getSubjects(s.org, s.project, s.view, pageParams(token), { signal }),
@@ -52,6 +53,44 @@ const typeFetchers: PageFetcher[] = [
 
 const fallbackFetcher: PageFetcher = (s, token, signal) =>
   getAnnotations(s.org, s.project, s.view, pageParams(token), { signal })
+
+/**
+ * The type lists paged at once: a browser has six HTTP/1.1 connections per origin, so the catalog leaves some to the
+ * page's own requests (the detail, the history, a save) instead of queueing them behind its lists.
+ */
+const typeListConcurrency = 4
+
+/** How far the current load is; reset when a load starts. */
+export interface CatalogProgress {
+  /** The type lists of this load that settled, loaded or failed. */
+  lists: number
+  /** The type lists of a load. */
+  total: number
+  /** The annotations this load collected so far, shown or not (a reload collects into its own map). */
+  annotations: number
+  /** True while GetAnnotations runs, after a type list failed. */
+  fallback: boolean
+  /** True when the load fills its own map while a shown catalog (a snapshot, the previous load) stays until the end. */
+  replacing: boolean
+}
+
+const initialProgress = (): CatalogProgress => ({
+  lists: 0,
+  total: typeFetchers.length,
+  annotations: 0,
+  fallback: false,
+  replacing: false,
+})
+
+/**
+ * The text of a load in progress: "Loaded 1,234 annotations, 3 of 7 types…" on a first load, "Refreshing: …" while a
+ * shown catalog is replaced, and "… all types…" while GetAnnotations runs. The count is the load's own.
+ */
+export function catalogProgressText(progress: CatalogProgress): string {
+  const count = new Intl.NumberFormat().format(progress.annotations)
+  const types = progress.fallback ? 'all types' : `${progress.lists} of ${progress.total} types`
+  return `${progress.replacing ? 'Refreshing:' : 'Loaded'} ${count} annotations, ${types}…`
+}
 
 interface Snapshot {
   savedAt: number
@@ -85,10 +124,15 @@ export const useCatalogStore = defineStore('catalog', () => {
   const byKey = shallowRef(new Map<string, Annotation>())
   /** Configuration summaries by annotation key (companion spec E6); null while unknown. */
   const configurations = shallowRef<Map<string, ConfigurationSummary> | null>(null)
+  /** Why the last list of the summaries failed; cleared by the next load or refresh. */
+  const configurationsError = shallowRef<unknown>()
+  const progress = ref<CatalogProgress>(initialProgress())
   /** Bumped on every change of byKey; derived indexes depend on it. */
   const revision = ref(0)
 
   let controller: AbortController | undefined
+  /** The refresh of the summaries alone; aborted by the next refresh, by a load and by a reset. */
+  let configurationsController: AbortController | undefined
   /** Local changes made while a load collects into its own map (null = removed); replayed before the swap. */
   let pendingChanges: Map<string, Annotation | null> | undefined
   const partsCache = new Map<string, ParsedAnnotationKey | undefined>()
@@ -188,12 +232,63 @@ export const useCatalogStore = defineStore('catalog', () => {
       for (const annotation of page.Annotations ?? []) {
         into.set(annotation.AnnotationKey, annotation)
       }
+      // A load that was replaced (or stopped) no longer reports its progress.
+      if (!signal.aborted) {
+        progress.value.annotations = into.size
+      }
       if (into === byKey.value) {
         loadedCount.value = into.size
         publish()
       }
     }
   }
+
+  /**
+   * Pages the seven type lists into the map, at most four at once, and returns their failures. A list that timed out
+   * stops the others: the load ends with that error, and their answers would not be used.
+   */
+  async function pageTypes(target: Scope, signal: AbortSignal, into: Map<string, Annotation>): Promise<unknown[]> {
+    const lists = new AbortController()
+    const stop = () => lists.abort(signal.reason)
+    // A listener added to an aborted signal never fires: a replaced load must not page with a live signal.
+    if (signal.aborted) {
+      stop()
+    }
+    signal.addEventListener('abort', stop, { once: true })
+    const failures: unknown[] = []
+    let next = 0
+
+    const lane = async () => {
+      while (next < typeFetchers.length && !lists.signal.aborted) {
+        const fetcher = typeFetchers[next++]!
+        try {
+          await pageAll(fetcher, target, lists.signal, into)
+        } catch (cause) {
+          // The lists stopped after a timeout fail as aborted; only the timeout counts.
+          if (!lists.signal.aborted || isTimedOut(cause)) {
+            failures.push(cause)
+          }
+          if (isTimedOut(cause)) {
+            lists.abort()
+          }
+        } finally {
+          if (!signal.aborted) {
+            progress.value.lists++
+          }
+        }
+      }
+    }
+
+    try {
+      await Promise.all(Array.from({ length: Math.min(typeListConcurrency, typeFetchers.length) }, lane))
+    } finally {
+      signal.removeEventListener('abort', stop)
+    }
+    return failures
+  }
+
+  /** True while the catalog still shows the scope: a late answer for another view must not be written. */
+  const holds = (target: Scope) => !!scope.value && scopeId(scope.value) === scopeId(target)
 
   async function loadConfigurations(target: Scope, signal: AbortSignal): Promise<void> {
     const summaries = new Map<string, ConfigurationSummary>()
@@ -215,17 +310,23 @@ export const useCatalogStore = defineStore('catalog', () => {
           }
         }
       }
-      configurations.value = summaries
+      if (!signal.aborted && holds(target)) {
+        configurations.value = summaries
+      }
     } catch (cause) {
-      if (!isAborted(cause)) {
-        configurations.value = null
+      // An abort (also between pages, where paginate throws the reason of the signal) is no failure. A failure keeps
+      // the summaries known so far: null only when there were none.
+      if (!signal.aborted && !isAborted(cause) && holds(target)) {
+        configurationsError.value = cause
       }
     }
   }
 
   /**
-   * Loads the catalog of a scope: the snapshot first (if any), then the seven per-type streams in parallel.
-   * A type whose endpoint fails is retried through GetAnnotations, which returns every type.
+   * Loads the catalog of a scope: the snapshot first (if any), then the seven per-type streams, four at once.
+   * A type whose endpoint fails is retried through GetAnnotations, which returns every type; not after a timeout,
+   * which GetAnnotations would only wait for again. A failed load always ends: `ready` with the error when there is
+   * something to show, `error` otherwise.
    */
   async function load(target: Scope, options: { force?: boolean } = {}): Promise<void> {
     if (
@@ -241,11 +342,14 @@ export const useCatalogStore = defineStore('catalog', () => {
     controller?.abort()
     controller = new AbortController()
     const { signal } = controller
+    configurationsController?.abort()
 
     const sameScope = scope.value && scopeId(scope.value) === scopeId(target)
     scope.value = target
     status.value = 'loading'
     error.value = undefined
+    configurationsError.value = undefined
+    progress.value = initialProgress()
     partsCache.clear()
     ancestorsCache.clear()
 
@@ -266,22 +370,36 @@ export const useCatalogStore = defineStore('catalog', () => {
       }
     }
 
+    // Replaced while it read the snapshot: the state below (the map, the pending changes, the progress) is the next
+    // load's now.
+    if (signal.aborted) {
+      return
+    }
+
     void loadConfigurations(target, signal)
 
     // A fresh load collects into its own map while a snapshot is shown, then replaces it at once.
     const fresh = fromSnapshot.value || sameScope ? new Map<string, Annotation>() : byKey.value
     const changes = fresh === byKey.value ? undefined : new Map<string, Annotation | null>()
     pendingChanges = changes
+    progress.value.replacing = fresh !== byKey.value
 
     try {
-      const results = await Promise.allSettled(typeFetchers.map((fetcher) => pageAll(fetcher, target, signal, fresh)))
+      const failures = await pageTypes(target, signal, fresh)
 
       if (signal.aborted) {
         return
       }
 
-      if (results.some((result) => result.status === 'rejected')) {
+      const timeout = failures.find((failure) => isTimedOut(failure))
+      if (timeout) {
+        throw timeout
+      }
+
+      if (failures.length > 0) {
+        progress.value.fallback = true
         await pageAll(fallbackFetcher, target, signal, fresh)
+        progress.value.fallback = false
       }
 
       if (fresh !== byKey.value) {
@@ -306,6 +424,16 @@ export const useCatalogStore = defineStore('catalog', () => {
         return
       }
       error.value = cause
+      // The shown catalog (a snapshot or the previous load) stays, but nothing replaces it any more.
+      fromSnapshot.value = false
+      progress.value.fallback = false
+      // A first load pages straight into the shown map: what it collected before it failed misses whole types, and
+      // `ready` would tell the breadcrumbs and the composition that the ancestors it lacks do not exist.
+      if (fresh === byKey.value) {
+        byKey.value = new Map()
+        loadedCount.value = 0
+        publish()
+      }
       status.value = byKey.value.size > 0 ? 'ready' : 'error'
     } finally {
       if (pendingChanges === changes) {
@@ -329,11 +457,18 @@ export const useCatalogStore = defineStore('catalog', () => {
     }
   }
 
-  /** Reloads only the configuration summaries (a delete hides configurations, a restore brings them back). */
+  /**
+   * Reloads only the configuration summaries (a delete hides configurations, a restore brings them back). The next
+   * refresh, a load and a reset abort it, and it writes only while the catalog still holds its scope.
+   */
   async function refreshConfigurations(): Promise<void> {
-    if (scope.value) {
-      await loadConfigurations(scope.value, new AbortController().signal)
+    if (!scope.value) {
+      return
     }
+    configurationsController?.abort()
+    configurationsController = new AbortController()
+    configurationsError.value = undefined
+    await loadConfigurations(scope.value, configurationsController.signal)
   }
 
   function setConfiguration(key: string, summary: ConfigurationSummary | undefined): void {
@@ -351,11 +486,14 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   function reset(): void {
     controller?.abort()
+    configurationsController?.abort()
     scope.value = null
     status.value = 'idle'
     error.value = undefined
+    progress.value = initialProgress()
     byKey.value = new Map()
     configurations.value = null
+    configurationsError.value = undefined
     loadedCount.value = 0
     loadedAt.value = undefined
     fromSnapshot.value = false
@@ -377,12 +515,14 @@ export const useCatalogStore = defineStore('catalog', () => {
     loadedCount,
     loadedAt,
     fromSnapshot,
+    progress,
     byKey,
     revision,
     annotations,
     childrenByKey,
     labelCounts,
     configurations,
+    configurationsError,
     configured,
     partsOf,
     ancestorsOf,

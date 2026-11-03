@@ -145,11 +145,21 @@ const rowClass = (row: { original: Row }) =>
     </template>
 
     <template #body>
-      <LoadingState v-if="!catalog.configurations && catalog.status !== 'error'" label="Loading configurations…" />
+      <LoadingState
+        v-if="!catalog.configurations && catalog.status !== 'error' && !catalog.configurationsError"
+        label="Loading configurations…"
+      />
       <ErrorState
         v-else-if="catalog.status === 'error'"
         :error="catalog.error"
         @retry="context.scope && catalog.load(context.scope, { force: true })"
+      />
+      <!-- The list of the summaries failed and none are known: its error, not "Loading configurations…" forever. -->
+      <ErrorState
+        v-else-if="!catalog.configurations"
+        :error="catalog.configurationsError"
+        title="The configurations could not be loaded"
+        @retry="catalog.refreshConfigurations()"
       />
       <EmptyState
         v-else-if="rows.length === 0"

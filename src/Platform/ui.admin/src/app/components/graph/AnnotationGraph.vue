@@ -2,7 +2,7 @@
 import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useElementSize, useMutationObserver, usePreferredReducedMotion } from '@vueuse/core'
-import { useCatalogStore } from '@/stores/catalog'
+import { catalogProgressText, useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import type { GraphFrameMemory, GraphTransform } from '@/stores/page-memory'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -558,6 +558,21 @@ const loading = computed(
 // An empty view has no legend: every count is 0 and no toggle changes anything (424-130).
 const empty = computed(() => catalog.status === 'ready' && catalog.loadedCount === 0)
 const allHidden = computed(() => hasData.value && visibleKeys.value.length === 0 && candidates.value.length > 0)
+
+// The overlay tells how far a load is: its own count and the type lists settled.
+const loadingLabel = computed(() =>
+  layingOut.value
+    ? `Laying out ${formatter.format(graph.value.nodes.length)} annotations…`
+    : catalog.status === 'loading'
+      ? catalogProgressText(catalog.progress)
+      : `Loaded ${formatter.format(catalog.loadedCount)} annotations…`,
+)
+
+function reload() {
+  if (context.scope) {
+    void catalog.load(context.scope, { force: true })
+  }
+}
 </script>
 
 <template>
@@ -643,13 +658,17 @@ const allHidden = computed(() => hasData.value && visibleKeys.value.length === 0
             @show-all="hidden = new Set()"
           />
         </div>
+        <!-- A failed refresh keeps the graph it had (a snapshot, the previous load), with the error below the legend. -->
+        <div v-if="catalog.status === 'ready' && catalog.error" class="pointer-events-auto px-3 pb-3">
+          <ErrorState compact :error="catalog.error" title="The catalog could not be refreshed" @retry="reload" />
+        </div>
         <template v-if="!loading">
           <ErrorState
             v-if="catalog.status === 'error'"
             class="pointer-events-auto"
             :error="catalog.error"
             title="The catalog could not be loaded"
-            @retry="context.scope && catalog.load(context.scope, { force: true })"
+            @retry="reload"
           />
           <EmptyState
             v-else-if="empty"
@@ -673,13 +692,7 @@ const allHidden = computed(() => hasData.value && visibleKeys.value.length === 0
       </div>
 
       <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-default/60">
-        <LoadingState
-          :label="
-            layingOut
-              ? `Laying out ${formatter.format(graph.nodes.length)} annotations…`
-              : `Loaded ${formatter.format(catalog.loadedCount)} annotations…`
-          "
-        />
+        <LoadingState :label="loadingLabel" />
       </div>
     </div>
   </div>

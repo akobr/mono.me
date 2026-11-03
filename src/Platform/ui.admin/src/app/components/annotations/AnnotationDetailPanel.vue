@@ -11,6 +11,7 @@ import { usePreferencesStore } from '@/stores/preferences'
  * The annotation detail beside the grid or the graph (spec section 11.1). The detail always works on a fresh
  * GetAnnotation, never on the catalog snapshot; the tabs are child routes rendered by the inner <RouterView>.
  * A key that is not found is asked for among the deleted annotations: a deleted one shows its history with Restore.
+ * Only a 404 of that lookup means "not found"; any other failure (a timeout, a 5xx) shows the error with Retry.
  */
 const props = withDefaults(defineProps<{ section?: 'annotations' | 'graph' }>(), { section: 'annotations' })
 
@@ -25,6 +26,7 @@ const query = useAnnotation(key)
 const annotation = computed(() => query.data.value ?? catalog.byKey.get(key.value))
 const notFound = computed(() => query.isError.value && isNotFound(query.error.value))
 const deleted = useDeletedAnnotation(key, notFound)
+const deletedFailed = computed(() => deleted.isError.value && !isNotFound(deleted.error.value))
 
 watch(key, (value) => preferences.rememberKey(value), { immediate: true })
 
@@ -48,6 +50,7 @@ function close() {
     <LoadingState v-if="query.isPending.value && !annotation" />
     <LoadingState v-else-if="notFound && deleted.isPending.value" />
     <AnnotationHistory v-else-if="notFound && deleted.data.value" :annotation-key="key" @restored="query.refetch()" />
+    <ErrorState v-else-if="notFound && deletedFailed" :error="deleted.error.value" @retry="deleted.refetch()" />
     <EmptyState
       v-else-if="notFound"
       icon="i-lucide-search-x"

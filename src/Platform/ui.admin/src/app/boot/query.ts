@@ -1,10 +1,13 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/vue-query'
-import { isStorytellerError } from '@42for.net/2splatform.sdk'
+import { isStorytellerError, isTimedOut } from '@42for.net/2splatform.sdk'
 import { reportApiError } from './api-errors'
 
-/** One retry for failed reads, but never for 4xx: those answers do not change on a second try. */
+/**
+ * One retry for failed reads, but never for 4xx: those answers do not change on a second try. Never for a timeout
+ * either: a second wait before the error is worse than the error's Retry.
+ */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
-  if (failureCount >= 1) {
+  if (failureCount >= 1 || isTimedOut(error)) {
     return false
   }
 

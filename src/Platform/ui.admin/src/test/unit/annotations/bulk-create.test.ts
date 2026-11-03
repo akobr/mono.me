@@ -1,13 +1,15 @@
 import 'fake-indexeddb/auto'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { DOMWrapper } from '@vue/test-utils'
-import { http, HttpResponse } from 'msw'
+import { QueryObserver, type QueryClient } from '@tanstack/vue-query'
+import { delay, http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import {
   deleteAnnotation,
   getAnnotation,
   getAnnotationHistory,
+  getDeletedAnnotations,
   setAnnotationsSimple,
   type Annotation,
 } from '@42for.net/2splatform.sdk'
@@ -221,6 +223,31 @@ describe('useAnnotationActions().createMany', () => {
     expect(active().has('sbt.bulk-100')).toBe(false)
   })
 
+  // 424-166: the refresh after the writes runs in the background, and the catalog reload lists the configurations.
+  it('returns after the writes, and asks for no configuration summaries of its own', async () => {
+    const catalog = useCatalogStore()
+    await catalog.load(scope)
+    await settle(10)
+    let summaries = 0
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/configurations', () => {
+        summaries++
+      }),
+    )
+    const screen = await mountScreen(Harness, {})
+    const harness = screen.inner().vm as unknown as HarnessApi
+
+    const outcome = await harness.createMany(['sbt.bulk-0'])
+    await vi.waitFor(() => expect(catalog.status).toBe('ready'))
+    await settle(10)
+    screen.host.unmount()
+
+    expect(keysOf(outcome.created)).toEqual(['sbt.bulk-0'])
+    expect(catalog.byKey.has('sbt.bulk-0')).toBe(true)
+    // the one of the catalog reload
+    expect(summaries).toBe(1)
+  })
+
   it('leaves the catalog alone once the user has moved to another view', async () => {
     const catalog = useCatalogStore()
     await catalog.load(scope)
@@ -266,7 +293,7 @@ describe('AnnotationBulkCreateDialog', () => {
     })
     unmount = () => screen.host.unmount()
     await settle(6)
-    return { closed }
+    return { closed, queryClient: screen.queryClient as QueryClient }
   }
 
   // The modal is teleported to the body.
@@ -388,6 +415,35 @@ describe('AnnotationBulkCreateDialog', () => {
 
     await click('Cancel')
     expect(closed).toEqual([true])
+  })
+
+  // 424-166: the result does not wait for the queries the run invalidates.
+  it('shows the result while a query the run invalidated does not answer', async () => {
+    let lists = 0
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/annotations/deleted', async () => {
+        // the first answer comes from the mock, the refresh after the run never comes
+        if (++lists > 1) {
+          await delay('infinite')
+        }
+      }),
+    )
+    const { queryClient } = await openDialog()
+    // an open list of the deleted annotations (the Deleted page), which the run invalidates
+    const observer = new QueryObserver(queryClient, {
+      queryKey: ['v1', org, project, view, 'annotations', 'deleted'],
+      queryFn: ({ signal }) => getDeletedAnnotations(org, project, view, undefined, { signal }),
+    })
+    const stop = observer.subscribe(() => {})
+    await vi.waitFor(() => expect(observer.getCurrentResult().isSuccess).toBe(true))
+    await type('northwind.billing')
+
+    await click('Create 1 annotation')
+
+    expect(text()).toContain('Created 2 annotations: 1 from the list and 1 missing ancestor.')
+    expect(lists).toBe(2)
+    expect(observer.getCurrentResult().isFetching).toBe(true)
+    stop()
   })
 
   it('does not count a key of the list as a missing ancestor of another', async () => {

@@ -8,17 +8,19 @@ import {
   hasErrorCode,
   isConflict,
   isPreconditionFailed,
+  isTimedOut,
   patchConfiguration,
   setConfiguration,
+  type Configuration,
 } from '@42for.net/2splatform.sdk'
 import { invalidateConfiguration } from '@/queries/invalidation'
 import { useCatalogStore } from '@/stores/catalog'
-import { useContextStore } from '@/stores/context'
+import { useContextStore, type Scope } from '@/stores/context'
 import { usePreferencesStore, type EditorMode } from '@/stores/preferences'
 import { metaOf } from '@/utils/annotation-key'
 import { cloneJson } from '@/utils/clone'
 import { errorMessage } from '@/utils/errors'
-import { buildPatch, changeCount } from '@/utils/json-patch'
+import { buildPatch, changeCount, sameJson } from '@/utils/json-patch'
 import { parseServerErrors, type ValidationIssue } from '@/utils/schema-validation'
 import { bindingDecorations } from '@/components/editor/setup/bindings'
 import { schemaLinter } from '@/components/editor/setup/schema-lint'
@@ -30,7 +32,8 @@ const SchemaForm = defineAsyncComponent(() => import('./SchemaForm.vue'))
 /**
  * The Edit tab of a configuration (spec section 11.2): the own stored content as Form (when a schema applies),
  * JSON or YAML. Saving sends an RFC 6902 patch guarded with `test` operations; a 409 shows the schema errors (with
- * Save anyway), a 412 opens the conflict dialog. Inherited values come from the effective document.
+ * Save anyway), a 412 opens the conflict dialog. Inherited values come from the effective document. Until the own
+ * content is known there is nothing to patch against: its error shows Retry, and Save does nothing.
  */
 const props = defineProps<{ annotationKey: string }>()
 
@@ -54,6 +57,8 @@ const saving = ref(false)
 const serverErrors = ref<ValidationIssue[]>([])
 const conflictOpen = ref(false)
 const theirs = ref<unknown>()
+/** Why the stored content for the conflict dialog could not be read; the dialog shows it with Retry. */
+const theirsError = ref<unknown>()
 const confirmDelete = ref(false)
 const creating = ref(false)
 
@@ -103,19 +108,89 @@ const extensions = computed(() =>
   schema.value && mode.value !== 'form' ? [schemaLinter(schema.value, mode.value), bindings] : [bindings],
 )
 
-async function refreshOwn(): Promise<unknown> {
-  await effective.refetch()
+/**
+ * Reads the effective document (for its version) and the own content of that version again, each read bounded by the
+ * read timeout. `read` is false when either failed: the content is then the last one known, not the stored one.
+ */
+async function refreshOwn(): Promise<{ content: unknown; read: boolean }> {
+  const fresh = await effective.refetch()
   const result = await own.refetch()
-  return result.data?.Content
+  return { content: result.data?.Content, read: !fresh.isError && !result.isError && result.data !== undefined }
+}
+
+/**
+ * The patch was stored: the document it was built from becomes the base (an edit made during the save stays a change),
+ * and the list and the badges follow without a reload.
+ */
+function stored(saved: Pick<Configuration, 'Version' | 'Modified'>, sent: unknown): void {
+  original.value = sent
+  catalog.setConfiguration(props.annotationKey, {
+    AnnotationKey: props.annotationKey,
+    Version: saved.Version,
+    Modified: saved.Modified,
+    HasContent: true,
+  })
+}
+
+/**
+ * A patch that ran out of time may have been stored. The own content read again tells only when it equals the document
+ * sent: the save is done. Different or unreadable, nobody knows: the API may still be applying the patch it no longer
+ * answers, and a patch of `add` operations (no `test` guards) sent again could add an array element twice, so the
+ * draft stays and the user reloads first.
+ */
+async function settleTimedOutSave(scope: Scope, sent: unknown, error: unknown): Promise<void> {
+  const { content, read } = await refreshOwn().catch(() => ({ content: undefined, read: false }))
+
+  if (read && sameJson(content, sent)) {
+    stored({ Version: own.data.value?.Version, Modified: own.data.value?.Modified }, sent)
+    // The documents are fresh already; the list and the history are not.
+    void invalidateConfiguration(queryClient, scope, props.annotationKey)
+    toast.add({
+      title: 'Configuration saved',
+      description: 'The API answered late, but the content is stored.',
+      color: 'success',
+      icon: 'i-lucide-check',
+    })
+  } else {
+    toast.add({
+      title: 'The API did not answer in time; the change may have been saved. Reload before saving again.',
+      description: errorMessage(error),
+      color: 'error',
+    })
+  }
+}
+
+/** The stored content for the conflict dialog; a failed read leaves the error for the dialog's Retry, not a spinner. */
+async function loadTheirs(): Promise<void> {
+  theirs.value = undefined
+  theirsError.value = undefined
+  const { content, read } = await refreshOwn().catch(() => ({ content: undefined, read: false }))
+
+  if (read) {
+    theirs.value = content
+  } else {
+    theirsError.value = effective.error.value ?? own.error.value ?? new Error('The stored configuration could not be read.')
+  }
 }
 
 async function save(force = false): Promise<void> {
-  // Nothing stored (or no annotation): a patch would fail with 404, the first content is created instead.
-  if (!context.scope || noOwn.value || missing.value || saving.value || patch.value.length === 0) {
+  // Nothing stored (or no annotation): a patch would fail with 404, the first content is created instead. An unknown
+  // own content (still loading, or failed) has no base: the patch would be `add` operations without `test` guards.
+  if (
+    !context.scope ||
+    noOwn.value ||
+    missing.value ||
+    original.value === undefined ||
+    saving.value ||
+    patch.value.length === 0
+  ) {
     return
   }
 
-  const { org, project, view } = context.scope
+  const scope = context.scope
+  const { org, project, view } = scope
+  // The document as sent: the editor stays editable while the save runs.
+  const sent = cloneJson(draft.value)
   saving.value = true
   serverErrors.value = []
 
@@ -128,21 +203,19 @@ async function save(force = false): Promise<void> {
       patch.value,
       force ? { force: true } : undefined,
     )
-    original.value = cloneJson(draft.value)
-    catalog.setConfiguration(props.annotationKey, {
-      AnnotationKey: props.annotationKey,
-      Version: saved.Version,
-      Modified: saved.Modified,
-      HasContent: true,
-    })
-    await invalidateConfiguration(queryClient, context.scope, props.annotationKey)
+    stored(saved, sent)
     toast.add({ title: `Configuration saved (v${saved.Version ?? '?'})`, color: 'success', icon: 'i-lucide-check' })
+    // The documents, the list and the history refresh in the background: the save does not wait for them, and the
+    // watcher of the own content does not replace a draft edited meanwhile.
+    void invalidateConfiguration(queryClient, scope, props.annotationKey)
   } catch (error) {
     if (isConflict(error) && error.schemaErrors) {
       serverErrors.value = parseServerErrors(error.schemaErrors, props.annotationKey)
     } else if (isPreconditionFailed(error) || hasErrorCode(error, 'PatchTestFailed')) {
       conflictOpen.value = true
-      theirs.value = await refreshOwn().catch(() => undefined)
+      await loadTheirs()
+    } else if (isTimedOut(error)) {
+      await settleTimedOutSave(scope, sent, error)
     } else {
       toast.add({ title: 'The configuration was not saved', description: errorMessage(error), color: 'error' })
     }
@@ -309,6 +382,11 @@ defineShortcuts({
         />
 
         <LoadingState v-if="own.isPending.value && draft === undefined" />
+        <ErrorState
+          v-else-if="own.isError.value && draft === undefined"
+          :error="own.error.value"
+          @retry="own.refetch()"
+        />
         <SchemaForm
           v-else-if="mode === 'form' && schema"
           v-model="draft"
@@ -353,7 +431,9 @@ defineShortcuts({
       v-model:open="conflictOpen"
       :theirs="theirs"
       :yours="draft"
-      :loading="theirs === undefined"
+      :loading="theirs === undefined && !theirsError"
+      :error="theirsError"
+      @retry="loadTheirs"
       @reload="reloadTheirs"
       @overwrite="overwrite"
     />

@@ -17,8 +17,8 @@ export function onApiError(listener: Listener): () => void {
 }
 
 /**
- * Only failures a screen cannot handle itself are reported globally: server errors and an unreachable API.
- * 4xx responses (400, 403, 404, 409, 412, 422) belong to the screen that made the call.
+ * Only failures a screen cannot handle itself are reported globally: server errors and an unreachable API (a timeout
+ * included, status 0 as well). 4xx responses (400, 403, 404, 409, 412, 422) belong to the screen that made the call.
  */
 export function shouldReport(error: unknown): boolean {
   if (!isStorytellerError(error)) {
@@ -38,7 +38,11 @@ export function reportApiError(error: unknown): void {
 
   const notice: ApiErrorNotice = isStorytellerError(error)
     ? {
-        title: error.status === 0 ? 'The API is not reachable' : 'The API failed',
+        title: error.timedOut
+          ? 'The API did not answer in time'
+          : error.status === 0
+            ? 'The API is not reachable'
+            : 'The API failed',
         description: error.hint ?? error.message,
       }
     : { title: 'Unexpected error', description: error instanceof Error ? error.message : String(error) }

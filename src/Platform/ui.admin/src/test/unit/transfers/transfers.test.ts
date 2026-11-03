@@ -329,16 +329,20 @@ describe('transfers store', () => {
   })
 
   it('keeps a saved import that could not be read for another reason than a 404', async () => {
+    let answered = false
     server.use(
-      http.get('*/api/v1/:org/:project/:view/imports/:id', () =>
-        HttpResponse.json({ Message: 'down', ErrorCode: 'Unavailable' }, { status: 503 }),
-      ),
+      http.get('*/api/v1/:org/:project/:view/imports/:id', () => {
+        answered = true
+        return HttpResponse.json({ Message: 'down', ErrorCode: 'Unavailable' }, { status: 503 })
+      }),
     )
     const saved = JSON.stringify([{ id: 'busy', scope, startedAt: Date.now(), finished: true }])
 
     const { transfers } = await reload(saved)
     const other = { ...scope, view: 'staging' }
-    await vi.waitFor(() => expect(transfers.latestImport(scope)).toBeUndefined())
+    // The 503 has to be answered before the mock is back: it would answer 404 for the unknown job.
+    await vi.waitFor(() => expect(answered).toBe(true))
+    expect(transfers.latestImport(scope)).toBeUndefined()
     server.resetHandlers()
     await settle(await transfers.startImport(other, file(), { dryRun: true }))
 
