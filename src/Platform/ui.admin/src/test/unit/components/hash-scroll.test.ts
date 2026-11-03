@@ -11,7 +11,7 @@ const scrollIntoView = vi.fn(function (this: HTMLElement) {
   scrolls.push(this.id)
 })
 
-async function mountPage(path: string, ready = ref(true)) {
+async function mountPage(path: string, ready = ref(true), shown = ref(false)) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
@@ -28,6 +28,8 @@ async function mountPage(path: string, ready = ref(true)) {
           h('section', { id: 'members', tabindex: -1 }),
           ready.value ? h('section', { id: 'invitations', tabindex: -1 }) : null,
           h('section', { id: '100%', tabindex: -1 }),
+          // A section of a role, rendered only once the role allows it.
+          shown.value ? h('section', { id: 'trusted-issuers', tabindex: -1 }) : null,
         ])
     },
   })
@@ -72,6 +74,28 @@ describe('hash scroll', () => {
     ready.value = true
     await settle()
     expect(scrolls).toEqual(['invitations'])
+  })
+
+  it('keeps the hash of a section that is not rendered, and scrolls to it once it appears', async () => {
+    const ready = ref(true)
+    const shown = ref(false)
+    await mountPage('/acme/billing/machines#trusted-issuers', ready, shown)
+    expect(scrolls).toEqual([])
+
+    // A role granted since shows the section, once the content above it has loaded again (424-164).
+    ready.value = false
+    shown.value = true
+    await settle()
+    ready.value = true
+    await settle()
+    expect(scrolls).toEqual(['trusted-issuers'])
+    expect(document.activeElement?.id).toBe('trusted-issuers')
+
+    ready.value = false
+    await settle()
+    ready.value = true
+    await settle()
+    expect(scrolls).toEqual(['trusted-issuers'])
   })
 
   it('does not scroll without a hash, or again when the content only reloads', async () => {
