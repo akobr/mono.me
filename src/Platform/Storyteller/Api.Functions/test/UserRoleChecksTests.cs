@@ -2,8 +2,8 @@ using _42.Platform.Storyteller.Api.Security;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
-// The role checks of users run in every Release build, and in a Debug build (DEV_AUTH) only in the async flow of a test
-// that turns them on, so tests in parallel keep the Debug behaviour (424-164).
+// The role check of a user on the access point runs in every Release build, and in a Debug build (DEV_AUTH) only in the
+// async flow of a test that turns it on, so tests in parallel keep the Debug behaviour (424-164).
 public class UserRoleChecksTests
 {
     private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;

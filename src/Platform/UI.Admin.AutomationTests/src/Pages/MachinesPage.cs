@@ -13,8 +13,9 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // "Reset" (a kind with a secret: not Federated or Certificate) and "Delete <id>", both only for a user with the role
 // the machine's scopes need. Reset asks "Reset <id>?" and shows the new credentials once ("New credentials"); Delete
 // asks "Delete <id>?" with the typed id and toasts "Machine <id> deleted". The ids are machine ids (mach-<hex> on the
-// mock, GUIDs on a deployed target): find a row by its id, never by its index. Below Contributor the API refuses the
-// list and the section shows "No access" with "Retry". The section headings are upper case only through CSS.
+// mock, GUIDs on a deployed target): find a row by its id, never by its index. Below Contributor the section shows
+// "No access" with "Retry": the page does not ask for the list (the API refuses it, but a Debug API skips its role
+// checks of users), and Retry reads the role again. The section headings are upper case only through CSS.
 public sealed partial class MachinesPage(App app, AppRoutes routes)
 {
     // The columns of the machines, in their order; the last one (the actions) has no header.
@@ -34,7 +35,7 @@ public sealed partial class MachinesPage(App app, AppRoutes routes)
 
     public ILocator NoMachineAccess => MachineAccessSection.GetByRole(AriaRole.Heading, new() { Name = "No machine access", Exact = true });
 
-    // The error state of a list the API refused (403 below Contributor).
+    // The refusal of the list below Contributor, shown by the page without asking, as when the API refuses (403).
     public ILocator NoAccess => MachineAccessSection.GetByRole(AriaRole.Heading, new() { Name = "No access", Exact = true });
 
     public ILocator RetryButton => MachineAccessSection.GetByRole(AriaRole.Button, new() { Name = "Retry", Exact = true });
