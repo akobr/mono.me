@@ -84,7 +84,9 @@ var uiAdmin = builder.AddViteApp("ui-admin", "../../ui.admin/src", "dev:aspire")
     })
     .WithEnvironment("VITE_API_BASE_URL", ReferenceExpression.Create($"{apiFunctions.GetEndpoint("http")}/api"))
     .WithReference(apiFunctions)
-    .WaitFor(apiFunctions);
+    .WaitFor(apiFunctions)
+    // Healthy once Vite serves the page, so the UI tests wait for the dev server, not just its process.
+    .WithHttpHealthCheck("/", endpointName: "http");
 
 // MCP server (Storyteller/Mcp), started from the dashboard. Its user secrets need Mcp:ResourceUrl (its own URL ending
 // in /mcp, for example https://localhost:7180/mcp), Mcp:Provider and Mcp:Authentication:* (the same provider as the
@@ -123,7 +125,8 @@ builder.AddProject<Projects.UI_Admin_AutomationTests>("ui-tests-elementary")
     .WithParentRelationship(uiAutomation)
     .WaitFor(apiFunctions)
     .WaitFor(uiAdmin)
-    .WithExplicitStart();
+    .WithExplicitStart()
+    .ExcludeFromManifest();
 
 builder.AddProject<Projects.UI_Admin_AutomationTests>("ui-tests-all")
     .WithEnvironment("UITESTS_PROFILE", "dev")
@@ -132,7 +135,8 @@ builder.AddProject<Projects.UI_Admin_AutomationTests>("ui-tests-all")
     .WithParentRelationship(uiAutomation)
     .WaitFor(apiFunctions)
     .WaitFor(uiAdmin)
-    .WithExplicitStart();
+    .WithExplicitStart()
+    .ExcludeFromManifest();
 
 builder.Build().Run();
 
