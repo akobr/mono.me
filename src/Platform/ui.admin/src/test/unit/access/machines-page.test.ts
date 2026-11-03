@@ -7,6 +7,7 @@ import { routes } from 'vue-router/auto-routes'
 import type { MachineAccess } from '@42for.net/2splatform.sdk'
 import { mockHandlers } from '@/mock/all-handlers'
 import { createSeed, loadDb, saveDb } from '@/mock/db'
+import { useContextStore } from '@/stores/context'
 import { mountScreen, settle } from '../../helpers'
 
 // A Reader has no access to Machines (424-164, ACC-MCH-08). The API refuses the list below Contributor, but a Debug
@@ -136,6 +137,17 @@ describe('Machines page by role', () => {
     expect(button('New machine')).toBeTruthy()
     expect(headings()).not.toContain('Shared certificates')
     expect(headings()).not.toContain('Trusted issuers')
+  })
+
+  it('does not flash No access to an Owner while the context guard clears the project on the way out', async () => {
+    await mountMachines('/acme/billing/machines', { 'acme.billing': 'Owner' })
+    await vi.waitFor(() => expect(machineAccess().querySelector('table')).toBeTruthy())
+
+    // the guard of a navigation to the organization, before its page has loaded
+    useContextStore().set({ org: 'acme' })
+    await settle()
+
+    expect(noAccessIn(machineAccess())).toBeUndefined()
   })
 
   it('shows No access in the detail of a machine to a Reader without asking for it', async () => {
