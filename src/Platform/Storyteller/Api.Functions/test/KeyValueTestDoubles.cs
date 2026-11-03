@@ -67,6 +67,9 @@ internal sealed class FixedKeyValuePolicies(bool requireMtls = true, KeyValuePol
     public Task<KeyValuePolicy> GetAsync(string organization, string project, CancellationToken cancellationToken = default)
         => Task.FromResult(policy ?? new KeyValuePolicy { RequireMtlsForSecretDelivery = requireMtls });
 
+    public Task<KeyValuePolicy> GetCurrentAsync(string organization, string project, CancellationToken cancellationToken = default)
+        => GetAsync(organization, project, cancellationToken);
+
     public Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default)
         => Task.FromResult(policy);
 

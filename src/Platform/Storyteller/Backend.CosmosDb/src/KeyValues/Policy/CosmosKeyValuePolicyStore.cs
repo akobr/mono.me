@@ -49,6 +49,9 @@ public class CosmosKeyValuePolicyStore : IKeyValuePolicyStore
     {
         var (entity, _) = await ReadAsync(organization, project, cancellationToken);
         var policy = entity?.KeyValues ?? KeyValuePolicyDefaults.Create();
+
+        // a slow read can put back a copy older than a concurrent save's; the cache expires within a minute, and every
+        // change reads past it, so a stale copy never rejects a current version for longer
         _cache.Set(GetCacheKey(organization, project), policy, CacheExpiration);
         return policy;
     }

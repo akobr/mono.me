@@ -2,12 +2,16 @@
 
 using System;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.KeyValues;
 using _42.Platform.Storyteller.KeyValues.Audit;
 using _42.Platform.Storyteller.KeyValues.Policy;
+using _42.Platform.Storyteller.KeyValues.Protection;
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
@@ -116,6 +120,31 @@ public class KeyValueMaintenanceTests(Startup startup)
 
         var again = await Maintenance.CheckKeysAsync(Org, project);
         again.Version.Should().Be(checkedPolicy.Version, "with every key known, the check waits for its interval again");
+    }
+
+    // A re-wrap on an instance whose cache predates the first Standard secret keeps the key that secret recorded.
+    [Fact]
+    public async Task Rewrap_OnAStaleInstance_KeepsTheRecordedStandardKey()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("stale");
+        var allowHsm = new KeyValuePolicyUpdate { AllowedProtections = [KeyValueProtection.Public, KeyValueProtection.Standard, KeyValueProtection.Hsm] };
+        await Policies.UpdateAsync(Org, project, allowHsm, Admin);
+        using var otherCache = new MemoryCache(new MemoryCacheOptions());
+        var repositories = Context.Services.GetRequiredService<IContainerRepositoryProvider>();
+        var otherStore = new CosmosKeyValuePolicyStore(repositories, Context.Services.GetRequiredService<IOptions<JsonSerializerOptions>>(), otherCache);
+        var otherMaintenance = new CosmosKeyValueMaintenanceService(
+            otherStore,
+            Context.Services.GetServices<IKeyEncryptionProvider>(),
+            repositories,
+            Context.Services.GetRequiredService<IOptions<KeyValueOptions>>());
+        (await otherStore.GetAsync(Org, project)).Standard.Should().BeNull("the other instance caches the policy before the first Standard secret");
+
+        await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "v" }, Admin);
+        await otherMaintenance.RewrapAsync(Org, project, KeyValueProtection.Hsm);
+
+        var policy = await Policies.GetAsync(Org, project);
+        policy.Rewrap!.Protection.Should().Be(KeyValueProtection.Hsm);
+        policy.Standard!.KeyId.Should().Be(Standard.KeyId, "the re-wrap's save never takes the key away");
     }
 
     [Fact]

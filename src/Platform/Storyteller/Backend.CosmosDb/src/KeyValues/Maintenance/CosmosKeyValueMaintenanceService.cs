@@ -260,7 +260,7 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
             LastError = lastError,
         };
 
-        var latest = await _policies.GetAsync(organization, project, cancellationToken);
+        var latest = await _policies.GetCurrentAsync(organization, project, cancellationToken);
         await SaveAsync(organization, project, latest with { Rewrap = status }, cancellationToken);
         await AuditAsync(organization, project, KeyValueAuditOperation.Rewrap, $"{protection} -> {info.CurrentKeyVersion}: {processed} envelope(s){(lastError is null ? string.Empty : $", last error: {lastError}")}", cancellationToken);
         return status;
@@ -337,9 +337,11 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
             }
             catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.PolicyVersionMismatch && attempt < 2)
             {
-                // a user changed the policy meanwhile: take their version and keep our key state
-                var latest = await _policies.GetAsync(organization, project, cancellationToken);
-                policy = latest with { Standard = policy.Standard, Hsm = policy.Hsm, Byok = policy.Byok, Rewrap = policy.Rewrap };
+                // a user or a first Standard write changed the policy meanwhile: take their version and keep our key
+                // state, but never replace a key recorded meanwhile with the unknown key of an older copy
+                var latest = await _policies.GetCurrentAsync(organization, project, cancellationToken);
+                var hsm = policy.Hsm is null ? latest.Hsm : policy.Hsm with { Key = policy.Hsm.Key ?? latest.Hsm?.Key };
+                policy = latest with { Standard = policy.Standard ?? latest.Standard, Hsm = hsm, Byok = policy.Byok, Rewrap = policy.Rewrap };
             }
         }
 
