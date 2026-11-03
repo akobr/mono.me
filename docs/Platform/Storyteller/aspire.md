@@ -4,7 +4,7 @@ The package `42.Platform.Storyteller.Aspire.Hosting` lets an Aspire AppHost pass
 
 There is no client package. The process reads the variables as it does outside Aspire: with the [configuration provider](configuration-provider.md) (`builder.Configuration.AddStoryteller()`), with [Hosting](hosting.md) (`builder.AddStoryteller()`), with `sform`, or with any code that reads the same names.
 
-The code is in `src/Platform/Storyteller/Aspire.Hosting/src/`. The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md), section 10.
+The code is in `src/Libraries/Platform/Storyteller/Aspire.Hosting/src/`. The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md), section 10.
 
 ## Package
 

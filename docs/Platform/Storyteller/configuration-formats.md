@@ -2,7 +2,7 @@
 
 A configuration is one JSON document, but most consumers take flat keys: .NET `IConfiguration` (`db:hosts:0`), Spring Boot (`db.hosts[0]`), environment variables and `.env` files (`DB__HOSTS__0`), Helm values (YAML). The library `42.Platform.Storyteller.ConfigurationFormats` renders the `Content` object of a configuration in four flat formats, `flat`, `properties`, `env` and `yaml`, with one set of rules. The [.NET configuration provider](configuration-provider.md) takes its `IConfiguration` keys from the same library, so the `flat` keys are exactly the keys the provider applies, and every format renders the same values. The API serves the four formats on the effective and the resolved read with `?format=` (see [The API](#the-api)).
 
-The code is in `src/Platform/Storyteller/ConfigurationFormats/src/`: the flattener and its rules (`DocumentFlattener`, `DocumentRules`, `JsonPaths`, `InvalidDocumentException`), the formatter (`ConfigurationFormatter`, `ConfigurationFormatNames`) and one renderer per format (`Rendering/`). The design and its decisions are in [the spec](specs/2026-10-27%20Flat%20Output%20Formats%20for%20Configurations.md).
+The code is in `src/Libraries/Platform/Storyteller/ConfigurationFormats/src/`: the flattener and its rules (`DocumentFlattener`, `DocumentRules`, `JsonPaths`, `InvalidDocumentException`), the formatter (`ConfigurationFormatter`, `ConfigurationFormatNames`) and one renderer per format (`Rendering/`). The design and its decisions are in [the spec](specs/2026-10-27%20Flat%20Output%20Formats%20for%20Configurations.md).
 
 ## The library
 
