@@ -37,7 +37,9 @@ import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 // ContributorWithSecrets), as the API refuses the reset (424-79); such a machine has no Delete either, as the API
 // refuses that too: a delete stops whatever runs with its scopes. Below Contributor the page does not ask for the
 // machines and shows the API's refusal itself (No access, Retry): a Debug API (DEV_AUTH) skips its role checks of users
-// and would list them (424-164). Retry reloads the account, so a role granted since the sign-in shows the list.
+// and would list them (424-164). Retry reloads the account, so a role granted since the sign-in shows the list. The
+// role is read only while the context has the project: the context guard clears it before the next page loads, and
+// the page must not flash No access on the way out.
 const context = useContextStore()
 const session = useSessionStore()
 const queryClient = useQueryClient()
@@ -143,7 +145,7 @@ useHashScroll(
       <div class="space-y-6">
         <section class="space-y-2">
           <h2 class="text-xs font-semibold text-muted uppercase">Machine access</h2>
-          <ErrorState v-if="!canManage" :error="noAccess" @retry="session.loadAccount(true)" />
+          <ErrorState v-if="context.projectKey && !canManage" :error="noAccess" @retry="session.loadAccount(true)" />
           <LoadingState v-else-if="machines.isPending.value" />
           <ErrorState v-else-if="machines.isError.value" :error="machines.error.value" @retry="machines.refetch()" />
           <EmptyState

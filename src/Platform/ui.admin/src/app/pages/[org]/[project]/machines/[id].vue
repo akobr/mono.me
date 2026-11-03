@@ -24,7 +24,8 @@ import {
 // ContributorWithSecrets for secrets scopes) edit its rules, as the API refuses them otherwise (424-79). A rule whose
 // issuer was deleted, or whose audience is not the token endpoint (the UI presets it from the address it calls the API
 // at, which a proxy or the API's public base URL can change), is flagged. Below Contributor, as on the list, the panel
-// does not ask for the machine and shows No access with Retry, which reloads the account (424-164).
+// does not ask for the machine and shows No access with Retry, which reloads the account (424-164), only while the
+// context has the project.
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
@@ -76,7 +77,7 @@ function close() {
       </div>
     </template>
     <div class="space-y-6 p-4">
-      <ErrorState v-if="!canManage" :error="noAccess" @retry="session.loadAccount(true)" />
+      <ErrorState v-if="context.projectKey && !canManage" :error="noAccess" @retry="session.loadAccount(true)" />
       <LoadingState v-else-if="machine.isPending.value" />
       <ErrorState v-else-if="machine.isError.value" :error="machine.error.value" @retry="machine.refetch()" />
       <template v-else>
