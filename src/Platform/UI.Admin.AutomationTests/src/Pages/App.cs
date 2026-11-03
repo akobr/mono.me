@@ -296,11 +296,12 @@ public sealed partial class App
         await ClickSignOutAsync();
     }
 
-    // Clicks "Sign out" of the open user menu and returns once the app shows /login. AuthKit gets there through the
-    // WorkOS logout, which returns to <origin>/login only when that URL is a Sign-out URI of the target's WorkOS
-    // environment, or the environment has a default one; otherwise WorkOS keeps the browser on its error page
-    // (error.workos.com/user_management/app-homepage-url-not-found), and the failure names the missing Sign-out URI
-    // instead of a mismatch of the URL. A failure on the app's own origin keeps Playwright's message.
+    // Clicks "Sign out" of the open user menu and returns once the app shows /login on its own origin. AuthKit gets
+    // there through the WorkOS logout, which returns to <origin>/login only when that URL is a Sign-out URI of the
+    // target's WorkOS environment; otherwise WorkOS goes to the environment's default Sign-out URI, and without one it
+    // keeps the browser on its error page (error.workos.com/user_management/app-homepage-url-not-found). A sign-out
+    // that ends off the app's origin fails with a message that names the Sign-out URI to register instead of a
+    // mismatch of the URL; a failure on the app's own origin keeps Playwright's message.
     public async Task ClickSignOutAsync()
     {
         var origin = OriginOf(Page.Url);
@@ -308,12 +309,12 @@ public sealed partial class App
 
         try
         {
-            await Expect(Page).ToHaveURLAsync(LoginPath());
+            await Expect(Page).ToHaveURLAsync(origin is null ? LoginPath() : new Regex($"^{Regex.Escape(origin)}{LoginPath()}", RegexOptions.IgnoreCase));
         }
         catch (PlaywrightException exception) when (origin is not null && !string.Equals(OriginOf(Page.Url), origin, StringComparison.OrdinalIgnoreCase))
         {
             throw new PlaywrightException(
-                $"The sign-out ended on {Page.Url} instead of {origin}/login: WorkOS returns there only when {origin}/login is a Sign-out URI of the target's WorkOS environment, or its default one (\"AuthKit checklist\" in docs/Platform/UI.Admin.AutomationTests/automation-tests.md).",
+                $"The sign-out ended on {Page.Url} instead of {origin}/login: WorkOS returns there only when {origin}/login is a Sign-out URI of the target's WorkOS environment, and otherwise goes to the environment's default Sign-out URI or, without one, to its error page (\"AuthKit checklist\" in docs/Platform/UI.Admin.AutomationTests/automation-tests.md).",
                 exception);
         }
     }
@@ -371,10 +372,11 @@ public sealed partial class App
         return AppRoutes.WithQuery(path, (name, value));
     }
 
-    // The scheme, host and port of an absolute URL (http://localhost:5173), or null for any other URL.
+    // The scheme, host and port of an absolute URL with a host (http://localhost:5173), or null for any other URL
+    // (about:blank, data:, a relative one).
     private static string? OriginOf(string url)
     {
-        return Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.GetLeftPart(UriPartial.Authority) : null;
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Authority.Length > 0 ? uri.GetLeftPart(UriPartial.Authority) : null;
     }
 
     // Playwright translates a locator's regex to JavaScript: only IgnoreCase, Multiline and Singleline are allowed.
