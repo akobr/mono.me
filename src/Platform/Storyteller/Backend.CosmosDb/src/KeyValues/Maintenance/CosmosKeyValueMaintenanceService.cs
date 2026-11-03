@@ -260,8 +260,11 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
             LastError = lastError,
         };
 
+        // a rotation during this run started a re-wrap of its own: keep it pending for the next run
         var latest = await _policies.GetCurrentAsync(organization, project, cancellationToken);
-        await SaveAsync(organization, project, latest with { Rewrap = status }, cancellationToken);
+        var newerPending = latest.Rewrap is { CompletedAt: null } current
+            && (current.Protection != protection || !string.Equals(current.TargetKeyVersion, info.CurrentKeyVersion, StringComparison.Ordinal));
+        await SaveAsync(organization, project, latest with { Rewrap = newerPending ? latest.Rewrap : status }, cancellationToken);
         await AuditAsync(organization, project, KeyValueAuditOperation.Rewrap, $"{protection} -> {info.CurrentKeyVersion}: {processed} envelope(s){(lastError is null ? string.Empty : $", last error: {lastError}")}", cancellationToken);
         return status;
     }
