@@ -9,7 +9,7 @@ import {
   type KeyValueProtection,
 } from '@42for.net/2splatform.sdk'
 import { useContextStore } from '@/stores/context'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import { levelMeta, serverSideLevels } from '@/utils/key-values'
 
 /**
@@ -70,7 +70,7 @@ async function run(action: () => Promise<string[]>) {
   try {
     emit('done', await action())
   } catch (error) {
-    toast.add({ title: 'The bulk action failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'The bulk action failed'), description: errorMessage(error), color: 'error' })
   } finally {
     busy.value = false
   }

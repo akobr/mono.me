@@ -1,6 +1,6 @@
 import type { AnnotationDeletionResult } from '@42for.net/2splatform.sdk'
 import { formatDate } from '@/utils/dates'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 
 /**
  * The toast after a delete (spec 4.4): what moved to Deleted, the date it is purged (PurgeAt of the API), and Undo,
@@ -31,7 +31,7 @@ export function useDeletionToast() {
       )
       onUndone?.()
     } catch (error) {
-      toast.add({ title: 'Undo failed', description: errorMessage(error), color: 'error' })
+      toast.add({ title: writeFailureTitle(error, 'Undo failed'), description: errorMessage(error), color: 'error' })
     }
   }
 

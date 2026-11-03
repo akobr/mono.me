@@ -19,7 +19,7 @@ import { useContextStore, type Scope } from '@/stores/context'
 import { usePreferencesStore, type EditorMode } from '@/stores/preferences'
 import { metaOf } from '@/utils/annotation-key'
 import { cloneJson } from '@/utils/clone'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import { buildPatch, changeCount, sameJson } from '@/utils/json-patch'
 import { parseServerErrors, type ValidationIssue } from '@/utils/schema-validation'
 import { bindingDecorations } from '@/components/editor/setup/bindings'
@@ -282,7 +282,7 @@ async function create(fromTemplate: boolean) {
     await invalidateConfiguration(queryClient, context.scope, props.annotationKey)
     toast.add({ title: 'Configuration created', color: 'success', icon: 'i-lucide-plus' })
   } catch (error) {
-    toast.add({ title: 'The configuration was not created', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'The configuration was not created'), description: errorMessage(error), color: 'error' })
   } finally {
     creating.value = false
   }
@@ -307,7 +307,7 @@ async function remove() {
       icon: 'i-lucide-trash-2',
     })
   } catch (error) {
-    toast.add({ title: 'Delete failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'Delete failed'), description: errorMessage(error), color: 'error' })
   }
 }
 

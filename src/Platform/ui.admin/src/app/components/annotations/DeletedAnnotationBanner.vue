@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { Annotation } from '@42for.net/2splatform.sdk'
 import { formatDate } from '@/utils/dates'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 
 /**
  * A deleted annotation (spec 4.3, 4.5): when and by whom it was deleted, how many descendants went with it, the
@@ -34,7 +34,7 @@ async function restore(descendantsToo: boolean) {
     })
     emit('restored')
   } catch (error) {
-    toast.add({ title: 'Restore failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'Restore failed'), description: errorMessage(error), color: 'error' })
   } finally {
     busy.value = false
   }

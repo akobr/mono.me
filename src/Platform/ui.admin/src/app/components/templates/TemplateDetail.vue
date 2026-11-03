@@ -21,7 +21,7 @@ import { useContextStore, type Scope } from '@/stores/context'
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 import { metaOf, type AnnotationTypeCode } from '@/utils/annotation-key'
 import { cloneJson } from '@/utils/clone'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import { buildPatch, changeCount } from '@/utils/json-patch'
 import { bindingDecorations } from '@/components/editor/setup/bindings'
 import { provideBindingAssist, useBindingAssist } from '@/composables/useBindingAssist'
@@ -142,7 +142,7 @@ async function save() {
       conflictOpen.value = true
       theirs.value = (await template.refetch()).data?.Content
     } else {
-      toast.add({ title: 'The template was not saved', description: errorMessage(error), color: 'error' })
+      toast.add({ title: writeFailureTitle(error, 'The template was not saved'), description: errorMessage(error), color: 'error' })
     }
   } finally {
     saving.value = false
@@ -170,7 +170,7 @@ async function remove() {
     toast.add({ title: 'Template deleted', color: 'success', icon: 'i-lucide-trash-2' })
     await afterSave(scope)
   } catch (error) {
-    toast.add({ title: 'Delete failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'Delete failed'), description: errorMessage(error), color: 'error' })
   }
 }
 

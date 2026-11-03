@@ -9,7 +9,7 @@ import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 import { cloneJson } from '@/utils/clone'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import { schemaApi, starterSchema, type SchemaTarget } from '@/utils/schema-targets'
 import { validateSchemaDocument } from '@/utils/schema-validation'
 import type { VersionSource } from '@/components/versions/version-source'
@@ -111,7 +111,7 @@ async function save(force = false) {
     if (isConflict(error) && error.schemaErrors?.length) {
       nonCompliant.value = error.schemaErrors
     } else {
-      toast.add({ title: 'The schema was not saved', description: errorMessage(error), color: 'error' })
+      toast.add({ title: writeFailureTitle(error, 'The schema was not saved'), description: errorMessage(error), color: 'error' })
     }
   } finally {
     saving.value = false
@@ -143,7 +143,7 @@ async function remove() {
     await invalidateSchemas(queryClient, context.scope)
     toast.add({ title: 'Schema deleted', color: 'success', icon: 'i-lucide-trash-2' })
   } catch (error) {
-    toast.add({ title: 'Delete failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'Delete failed'), description: errorMessage(error), color: 'error' })
   }
 }
 

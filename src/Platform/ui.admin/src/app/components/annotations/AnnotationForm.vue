@@ -17,7 +17,7 @@ import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore, type EditorMode } from '@/stores/preferences'
 import { descendantTypeCodes, groupedDescendants, metaOf } from '@/utils/annotation-key'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import {
   cronFieldHint,
   genericUnitDefinitionHelp,
@@ -106,7 +106,7 @@ const save = handleSubmit(async (draft) => {
         setFieldError(field as keyof AnnotationForm, message)
       }
     }
-    toast.add({ title: 'The annotation was not saved', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'The annotation was not saved'), description: errorMessage(error), color: 'error' })
   }
 })
 

@@ -52,6 +52,16 @@ export function roleRequiredError(role: AccountRoleName, subject: string): Story
   })
 }
 
+/**
+ * The title of a failed write's toast: a write that ran out of time may still be applied by the API, so it does not say
+ * "not saved" (the SDK's hint, in the description, says to read it again before repeating it).
+ */
+export function writeFailureTitle(error: unknown, title: string): string {
+  return isStorytellerError(error) && error.timedOut
+    ? 'The API did not answer in time; the change may have been saved'
+    : title
+}
+
 /** The message of an error for a form field or a toast. */
 export function errorMessage(error: unknown): string {
   const description = describeError(error)
