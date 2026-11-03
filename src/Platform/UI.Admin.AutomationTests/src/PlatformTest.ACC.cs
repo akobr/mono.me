@@ -52,7 +52,7 @@ public abstract partial class PlatformTest
 
     // On a deployed target, once the app handed a sign-in over to AuthKit (Continue with AuthKit, or a protected page
     // opened signed out): waits until the browser left the app's host, signs in on the hosted page as the leased user,
-    // with WorkOS' labels like AuthKitSignIn (Email, Continue, Password, Sign in), and returns once the browser is back
+    // with WorkOS' labels like AuthKitSignIn (Email, Continue or Continue with email, Password, Sign in), and returns once the browser is back
     // on the app past /callback. The steps on the hosted page are not traced: the chunk recorded so far is dropped, and
     // a new one starts once the steps ended. A browser that is not back on the app by then (a step failed: a wrong
     // password, an MFA or Radar prompt, a renamed button) first has the value of every input and text area of its
