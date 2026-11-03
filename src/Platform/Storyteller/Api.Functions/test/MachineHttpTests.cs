@@ -4,6 +4,7 @@ using System.Text.Json;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
+using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1;
 
@@ -702,6 +703,50 @@ public class MachineHttpTests
         }
 
         access.Calls.ShouldBeEmpty();
+    }
+
+    // 424-164: the machine list and a machine need a Contributor, and below it a user gets 403 AccessDenied before a
+    // machine is read. The role checks of a Release build run here in every build (UserRoleChecks), as a Debug build
+    // (DEV_AUTH) skips them and served the list to a Reader of the admin UI.
+    [Theory]
+    [InlineData(AccountRole.None, false)]
+    [InlineData(AccountRole.Reader, false)]
+    [InlineData(AccountRole.Contributor, true)]
+    [InlineData(AccountRole.ContributorWithSecrets, true)]
+    [InlineData(AccountRole.Administrator, true)]
+    [InlineData(AccountRole.Owner, true)]
+    public async Task ListAndGet_RoleChecksEnforced_NeedAContributorInEveryBuild(AccountRole role, bool allowed)
+    {
+        using var roleChecks = UserRoleChecks.Enforce();
+        var access = new RecordingAccess(Machine()) { Role = role };
+        var http = CreateHttp(access);
+
+        if (allowed)
+        {
+            (await http.GetMachines(ContributorRequest(), "org1", "proj1")).ShouldBeOfType<OkObjectResult>();
+            (await http.GetMachine(ContributorRequest(), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkObjectResult>();
+
+            access.Calls.ShouldBe(["list:org1/proj1", $"get:org1/proj1/{KeycloakId}"]);
+            access.Roles.ShouldBe(["org1.proj1", "org1.proj1"]);
+            return;
+        }
+
+        foreach (var call in new Func<Task>[]
+                 {
+                     () => http.GetMachines(ContributorRequest(), "org1", "proj1"),
+                     () => http.GetMachine(ContributorRequest(), "org1", "proj1", KeycloakId),
+                 })
+        {
+            var denied = await Should.ThrowAsync<AccessDeniedException>(call);
+            denied.Message.ShouldBe("No Contributor access to 'org1.proj1'.");
+
+            var response = ErrorResponseMapping.ToActionResult(denied).ShouldBeOfType<ObjectResult>();
+            response.StatusCode.ShouldBe((int)HttpStatusCode.Forbidden);
+            response.Value.ShouldBeOfType<Models.ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        }
+
+        access.Calls.ShouldBeEmpty();
+        access.Roles.ShouldBe(["org1.proj1", "org1.proj1"]);
     }
 
     // Machines are managed by users (spec 7.4): every machine route refuses a machine in every build, also one whose
