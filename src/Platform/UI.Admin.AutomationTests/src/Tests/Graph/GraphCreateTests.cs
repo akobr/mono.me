@@ -87,7 +87,7 @@ public sealed class GraphCreateTests : PlatformTest
         await Expect(graph.OpenAsListButton).ToBeDisabledAsync();
 
         await graph.EmptyBulkCreateButton.ClickAsync();
-        var bulkCreate = new BulkCreateDialog(Page);
+        var bulkCreate = new BulkCreateDialog(App);
         await Expect(bulkCreate.Root).ToBeVisibleAsync();
 
         var tree = PlatformData.GraphTree();

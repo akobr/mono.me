@@ -100,6 +100,7 @@ public sealed partial class AnnotationDeleteTests : PlatformTest
         await detail.DeleteAsync(subject);
 
         await detail.OpenAsync(subject);
+        await banner.WaitForAsync();
         await Expect(banner.Title(subject)).ToBeVisibleAsync();
         await Expect(detail.DeletedBadge).ToBeVisibleAsync();
         await Expect(banner.Description).ToHaveTextAsync(
@@ -113,16 +114,19 @@ public sealed partial class AnnotationDeleteTests : PlatformTest
         await Expect(detail.MenuItem("Copy link")).ToHaveCountAsync(0);
 
         await detail.OpenAsync(context);
+        await banner.WaitForAsync();
         await Expect(banner.Title(context)).ToBeVisibleAsync();
         await Expect(banner.Description).ToHaveTextAsync(
             new Regex($@"^\s*Deleted on {DatePattern} by {user}\s+together with {Regex.Escape(subject)}\.\s+Purged automatically on {DatePattern}\.\s*$"));
 
         await detail.OpenAsync(subject);
+        await banner.WaitForAsync();
         await Expect(banner.Title(subject)).ToBeVisibleAsync();
         await banner.RestoreWithoutDescendantsAsync(subject);
         await Expect(detail.Identity).ToHaveTextAsync(subject);
 
         await detail.OpenAsync(context);
+        await banner.WaitForAsync();
         await Expect(banner.Title(context)).ToBeVisibleAsync();
         await Expect(banner.Description).Not.ToContainTextAsync("together with");
         await Expect(banner.Description).ToHaveTextAsync(new Regex($@"^\s*Deleted on {DatePattern} by {user}\.\s+Purged automatically on {DatePattern}\.\s*$"));

@@ -13,7 +13,13 @@
     "EmailDomain": "example.com",
     // { "<Role>": "<org>/<project>[/<view>]" }: a project where every pool user holds the role, for the tests of that
     // role ([UserRole]); a role without an entry leases a pool user who holds it in Target:Project.
-    "RoleProjects": {}
+    "RoleProjects": {},
+    // How long a wait for an answer of the API may take: two reads in a row at the admin UI's 30 s read timeout, plus
+    // a margin, so that a stalled request ends in the UI's error state, which the wait reports.
+    "ApiTimeoutMs": 65000,
+    // The same for a write (a save's toast, Bulk create's result): a write at the admin UI's 120 s write timeout, then
+    // the two reads with which a configuration save that timed out reads its content again, plus a margin.
+    "ApiWriteTimeoutMs": 185000
   },
   "Browser": {
     "Provider": "Local",
@@ -80,6 +86,15 @@
     "MaxParallelSessions": 5,
     "ConnectTimeoutSeconds": 300,
     "AdditionalCapabilities": {}
+  },
+  // The purge of the automation data of earlier runs (Tests/Maintenance, the category Maintenance): off, so nothing is
+  // deleted unless a run asks for it with --test-parameter Maintenance:Purge=true (or UITESTS_Maintenance__Purge=true).
+  // It deletes the roots of the target's view named like generated data (at-<runId>-…) of other runs, created more than
+  // OlderThanHours ago, then purges such deleted roots, and starts no request after BudgetSeconds.
+  "Maintenance": {
+    "Purge": false,
+    "OlderThanHours": 72,
+    "BudgetSeconds": 120
   },
   "Reporting": {
     "Enabled": false,

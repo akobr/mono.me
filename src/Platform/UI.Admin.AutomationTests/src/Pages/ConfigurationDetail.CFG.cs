@@ -171,7 +171,7 @@ public sealed partial class ConfigurationDetail
         ArgumentException.ThrowIfNullOrWhiteSpace(filter);
 
         await app.GotoAsync(AppRoutes.WithQuery(routes.Configuration(key), ("q", filter)));
-        await Expect(NoConfiguration.Or(JsonMode)).ToBeVisibleAsync();
+        await WaitForEditTabAsync();
     }
 
     // Creates the own configuration from the type's template (version 1); the editor replaces the empty state.
@@ -179,7 +179,7 @@ public sealed partial class ConfigurationDetail
     {
         await Expect(NoConfiguration).ToBeVisibleAsync();
         await StartFromTemplateButton.ClickAsync();
-        await Expect(JsonMode).ToBeVisibleAsync();
+        await WaitForCreatedAsync();
     }
 
     // Saves with Ctrl/Cmd+S pressed in a control of the page (Form mode has no editor to press it in: the window's

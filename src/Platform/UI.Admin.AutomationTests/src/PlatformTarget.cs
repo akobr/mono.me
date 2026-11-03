@@ -4,11 +4,20 @@ namespace _42.Platform.UI.Admin.AutomationTests;
 
 // The Platform's keys of the Target section, next to the library's BaseUrl and SignIn: the pre-provisioned
 // organization, project and view the tests work in, the dataset of a mock target, the domain of generated e-mail
-// addresses and the projects of the exact roles. Read with Settings.Bind<PlatformTarget>("Target"); the defaults are in
-// testsettings.json.
+// addresses, the projects of the exact roles and how long a wait for the API may take. Read with
+// Settings.Bind<PlatformTarget>("Target"); the defaults are in testsettings.json.
 public sealed class PlatformTarget : TargetSettings
 {
     public const string Section = "Target";
+
+    // ApiTimeoutMs of testsettings.json, also App's default: two reads at the admin UI's 30 s read timeout, plus a
+    // margin.
+    public const int DefaultApiTimeoutMs = 65_000;
+
+    // ApiWriteTimeoutMs of testsettings.json, also App's default: a write at the admin UI's 120 s write timeout, then
+    // the two reads at its 30 s read timeout with which a configuration save that timed out reads its content again,
+    // plus a margin.
+    public const int DefaultApiWriteTimeoutMs = 185_000;
 
     private Dictionary<string, string> roleProjects = new(StringComparer.OrdinalIgnoreCase);
 
@@ -24,6 +33,18 @@ public sealed class PlatformTarget : TargetSettings
 
     // Generated addresses are sub-addresses on it: ui-tests+<slug>@<EmailDomain>.
     public string EmailDomain { get; set; } = "example.com";
+
+    // How long a wait for the answer to a read may take (App.ApiTimeoutMs): two reads in a row (an annotation, then its
+    // history or its deletion) at the admin UI's read timeout of 30 s, plus a margin, so that a stalled request ends in
+    // the UI's error state, which the wait reports, rather than in a bare test timeout. A wait that passes is not
+    // slower; Execution:ExpectTimeoutMs stays for everything else.
+    public int ApiTimeoutMs { get; set; } = DefaultApiTimeoutMs;
+
+    // How long a wait for the answer to a write may take (App.ApiWriteTimeoutMs): a save's toast, a created
+    // configuration (Bulk create, two writes in a row, waits twice as long). The admin UI gives a write 120 s, and a
+    // configuration save that timed out reads its content again before its toast, so ApiTimeoutMs would end such a wait
+    // before the UI's error.
+    public int ApiWriteTimeoutMs { get; set; } = DefaultApiWriteTimeoutMs;
 
     // By a Role name (Contributor, Reader, …; case-insensitive), "<org>/<project>[/<view>]": a project in which every
     // pool user holds that role, so a test of the role ([UserRole]) works there with any pool user. A role without an

@@ -172,7 +172,7 @@ public abstract partial class PlatformTest
     protected async Task<App> OpenSecondPageAsync()
     {
         var page = await Context.NewPageAsync();
-        return new App(page, Target.MockScenario);
+        return new App(page, Target.MockScenario, Target.ApiTimeoutMs, Target.ApiWriteTimeoutMs);
     }
 
     private static bool HasLoaded(IPage page)

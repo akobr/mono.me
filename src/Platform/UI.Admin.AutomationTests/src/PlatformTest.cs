@@ -22,7 +22,7 @@ public abstract partial class PlatformTest : UiTest
 
     protected PlatformTarget Target => Settings.Bind<PlatformTarget>(PlatformTarget.Section);
 
-    protected App App => app ??= new App(Page, Target.MockScenario);
+    protected App App => app ??= new App(Page, Target.MockScenario, Target.ApiTimeoutMs, Target.ApiWriteTimeoutMs);
 
     protected PlatformData PlatformData => platformData ??= new PlatformData(Data, Session.RunId, Target.EmailDomain);
 }

@@ -29,7 +29,7 @@ public sealed partial class BulkCreateDialog
     public ILocator Review => Root.GetByRole(AriaRole.Region, new() { Name = "Review", Exact = true });
 
     // The nested dialog of a list with deleted keys or ancestors, with Cancel, "Create new" and "Restore".
-    public DeletedKeysDialog DeletedKeys => new(page);
+    public DeletedKeysDialog DeletedKeys => new(app.Page);
 
     // The review row of a line by its number (the Line cell), whatever its text: lines can share a prefix, and an
     // invalid line's text (a tab, two dots) is hard to match. Its Key cell holds the key (and the typed text of a
@@ -40,7 +40,7 @@ public sealed partial class BulkCreateDialog
         ArgumentOutOfRangeException.ThrowIfLessThan(line, 1);
 
         var number = line.ToString(CultureInfo.InvariantCulture);
-        return Review.GetByRole(AriaRole.Row).Filter(new() { Has = page.GetByRole(AriaRole.Cell, new() { Name = number, Exact = true }) });
+        return Review.GetByRole(AriaRole.Row).Filter(new() { Has = app.Page.GetByRole(AriaRole.Cell, new() { Name = number, Exact = true }) });
     }
 
     // Clicks "Create N annotation(s)" for a list with deleted keys or ancestors and returns the nested "Deleted

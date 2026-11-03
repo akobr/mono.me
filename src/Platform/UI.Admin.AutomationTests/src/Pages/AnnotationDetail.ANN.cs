@@ -109,12 +109,15 @@ public sealed partial class AnnotationDetail
         return page.GetByRole(AriaRole.Dialog).Filter(new() { Has = page.GetByText(LineageHeadingText, new() { Exact = true }) });
     }
 
-    // Opens the History tab with its link and waits for the timeline.
+    // Opens the History tab with its link and waits until the history loaded (AnnotationHistory.WaitForLoadAsync, up to
+    // Target:ApiTimeoutMs): the timeline, or "No history", which a lagging audit of a deployed API can show for a new
+    // key and AnnotationHistory.WaitForEntryAsync reloads; an error state in the detail throws with its text.
     public async Task OpenHistoryTabAsync(string key)
     {
+        var path = routes.AnnotationHistory(key);
         await HistoryTabLink.ClickAsync();
-        await app.ExpectAtAsync(routes.AnnotationHistory(key));
-        await Expect(History).ToBeVisibleAsync();
+        await app.ExpectAtAsync(path);
+        await new AnnotationHistory(app, section).WaitForLoadAsync(path);
     }
 
     // Opens the detail by its URL and waits until it shows the annotation's form (its identity line): a fresh page

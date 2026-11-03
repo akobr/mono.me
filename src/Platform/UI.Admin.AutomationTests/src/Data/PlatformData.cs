@@ -8,9 +8,11 @@ using _42.Testing.UI.Automation.Runtime.Data;
 namespace _42.Platform.UI.Admin.AutomationTests.Data;
 
 // The Platform's generated data, on top of the test's SeededData, so a run's data repeats with its seed. Everything a
-// test creates carries "at-<runId>" (automation test and the run), which makes leftovers attributable; nothing is
-// deleted. Every generated part starts with 4 random hex digits before its words, so names stay unique within a run
-// after the cuts to 40 and 63 characters (the words come from a list of only 181). The names keep the Platform's rules:
+// test creates carries "at-<runId>" (automation test and the run), which makes leftovers attributable; the tests delete
+// nothing, and only a run that asks for it (Maintenance:Purge, Tests/Maintenance/AutomationDataTests) deletes the
+// annotation roots of earlier runs from the target's view by that name. Every generated part starts with 4 random hex
+// digits before its words, so names stay unique within a run after the cuts to 40 and 63 characters (the words come
+// from a list of only 181). The names keep the Platform's rules:
 //   - organization, project and view names: 2 to 63 of a-z, 0-9 and '-' (NameRules), so a slug;
 //   - an annotation key: <code>.<part>[.<part>…], parts without '.', '/', '\', '?', '#' or control characters, kept
 //     short (40) so the key stays under 200 characters (a uxe at most 168);
