@@ -3,7 +3,10 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FederationRule, MachineAccess } from '@42for.net/2splatform.sdk'
 import { useGetFederatedIssuers, useGetMachineAccess } from '@42for.net/2splatform.sdk/vue-query'
+import { capabilityRoles } from '@/composables/useRole'
 import { useContextStore } from '@/stores/context'
+import { useSessionStore } from '@/stores/session'
+import { roleRequiredError } from '@/utils/errors'
 import { audienceDiffers } from '@/utils/federation'
 import {
   credentialKindLabel,
@@ -20,18 +23,21 @@ import {
 // setup again, but only users with the role the scopes of the machine need (an Administrator for management scopes,
 // ContributorWithSecrets for secrets scopes) edit its rules, as the API refuses them otherwise (424-79). A rule whose
 // issuer was deleted, or whose audience is not the token endpoint (the UI presets it from the address it calls the API
-// at, which a proxy or the API's public base URL can change), is flagged.
+// at, which a proxy or the API's public base URL can change), is flagged. Below Contributor, as on the list, the panel
+// does not ask for the machine and shows No access with Retry, which reloads the account (424-164).
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
+const session = useSessionStore()
 const canManage = useCan('machines')
+const noAccess = roleRequiredError(capabilityRoles.machines, 'Machines')
 
 const id = computed(() => String((route.params as { id: string }).id))
 const machine = useGetMachineAccess(
   () => context.org ?? '',
   () => context.project ?? '',
   id,
-  { query: { meta: { silent: true } } },
+  { query: { enabled: () => !!context.project && canManage.value, meta: { silent: true } } },
 )
 const federated = computed(() => isFederated(machine.data.value?.CredentialKind))
 const canGiveScopes = useCan(() => requiredRoleFor(machine.data.value))
@@ -70,7 +76,8 @@ function close() {
       </div>
     </template>
     <div class="space-y-6 p-4">
-      <LoadingState v-if="machine.isPending.value" />
+      <ErrorState v-if="!canManage" :error="noAccess" @retry="session.loadAccount(true)" />
+      <LoadingState v-else-if="machine.isPending.value" />
       <ErrorState v-else-if="machine.isError.value" :error="machine.error.value" @retry="machine.refetch()" />
       <template v-else>
         <dl class="grid grid-cols-[10rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">

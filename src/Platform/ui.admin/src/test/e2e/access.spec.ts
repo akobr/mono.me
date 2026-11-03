@@ -309,6 +309,28 @@ test('a Contributor neither resets, deletes nor edits the rules of a machine wit
   await expect(managed).toHaveCount(1)
 })
 
+// A Reader has no access to Machines (424-164, ACC-MCH-08): the Reader of northwind/portal opens the page by its
+// address and gets No access with Retry, without New machine or the sections of Administrators, and so does the detail
+// of a machine. The page does not ask the API, which a Debug build (DEV_AUTH) would answer.
+test('a Reader gets No access on Machines and on the detail of a machine', async ({ page }) => {
+  await openApp(page, '/northwind/portal/machines')
+  const machineAccess = page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Machine access', exact: true, level: 2 }) })
+  await expect(machineAccess.getByRole('heading', { name: 'No access', exact: true })).toBeVisible()
+  await expect(machineAccess.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+  await expect(machineAccess.getByRole('table')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New machine', exact: true })).toHaveCount(0)
+  await expect(page.locator('section#shared-certificates')).toHaveCount(0)
+  await expect(page.locator('section#trusted-issuers')).toHaveCount(0)
+
+  await goto(page, '/northwind/portal/machines/mach-portal-reader')
+  const detail = page.getByRole('region', { name: 'mach-portal-reader' })
+  await expect(detail.getByRole('heading', { name: 'No access', exact: true })).toBeVisible()
+  await expect(detail.getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+  await expect(detail.getByText('Runtime scopes')).toHaveCount(0)
+})
+
 // A reset replaces only the secret of a machine (424-82): a Certificate machine has none, its certificate is renewed.
 test('a reset replaces the secret of a machine, and a Certificate machine has no Reset', async ({ page }) => {
   await openApp(page, '/acme/billing/machines')
