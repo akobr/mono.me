@@ -112,7 +112,7 @@ The committed `testsettings.json` holds a pool of 8 users (their e-mails and rol
 - no MFA (and no other second step) for the pool users;
 - verified e-mail addresses of the pool users;
 - each pool user a member of the default organization and project with the roles listed in `Users:Pool`;
-- the target's redirect URI `https://<admin host>/callback` (and the sign-out redirect `/login`) registered;
+- the target's Redirect URI `<admin origin>/callback` and its Sign-out URI `<admin origin>/login`, set as the default one (the `dev` profile: `http://localhost:5173/callback` and `http://localhost:5173/login` in the Staging environment); without the Sign-out URI a sign-out ends on WorkOS' error page `app-homepage-url-not-found`, and cases 12, 13 and 107 fail there (the admin UI's README, "WorkOS dashboard checklist");
 - a custom auth domain (`authApiHostname` in the deployment's `app-config.json`) on any host other than `localhost`.
 
 ## The target check
@@ -325,6 +325,7 @@ jobs:
 | Tests Blocked: `No free user with role …` / `No user of Users:Pool has role …` | The pool is too small for the parallelism, or no user has the role the test asks for (`Roles` in `Users:Pool`) |
 | Tests Blocked: `… before the engine's time for the start of the test ran out (e.g. its hook timeout)` | TUnit's hook timeout ended the start before the pool's or the provider's own timeout; the adapter raises it to the settings' start budget (library readme, "Tests: `UiTest`"), so another hook timeout (a `[Timeout]` on a hook) is lower than the budget |
 | The sign-in fails (`sign-in-failure.png` in the test's folder) | The AuthKit hosted page changed or a checklist item is missing ("AuthKit checklist") |
+| `The sign-out ended on https://error.workos.com/user_management/app-homepage-url-not-found instead of <origin>/login …` (cases 12, 13 and 107) | `<origin>/login` is not a Sign-out URI of the target's WorkOS environment, which has no default one either; add it as the default ("AuthKit checklist") |
 | `Users:Pool:<n>:Email is required …` on the mock | The user secrets hold passwords of more pool users (`Users:Pool:<n>:Password`, for a deployed pool) than the profile lists: the mock profile has eight placeholders; with a larger deployed pool, add placeholders to `testsettings.mock.json` or set `UITESTS_Users__Pool__<n>__Email` |
 | A request to the mock fails with `net::ERR_CONNECTION_REFUSED` (an asset, then the user menu never shows) | `vite preview` listens on one address of `localhost` only (e.g. `::1`) and the browser asked the other: serve it with `--host 127.0.0.1` and use `UITESTS_Target__BaseUrl=http://127.0.0.1:4174` |
 | Exit code `8` | The filter matched no test; check the category (`Area-Access`, not `Access`) or add `--ignore-exit-code 8` |

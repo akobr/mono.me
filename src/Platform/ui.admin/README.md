@@ -143,10 +143,12 @@ The sign-in provider and the AuthKit client ID come from the API (`GET v1/auth/c
 
 ### WorkOS dashboard checklist
 
-- Redirect URIs: `http://localhost:5173/callback` and `https://<admin-host>/callback`.
+Every WorkOS environment has its own settings. The `localhost` entries belong to the **Staging** environment (the one `npm run dev` and the Aspire host sign in with), the `<admin-host>` ones to the environment of that deployment. The URIs are under **Redirects** of the admin UI's application.
+
+- Redirect URIs: `https://<admin-host>/callback` (Staging: `http://localhost:5173/callback`).
+- Sign-out URIs: `https://<admin-host>/login` (Staging: `http://localhost:5173/login`), set as the **default**. The app signs out through the WorkOS logout with `<origin>/login` as `returnTo`. WorkOS returns there only when it is one of the Sign-out URIs, and otherwise goes to the default one. With neither, the sign-out ends on WorkOS' error page `error.workos.com/user_management/app-homepage-url-not-found` ("Couldn't sign in"). The deprecated App homepage URL is not needed.
 - Initiate login URI: `https://<admin-host>/login`.
-- Sign-out redirect: `https://<admin-host>/login` (and `http://localhost:5173/login`).
-- CORS allowed origins: `http://localhost:5173` and `https://<admin-host>`.
+- CORS allowed origins: `https://<admin-host>` (Staging: `http://localhost:5173`).
 - JWT template with `aud`, `email`, `name` and `email_verified` (see `docs/Platform/Storyteller/authentication.md`).
 - Invitation accept URL: `https://<admin-host>/invitations/accept`.
 - A custom authentication domain (`auth.42for.net`) for every deployed environment.

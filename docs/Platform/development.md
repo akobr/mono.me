@@ -42,6 +42,7 @@ Switch the dashboard to the **Staging** environment first; settings of Productio
 2. **Resource indicator**: add exactly `https://localhost:7180/mcp` (lower case, the port, no trailing slash) and, in its **…** menu, **Set as default**.
    Without it, AuthKit issues tokens whose `aud` is the environment's client id (`client_01M3MMV9SP2W3D7VDZ3242KJNR`), and the MCP server answers `401` with `error="invalid_token"` (in its log: `IDX10214: Audience validation failed`). Do **not** work around it by making that client id the MCP audience: it is also the audience of the admin UI and `sform` tokens, and listing it in the actor's `SubjectAudiences` makes the API refuse every ordinary user token.
 3. **Scope**: dynamically registered clients get the OpenID scopes plus the environment's default scopes, which WorkOS support sets. For local testing use `openid` as the MCP scope; a real permission such as `mcp:access` needs WorkOS support to add it to the default scopes.
+4. **Admin UI**: under **Redirects** of the application, the Redirect URI `http://localhost:5173/callback` and the Sign-out URI `http://localhost:5173/login` with **Set as default**; the CORS origin `http://localhost:5173`. Without the Sign-out URI, signing out of the admin UI ends on WorkOS' error page `app-homepage-url-not-found` instead of `/login`. The whole list, deployed hosts included, is the [WorkOS dashboard checklist](../../src/Platform/ui.admin/README.md#workos-dashboard-checklist) of the admin UI.
 
 After changing WorkOS settings, clear the client's OAuth state and sign in again: a refresh token can keep the old audience.
 
@@ -168,6 +169,7 @@ What to try:
 | `https://localhost:7180/mcp` in a browser: `405` | Expected; use an MCP client |
 | *certificate signature failure* (Claude Code), *fetch failed* (Inspector) | Node does not trust the dev certificate; see [step 2](#2-trust-the-dev-certificate-in-node) |
 | `401 invalid_token` from the MCP server; log `IDX10214 … Audiences: 'client_…'` | The resource indicator is missing in WorkOS staging; see [step 3](#3-workos-authkit-staging) |
+| Signing out of the admin UI ends on `error.workos.com/user_management/app-homepage-url-not-found` ("Couldn't sign in") | `http://localhost:5173/login` is not a Sign-out URI of WorkOS staging, and staging has no default one; see [step 3](#3-workos-authkit-staging) |
 | `403 insufficient_scope` | The token lacks `Mcp:Authentication:Scope`; use `openid` locally |
 | *The Storyteller API does not accept the MCP server as an actor…* | The MCP secret does not hash to the API's `ClientSecretHash` (often the hash was given to the MCP server), the actor id differs, or the API does not run in `Development` |
 | *The subject token is not accepted for this actor.* | `SubjectAudiences` does not hold the token's `aud`; the API's log names the reason |
