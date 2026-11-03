@@ -9,9 +9,11 @@ import {
   useGetSharedCertificates,
 } from '@42for.net/2splatform.sdk/vue-query'
 import { useBootState } from '@/boot/state'
+import { capabilityRoles } from '@/composables/useRole'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
-import { errorMessage } from '@/utils/errors'
+import { useSessionStore } from '@/stores/session'
+import { errorMessage, roleRequiredError } from '@/utils/errors'
 import {
   certificateDaysLeft,
   credentialKindLabel,
@@ -33,8 +35,11 @@ import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 // whose certificate is renewed, not reset (424-82); a reset of a CertificateAndApiKey machine replaces only its API key.
 // Nor has a machine whose scopes need a higher role than the user's (management scopes an Administrator, secrets scopes
 // ContributorWithSecrets), as the API refuses the reset (424-79); such a machine has no Delete either, as the API
-// refuses that too: a delete stops whatever runs with its scopes.
+// refuses that too: a delete stops whatever runs with its scopes. Below Contributor the page does not ask for the
+// machines and shows the API's refusal itself (No access, Retry): a Debug API (DEV_AUTH) skips its role checks of users
+// and would list them (424-164). Retry reloads the account, so a role granted since the sign-in shows the list.
 const context = useContextStore()
+const session = useSessionStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const role = useRole()
@@ -46,8 +51,9 @@ const detail = useDetailPanel()
 const machines = useGetMachineAccesses(
   () => context.org ?? '',
   () => context.project ?? '',
-  { query: { enabled: () => !!context.project, meta: { silent: true } } },
+  { query: { enabled: () => !!context.project && canManage.value, meta: { silent: true } } },
 )
+const noAccess = roleRequiredError(capabilityRoles.machines, 'Machines')
 const policy = useGetMachineAuthentication(() => context.projectKey ?? '', {
   query: { enabled: () => !!context.projectKey && canManage.value, meta: { silent: true } },
 })
@@ -118,7 +124,9 @@ const issuers = useGetFederatedIssuers(
 // #shared-certificates (the old Certificates page redirects here) and #trusted-issuers (linked from New machine)
 // scroll once the sections above them are listed.
 useHashScroll(
-  () => !machines.isPending.value && !(canAdmin.value && (certificates.isPending.value || issuers.isPending.value)),
+  () =>
+    (!canManage.value || !machines.isPending.value) &&
+    !(canAdmin.value && (certificates.isPending.value || issuers.isPending.value)),
 )
 </script>
 
@@ -135,7 +143,8 @@ useHashScroll(
       <div class="space-y-6">
         <section class="space-y-2">
           <h2 class="text-xs font-semibold text-muted uppercase">Machine access</h2>
-          <LoadingState v-if="machines.isPending.value" />
+          <ErrorState v-if="!canManage" :error="noAccess" @retry="session.loadAccount(true)" />
+          <LoadingState v-else-if="machines.isPending.value" />
           <ErrorState v-else-if="machines.isError.value" :error="machines.error.value" @retry="machines.refetch()" />
           <EmptyState
             v-else-if="!machines.data.value?.length"

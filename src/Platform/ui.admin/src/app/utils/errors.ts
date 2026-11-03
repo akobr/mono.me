@@ -1,4 +1,4 @@
-import { isStorytellerError } from '@42for.net/2splatform.sdk'
+import { isStorytellerError, StorytellerError, type AccountRoleName } from '@42for.net/2splatform.sdk'
 
 export interface ErrorDescription {
   title: string
@@ -28,6 +28,19 @@ export function describeError(error: unknown, fallbackTitle = 'Something went wr
   }
 
   return { title: fallbackTitle, message: error instanceof Error ? error.message : String(error ?? 'Unknown error') }
+}
+
+/**
+ * The refusal of a screen that knows, before it asks, that the caller's role is below `role`: the 403 AccessDenied of
+ * the API, so `ErrorState` shows it as "No access" with Retry. Screens check first because a Debug API (DEV_AUTH)
+ * skips its role checks of users and would answer (424-164).
+ */
+export function roleRequiredError(role: AccountRoleName, subject: string): StorytellerError {
+  return new StorytellerError({
+    status: 403,
+    errorCode: 'AccessDenied',
+    message: `${subject} need the ${role} role or a higher one in this project.`,
+  })
 }
 
 /** The message of an error for a form field or a toast. */
