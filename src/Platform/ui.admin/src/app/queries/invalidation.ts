@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/vue-query'
-import type { ViewArchiveContent, ViewImport } from '@42for.net/2splatform.sdk'
-import { invalidateByPath, removeByPath } from '@42for.net/2splatform.sdk/vue-query'
+import type { KeyValuePolicy, ViewArchiveContent, ViewImport } from '@42for.net/2splatform.sdk'
+import { invalidateByPath, pathToQueryKey, removeByPath } from '@42for.net/2splatform.sdk/vue-query'
 import type { Scope } from '@/stores/context'
 import { recreatedAnnotations, writtenConfigurations, writtenContents } from '@/utils/transfers'
 
@@ -130,9 +130,17 @@ export async function invalidateProject(client: QueryClient, key: string): Promi
   ])
 }
 
-/** Every pair of the view, their versions and diffs. */
-export function invalidateKeyValues(client: QueryClient, scope: Scope): Promise<void> {
-  return invalidateByPath(client, `${base(scope)}/key-values`)
+/**
+ * Every pair of the view, their versions and diffs; and the project's policy while the cached one has no Standard key:
+ * the API records the key with the project's first Standard secret (424-167), and Settings shows it then.
+ */
+export async function invalidateKeyValues(client: QueryClient, scope: Scope): Promise<void> {
+  const policyPath = `/v1/${scope.org}/${scope.project}/key-values/policy`
+  const policy = client.getQueryData<KeyValuePolicy>(pathToQueryKey(policyPath))
+  await Promise.all([
+    invalidateByPath(client, `${base(scope)}/key-values`),
+    policy && !policy.Standard ? invalidateByPath(client, policyPath) : undefined,
+  ])
 }
 
 /** The project's key/value policy, its recipients, and the lists (a level change shows up there). */
