@@ -18,7 +18,9 @@ export interface StorytellerConfig {
    * The longest a request may take in milliseconds, from the call until its body is read, across the token lookup and
    * the retry after a 401; a browser counts the time it queues the request as well. A function picks the limit per
    * request (method in upper case, url as fetch gets it: the base URL and the path), for example by method. Undefined
-   * or 0: no limit. A request that runs out of time fails with StorytellerError status 0 and timedOut.
+   * or 0 (or anything else that is not a positive number, a negative one included): no limit. A request that runs out
+   * of time fails with StorytellerError status 0 and timedOut, and a write (not GET or HEAD) gets a hint that the API
+   * may still apply it.
    */
   timeoutMs?: number | ((request: { method: string; url: string }) => number | undefined)
 }
@@ -83,17 +85,18 @@ export async function runRequest<T>(url: string, init: StorytellerRequestInit, r
   const current = getStorytellerConfig()
   const { timeoutMs, ...request } = init
   const target = /^https?:\/\//i.test(url) ? url : `${current.baseUrl}${url.startsWith('/') ? '' : '/'}${url}`
-  const limitMs = limitOf(current, timeoutMs, request.method, target)
+  const method = (request.method ?? 'GET').toUpperCase()
+  const limitMs = limitOf(current, timeoutMs, method, target)
   const caller = request.signal ?? undefined
 
   if (limitMs === undefined) {
     // Without a deadline the caller's signal reaches fetch as it is.
-    return await perform(current, target, request, read, { target, caller, signal: caller, timedOut: false })
+    return await perform(current, target, request, read, { target, method, caller, signal: caller, timedOut: false })
   }
 
   // AbortSignal.any and AbortSignal.timeout are not in every runtime the SDK supports, so the deadline is a timer.
   const deadline = new AbortController()
-  const attempt: Attempt = { target, caller, signal: deadline.signal, limitMs, timedOut: false }
+  const attempt: Attempt = { target, method, caller, signal: deadline.signal, limitMs, timedOut: false }
   const forward = () => deadline.abort(caller?.reason)
   const timer = setTimeout(() => {
     // The first abort decides: a caller that aborted first stays aborted.
@@ -121,6 +124,8 @@ export async function runRequest<T>(url: string, init: StorytellerRequestInit, r
 /** One request: what its failures are mapped from. */
 interface Attempt {
   target: string
+  /** In upper case; a write that timed out may still be applied by the API (the hint says so). */
+  method: string
   /** The signal the caller passed. */
   caller?: AbortSignal
   /** What the steps race against: the caller's signal combined with the deadline, or the caller's signal alone. */
@@ -163,7 +168,14 @@ async function perform<T>(
   try {
     return await race(() => read(response), attempt.signal)
   } catch (error) {
-    throw failure(error, attempt)
+    // Only what ended the transport is the request's failure: an abort, the deadline, a body stream that broke
+    // (TypeError). Anything else of read (a body that does not parse, a bug) passes as it is, not as a transient
+    // network failure that a poller would retry for ever.
+    if (error instanceof StorytellerError || attempt.signal?.aborted || isTransportError(error)) {
+      throw failure(error, attempt)
+    }
+
+    throw error
   }
 }
 
@@ -262,6 +274,7 @@ function failure(error: unknown, attempt: Attempt): StorytellerError {
     return new StorytellerError({
       status: 0,
       message: `The Storyteller API did not answer within ${seconds(attempt.limitMs)} s (${path}).`,
+      hint: writeHint(attempt),
       timedOut: true,
       cause: error,
     })
@@ -271,7 +284,13 @@ function failure(error: unknown, attempt: Attempt): StorytellerError {
 
   if (callerAborted && nameOf(attempt.caller?.reason) === 'TimeoutError') {
     // A poller's AbortSignal.timeout stays transient.
-    return new StorytellerError({ status: 0, message: `The Storyteller API did not answer in time (${path}).`, timedOut: true, cause: error })
+    return new StorytellerError({
+      status: 0,
+      message: `The Storyteller API did not answer in time (${path}).`,
+      hint: writeHint(attempt),
+      timedOut: true,
+      cause: error,
+    })
   }
 
   if (callerAborted || nameOf(error) === 'AbortError') {
@@ -279,6 +298,19 @@ function failure(error: unknown, attempt: Attempt): StorytellerError {
   }
 
   return new StorytellerError({ status: 0, message: `The Storyteller API is not reachable (${path}).`, cause: error })
+}
+
+// A write the client stopped waiting for may still be applied: repeating it blindly could apply it twice.
+function writeHint(attempt: Attempt): string | undefined {
+  return attempt.method === 'GET' || attempt.method === 'HEAD'
+    ? undefined
+    : 'The API may still apply the change: read it again before you repeat it.'
+}
+
+// The errors of a broken transport: fetch and a body stream reject with a TypeError, an abort with its reason.
+function isTransportError(error: unknown): boolean {
+  const name = nameOf(error)
+  return name === 'TypeError' || name === 'AbortError' || name === 'TimeoutError'
 }
 
 function nameOf(value: unknown): unknown {
