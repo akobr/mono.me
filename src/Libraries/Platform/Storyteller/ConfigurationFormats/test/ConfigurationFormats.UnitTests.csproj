@@ -19,7 +19,7 @@
   <ItemGroup>
     <!-- The conformance suite, shared with the providers and SDKs of other languages; embedded so the tests read it
          without the file system. RecursiveDir holds the separator of the OS, which ConformanceFiles normalizes. -->
-    <EmbeddedResource Include="..\..\conformance\**\*.json" LogicalName="Conformance/%(RecursiveDir)%(Filename)%(Extension)" Link="Conformance\%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\..\..\Platform\Storyteller\conformance\**\*.json" LogicalName="Conformance/%(RecursiveDir)%(Filename)%(Extension)" Link="Conformance\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
