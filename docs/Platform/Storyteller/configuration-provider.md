@@ -4,9 +4,9 @@ The package `42.Platform.Storyteller.Configuration` loads one Storyteller config
 
 The code is in:
 
-- `src/Platform/Storyteller/Configuration/src/`: the options and their environment (`Settings/`), the transport (`Transport/`), the reader (`Reading/`), the last-known-good cache (`Caching/`), the engine with its refresh and rollback (`Engine/`), the container integration (`Container/`), the substitution of references (`References/`) and the documents on demand (`Documents/`);
-- `src/Platform/Storyteller/ConfigurationFormats/src/`: the flattener (`DocumentFlattener`, `JsonPaths`), in the shared library of the [configuration formats](configuration-formats.md) that the provider references;
-- `src/Platform/Storyteller/Configuration.KeyVault/src/`: `KeyVaultReferenceResolver`;
+- `src/Libraries/Platform/Storyteller/Configuration/src/`: the options and their environment (`Settings/`), the transport (`Transport/`), the reader (`Reading/`), the last-known-good cache (`Caching/`), the engine with its refresh and rollback (`Engine/`), the container integration (`Container/`), the substitution of references (`References/`) and the documents on demand (`Documents/`);
+- `src/Libraries/Platform/Storyteller/ConfigurationFormats/src/`: the flattener (`DocumentFlattener`, `JsonPaths`), in the shared library of the [configuration formats](configuration-formats.md) that the provider references;
+- `src/Libraries/Platform/Storyteller/Configuration.KeyVault/src/`: `KeyVaultReferenceResolver`;
 - `src/Platform/Storyteller/Sdk.NSwag/src/`: the conditional reads (`ApiSdk.Conditional.cs`), the machine credentials (`Credentials/`) and the resilience pipeline (`Resilience/`), described in the [SDK readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md).
 
 The design and its decisions are in [the spec](specs/2026-10-23%20Configuration%20Provider%20for%20.NET.md). The server side of the reads (tags, headers, the `304`) is in [Conditional reads](inheritance.md#conditional-reads).

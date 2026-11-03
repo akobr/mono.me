@@ -12,8 +12,8 @@ Language-neutral JSON vectors that every Storyteller configuration provider and 
 Run it:
 
 ```bash
-dotnet test --project src/Platform/Storyteller/ConfigurationFormats/test
-dotnet test --project src/Platform/Storyteller/Configuration/test --filter "FullyQualifiedName~Conformance"
+dotnet test --project src/Libraries/Platform/Storyteller/ConfigurationFormats/test
+dotnet test --project src/Libraries/Platform/Storyteller/Configuration/test --filter "FullyQualifiedName~Conformance"
 
 cd src/Platform/Storyteller/sdk.typescript/src
 npx vitest run test/conformance
