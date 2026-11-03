@@ -22,6 +22,9 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="42.Platform.Storyteller.Backend.Core.UnitTests" />
+    <!-- EmulatorHttpHandler accepts any server certificate: only the clients of the local emulators may use it. -->
+    <InternalsVisibleTo Include="42.Platform.Storyteller.Backend.CosmosDb" />
+    <InternalsVisibleTo Include="42.Platform.Storyteller.KeyValues.Azure.KeyVault" />
   </ItemGroup>
 
   <ItemGroup>
