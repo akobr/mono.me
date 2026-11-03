@@ -203,7 +203,8 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
             return null;
         }
 
-        var policy = await _policies.GetAsync(organization, project, cancellationToken);
+        // past the cache: the end of the run compares the stored re-wrap with this one
+        var policy = await _policies.GetCurrentAsync(organization, project, cancellationToken);
         var scope = new KeyValueScope(organization, project);
         var info = await provider.GetKeyInfoAsync(scope, policy, cancellationToken);
         var now = _timeProvider.GetUtcNow();
@@ -260,9 +261,11 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
             LastError = lastError,
         };
 
-        // a rotation during this run started a re-wrap of its own: keep it pending for the next run
+        // a rotation during this run started a re-wrap of its own: keep it pending for the next run. A pending re-wrap
+        // that was already there, with a target older than the version this run moved to, is this run's and completes.
         var latest = await _policies.GetCurrentAsync(organization, project, cancellationToken);
         var newerPending = latest.Rewrap is { CompletedAt: null } current
+            && current != policy.Rewrap
             && (current.Protection != protection || !string.Equals(current.TargetKeyVersion, info.CurrentKeyVersion, StringComparison.Ordinal));
         await SaveAsync(organization, project, latest with { Rewrap = newerPending ? latest.Rewrap : status }, cancellationToken);
         await AuditAsync(organization, project, KeyValueAuditOperation.Rewrap, $"{protection} -> {info.CurrentKeyVersion}: {processed} envelope(s){(lastError is null ? string.Empty : $", last error: {lastError}")}", cancellationToken);

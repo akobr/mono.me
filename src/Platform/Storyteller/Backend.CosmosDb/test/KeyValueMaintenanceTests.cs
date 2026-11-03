@@ -147,6 +147,24 @@ public class KeyValueMaintenanceTests(Startup startup)
         policy.Standard!.KeyId.Should().Be(Standard.KeyId, "the re-wrap's save never takes the key away");
     }
 
+    // The vault rotated on its own after the pending re-wrap started: the run moves to the newest version and completes.
+    [Fact]
+    public async Task Rewrap_CompletesAPendingTargetOlderThanTheCurrentVersion()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("oldtarget");
+        await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "v" }, Admin);
+        var rotated = await Policies.RotateAsync(Org, project, KeyValueProtection.Standard, Admin);
+        await Standard.RotateAsync(new KeyValueScope(Org, project), rotated);
+
+        var status = await Maintenance.RewrapAsync(Org, project, KeyValueProtection.Standard);
+
+        status!.TargetKeyVersion.Should().Be(Standard.CurrentVersion);
+        status.TargetKeyVersion.Should().NotBe(rotated.Rewrap!.TargetKeyVersion);
+        var stored = (await Policies.GetAsync(Org, project)).Rewrap!;
+        stored.TargetKeyVersion.Should().Be(Standard.CurrentVersion);
+        stored.CompletedAt.Should().NotBeNull("the older target is not a newer re-wrap");
+    }
+
     // A rotation while a re-wrap runs starts a re-wrap of its own; the running one does not mark it complete.
     [Fact]
     public async Task Rewrap_KeepsTheReWrapOfARotationDuringTheRun()
