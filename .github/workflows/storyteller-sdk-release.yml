@@ -75,13 +75,16 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The configuration provider and every package it depends on, released together. The Hosting packages join the
-      # list when they reach main.
+      # The configuration provider and every package it depends on, released together. The provider and the
+      # formats and Key Vault packages live in Libraries. The Hosting packages join the list when they reach main.
       - name: Pack the NuGet packages
         if: inputs.packages != 'npm'
         run: |
-          for project in Abstractions.Annotations KeyValues.ClientEncryption Sdk.NSwag ConfigurationFormats Configuration Configuration.KeyVault; do
+          for project in Abstractions.Annotations KeyValues.ClientEncryption Sdk.NSwag; do
             dotnet pack "src/Platform/Storyteller/$project/src/$project.csproj" -c Release -p:ContinuousIntegrationBuild=true -o out/nuget
+          done
+          for project in ConfigurationFormats Configuration Configuration.KeyVault; do
+            dotnet pack "src/Libraries/Platform/Storyteller/$project/src/$project.csproj" -c Release -p:ContinuousIntegrationBuild=true -o out/nuget
           done
 
           ls -l out/nuget

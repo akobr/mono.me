@@ -11,8 +11,9 @@ on:
     paths:
       - src/Platform/Storyteller/conformance/**
       - src/Platform/Storyteller/Abstractions.Annotations/**
-      - src/Platform/Storyteller/Configuration/**
-      - src/Platform/Storyteller/ConfigurationFormats/**
+      - src/Libraries/Platform/Storyteller/Configuration/**
+      - src/Libraries/Platform/Storyteller/ConfigurationFormats/**
+      - src/Libraries/Platform/Storyteller/version.json
       - src/Platform/Storyteller/KeyValues.ClientEncryption/**
       - src/Platform/Storyteller/Sdk.NSwag/**
       - src/Platform/Storyteller/sdk.typescript/**
@@ -32,8 +33,9 @@ on:
     paths:
       - src/Platform/Storyteller/conformance/**
       - src/Platform/Storyteller/Abstractions.Annotations/**
-      - src/Platform/Storyteller/Configuration/**
-      - src/Platform/Storyteller/ConfigurationFormats/**
+      - src/Libraries/Platform/Storyteller/Configuration/**
+      - src/Libraries/Platform/Storyteller/ConfigurationFormats/**
+      - src/Libraries/Platform/Storyteller/version.json
       - src/Platform/Storyteller/KeyValues.ClientEncryption/**
       - src/Platform/Storyteller/Sdk.NSwag/**
       - src/Platform/Storyteller/sdk.typescript/**
@@ -94,10 +96,10 @@ jobs:
       # The whole test projects: the vectors run in them, and this is the repository's .NET test job.
       # dotnet test runs on Microsoft.Testing.Platform (global.json), which takes a project with --project.
       - name: Configuration formats – flattening and format vectors
-        run: dotnet test --project src/Platform/Storyteller/ConfigurationFormats/test/ConfigurationFormats.UnitTests.csproj
+        run: dotnet test --project src/Libraries/Platform/Storyteller/ConfigurationFormats/test/ConfigurationFormats.UnitTests.csproj
 
       - name: Configuration provider – suite, error and refresh vectors
-        run: dotnet test --project src/Platform/Storyteller/Configuration/test/Configuration.UnitTests.csproj
+        run: dotnet test --project src/Libraries/Platform/Storyteller/Configuration/test/Configuration.UnitTests.csproj
 
   typescript:
     name: TypeScript SDK
