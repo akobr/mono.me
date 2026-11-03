@@ -12,6 +12,11 @@ internal sealed class InMemoryPolicyStore : IKeyValuePolicyStore
         return Task.FromResult(_policies.GetValueOrDefault($"{organization}.{project}") ?? new KeyValuePolicy());
     }
 
+    public Task<KeyValuePolicy> GetCurrentAsync(string organization, string project, CancellationToken cancellationToken = default)
+    {
+        return GetAsync(organization, project, cancellationToken);
+    }
+
     public Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default)
     {
         _policies[$"{organization}.{project}"] = policy;

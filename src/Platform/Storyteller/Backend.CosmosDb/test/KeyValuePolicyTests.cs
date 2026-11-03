@@ -394,6 +394,30 @@ public class KeyValuePolicyTests(Startup startup)
         shown.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
     }
 
+    // A vault call that times out throws TaskCanceledException although the request was not cancelled; the value is
+    // stored already, so the write succeeds and the next Standard write records the key.
+    [Fact]
+    public async Task FailedRecord_NeverFailsTheWrite()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("timeout");
+        StandardProvider.KeyInfoFailure = new TaskCanceledException("The vault did not answer in time.");
+
+        try
+        {
+            var written = await KeyValues.SetAsync(Org, project, View, "db.password", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s" }, Admin);
+
+            written.Version.Should().Be(1);
+            (await Policies.GetAsync(Org, project)).Standard.Should().BeNull();
+        }
+        finally
+        {
+            StandardProvider.KeyInfoFailure = null;
+        }
+
+        await KeyValues.SetAsync(Org, project, View, "api.key", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "k" }, Admin);
+        (await Policies.GetAsync(Org, project)).Standard!.KeyId.Should().Be(StandardProvider.KeyId);
+    }
+
     [Fact]
     public async Task StandardSecret_WithoutAnAccessPoint_IsStoredWithoutAPolicy()
     {

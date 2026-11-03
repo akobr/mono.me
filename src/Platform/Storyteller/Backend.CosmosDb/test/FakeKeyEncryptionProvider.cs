@@ -40,6 +40,9 @@ internal sealed class FakeKeyEncryptionProvider : IKeyEncryptionProvider, IHsmBa
 
     public bool IsRevoked { get; set; }
 
+    // Thrown by GetKeyInfoAsync only, e.g. a vault call that times out after a write wrapped its data key.
+    public Exception? KeyInfoFailure { get; set; }
+
     public HsmBackend GetBackend(KeyValueScope scope) => HsmBackend.KeyVaultPremium;
 
     public Task<ProtectionKeyInfo> EnsureKeyAsync(KeyValueScope scope, KeyValuePolicy policy, CancellationToken cancellationToken = default)
@@ -80,6 +83,12 @@ internal sealed class FakeKeyEncryptionProvider : IKeyEncryptionProvider, IHsmBa
     public Task<ProtectionKeyInfo> GetKeyInfoAsync(KeyValueScope scope, KeyValuePolicy policy, CancellationToken cancellationToken = default)
     {
         ThrowWhenUnavailable();
+
+        if (KeyInfoFailure is { } failure)
+        {
+            throw failure;
+        }
+
         return Task.FromResult(Info());
     }
 

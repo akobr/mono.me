@@ -8,6 +8,7 @@ import { recreatedAnnotations, writtenConfigurations, writtenContents } from '@/
 // so a prefix covers a resource and everything below it (versions, diffs, resolved).
 
 const base = (scope: Scope) => `/v1/${scope.org}/${scope.project}/${scope.view}`
+const projectKeyValues = (org: string, project: string) => `/v1/${org}/${project}/key-values`
 
 export function invalidateAnnotation(client: QueryClient, scope: Scope, key: string): Promise<void> {
   return invalidateByPath(client, `${base(scope)}/annotations/${key}`)
@@ -135,15 +136,16 @@ export async function invalidateProject(client: QueryClient, key: string): Promi
  * the API records the key with the project's first Standard secret (424-167), and Settings shows it then.
  */
 export async function invalidateKeyValues(client: QueryClient, scope: Scope): Promise<void> {
-  const policyPath = `/v1/${scope.org}/${scope.project}/key-values/policy`
+  const policyPath = `${projectKeyValues(scope.org, scope.project)}/policy`
   const policy = client.getQueryData<KeyValuePolicy>(pathToQueryKey(policyPath))
+  const awaitsStandardKey = !!policy && !policy.Standard && (policy.AllowedProtections ?? ['Standard']).includes('Standard')
   await Promise.all([
     invalidateByPath(client, `${base(scope)}/key-values`),
-    policy && !policy.Standard ? invalidateByPath(client, policyPath) : undefined,
+    awaitsStandardKey ? invalidateByPath(client, policyPath) : undefined,
   ])
 }
 
 /** The project's key/value policy, its recipients, and the lists (a level change shows up there). */
 export async function invalidateKeyValuePolicy(client: QueryClient, org: string, project: string): Promise<void> {
-  await invalidateByPath(client, `/v1/${org}/${project}/key-values`)
+  await invalidateByPath(client, projectKeyValues(org, project))
 }

@@ -52,6 +52,17 @@ describe('invalidateKeyValues', () => {
     expect(invalidated(client, policyKey)).toBe(false)
   })
 
+  it('leaves a policy that does not allow Standard alone', async () => {
+    const client = cached([
+      [pairsKey, { Items: [] }],
+      [policyKey, { ...withoutKey, AllowedProtections: ['Public', 'Hsm'] }],
+    ])
+
+    await invalidateKeyValues(client, scope)
+
+    expect(invalidated(client, policyKey)).toBe(false)
+  })
+
   it('needs no cached policy', async () => {
     const client = cached([[pairsKey, { Items: [] }]])
 

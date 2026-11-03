@@ -1559,7 +1559,8 @@ public class CosmosKeyValueService : IKeyValueService
 
     // The first Standard secret records the project's Standard key in the policy, so Settings shows it at once (424-167).
     // The policy is the one the write read: once it knows the key, a write costs nothing more. The value is already
-    // stored, so a failed record never fails the write; the next Standard write tries again.
+    // stored, so a failed record never fails the write, not even a vault timeout (TaskCanceledException without a cancelled
+    // request); the next Standard write tries again.
     private async Task RecordStandardKeyAsync(string organization, string project, KeyValueProtection protection, KeyValuePolicy policy)
     {
         if (protection != KeyValueProtection.Standard || policy.Standard is not null || _maintenance is null)
@@ -1571,7 +1572,7 @@ public class CosmosKeyValueService : IKeyValueService
         {
             await _maintenance.RecordStandardKeyAsync(organization, project);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
             _logger.LogWarning(exception, "Could not record the Standard key of {Organization}.{Project} in its policy", organization, project);
         }
