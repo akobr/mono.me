@@ -8,7 +8,7 @@ import { deleteKeyValue, type KeyValueProtection, type KeyValueSummary } from '@
 import { invalidateKeyValues } from '@/queries/invalidation'
 import { useKeyValuePolicy, useKeyValues } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import { bindingFor, daysUntil, isSecretLevel, levelMeta, levels, maskedValue, valuePreview } from '@/utils/key-values'
 import KeyValueLevelBadge from '@/components/key-values/KeyValueLevelBadge.vue'
 import AuditActorLink from '@/components/common/AuditActorLink.vue'
@@ -138,7 +138,7 @@ async function remove(key: string) {
     toast.add({ title: `'${key}' deleted`, description: 'Restore it from the Deleted keys.', color: 'success', icon: 'i-lucide-trash-2' })
     await invalidateKeyValues(queryClient, scope)
   } catch (error) {
-    toast.add({ title: 'The key was not deleted', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'The key was not deleted'), description: errorMessage(error), color: 'error' })
   }
 }
 

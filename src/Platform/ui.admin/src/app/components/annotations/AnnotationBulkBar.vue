@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useCatalogStore } from '@/stores/catalog'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 
 /** Bulk actions for the selected rows (Contributor and above): enable, disable, add or remove a label, delete. */
 const props = defineProps<{ keys: string[] }>()
@@ -33,7 +33,7 @@ async function run(title: string, action: () => Promise<unknown>) {
     toast.add({ title, color: 'success', icon: 'i-lucide-check' })
     emit('clear')
   } catch (error) {
-    toast.add({ title: 'The bulk action failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'The bulk action failed'), description: errorMessage(error), color: 'error' })
   } finally {
     busy.value = false
   }

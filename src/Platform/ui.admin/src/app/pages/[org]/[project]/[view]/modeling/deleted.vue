@@ -8,7 +8,7 @@ import { collectAll, getDeletedAnnotations, type Annotation } from '@42for.net/2
 import { getGetDeletedAnnotationsQueryKey } from '@42for.net/2splatform.sdk/vue-query'
 import { useContextStore } from '@/stores/context'
 import { formatDate, formatRelative } from '@/utils/dates'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 
 // The deleted annotations of the view (spec 4.5): the roots of deletions, newest first, or every deleted annotation
 // with "Show cascaded". Contributors restore them (with or without descendants), Administrators delete them
@@ -122,7 +122,7 @@ async function restore(keys: string[], descendants = true) {
     )
     selected.value = new Set()
   } catch (error) {
-    toast.add({ title: 'Restore failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'Restore failed'), description: errorMessage(error), color: 'error' })
   } finally {
     busy.value = false
   }
@@ -162,7 +162,7 @@ async function purge() {
           },
     )
   } catch (error) {
-    toast.add({ title: 'Delete failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'Delete failed'), description: errorMessage(error), color: 'error' })
   } finally {
     busy.value = false
   }

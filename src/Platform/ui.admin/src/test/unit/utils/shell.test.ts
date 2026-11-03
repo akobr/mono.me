@@ -4,7 +4,7 @@ import { groupMemberships, hasOrganization } from '@/utils/memberships'
 import { currentSection, projectTarget, viewLocation, viewTarget } from '@/utils/context-paths'
 import { accessibleContext, buildNavigation, mergeContext, navigationScope } from '@/utils/navigation'
 import { clampDetailWidth, detailMode } from '@/utils/detail-panel'
-import { describeError } from '@/utils/errors'
+import { describeError, writeFailureTitle } from '@/utils/errors'
 import { StorytellerError } from '@42for.net/2splatform.sdk'
 
 describe('safeReturnTo', () => {
@@ -350,5 +350,22 @@ describe('detail panel', () => {
     expect(clampDetailWidth(42.5)).toBe(42.5)
     expect(clampDetailWidth(90)).toBe(70)
     expect(clampDetailWidth(Number.NaN)).toBe(40)
+  })
+})
+
+describe('writeFailureTitle', () => {
+  it('says a write that timed out may have been saved, and keeps the title of any other failure', () => {
+    const timedOut = new StorytellerError({
+      status: 0,
+      message: 'The Storyteller API did not answer within 120 s (/v1/x).',
+      timedOut: true,
+    })
+    const refused = new StorytellerError({ status: 500, message: 'Down' })
+
+    expect(writeFailureTitle(timedOut, 'The template was not saved')).toBe(
+      'The API did not answer in time; the change may have been saved',
+    )
+    expect(writeFailureTitle(refused, 'The template was not saved')).toBe('The template was not saved')
+    expect(writeFailureTitle(new Error('x'), 'Delete failed')).toBe('Delete failed')
   })
 })

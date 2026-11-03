@@ -17,7 +17,7 @@ import { useKeyValue, useKeyValuePolicy, useRecipients } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { actorName } from '@/utils/audit'
 import { formatDateTime } from '@/utils/dates'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import {
   bindingFor,
   daysUntil,
@@ -196,7 +196,7 @@ async function changeProtection(target: KeyValueProtection) {
     }
     await refresh()
   } catch (error) {
-    toast.add({ title: 'The level was not changed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'The level was not changed'), description: errorMessage(error), color: 'error' })
   }
 }
 
@@ -214,7 +214,7 @@ async function restore() {
     }
     await refresh()
   } catch (error) {
-    toast.add({ title: 'The key was not restored', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'The key was not restored'), description: errorMessage(error), color: 'error' })
   }
 }
 

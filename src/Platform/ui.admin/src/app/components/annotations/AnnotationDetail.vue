@@ -9,7 +9,7 @@ import { useContextStore } from '@/stores/context'
 import { deletedWith } from '@/utils/annotation-key'
 import { annotationStatus } from '@/utils/annotation-status'
 import { actorName } from '@/utils/audit'
-import { errorMessage } from '@/utils/errors'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import type { TreePerspective } from '@/utils/tree-projection'
 
 /** Header, breadcrumb and tab navigation of the annotation detail (spec section 11.1, soft-delete spec 4.1). */
@@ -127,7 +127,7 @@ async function remove() {
     notifyDeleted(`${key} deleted`, deletions, () => void router.push({ path: detailPath, query: route.query }))
     await router.push({ path: `${viewBase.value}/${props.section}`, query: route.query })
   } catch (error) {
-    toast.add({ title: 'Delete failed', description: errorMessage(error), color: 'error' })
+    toast.add({ title: writeFailureTitle(error, 'Delete failed'), description: errorMessage(error), color: 'error' })
   } finally {
     deleting.value = false
   }
