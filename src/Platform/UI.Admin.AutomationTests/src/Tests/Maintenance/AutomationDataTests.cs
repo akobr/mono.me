@@ -15,8 +15,11 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Maintenance;
 
 // Housekeeping of the target's view, not a case of the catalogue (no [TestCase], so no reporter gets its result): the
 // automation data of earlier runs, which the tests themselves never delete. Skipped unless a run asks for it with
-// Maintenance:Purge=true, and always on the mock ([RequiresPurge]). [Serial]: it runs alone, after the other tests, so
-// it neither competes with them for the API nor holds an Administrator of the pool while they run. Not covered: the
+// Maintenance:Purge=true, and always on the mock ([RequiresPurge]). [Serial]: it runs after the tests without a parallel
+// constraint and never beside another serial test, so it does not compete with most tests for the API or hold an
+// Administrator of the pool while they run. It is not ordered against a test with a key of its own ([NotInParallel],
+// e.g. ModelingExportImportTests), which may run beside it: the age of the data (OlderThanHours, never the current run),
+// not the order, keeps it off the data of a running test. Not covered: the
 // disposable projects and organizations (the API cannot delete a project), key values (at_<runId>…) and the views of
 // Target:RoleProjects.
 public sealed partial class AutomationDataTests : PlatformTest
