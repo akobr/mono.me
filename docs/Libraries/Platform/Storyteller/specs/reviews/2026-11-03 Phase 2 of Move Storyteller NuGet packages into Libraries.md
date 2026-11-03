@@ -8,8 +8,8 @@ Phase 2 is section 2 of [Move Storyteller NuGet packages into Libraries](../2026
 
 | Commit | Content |
 |---|---|
-| `5ecdba71` | The code locations in the living docs and in `CLAUDE.md` |
-| `57d44566` | The conformance workflow and the NuGet pack loop |
+| `85527aab` | The code locations in the living docs and in `CLAUDE.md` |
+| `a3f90623` | The conformance workflow and the NuGet pack loop |
 
 ## What Was Done
 
