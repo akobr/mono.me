@@ -480,16 +480,14 @@ public static class HttpRequestDataExtensions
     }
 
     // Users: EnsureUser, then the role on the access point (403). Debug builds (DEV_AUTH) skip User.Impersonation and
-    // the role, so they also serve requests without an identity. Called by async methods only, so what EnsureUser
-    // throws ends in their task.
+    // the role, so they also serve requests without an identity; a test may turn the role check on (UserRoleChecks).
+    // Called by async methods only, so what EnsureUser throws ends in their task.
     private static Task CheckUserAccessAsync(HttpRequestData request, IAccessService accessService, string accessPointKey, AccountRole minimalRole)
     {
         request.EnsureUser();
-#if DEV_AUTH
-        return Task.CompletedTask;
-#else
-        return EnsureUserRoleAsync(request, accessService, accessPointKey, minimalRole);
-#endif
+        return UserRoleChecks.AreSkipped
+            ? Task.CompletedTask
+            : EnsureUserRoleAsync(request, accessService, accessPointKey, minimalRole);
     }
 
     private static async Task EnsureUserRoleAsync(HttpRequestData request, IAccessService accessService, string accessPointKey, AccountRole minimalRole)
