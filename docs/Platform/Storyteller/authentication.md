@@ -193,6 +193,7 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
 4. If you use the role-driven mode, create the permission that maps to `User.Impersonation` and assign it to organization roles. No other permission matters for users; the permissions of machines are described in [AuthKit M2M applications](#authkit-m2m-applications).
 5. Enable **CLI Auth** for the environment so `sform` can use the device sign-in. Without it, `POST /user_management/authorize/device` is rejected and `sform account` reports the WorkOS message.
 6. For invitation emails, set `Auth:AuthKit:ApiKey` (the management key) and point the environment's invitation link at the admin UI's accept page, for example `https://admin.42for.net/invitations/accept`. Without the key, invitations are still created, but no email is sent.
+7. For the admin UI, register its Redirect URI (`/callback`), its default Sign-out URI (`/login`) and its CORS origin in the same environment, as the [WorkOS dashboard checklist](../../../src/Platform/ui.admin/README.md#workos-dashboard-checklist) of the admin UI lists them. Without the Sign-out URI, a sign-out ends on WorkOS' error page `app-homepage-url-not-found`.
 
 ## Discovery endpoint
 
