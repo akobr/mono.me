@@ -177,7 +177,8 @@ export function useAnnotationActions() {
 
   /**
    * RestoreAnnotations, up to 100 keys per request. The restored annotations (and the ancestors created for them)
-   * go back into the catalog; a failure of one key does not stop the others.
+   * go back into the catalog; a failure of one key does not stop the others. Only the deleted lists (the Deleted page's
+   * own data) are awaited; the queries of the restored keys refresh in the background.
    */
   async function restoreMany(keys: string[], options: { descendants?: boolean } = {}): Promise<RestoreOutcome> {
     const target = scope()
@@ -196,10 +197,10 @@ export function useAnnotationActions() {
       outcome.failed.push(...(result.Failed ?? []))
     }
 
-    await Promise.all([
-      invalidateDeleted(queryClient, target),
-      ...outcome.restored.map((annotation) => invalidateAnnotation(queryClient, target, annotation.AnnotationKey)),
-    ])
+    for (const annotation of outcome.restored) {
+      void invalidateAnnotation(queryClient, target, annotation.AnnotationKey)
+    }
+    await invalidateDeleted(queryClient, target)
     void catalog.refreshConfigurations()
     return outcome
   }
@@ -208,7 +209,8 @@ export function useAnnotationActions() {
    * SetAnnotationsSimple, up to 100 keys per request, one request after another (424-33). The keys go in merge
    * order, so a key of the list never comes back as an ancestor of an earlier batch. The API creates the missing
    * ancestors and skips existing keys. A failed batch stops the run; the outcome keeps what was created and the
-   * error, since the batches before it (and maybe a part of it) stay written.
+   * error, since the batches before it (and maybe a part of it) stay written. It returns after the writes: the refresh
+   * of the touched queries and of the catalog does not hold the dialog's result.
    */
   async function createMany(keys: string[]): Promise<BulkCreateOutcome> {
     const target = scope()
@@ -249,15 +251,14 @@ export function useAnnotationActions() {
 
     // The failed batch is in no response: its keys and their ancestors may have been written (or re-created).
     const touched = new Set([...created, ...failed.flatMap((key) => [key, ...getAllAncestors(key)])])
-    await Promise.all([
-      invalidateDeleted(queryClient, target),
-      ...[...touched].map((key) => invalidateAnnotation(queryClient, target, key)),
-    ])
+    void invalidateDeleted(queryClient, target)
+    for (const key of touched) {
+      void invalidateAnnotation(queryClient, target, key)
+    }
     // The relation arrays of the response are snapshots that miss the children written later in the same request,
-    // and a failed batch is in no response, so the catalog reloads in the background.
+    // and a failed batch is in no response, so the catalog reloads in the background (its configurations with it).
     if (inCatalog()) {
       void catalog.load(target, { force: true })
-      void catalog.refreshConfigurations()
     }
     return outcome
   }

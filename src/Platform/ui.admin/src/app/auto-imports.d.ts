@@ -9,6 +9,7 @@
 export {}
 declare global {
   const capabilityRoles: typeof import('./composables/useRole').capabilityRoles
+  const catalogProgressText: typeof import('./stores/catalog').catalogProgressText
   const chunk: typeof import('./composables/useAnnotationActions').chunk
   const clearCatalogSnapshots: typeof import('./stores/catalog').clearCatalogSnapshots
   const defaultPreferences: typeof import('./stores/preferences').defaultPreferences
@@ -99,7 +100,7 @@ declare global {
   export type { ShortcutGroup } from './composables/useShortcutsHelp'
   import('./composables/useShortcutsHelp')
   // @ts-ignore
-  export type { CatalogStatus } from './stores/catalog'
+  export type { CatalogStatus, CatalogProgress } from './stores/catalog'
   import('./stores/catalog')
   // @ts-ignore
   export type { Scope, ContextAccess } from './stores/context'

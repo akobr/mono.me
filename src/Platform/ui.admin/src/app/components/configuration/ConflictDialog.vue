@@ -5,11 +5,12 @@ import { toJson } from '@/utils/json-yaml'
 
 /**
  * A failed JSON Patch `test` (412 PatchTestFailed): someone saved the configuration since it was loaded. Shows
- * theirs (the fresh own content) against yours, with Reload, Overwrite and Copy (spec section 11.2).
+ * theirs (the fresh own content) against yours, with Reload, Overwrite and Copy (spec section 11.2). When theirs could
+ * not be read, the error with Retry: without it neither Reload nor Overwrite has a base.
  */
 const open = defineModel<boolean>('open', { default: false })
-const props = defineProps<{ theirs: unknown; yours: unknown; loading?: boolean }>()
-const emit = defineEmits<{ reload: []; overwrite: [] }>()
+const props = defineProps<{ theirs: unknown; yours: unknown; loading?: boolean; error?: unknown }>()
+const emit = defineEmits<{ reload: []; overwrite: []; retry: [] }>()
 
 const { copy, copied } = useClipboard({ legacy: true })
 const theirsText = computed(() => toJson(props.theirs ?? {}))
@@ -23,6 +24,7 @@ const yoursText = computed(() => toJson(props.yours ?? {}))
         The stored configuration changed after you opened it. Compare their version (left) with yours (right).
       </p>
       <LoadingState v-if="loading" />
+      <ErrorState v-else-if="error" compact :error="error" @retry="emit('retry')" />
       <DiffEditor
         v-else
         :original="theirsText"
@@ -40,8 +42,14 @@ const yoursText = computed(() => toJson(props.yours ?? {}))
           variant="ghost"
           @click="copy(yoursText)"
         />
-        <UButton label="Reload, discard mine" color="neutral" variant="outline" @click="emit('reload')" />
-        <UButton label="Overwrite" color="warning" :disabled="loading" @click="emit('overwrite')" />
+        <UButton
+          label="Reload, discard mine"
+          color="neutral"
+          variant="outline"
+          :disabled="loading || !!error"
+          @click="emit('reload')"
+        />
+        <UButton label="Overwrite" color="warning" :disabled="loading || !!error" @click="emit('overwrite')" />
       </div>
     </template>
   </UModal>

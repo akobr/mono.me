@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { StorytellerError } from '@42for.net/2splatform.sdk'
+import { configureStoryteller, getStorytellerConfig, StorytellerError } from '@42for.net/2splatform.sdk'
+import { apiReadTimeoutMs, apiTimeoutMs, apiWriteTimeoutMs, configureApi } from '@/boot/api'
 import { AppConfigError, isLocalhost, loadAppConfig } from '@/boot/app-config'
 import { onApiError, reportApiError, shouldReport } from '@/boot/api-errors'
 import { shouldRetry } from '@/boot/query'
@@ -129,5 +130,56 @@ describe('global API errors', () => {
     expect(shouldRetry(0, new StorytellerError({ status: 502, message: 'bad gateway' }))).toBe(true)
     expect(shouldRetry(1, new StorytellerError({ status: 502, message: 'bad gateway' }))).toBe(false)
     expect(shouldRetry(0, new StorytellerError({ status: 404, message: 'missing' }))).toBe(false)
+  })
+})
+
+describe('request timeouts', () => {
+  const timedOut = () =>
+    new StorytellerError({
+      status: 0,
+      message: 'The Storyteller API did not answer within 30 s (/api/v1/acme/billing/default/annotations).',
+      timedOut: true,
+    })
+
+  it('gives a read 30 s and any other request 120 s', () => {
+    expect(apiReadTimeoutMs).toBe(30_000)
+    expect(apiWriteTimeoutMs).toBe(120_000)
+    expect(apiTimeoutMs({ method: 'GET' })).toBe(30_000)
+    expect(apiTimeoutMs({ method: 'HEAD' })).toBe(30_000)
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      expect(apiTimeoutMs({ method })).toBe(120_000)
+    }
+  })
+
+  it('configures the SDK with them', () => {
+    const shared = getStorytellerConfig()
+    try {
+      configureApi({ apiBaseUrl: 'https://api.test/api', environmentName: 'test' }, () => {})
+
+      expect(getStorytellerConfig().timeoutMs).toBe(apiTimeoutMs)
+    } finally {
+      configureStoryteller(shared)
+    }
+  })
+
+  it('does not retry a timeout: a second wait before the error is worse than its Retry', () => {
+    expect(shouldRetry(0, timedOut())).toBe(false)
+    expect(shouldRetry(0, new StorytellerError({ status: 0, message: 'offline' }))).toBe(true)
+  })
+
+  it('reports a timeout like any status-0 failure, with its own title', () => {
+    vi.mocked(captureApiError).mockClear()
+    const listener = vi.fn()
+    const off = onApiError(listener)
+    const error = timedOut()
+
+    reportApiError(error)
+    off()
+
+    expect(listener).toHaveBeenCalledExactlyOnceWith({
+      title: 'The API did not answer in time',
+      description: error.message,
+    })
+    expect(vi.mocked(captureApiError)).toHaveBeenCalledExactlyOnceWith(error)
   })
 })

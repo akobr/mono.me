@@ -4,7 +4,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useEventListener, useMediaQuery } from '@vueuse/core'
 import type { RowSelectionState, SortingState } from '@tanstack/vue-table'
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { useCatalogStore } from '@/stores/catalog'
+import { catalogProgressText, useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { columnLabels } from '@/components/annotations/grid/annotation-columns'
 import { expandableIds, projectTree, type TreeNode } from '@/utils/tree-projection'
@@ -221,7 +221,13 @@ const activeLabel = computed(() => {
   return annotation ? `${annotation.Name}, ${annotation.AnnotationKey}` : ''
 })
 
-const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(catalog.loadedCount)} annotations…`)
+const progressLabel = computed(() => catalogProgressText(catalog.progress))
+
+function reload() {
+  if (context.scope) {
+    void catalog.load(context.scope, { force: true })
+  }
+}
 </script>
 
 <template>
@@ -240,7 +246,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
               variant="ghost"
               aria-label="Reload the catalog"
               :loading="catalog.status === 'loading'"
-              @click="context.scope && catalog.load(context.scope, { force: true })"
+              @click="reload"
             />
           </UTooltip>
           <AnnotationCreateActions variant="header" />
@@ -270,8 +276,17 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
         v-if="catalog.status === 'loading' || catalog.fromSnapshot"
         class="flex items-center gap-3 border-b border-default px-4 py-1.5 text-xs text-muted"
       >
-        <UProgress size="xs" class="w-40" />
-        <span>{{ catalog.fromSnapshot ? 'Refreshing…' : progressLabel }}</span>
+        <UProgress
+          size="xs"
+          class="w-40"
+          :model-value="catalog.progress.fallback ? null : catalog.progress.lists"
+          :max="catalog.progress.total"
+        />
+        <span>{{ progressLabel }}</span>
+      </div>
+      <!-- A failed refresh keeps the catalog it had (a snapshot, the previous load), with the error above it. -->
+      <div v-if="catalog.status === 'ready' && catalog.error" class="border-b border-default p-2">
+        <ErrorState compact :error="catalog.error" title="The catalog could not be refreshed" @retry="reload" />
       </div>
       <AnnotationBulkBar v-if="selectedKeys.length && canEdit" :keys="selectedKeys" @clear="rowSelection = {}" />
 
@@ -279,7 +294,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
         v-if="catalog.status === 'error'"
         :error="catalog.error"
         title="The catalog could not be loaded"
-        @retry="context.scope && catalog.load(context.scope, { force: true })"
+        @retry="reload"
       />
       <EmptyState
         v-else-if="catalog.status === 'ready' && catalog.loadedCount === 0"

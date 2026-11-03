@@ -18,6 +18,7 @@ import {
   type AnnotationAuditEntry,
   type ConfigurationSummary,
 } from '@42for.net/2splatform.sdk'
+import AnnotationDetailPanel from '@/components/annotations/AnnotationDetailPanel.vue'
 import AnnotationHistory from '@/components/annotations/AnnotationHistory.vue'
 import ConfigurationLink from '@/components/annotations/ConfigurationLink.vue'
 import DeletedKeysDialog from '@/components/annotations/DeletedKeysDialog.vue'
@@ -297,6 +298,72 @@ describe('AnnotationHistory', () => {
       /Deleted on .+ by Ada Lovelace with \d+ descendants/,
     )
     expect(screen.host.text()).toContain('Restore')
+    screen.host.unmount()
+  })
+
+  // 424-166: a lookup that failed (a timeout, a 5xx) is not "no banner".
+  it('shows a failed lookup of the deleted banner with Retry', async () => {
+    await deleteAnnotation(org, project, view, 'sbt.contoso')
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/annotations/deleted/:key', () =>
+        HttpResponse.json({ Message: 'Down' }, { status: 503 }),
+      ),
+    )
+    const screen = await mountScreen(AnnotationHistory, { annotationKey: 'sbt.contoso' })
+    await settle(10)
+
+    expect(screen.host.find('[data-testid="deleted-banner"]').exists()).toBe(false)
+    expect(screen.host.text()).toContain('The deleted annotation could not be loaded')
+    expect(screen.host.text()).toContain('Down')
+    // the history itself is there
+    expect(screen.host.find('section[aria-label="History"]').exists()).toBe(true)
+
+    server.resetHandlers()
+    await screen.host
+      .findAll('button')
+      .find((button) => button.text() === 'Retry')!
+      .trigger('click')
+    await settle(10)
+
+    expect(screen.host.find('[data-testid="deleted-banner"]').exists()).toBe(true)
+    expect(screen.host.text()).not.toContain('The deleted annotation could not be loaded')
+    screen.host.unmount()
+  })
+})
+
+describe('AnnotationDetailPanel', () => {
+  const panelRoutes = [
+    { path: '/:org/:project/:view/annotations/:key', component: { render: () => null } },
+    { path: '/:pathMatch(.*)*', component: { render: () => null } },
+  ]
+
+  // 424-166: only a 404 of the deleted lookup means "not found"; a timeout or a 5xx shows the error with Retry.
+  it('shows a failed lookup of a deleted annotation with Retry, not "Annotation not found"', async () => {
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/annotations/deleted/:key', () =>
+        HttpResponse.json({ Message: 'Down' }, { status: 503 }),
+      ),
+    )
+    const screen = await mountScreen(
+      AnnotationDetailPanel,
+      {},
+      { path: '/acme/billing/default/annotations/sbt.nowhere', routes: panelRoutes },
+    )
+    await settle(10)
+
+    expect(screen.host.text()).not.toContain('Annotation not found')
+    expect(screen.host.text()).toContain('The API failed')
+    expect(screen.host.text()).toContain('Down')
+
+    // the lookup answers 404 now: the key is unknown
+    server.resetHandlers()
+    await screen.host
+      .findAll('button')
+      .find((button) => button.text() === 'Retry')!
+      .trigger('click')
+    await settle(10)
+
+    expect(screen.host.text()).toContain('Annotation not found')
     screen.host.unmount()
   })
 })

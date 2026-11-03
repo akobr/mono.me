@@ -56,6 +56,7 @@ export function startSentry(
 /**
  * A Storyteller failure is reported by its status and error code only: the message (with the request path for an
  * unreachable API), the hint, the body and the cause stay in the browser. Any other error is reported as it is.
+ * A timeout has its own message and fingerprint, so it does not merge with network failures.
  */
 function captureApiError(error: unknown, router: Router): void {
   if (!isStorytellerError(error)) {
@@ -69,9 +70,14 @@ function captureApiError(error: unknown, router: Router): void {
     tags.api_error_code = error.errorCode
   }
 
-  captureMessage(reachable ? `Storyteller API answered ${error.status}` : 'Storyteller API is not reachable', {
-    level: reachable ? 'error' : 'warning',
-    tags,
-    fingerprint: ['storyteller-api', String(error.status), ...(error.errorCode ? [error.errorCode] : [])],
-  })
+  const message = error.timedOut
+    ? 'Storyteller API did not answer in time'
+    : reachable
+      ? `Storyteller API answered ${error.status}`
+      : 'Storyteller API is not reachable'
+  const fingerprint = error.timedOut
+    ? ['storyteller-api', 'timeout']
+    : ['storyteller-api', String(error.status), ...(error.errorCode ? [error.errorCode] : [])]
+
+  captureMessage(message, { level: reachable ? 'error' : 'warning', tags, fingerprint })
 }

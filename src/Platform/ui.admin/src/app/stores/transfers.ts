@@ -13,6 +13,7 @@ import {
   type ViewImport,
   type ViewImportExisting,
 } from '@42for.net/2splatform.sdk'
+import { apiTransferTimeoutMs } from '@/boot/api'
 import { saveBlob } from '@/utils/download'
 import { errorMessage } from '@/utils/errors'
 import type { Scope } from './context'
@@ -157,13 +158,21 @@ export const useTransfersStore = defineStore('transfers', () => {
 
   /** Uploads a zip; the options left out get the API's defaults (all four kinds, Overwrite, no force, a real run). */
   async function startImport(scope: Scope, file: File, options: ImportOptions = {}): Promise<ImportJob> {
-    const state = await startViewImport(scope.org, scope.project, scope.view, file, {
-      include: includeOf(options.include),
-      existing: options.existing,
-      force: options.force || undefined,
-      dryRun: options.dryRun || undefined,
-      fileName: file.name,
-    })
+    // The upload grows with the archive: it gets the transfer limit, not the write limit.
+    const state = await startViewImport(
+      scope.org,
+      scope.project,
+      scope.view,
+      file,
+      {
+        include: includeOf(options.include),
+        existing: options.existing,
+        force: options.force || undefined,
+        dryRun: options.dryRun || undefined,
+        fileName: file.name,
+      },
+      { timeoutMs: apiTransferTimeoutMs },
+    )
     const job = track<ImportJob>({
       kind: 'import',
       id: state.Id!,
@@ -180,7 +189,10 @@ export const useTransfersStore = defineStore('transfers', () => {
 
   /** Fetches the archive of a finished export and saves it under the export's name. */
   async function download(job: ExportJob): Promise<void> {
-    const archive = await getViewExportArchive(job.scope.org, job.scope.project, job.scope.view, job.id)
+    // The download grows with the view: it gets the transfer limit, not the read limit.
+    const archive = await getViewExportArchive(job.scope.org, job.scope.project, job.scope.view, job.id, {
+      timeoutMs: apiTransferTimeoutMs,
+    })
     saveBlob(archive, job.state.FileName ?? `export-${job.scope.view}.zip`)
   }
 

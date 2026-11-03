@@ -7,7 +7,7 @@ import { actionColors, actionIcons, actionLabels, auditChanges, causeText } from
 
 /**
  * The History tab (spec 4.3): who changed the annotation, when and what, newest first. A deleted annotation gets a
- * banner with Restore above its history.
+ * banner with Restore above its history; when its lookup fails (other than 404), a compact error with Retry instead.
  */
 const props = defineProps<{ annotationKey: string }>()
 const emit = defineEmits<{ restored: [] }>()
@@ -16,6 +16,7 @@ const context = useContextStore()
 const history = useAnnotationHistory(() => props.annotationKey)
 const isDeleted = computed(() => history.data.value?.State === 'Deleted')
 const deleted = useDeletedAnnotation(() => props.annotationKey, isDeleted)
+const deletedFailed = computed(() => deleted.isError.value && !isNotFound(deleted.error.value))
 
 interface Item {
   value: string
@@ -43,6 +44,13 @@ const versionLink = (version: number) => ({
 <template>
   <div class="flex flex-col gap-4 p-4">
     <DeletedAnnotationBanner v-if="deleted.data.value" :annotation="deleted.data.value" @restored="emit('restored')" />
+    <ErrorState
+      v-else-if="deletedFailed"
+      compact
+      title="The deleted annotation could not be loaded"
+      :error="deleted.error.value"
+      @retry="deleted.refetch()"
+    />
 
     <LoadingState v-if="history.isPending.value" label="Loading the history…" />
     <EmptyState

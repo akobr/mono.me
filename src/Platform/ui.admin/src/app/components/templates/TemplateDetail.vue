@@ -17,7 +17,7 @@ import {
 } from '@42for.net/2splatform.sdk'
 import { invalidateAllConfigurations, invalidateTemplate } from '@/queries/invalidation'
 import { useCatalogStore } from '@/stores/catalog'
-import { useContextStore } from '@/stores/context'
+import { useContextStore, type Scope } from '@/stores/context'
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 import { metaOf, type AnnotationTypeCode } from '@/utils/annotation-key'
 import { cloneJson } from '@/utils/clone'
@@ -112,25 +112,31 @@ const versionSource = computed<VersionSource>(() => {
   }
 })
 
-async function afterSave() {
-  await invalidateTemplate(queryClient, context.scope!, props.type)
-  // Effective configurations of this type include the template.
-  await invalidateAllConfigurations(queryClient, context.scope!)
+/**
+ * After a write the template is read again, and awaited: whether it exists decides between create and patch on the next
+ * save. The effective configurations of this type include the template; they refresh in the background, since every
+ * configuration query of the view can be many requests.
+ */
+async function afterSave(scope: Scope) {
+  const refreshed = invalidateTemplate(queryClient, scope, props.type)
+  void invalidateAllConfigurations(queryClient, scope)
+  await refreshed
 }
 
 async function save() {
   if (!context.scope || saving.value) {
     return
   }
-  const { org, project, view } = context.scope
+  const scope = context.scope
+  const { org, project, view } = scope
   saving.value = true
   try {
     const saved = missing.value
       ? await setTemplate(org, project, view, props.type, (draft.value ?? {}) as Record<string, unknown>)
       : await patchTemplate(org, project, view, props.type, patch.value)
     original.value = cloneJson(draft.value)
-    await afterSave()
     toast.add({ title: `Template saved (v${saved.Version ?? '?'})`, color: 'success', icon: 'i-lucide-check' })
+    await afterSave(scope)
   } catch (error) {
     if (isPreconditionFailed(error) || hasErrorCode(error, 'PatchTestFailed')) {
       conflictOpen.value = true
@@ -153,15 +159,16 @@ async function remove() {
   if (!context.scope) {
     return
   }
-  const { org, project, view } = context.scope
+  const scope = context.scope
+  const { org, project, view } = scope
   try {
     await deleteTemplate(org, project, view, props.type)
     confirmDelete.value = false
     // Both together, so the editor stays clean; the 404 of the refetch then shows the empty state.
     original.value = undefined
     draft.value = undefined
-    await afterSave()
     toast.add({ title: 'Template deleted', color: 'success', icon: 'i-lucide-trash-2' })
+    await afterSave(scope)
   } catch (error) {
     toast.add({ title: 'Delete failed', description: errorMessage(error), color: 'error' })
   }

@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VueWrapper } from '@vue/test-utils'
-import { http } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import type { Annotation, ConfigurationSummary } from '@42for.net/2splatform.sdk'
 import ConfigurationCreateDialog from '@/components/configuration/ConfigurationCreateDialog.vue'
@@ -174,6 +174,39 @@ describe('ConfigurationCreateDialog', () => {
 
     expect(catalog.error).toBeUndefined()
     expect(text()).not.toContain('The catalog could not be loaded')
+    expect(offered(select())).toContain('exe.northwind.invoicing.prod')
+  })
+
+  // 424-166: a failed list of the summaries says so instead of "Loading the catalog…" forever.
+  it('says so when the configurations could not be listed and lists only them again', async () => {
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/configurations', () =>
+        HttpResponse.json({ Message: 'Down' }, { status: 503 }),
+      ),
+    )
+    const catalog = useCatalogStore()
+    await catalog.load(scope)
+    await vi.waitFor(() => expect(catalog.configurationsError).toBeDefined())
+
+    const { select } = await openDialog({ load: false })
+
+    expect(text()).toContain('The configurations could not be listed')
+    expect(select().exists()).toBe(false)
+
+    server.resetHandlers()
+    let typeLists = 0
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/subjects', () => {
+        typeLists++
+      }),
+    )
+    button('Retry')!.click()
+    await settle(10)
+
+    expect(catalog.configurationsError).toBeUndefined()
+    // the annotations were not loaded again
+    expect(typeLists).toBe(0)
+    expect(text()).not.toContain('could not be')
     expect(offered(select())).toContain('exe.northwind.invoicing.prod')
   })
 

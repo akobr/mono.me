@@ -1,7 +1,10 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { VueWrapper } from '@vue/test-utils'
+import { QueryObserver } from '@tanstack/vue-query'
+import { delay, http } from 'msw'
 import { setupServer } from 'msw/node'
 import {
+  getConfigurations,
   getDescendantTypeSchema,
   getDescendantTypeSchemaVersions,
   setDescendantTypeSchema,
@@ -269,6 +272,54 @@ describe('TemplateDetail', () => {
     const stored = latest(getDocument(loadDb(), scope, 'template:exe'))
     expect(stored?.Version).toBe(4)
     expect(stored?.Content?.retries).toBe(6)
+    view.host.unmount()
+  })
+
+  // 424-166: every configuration query of the view refreshes after a template save, in the background.
+  it('shows the toast of a save while the configurations of the view refresh', async () => {
+    let lists = 0
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/configurations', async () => {
+        // the first answer comes from the mock, the refresh after the save never comes
+        if (++lists > 1) {
+          await delay('infinite')
+        }
+      }),
+    )
+    const view = await mountScreen(
+      TemplateDetail,
+      { type: 'exe' },
+      { path: '/acme/billing/default/modeling/templates/exe' },
+    )
+    // an open list of the configurations (the Configurations page), which the save invalidates
+    const observer = new QueryObserver(view.queryClient, {
+      queryKey: ['v1', scope.org, scope.project, scope.view, 'configurations'],
+      queryFn: ({ signal }) => getConfigurations(scope.org, scope.project, scope.view, undefined, { signal }),
+    })
+    const stop = observer.subscribe(() => {})
+    await vi.waitFor(() => expect(observer.getCurrentResult().isSuccess).toBe(true))
+    await settle(10)
+
+    const template = JSON.parse(view.host.find('textarea').element.value) as Record<string, unknown>
+    await view.host.find('textarea').setValue(JSON.stringify({ ...template, retries: 5 }, null, 2))
+    await settle()
+    await view.host
+      .findAll('button')
+      .find((button) => button.text() === 'Save')!
+      .trigger('click')
+
+    await vi.waitFor(() => expect(view.host.text()).toContain('Template saved (v4)'))
+    await vi.waitFor(() => expect(lists).toBe(2))
+    await settle(10)
+    expect(observer.getCurrentResult().isFetching).toBe(true)
+    // the template itself was read again: the next save patches it
+    expect(
+      view.host
+        .findAll('button')
+        .find((button) => button.text() === 'Save')!
+        .attributes('disabled'),
+    ).toBeDefined()
+    stop()
     view.host.unmount()
   })
 })

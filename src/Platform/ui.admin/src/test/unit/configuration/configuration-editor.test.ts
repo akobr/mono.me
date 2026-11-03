@@ -1,6 +1,15 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createApp } from 'vue'
+import { delay, http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { isNotFound, patchConfiguration } from '@42for.net/2splatform.sdk'
+import { useToast } from '@nuxt/ui/composables'
+import {
+  configureStoryteller,
+  getStorytellerConfig,
+  isNotFound,
+  patchConfiguration,
+  type StorytellerConfig,
+} from '@42for.net/2splatform.sdk'
 import ConfigurationEditor from '@/components/configuration/ConfigurationEditor.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import { loadDb, saveDb } from '@/mock/db'
@@ -194,6 +203,187 @@ describe('ConfigurationEditor (JSON Patch saves)', () => {
     expect(ownContent(loadDb(), scope, key)).toBeUndefined()
     expect(view.host.text()).toContain('No configuration yet')
     expect(hasUnsavedChanges()).toBe(false)
+    view.host.unmount()
+  })
+})
+
+// 424-166: a save shows its toast after the patch, and a patch that ran out of time is checked, not guessed.
+describe('ConfigurationEditor on a slow API', () => {
+  let shared: StorytellerConfig | undefined
+
+  /** The SDK of the unit tests has no timeout (test/setup.ts); these tests give it a short one. */
+  function timeoutAfter(timeoutMs: number) {
+    shared = getStorytellerConfig()
+    configureStoryteller({ ...shared, timeoutMs })
+  }
+
+  // The toasts are global state of Nuxt UI: the toasts of the tests before would still be shown. These tests read the
+  // toasts of their own save.
+  beforeEach(() => {
+    createApp({}).runWithContext(() => useToast().clear())
+  })
+
+  afterEach(() => {
+    if (shared) {
+      configureStoryteller(shared)
+      shared = undefined
+    }
+  })
+
+  const documentUrl = '*/api/v1/:org/:project/:view/configuration/:key'
+  const versionUrl = '*/api/v1/:org/:project/:view/configuration/:key/versions/:version'
+  const hang = async () => {
+    await delay('infinite')
+  }
+  const page = () => document.body.textContent ?? ''
+
+  async function edit(view: Awaited<ReturnType<typeof mountEditor>>) {
+    const own = JSON.parse(textarea(view).element.value) as Record<string, unknown>
+    const edited = { ...own, retries: own.retries === 7 ? 6 : 7 }
+    await textarea(view).setValue(JSON.stringify(edited, null, 2))
+    await settle()
+    expect(view.host.text()).toContain('1 change')
+    return { own, edited }
+  }
+
+  it('shows the toast of a save while the documents refresh in the background', async () => {
+    const key = configuredExecution()
+    const view = await mountEditor(key)
+    const { edited } = await edit(view)
+    // from now on the effective document does not answer
+    server.use(http.get(documentUrl, hang))
+
+    await saveButton(view).trigger('click')
+
+    await vi.waitFor(() => expect(page()).toMatch(/Configuration saved \(v\d+\)/))
+    expect(ownContent(loadDb(), scope, key)).toEqual(edited)
+    expect(view.host.text()).not.toContain('1 change')
+    expect(hasUnsavedChanges()).toBe(false)
+    view.host.unmount()
+  })
+
+  it('counts a save that timed out as done when the content read again is the draft', async () => {
+    const key = configuredExecution()
+    const view = await mountEditor(key)
+    const { edited } = await edit(view)
+    timeoutAfter(200)
+    // the API stores the patch, but its answer does not come in time
+    server.use(
+      http.patch(documentUrl, async () => {
+        const db = loadDb()
+        putVersion(db, scope, `configuration:${key}`, edited)
+        saveDb(db)
+        await delay('infinite')
+      }),
+    )
+
+    await saveButton(view).trigger('click')
+
+    await vi.waitFor(() => expect(page()).toContain('The API answered late, but the content is stored.'), {
+      timeout: 3000,
+    })
+    expect(page()).toContain('Configuration saved')
+    expect(page()).not.toContain('not saved')
+    expect(view.host.text()).not.toContain('1 change')
+    expect(hasUnsavedChanges()).toBe(false)
+    view.host.unmount()
+  })
+
+  it('keeps the draft when a save that timed out is not stored (yet), and says it may still be', async () => {
+    const key = configuredExecution()
+    const view = await mountEditor(key)
+    const { own } = await edit(view)
+    timeoutAfter(200)
+    server.use(http.patch(documentUrl, hang))
+
+    await saveButton(view).trigger('click')
+
+    // The content read again is the old one, but the API may still be applying the patch it no longer answers.
+    await vi.waitFor(
+      () =>
+        expect(page()).toContain(
+          'The API did not answer in time; the change may have been saved. Reload before saving again.',
+        ),
+      { timeout: 3000 },
+    )
+    expect(page()).not.toContain('Configuration saved')
+    expect(ownContent(loadDb(), scope, key)).toEqual(own)
+    expect(view.host.text()).toContain('1 change')
+    expect(hasUnsavedChanges()).toBe(true)
+    view.host.unmount()
+  })
+
+  it('says a save that timed out may have been stored when the content cannot be read again', async () => {
+    const key = configuredExecution()
+    const view = await mountEditor(key)
+    await edit(view)
+    timeoutAfter(200)
+    server.use(http.patch(documentUrl, hang), http.get(documentUrl, hang))
+
+    await saveButton(view).trigger('click')
+
+    await vi.waitFor(
+      () =>
+        expect(page()).toContain(
+          'The API did not answer in time; the change may have been saved. Reload before saving again.',
+        ),
+      { timeout: 3000 },
+    )
+    expect(page()).not.toContain('Configuration saved')
+    expect(hasUnsavedChanges()).toBe(true)
+    view.host.unmount()
+  })
+
+  it('shows the error of the stored content in the conflict dialog with Retry, not a spinner', async () => {
+    const key = configuredExecution()
+    const view = await mountEditor(key)
+    const own = JSON.parse(textarea(view).element.value) as Record<string, unknown>
+    const db = loadDb()
+    putVersion(db, scope, `configuration:${key}`, { ...own, retries: 9 })
+    saveDb(db)
+    await textarea(view).setValue(JSON.stringify({ ...own, retries: own.retries === 2 ? 3 : 2 }, null, 2))
+    await settle()
+    // the stored content of the new version does not come
+    timeoutAfter(200)
+    server.use(http.get(versionUrl, hang))
+
+    await saveButton(view).trigger('click')
+
+    await vi.waitFor(() => expect(page()).toContain('The API did not answer in time'), { timeout: 3000 })
+    expect(page()).toContain('Someone else changed this configuration')
+    const button = (label: string) =>
+      [...document.body.querySelectorAll('button')].find((candidate) => candidate.textContent?.trim() === label)
+    expect(button('Retry')).toBeDefined()
+    expect(button('Overwrite')?.disabled).toBe(true)
+    expect(button('Reload, discard mine')?.disabled).toBe(true)
+
+    // Retry reads the stored content again; this time it answers.
+    server.resetHandlers()
+    button('Retry')!.click()
+    await vi.waitFor(() => expect(document.body.querySelector('[data-diff]')?.textContent).toContain('"retries": 9'), {
+      timeout: 3000,
+    })
+    expect(button('Overwrite')?.disabled).toBe(false)
+    view.host.unmount()
+  })
+
+  it('shows the error of the own content with Retry, not an empty document to patch', async () => {
+    const key = configuredExecution()
+    server.use(http.get(versionUrl, () => HttpResponse.json({ Message: 'Down' }, { status: 503 })))
+    const view = await mountEditor(key)
+
+    expect(view.host.find('textarea').exists()).toBe(false)
+    expect(view.host.text()).toContain('The API failed')
+    expect(view.host.text()).toContain('Down')
+
+    server.resetHandlers()
+    await view.host
+      .findAll('button')
+      .find((button) => button.text().includes('Retry'))!
+      .trigger('click')
+    await settle(10)
+
+    expect(JSON.parse(textarea(view).element.value)).toEqual(ownContent(loadDb(), scope, key))
     view.host.unmount()
   })
 })

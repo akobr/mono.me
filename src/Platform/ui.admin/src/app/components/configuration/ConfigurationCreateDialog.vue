@@ -21,8 +21,13 @@ const select = useTemplateRef<{ triggerRef?: HTMLElement }>('select')
 const openButton = useTemplateRef<ComponentPublicInstance>('openButton')
 
 // A snapshot can hold keys deleted since, and a catalog still loading misses keys: the list waits for both. A failed
-// load says so instead of loading forever.
-const failed = computed(() => catalog.status === 'error' || !!catalog.error)
+// load (of the annotations or of the configuration summaries) says so instead of loading forever.
+const failed = computed(() => catalog.status === 'error' || !!catalog.error || !!catalog.configurationsError)
+const failure = computed(() =>
+  catalog.status === 'error' || catalog.error
+    ? 'The catalog could not be loaded, so the annotations without a configuration are not known.'
+    : 'The configurations could not be listed, so the annotations without a configuration are not known.',
+)
 const ready = computed(
   () => catalog.status === 'ready' && !catalog.fromSnapshot && !!catalog.configurations && !failed.value,
 )
@@ -72,7 +77,10 @@ async function onPick() {
 }
 
 function retry() {
-  if (context.scope) {
+  // Only the summaries failed: they are listed again, without reloading (or restarting) the annotations.
+  if (catalog.status !== 'error' && !catalog.error) {
+    void catalog.refreshConfigurations()
+  } else if (context.scope) {
     void catalog.load(context.scope, { force: true })
   }
 }
@@ -100,7 +108,7 @@ function go() {
           color="error"
           variant="subtle"
           icon="i-lucide-circle-alert"
-          description="The catalog could not be loaded, so the annotations without a configuration are not known."
+          :description="failure"
           :actions="[{ label: 'Retry', color: 'error', variant: 'outline', onClick: retry }]"
         />
         <UAlert v-else-if="nothing" color="neutral" variant="subtle" icon="i-lucide-info" :description="nothing" />
