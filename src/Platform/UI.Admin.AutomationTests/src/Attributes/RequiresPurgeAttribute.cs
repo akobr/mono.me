@@ -17,6 +17,8 @@ public sealed class RequiresPurgeAttribute() : SkipAttribute(NotAskedFor)
     {
         return Task.FromResult(UiAutomationSession.LoadedSettings switch
         {
+            // Not loaded: the session fails every test before it starts (UiAutomationSession.SkipReason), this one
+            // included, before it could delete anything; as [MockOnly] does, the failure is not hidden as a skip.
             null => false,
             { IsConfigured: false } or { IsReplay: true } => true,
             var settings => settings.Bind<PlatformTarget>(PlatformTarget.Section).IsMock || !settings.Bind<MaintenanceSettings>(MaintenanceSettings.Section).Purge,
