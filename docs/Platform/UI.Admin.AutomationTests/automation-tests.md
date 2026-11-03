@@ -106,7 +106,7 @@ The committed `testsettings.json` holds a pool of 8 users (their e-mails and rol
 
 ## AuthKit checklist
 
-`Target:SignIn` `AuthKit` (`Access/AuthKitSignIn.cs`) signs each pool user in once per run, through `/login`, "Continue with AuthKit" and the AuthKit hosted page (Email, Continue, Password, Sign in, WorkOS' labels; the e-mail and the password are typed, not filled, because BrowserStack can mask only a typed value in its logs), then gives the user's later tests the captured storage state; authkit-js rotates the refresh token on every page load, so the cookies and the `workos:*` local storage items of a test that ended signed in carry over to the user's next test. The AuthKit environment of the target needs, by hand:
+`Target:SignIn` `AuthKit` (`Access/AuthKitSignIn.cs`) signs each pool user in once per run, through `/login`, "Continue with AuthKit" and the AuthKit hosted page (Email, Continue or Continue with email, also with its "Last used" badge, Password, Sign in, WorkOS' labels; the e-mail and the password are typed, not filled, because BrowserStack can mask only a typed value in its logs), then gives the user's later tests the captured storage state; authkit-js rotates the refresh token on every page load, so the cookies and the `workos:*` local storage items of a test that ended signed in carry over to the user's next test. The AuthKit environment of the target needs, by hand:
 
 - password authentication enabled;
 - no MFA (and no other second step) for the pool users;

@@ -25,8 +25,9 @@ public sealed class AuthKitSignIn : ISignInFlow
 {
     public const string FlowName = "AuthKit";
 
-    // The e-mail step's button: "Continue" alone, or "Continue with email" when social connections are enabled.
-    internal static readonly System.Text.RegularExpressions.Regex AuthKitContinue = new("^Continue( with email)?$");
+    // The e-mail step's button of the hosted page: "Continue", or "Continue with email" with the social sign-ins; once
+    // e-mail was used in the browser, its "Last used" badge joins the accessible name.
+    internal static readonly System.Text.RegularExpressions.Regex AuthKitContinue = new(@"^Continue( with email)?(\s*Last used)?$");
 
     // The keys authkit-js keeps in local storage (devMode, on localhost): workos:refresh-token:<client id> and others.
     private const string StoragePrefix = "workos:";
