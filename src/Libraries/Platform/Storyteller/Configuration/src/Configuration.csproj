@@ -35,9 +35,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
+    <ProjectReference Include="..\..\..\..\..\Platform\Storyteller\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
     <ProjectReference Include="..\..\ConfigurationFormats\src\ConfigurationFormats.csproj" />
-    <ProjectReference Include="..\..\Sdk.NSwag\src\Sdk.NSwag.csproj" />
+    <ProjectReference Include="..\..\..\..\..\Platform\Storyteller\Sdk.NSwag\src\Sdk.NSwag.csproj" />
   </ItemGroup>
 
 </Project>
