@@ -293,8 +293,29 @@ public sealed partial class App
     public async Task SignOutAsync()
     {
         await OpenUserMenuAsync();
+        await ClickSignOutAsync();
+    }
+
+    // Clicks "Sign out" of the open user menu and returns once the app shows /login. AuthKit gets there through the
+    // WorkOS logout, which returns to <origin>/login only when that URL is a Sign-out URI of the target's WorkOS
+    // environment, or the environment has a default one; otherwise WorkOS keeps the browser on its error page
+    // (error.workos.com/user_management/app-homepage-url-not-found), and the failure names the missing Sign-out URI
+    // instead of a mismatch of the URL. A failure on the app's own origin keeps Playwright's message.
+    public async Task ClickSignOutAsync()
+    {
+        var origin = OriginOf(Page.Url);
         await UserMenuItem("Sign out").ClickAsync();
-        await Expect(Page).ToHaveURLAsync(LoginPath());
+
+        try
+        {
+            await Expect(Page).ToHaveURLAsync(LoginPath());
+        }
+        catch (PlaywrightException exception) when (origin is not null && !string.Equals(OriginOf(Page.Url), origin, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new PlaywrightException(
+                $"The sign-out ended on {Page.Url} instead of {origin}/login: WorkOS returns there only when {origin}/login is a Sign-out URI of the target's WorkOS environment, or its default one (\"AuthKit checklist\" in docs/Platform/UI.Admin.AutomationTests/automation-tests.md).",
+                exception);
+        }
     }
 
     // Opens the command palette with the navbar's "Search…" (there on every width) and returns its input.
@@ -348,6 +369,12 @@ public sealed partial class App
     internal static string WithQuery(string path, string name, string value)
     {
         return AppRoutes.WithQuery(path, (name, value));
+    }
+
+    // The scheme, host and port of an absolute URL (http://localhost:5173), or null for any other URL.
+    private static string? OriginOf(string url)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.GetLeftPart(UriPartial.Authority) : null;
     }
 
     // Playwright translates a locator's regex to JavaScript: only IgnoreCase, Multiline and Singleline are allowed.
