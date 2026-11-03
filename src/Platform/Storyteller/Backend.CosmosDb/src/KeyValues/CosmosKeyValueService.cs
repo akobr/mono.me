@@ -39,6 +39,7 @@ public class CosmosKeyValueService : IKeyValueService
     private readonly IKeyValuePolicyStore _policies;
     private readonly IKeyValueAuditLog? _audit;
     private readonly IKeyValueUsageRecorder? _usage;
+    private readonly IKeyValueMaintenanceService? _maintenance;
     private readonly KeyValueOptions _options;
     private readonly JsonSerializerSettings _serializerOptions;
     private readonly JsonContentDiffer _differ;
@@ -55,13 +56,15 @@ public class CosmosKeyValueService : IKeyValueService
         IKeyValueAuditLog? audit = null,
         IKeyValueUsageRecorder? usage = null,
         TimeProvider? timeProvider = null,
-        ILogger<CosmosKeyValueService>? logger = null)
+        ILogger<CosmosKeyValueService>? logger = null,
+        IKeyValueMaintenanceService? maintenance = null)
     {
         _repositoryProvider = repositoryProvider;
         _protector = protector;
         _policies = policies;
         _audit = audit;
         _usage = usage;
+        _maintenance = maintenance;
         _options = options.Value;
         _serializerOptions = serializerOptions.Value;
         _differ = new JsonContentDiffer(jsonSettingsProvider);
@@ -177,6 +180,7 @@ public class CosmosKeyValueService : IKeyValueService
                     var response = await place.Container.CreateItemAsync(created, place.PartitionKey);
                     LogCharge("create", place, response.RequestCharge);
                     await RecordWriteAsync(place, caller, created, KeyValueAuditOperation.Create, previous: null);
+                    await RecordStandardKeyAsync(organization, project, protection, policy);
                     return created.ToKeyValue(write.Value, now);
                 }
                 catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.Conflict)
@@ -207,6 +211,7 @@ public class CosmosKeyValueService : IKeyValueService
             if (updated is not null)
             {
                 await RecordWriteAsync(place, caller, updated, KeyValueAuditOperation.Update, existing.Content.Protection);
+                await RecordStandardKeyAsync(organization, project, targetProtection, policy);
                 return updated.ToKeyValue(write.Value, now);
             }
         }
@@ -269,7 +274,14 @@ public class CosmosKeyValueService : IKeyValueService
         var policy = await _policies.GetAsync(organization, project);
         EnsureProtectionAllowed(policy, target);
 
-        return await RunBulkAsync(organization, project, view, request, caller, KeyValueState.Active, (place, key, bulkCaller) => ProtectOneAsync(place, key, target, bulkCaller));
+        var result = await RunBulkAsync(organization, project, view, request, caller, KeyValueState.Active, (place, key, bulkCaller) => ProtectOneAsync(place, key, target, bulkCaller));
+
+        if (result.Items.Any(item => item.Outcome == KeyValueBulkOutcome.Done))
+        {
+            await RecordStandardKeyAsync(organization, project, target, policy);
+        }
+
+        return result;
     }
 
     public async Task<IReadOnlyList<KeyValueVersion>> GetVersionsAsync(string organization, string project, string view, string key)
@@ -529,6 +541,11 @@ public class CosmosKeyValueService : IKeyValueService
             + $"{results.Count(result => result.Action == KeyValueImportAction.Update)} updated, "
             + $"{results.Count(result => result.Action == KeyValueImportAction.Delete)} deleted, "
             + $"{results.Count(result => result.ErrorCode is not null)} failed");
+
+        if (results.Any(result => result.ErrorCode is null && result.Protection == KeyValueProtection.Standard && result.Action is KeyValueImportAction.Create or KeyValueImportAction.Update))
+        {
+            await RecordStandardKeyAsync(organization, project, KeyValueProtection.Standard, policy);
+        }
 
         return new KeyValueImportResult
         {
@@ -1538,6 +1555,26 @@ public class CosmosKeyValueService : IKeyValueService
     private void LogCharge(string operation, Place place, double requestCharge)
     {
         _logger.LogDebug("kv {Operation} in {PartitionKey}: {RequestCharge} RU", operation, place.PartitionKeyValue, requestCharge);
+    }
+
+    // The first Standard secret records the project's Standard key in the policy, so Settings shows it at once (424-167).
+    // The policy is the one the write read: once it knows the key, a write costs nothing more. The value is already
+    // stored, so a failed record never fails the write; the next Standard write tries again.
+    private async Task RecordStandardKeyAsync(string organization, string project, KeyValueProtection protection, KeyValuePolicy policy)
+    {
+        if (protection != KeyValueProtection.Standard || policy.Standard is not null || _maintenance is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _maintenance.RecordStandardKeyAsync(organization, project);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _logger.LogWarning(exception, "Could not record the Standard key of {Organization}.{Project} in its policy", organization, project);
+        }
     }
 
     // Every write is metered; writes that touch a secret are audited.

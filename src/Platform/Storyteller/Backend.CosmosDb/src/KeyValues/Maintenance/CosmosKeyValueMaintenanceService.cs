@@ -75,7 +75,12 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
         var now = _timeProvider.GetUtcNow();
         var lastCheck = new[] { policy.Standard?.CheckedAt, policy.Hsm?.Key?.CheckedAt, policy.Byok?.LastCheckedAt }.Max();
 
-        if (!force && lastCheck is not null && now - lastCheck.Value < CheckInterval)
+        // a Standard key the policy does not know yet is recorded at once, whenever the other keys were checked (424-167)
+        var standardMissing = policy.Standard is null
+            && policy.AllowedProtections.Contains(KeyValueProtection.Standard)
+            && _providers.ContainsKey(KeyValueProtection.Standard);
+
+        if (!force && !standardMissing && lastCheck is not null && now - lastCheck.Value < CheckInterval)
         {
             return policy;
         }
@@ -144,6 +149,50 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
         }
 
         return await SaveAsync(organization, project, updated, cancellationToken);
+    }
+
+    public async Task<KeyValuePolicy> RecordStandardKeyAsync(string organization, string project, CancellationToken cancellationToken = default)
+    {
+        if (!_providers.TryGetValue(KeyValueProtection.Standard, out var provider))
+        {
+            return await _policies.GetAsync(organization, project, cancellationToken);
+        }
+
+        var scope = new KeyValueScope(organization, project);
+
+        for (var attempt = 0; ; attempt++)
+        {
+            var policy = await _policies.GetAsync(organization, project, cancellationToken);
+
+            if (policy.Standard is not null)
+            {
+                return policy;
+            }
+
+            // read fresh: the write has just wrapped with the key, and the provider's ensured info is stale after a rotation
+            var info = await provider.GetKeyInfoAsync(scope, policy, cancellationToken);
+            var now = _timeProvider.GetUtcNow();
+            var recorded = CosmosKeyValuePolicyService.WithKeyInfo(policy, KeyValueProtection.Standard, info with { CheckedAt = now }) with
+            {
+                Version = policy.Version + 1,
+                Modified = AuditStamp.Of(AuditActor.System, now),
+            };
+
+            try
+            {
+                return await _policies.SetAsync(organization, project, recorded, cancellationToken);
+            }
+            catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.PolicyVersionMismatch && attempt < 2)
+            {
+                // another first write or an Administrator was faster; the store dropped its cache, so the next attempt
+                // reads their policy and stops when it already knows the key
+            }
+            catch (NotFoundException)
+            {
+                // a project without an access point has no policy to record into
+                return policy;
+            }
+        }
     }
 
     public async Task<RewrapStatus?> RewrapAsync(string organization, string project, KeyValueProtection protection, CancellationToken cancellationToken = default)

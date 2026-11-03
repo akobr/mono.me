@@ -31,6 +31,8 @@ public class KeyValuePolicyTests(Startup startup)
 
     private IKeyValueAuditLog Audit => Context.Services.GetRequiredService<IKeyValueAuditLog>();
 
+    private FakeKeyEncryptionProvider StandardProvider => Context.Services.GetRequiredService<FakeKeyEncryptionProvider>();
+
     [Fact]
     public async Task Defaults_PublicAndStandard_WithMtlsRequired()
     {
@@ -235,5 +237,140 @@ public class KeyValuePolicyTests(Startup startup)
 
         var unchanged = await Policies.UpdateAsync(Org, project, new KeyValuePolicyUpdate { RequireMtlsForSecretDelivery = false, ExpectedVersion = 1 }, Admin);
         unchanged.Version.Should().Be(1, "nothing changed, nothing is written");
+    }
+
+    // 424-167: the first Standard secret records the project's Standard key, so Settings shows it with Rotate now.
+    [Fact]
+    public async Task FirstStandardSecret_RecordsTheStandardKey()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("first");
+        var before = await Policies.GetAsync(Org, project);
+        before.Standard.Should().BeNull();
+        before.Version.Should().Be(0);
+
+        await KeyValues.SetAsync(Org, project, View, "db.password", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s" }, Admin);
+
+        var policy = await Policies.GetAsync(Org, project);
+        policy.Standard.Should().NotBeNull();
+        policy.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
+        policy.Standard.CurrentKeyVersion.Should().Be(StandardProvider.CurrentVersion);
+        policy.Standard.CheckedAt.Should().NotBeNull();
+        policy.Version.Should().Be(1);
+        policy.Modified!.By.Should().Be(AuditActor.System);
+        policy.AllowedProtections.Should().Equal(KeyValueProtection.Public, KeyValueProtection.Standard);
+
+        // stored, not only cached: the maintenance lists the project from now on
+        var stored = (await Store.ListAsync()).Where(entry => entry.Organization == Org && entry.Project == project).ToList();
+        stored.Should().ContainSingle();
+        stored[0].Policy.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
+
+        await KeyValues.SetAsync(Org, project, View, "api.key", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "k" }, Admin);
+        await KeyValues.SetAsync(Org, project, View, "db.password", new KeyValueWrite { Value = "s2" }, Admin);
+        (await Policies.GetAsync(Org, project)).Version.Should().Be(1, "a known key is not recorded again");
+
+        var changes = await Audit.QueryAsync(Org, project, new KeyValueAuditQuery { Operation = KeyValueAuditOperation.PolicyChange });
+        changes.Items.Should().BeEmpty("the platform's record of its own key is not a policy change");
+    }
+
+    [Fact]
+    public async Task PublicPair_RecordsNoKey()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("public");
+
+        await KeyValues.SetAsync(Org, project, View, "db.host", new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "localhost" }, Admin);
+
+        var policy = await Policies.GetAsync(Org, project);
+        policy.Standard.Should().BeNull();
+        policy.Version.Should().Be(0);
+        (await Store.ListAsync()).Should().NotContain(entry => entry.Project == project);
+    }
+
+    [Fact]
+    public async Task StandardUpdate_RecordsTheKey()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("update");
+        await KeyValues.SetAsync(Org, project, View, "token", new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "t1" }, Admin);
+        (await Policies.GetAsync(Org, project)).Standard.Should().BeNull();
+
+        await KeyValues.SetAsync(Org, project, View, "token", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "t2" }, Admin);
+
+        var policy = await Policies.GetAsync(Org, project);
+        policy.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
+        policy.Version.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Import_OfAStandardSecret_RecordsTheKeyOnce()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("import");
+        var document = new KeyValueDocument
+        {
+            Items =
+            [
+                new KeyValueDocumentItem { Key = "db.host", Protection = KeyValueProtection.Public, Value = "localhost" },
+                new KeyValueDocumentItem { Key = "db.password", Protection = KeyValueProtection.Standard, Value = "s" },
+                new KeyValueDocumentItem { Key = "api.key", Protection = KeyValueProtection.Standard, Value = "k" },
+            ],
+        };
+
+        var dryRun = await KeyValues.ImportAsync(Org, project, View, document, new KeyValueImportOptions { DryRun = true }, Admin);
+        dryRun.IsDryRun.Should().BeTrue();
+        (await Policies.GetAsync(Org, project)).Standard.Should().BeNull("a dry run writes nothing");
+
+        var result = await KeyValues.ImportAsync(Org, project, View, document, new KeyValueImportOptions(), Admin);
+
+        result.IsComplete.Should().BeTrue();
+        var policy = await Policies.GetAsync(Org, project);
+        policy.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
+        policy.Version.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Protect_ToStandard_RecordsTheKey()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("protect");
+        var allowHsm = new KeyValuePolicyUpdate { AllowedProtections = [KeyValueProtection.Public, KeyValueProtection.Standard, KeyValueProtection.Hsm] };
+        var enabled = await Policies.UpdateAsync(Org, project, allowHsm, Admin);
+        enabled.Hsm!.Key.Should().NotBeNull("enabling the level records the HSM key");
+        enabled.Standard.Should().BeNull();
+        await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Protection = KeyValueProtection.Hsm, Value = "v" }, Admin);
+        (await Policies.GetAsync(Org, project)).Standard.Should().BeNull("an HSM secret records no Standard key");
+
+        var result = await KeyValues.ProtectAsync(Org, project, View, new KeyValueBulkRequest { Keys = ["s"], Protection = KeyValueProtection.Standard }, Admin);
+
+        result.Items.Single().Outcome.Should().Be(KeyValueBulkOutcome.Done);
+        var policy = await Policies.GetAsync(Org, project);
+        policy.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
+        policy.Hsm!.Key.Should().BeEquivalentTo(enabled.Hsm.Key, "the record changes nothing else");
+        policy.Version.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ConcurrentFirstStandardSecrets_RecordTheKeyOnce()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("burst");
+
+        var written = await Task.WhenAll(Enumerable.Range(0, 8).Select(index =>
+            KeyValues.SetAsync(Org, project, View, $"secret.k{index}", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = $"v{index}" }, Admin)));
+
+        written.Should().OnlyContain(pair => pair.Protection == KeyValueProtection.Standard);
+        var policy = await Policies.GetAsync(Org, project);
+        policy.Standard!.KeyId.Should().Be(StandardProvider.KeyId);
+        policy.Version.Should().Be(1, "the writers that lost the race read the recorded key and stop");
+    }
+
+    [Fact]
+    public async Task StandardSecret_WithoutAnAccessPoint_IsStoredWithoutAPolicy()
+    {
+        var project = $"kv-noapt-{Guid.NewGuid():N}"[..30];
+
+        var written = await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "v" }, Admin);
+
+        written.Version.Should().Be(1);
+        (await KeyValues.GetAsync(Org, project, View, "s", new KeyValueReadOptions { Reveal = true }, Admin))!.Value.Should().Be("v");
+        var policy = await Policies.GetAsync(Org, project);
+        policy.Standard.Should().BeNull();
+        policy.Version.Should().Be(0);
+        (await Store.ListAsync()).Should().NotContain(entry => entry.Project == project);
     }
 }

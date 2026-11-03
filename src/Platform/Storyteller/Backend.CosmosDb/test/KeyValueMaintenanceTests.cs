@@ -98,6 +98,26 @@ public class KeyValueMaintenanceTests(Startup startup)
         (await KeyValues.GetAsync(Org, project, View, "s", new KeyValueReadOptions { Reveal = true }, Admin))!.Value.Should().Be("v");
     }
 
+    // 424-167: a Standard key the policy does not know is recorded at the next run, whenever the other keys were checked.
+    [Fact]
+    public async Task DailyCheck_RecordsAMissingStandardKey_RightAfterAnotherCheck()
+    {
+        var project = await Context.CreateProjectWithAccessPointAsync("missing");
+        var allowHsm = new KeyValuePolicyUpdate { AllowedProtections = [KeyValueProtection.Public, KeyValueProtection.Standard, KeyValueProtection.Hsm] };
+        var enabled = await Policies.UpdateAsync(Org, project, allowHsm, Admin);
+        enabled.Hsm!.Key!.CheckedAt.Should().NotBeNull("enabling the level checked the HSM key just now");
+        enabled.Standard.Should().BeNull();
+
+        var checkedPolicy = await Maintenance.CheckKeysAsync(Org, project);
+
+        checkedPolicy.Standard.Should().NotBeNull("the check does not wait 20 hours for a key it does not know");
+        checkedPolicy.Standard!.CurrentKeyVersion.Should().Be(Standard.CurrentVersion);
+        checkedPolicy.Version.Should().Be(enabled.Version + 1);
+
+        var again = await Maintenance.CheckKeysAsync(Org, project);
+        again.Version.Should().Be(checkedPolicy.Version, "with every key known, the check waits for its interval again");
+    }
+
     [Fact]
     public async Task Protect_MovesAKeyBetweenTheServerSideLevels()
     {
