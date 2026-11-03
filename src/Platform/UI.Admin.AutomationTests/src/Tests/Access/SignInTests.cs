@@ -46,8 +46,7 @@ public sealed partial class SignInTests : PlatformTest
             await Expect(App.UserMenuItem(item)).ToBeVisibleAsync();
         }
 
-        await App.UserMenuItem("Sign out").ClickAsync();
-        await App.ExpectAtAsync(Routes.Login());
+        await App.ClickSignOutAsync();
         var login = new LoginPage(App);
         await Expect(login.Heading).ToBeVisibleAsync();
         await Expect(login.Intro).ToBeVisibleAsync();
