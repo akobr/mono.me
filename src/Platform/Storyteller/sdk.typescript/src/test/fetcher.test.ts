@@ -1,6 +1,6 @@
 import { getEventListeners } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { configureStoryteller, getStorytellerConfig, storytellerFetch, type StorytellerConfig } from '../lib/fetcher'
+import { configureStoryteller, getStorytellerConfig, runRequest, storytellerFetch, type StorytellerConfig } from '../lib/fetcher'
 import { hasErrorCode, isAborted, isForbidden, isPreconditionFailed, isTimedOut, isTransientError, StorytellerError } from '../lib/errors'
 import { deleteAnnotation } from '../generated/client/annotations/annotations'
 import { getViewExportArchive, startViewExport, startViewImport } from '../generated/client/transfers/transfers'
@@ -361,6 +361,32 @@ describe('storytellerFetch timeouts', () => {
     // fetch got the deadline's signal, never the option
     expect(calls[0]?.init.signal?.aborted).toBe(true)
     expect(calls[0]?.init).not.toHaveProperty('timeoutMs')
+  })
+
+  it('hints that a timed-out write may still be applied, and a read gets no hint', async () => {
+    useFakeTimers()
+    const { fetch } = hangingFetch()
+    configure({ fetch, timeoutMs: 500 })
+
+    const read = storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+    const write = storytellerFetch('/v1/b', { method: 'put' }).catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(500)
+
+    expect(((await read) as StorytellerError).hint).toBeUndefined()
+    expect(await write).toMatchObject({
+      timedOut: true,
+      hint: 'The API may still apply the change: read it again before you repeat it.',
+    })
+  })
+
+  it('passes an error of the body handling as it is, not as a network failure', async () => {
+    configure({ fetch: fakeFetch(new Response('<html>', { status: 200 })).fetch, timeoutMs: 500 })
+    const broken = new SyntaxError('Unexpected token <')
+
+    const error = await runRequest('/v1/a', {}, () => Promise.reject(broken)).catch((caught: unknown) => caught)
+
+    expect(error).toBe(broken)
+    expect(isTransientError(error)).toBe(false)
   })
 
   it('picks the limit per request with a function of the method and the URL', async () => {
