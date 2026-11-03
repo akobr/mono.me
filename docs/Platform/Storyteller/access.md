@@ -58,7 +58,7 @@ The description is stored on the project's access point document (`apt.{organiza
 
 ## Roles
 
-Scopes describe machines, roles describe people. A user is authorized by the role on the access point only: the token must act for a user (the scope `User.Impersonation`, else `401` with no body; the reason is only logged), and data scopes in a user token grant nothing. Debug builds (`DEV_AUTH`) skip these checks of users; the checks of machines and the [restrictions of actors](#actors) run in every build. A machine has no role: its scopes decide, as described below the table.
+Scopes describe machines, roles describe people. A user is authorized by the role on the access point only: the token must act for a user (the scope `User.Impersonation`, else `401` with no body; the reason is only logged), and data scopes in a user token grant nothing. Debug builds (`DEV_AUTH`) skip these checks of users; the checks of machines and the [restrictions of actors](#actors) run in every build. A unit test of `Api.Functions` turns the role check on the access point back on in a Debug build with `UserRoleChecks.Enforce()`, for its own async flow only (also the role that the scopes of a machine need); `User.Impersonation` and the secret rights keep their Debug behaviour there. A machine has no role: its scopes decide, as described below the table.
 
 `None < Reader < Contributor < ContributorWithSecrets < Administrator < Owner`
 
@@ -75,12 +75,13 @@ Scopes describe machines, roles describe people. A user is authorized by the rol
 | Write key/value secrets: set, delete, restore, protect, import with secrets | `ContributorWithSecrets` on the project; machines `Secrets.Write`, under the mTLS rule of the project. A restore answers no `403` for a secret: it reports the key as `Forbidden` |
 | Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project, users only: machine credentials get `403` |
 | Set the [description of a project](#projects) | `Administrator` on the project, users only: machine credentials get `403` |
+| List the machines of a project and read one | `Contributor` on the project, whatever the scopes of the machines, users only: machine credentials get `403` |
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 
 The [MCP server](mcp.md) acts with the role of the signed-in person: its calls carry a Storyteller user token of that person, whose `act` names the server as the actor. The role decides as on a direct call, so an assistant never does more than the person may do, and the audit names the person, with the server's actor id in `Via` (see [Audit Stamps](audit-stamps.md#the-actor)). The actor's restrictions apply on top of the role (see [Actors](#actors)). The server offers a part of the API only (see [its limits](mcp.md#limits)).
 
-The API reads schemas, templates, deleted annotations and what the comparison of views needs (the views, the configurations and their diffs) with `Reader`. The admin UI locks its **Modeling** page, where they are, below `Contributor`; that lock is a choice of the admin UI. Its **Export & Import** tab is locked below `Administrator`, as the API requires (see [export-import.md](export-import.md#administration-ui)).
+The API reads schemas, templates, deleted annotations and what the comparison of views needs (the views, the configurations and their diffs) with `Reader`. The admin UI locks its **Modeling** page, where they are, below `Contributor`; that lock is a choice of the admin UI. Its **Export & Import** tab is locked below `Administrator`, as the API requires (see [export-import.md](export-import.md#administration-ui)). Its **Machines** page and the detail of a machine show **No access** below `Contributor` without asking the API, so a Debug build, which skips the role check, shows a Reader no machine either.
 
 Machines have no role; their [scopes](authentication.md#scopes-of-machines) decide. A machine is exactly one flat list of scopes, `MachineAccess.Scopes`, in two groups:
 

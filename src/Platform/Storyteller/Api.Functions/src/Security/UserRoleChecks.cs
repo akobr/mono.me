@@ -1,8 +1,10 @@
 namespace _42.Platform.Storyteller.Api.Security;
 
-// Debug builds (DEV_AUTH) skip the role checks of users. A test turns them on for its own async flow, so it runs the
-// checks of a Release build in a Debug build while other tests, in parallel, keep the Debug behaviour (424-164).
-// Nothing turns them off: Release builds always check, and Enforce changes nothing there.
+// Debug builds (DEV_AUTH) skip the role check of a user on the access point of a route (CheckUserAccessAsync, also for
+// the role that the scopes of a machine need). A test turns it on for its own async flow, so that check runs as in a
+// Release build while other tests, in parallel, keep the Debug behaviour (424-164). The other DEV_AUTH branches of users
+// stay: User.Impersonation, and the secret rights every user gets. Nothing turns the check off: Release builds always
+// check, and Enforce changes nothing there.
 internal static class UserRoleChecks
 {
 #if DEV_AUTH
