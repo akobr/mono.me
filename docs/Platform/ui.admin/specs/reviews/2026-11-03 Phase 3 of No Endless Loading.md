@@ -125,13 +125,9 @@ After the fixes `dotnet build src/Platform/UI.Admin.AutomationTests/src --no-inc
     - `ErrorStates.TextAsync` gives the same one-line text for a rendered and for a `display:none` error state, and for a compact alert found through `Around(Retry)`.
     - `AnnotationsPage.WaitForCatalogAsync` throws with that text on a hidden "The catalog could not be loaded", and passes on a hidden, enabled "Reload the catalog".
     - `GraphPage.WaitForCatalogAsync` throws on "The catalog could not be refreshed".
-- **Not done: the ten cases (110, 111, 177, 178, 67, 220, 222, 221, 192, 74) on the `dev` profile, and `PurgeAutomationData` against a real API.** Two things blocked them:
-  - The local stack that was running (the Functions host on 7071 and the Vite dev server on 5173) is another checkout's, started from the IDE. It runs neither this branch's API nor its admin UI, and this branch's stack cannot start beside it on the same ports.
-  - A read-only try of the purge against it (`--test-parameter Maintenance:OlderThanHours=1000000`, so nothing qualifies) stopped in the target check, before the test sent any request. AuthKit's hosted page now shows "Continue with email" (with social sign-in buttons), and `Access/AuthKitSignIn.cs:53` clicks a button named exactly "Continue". Every `dev` run stops there until the sign-in flow matches the page.
-
-  To run them once this branch's stack runs on 5173 and 7071:
+- **The ten cases (110, 111, 177, 178, 67, 220, 222, 221, 192, 74) on the `dev` profile: all passed** (issue step 4). The owner ran them on 2026-11-03 against this branch's local stack, run `20261103-215826-hdjz`: `results.jsonl` has 10 results, all `Passed`, so none has to be split out as a functional problem. An earlier attempt by the implementation could not run them: another checkout's stack held the ports, and its sign-in stopped at AuthKit's "Continue with email" button, which main fixed in 424-165.
+- **Not done: `PurgeAutomationData` against a real API.** It has only been skipped so far. The earlier read-only try (`--test-parameter Maintenance:OlderThanHours=1000000`) stopped in the sign-in before it sent a request. To list what it would do without deleting anything:
 
   ```bash
-  UITESTS_PROFILE=dev dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/*/*/(AnnotationFilterTests)|(AnnotationDetailTests)|(AnnotationBulkCreateTests)|(AnnotationDeleteTests)|(ConfigurationBindingTests)|(ConfigurationInheritanceTests)|(ConfigurationCreateTests)/*"
-  UITESTS_PROFILE=dev dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Maintenance]" --test-parameter Maintenance:Purge=true --test-parameter Maintenance:OlderThanHours=1000000 --output Detailed   # lists only
+  UITESTS_PROFILE=dev dotnet run --project src/Platform/UI.Admin.AutomationTests/src -- --treenode-filter "/**[Category=Maintenance]" --test-parameter Maintenance:Purge=true --test-parameter Maintenance:OlderThanHours=1000000 --output Detailed
   ```
