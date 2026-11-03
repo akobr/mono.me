@@ -92,4 +92,45 @@ public class KeyValueEndToEndTests(Startup startup)
         raw.Should().Contain($"{_vaultUri.Host}");
         raw.Should().Contain("\"Algorithm\":\"RSA-OAEP-256\"");
     }
+
+    // 424-167: the first Standard secret records the vault's key in the project's policy.
+    [Fact]
+    public async Task FirstStandardSecret_RecordsTheVaultKey()
+    {
+        var services = Context.Services;
+        var options = Options.Create(new KeyValueOptions { Protection = new KeyValueProtectionOptions { Emulator = true } });
+        var provider = KeyVaultKeyProvider.CreateStandard(KeyVaultClients.CreateKeyClient(_vaultUri, emulator: true, isProduction: false), options);
+        var policies = services.GetRequiredService<IKeyValuePolicyStore>();
+        var repositories = services.GetRequiredService<IContainerRepositoryProvider>();
+        using var protector = new EnvelopeValueProtector([provider], policies, options);
+        var maintenance = new CosmosKeyValueMaintenanceService(policies, [provider], repositories, options);
+        var keyValues = new CosmosKeyValueService(
+            repositories,
+            protector,
+            policies,
+            options,
+            services.GetRequiredService<IJsonSerializationSettingsProvider>(),
+            services.GetRequiredService<IOptions<JsonSerializerSettings>>(),
+            maintenance: maintenance);
+
+        var project = await Context.CreateProjectWithAccessPointAsync("e2e");
+        var admin = KeyValueCaller.WithSecrets(AuditActor.Account("admin"));
+        (await policies.GetAsync(Org, project)).Standard.Should().BeNull();
+
+        await keyValues.SetAsync(Org, project, View, "db.password", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "hunter2" }, admin);
+
+        var policy = await policies.GetAsync(Org, project);
+        var keyName = KeyVaultKeyProvider.GetKeyName(options.Value.Protection.Standard.KeyNamePrefix, new KeyValueScope(Org, project));
+        policy.Standard.Should().NotBeNull();
+        policy.Standard!.KeyId.Should().EndWith($"/keys/{keyName}");
+        policy.Standard.CurrentKeyVersion.Should().NotBeNullOrEmpty();
+        policy.Standard.NextRotationAt.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(300));
+        policy.Version.Should().Be(1);
+
+        var container = repositories.GetOrganizationContainer(Org).Container;
+        using var response = await container.ReadItemStreamAsync("kv.db.password", PartitionKeys.GetCosmosKeyValues(project, View));
+        using var reader = new StreamReader(response.Content, Encoding.UTF8);
+        var raw = await reader.ReadToEndAsync();
+        raw.Should().Contain($"/keys/{keyName}/{policy.Standard.CurrentKeyVersion}\"", "the envelope was wrapped with the recorded version");
+    }
 }

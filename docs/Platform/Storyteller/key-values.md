@@ -40,21 +40,21 @@ A write that turns a public pair into a secret or a secret into a public pair ne
 
 ## Project policy
 
-`KeyValuePolicy` lives on the project's access point (the `core` container, next to the machine authentication policy) and is cached for a minute. Without a stored policy the defaults apply: `Public` and `Standard` allowed, `Standard` the default secret level, and secrets delivered to machines only over mTLS.
+`KeyValuePolicy` lives on the project's access point (the `core` container, next to the machine authentication policy) and is cached for a minute. Without a stored policy the defaults apply: `Public` and `Standard` allowed, `Standard` the default secret level, and secrets delivered to machines only over mTLS. A policy is stored when an Administrator first changes it, or when the project's first Standard write records the Standard key in it.
 
 | Member | Meaning |
 | --- | --- |
 | `AllowedProtections` | The levels a write may use; `Public` can never be removed. Disabling a level that keys of the project still carry (active or deleted) fails with `409 ProtectionInUse` and the counts per view |
 | `DefaultSecretProtection` | A secret level the clients offer as default; it must be allowed |
 | `RequireMtlsForSecretDelivery` | Machines receive secret values only with an mTLS certificate (see [Secret delivery](#secret-delivery)) |
-| `Standard`, `Hsm.Key` | Read-only: the project's key-encryption keys, their current version, the next rotation |
+| `Standard`, `Hsm.Key` | Read-only: the project's key-encryption keys (`KeyId`, versionless), their `CurrentKeyVersion`, `NextRotationAt` and when the platform last read them (`CheckedAt`). `Standard` is recorded by the project's first Standard write (a create, an update, a protect or an import), a rotation, or the daily check; `Hsm.Key` when the level is enabled, or by a rotation |
 | `Hsm.Backend`, `Hsm.RotationInterval` | `KeyVaultPremium` or `ManagedHsm` (read-only), and how often the platform rotates the HSM key |
 | `Byok` | The customer's key: `KeyUri` (versionless) and `TenantId`, plus the read-only `VerifiedAt`, `CurrentKeyVersion`, `Health`, `LastCheckedAt`, `LastError` |
 | `Recipients` | The RSA public keys that client-encrypted values are made for |
 | `Rewrap` | Read-only: the re-wrap in progress after a rotation |
 | `Version` | Optimistic concurrency: an update with `ExpectedVersion` fails with `409 PolicyVersionMismatch` when it is stale |
 
-Readers see the policy; Administrators change it (`IKeyValuePolicyService`: `UpdateAsync`, `VerifyByokAsync`, `RotateAsync`, the recipient methods). Every change writes a `PolicyChange` audit event. Enabling a level has requirements:
+Readers see the policy; Administrators change it (`IKeyValuePolicyService`: `UpdateAsync`, `VerifyByokAsync`, `RotateAsync`, the recipient methods). Every change by an Administrator writes a `PolicyChange` audit event. The platform's own updates of the read-only members (the first Standard write and the daily check record the keys, a re-wrap its progress) write no `PolicyChange` event and stamp `Modified` with the `System` actor; a re-wrap writes its own `Rewrap` event, and a customer key that becomes unavailable a `ByokUnavailable` event. They raise `Version` too, so a client that holds the previous version gets `409 PolicyVersionMismatch` and reloads. Enabling a level has requirements:
 
 - `Hsm`: an HSM provider is configured; the project's HSM key is created and recorded, and the backend is noted.
 - `Byok`: the customer key is set and verified (`VerifiedAt`), otherwise `409 ByokNotConfigured`.
@@ -91,7 +91,7 @@ A reference is a public pair with the content type `application/vnd.2s.secret-re
 
 The Standard and HSM keys carry a Key Vault rotation policy (`RotationInterval`, 365 days by default), and an Administrator rotates now with `RotateAsync` (`POST …/policy/rotate`), which also starts a **re-wrap**. New writes always wrap with the current key version. A re-wrap (`IKeyValueMaintenanceService.RewrapAsync`) finds every envelope of the level whose key id is not the current version, unwraps its data key with the old version and wraps it with the new one; the ciphertext does not change. The patch keeps the item's `ttl` (Cosmos counts it from the last write) and skips items that changed meanwhile. Progress is in `KeyValuePolicy.Rewrap`. Old key versions are never disabled; an unused HSM key version stops costing after 30 days.
 
-`KeyValueProtectionTimer` (hourly) runs `IKeyValueMaintenanceService.RunAsync`: for every project with a stored policy, the daily key check (at most once per 20 hours) and then the pending re-wrap. The check makes sure of the free Standard key, reads the current version of the HSM key once the level was enabled, records the customer key's health, and starts a re-wrap when a version changed. Timer triggers need `AzureWebJobsStorage`; the Functions host keeps serving HTTP when that storage is missing locally, and only the timers fail to listen.
+`KeyValueProtectionTimer` (hourly) runs `IKeyValueMaintenanceService.RunAsync`: for every project with a stored policy, the daily key check (at most once per 20 hours) and then the pending re-wrap. A project gets a stored policy with its first Standard secret at the latest. The check makes sure of the free Standard key (a Standard key the policy does not know yet is recorded at the next run, however recently the other keys were checked), reads the current version of the HSM key once the level was enabled, records the customer key's health, and starts a re-wrap when a version changed. Timer triggers need `AzureWebJobsStorage`; the Functions host keeps serving HTTP when that storage is missing locally, and only the timers fail to listen.
 
 ## Secret delivery
 
@@ -167,7 +167,7 @@ Plaintext never reaches Cosmos DB or the logs. Decrypted values are cached in pr
 
 ### The Standard level and Key Vault
 
-The Standard KEK is one RSA-2048 software key per project, named `kek-` plus 32 hex characters of SHA-256 of `{organization}/{project}`, in the Standard vault `AzureKeyVaults:{KeyValues:Protection:Standard:VaultName}` (`default` by default). It is created on the first Standard write of the project, with the operations `wrapKey` and `unwrapKey` and a yearly rotation policy. Wrapping uses the latest key version and records it in the envelope; unwrapping uses the recorded version, so a rotation never breaks an old envelope.
+The Standard KEK is one RSA-2048 software key per project, named `kek-` plus 32 hex characters of SHA-256 of `{organization}/{project}`, in the Standard vault `AzureKeyVaults:{KeyValues:Protection:Standard:VaultName}` (`default` by default). It is created on the first Standard write of the project, with the operations `wrapKey` and `unwrapKey` and a yearly rotation policy. That write also records the key in the project's policy (`IKeyValueMaintenanceService.RecordStandardKeyAsync`: `Standard` with `KeyId`, `CurrentKeyVersion`, `NextRotationAt` and `CheckedAt`, read fresh from the vault), so **Settings → Secrets** shows it with **Rotate now** at once. Writers that race on the first record re-read the policy and stop when it knows the key; a record that fails is logged and never fails the write, and the next Standard write tries again. A project whose Standard secrets were written before the platform recorded the key on the first write gets it with its next Standard write, or from the daily check once its policy is stored. Wrapping uses the latest key version and records it in the envelope; unwrapping uses the recorded version, so a rotation never breaks an old envelope.
 
 The Storyteller identity needs the roles **Key Vault Crypto Officer** (create keys, set rotation policies) and **Key Vault Crypto Service Encryption User** (wrap, unwrap) on that vault. A deployment without the vault still works for public pairs; a Standard write then answers `501 ProtectionNotConfigured`.
 

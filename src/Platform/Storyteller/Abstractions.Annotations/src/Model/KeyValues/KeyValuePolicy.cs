@@ -15,7 +15,7 @@ public record class KeyValuePolicy
     // Machines receive secret values only when they authenticate with an mTLS certificate.
     public bool RequireMtlsForSecretDelivery { get; init; } = true;
 
-    // Read-only, set by the platform.
+    // Read-only, set by the platform: recorded by the project's first Standard write, a rotation, or the daily check.
     public ProtectionKeyInfo? Standard { get; init; }
 
     public HsmSettings? Hsm { get; init; }

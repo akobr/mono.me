@@ -8,7 +8,8 @@ public interface IKeyValuePolicyStore
     // Replaces the policy; a concurrent change (the stored version differs from policy.Version - 1) fails with PolicyVersionMismatch.
     Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default);
 
-    // Every project that has a stored policy, for the maintenance runs.
+    // Every project that has a stored policy, for the maintenance runs: an Administrator saved it, or the project's
+    // first Standard write recorded its Standard key.
     Task<IReadOnlyList<(string Organization, string Project, KeyValuePolicy Policy)>> ListAsync(CancellationToken cancellationToken = default);
 }
 
