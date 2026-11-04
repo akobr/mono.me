@@ -9,6 +9,32 @@ const wide = useMediaQuery('(min-width: 1280px)')
 const collapsed = ref(!wide.value)
 watch(wide, (value) => (collapsed.value = !value))
 
+interface StoredSidebar {
+  size?: number
+  collapsed?: boolean
+}
+
+let started = false
+let storedCollapsed = false
+
+// UDashboardSidebar shows its stored state, not `collapsed`. Only the first read of a page may bring back a stored rail;
+// a stored "expanded" is no choice, so the start decides (424-168). A later read (the layout after a bare route, a new
+// pin) keeps `collapsed`, as the shared value may come from another window. What was not changed is written back as it
+// was, so reading stores nothing. An open window does not listen: an event would be such a read, and undo its state.
+export const sidebarStorage = {
+  listenToStorageChanges: false,
+  serializer: {
+    read: (raw: string): StoredSidebar => {
+      const stored: StoredSidebar = JSON.parse(raw)
+      const first = !started
+      started = true
+      storedCollapsed = stored.collapsed ?? false
+      return first && stored.collapsed ? stored : { size: stored.size }
+    },
+    write: (state: StoredSidebar) => JSON.stringify({ ...state, collapsed: state.collapsed ?? storedCollapsed }),
+  },
+}
+
 /**
  * Navigation state shared by the navbar's hamburger, the sidebar and the "[" shortcut:
  * - `open`: the slideover (below lg with a pinned sidebar, or at every size when the sidebar is unpinned);
