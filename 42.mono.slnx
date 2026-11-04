@@ -55,6 +55,8 @@
     <Project Path="src/Libraries/Platform/Storyteller/Configuration.KeyVault/test/Configuration.KeyVault.UnitTests.csproj" />
     <Project Path="src/Libraries/Platform/Storyteller/ConfigurationFormats/src/ConfigurationFormats.csproj" />
     <Project Path="src/Libraries/Platform/Storyteller/ConfigurationFormats/test/ConfigurationFormats.UnitTests.csproj" />
+    <Project Path="src/Libraries/Platform/Storyteller/Hosting/src/Hosting.csproj" />
+    <Project Path="src/Libraries/Platform/Storyteller/Hosting/test/Hosting.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Libraries/Functional/">
     <Project Path="src/Libraries/Functional/Monads.Trees/src/Monads.Trees.csproj" />
@@ -139,8 +141,6 @@
     <Project Path="src/Platform/Storyteller/Binding.Language/test/Binding.Language.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Object/src/Binding.Object.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Object/test/Binding.Object.UnitTests.csproj" />
-    <Project Path="src/Platform/Storyteller/Hosting/src/Hosting.csproj" />
-    <Project Path="src/Platform/Storyteller/Hosting/test/Hosting.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/DbCreator/src/DbCreator.csproj" />
     <Project Path="src/Platform/Storyteller/KeyValues.Azure.KeyVault/src/KeyValues.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/KeyValues.ClientEncryption/src/KeyValues.ClientEncryption.csproj" />
