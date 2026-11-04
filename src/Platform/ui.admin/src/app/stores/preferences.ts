@@ -50,8 +50,8 @@ export const defaultPreferences: Preferences = {
 }
 
 /**
- * UI state only; nothing secret is ever stored here. The sidebar size is persisted by UDashboardGroup itself; the
- * detail panel keeps its mode and width here.
+ * UI state only; nothing secret is ever stored here. The sidebar's size and whether it is collapsed are persisted by
+ * UDashboardGroup itself; the detail panel keeps its mode and width here.
  */
 export const usePreferencesStore = defineStore('preferences', () => {
   // A copy: useStorage would otherwise mutate the shared defaults when nothing is stored yet.
