@@ -2,7 +2,7 @@ name: Storyteller SDK release
 run-name: ${{ inputs.publish && 'Publish' || 'Pack' }} the Storyteller SDKs (${{ inputs.packages }})
 
 # Releases the Storyteller SDKs once the conformance suite passes on the same commit: the NuGet packages of the .NET
-# configuration provider, Hosting and the packages they depend on, and the npm package of the TypeScript SDK. The packages are
+# configuration provider, Hosting, Aspire and the packages they depend on, and the npm package of the TypeScript SDK. The packages are
 # packed once, after the gate, and the publish jobs push exactly those files. Without publish the run is a dry run that
 # uploads the packages as an artifact. Spec: docs/Platform/Storyteller/specs/2026-10-28 Shared Conformance Vectors for
 # Configuration Providers and SDKs.md, section 8.
@@ -75,15 +75,15 @@ jobs:
         with:
           global-json-file: global.json
 
-      # The configuration provider, Hosting and every package they depend on, released together. The provider and the
-      # formats, Key Vault and Hosting packages live in Libraries.
+      # The configuration provider, Hosting, Aspire and every package they depend on, released together. The provider and the
+      # formats, Key Vault, Hosting and Aspire packages live in Libraries.
       - name: Pack the NuGet packages
         if: inputs.packages != 'npm'
         run: |
           for project in Abstractions.Annotations KeyValues.ClientEncryption Sdk.NSwag; do
             dotnet pack "src/Platform/Storyteller/$project/src/$project.csproj" -c Release -p:ContinuousIntegrationBuild=true -o out/nuget
           done
-          for project in ConfigurationFormats Configuration Configuration.KeyVault Hosting; do
+          for project in ConfigurationFormats Configuration Configuration.KeyVault Hosting Aspire.Hosting; do
             dotnet pack "src/Libraries/Platform/Storyteller/$project/src/$project.csproj" -c Release -p:ContinuousIntegrationBuild=true -o out/nuget
           done
 
