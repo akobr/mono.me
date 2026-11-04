@@ -76,6 +76,22 @@ describe('docked sidebar between lg and xl', () => {
     expect(button('Collapse sidebar')).not.toBeNull()
   })
 
+  it('keeps its state when the layout comes back after another window stored the rail', async () => {
+    localStorage.setItem(storageKey, expanded)
+    const first = await mountLayout()
+    first.button('Expand sidebar')!.click()
+    await settle()
+    unmount!()
+    const rail = '{"size":22,"collapsed":true}'
+    localStorage.setItem(storageKey, rail)
+
+    const { root } = await mountLayout()
+
+    expect(root().dataset.collapsed).toBe('false')
+    expect(sidebar.collapsed.value).toBe(false)
+    expect(localStorage.getItem(storageKey)).toBe(rail)
+  })
+
   it.each([
     ['the rail', true],
     ['the expanded sidebar', false],
