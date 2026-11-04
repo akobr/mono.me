@@ -213,7 +213,7 @@ npx vitest run test/conformance
 
 1. **Gate.** It calls the conformance workflow first.
 2. **Pack.** Only then does it pack, once, from that commit:
-   - the NuGet packages of the .NET configuration provider, Hosting and the packages they depend on (`Abstractions.Annotations`, `KeyValues.ClientEncryption`, `Sdk.NSwag`, `ConfigurationFormats`, `Configuration`, `Configuration.KeyVault`, `Hosting`);
+   - the NuGet packages of the .NET configuration provider, Hosting, Aspire and the packages they depend on (`Abstractions.Annotations`, `KeyValues.ClientEncryption`, `Sdk.NSwag`, `ConfigurationFormats`, `Configuration`, `Configuration.KeyVault`, `Hosting`, `Aspire.Hosting`);
    - the npm package `@42for.net/2splatform.sdk`.
 3. **Publish.** The publish jobs push exactly those files.
 
