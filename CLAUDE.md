@@ -77,7 +77,6 @@ The flagship **2S Platform** — a serverless annotation/metadata platform.
 - `Binding.Abstractions/` / `Binding.Core/` / `Binding.Azure.KeyVault/` — configuration bindings
 - `Api.Functions/` — Azure Functions HTTP API (isolated worker model)
 - `Api.Web/` — ASP.NET Core Web API
-- `Hosting/` — hosting for .NET (`42.Platform.Storyteller.Hosting`): who am I (`IExecutionContext`), `ISubscriptionCatalog` with the polling informer, and `IStorytellerSubscriptions` with the documents and named options of every subscription
 - `DbCreator/` — CosmosDB schema creation tool
 - `Mcp/` — MCP server over the API for AI assistants (Streamable HTTP; signs people in with the deployment's provider (Entra ID, AuthKit or Keycloak) and exchanges their token for a Storyteller user token through the API's RFC 8693 token exchange (`POST v1/access/token`) as an actor; docs in `docs/Platform/Storyteller/mcp.md`)
 
@@ -116,6 +115,7 @@ Reusable NuGet packages (suppressed as top-level mrepo item, referenced internal
 - `Platform/Storyteller/Configuration/` — configuration provider for .NET (`42.Platform.Storyteller.Configuration`): loads a configuration into `IConfiguration`, and `IStorytellerDocuments` reads any configuration on demand
 - `Platform/Storyteller/Configuration.KeyVault/` — Azure Key Vault resolver of the provider's secret references
 - `Platform/Storyteller/ConfigurationFormats/` — library (`42.Platform.Storyteller.ConfigurationFormats`) that flattens a configuration and renders it as `flat`, `properties`, `env` or `yaml`; shared by the API, `sform` and the .NET configuration provider. The generic Storyteller docs stay under `docs/Platform/Storyteller/`
+- `Platform/Storyteller/Hosting/` — hosting for .NET (`42.Platform.Storyteller.Hosting`): who am I (`IExecutionContext`), `ISubscriptionCatalog` with the polling informer, and `IStorytellerSubscriptions` with the documents and named options of every subscription
 - `Roslyn/Compose/` — Roslyn code composition helpers
 - `Structures/Graph/` — graph data structures (QuikGraph-based)
 - `Testing/System.IO.Abstractions.Trace/` — tracing wrapper for IFileSystem
