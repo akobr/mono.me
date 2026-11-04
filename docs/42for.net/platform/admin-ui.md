@@ -316,7 +316,7 @@ The UI adapts to the screen:
 
 - **Phone:** the lists become cards, the detail opens full-screen, and the filters move to a bottom sheet.
 - **Tablet:** the detail slides in from the right, or opens in full screen.
-- **Desktop:** the resizable sidebar sits beside the list; the detail opens over the list, pinned beside it and resizable, or in full screen.
+- **Desktop:** the resizable sidebar sits beside the list; the detail opens over the list, pinned beside it and resizable, or in full screen. In a window from 1024 to 1279 px wide the sidebar starts collapsed to its icons, and widening the window expands it. If you collapse it in a wider window, it stays collapsed when you reload.
 
 It follows the system light or dark theme unless you pick one in the command palette or on the account page. The account page also keeps your other preferences: row density, editor formats, the date format and your own names, colors and icons of the annotation types.
 

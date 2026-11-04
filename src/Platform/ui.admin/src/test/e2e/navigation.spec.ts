@@ -477,3 +477,90 @@ test('a dirty template asks before another tab of Modeling opens', async ({ page
   await expect(page).toHaveURL(`${modeling}/schemas`)
   await expect(modelingTab(page, 'Schemas')).toHaveAttribute('aria-selected', 'true')
 })
+
+const annotations = '/acme/billing/default/annotations'
+const expandSidebar = (page: Page) => page.getByRole('button', { name: 'Expand sidebar', exact: true })
+const collapseSidebar = (page: Page) => page.getByRole('button', { name: 'Collapse sidebar', exact: true })
+/** A menu link by its name: the expanded sidebar has one, the icon rail has none. */
+const namedLink = (page: Page) => page.getByRole('link', { name: 'Configurations', exact: true })
+
+// The sidebar stores whether it is collapsed, and a window between lg and xl starts as the icon rail whatever it finds
+// there (424-168). A new tab shares the storage, so it finds what the wider one stored.
+test('starts the docked sidebar as the icon rail between lg and xl after a wider window', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'A phone has no docked sidebar')
+  await openApp(page, annotations)
+  await expect(collapseSidebar(page)).toBeVisible()
+
+  const narrow = await page.context().newPage()
+  await narrow.setViewportSize({ width: 1100, height: 900 })
+  await openApp(narrow, annotations)
+  await expect(expandSidebar(narrow)).toBeVisible()
+  await expect(namedLink(narrow)).toHaveCount(0)
+
+  // That start stored nothing: the next start of a wider window is expanded.
+  await goto(page, annotations)
+  await expect(collapseSidebar(page)).toBeVisible()
+  await expect(namedLink(page)).toBeVisible()
+
+  // The state "[" toggles is the one on the screen: the first press expands the rail.
+  await narrow.keyboard.press('[')
+  await expect(collapseSidebar(narrow)).toBeVisible()
+  await expect(namedLink(narrow)).toBeVisible()
+})
+
+test('expands and collapses the docked sidebar when an open window crosses xl', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'A phone has no docked sidebar')
+  await page.setViewportSize({ width: 1100, height: 900 })
+  await openApp(page, annotations)
+  await expect(expandSidebar(page)).toBeVisible()
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await expect(collapseSidebar(page)).toBeVisible()
+  await expect(namedLink(page)).toBeVisible()
+
+  await page.setViewportSize({ width: 1100, height: 900 })
+  await expect(expandSidebar(page)).toBeVisible()
+  await expect(namedLink(page)).toHaveCount(0)
+})
+
+// The logo goes through a bare route, which mounts the layout again; the sidebar stays as the user set it, as it does
+// with any other link.
+test('keeps the docked sidebar expanded after the logo link between lg and xl', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'A phone has no docked sidebar')
+  await page.setViewportSize({ width: 1100, height: 900 })
+  await openApp(page, '/acme/billing/default/configurations')
+  await expandSidebar(page).click()
+  await expect(collapseSidebar(page)).toBeVisible()
+
+  await page.getByRole('link', { name: '2S Admin home' }).click()
+  await expect.poll(() => new URL(page.url()).pathname).toBe(annotations)
+  await expect(collapseSidebar(page)).toBeVisible()
+  await expect(namedLink(page)).toBeVisible()
+})
+
+test('pins the docked sidebar as the icon rail between lg and xl', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'A phone has no docked sidebar')
+  await openApp(page, annotations)
+  await page.getByRole('button', { name: 'Unpin sidebar', exact: true }).click()
+  await page.setViewportSize({ width: 1100, height: 900 })
+
+  await page.getByRole('button', { name: 'Search…' }).click()
+  await page.getByPlaceholder('Search annotations, pages, projects and actions…').fill('Pin the sidebar')
+  await page.getByRole('option', { name: 'Pin the sidebar' }).click()
+
+  await expect(expandSidebar(page)).toBeVisible()
+  await expect(namedLink(page)).toHaveCount(0)
+})
+
+test('keeps the docked sidebar collapsed through a reload from xl up', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'A phone has no docked sidebar')
+  await openApp(page, annotations)
+  await expect(collapseSidebar(page)).toBeVisible()
+
+  await page.keyboard.press('[')
+  await expect(expandSidebar(page)).toBeVisible()
+
+  await goto(page, annotations)
+  await expect(expandSidebar(page)).toBeVisible()
+  await expect(namedLink(page)).toHaveCount(0)
+})
