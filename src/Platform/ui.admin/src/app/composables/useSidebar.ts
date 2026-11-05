@@ -21,18 +21,26 @@ let storedCollapsed = false
 // a stored "expanded" is no choice, so the start decides (424-168). A later read (the layout after a bare route, a new
 // pin) keeps `collapsed`, as the shared value may come from another window. What was not changed is written back as it
 // was, so reading stores nothing. An open window does not listen: an event would be such a read, and undo its state.
+// Below xl the rail comes from the width, so it is not stored as a choice for a later start at xl.
 export const sidebarStorage = {
   listenToStorageChanges: false,
   serializer: {
     read: (raw: string): StoredSidebar => {
       const stored: StoredSidebar = JSON.parse(raw)
-      const first = !started
-      started = true
       storedCollapsed = stored.collapsed ?? false
-      return first && stored.collapsed ? stored : { size: stored.size }
+      return !started && stored.collapsed ? stored : { size: stored.size }
     },
-    write: (state: StoredSidebar) => JSON.stringify({ ...state, collapsed: state.collapsed ?? storedCollapsed }),
+    write: (state: StoredSidebar) => {
+      const choice = state.collapsed && !wide.value ? undefined : state.collapsed
+      storedCollapsed = choice ?? storedCollapsed
+      return JSON.stringify({ ...state, collapsed: storedCollapsed })
+    },
   },
+}
+
+/** The layout has mounted, also with nothing stored: from now on `collapsed` decides over the stored state. */
+export function markSidebarStarted(): void {
+  started = true
 }
 
 /**
