@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useContextStore } from '@/stores/context'
 import { useSessionStore } from '@/stores/session'
-import { sidebarStorage } from '@/composables/useSidebar'
+import { markSidebarStarted, sidebarStorage } from '@/composables/useSidebar'
 
 const { access } = storeToRefs(useContextStore())
 const session = useSessionStore()
+
+onMounted(markSidebarStarted)
 
 </script>
 

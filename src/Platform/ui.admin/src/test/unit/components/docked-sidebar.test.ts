@@ -92,6 +92,25 @@ describe('docked sidebar between lg and xl', () => {
     expect(localStorage.getItem(storageKey)).toBe(rail)
   })
 
+  it('does not store the rail of this width as a choice', async () => {
+    localStorage.setItem(storageKey, expanded)
+    const { button } = await mountLayout()
+    button('Expand sidebar')!.click()
+    await settle()
+
+    button('Collapse sidebar')!.click()
+    await settle()
+
+    expect(button('Expand sidebar')).not.toBeNull()
+    expect(localStorage.getItem(storageKey)).toBe(expanded)
+  })
+
+  it('stores no rail at a start with nothing stored', async () => {
+    await mountLayout()
+
+    expect(JSON.parse(localStorage.getItem(storageKey)!).collapsed).toBe(false)
+  })
+
   it.each([
     ['the rail', true],
     ['the expanded sidebar', false],

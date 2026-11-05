@@ -46,7 +46,7 @@ Runs:
 Known limits, for the maintainer:
 
 - An expansion between 1024 and 1279 px is not kept over a reload: the stored text is the same as after a wide window.
-- A rail stored below 1280 px (a first start there, a shrink of an open page, or a collapse) still opens as the rail at the next start from 1280 px up, until one press of `[`. This is as before, and is outside this issue.
+- The spec left a rail stored below 1280 px opening as the rail at the next start from 1280 px up. A later PR review changed that: `serializer.write` no longer stores a rail below 1280 px as a choice, so a first start there, a shrink or a collapse leaves the stored value as it was. Startup is also marked done when the layout mounts (`markSidebarStarted`), so it no longer depends on a stored value. This replaces the two rare cases noted in section 1; as a result, a page that starts unpinned does not bring back a stored rail when it is pinned.
 - Open windows no longer follow each other's collapse or width until their next start, and a window's next write carries its own size over a width dragged in another one.
 - The fix relies on the `?? defaultStorageValue.collapsed` fallback of `useResizable.js:34` (`@nuxt/ui` 4.11.3). `storageOptions` is typed `Record<string, any>`, so an upgrade would not fail at compile time; the unit tests would catch it.
 
