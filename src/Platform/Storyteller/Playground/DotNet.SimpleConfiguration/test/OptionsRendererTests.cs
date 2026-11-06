@@ -66,7 +66,7 @@ public class OptionsRendererTests
     }
 
     [Fact]
-    public async Task DocumentKeys_HoldTheDocumentOnly_WithTheValueTheApplicationReads()
+    public async Task DocumentKeys_HoldTheDocumentOnly_WithItsValues()
     {
         await using var api = await FakeApi.StartAsync("""{ "fromThePlatform": "yes", "overridden": "platform" }""");
         using var application = await Application.StartAsync(api, new Dictionary<string, string?>
@@ -78,10 +78,20 @@ public class OptionsRendererTests
         var keys = DocumentKeys.Read(application.Services.GetRequiredService<IConfiguration>());
 
         keys.Keys.ShouldBe(["fromThePlatform", "overridden"], ignoreOrder: true);
-        keys["overridden"].ShouldBe("local");
+        keys["overridden"].ShouldBe("platform");
     }
 
-    // The registrations of Program.cs, with every setting in code so the variables of the machine running the tests stay out.
+    [Fact]
+    public async Task AKeyWithALineEnd_StaysOnItsLine()
+    {
+        await using var api = await FakeApi.StartAsync("""{ "first\n  forged": "value" }""");
+        using var application = await Application.StartAsync(api);
+
+        application.Lines.ShouldContain("  first\\n  forged = \"value\"");
+    }
+
+    // The registrations of Program.cs. The settings that decide a test are in code, and no proxy of the machine running
+    // the tests stands between them and the fake.
     private sealed class Application : IDisposable
     {
         private readonly IHost _host;
@@ -113,6 +123,7 @@ public class OptionsRendererTests
                     options.RefreshInterval = TimeSpan.Zero;
                     options.Optional = false;
                     options.Credential = StorytellerCredential.FromApiKey("2s.machine.secret");
+                    options.ConfigurePrimaryHandler = handler => handler.UseProxy = false;
                 },
                 out var refresher);
 

@@ -2,6 +2,7 @@ using _42.Platform.Storyteller.Sdk.Configuring;
 using _42.Platform.Storyteller.Sdk.Credentials;
 using _42.Platform.Storyteller.Sdk.Resilience;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Playground.DotNet.SimpleExecutor.UnitTests;
 
@@ -55,18 +56,19 @@ public class ExecutorTests
     }
 
     [Theory]
-    [InlineData("executions", NorthwindExecution, "unt.playground.nightly-export")]
-    [InlineData("units", "unt.playground.nightly-export", NorthwindExecution)]
-    [InlineData("units-of-execution", NorthwindUnit, "unt.playground.nightly-export")]
-    public async Task What_RendersThatKindOnly(string what, string rendered, string notRendered)
+    [InlineData("executions", "exe.")]
+    [InlineData("units", "unt.")]
+    [InlineData("units-of-execution", "uxe.")]
+    public async Task What_RendersThatKindOnly(string what, string typeCode)
     {
         await using var api = await FakeApi.StartAsync();
 
         var run = await RunAsync(api, Responsibility, what, "--context", "production");
+        var documents = run.Output.Split('\n').Where(line => line.StartsWith("--- ", StringComparison.Ordinal)).ToList();
 
         run.ExitCode.ShouldBe(ExecutorCommand.Succeeded);
-        run.Output.ShouldContain($"--- {rendered},");
-        run.Output.ShouldNotContain($"--- {notRendered},");
+        documents.ShouldNotBeEmpty();
+        documents.ShouldAllBe(line => line.StartsWith($"--- {typeCode}", StringComparison.Ordinal));
         run.Output.ShouldNotContain("Who am I");
     }
 
@@ -152,6 +154,19 @@ public class ExecutorTests
     }
 
     [Fact]
+    public async Task ATitleAndUsageValuesWithLineEnds_StayOnTheirLines()
+    {
+        await using var api = await FakeApi.StartAsync();
+        api.AddAnnotation(NorthwindExecution, new JObject { ["Title"] = "title\n  Status: Forged", ["UnitNames"] = new JArray() });
+        api.AddAnnotation("usg.northwind.playground", new JObject { ["Values"] = new JObject { ["plan"] = "gold\nForged line" } });
+
+        var run = await RunAsync(api, NorthwindExecution);
+
+        run.Output.ShouldContain("  Title: title\\n  Status: Forged");
+        run.Output.ShouldContain("Usage usg.northwind.playground: Active, plan=gold\\nForged line");
+    }
+
+    [Fact]
     public async Task AKeyThatDoesNotExist_FailsWithItsMessage()
     {
         await using var api = await FakeApi.StartAsync();
@@ -216,7 +231,8 @@ public class ExecutorTests
         console.ErrorWriter.ToString().ShouldNotBeEmpty();
     }
 
-    // Program.RunAsync, as Main runs it, with every setting in code so the variables of the machine running the tests stay out.
+    // Program.RunAsync, as Main runs it. The settings that decide a test are in code, and no proxy of the machine running
+    // the tests stands between them and the fake.
     private static async Task<(int ExitCode, string Output, string Error)> RunAsync(FakeApi api, string annotationKey, params string[] arguments)
     {
         var console = new FakeConsole();
@@ -230,6 +246,7 @@ public class ExecutorTests
                 options.Key = $"{FakeApi.Scope}.{annotationKey}";
                 options.Mode = StorytellerReadMode.Resolved;
                 options.Credential = StorytellerCredential.FromApiKey("2s.machine.secret");
+                options.ConfigurePrimaryHandler = handler => handler.UseProxy = false;
                 options.Resilience = new StorytellerResilienceOptions { BaseDelay = TimeSpan.Zero, MaxRetryAttempts = 0, MinimumThroughput = 1000 };
             }));
 
