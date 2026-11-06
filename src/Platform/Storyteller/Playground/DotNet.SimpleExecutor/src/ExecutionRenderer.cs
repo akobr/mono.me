@@ -1,5 +1,6 @@
 using _42.Platform.Storyteller.ConfigurationFormats;
 using _42.Platform.Storyteller.Sdk.Hosting;
+using Newtonsoft.Json;
 
 namespace _42.Platform.Storyteller.Playground.DotNet.SimpleExecutor;
 
@@ -21,7 +22,7 @@ public sealed class ExecutionRenderer
 
         if (!string.IsNullOrEmpty(self.Annotation.Title))
         {
-            _output.WriteLine($"  Title: {self.Annotation.Title}");
+            _output.WriteLine($"  Title: {Escape(self.Annotation.Title)}");
         }
 
         _output.WriteLine($"  Status: {self.GetSubscriptionStatus(now)}");
@@ -44,7 +45,7 @@ public sealed class ExecutionRenderer
 
         if (usage is not null)
         {
-            var values = usage.Values.Select(pair => $", {pair.Key}={pair.Value}");
+            var values = usage.Values.Select(pair => $", {Escape(pair.Key)}={Escape(pair.Value)}");
             _output.WriteLine($"  Usage {usage.AnnotationKey}: {usage.GetStatus(now)}{string.Concat(values)}");
         }
 
@@ -69,5 +70,11 @@ public sealed class ExecutionRenderer
     {
         _output.WriteLine($"--- {key}, version {version}, {body.Format.GetName()}");
         _output.Write(body.Text);
+    }
+
+    // A line end or a C0 control character of an annotation neither breaks the line nor reaches the terminal.
+    private static string Escape(object? value)
+    {
+        return JsonConvert.ToString(value?.ToString() ?? string.Empty)[1..^1];
     }
 }

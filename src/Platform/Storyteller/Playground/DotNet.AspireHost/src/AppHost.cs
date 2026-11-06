@@ -28,7 +28,7 @@ builder.AddProject<Projects.DotNet_SimpleExecutor>("simple-executor")
     .WithStorytellerKey($"rst.{responsibility}")
     .WithArgs("--context", context, "--watch");
 
-// The point of view of one subject, once, started from the dashboard: who am I with the ancestors of an execution.
+// The point of view of one subject, once, started from the dashboard: who am I of an execution.
 builder.AddProject<Projects.DotNet_SimpleExecutor>("simple-executor-of-subject")
     .WithReference(storyteller)
     .WithExecution(subject, responsibility, context)

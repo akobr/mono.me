@@ -77,6 +77,11 @@ internal sealed class FakeApi : IAsyncDisposable
         }.ToString();
     }
 
+    public void AddAnnotation(string annotationKey, JObject? members = null)
+    {
+        _routes[$"{RootPath}/annotations/{annotationKey}"] = Annotation(annotationKey, members).ToString();
+    }
+
     public void RemoveConfiguration(string annotationKey)
     {
         _routes.Remove($"{RootPath}/configuration/{annotationKey}/resolved");
@@ -101,11 +106,6 @@ internal sealed class FakeApi : IAsyncDisposable
 
         annotation.Merge(members);
         return annotation;
-    }
-
-    private void AddAnnotation(string annotationKey, JObject? members = null)
-    {
-        _routes[$"{RootPath}/annotations/{annotationKey}"] = Annotation(annotationKey, members).ToString();
     }
 
     private void AddList(string list, params string[] annotationKeys)

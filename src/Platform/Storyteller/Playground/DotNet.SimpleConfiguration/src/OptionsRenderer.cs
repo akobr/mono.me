@@ -44,7 +44,7 @@ public sealed class OptionsRenderer : IHostedService
 
             foreach (var (key, value) in _keys)
             {
-                _output.WriteLine($"  {key} = {Quote(value)}");
+                _output.WriteLine($"  {Escape(key)} = {Quote(value)}");
             }
 
             WriteOptions(_monitor.CurrentValue);
@@ -75,9 +75,9 @@ public sealed class OptionsRenderer : IHostedService
             {
                 _output.WriteLine(change.Kind switch
                 {
-                    KeyChangeKind.Added => $"  + {change.Key} = {Quote(change.After)}",
-                    KeyChangeKind.Changed => $"  ~ {change.Key} = {Quote(change.Before)} -> {Quote(change.After)}",
-                    _ => $"  - {change.Key} = {Quote(change.Before)}",
+                    KeyChangeKind.Added => $"  + {Escape(change.Key)} = {Quote(change.After)}",
+                    KeyChangeKind.Changed => $"  ~ {Escape(change.Key)} = {Quote(change.Before)} -> {Quote(change.After)}",
+                    _ => $"  - {Escape(change.Key)} = {Quote(change.Before)}",
                 });
             }
 
@@ -90,9 +90,14 @@ public sealed class OptionsRenderer : IHostedService
         _output.WriteLine($"Options: {JsonConvert.SerializeObject(options)}");
     }
 
-    // A line end or a control character in a value does not break the line.
+    // A line end or a C0 control character of the document neither breaks the line nor reaches the terminal.
     private static string Quote(string? value)
     {
         return JsonConvert.ToString(value);
+    }
+
+    private static string Escape(string key)
+    {
+        return JsonConvert.ToString(key)[1..^1];
     }
 }
