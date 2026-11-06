@@ -10,7 +10,7 @@ The package `42.Platform.Storyteller.Hosting` adds the catalog to the [configura
 
 The code is in `src/Libraries/Platform/Storyteller/Hosting/src/`: the public types at its root, the registration (`Container/` and the extension classes), who am I (`Executions/`), the catalog (`Catalog/`), the reads (`Reading/`), the polling informer (`Informer/`), and the subscriptions with their named options (`Subscriptions/`).
 
-The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md). An Aspire AppHost passes the variables with [the Aspire integration](aspire.md).
+The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md). An Aspire AppHost passes the variables with [the Aspire integration](aspire.md). `DotNet.SimpleExecutor` of [the playground](playground.md) runs who am I and the catalog.
 
 ## Package
 
