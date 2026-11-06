@@ -179,7 +179,7 @@ builder.AddProject<Projects.Invoicing_Worker>("invoicing-worker")
 - **The endpoint** is an endpoint reference, resolved at start to the port Aspire allocated. `http` to `localhost` is accepted for projects and executables.
 - **The order of starts.** `WaitFor(storyteller)` proceeds at once, so the process waits for the API project.
 - **The machine.** Create a machine in the local platform with `sform account machine create`, and put its API key into the parameter, for example with `dotnet user-secrets set Parameters:storyteller-api-key <key>` in the AppHost's project.
-- **Not wired.** `src/Platform/Aspire.Host` itself has no project that reads Storyteller, so it does not use this integration.
+- **Not wired.** `src/Platform/Aspire.Host` itself has no project that reads Storyteller, so it does not use this integration. `DotNet.AspireHost` of [the playground](playground.md) does, against this local platform.
 
 ## What other processes get
 

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.6.4" />
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.Playground.DotNet.AspireHost</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.Playground.DotNet.AspireHost</RootNamespace>
+
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>9969d00d-3cd7-4faf-abe0-47f4a2eb4efc</UserSecretsId>
+    <!-- ASPIRE010: the AppHost takes the DCP and the Dashboard from their NuGet packages, not from the Aspire CLI bundle -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A library with the extension methods, not a resource of the AppHost. -->
+    <ProjectReference Include="..\..\..\..\..\Libraries\Platform\Storyteller\Aspire.Hosting\src\Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\DotNet.SimpleConfiguration\src\DotNet.SimpleConfiguration.csproj" />
+    <ProjectReference Include="..\..\DotNet.SimpleExecutor\src\DotNet.SimpleExecutor.csproj" />
+  </ItemGroup>
+
+</Project>

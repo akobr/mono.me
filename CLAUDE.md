@@ -79,6 +79,7 @@ The flagship **2S Platform** — a serverless annotation/metadata platform.
 - `Api.Web/` — ASP.NET Core Web API
 - `DbCreator/` — CosmosDB schema creation tool
 - `Mcp/` — MCP server over the API for AI assistants (Streamable HTTP; signs people in with the deployment's provider (Entra ID, AuthKit or Keycloak) and exchanges their token for a Storyteller user token through the API's RFC 8693 token exchange (`POST v1/access/token`) as an actor; docs in `docs/Platform/Storyteller/mcp.md`)
+- `Playground/` — example applications that run against a platform (docs in `docs/Platform/Storyteller/playground.md`): `DotNet.SimpleConfiguration` (a responsibility's configuration as `IConfiguration`, with a console renderer of the changes of `IOptionsMonitor`), `DotNet.SimpleExecutor` (`IExecutionContext` and `ISubscriptionCatalog`: executions, units and units of execution in a format of `ConfigurationFormats`), `DotNet.AspireHost` (both as resources through `42.Platform.Storyteller.Aspire.Hosting`), and `data/` for `sform story import`
 
 When you make changes in Storyteller, keep the documentation in `docs/Platform/Storyteller/` up to date. Treat existing files in `docs/Platform/Storyteller/specs/` as historical reference documents, but create new specs and reviews there when the Documentation Workflow requires them.
 

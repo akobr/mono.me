@@ -155,6 +155,13 @@
       <Deploy />
     </Project>
   </Folder>
+  <Folder Name="/Platform/Storyteller/Playground/">
+    <Project Path="src/Platform/Storyteller/Playground/DotNet.AspireHost/src/DotNet.AspireHost.csproj" />
+    <Project Path="src/Platform/Storyteller/Playground/DotNet.SimpleConfiguration/src/DotNet.SimpleConfiguration.csproj" />
+    <Project Path="src/Platform/Storyteller/Playground/DotNet.SimpleConfiguration/test/DotNet.SimpleConfiguration.UnitTests.csproj" />
+    <Project Path="src/Platform/Storyteller/Playground/DotNet.SimpleExecutor/src/DotNet.SimpleExecutor.csproj" />
+    <Project Path="src/Platform/Storyteller/Playground/DotNet.SimpleExecutor/test/DotNet.SimpleExecutor.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Platform/Supervisor/">
     <Project Path="src/Platform/Supervisor/Abstraction/src/Abstraction.csproj" />
     <Project Path="src/Platform/Supervisor/Api.Functions/src/Api.Functions.csproj" />
