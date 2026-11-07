@@ -11,35 +11,44 @@ namespace _42.Platform.Cli.Model;
 
 public static class AnnotationExtensions
 {
-    // The body of a write. The relation arrays stay out: the server owns them.
-    public static SdkAnnotation ToSdkAnnotation(this CoreAnnotation @this)
+    // The body of a write. Without a stored annotation it holds the input alone, and the write replaces the content of an
+    // existing key. With one, the input is merged into it: a member the input has wins, the labels are joined, and each
+    // value of the input is written over the one of the same name. The relation arrays stay out: the server owns them.
+    public static SdkAnnotation ToSdkAnnotation(this CoreAnnotation @this, SdkAnnotation? stored = null)
     {
-        var annotation = CreateForKey(AnnotationKey.Parse(@this.AnnotationKey), @this);
+        var annotation = CreateForKey(AnnotationKey.Parse(@this.AnnotationKey), @this, stored);
 
         annotation.AnnotationKey = @this.AnnotationKey;
         annotation.Name = @this.Name;
-        annotation.Title = @this.Title;
-        annotation.ValidFrom = @this.ValidFrom;
-        annotation.ExpiresAt = @this.ExpiresAt;
-        annotation.IsDisabled = @this.IsDisabled;
-        annotation.TimeZone = @this.TimeZone;
+        annotation.Title = @this.Title ?? stored?.Title;
+        annotation.ValidFrom = @this.ValidFrom ?? stored?.ValidFrom;
+        annotation.ExpiresAt = @this.ExpiresAt ?? stored?.ExpiresAt;
+        annotation.IsDisabled = @this.IsDisabled ?? stored?.IsDisabled;
+        annotation.TimeZone = @this.TimeZone ?? stored?.TimeZone;
 
         annotation.ViewName = @this.ViewName;
         annotation.ProjectName = @this.ProjectName;
 
-        annotation.Description = @this.Description;
-        annotation.DocumentationLink = @this.DocumentationLink;
+        annotation.Description = @this.Description ?? stored?.Description;
+        annotation.DocumentationLink = @this.DocumentationLink ?? stored?.DocumentationLink;
 
-        annotation.Values = @this.Values?.ToDictionary(k => k.Key, v => v.Value) ?? new Dictionary<string, object>();
-        annotation.Labels = @this.Labels?.ToList() ?? new List<string>();
+        var values = stored?.Values?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? new Dictionary<string, object>();
+
+        foreach (var (name, value) in @this.Values ?? new Dictionary<string, object>())
+        {
+            values[name] = value;
+        }
+
+        annotation.Values = values;
+        annotation.Labels = (stored?.Labels ?? []).Concat(@this.Labels ?? []).Distinct(StringComparer.Ordinal).ToList();
 
         return annotation;
     }
 
     // The model of the key's type, with its type-specific members. The API reads a body into that type, where they are
     // required, and answers 400 without them. Everything but a unit's type and definition comes from the key, as the
-    // API's AnnotationFactory makes it.
-    private static SdkAnnotation CreateForKey(AnnotationKey key, CoreAnnotation source)
+    // API's AnnotationFactory makes it; those come from the input, else from the stored unit, else the defaults of a create.
+    private static SdkAnnotation CreateForKey(AnnotationKey key, CoreAnnotation source, SdkAnnotation? stored)
     {
         return key.Type switch
         {
@@ -49,8 +58,8 @@ public static class AnnotationExtensions
             {
                 ResponsibilityKey = key.GetResponsibilityKey(),
                 ResponsibilityName = key.GetResponsibilityName(),
-                UnitType = (source as CoreUnit)?.UnitType ?? CoreUnit.DefaultUnitType,
-                UnitDefinition = (source as CoreUnit)?.UnitDefinition ?? CoreUnit.DefaultUnitDefinition,
+                UnitType = (source as CoreUnit)?.UnitType ?? (stored as Sdk.Unit)?.UnitType ?? CoreUnit.DefaultUnitType,
+                UnitDefinition = (source as CoreUnit)?.UnitDefinition ?? (stored as Sdk.Unit)?.UnitDefinition ?? CoreUnit.DefaultUnitDefinition,
             },
             AnnotationType.Usage => new Sdk.Usage
             {
