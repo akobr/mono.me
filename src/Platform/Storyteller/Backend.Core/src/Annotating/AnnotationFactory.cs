@@ -3,8 +3,8 @@ namespace _42.Platform.Storyteller.Annotating;
 // Builds annotation models whose key-derived members always agree with the key.
 public static class AnnotationFactory
 {
-    public const string DefaultUnitType = "event";
-    public const string DefaultUnitDefinition = "unknown";
+    public const string DefaultUnitType = Unit.DefaultUnitType;
+    public const string DefaultUnitDefinition = Unit.DefaultUnitDefinition;
 
     // A model of the key's runtime type with the members derived from the key and empty relation arrays.
     // With copyFrom, it takes the members an automatic ancestor copies from its descendant: the validity window,
