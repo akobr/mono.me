@@ -158,7 +158,7 @@ A machine deletes and restores only with the scope `Annotation.Write` and the ma
 
 Every change is recorded with the account or machine that made it: creates, updates (with the old and new values), deletes, restores, and configuration versions.
 
-Writing a key that is deleted creates it again with an empty configuration. `sform story set` asks first and can restore the old record instead, so its configuration and history come back.
+Writing a key that is deleted creates it again with an empty configuration. `sform story set` asks first and can restore the old record instead, so its configuration and history come back. Its write then replaces the record's content: what the file and the options do not hold is cleared. To get the record back as it was, use `sform story restore`.
 
 ## Export and import
 

@@ -19,7 +19,7 @@ using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.SET, CommandNames.CREATE, Description = "Create or update an annotation.")]
+[Command(CommandNames.SET, CommandNames.CREATE, Description = "Create an annotation, or replace the content of an existing one: what the file and the options do not hold is cleared.")]
 public class StorytellerSetCommand : BaseContextCommand
 {
     internal const string RestoreAndUpdateChoice = "Restore and update (keeps the configuration and the history)";
@@ -43,20 +43,20 @@ public class StorytellerSetCommand : BaseContextCommand
         _fileSystem = fileSystem;
     }
 
-    [Argument(0, Description = "An annotation key to get.")]
+    [Argument(0, Description = "The annotation key to create or replace.")]
     public string AnnotationKey { get; set; } = string.Empty;
 
-    [Option("-i|--import", CommandOptionType.SingleValue, Description = "Specify a file from where the annotation(s) will be imported.")]
+    [Option("-i|--import", CommandOptionType.SingleValue, Description = "A JSON file with the content of the annotation, for example one saved with sform story get -e.")]
     public string? ImportFilePath { get; set; }
 
     public bool IsImportRequested => !string.IsNullOrWhiteSpace(ImportFilePath);
 
-    [Option("-c|--custom-properties", CommandOptionType.MultipleValue, Description = "Specify custom properties to be set on the configuration.")]
+    [Option("-c|--custom-properties", CommandOptionType.MultipleValue, Description = "A value of the annotation, as name=value. It wins over the same name in the file.")]
     public string[]? CustomProperties { get; set; }
 
     public bool AreCustomPropertiesSpecified => CustomProperties?.Length > 0;
 
-    [Option("-l|--labels", CommandOptionType.MultipleValue, Description = "Specify labels to be set on the configuration.")]
+    [Option("-l|--labels", CommandOptionType.MultipleValue, Description = "A label of the annotation, added to those of the file.")]
     public string[]? Labels { get; set; }
 
     public bool AreLabelsSpecified => Labels?.Length > 0;
@@ -69,7 +69,7 @@ public class StorytellerSetCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
-        var annotationKey = Console.ValidateAnnotationKey(AnnotationKey);
+        var annotationKey = WithLowerCaseTypeCode(Console.ValidateAnnotationKey(AnnotationKey));
         var fullKey = Context.GetFullKey(annotationKey);
 
         if (RestoreDeleted && Recreate)
@@ -96,18 +96,30 @@ public class StorytellerSetCommand : BaseContextCommand
             }
 
             using var fileReader = _fileSystem.File.OpenText(ImportFilePath);
-            await using var jsonReader = new JsonTextReader(fileReader);
-            var fileContent = await JObject.LoadAsync(
-                jsonReader,
-                new JsonLoadSettings
-                {
-                    CommentHandling = CommentHandling.Ignore,
-                    DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Ignore,
-                    LineInfoHandling = LineInfoHandling.Ignore,
-                });
 
-            var annotationType = AnnotationTypes.GetRuntimeType(annotationKey.Type);
-            var serializedAnnotation = fileContent.ToObject(annotationType, JsonSerializer.CreateDefault());
+            // A date-like string stays as written: parsed, it would be written back in the offset of this machine.
+            await using var jsonReader = new JsonTextReader(fileReader) { DateParseHandling = DateParseHandling.None };
+            object? serializedAnnotation;
+
+            try
+            {
+                var fileContent = await JObject.LoadAsync(
+                    jsonReader,
+                    new JsonLoadSettings
+                    {
+                        CommentHandling = CommentHandling.Ignore,
+                        DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Ignore,
+                        LineInfoHandling = LineInfoHandling.Ignore,
+                    });
+
+                var annotationType = AnnotationTypes.GetRuntimeType(annotationKey.Type);
+                serializedAnnotation = fileContent.ToObject(annotationType, JsonSerializer.CreateDefault());
+            }
+            catch (JsonException exception)
+            {
+                Console.WriteErrorLine($"The import file '{_fileSystem.Path.GetFileName(ImportFilePath)}' does not contain a valid annotation: {exception.Message}");
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
 
             if (serializedAnnotation is not _42.Platform.Storyteller.Annotation castedAnnotation)
             {
@@ -144,20 +156,18 @@ public class StorytellerSetCommand : BaseContextCommand
                 customProperties[parts[0]] = PropertyValueParser.ParseValue(parts[1]);
             }
 
-            if (annotation.Values is null)
+            // An option wins over the same name in the file.
+            var values = annotation.Values?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? [];
+
+            foreach (var (name, value) in customProperties)
             {
-                annotation = annotation with
-                {
-                    Values = customProperties,
-                };
+                values[name] = value;
             }
-            else
+
+            annotation = annotation with
             {
-                annotation = annotation with
-                {
-                    Values = new Dictionary<string, object>(annotation.Values.Concat(customProperties)),
-                };
-            }
+                Values = values,
+            };
         }
 
         if (AreLabelsSpecified)
@@ -216,6 +226,14 @@ public class StorytellerSetCommand : BaseContextCommand
             Console.WriteLine($"Error occurred: {e.Message}");
             return ExitCodes.ERROR_CRASH;
         }
+    }
+
+    // The API stores an annotation under its key as written, so a type code in another case would be a second annotation
+    // next to the real one.
+    private static _42.Platform.Storyteller.AnnotationKey WithLowerCaseTypeCode(_42.Platform.Storyteller.AnnotationKey key)
+    {
+        var text = key.ToString();
+        return _42.Platform.Storyteller.AnnotationKey.Parse(key.TypeCode.ToLowerInvariant() + text[key.TypeCode.Length..]);
     }
 
     // A write to a deleted key, or below a deleted ancestor, re-creates it empty. Before that happens, the user chooses:
