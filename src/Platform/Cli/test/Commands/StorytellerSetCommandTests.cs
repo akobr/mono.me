@@ -38,6 +38,12 @@ public class StorytellerSetCommandTests
             .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>()))
             .Callback(() => _calls.Add("set"))
             .ReturnsAsync(AnnotationCommandFixture.Active(Key));
+
+        // The read of what the write merges into.
+        _fixture.Api
+            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, true, It.IsAny<bool?>(), It.IsAny<CancellationToken>()))
+            .Callback(() => _calls.Add("get"))
+            .ReturnsAsync(AnnotationCommandFixture.Active(Key));
     }
 
     [Fact]
@@ -48,7 +54,7 @@ public class StorytellerSetCommandTests
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe(["set"]);
+        _calls.ShouldBe(["get", "set"]);
         _fixture.Console.Mock.Verify(console => console.Select(It.IsAny<SelectOptions<string>>()), Times.Never);
     }
 
@@ -61,7 +67,7 @@ public class StorytellerSetCommandTests
         var exitCode = await Execute(restoreDeleted: true);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe([$"restore:{Key}:False", "set"]);
+        _calls.ShouldBe([$"restore:{Key}:False", "get", "set"]);
         _fixture.Line("- exe.northwind.billing.prod").ShouldContain("by Ales Kobr");
     }
 
@@ -73,13 +79,13 @@ public class StorytellerSetCommandTests
         var exitCode = await Execute(recreate: true);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe(["set"]);
+        _calls.ShouldBe(["get", "set"]);
         _fixture.Line("This annotation is deleted").ShouldNotBeNull();
     }
 
     [Theory]
-    [InlineData(StorytellerSetCommand.RestoreAndUpdateChoice, "restore:sbt.northwind:False,set")]
-    [InlineData(StorytellerSetCommand.CreateNewChoice, "set")]
+    [InlineData(StorytellerSetCommand.RestoreAndUpdateChoice, "restore:sbt.northwind:False,get,set")]
+    [InlineData(StorytellerSetCommand.CreateNewChoice, "get,set")]
     public async Task DeletedAncestor_AsksAndFollowsTheAnswer(string answer, string expectedCalls)
     {
         DeletedAmong("sbt.northwind");

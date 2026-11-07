@@ -31,6 +31,27 @@ public class StorytellerSetBodyTests
 {
     private const string UnitKey = "unt.billing.export";
     private const string ImportFile = "annotation.json";
+    private const string NotFound = """{ "Message": "The annotation does not exist.", "ErrorCode": "AnnotationNotFound" }""";
+
+    // As a read answers them: date-like strings unparsed, the relation arrays included.
+    private const string StoredExecution = """
+        {
+          "AnnotationType": "Execution", "ProjectName": "proj1", "ViewName": "default",
+          "AnnotationKey": "exe.northwind.billing.prod", "Name": "prod",
+          "Title": "Stored", "Description": "Stored description", "DocumentationLink": "https://example.com/stored",
+          "TimeZone": "Europe/Prague", "ValidFrom": "2026-01-01T00:00:00+00:00", "IsDisabled": true,
+          "Labels": ["stored"],
+          "Values": { "tier": "gold", "since": "2026-10-24T10:00:00.000+02:00", "nested": { "at": 1 } },
+          "UnitNames": ["export"]
+        }
+        """;
+
+    private const string StoredUnit = """
+        {
+          "AnnotationType": "Unit", "ProjectName": "proj1", "ViewName": "default",
+          "AnnotationKey": "unt.billing.export", "Name": "export", "UnitType": "time", "UnitDefinition": "0 2 * * *"
+        }
+        """;
 
     // What the API reads a body with (AnnotationsHttp.AnnotationBodyOptions): into the runtime type of its AnnotationType,
     // where a missing required member is a 400.
@@ -250,6 +271,99 @@ public class StorytellerSetBodyTests
     }
 
     [Fact]
+    public async Task Merge_KeepsWhatTheInputDoesNotHold()
+    {
+        var body = await SetAsync(
+            "exe.northwind.billing.prod",
+            configure: command =>
+            {
+                command.CustomProperties = ["plan=pro"];
+                command.Labels = ["eu"];
+            },
+            stored: StoredExecution);
+
+        _http.Requests[1].Method.ShouldBe(HttpMethod.Get);
+        _http.Requests[1].Uri.Query.ShouldContain("includeInactive=true");
+        body["Title"]!.Value<string>().ShouldBe("Stored");
+        body["Description"]!.Value<string>().ShouldBe("Stored description");
+        body["DocumentationLink"]!.Value<string>().ShouldBe("https://example.com/stored");
+        body["TimeZone"]!.Value<string>().ShouldBe("Europe/Prague");
+        body["ValidFrom"]!.Value<string>().ShouldStartWith("2026-01-01T00:00:00");
+        body["IsDisabled"]!.Value<bool>().ShouldBeTrue();
+        body["Labels"]!.Values<string>().ShouldBe(["stored", "eu"]);
+        body["Values"]!["tier"]!.Value<string>().ShouldBe("gold");
+        body["Values"]!["since"]!.Value<string>().ShouldBe("2026-10-24T10:00:00.000+02:00");
+        body["Values"]!["nested"]!["at"]!.Value<int>().ShouldBe(1);
+        body["Values"]!["plan"]!.Value<string>().ShouldBe("pro");
+        body.ContainsKey("UnitNames").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Merge_TheFileWinsOverTheStoredMembers_AndTheOptionsOverTheFile()
+    {
+        _fileSystem.AddFile(ImportFile, new MockFileData("""{ "Title": "From the file", "IsDisabled": false, "Labels": ["stored"], "Values": { "tier": "silver", "plan": "free" } }"""));
+
+        var body = await SetAsync("exe.northwind.billing.prod", ImportFile, command => command.CustomProperties = ["plan=pro"], StoredExecution);
+
+        body["Title"]!.Value<string>().ShouldBe("From the file");
+        body["Description"]!.Value<string>().ShouldBe("Stored description");
+        body["IsDisabled"]!.Value<bool>().ShouldBeFalse();
+        body["Labels"]!.Values<string>().ShouldBe(["stored"]);
+        body["Values"]!["tier"]!.Value<string>().ShouldBe("silver");
+        body["Values"]!["plan"]!.Value<string>().ShouldBe("pro");
+        body["Values"]!["since"]!.Value<string>().ShouldBe("2026-10-24T10:00:00.000+02:00");
+    }
+
+    [Fact]
+    public async Task Merge_AStoredUnit_KeepsItsTypeAndDefinition()
+    {
+        var body = await SetAsync(UnitKey, stored: StoredUnit);
+
+        body["UnitType"]!.Value<string>().ShouldBe("time");
+        body["UnitDefinition"]!.Value<string>().ShouldBe("0 2 * * *");
+    }
+
+    [Fact]
+    public async Task Merge_AUnitOfTheFile_WinsOverTheStoredOne()
+    {
+        _fileSystem.AddFile(ImportFile, new MockFileData("""{ "UnitType": "message" }"""));
+
+        var body = await SetAsync(UnitKey, ImportFile, stored: StoredUnit);
+
+        body["UnitType"]!.Value<string>().ShouldBe("message");
+        body["UnitDefinition"]!.Value<string>().ShouldBe("0 2 * * *");
+    }
+
+    [Fact]
+    public async Task Replace_ReadsNothing_AndSendsTheInputAlone()
+    {
+        var body = await SetAsync("exe.northwind.billing.prod", configure: command =>
+        {
+            command.IsReplaceRequested = true;
+            command.Labels = ["eu"];
+        });
+
+        _http.Requests.Count.ShouldBe(2);
+        _http.Requests.ShouldNotContain(request => request.Method == HttpMethod.Get);
+        body.ContainsKey("Title").ShouldBeFalse();
+        body["Labels"]!.Values<string>().ShouldBe(["eu"]);
+        ((JObject)body["Values"]!).Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ARefusedRead_SendsNoWrite()
+    {
+        _http.Respond(HttpStatusCode.OK, "[]");
+        _http.Respond(HttpStatusCode.Forbidden, """{ "Message": "The machine may not read it.", "ErrorCode": "AnnotationRestricted" }""");
+
+        var exitCode = await CreateCommand("exe.northwind.billing.prod").OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _http.Requests.Count.ShouldBe(2);
+        _http.Requests[^1].Method.ShouldBe(HttpMethod.Get);
+    }
+
+    [Fact]
     public async Task Write_GoesToTheRouteOfTheKey()
     {
         await SetAsync(UnitKey);
@@ -258,22 +372,36 @@ public class StorytellerSetBodyTests
         write.Uri.AbsolutePath.ShouldBe($"/api/v1/{AnnotationCommandFixture.Organization}/{AnnotationCommandFixture.Project}/{AnnotationCommandFixture.View}/annotations/{UnitKey}");
     }
 
-    private async Task<JObject> SetAsync(string key, string? importFile = null, Action<StorytellerSetCommand>? configure = null)
+    private async Task<JObject> SetAsync(string key, string? importFile = null, Action<StorytellerSetCommand>? configure = null, string? stored = null)
     {
-        (await ExecuteAsync(key, importFile, configure)).ShouldBe(ExitCodes.SUCCESS);
+        (await ExecuteAsync(key, importFile, configure, stored)).ShouldBe(ExitCodes.SUCCESS);
 
         // Without parsing dates: the assertions are about the text that was sent.
         using var reader = new JsonTextReader(new StringReader(_http.Requests[^1].Body!)) { DateParseHandling = DateParseHandling.None };
         return JObject.Load(reader);
     }
 
-    private Task<int> ExecuteAsync(string key, string? importFile = null, Action<StorytellerSetCommand>? configure = null)
+    // The lookup of deleted keys, the read of what a merge goes into (404 without a stored annotation, none with
+    // --replace), then the write.
+    private Task<int> ExecuteAsync(string key, string? importFile = null, Action<StorytellerSetCommand>? configure = null, string? stored = null)
     {
-        // The lookup of deleted keys, then the write.
-        _http.Respond(HttpStatusCode.OK, "[]");
-        _http.Respond(HttpStatusCode.OK, Answer(key));
+        var command = CreateCommand(key, importFile);
+        configure?.Invoke(command);
 
-        var command = new StorytellerSetCommand(
+        _http.Respond(HttpStatusCode.OK, "[]");
+
+        if (!command.IsReplaceRequested)
+        {
+            _http.Respond(stored is null ? HttpStatusCode.NotFound : HttpStatusCode.OK, stored ?? NotFound);
+        }
+
+        _http.Respond(HttpStatusCode.OK, Answer(key));
+        return command.OnExecuteAsync();
+    }
+
+    private StorytellerSetCommand CreateCommand(string key, string? importFile = null)
+    {
+        return new StorytellerSetCommand(
             _fixture.Console.Object,
             _fixture.Context.Object,
             new AnnotationsApiClient(new HttpClient(_http), new SdkConfiguration { BaseUrl = "http://localhost:7071/api" }),
@@ -283,9 +411,6 @@ public class StorytellerSetBodyTests
             AnnotationKey = key,
             ImportFilePath = importFile,
         };
-
-        configure?.Invoke(command);
-        return command.OnExecuteAsync();
     }
 
     private static string Answer(string key)

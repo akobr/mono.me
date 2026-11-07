@@ -19,7 +19,7 @@ using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.SET, CommandNames.CREATE, Description = "Create an annotation, or replace the content of an existing one: what the file and the options do not hold is cleared.")]
+[Command(CommandNames.SET, CommandNames.CREATE, Description = "Create an annotation, or merge into an existing one; --replace clears what the file and the options do not hold.")]
 public class StorytellerSetCommand : BaseContextCommand
 {
     internal const string RestoreAndUpdateChoice = "Restore and update (keeps the configuration and the history)";
@@ -43,7 +43,7 @@ public class StorytellerSetCommand : BaseContextCommand
         _fileSystem = fileSystem;
     }
 
-    [Argument(0, Description = "The annotation key to create or replace.")]
+    [Argument(0, Description = "The annotation key to create or update.")]
     public string AnnotationKey { get; set; } = string.Empty;
 
     [Option("-i|--import", CommandOptionType.SingleValue, Description = "A JSON file with the content of the annotation, for example one saved with sform story get -e.")]
@@ -66,6 +66,9 @@ public class StorytellerSetCommand : BaseContextCommand
 
     [Option("--recreate", CommandOptionType.NoValue, Description = "When the annotation or an ancestor is deleted, create it new, with an empty configuration.")]
     public bool Recreate { get; set; }
+
+    [Option("--replace", CommandOptionType.NoValue, Description = "Replace the content of an existing annotation instead of merging into it: what the file and the options do not hold is cleared.")]
+    public bool IsReplaceRequested { get; set; }
 
     protected override async Task<int> ExecuteAsync()
     {
@@ -200,12 +203,15 @@ public class StorytellerSetCommand : BaseContextCommand
                 return deletedResult.Value;
             }
 
+            // Read after a restore, so Restore and update merges into the restored record.
+            var stored = IsReplaceRequested ? null : await ReadStoredAsync(annotationKey);
+
             var resultAnnotation = await _annotationsApi.SetAnnotationAsync(
                 Context.OrganizationName,
                 Context.ProjectName,
                 Context.ViewName,
                 annotationKey,
-                annotation.ToSdkAnnotation());
+                annotation.ToSdkAnnotation(stored));
 
             Console.WriteJson(resultAnnotation);
             return ExitCodes.SUCCESS;
@@ -225,6 +231,25 @@ public class StorytellerSetCommand : BaseContextCommand
         {
             Console.WriteLine($"Error occurred: {e.Message}");
             return ExitCodes.ERROR_CRASH;
+        }
+    }
+
+    // The annotation to merge into, whatever its status; none when the key does not exist or is deleted. The API has no
+    // merge of its own: a write replaces the content.
+    private async Task<_42.Platform.Storyteller.Sdk.Annotation?> ReadStoredAsync(_42.Platform.Storyteller.AnnotationKey annotationKey)
+    {
+        try
+        {
+            return await _annotationsApi.GetAnnotationAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                annotationKey,
+                includeInactive: true);
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
+        {
+            return null;
         }
     }
 
