@@ -363,6 +363,32 @@ public class StorytellerSetBodyTests
         _http.Requests[^1].Method.ShouldBe(HttpMethod.Get);
     }
 
+    // As before the fix, when the SDK refused a body without AnnotationKey: a plain error and exit code, not a crash.
+    [Fact]
+    public async Task ABodyTheClientCannotWrite_IsAnErrorLine_NotACrash()
+    {
+        using var error = new StringWriter();
+        _fixture.InnerConsole.SetupGet(console => console.Error).Returns(error);
+        _http.Respond(HttpStatusCode.OK, "[]");
+        _http.Respond(HttpStatusCode.NotFound, NotFound);
+
+        var command = new StorytellerSetCommand(
+            _fixture.Console.Object,
+            _fixture.Context.Object,
+            new UnwritableBodyClient(new HttpClient(_http)),
+            Options.Create(new AccessDefaultOptions()),
+            _fileSystem)
+        {
+            AnnotationKey = UnitKey,
+        };
+
+        var exitCode = await command.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        error.ToString().ShouldContain($"The annotation {UnitKey} could not be sent");
+        error.ToString().ShouldContain("AnnotationKey");
+    }
+
     [Fact]
     public async Task Write_GoesToTheRouteOfTheKey()
     {
@@ -411,6 +437,16 @@ public class StorytellerSetBodyTests
             AnnotationKey = key,
             ImportFilePath = importFile,
         };
+    }
+
+    // The SDK's refusal of a body, as it threw for a missing required member.
+    private sealed class UnwritableBodyClient(HttpClient httpClient)
+        : AnnotationsApiClient(httpClient, new SdkConfiguration { BaseUrl = "http://localhost:7071/api" })
+    {
+        public override Task<_42.Platform.Storyteller.Sdk.Annotation> SetAnnotationAsync(string organization, string project, string view, string key, _42.Platform.Storyteller.Sdk.Annotation body = null!, System.Threading.CancellationToken cancellationToken = default)
+        {
+            throw new JsonSerializationException("Cannot write a null value for property 'AnnotationKey'. Property requires a value. Path ''.");
+        }
     }
 
     private static string Answer(string key)

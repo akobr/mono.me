@@ -216,6 +216,13 @@ public class StorytellerSetCommand : BaseContextCommand
             Console.WriteJson(resultAnnotation);
             return ExitCodes.SUCCESS;
         }
+        catch (JsonException e)
+        {
+            // The client refused to write the body, before any request: a defect of sform, not of the input. The
+            // message names the member and its path, not a value.
+            Console.WriteErrorLine($"The annotation {annotationKey} could not be sent: {e.Message}");
+            return ExitCodes.ERROR_CRASH;
+        }
         catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.BadRequest or (int)HttpStatusCode.Conflict)
         {
             // for example InvalidAnnotation: the server names the field and its limit
