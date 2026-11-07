@@ -61,6 +61,10 @@ Reviewers found these by running the command with inputs the first tests did not
 3. **A file that is no annotation ended as a crash.** Newtonsoft's exceptions reached `Program`'s "the tool is broken". The command now catches `JsonException` and exits with `2`, with the file name and the reader's message on standard error. It uses `WriteErrorLine`, not `WriteImportant`: see the next section.
 4. **A type code in another case wrote a second annotation.** `sform story set EXE.n.b.p` looked up and wrote `EXE.n.b.p`, and the API stores an annotation under its key as written. The command now lower-cases the type code first. This was shown with the real client and annotation service, not with Cosmos DB.
 
+## Added after the review
+
+**A body the client cannot write** no longer ends as a crash. Asked for by 424-207: the write now catches `JsonException` from the SDK, such as the `Cannot write a null value for property 'AnnotationKey'` of the bug, prints `The annotation {key} could not be sent: …` on standard error, and exits with `1`. The test `ABodyTheClientCannotWrite_IsAnErrorLine_NotACrash` makes the client refuse the body. sform passes 1103 tests.
+
 ## Open
 
 1. **The API accepts a type code in another case.** The command now sends a canonical key, but any other client can still create `EXE.n.b.p` next to `exe.n.b.p`. Canonicalizing in the API's write would close that for every client.
