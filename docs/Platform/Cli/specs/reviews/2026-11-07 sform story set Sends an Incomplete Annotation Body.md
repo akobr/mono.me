@@ -13,7 +13,7 @@ This review covers all of [sform story set Sends an Incomplete Annotation Body](
 | `e7716bc0` | `annotation-lifecycle.md` and `docs/42for.net/platform/annotations.md` |
 | This commit | This review |
 
-**Decided with the owner:** `sform story set` keeps replacing the content of an existing key, as the API's `PUT` does (spec section 3).
+**Decided with the owner:** `sform story set` keeps replacing the content of an existing key, as the API's `PUT` does (spec section 3). **Reversed later the same day**: the command now merges by default and replaces with `--replace`, see [sform story set Merges by Default](../2026-11-07%20sform%20story%20set%20Merges%20by%20Default.md).
 
 ## What Was Done
 
