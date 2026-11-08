@@ -13,6 +13,13 @@ namespace _42.Platform.Storyteller.Annotating;
 // Parsed up front; Apply is pure, so a write can run it again on every attempt against fresh state.
 public sealed class AnnotationPatch
 {
+    // The most a document may weigh while a JSON Patch builds it (about its size in characters). A copy doubles a value
+    // with a few bytes of patch, so the weight of every value an operation adds is counted before it is added.
+    internal const long MaxDocumentWeight = 16 * 1024 * 1024;
+
+    // The deepest a JSON Patch may nest a value of the document, the root being 1: the depth the API reads a body to.
+    internal const int MaxDocumentDepth = 64;
+
     // The public properties of each runtime type. Those that are not editable (identity, type-specific, relation
     // and server-owned members) a merge patch ignores, as a full write does, so a read body can be sent back.
     private static readonly ConcurrentDictionary<Type, IReadOnlySet<string>> Properties = new();
@@ -75,9 +82,10 @@ public sealed class AnnotationPatch
             return operations.Deserialize<JsonPatch>()
                 ?? throw new JsonPatchException("Invalid JSON Patch document.", JsonPatchFailureKind.Invalid);
         }
-        catch (Exception exception) when (exception is JsonException or PointerParseException)
+        catch (Exception exception) when (exception is JsonException or PointerParseException or InvalidOperationException)
         {
-            // Unknown op, missing path or value, or a malformed pointer: the document itself is not a valid patch.
+            // Unknown op, missing path or value, a malformed pointer, or a value nested deeper than a body is read: the
+            // document itself is not a valid patch.
             throw new JsonPatchException($"Invalid JSON Patch document: {exception.Message}", JsonPatchFailureKind.Invalid);
         }
     }
@@ -267,6 +275,103 @@ public sealed class AnnotationPatch
         }
     }
 
+    // What the operation adds: its weight joins the document's (a replaced or moved value is not taken off, so the sum
+    // only grows), and the value may not end deeper than MaxDocumentDepth. The error, or null.
+    private static string? CheckGrowth(JsonNode? root, PatchOperation operation, ref long weight)
+    {
+        JsonNode? value;
+
+        switch (operation.Op)
+        {
+            case OperationType.Add:
+            case OperationType.Replace:
+                value = operation.Value;
+                break;
+
+            case OperationType.Copy:
+            case OperationType.Move:
+                // a missing source fails in the operation itself
+                if (!TryResolve(root, GetSegments(operation.From), GetSegments(operation.From).Length, out value))
+                {
+                    return null;
+                }
+
+                break;
+
+            default:
+                return null;
+        }
+
+        var added = Weigh(value, MaxDocumentWeight - weight, out var depth);
+
+        if (operation.Op != OperationType.Move)
+        {
+            weight += added;
+        }
+
+        if (weight > MaxDocumentWeight)
+        {
+            return $"The patched annotation would be larger than {MaxDocumentWeight} characters.";
+        }
+
+        // the root is 1, so a value at a path of n segments starts at depth n + 1
+        return GetSegments(operation.Path).Length + depth > MaxDocumentDepth
+            ? $"The patched annotation would nest deeper than {MaxDocumentDepth} levels."
+            : null;
+    }
+
+    // About the size of the node in characters, and its depth (a value is 1). Iterative, so no depth overflows the
+    // stack; it stops counting once the weight passes limit.
+    private static long Weigh(JsonNode? node, long limit, out int depth)
+    {
+        long weight = 0;
+        depth = 0;
+        var pending = new Stack<(JsonNode? Node, int Depth)>();
+        pending.Push((node, 1));
+
+        while (pending.Count > 0 && weight <= limit)
+        {
+            var (current, level) = pending.Pop();
+            depth = Math.Max(depth, level);
+
+            switch (current)
+            {
+                case JsonObject currentObject:
+                    weight += 2;
+
+                    foreach (var (name, child) in currentObject)
+                    {
+                        weight += name.Length + 4;
+                        pending.Push((child, level + 1));
+                    }
+
+                    break;
+
+                case JsonArray currentArray:
+                    weight += 2;
+
+                    foreach (var item in currentArray)
+                    {
+                        weight += 1;
+                        pending.Push((item, level + 1));
+                    }
+
+                    break;
+
+                case JsonValue currentValue when currentValue.GetValueKind() == JsonValueKind.String:
+                    weight += currentValue.GetValue<string>().Length + 2;
+                    break;
+
+                default:
+                    // a number, a boolean or null
+                    weight += 8;
+                    break;
+            }
+        }
+
+        return weight;
+    }
+
     // The node at the first count segments; false when one of them does not exist. A JSON null is a node too (null).
     private static bool TryResolve(JsonNode? root, string[] segments, int count, out JsonNode? node)
     {
@@ -384,14 +489,16 @@ public sealed class AnnotationPatch
     }
 
     // RFC 6902 over the editable document; paths are case-sensitive. JsonPatch.Net parsed and validated the operations.
+    // The document may not outgrow MaxDocumentWeight or MaxDocumentDepth on the way.
     private JsonObject ApplyJsonPatch(JsonObject document)
     {
         JsonNode? root = document;
+        var weight = Weigh(document, MaxDocumentWeight, out _);
 
         for (var index = 0; index < _jsonPatch!.Operations.Count; index++)
         {
             var operation = _jsonPatch.Operations[index];
-            var error = ApplyOperation(ref root, operation);
+            var error = CheckGrowth(root, operation, ref weight) ?? ApplyOperation(ref root, operation);
 
             if (error is not null)
             {

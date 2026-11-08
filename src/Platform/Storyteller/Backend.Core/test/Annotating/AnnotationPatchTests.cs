@@ -327,7 +327,6 @@ public class AnnotationPatchTests
     [InlineData("""[{"op":"add","path":"/Values/limits/cpu","value":2}]""")]
     [InlineData("""[{"op":"replace","path":"/Labels/0","value":"x"}]""")]
     [InlineData("""[{"op":"add","path":"/Labels/1","value":"x"}]""")]
-    [InlineData("""[{"op":"add","path":"/Labels/01","value":"x"}]""")]
     [InlineData("""[{"op":"remove","path":"/Labels/-"}]""")]
     [InlineData("""[{"op":"add","path":"/Title/x","value":"x"}]""")]
     [InlineData("""[{"op":"copy","from":"/Values/missing","path":"/Values/x"}]""")]
@@ -635,6 +634,110 @@ public class AnnotationPatchTests
         document["UnitDefinition"]!.GetValue<string>().ShouldBe("unknown");
         document["ValidFrom"]!.GetValue<string>().ShouldBe("2026-11-01T09:30:00+02:00");
         document["Values"]!.ToJsonString().ShouldBe("""{"n":1}""");
+    }
+
+    // RFC 6901: an index has no leading zero, even where the number would address an item.
+    [Theory]
+    [InlineData("""[{"op":"add","path":"/Labels/01","value":"x"}]""")]
+    [InlineData("""[{"op":"replace","path":"/Labels/01","value":"x"}]""")]
+    [InlineData("""[{"op":"remove","path":"/Labels/00"}]""")]
+    public void JsonPatch_AnIndexWithALeadingZero_IsOperationFailed(string operations)
+    {
+        var exception = Should.Throw<JsonPatchException>(() => JsonPatch(operations).Apply(Execution() with { Labels = ["a", "b"] }));
+
+        exception.Kind.ShouldBe(JsonPatchFailureKind.OperationFailed);
+    }
+
+    // A copy doubles a value with a few bytes of patch: the document may not outgrow its limit on the way.
+    [Fact]
+    public void JsonPatch_CopiesThatDoubleTheDocument_StopAtTheLimit()
+    {
+        var operations = new JsonArray { new JsonObject { ["op"] = "add", ["path"] = "/Values/a", ["value"] = new JsonArray(new string('x', 1000)) } };
+
+        for (var index = 0; index < 40; index++)
+        {
+            operations.Add(new JsonObject { ["op"] = "copy", ["from"] = "/Values/a", ["path"] = "/Values/a/-" });
+        }
+
+        var exception = Should.Throw<JsonPatchException>(() => AnnotationPatch.Json(operations).Apply(Execution()));
+
+        exception.Kind.ShouldBe(JsonPatchFailureKind.OperationFailed);
+        exception.Message.ShouldContain("larger than");
+    }
+
+    // A value that nests deeper than a body is read is no valid patch.
+    [Fact]
+    public void JsonPatch_AValueDeeperThanABody_IsInvalid()
+    {
+        var operations = new JsonArray { new JsonObject { ["op"] = "add", ["path"] = "/Values/deep", ["value"] = Nested(70) } };
+
+        Should.Throw<JsonPatchException>(() => AnnotationPatch.Json(operations)).Kind.ShouldBe(JsonPatchFailureKind.Invalid);
+    }
+
+    // Each value is within the depth of a body, but the path it goes to makes the document deeper.
+    [Fact]
+    public void JsonPatch_ThatNestsTooDeep_IsOperationFailed()
+    {
+        var operations = new JsonArray
+        {
+            new JsonObject { ["op"] = "add", ["path"] = "/Values/x", ["value"] = Nested(3) },
+            new JsonObject { ["op"] = "add", ["path"] = "/Values/x/a/a/deep", ["value"] = Nested(60) },
+        };
+
+        var exception = Should.Throw<JsonPatchException>(() => AnnotationPatch.Json(operations).Apply(Execution()));
+
+        exception.Kind.ShouldBe(JsonPatchFailureKind.OperationFailed);
+        exception.Message.ShouldContain("deeper than");
+    }
+
+    // A copy of a value into itself nests one level per operation, each within the limits of a body.
+    [Fact]
+    public void JsonPatch_CopiesIntoItself_StopAtTheDepthLimit()
+    {
+        var operations = new JsonArray { new JsonObject { ["op"] = "add", ["path"] = "/Values/a", ["value"] = new JsonArray() } };
+        var path = "/Values/a";
+
+        for (var level = 0; level < 70; level++)
+        {
+            operations.Add(new JsonObject { ["op"] = "add", ["path"] = path + "/-", ["value"] = new JsonArray() });
+            path += "/0";
+        }
+
+        var exception = Should.Throw<JsonPatchException>(() => AnnotationPatch.Json(operations).Apply(Execution()));
+
+        exception.Message.ShouldContain("deeper than");
+    }
+
+    // A full write lets a null label or a null UnitType in; a patch of another member keeps working on such a record.
+    [Fact]
+    public void Patch_OfALegacyRecordWithNulls_KeepsWorking()
+    {
+        var execution = Execution() with { Labels = ["eu", null!, "us"] };
+        var unit = Unit() with { UnitType = null! };
+
+        var patchedExecution = Merge("""{"Title":"x"}""").Apply(execution);
+        var patchedUnit = Merge("""{"Title":"x"}""").Apply(unit);
+
+        patchedExecution.Labels.ShouldBe(["eu", "us"]);
+        patchedUnit.Title.ShouldBe("x");
+        ((Unit)patchedUnit).UnitType.ShouldBeNull();
+        Should.Throw<InvalidInputException>(() => Merge("""{"UnitDefinition":null}""").Apply(unit));
+    }
+
+    // An object of the given depth: {"a":{"a":…{}}}.
+    private static JsonObject Nested(int depth)
+    {
+        var root = new JsonObject();
+        var current = root;
+
+        for (var level = 1; level < depth; level++)
+        {
+            var next = new JsonObject();
+            current["a"] = next;
+            current = next;
+        }
+
+        return root;
     }
 
     private static AnnotationPatch Merge(string json)

@@ -32,6 +32,7 @@ internal static class AnnotationPatchDocument
         return annotation is Unit ? UnitMembers : CommonMembers;
     }
 
+    // A null label that a full write let in is no label.
     public static JsonObject From(Annotation annotation)
     {
         var document = new JsonObject
@@ -43,7 +44,7 @@ internal static class AnnotationPatchDocument
             [nameof(Annotation.Title)] = annotation.Title,
             [nameof(Annotation.Description)] = annotation.Description,
             [nameof(Annotation.DocumentationLink)] = annotation.DocumentationLink,
-            [nameof(Annotation.Labels)] = new JsonArray((annotation.Labels ?? []).Select(label => (JsonNode?)label).ToArray()),
+            [nameof(Annotation.Labels)] = new JsonArray((annotation.Labels ?? []).OfType<string>().Select(label => (JsonNode?)label).ToArray()),
             [nameof(Annotation.Values)] = ToValues(annotation.Values),
         };
 
@@ -85,8 +86,8 @@ internal static class AnnotationPatchDocument
         return annotation is Unit unit
             ? unit with
             {
-                UnitType = ReadUnitMember(document, nameof(Unit.UnitType)),
-                UnitDefinition = ReadUnitMember(document, nameof(Unit.UnitDefinition)),
+                UnitType = ReadUnitMember(document, nameof(Unit.UnitType), (current as Unit)?.UnitType),
+                UnitDefinition = ReadUnitMember(document, nameof(Unit.UnitDefinition), (current as Unit)?.UnitDefinition),
             }
             : annotation;
     }
@@ -172,11 +173,17 @@ internal static class AnnotationPatchDocument
             : throw Invalid($"The member '{member}' must be a string or null.");
     }
 
-    // A unit always has its type and definition.
-    private static string ReadUnitMember(JsonObject document, string member)
+    // A unit always has its type and definition; only one stored without it (a full write lets a null in) keeps it so.
+    private static string ReadUnitMember(JsonObject document, string member, string? stored)
     {
-        var node = Get(document, member)
-            ?? throw Invalid($"A unit always has a {member}: the member '{member}' cannot be removed or null.");
+        var node = Get(document, member);
+
+        if (node is null)
+        {
+            return stored is null
+                ? null!
+                : throw Invalid($"A unit always has a {member}: the member '{member}' cannot be removed or null.");
+        }
 
         return node.GetValueKind() == JsonValueKind.String
             ? node.GetValue<string>()
@@ -228,12 +235,25 @@ internal static class AnnotationPatchDocument
         const string member = nameof(Annotation.Values);
         var node = Get(document, member);
 
-        return node switch
+        if (node is null)
         {
-            null => null,
-            JsonObject values => values.Deserialize<Dictionary<string, object>>() ?? new Dictionary<string, object>(),
-            _ => throw Invalid($"The member '{member}' must be an object or null."),
-        };
+            return null;
+        }
+
+        if (node is not JsonObject values)
+        {
+            throw Invalid($"The member '{member}' must be an object or null.");
+        }
+
+        try
+        {
+            return values.Deserialize<Dictionary<string, object>>() ?? new Dictionary<string, object>();
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            // deeper than System.Text.Json reads (64 levels), as a body would be
+            throw Invalid($"The member '{member}' nests too deep: {exception.Message}");
+        }
     }
 
     private static JsonNode? Get(JsonObject document, string member)
