@@ -93,7 +93,7 @@ public sealed class AccessPointTests : CliTest
     // ACC-PNT-04: points create creates a project the creator owns and makes it the default project.
     // As an Owner of Target:Organization, sform account points create in a terminal asks "Select existing organization or
     // create new" (the organization is picked by typing its name into the list) and "Name of your new project" (a
-    // generated name) and ends with 0; access.default.json of the home then names the new project with the view default,
+    // generated name) and ends with 0; sform.settings.json of the home then names the new project with the view default,
     // and sform account points get -p <org>.<new project> lists the leased user as its Owner. The project stays.
     [Test]
     [TestCase(295)]
@@ -118,10 +118,9 @@ public sealed class AccessPointTests : CliTest
             (await terminal.WaitForExitAsync()).ShouldSucceed();
         }
 
-        var access = JsonNode.Parse(Home.ReadText(SformHome.AccessDefaultFileName) ?? "null")?["access"];
-        await Assert.That(access?["OrganizationName"]?.GetValue<string>()).IsEqualTo(Target.Organization);
-        await Assert.That(access?["ProjectName"]?.GetValue<string>()).IsEqualTo(name);
-        await Assert.That(access?["ViewName"]?.GetValue<string>()).IsEqualTo("default");
+        await Assert.That(Home.AccessSetting("organizationName")).IsEqualTo(Target.Organization);
+        await Assert.That(Home.AccessSetting("projectName")).IsEqualTo(name);
+        await Assert.That(Home.AccessSetting("viewName")).IsEqualTo("default");
 
         var accountId = await AccountIdAsync();
         var get = (await Sform("account", "points", "get", "-p", key)).ShouldSucceed();

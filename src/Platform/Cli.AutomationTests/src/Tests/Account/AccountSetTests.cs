@@ -6,13 +6,14 @@ using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Account;
 
-// Default Project: sform account set stores the default project and view in the home's access.default.json.
+// Default Project: sform account set stores the default project and view in the access section of the home's
+// sform.settings.json.
 [Area(Area.Account)]
 public sealed class AccountSetTests : CliTest
 {
     // ACC-SET-01: account set -p -v stores the default project and view, and later commands use them.
     // account set -p <org>.<project> -v <view> (a generated view: a view exists by its data, and with "default" a set
-    // that ignored -v would pass) confirms the default and writes access.default.json; account then ends with 0 and names
+    // that ignored -v would pass) confirms the default and writes it to sform.settings.json; account then ends with 0 and names
     // it ("Default project set to <org>.<project> with <view> view."); story without -p and -v reads that project's view
     // instead of asking for account set (43). account set --projectKey … --viewName default names the current default
     // ("Currently the default project is set to … and view is <view>.") and switches the view to default, as account and
@@ -56,7 +57,7 @@ public sealed class AccountSetTests : CliTest
     // With the default set to the target project (account set -p <org>.<project>), sform account set in a terminal names the
     // current default and asks "Which project would you like to set as default" with the user's projects, the target project
     // among them and preselected: Enter alone picks it, sform says "Default project set to <org>.<project> with view
-    // default." and access.default.json names it.
+    // default." and sform.settings.json names it.
     [Test]
     [TestCase(269)]
     [UserRole(Role.Any)]
@@ -96,8 +97,8 @@ public sealed class AccountSetTests : CliTest
     }
 
     // ACC-SET-04: account set -p checks only the format: a key without a dot fails with exit 2, an unknown project is stored.
-    // With the default set to the target project, sform account set -p only-org ends with 2 before any call ("The project
-    // key 'only-org' is not in the format <organizationName>.<projectName>.") and leaves access.default.json as it was;
+    // With the default set to the target project, sform account set -p only-org ends with 2 before any call ("'only-org'
+    // is no project key; it takes <organization>.<project>.") and leaves sform.settings.json as it was;
     // sform account set -p <org>.<generated> is not checked against the account: it stores the generated project as the
     // default and ends with 0.
     [Test]
@@ -107,12 +108,12 @@ public sealed class AccountSetTests : CliTest
     public async Task AccountSet_ProjectKey_ChecksFormatOnly()
     {
         (await Sform("account", "set", "-p", ProjectKey)).ShouldSucceed();
-        var before = Home.ReadText(Access.SformHome.AccessDefaultFileName);
+        var before = Home.ReadText(Access.SformHome.SettingsFileName);
 
         (await Sform("account", "set", "-p", "only-org"))
             .ShouldExitWith(CliExit.WrongInput)
-            .ShouldContain("The project key 'only-org' is not in the format <organizationName>.<projectName>.");
-        await Assert.That(Home.ReadText(Access.SformHome.AccessDefaultFileName)).IsEqualTo(before);
+            .ShouldContain("'only-org' is no project key; it takes <organization>.<project>.");
+        await Assert.That(Home.ReadText(Access.SformHome.SettingsFileName)).IsEqualTo(before);
 
         var generated = CliData.ProjectName();
         (await Sform("account", "set", "-p", $"{Organization}.{generated}"))
@@ -121,15 +122,12 @@ public sealed class AccountSetTests : CliTest
         await AssertDefaultAsync("default", generated);
     }
 
-    // access.default.json of the home: { "access": { "OrganizationName", "ProjectName", "ViewName" } }.
+    // The access section of the home's sform.settings.json: { "access": { "organizationName", "projectName", "viewName" } }.
     private async Task AssertDefaultAsync(string view, string? project = null)
     {
-        var text = Home.ReadText(Access.SformHome.AccessDefaultFileName);
-        await Assert.That(text).IsNotNull();
-
-        var access = JsonNode.Parse(text!)!["access"]!;
-        await Assert.That(access["OrganizationName"]!.GetValue<string>()).IsEqualTo(Organization);
-        await Assert.That(access["ProjectName"]!.GetValue<string>()).IsEqualTo(project ?? Project);
-        await Assert.That(access["ViewName"]!.GetValue<string>()).IsEqualTo(view);
+        await Assert.That(Home.ReadSettings()?["access"]).IsNotNull();
+        await Assert.That(Home.AccessSetting("organizationName")).IsEqualTo(Organization);
+        await Assert.That(Home.AccessSetting("projectName")).IsEqualTo(project ?? Project);
+        await Assert.That(Home.AccessSetting("viewName")).IsEqualTo(view);
     }
 }

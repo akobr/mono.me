@@ -5,7 +5,7 @@ using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.General;
 
-// Context Options: which project and view a context command targets: -p/-v, the default project of access.default.json,
+// Context Options: which project and view a context command targets: -p/-v, the default project of sform.settings.json,
 // house.main, and a machine's STORYTELLER_PROJECT and STORYTELLER_VIEW. A view exists by its data, so each case puts an
 // annotation (as an Editor) into a generated view and recognises the target by it.
 [Area(Area.General)]
@@ -47,7 +47,7 @@ public sealed class ContextTests : CliTest
     }
 
     // GEN-CTX-02: Without a default project and without -p a context command targets house.main with the view default.
-    // With no access.default.json, sform story sends its request to house.main with the view default, which the leased user
+    // With no default project, sform story sends its request to house.main with the view default, which the leased user
     // is no member of: the API refuses it with 44, "No Reader access to 'house.main'." and "Error code: AccessDenied", and
     // sform story does not point to sform account set (only sform account does).
     [Test]

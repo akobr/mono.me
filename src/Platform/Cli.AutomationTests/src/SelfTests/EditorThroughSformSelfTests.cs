@@ -8,7 +8,7 @@ namespace _42.Platform.Cli.AutomationTests.SelfTests;
 
 // Mode E end to end without a target: the built sform runs story config edit as a machine with an API key against a stub
 // of the API (StubApi; the configuration does not exist yet, so sform opens the editor on {} and creates the
-// configuration with a POST), with editor.config.json of its SFORM_HOME naming the fake editor. It shows that sform starts
+// configuration with a POST), with the editor section of sform.settings.json in its SFORM_HOME naming the fake editor. It shows that sform starts
 // the fake editor's apphost from the custom command with its temporary file, waits for it, and reacts to each change as
 // the catalogue's E cases expect.
 [Category(CliCategories.SelfTest)]
@@ -103,8 +103,8 @@ public sealed class EditorThroughSformSelfTests
     private static async Task<FakeEditor> UseEditorAsync(SelfTestSandbox sandbox)
     {
         var editor = new FakeEditor(sandbox.WorkingDirectory, sandbox.FileSystem);
-        var json = new JsonObject { ["editor"] = new JsonObject { ["EditorType"] = "Custom", ["CustomCommand"] = editor.Command } };
-        await sandbox.FileSystem.File.WriteAllTextAsync(sandbox.Home.EditorConfigFile, json.ToJsonString(), new UTF8Encoding(false));
+        sandbox.Home.WriteSettingsSection("editor", new JsonObject { ["editorType"] = "Custom", ["customCommand"] = editor.Command });
+        await Task.CompletedTask;
         return editor;
     }
 
