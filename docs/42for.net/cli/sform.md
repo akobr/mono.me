@@ -111,7 +111,7 @@ A machine can do what its scopes allow, and it gets them when it is created. **R
 | `annotation-write` | `Annotation.Write` | `AnnotationWrite` | Runtime | `sform story set` and `edit` |
 | `configuration-read` | `Configuration.Read` | `ConfigurationRead` | Runtime | the reads of `sform story config`, `schema`, `template` and `kv` |
 | `configuration-write` | `Configuration.Write` | `ConfigurationWrite` | Runtime | the writes of `sform story config` and `kv`; with `schema-write` or `template-write`, those of `schema` and `template` |
-| `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config <key> --resolved`, `sform story kv export --include-secrets` |
+| `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config <key> --resolved`, `sform story config export <key>`, `sform story kv export --include-secrets` |
 | `secrets-write` | `Secrets.Write` | `SecretsWrite` | Runtime | `sform story kv set` of a secret, and `sform story kv protect` |
 | `configuration-transfer` | `Configuration.Transfer` | `ConfigurationTransfer` | Management | `sform story export` and `import`, `sform story kv export` and `import`; an import of a view also needs `schema-write`, `template-write` and `annotation-manage` for those kinds |
 | `schema-write` | `Schema.Write` | `SchemaWrite` | Management | the writes and deletes of `sform story schema`, and `sform story import` of schemas |
@@ -131,7 +131,7 @@ sform account machine create --scope configuration-write -m schema-write,templat
 Without a scope it needs, the API answers `403` with a message that names the scope, such as "This operation needs the scope Annotation.Manage, which the machine was not created with.", and `sform` prints it. Machines created before these scopes existed have none: their API keys and certificates get `401`, their client credentials `403`, and a federated machine gets no token. A machine cannot be edited: create a new one with the scopes the job needs.
 
 ::: warning
-Commands print what they read or write, and the job log keeps everything a step prints. A step that prints a resolved configuration with secrets puts those values into the log, and `--export` alone still prints the whole model. To use a configuration in a job, write it to a file with `--export` and `--format` or `--content-only`, which then print nothing, with `--mask` to hide its values in the log of later steps; or put it into the environment of the job with `--github-env`, which masks the values that bindings produced before it writes anything else. See [Read a configuration](#read-a-configuration).
+Commands print what they read or write, and the job log keeps everything a step prints. A step that prints a resolved configuration with secrets puts those values into the log, and `--export` alone still prints the whole model. To use a configuration in a job, run `sform story config export`: it masks the values that bindings produced before it writes anything else, then puts the configuration into the environment of the job with `--github-env`, into a file with `--export`, or both, and prints no value. `sform story config` with `--export` and `--format` or `--content-only` also prints nothing, but masks nothing either. See [Export to GitHub Actions](#export-to-github-actions).
 
 The runner also reads `##[command]` anywhere in a line that a step prints as a workflow command, so a printed configuration can set outputs or annotations of the step through its names and values. The messages of `sform` write every `#` as `\u0023`.
 :::
@@ -145,26 +145,24 @@ The details, such as the token URL rules, the certificate header for a local API
 `sform story config <key>` prints the configuration of an annotation: its whole model, with the version and the audit stamp, as coloured JSON. `-r` reads the resolved configuration, with its bindings evaluated, and `--version <n>` the stored content of a version.
 
 ::: warning
-`--format`, `--content-only`, `--env-prefix`, `--github-env`, `--mask`, `--allow-unprefixed` and `--allow-unresolved` are newer than the `sform` on NuGet, which ends such a command as an unrecognized option. Until a release has them, install a `sform` packed from the repository, as [Until sform is published](/cli/github-action#until-sform-is-published) shows.
+`--format`, `--content-only`, `--env-prefix` and `sform story config export` are newer than the `sform` on NuGet, which ends such a command as an unrecognized option or argument. Until a release has them, install a `sform` packed from the repository, as [Until sform is published](/cli/github-action#until-sform-is-published) shows.
 :::
 
 ``` text
 sform story config <key> [-r|--resolved | --version <n>] [-f|--format json|flat|properties|env|yaml]
                          [--content-only] [-e|--export <file>] [--env-prefix <PREFIX>]
-                         [--github-env] [--mask bound|all] [--allow-unprefixed] [--allow-unresolved]
 ```
 
-`--format` writes the content alone in a flat format: `flat`, a JSON object of the .NET `IConfiguration` keys (`db:hosts:0`); `properties` for Spring Boot (`db.hosts[0]`); `env`, a `.env` file (`DB__HOSTS__0`); or `yaml`. `sform` formats the content itself, with the library the API uses for `?format=`, so the text is the same as the API's, also for `--version`. `--env-prefix APP_` puts a prefix before every `env` name (`APP_DB__HOST`), as .NET `AddEnvironmentVariables("APP_")` expects. A document a format cannot write, for example a name with a space in `env`, stops the command with the rule and the JSON path of the name. The formats and their rules are in [Configuration Formats](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/configuration-formats.md).
+`--format` writes the content alone in a flat format: `flat`, a JSON object of the .NET `IConfiguration` keys (`db:hosts:0`); `properties` for Spring Boot (`db.hosts[0]`); `env`, a `.env` file (`DB__HOSTS__0`); or `yaml`. `sform` formats the content itself, with the library the API uses for `?format=`, so the text is the same as the API's, also for `--version`. `--env-prefix APP_` puts a prefix before every `env` name (`APP_DB__HOST`), as .NET `AddEnvironmentVariables("APP_")` expects; it applies to `--format env` only. A document a format cannot write, for example a name with a space in `env`, stops the command with the rule and the JSON path of the name. The formats and their rules are in [Configuration Formats](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/configuration-formats.md).
 
 | Options | Standard output | The `--export` file |
 |---|---|---|
 | None, or `--format json` | The model, with line numbers and colours | The model; `sform` asks before it replaces a file |
 | `--format flat`, `properties`, `env` or `yaml` | The text with line numbers, without colours; nothing with `--export` | The text |
 | `--content-only` | The content alone, as it is: the text of the format, or for `json` the content of the model, indented by two spaces (`{}` without content); nothing with `--export` | The same |
-| `--github-env` or `--mask` | Only the `::add-mask::` commands | The content in the format of `--format`; for `json`, the content of the model |
 
-- With `--format flat`, `properties`, `env` or `yaml`, `--content-only`, `--github-env` or `--mask`, the content is written as UTF-8 without a byte order mark and with LF line ends, also to a Windows console. The `--export` file is then replaced without asking, and on Linux and macOS a file of a resolved configuration is readable and writable by its owner alone (mode `0600`) from the moment it exists: `sform` writes a new file next to it and moves it over the old one, so a reader that opened the old file keeps that file, and a symbolic link at the path is replaced, not followed. The model (no option, or `--format json` alone) is exported as before: `sform` asks before it replaces a file, and the file gets the default permissions.
-- With `--content-only`, `--github-env` or `--mask`, every message of the command goes to standard error, one line each, so standard output holds the content alone and can be piped or redirected. Parsing errors, sign-in failures, refusals of the API (`401`, `403`) and crashes are still printed to standard output; they end with a non-zero exit code, and the `--export` file is not written.
+- With `--format flat`, `properties`, `env` or `yaml`, or `--content-only`, the content is written as UTF-8 without a byte order mark and with LF line ends, also to a Windows console. The `--export` file is then replaced without asking, and on Linux and macOS a file of a resolved configuration is readable and writable by its owner alone (mode `0600`) from the moment it exists: `sform` writes a new file next to it and moves it over the old one, so a reader that opened the old file keeps that file, and a symbolic link at the path is replaced, not followed. The model (no option, or `--format json` alone) is exported as before: `sform` asks before it replaces a file, and the file gets the default permissions.
+- With `--content-only`, every message of the command goes to standard error, one line each, so standard output holds the content alone and can be piped or redirected. Parsing errors, sign-in failures, refusals of the API (`401`, `403`) and crashes are still printed to standard output; they end with a non-zero exit code, and the `--export` file is not written.
 - Windows PowerShell 5.1 re-encodes what `>` redirects, so use `--export` there. PowerShell 7 and the other shells keep the bytes.
 
 ``` powershell
@@ -173,19 +171,37 @@ sform story config exe.northwind.invoicing.production -r -f yaml -e values.yaml
 sform story config exe.northwind.invoicing.production --version 3 -f properties --content-only
 ```
 
-A resolved configuration holds secret values only for a caller with the right to read secrets: a user with the `ContributorWithSecrets` role, or a machine with `Secrets.Read`, which by default must call with its certificate over mTLS. When the API withholds the secrets (`X-2S-Secrets-Withheld: mtls-required`), the values of secret bindings are their expressions, and `sform` warns about it. A machine without `Secrets.Read` gets the expressions without that header: when a resolved value starts with `@`, `sform` also reads the effective configuration, and warns about every value that is still the expression the effective configuration has at the same path. Warnings and errors name paths, never a value.
+A resolved configuration holds secret values only for a caller with the right to read secrets: a user with the `ContributorWithSecrets` role, or a machine with `Secrets.Read`, which by default must call with its certificate over mTLS. When the API withholds the secrets (`X-2S-Secrets-Withheld: mtls-required`), the values of secret bindings are their expressions, and `sform` warns about it. A machine without `Secrets.Read` gets the expressions without that header: when a resolved value starts with `@`, `sform` also reads the effective configuration, and warns about every value that is still the expression the effective configuration has at the same path. Warnings and errors name paths, never a value. To hand a resolved configuration to a CI job with masks, use `sform story config export`, see [Export to GitHub Actions](#export-to-github-actions).
 
 | Exit code | When |
 |---|---|
 | `0` | The configuration was printed or written |
-| `2` | Nothing was written: an invalid key, format, mask or prefix; options that do not go together (`--version` with `--resolved`, `--env-prefix` without `--format env` or `--github-env`, `--github-env` or `--mask` without `--resolved` or with `--version`, `--content-only` with `--github-env` or `--mask` but without `--export`, `--github-env` with neither `--env-prefix` nor `--allow-unprefixed`, `--allow-unprefixed` or `--allow-unresolved` without `--github-env` or `--mask`); `--github-env` outside a GitHub Actions job; a configuration or version that does not exist; a request the API rejects (`400`, `409`, `412`); a document the format cannot write; a binding that cannot be evaluated (`422`); and for `--github-env` and `--mask`, withheld secrets, unresolved bindings and refused variables. Also an `--export` file of the content or `GITHUB_ENV` that cannot be written: `--github-env` and `--mask` have printed the masks by then, and when the `--export` file fails, `GITHUB_ENV` was already appended |
-| `-1` | The command line does not parse: an unknown option, an option without its value, an option that takes a value given twice (`--format env --format yaml`), or `--version abc`. Shells on Linux and macOS show `255` |
+| `2` | Nothing was written: an invalid key, format or prefix; options that do not go together (`--version` with `--resolved`, `--env-prefix` without `--format env`); a configuration or version that does not exist; a request the API rejects (`400`, `409`, `412`); a document the format cannot write; a binding that cannot be evaluated (`422`). Also an `--export` file of the content that cannot be written |
+| `-1` | The command line does not parse: an unknown option, an option of `config export` such as `--github-env` or `--mask`, an option without its value, an option that takes a value given twice (`--format env --format yaml`), or `--version abc`. Shells on Linux and macOS show `255` |
 | `44` | The API refused the read (`401`, `403`) |
 | `1` | Another failure of the API (`500` and the other statuses), or a crash |
 
 ### Export to GitHub Actions
 
-`--github-env` exports a resolved configuration into the environment of a GitHub Actions job: every value becomes a variable with its `env` name in `GITHUB_ENV`, which the runner reads after the step. Its options, like the others of [Read a configuration](#read-a-configuration), need a `sform` packed from the repository until a release has them. The [GitHub Action](/cli/github-action) installs `sform` and runs this command in one step, and shows how to pack it.
+`sform story config export <key>` hands a resolved configuration to a CI job. It always reads the resolved configuration and always masks. With `--github-env` it exports the configuration into the environment of a GitHub Actions job: every value becomes a variable with its `env` name in `GITHUB_ENV`, which the runner reads after the step. With `--export` it writes the configuration to a file. Like the options of [Read a configuration](#read-a-configuration), the command needs a `sform` packed from the repository until a release has it. The [GitHub Action](/cli/github-action) installs `sform` and runs this command in one step, and shows how to pack it.
+
+``` text
+sform story config export <key> [--github-env] [--mask bound|all] [--prefix <PREFIX>]
+                                [--allow-unprefixed] [--allow-unresolved]
+                                [-e|--export <file> [-f|--format env|flat|properties|yaml|json]]
+```
+
+| Option | Meaning |
+|---|---|
+| `--github-env` | Append every value to `GITHUB_ENV` as a variable with its `env` name. Needs `--prefix` or `--allow-unprefixed`, and a step of a GitHub Actions job (`GITHUB_ENV` set) |
+| `--mask bound\|all` | `bound`, the default, masks the values that bindings produced, `all` every string and number; see **Masking** below |
+| `--prefix <PREFIX>` | A prefix before every variable name, for example `APP_` (an ASCII letter, then ASCII letters, digits and `_`): for `--github-env`, and for an `--export` file in `env` |
+| `--allow-unprefixed` | Let `--github-env` write the names of the configuration without a prefix |
+| `--allow-unresolved` | Export binding expressions that were not resolved as they are, instead of refusing |
+| `-e\|--export <file>` | Also write the content alone to this file. It is replaced without asking, and on Linux and macOS it is readable and writable by its owner alone (mode `0600`) from the moment it exists, as for `story config` |
+| `-f\|--format` | The format of the `--export` file: `env`, the default, `flat`, `properties`, `yaml`, or `json` for the content of the model; it needs `--export` |
+
+The command needs a target: `--github-env`, `--export`, or both; `--mask` alone only prints the masks. `--resolved` and `--content-only` are implied, so `story config export` takes neither, nor `--version`. Standard output holds only the `::add-mask::` commands, every message goes to standard error as one line, and the content is written as UTF-8 without a byte order mark and with LF line ends. `export` is a subcommand of `config`, so `sform story config export` never reads `export` as a key, as with `set` or `versions`; an annotation key has at least two segments anyway.
 
 ``` yaml
 # GitHub Actions: the later steps read APP_DB__HOST, APP_DB__PASSWORD, …
@@ -193,7 +209,7 @@ A resolved configuration holds secret values only for a caller with the right to
 - run: printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/storyteller.pfx"
   env:
     CERTIFICATE: ${{ secrets.STORYTELLER_CERTIFICATE_BASE64 }}
-- run: sform story config exe.northwind.invoicing.production -r --github-env --env-prefix APP_
+- run: sform story config export exe.northwind.invoicing.production --github-env --prefix APP_
   env:
     STORYTELLER_ENDPOINT: https://storyteller.example.com/api
     STORYTELLER_CLIENT_CERTIFICATE: ${{ runner.temp }}/storyteller.pfx
@@ -209,9 +225,17 @@ In one run, with one resolved and one effective read, `sform`:
 4. writes the `--export` file, when it is given;
 5. writes a summary to standard error: the names of the variables, how many values it masked, and the names it did not mask because they are shorter than four characters.
 
-**What later steps see.** A variable in `GITHUB_ENV` reaches every later step of the job, actions of other authors included, and the log prints it in the `env:` block of every such step; only masked values are hidden there. Export what the job needs: a prefix keeps the names apart, `--mask all` hides every string and number, and `--export` to a file under `$RUNNER_TEMP` with `--mask` instead of `--github-env` keeps the values out of the environment of the other steps.
+| Exit code | When |
+|---|---|
+| `0` | The configuration was exported |
+| `2` | Nothing was written: an invalid key, format, mask or prefix; no target; options that do not go together (`--format` without `--export`, `--prefix` with neither `--github-env` nor an `--export` file in `env`, `--github-env` with neither `--prefix` nor `--allow-unprefixed`, `--allow-unprefixed` without `--github-env`); `--github-env` outside a GitHub Actions job; a configuration that does not exist; a request the API rejects (`400`, `409`, `412`); a document the format cannot write; a binding that cannot be evaluated (`422`); withheld secrets, unresolved bindings and refused variables. Also `GITHUB_ENV` or an `--export` file that cannot be written: the masks are printed by then, and when the `--export` file fails, `GITHUB_ENV` was already appended |
+| `-1` | The command line does not parse: an unknown option, an option of `story config` such as `--resolved` or `--content-only`, an option without its value, or an option that takes a value given twice. Shells on Linux and macOS show `255` |
+| `44` | The API refused a read (`401`, `403`) |
+| `1` | Another failure of the API (`500` and the other statuses), or a crash |
 
-**Names.** The names come from the configuration, so whoever edits the configuration could steer the later steps: `PATH`, `NODE_OPTIONS`, `LD_PRELOAD` or `RESTORESOURCES` change which tools run and where they get packages. `--github-env` therefore needs `--env-prefix`, for example `APP_`, or `--allow-unprefixed` for a job where the people who edit the configuration may steer the job anyway. Either way, names that the runner reserves or that change how later steps or their tools run are refused, compared without regard to case and with the prefix. No such list is complete (MSBuild reads every variable as a property), which is why the prefix is required.
+**What later steps see.** A variable in `GITHUB_ENV` reaches every later step of the job, actions of other authors included, and the log prints it in the `env:` block of every such step; only masked values are hidden there. Export what the job needs: a prefix keeps the names apart, `--mask all` hides every string and number, and `--export` to a file under `$RUNNER_TEMP` without `--github-env` keeps the values out of the environment of the other steps.
+
+**Names.** The names come from the configuration, so whoever edits the configuration could steer the later steps: `PATH`, `NODE_OPTIONS`, `LD_PRELOAD` or `RESTORESOURCES` change which tools run and where they get packages. `--github-env` therefore needs `--prefix`, for example `APP_`, or `--allow-unprefixed` for a job where the people who edit the configuration may steer the job anyway. Either way, names that the runner reserves or that change how later steps or their tools run are refused, compared without regard to case and with the prefix. No such list is complete (MSBuild reads every variable as a property), which is why the prefix is required.
 
 ::: details The refused names
 `NODE_OPTIONS`, `PATH`, `HOME`, `SHELL`, `ENV`, `BASH_ENV`, `CDPATH`, `IFS`, `PS4`, `PROMPT_COMMAND`, `SHELLOPTS`, `BASHOPTS`, `GLOBIGNORE`, `CLASSPATH`, `CC`, `CXX`, `MAKEFLAGS`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `JAVA_OPTS`, `MAVEN_OPTS`, `GRADLE_OPTS`, `SBT_OPTS`, `PYTHONPATH`, `PYTHONSTARTUP`, `PYTHONHOME`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `RUBYOPT`, `RUBYLIB`, `NODE_PATH`, `NODE_EXTRA_CA_CERTS`, `NODE_TLS_REJECT_UNAUTHORIZED`, `LUA_INIT`, `RUSTC_WRAPPER`, `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `GOFLAGS`, `GOPROXY`, `GONOSUMDB`, `GOSUMDB`, `GOINSECURE`, `RESTORESOURCES`, `KUBECONFIG`, `PATHEXT`, `COMSPEC` and `PSMODULEPATH`, and every name that starts with `GITHUB_`, `RUNNER_`, `ACTIONS_`, `INPUT_`, `STATE_`, `LD_`, `DYLD_`, `BASH_FUNC_`, `DOTNET_`, `COREHOST_`, `CORECLR_`, `COMPLUS_`, `MSBUILD`, `NUGET_`, `NPM_CONFIG_`, `YARN_`, `PIP_`, `CARGO_`, `DOCKER_`, `GIT_` or `STORYTELLER_`.
@@ -246,10 +270,10 @@ rm storyteller.pfx
 
 The certificate expires after the certificate lifetime of the project, or after the days that `-l` of `machine create` gives. Before then, the two secrets need a new certificate and its password.
 
-`--mask` without `--github-env` writes only the masks and the `--export` file, for a job that keeps the configuration in a file for the one step that needs it:
+`--export` without `--github-env` writes only the masks and the file, `env` unless `--format` says otherwise, for a job that keeps the configuration in a file for the one step that needs it:
 
 ``` yaml
-- run: sform story config exe.northwind.invoicing.production -r --mask bound -f env -e "$RUNNER_TEMP/billing.env"
+- run: sform story config export exe.northwind.invoicing.production -e "$RUNNER_TEMP/billing.env"
 - run: docker compose --env-file "$RUNNER_TEMP/billing.env" up --detach
 ```
 

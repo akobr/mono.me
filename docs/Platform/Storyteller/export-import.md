@@ -638,7 +638,7 @@ The code is in `src/Platform/Cli/src/`:
 - `Services/TransferPolling.cs`: waiting for a job;
 - `Output/TransferConsoleExtensions.cs`: the tables, the export summary, and `WriteRefusal`, which prints the server's message of a refused step and returns its exit code.
 
-The commands call `ITransfersApiClient`. The `sform story config export` and `sform story config import` of the first spec are removed; they were never released.
+The commands call `ITransfersApiClient`. The `sform story config export` and `sform story config import` of the first spec are removed; they were never released. `sform story config export` is now another command: the export of a resolved configuration into a CI job (see [Export to GitHub Actions](https://42for.net/cli/sform#export-to-github-actions)).
 
 ### Command options
 
