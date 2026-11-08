@@ -203,7 +203,7 @@ The version of an annotation is the Cosmos DB `_etag` of its annotation item. Th
 
 Without a condition, `POST` and `PUT` create, update or re-create as before. A create that loses to a concurrent create of the same key updates it on the next attempt.
 
-A create writes the key, and any ancestors it creates, before it adds their names to the relation arrays of their active parents. When a parent changes in between, that last step fails and the write is tried again: the key is then the version this write created, so its condition is not checked again (an `If-None-Match: *` does not fail on its own create), and the attempt adds the missing names to the parents, each under its ETag.
+A create writes the key, and any ancestors it creates, before it adds their names to the relation arrays of their active parents. When a parent changes in between, that last step fails after the keys are stored: the create then adds the missing names to the parents again, each under a fresh ETag, up to three times, so a bulk create, an import and a single create report the key as created. Should that still fail, the whole write is tried again: the key is then the version this write created, so its condition is not checked again (an `If-None-Match: *` does not fail on its own create), and the attempt completes the names as well.
 
 ```text
 GET  …/annotations/exe.northwind.invoicing.prod          → 200, ETag: "a1.…"
