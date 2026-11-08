@@ -390,7 +390,7 @@ sform account settings set access.view preview
 sform account settings unset editor.type                         # ask again on the next edit
 ```
 
-`sform account set` sets the default project too, from the projects of your account, and `sform account register` and `sform account access-point create` set the project they create.
+`sform account set` sets the default project too, from the projects of your account, and `sform account register` and `sform account points create` set the project they create.
 
 A custom command, and `$VISUAL` or `$EDITOR`, is the executable, or a path in quotes, followed by its arguments, e.g. `"C:\Program Files\Notepad++\notepad++.exe" -multiInst -nosession`; no shell expands it. On Windows `sform` finds the executable on the `PATH` with the extensions of `PATHEXT`, so `code --wait` starts `code.cmd`. When the editor of `$VISUAL` or `$EDITOR` cannot be started, `sform` asks for one instead.
 

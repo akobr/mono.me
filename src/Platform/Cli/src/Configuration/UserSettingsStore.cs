@@ -321,14 +321,18 @@ public sealed class UserSettingsStore : IUserSettingsStore
     {
         try
         {
-            var file = _fileSystem.FileInfo.New(FilePath);
+            // Followed link by link, so a link to a file that does not exist yet (dotfiles linked before they are written)
+            // is followed too; a relative target is relative to the folder of its link.
+            var path = FilePath;
 
-            if (file.Exists && file.LinkTarget is not null && file.ResolveLinkTarget(returnFinalTarget: true) is { } target)
+            for (var hop = 0; hop < 16 && _fileSystem.FileInfo.New(path).LinkTarget is { } target; hop++)
             {
-                return target.FullName;
+                path = _fileSystem.Path.GetFullPath(_fileSystem.Path.Combine(_fileSystem.Path.GetDirectoryName(path) ?? string.Empty, target));
             }
+
+            return path;
         }
-        catch (Exception exception) when (IsFileFailure(exception))
+        catch (Exception exception) when (exception is ArgumentException || IsFileFailure(exception))
         {
             // The link cannot be followed: the path itself is written.
         }
@@ -356,6 +360,13 @@ public sealed class UserSettingsStore : IUserSettingsStore
 
         try
         {
+            var directory = _fileSystem.Path.GetDirectoryName(path);
+
+            if (path != FilePath && !string.IsNullOrEmpty(directory))
+            {
+                _fileSystem.Directory.CreateDirectory(directory);
+            }
+
             _fileSystem.File.WriteAllText(temporaryPath, settings.ToString(Formatting.Indented) + Environment.NewLine);
             _fileSystem.File.Move(temporaryPath, path, overwrite: true);
         }
