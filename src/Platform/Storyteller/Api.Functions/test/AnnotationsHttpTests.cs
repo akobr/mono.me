@@ -1314,7 +1314,8 @@ public partial class AnnotationsHttpTests
 
         public Task<MarkedRead<Annotation>> GetAnnotationWithMarkerAsync(FullKey fullKey)
         {
-            return Task.FromResult(new MarkedRead<Annotation>(Stored, Stored is null ? null : StoredMarker));
+            // as the Cosmos service: the marker of the item in any state, also of a deleted one
+            return Task.FromResult(new MarkedRead<Annotation>(Stored, Stored is null && StoredDeleted is null ? null : StoredMarker));
         }
 
         // The patch of the last PatchAnnotationAsync, which applies it to Stored.
