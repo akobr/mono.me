@@ -60,6 +60,9 @@ namespace _42.Platform.Cli
             services.AddSingleton<IEditorService, EditorService>();
             services.AddSingleton<TransferPolling>();
 
+            // Constructor injection of McMaster resolves every parameter, also one with a default value (KeyValueListCommand).
+            services.AddSingleton(TimeProvider.System);
+
             ConfigureStorytellerSdk(services);
         }
 
