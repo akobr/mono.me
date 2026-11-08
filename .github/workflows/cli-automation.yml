@@ -1,0 +1,287 @@
+name: CLI automation
+run-name: CLI automation (${{ inputs.target_url || 'environment target' }}${{ inputs.profile && format(', {0}', inputs.profile) || '' }})
+
+# The TUnit suite of src/Platform/Cli.AutomationTests: the source build of sform, run out of process against a deployed
+# Storyteller API (target_url, or the environment cli-automation). Users sign in through the AuthKit device code, which
+# a local headless Chromium approves; machines through their STORYTELLER_* credentials. Run by hand or called by another
+# workflow; it has no push or pull request trigger (gating pull requests on the Elementary set is a follow-up). Spec:
+# docs/Platform/Cli.AutomationTests/specs/2026-11-08 CLI Automation Testing Project.md, section 5; usage:
+# docs/Platform/Cli.AutomationTests/automation-tests.md. Restrict the environment cli-automation (Settings >
+# Environments > Deployment branches and tags) to main: its secrets are the CLI pool users' passwords, the machine keys
+# and the Testiny key, and a workflow run of another branch could otherwise read them.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Settings profiles, comma-separated (e.g. ci); empty for the base settings and ci
+        required: false
+        type: string
+        default: ''
+      filter:
+        description: TUnit tree node filter; empty runs every test
+        required: false
+        type: string
+        default: '/**[Category=Elementary]'
+      target_url:
+        description: The Storyteller API to test, /api included; empty for the environment's UITESTS_TARGET_BASE_URL
+        required: false
+        type: string
+        default: ''
+      report_testiny:
+        description: Report the run to Testiny (project 2SC, the environment's API key)
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      profile:
+        required: false
+        type: string
+        default: ''
+      filter:
+        required: false
+        type: string
+        default: '/**[Category=Elementary]'
+      target_url:
+        required: false
+        type: string
+        default: ''
+      report_testiny:
+        required: false
+        type: boolean
+        default: false
+    # A secret of the environment cli-automation wins over the one a caller passes.
+    secrets:
+      UITESTS_USER_0_PASSWORD:
+        required: false
+      UITESTS_USER_1_PASSWORD:
+        required: false
+      UITESTS_USER_2_PASSWORD:
+        required: false
+      UITESTS_USER_3_PASSWORD:
+        required: false
+      UITESTS_USER_4_PASSWORD:
+        required: false
+      UITESTS_USER_5_PASSWORD:
+        required: false
+      UITESTS_USER_6_PASSWORD:
+        required: false
+      UITESTS_USER_7_PASSWORD:
+        required: false
+      UITESTS_MACHINE_APIKEY_API_KEY:
+        required: false
+      UITESTS_TESTINY_API_KEY:
+        required: false
+
+# The runs share the CLI pool users (a user's sessions are not shared between two runs), so they share one group. One
+# run at a time; up to 100 wait, first in, first out. A running run is never cancelled.
+concurrency:
+  group: cli-automation-target
+  cancel-in-progress: false
+  queue: max
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  PROJECT: src/Platform/Cli.AutomationTests/src
+  RESULTS_DIR: TestResults/cli-automation
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  tests:
+    name: CLI automation tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: cli-automation
+    # Inputs and variables reach the scripts only through env:, never as ${{ }} in a script; only the Run step gets the
+    # secrets (its env:), so no install script, action or build step sees them.
+    env:
+      PROFILE: ${{ inputs.profile }}
+      FILTER: ${{ inputs.filter }}
+      TARGET_URL: ${{ inputs.target_url }}
+      REPORT_TESTINY: ${{ inputs.report_testiny }}
+      TUNIT_GITHUB_REPORTER_STYLE: collapsible
+      TUNIT_AGGREGATE_REPORTS: 'off'
+      TUNIT_DISABLE_ARTIFACT_UPLOAD: 'true'
+      CI_TARGET_BASE_URL: ${{ vars.UITESTS_TARGET_BASE_URL }}
+    steps:
+      - name: Check the inputs
+        run: |
+          if [ -z "$TARGET_URL" ] && [ -z "$CI_TARGET_BASE_URL" ]; then
+            echo "::error::No target: set the target_url input or the variable UITESTS_TARGET_BASE_URL of the environment cli-automation."
+            exit 1
+          fi
+
+      # The whole history: the versioning of the build fails on a shallow clone.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # Builds sform too (a project reference of the tests) and the fake editor of the edit cases.
+      - name: Build
+        run: dotnet build "$PROJECT" -c Release
+
+      # Only Chromium, for the AuthKit device page; the runner's image has PowerShell for Playwright's script. The
+      # pseudo terminal of the terminal cases is util-linux script, which the image has too.
+      - name: Install Chromium
+        run: pwsh "$PROJECT/bin/Release/net10.0/playwright.ps1" install --with-deps chromium
+
+      # The settings: the ci profile and the given ones, the target and its pool users (only the variables that are set,
+      # so the committed values stay), the API key machine, and Testiny (with report_testiny); then the run, its log in
+      # the results. The only step with the secrets, and only with those its path needs: no Testiny key without
+      # report_testiny, also when a caller passes every secret; the CI_* copies are unset before the tests start.
+      - name: Run
+        env:
+          CI_TARGET_ORGANIZATION: ${{ vars.UITESTS_TARGET_ORGANIZATION }}
+          CI_TARGET_PROJECT: ${{ vars.UITESTS_TARGET_PROJECT }}
+          CI_TARGET_VIEW: ${{ vars.UITESTS_TARGET_VIEW }}
+          CI_TARGET_AUTHKIT_ORGANIZATION_ID: ${{ vars.UITESTS_TARGET_AUTHKIT_ORGANIZATION_ID }}
+          CI_TARGET_FEATURES: ${{ vars.UITESTS_TARGET_FEATURES }}
+          CI_USER_0_EMAIL: ${{ vars.UITESTS_USER_0_EMAIL }}
+          CI_USER_0_ROLES: ${{ vars.UITESTS_USER_0_ROLES }}
+          CI_USER_0_PASSWORD: ${{ secrets.UITESTS_USER_0_PASSWORD }}
+          CI_USER_1_EMAIL: ${{ vars.UITESTS_USER_1_EMAIL }}
+          CI_USER_1_ROLES: ${{ vars.UITESTS_USER_1_ROLES }}
+          CI_USER_1_PASSWORD: ${{ secrets.UITESTS_USER_1_PASSWORD }}
+          CI_USER_2_EMAIL: ${{ vars.UITESTS_USER_2_EMAIL }}
+          CI_USER_2_ROLES: ${{ vars.UITESTS_USER_2_ROLES }}
+          CI_USER_2_PASSWORD: ${{ secrets.UITESTS_USER_2_PASSWORD }}
+          CI_USER_3_EMAIL: ${{ vars.UITESTS_USER_3_EMAIL }}
+          CI_USER_3_ROLES: ${{ vars.UITESTS_USER_3_ROLES }}
+          CI_USER_3_PASSWORD: ${{ secrets.UITESTS_USER_3_PASSWORD }}
+          CI_USER_4_EMAIL: ${{ vars.UITESTS_USER_4_EMAIL }}
+          CI_USER_4_ROLES: ${{ vars.UITESTS_USER_4_ROLES }}
+          CI_USER_4_PASSWORD: ${{ secrets.UITESTS_USER_4_PASSWORD }}
+          CI_USER_5_EMAIL: ${{ vars.UITESTS_USER_5_EMAIL }}
+          CI_USER_5_ROLES: ${{ vars.UITESTS_USER_5_ROLES }}
+          CI_USER_5_PASSWORD: ${{ secrets.UITESTS_USER_5_PASSWORD }}
+          CI_USER_6_EMAIL: ${{ vars.UITESTS_USER_6_EMAIL }}
+          CI_USER_6_ROLES: ${{ vars.UITESTS_USER_6_ROLES }}
+          CI_USER_6_PASSWORD: ${{ secrets.UITESTS_USER_6_PASSWORD }}
+          CI_USER_7_EMAIL: ${{ vars.UITESTS_USER_7_EMAIL }}
+          CI_USER_7_ROLES: ${{ vars.UITESTS_USER_7_ROLES }}
+          CI_USER_7_PASSWORD: ${{ secrets.UITESTS_USER_7_PASSWORD }}
+          CI_MACHINE_APIKEY_API_KEY: ${{ secrets.UITESTS_MACHINE_APIKEY_API_KEY }}
+          CI_MACHINE_APIKEY_PROJECT: ${{ vars.UITESTS_MACHINE_APIKEY_PROJECT }}
+          CI_MACHINE_APIKEY_VIEW: ${{ vars.UITESTS_MACHINE_APIKEY_VIEW }}
+          CI_TESTINY_PROJECT_ID: ${{ vars.UITESTS_TESTINY_PROJECT_ID }}
+          CI_TESTINY_TEST_PLAN_ID: ${{ vars.UITESTS_TESTINY_TEST_PLAN_ID }}
+          CI_TESTINY_API_KEY: ${{ inputs.report_testiny && secrets.UITESTS_TESTINY_API_KEY || '' }}
+        run: |
+          results="$GITHUB_WORKSPACE/$RESULTS_DIR"
+          mkdir -p "$results"
+          export UITESTS_Execution__ArtifactsPath="$results/artifacts"
+
+          set_if() {
+            if [ -n "$2" ]; then
+              export "$1=$2"
+            fi
+          }
+
+          profiles="ci${PROFILE:+,${PROFILE// /}}"
+          export UITESTS_Target__BaseUrl="${TARGET_URL:-$CI_TARGET_BASE_URL}"
+          set_if UITESTS_Target__Organization "$CI_TARGET_ORGANIZATION"
+          set_if UITESTS_Target__Project "$CI_TARGET_PROJECT"
+          set_if UITESTS_Target__View "$CI_TARGET_VIEW"
+          set_if UITESTS_Target__AuthKitOrganizationId "$CI_TARGET_AUTHKIT_ORGANIZATION_ID"
+          # A comma-separated list of the target's features (Byok, Hsm, Registration, MultiOrganization).
+          feature_index=0
+          IFS=',' read -ra features <<< "$CI_TARGET_FEATURES"
+          for feature in "${features[@]}"; do
+            feature="${feature// /}"
+            if [ -n "$feature" ]; then
+              export "UITESTS_Target__Features__${feature_index}=$feature"
+              feature_index=$((feature_index + 1))
+            fi
+          done
+
+          # A password applies by index to the pool; any UITESTS_USER_<n>_EMAIL makes the variables' entries replace the
+          # committed pool of testsettings.json entirely (the highest layer with an e-mail defines the pool).
+          for index in 0 1 2 3 4 5 6 7; do
+            email_name="CI_USER_${index}_EMAIL"
+            roles_name="CI_USER_${index}_ROLES"
+            password_name="CI_USER_${index}_PASSWORD"
+            set_if "UITESTS_Users__Pool__${index}__Password" "${!password_name}"
+            if [ -z "${!email_name}" ]; then
+              continue
+            fi
+            export "UITESTS_Users__Pool__${index}__Email=${!email_name}"
+            role_index=0
+            IFS=',' read -ra roles <<< "${!roles_name}"
+            for role in "${roles[@]}"; do
+              role="${role// /}"
+              if [ -n "$role" ]; then
+                export "UITESTS_Users__Pool__${index}__Roles__${role_index}=$role"
+                role_index=$((role_index + 1))
+              fi
+            done
+          done
+
+          # The API key machine of the machine sign-in cases (Machines:apikey); without its key those cases skip.
+          set_if UITESTS_Machines__apikey__ApiKey "$CI_MACHINE_APIKEY_API_KEY"
+          set_if UITESTS_Machines__apikey__Project "$CI_MACHINE_APIKEY_PROJECT"
+          set_if UITESTS_Machines__apikey__View "$CI_MACHINE_APIKEY_VIEW"
+
+          if [ "$REPORT_TESTINY" = true ]; then
+            profiles="$profiles,reporting-testiny"
+            set_if UITESTS_Reporting__Testiny__ProjectId "$CI_TESTINY_PROJECT_ID"
+            set_if UITESTS_Reporting__Testiny__TestPlanId "$CI_TESTINY_TEST_PLAN_ID"
+            set_if UITESTS_Reporting__Testiny__ApiKey "$CI_TESTINY_API_KEY"
+          fi
+          export UITESTS_PROFILE="$profiles"
+
+          # The test process gets the secrets only as the UITESTS_* settings set above.
+          unset CI_USER_0_PASSWORD CI_USER_1_PASSWORD CI_USER_2_PASSWORD CI_USER_3_PASSWORD CI_USER_4_PASSWORD CI_USER_5_PASSWORD \
+            CI_USER_6_PASSWORD CI_USER_7_PASSWORD CI_MACHINE_APIKEY_API_KEY CI_TESTINY_API_KEY
+
+          arguments=(--report-trx --results-directory "$results")
+          if [ -n "$FILTER" ]; then
+            arguments=(--treenode-filter "$FILTER" "${arguments[@]}")
+          fi
+
+          # --no-build: the Build step built it, so no package's build targets run in this step, which has the secrets.
+          set +e
+          dotnet run --project "$PROJECT" -c Release --no-build -- "${arguments[@]}" 2>&1 | tee "$results/run.log"
+          code=${PIPESTATUS[0]}
+          set -e
+
+          # The run URL every reporter printed (e.g. "ui-automation: Testiny run: https://…"), under TUnit's summary.
+          if grep -qE '^ui-automation: [A-Za-z]+ run: https?://' "$results/run.log"; then
+            {
+              echo
+              echo '### Test case management'
+              grep -E '^ui-automation: [A-Za-z]+ run: https?://' "$results/run.log" | sed -E 's|^ui-automation: ([A-Za-z]+) run: (https?://[^ ]+).*$|- \1: [\2](\2)|'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$code"
+
+      # The artifacts are the results.jsonl, the TRX report and each test's sform-<n>.txt runs, which the runner wrote
+      # with every known secret masked. The homes of sform, with the pool users' sessions, live in the runner's temporary
+      # folder and are never uploaded; a trace (off in every committed profile) would hold the device page's typed
+      # password, so any .zip is removed first.
+      - name: Keep the traces private
+        if: failure() || cancelled()
+        run: |
+          if [ -d "$RESULTS_DIR" ]; then
+            find "$RESULTS_DIR" -type f -name '*.zip' -print -delete
+          fi
+
+      - name: Upload the test results
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-automation-${{ inputs.profile || 'base' }}-${{ github.run_attempt }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: ignore
+          retention-days: 7
