@@ -262,7 +262,7 @@ await terminal.SendLineAsync("nightly");
 | `[MachineOnly]` | Mode M: leases no pool user |
 | `[FreshSignIn]` | Mode F: the test's user runs use an empty home of its own; the test signs in itself |
 | `[Terminal]` | Mode T: skipped where no pseudo terminal is supported |
-| `[DisposableProject]` | Mode P: creates its own project (`CreateDisposableProjectAsync`, needs a pseudo terminal) |
+| `[DisposableProject]` | Mode P: creates its own project (`CreateDisposableProjectAsync`, needs a pseudo terminal). The project stays: neither sform nor the API can delete a project yet, so each run leaves its P projects in `Target:Organization`, named `cli-<runId>-prj-…` (the run id starts with its date); remove those of past runs by hand from time to time, or skip mode P with `--treenode-filter "/**[Category!=DisposableProject]"` |
 | `[RequiresFeature("<Feature>")]` | Mode X: skipped unless `Target:Features` lists it |
 | `[RequiresMachine("<name>")]` | Skipped unless `Machines:<name>` is configured with a credential |
 | `[Covers("<command path>", "<item>", …)]` | What the test exercises: the command path as typed after sform, and the options (each form), fixed values (`--protection=public`) and arguments (`arg0`) of that command whose effect it checks; repeat it per command, or put it on the class for all its tests. The rules of [the command coverage](#command-coverage) |
@@ -584,7 +584,7 @@ Project **`2SC`** (id 2), created by hand in the Testiny app. Its cases were cre
 
 ## CI
 
-`.github/workflows/cli-automation.yml` runs the suite on `ubuntu-latest` with the SDK of `global.json`, by hand (`workflow_dispatch`) or from another workflow (`workflow_call`); it has no push or pull request trigger yet (gating pull requests on the Elementary set is a follow-up). The runs share the CLI pool, so they share one concurrency group: one at a time, the others queued, a running one never cancelled.
+`.github/workflows/cli-automation.yml` runs the suite on `ubuntu-latest` with the SDK of `global.json`, by hand (`workflow_dispatch`) or from another workflow (`workflow_call`); it has no push or pull request trigger yet (gating pull requests on the Elementary set is a follow-up). What needs no target runs on every pull request that touches the CLI or its tests: `.github/workflows/cli-checks.yml` runs the unit tests of the CLI and the self tests and coverage checks of this project (`--treenode-filter "/**[(Category=SelfTest)|(Category=Coverage)]"`), without secrets. The runs share the CLI pool, so they share one concurrency group: one at a time, the others queued, a running one never cancelled.
 
 | Input | Default | Meaning |
 |---|---|---|
@@ -606,7 +606,7 @@ The target and its secrets come from the **`cli-automation` environment** (restr
 | `UITESTS_MACHINE_APIKEY_PROJECT`, `UITESTS_MACHINE_APIKEY_VIEW`, secret `UITESTS_MACHINE_APIKEY_API_KEY` | `Machines:apikey` (without the key the machine sign-in cases skip) |
 | `UITESTS_TESTINY_PROJECT_ID`, `UITESTS_TESTINY_TEST_PLAN_ID`, secret `UITESTS_TESTINY_API_KEY` | `Reporting:Testiny:*`, with `report_testiny` only |
 
-Only the `Run` step gets the secrets (the Testiny key only with `report_testiny`); a caller of `workflow_call` may pass secrets of the same names, which the environment's win over. On a failure or a cancellation the artifact `cli-automation-<profile or base>-<attempt>` (7 days) holds `TestResults/cli-automation`: the TRX report, `run.log`, and `artifacts/<runId>/` with `results.jsonl` and each test's redacted `sform-<n>.txt` (and the device page's screenshot and text of a failed sign-in); any `.zip` (a trace, off in every committed profile) is deleted first. The homes and the working directories are in the runner's temporary folder and never uploaded.
+Only the `Run` step gets the secrets (the Testiny key only with `report_testiny`); a caller of `workflow_call` may pass secrets of the same names, which the environment's win over. On a failure or a cancellation the artifact `cli-automation-<profile or base>-<attempt>` (7 days) holds `TestResults/cli-automation`: the TRX report, `run.log`, and `artifacts/<runId>/` with `results.jsonl` and each test's redacted `sform-<n>.txt` (and the device page's screenshot and text of a failed sign-in); any `.zip` (a trace, off in every committed profile) is deleted first. GitHub masks the secrets in its console log only, so the `Run` step replaces every secret it was given (the pool passwords, the machine key, the Testiny key) with `***` in every text file of the results, `run.log` included, before the upload. The homes and the working directories are in the runner's temporary folder and never uploaded.
 
 ## Troubleshooting
 

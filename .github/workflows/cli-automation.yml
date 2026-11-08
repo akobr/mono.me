@@ -262,6 +262,34 @@ jobs:
           code=${PIPESTATUS[0]}
           set -e
 
+          # GitHub masks the secrets in its console log only, not in files: every text file of the results (run.log above
+          # all, which holds whatever TUnit and the reporters printed) gets them replaced by *** before anything is uploaded.
+          python3 - "$results" <<'PY'
+          import os
+          import sys
+
+          suffixes = ('__PASSWORD', '__APIKEY', '__CLIENTSECRET', '__CERTIFICATEPASSWORD')
+          secrets = sorted(
+              {value for name, value in os.environ.items() if name.upper().startswith('UITESTS_') and name.upper().endswith(suffixes) and len(value) >= 4},
+              key=len,
+              reverse=True)
+          for root, _, files in os.walk(sys.argv[1]):
+              for file in files:
+                  path = os.path.join(root, file)
+                  try:
+                      with open(path, encoding='utf-8') as reader:
+                          text = reader.read()
+                  except (UnicodeDecodeError, OSError):
+                      continue
+                  masked = text
+                  for secret in secrets:
+                      masked = masked.replace(secret, '***')
+                  if masked != text:
+                      with open(path, 'w', encoding='utf-8') as writer:
+                          writer.write(masked)
+                      print(f'Masked a secret in {path}')
+          PY
+
           # The run URL every reporter printed (e.g. "ui-automation: Testiny run: https://…"), under TUnit's summary.
           if grep -qE '^ui-automation: [A-Za-z]+ run: https?://' "$results/run.log"; then
             {
