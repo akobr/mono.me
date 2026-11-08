@@ -9,7 +9,8 @@ namespace _42.Platform.Cli.UnitTests.Services;
 
 // The real EditorService with a stand-in for the editor: each open records the text and the path of the file, then
 // writes the next scripted text into it (null leaves the file as it is).
-internal sealed class ScriptedEditor(MockFileSystem fileSystem, IEnumerable<string?> edits) : EditorService(fileSystem)
+internal sealed class ScriptedEditor(MockFileSystem fileSystem, IEnumerable<string?> edits)
+    : EditorService(fileSystem, new UserSettingsStore(fileSystem, MockUnixSupport.Path(@"C:\Users\ada\.42for.net\sform.settings.json"), new Dictionary<string, string>()), EnvironmentEditor.None)
 {
     public static readonly EditorOptions Vim = new() { EditorType = EditorType.Vim };
 

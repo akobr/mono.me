@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Abstractions;
@@ -22,16 +23,19 @@ public class EditorService : IEditorService
 
     private readonly IFileSystem _fileSystem;
     private readonly IUserSettingsStore _settings;
+    private readonly EnvironmentEditor _environment;
 
     /// <summary>
     /// Initializes a new instance of <see cref="EditorService"/>.
     /// </summary>
     /// <param name="fileSystem">The file system of the temporary files.</param>
     /// <param name="settings">The settings store that keeps the chosen editor.</param>
-    public EditorService(IFileSystem fileSystem, IUserSettingsStore settings)
+    /// <param name="environment">The editor of $VISUAL or $EDITOR, used when none is configured.</param>
+    public EditorService(IFileSystem fileSystem, IUserSettingsStore settings, EnvironmentEditor environment)
     {
         _fileSystem = fileSystem;
         _settings = settings;
+        _environment = environment;
     }
 
     /// <summary>
@@ -114,6 +118,18 @@ public class EditorService : IEditorService
     }
 
     /// <summary>
+    /// Whether the executable of an editor is found: on the PATH, or as the file a custom command names by its path.
+    /// </summary>
+    /// <param name="options">The editor to look for.</param>
+    /// <returns><c>true</c> when the executable is found.</returns>
+    public bool IsEditorAvailable(EditorOptions options)
+    {
+        var executable = DescribeExecutable(options);
+
+        return !string.IsNullOrWhiteSpace(executable) && IsOnPath(executable);
+    }
+
+    /// <summary>
     /// Opens the specified file in the editor described by <paramref name="options"/> and returns the editor process's exit code.
     /// </summary>
     /// <param name="filePath">The path of the file to open in the editor.</param>
@@ -136,12 +152,21 @@ public class EditorService : IEditorService
         var isTerminalEditor = options.EditorType == Configuration.EditorType.Neovim ||
                                options.EditorType == Configuration.EditorType.Vim;
 
+        // Windows starts only an .exe by its bare name: code of a custom command or of $EDITOR is code.cmd on the PATH.
+        if (options.EditorType == Configuration.EditorType.Custom && OperatingSystem.IsWindows())
+        {
+            command = FindExecutable(command) ?? command;
+        }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = command,
             Arguments = arguments,
             UseShellExecute = isTerminalEditor,
-            CreateNoWindow = !isTerminalEditor,
+
+            // Only the cmd.exe that starts VS Code is hidden: a custom editor may be a terminal editor (vim, nano), which
+            // needs the console of sform; a GUI editor opens no console anyway.
+            CreateNoWindow = options.EditorType == Configuration.EditorType.VsCode,
         };
 
         using var process = Process.Start(startInfo);
@@ -171,17 +196,28 @@ public class EditorService : IEditorService
     /// </returns>
     public async Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew, bool confirm = true, Func<JObject, JsonEditCheck>? check = null)
     {
-        // 1. Ensure editor is configured
-        if (!options.IsConfigured)
-        {
-            console.WriteImportant("No editor is configured yet. Let's set one up.");
-            options = SetupEditorPreference(console);
+        // 1. The configured editor, else the one of $VISUAL or $EDITOR for this run, else ask and save the choice
+        var resolved = EditorResolution.Resolve(options, _environment);
 
-            if (!options.IsConfigured)
-            {
-                console.WriteImportant("No editor command was entered, edit aborted.");
-                return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
-            }
+        switch (resolved.Origin)
+        {
+            case EditorOrigin.Configured:
+                break;
+            case EditorOrigin.Environment:
+                options = resolved.Options!;
+                console.WriteLine($"Using ${resolved.Variable} ({options.CustomCommand}); change it with sform account settings editor.".ThemedLowlight(console.Theme));
+                break;
+            default:
+                console.WriteImportant("No editor is configured yet. Let's set one up.");
+                options = SetupEditorPreference(console);
+
+                if (!options.IsConfigured)
+                {
+                    console.WriteImportant("No editor command was entered, edit aborted.");
+                    return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+                }
+
+                break;
         }
 
         // 2. Write to a temp file
@@ -197,7 +233,35 @@ public class EditorService : IEditorService
 
             while (true)
             {
-                var exitCode = await OpenFileInEditorAsync(tempFilePath, options);
+                int exitCode;
+
+                try
+                {
+                    exitCode = await OpenFileInEditorAsync(tempFilePath, options);
+                }
+                catch (Win32Exception exception)
+                {
+                    // An editor that is not installed, or a command line that names no executable.
+                    console.WriteImportant($"The editor could not be started ({DescribeExecutable(options)}): {exception.Message}");
+
+                    // $VISUAL and $EDITOR come before asking, so asking stays the way out of a variable that does not work.
+                    if (resolved.Origin == EditorOrigin.Environment)
+                    {
+                        resolved = resolved with { Origin = EditorOrigin.None };
+                        options = SetupEditorPreference(console);
+
+                        if (options.IsConfigured)
+                        {
+                            continue;
+                        }
+
+                        console.WriteImportant("No editor command was entered, edit aborted.");
+                        return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+                    }
+
+                    console.WriteLine("Choose another one with sform account settings editor.".ThemedLowlight(console.Theme));
+                    return new JsonEditResult(null, ExitCodes.ERROR_CRASH);
+                }
 
                 if (exitCode != 0)
                 {
@@ -364,25 +428,130 @@ public class EditorService : IEditorService
     }
 
     /// <summary>
+    /// Parse a user-provided custom command into the executable name and its arguments, always appending the provided file path as a quoted argument.
+    /// </summary>
+    /// <param name="customCommand">The custom command string entered by the user; may include the executable and optional base arguments.</param>
+    /// <param name="filePath">The file path to append to the command's arguments; it will be quoted.</param>
+    /// <returns>
+    /// A tuple where `command` is the executable (the first token of <paramref name="customCommand"/>, or the quoted
+    /// path it starts with) and `arguments` are the remaining base arguments followed by the quoted <paramref name="filePath"/>.
+    /// </returns>
+    internal static (string Command, string Arguments) ParseCustomCommand(string customCommand, string filePath)
+    {
+        var (executable, baseArguments) = SplitCustomCommand(customCommand);
+        return baseArguments.Length == 0
+            ? (executable, $"\"{filePath}\"")
+            : (executable, $"{baseArguments} \"{filePath}\"");
+    }
+
+    /// <summary>
+    /// Splits a custom command into its executable and its arguments: at the first white space, or after the closing quote
+    /// of an executable in quotes, e.g. <c>"C:\Program Files\Notepad++\notepad++.exe" -multiInst</c>.
+    /// </summary>
+    /// <param name="customCommand">The custom command.</param>
+    /// <returns>The executable without quotes and the trimmed arguments, empty when there are none.</returns>
+    internal static (string Executable, string Arguments) SplitCustomCommand(string customCommand)
+    {
+        var trimmed = customCommand.Trim();
+
+        if (trimmed.Length > 0 && trimmed[0] is '"' or '\'')
+        {
+            var closing = trimmed.IndexOf(trimmed[0], 1);
+
+            if (closing > 0)
+            {
+                return (trimmed[1..closing], trimmed[(closing + 1)..].Trim());
+            }
+        }
+
+        var separator = trimmed.IndexOfAny([' ', '\t']);
+
+        return separator < 0
+            ? (trimmed, string.Empty)
+            : (trimmed[..separator], trimmed[(separator + 1)..].Trim());
+    }
+
+    /// <summary>
+    /// Finds the file that a command starts, as the shell does: a path as it is, else the first folder of the PATH that has
+    /// it, on Windows with each extension of PATHEXT when it has none (code is code.cmd), in lower case as the files usually
+    /// are named. The current folder is not searched.
+    /// </summary>
+    /// <param name="fileSystem">The file system to look in.</param>
+    /// <param name="executable">The executable of the command, a name or a path.</param>
+    /// <param name="searchPath">The PATH variable.</param>
+    /// <param name="pathExtensions">The PATHEXT variable; Windows only.</param>
+    /// <param name="isWindows">Whether the folders and extensions are those of Windows.</param>
+    /// <returns>The path of the file, or null when there is none.</returns>
+    internal static string? FindExecutable(IFileSystem fileSystem, string executable, string? searchPath, string? pathExtensions, bool isWindows)
+    {
+        if (string.IsNullOrWhiteSpace(executable))
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> extensions = isWindows && !fileSystem.Path.HasExtension(executable)
+            ? (string.IsNullOrWhiteSpace(pathExtensions) ? ".COM;.EXE;.BAT;.CMD" : pathExtensions)
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(extension => extension.ToLowerInvariant())
+                .ToList()
+            : [string.Empty];
+        var hasFolder = executable.IndexOfAny(['/', '\\']) >= 0;
+        IEnumerable<string> folders = hasFolder
+            ? [string.Empty]
+            : (searchPath ?? string.Empty).Split(isWindows ? ';' : ':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var folder in folders)
+        {
+            foreach (var extension in extensions)
+            {
+                try
+                {
+                    var candidate = hasFolder ? executable + extension : fileSystem.Path.Combine(folder.Trim('"'), executable + extension);
+
+                    if (fileSystem.File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+                catch (ArgumentException)
+                {
+                    // A folder of the PATH that is no valid path.
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Whether a command is found on the PATH, as the shell finds it.
+    /// </summary>
+    /// <param name="command">The command name to look up (for example, "code", "nvim", or "vim").</param>
+    /// <returns><c>true</c> when the command is found.</returns>
+    protected virtual bool IsOnPath(string command)
+    {
+        return FindExecutable(command) is not null;
+    }
+
+    /// <summary>
     /// Detects which supported editors are available on the current system by checking for their executables.
     /// </summary>
     /// <returns>A set containing one or more <see cref="EditorType"/> values for editors found on the system (possible values: <c>VsCode</c>, <c>Neovim</c>, <c>Vim</c>).</returns>
-    private static HashSet<EditorType> DetectAvailableEditors()
+    private HashSet<EditorType> DetectAvailableEditors()
     {
         var available = new HashSet<EditorType>();
-        var detectCommand = OperatingSystem.IsWindows() ? "where" : "which";
 
-        if (IsCommandAvailable(detectCommand, "code"))
+        if (IsOnPath("code"))
         {
             available.Add(EditorType.VsCode);
         }
 
-        if (IsCommandAvailable(detectCommand, "nvim"))
+        if (IsOnPath("nvim"))
         {
             available.Add(EditorType.Neovim);
         }
 
-        if (IsCommandAvailable(detectCommand, "vim"))
+        if (IsOnPath("vim"))
         {
             available.Add(EditorType.Vim);
         }
@@ -390,85 +559,27 @@ public class EditorService : IEditorService
         return available;
     }
 
-    /// <summary>
-    /// Checks whether a given command is available on the system by running the specified discovery executable with the target command as an argument.
-    /// </summary>
-    /// <param name="detectCommand">The discovery executable to run (for example, "where" on Windows or "which" on Unix).</param>
-    /// <param name="targetCommand">The command name to look up (for example, "code", "nvim", or "vim").</param>
-    /// <returns>`true` if the discovery process exits with code 0 within the timeout period, `false` otherwise.</returns>
-    private static bool IsCommandAvailable(string detectCommand, string targetCommand)
+    // The file that a command name starts, from the PATH of sform.
+    private string? FindExecutable(string executable)
     {
-        try
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = detectCommand,
-                Arguments = targetCommand,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-
-            using var process = Process.Start(startInfo);
-
-            if (process is null)
-            {
-                return false;
-            }
-
-            if (!process.WaitForExit(5000))
-            {
-                try
-                {
-                    process.Kill();
-                    process.WaitForExit();
-                }
-                catch
-                {
-                    // Ignore exceptions from Kill
-                }
-
-                return false;
-            }
-
-            try
-            {
-                return process.ExitCode == 0;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        catch
-        {
-            return false;
-        }
+        return FindExecutable(
+            _fileSystem,
+            executable,
+            Environment.GetEnvironmentVariable("PATH"),
+            Environment.GetEnvironmentVariable("PATHEXT"),
+            OperatingSystem.IsWindows());
     }
 
-    /// <summary>
-    /// Parse a user-provided custom command into the executable name and its arguments, always appending the provided file path as a quoted argument.
-    /// </summary>
-    /// <param name="customCommand">The custom command string entered by the user; may include the executable and optional base arguments.</param>
-    /// <param name="filePath">The file path to append to the command's arguments; it will be quoted.</param>
-    /// <returns>
-    /// A tuple where `command` is the executable (the first token of <paramref name="customCommand"/>)
-    /// and `arguments` are the remaining base arguments followed by the quoted <paramref name="filePath"/>.
-    /// If <paramref name="customCommand"/> contains no space, `arguments` will contain only the quoted file path.
-    /// </returns>
-    private static (string command, string arguments) ParseCustomCommand(string customCommand, string filePath)
+    // The executable that an editor starts, as the messages name it.
+    private static string DescribeExecutable(EditorOptions options)
     {
-        var trimmed = customCommand.Trim();
-        var spaceIndex = trimmed.IndexOf(' ');
-
-        if (spaceIndex < 0)
+        return options.EditorType switch
         {
-            return (trimmed, $"\"{filePath}\"");
-        }
-
-        var command = trimmed[..spaceIndex];
-        var baseArgs = trimmed[(spaceIndex + 1)..].Trim();
-        return (command, $"{baseArgs} \"{filePath}\"");
+            Configuration.EditorType.VsCode => "code",
+            Configuration.EditorType.Neovim => "nvim",
+            Configuration.EditorType.Vim => "vim",
+            Configuration.EditorType.Custom => SplitCustomCommand(options.CustomCommand ?? string.Empty).Executable,
+            _ => string.Empty,
+        };
     }
 }

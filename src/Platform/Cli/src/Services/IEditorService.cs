@@ -23,6 +23,13 @@ public interface IEditorService
     EditorOptions PromptEditorPreference(IExtendedConsole console);
 
     /// <summary>
+    /// Whether the executable of an editor is found on the PATH, or as a file for a custom command with a full path.
+    /// </summary>
+    /// <param name="options">The editor to look for.</param>
+    /// <returns><c>true</c> when the executable is found.</returns>
+    bool IsEditorAvailable(EditorOptions options);
+
+    /// <summary>
     /// Opens the specified file using the provided editor options.
     /// </summary>
     /// <param name="filePath">Path to the file to open.</param>

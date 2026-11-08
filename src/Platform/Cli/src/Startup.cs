@@ -58,6 +58,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IAuthenticationService, AuthenticationServiceSelector>();
             services.AddSingleton<ICommandContext, CommandContext>();
             services.AddSingleton<IUserSettingsStore, UserSettingsStore>();
+            services.AddSingleton(EnvironmentEditor.FromEnvironment(System.Environment.GetEnvironmentVariable));
             services.AddSingleton<IEditorService, EditorService>();
             services.AddSingleton<TransferPolling>();
 
