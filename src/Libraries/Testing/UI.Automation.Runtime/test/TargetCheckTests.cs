@@ -4,6 +4,7 @@ using _42.Testing.UI.Automation.Runtime.Reporting;
 using _42.Testing.UI.Automation.Runtime.Settings;
 using _42.Testing.UI.Automation.Runtime.UnitTests.Fakes;
 using Microsoft.Extensions.Time.Testing;
+using Microsoft.Playwright;
 
 namespace _42.Testing.UI.Automation.Runtime.UnitTests;
 
@@ -177,6 +178,86 @@ public sealed class TargetCheckTests
     }
 
     [Fact]
+    public async Task StartAsync_RunsACheckWithoutAPage_WithItsUser_AndStartsNoBrowserProvider()
+    {
+        var settings = Load(Settings);
+        var factoryCalls = 0;
+        TargetCheckContext? checkedWith = null;
+        var leasedAtCheck = -1;
+        var options = Options((context, _) =>
+        {
+            checkedWith = context;
+            leasedAtCheck = context.Session.Users.LeasedCount;
+            return Task.CompletedTask;
+        });
+        options.TargetCheckUsesBrowser = false;
+        options.BrowserProviderStart = BrowserProviderStart.OnFirstLease;
+        options.BrowserProviderFactory = (_, _) =>
+        {
+            factoryCalls++;
+            return Task.FromResult<IBrowserProvider>(browserProvider);
+        };
+
+        await using var session = await AutomationSession.StartAsync(settings, options);
+
+        var context = checkedWith.ShouldNotBeNull();
+        context.User.Email.ShouldBe("ada@example.test");
+        leasedAtCheck.ShouldBe(1);
+        context.HasPage.ShouldBeFalse();
+        Should.Throw<InvalidOperationException>(() => context.Page).Message
+            .ShouldBe("The target check has no page: the setup's TargetCheckUsesBrowser is false. Open a browser context when the check needs one (OpenBrowserAsync, or Scope.OpenBrowserAsync for another user).");
+        Should.Throw<InvalidOperationException>(() => context.Context).Message.ShouldStartWith("The target check has no context");
+        factoryCalls.ShouldBe(0);
+        session.Users.LeasedCount.ShouldBe(0);
+        reporterProvider.Created.ShouldHaveSingleItem().StartedRun.ShouldBeSameAs(session.Run);
+    }
+
+    [Fact]
+    public async Task StartAsync_LetsACheckWithoutAPage_OpenABrowserOnDemand()
+    {
+        var settings = Load(Settings);
+        var factoryCalls = 0;
+        IBrowserContext? opened = null;
+        var options = Options(async (context, token) => opened = await context.OpenBrowserAsync(token));
+        options.TargetCheckUsesBrowser = false;
+        options.BrowserProviderStart = BrowserProviderStart.OnFirstLease;
+        options.BrowserProviderFactory = (_, _) =>
+        {
+            factoryCalls++;
+            return Task.FromResult<IBrowserProvider>(browserProvider);
+        };
+
+        await using var session = await AutomationSession.StartAsync(settings, options);
+
+        opened.ShouldNotBeNull();
+        factoryCalls.ShouldBe(1);
+        browserProvider.Acquired.ShouldBe([TargetCheckContext.Test]);
+        browserProvider.Released.ShouldHaveSingleItem().ShouldNotBeNull().Outcome.ShouldBe(TestOutcome.Passed);
+        browserProvider.Completed.ShouldBe([TargetCheckContext.Test]);
+    }
+
+    [Fact]
+    public async Task StartAsync_FailsACheckWithoutAPage_ThatOpensABrowserThatDoesNotStart()
+    {
+        var settings = Load(Settings);
+        var options = Options(async (context, token) => await context.OpenBrowserAsync(token));
+        options.TargetCheckUsesBrowser = false;
+        options.BrowserProviderStart = BrowserProviderStart.OnFirstLease;
+        options.BrowserProviderFactory = (_, _) => throw new BrowserUnavailableException("The chromium browser did not launch.");
+
+        var exception = await Should.ThrowAsync<TargetCheckException>(() => AutomationSession.StartAsync(settings, options));
+
+        exception.Message.ShouldBe("The target check failed: BrowserUnavailableException: The chromium browser did not launch.");
+    }
+
+    [Fact]
+    public void FromSetup_TakesWhetherTheCheckUsesABrowser()
+    {
+        AutomationSessionOptions.FromSetup(new CheckingSetup()).TargetCheckUsesBrowser.ShouldBeTrue();
+        AutomationSessionOptions.FromSetup(new CheckingWithoutPageSetup()).TargetCheckUsesBrowser.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task FromSetup_TakesTheCheckOfASetupThatImplementsIt()
     {
         var setup = new CheckingSetup();
@@ -234,6 +315,11 @@ public sealed class TargetCheckTests
     }
 
     private sealed class DerivedCheckingSetup : CheckingSetup;
+
+    private sealed class CheckingWithoutPageSetup : CheckingSetup, IUiAutomationSetup
+    {
+        public bool TargetCheckUsesBrowser => false;
+    }
 
     private sealed class ExplicitlyCheckingSetup : IUiAutomationSetup
     {

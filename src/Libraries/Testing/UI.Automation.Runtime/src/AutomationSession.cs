@@ -16,12 +16,13 @@ namespace _42.Testing.UI.Automation.Runtime;
 // One run of a UI suite, engine-neutral: the engine adapter starts it once before the first test and stops it after
 // the last. It holds the run id (yyyyMMdd-HHmmss-xxxx) and the data seed, the browser provider, the context options,
 // the user pool, the cached sign-ins and the reporting dispatcher. Start fails fast: unknown sign-in flow, a pool that
-// cannot lease, browsers that do not launch, an unknown device, a reporter that refuses its settings or a target the
-// setup's check refuses (AutomationSessionOptions.TargetCheck) stop the run before any test, and before a reporter
-// creates a run; a failure after the reporters started completes their runs and disposes them. No static state of its
-// own (the adapter keeps the current session), but Playwright's Expect timeout is process-wide: run one session per
-// process at a time. Every report it creates, and the message of a failed target check, shows the settings' secrets and
-// the pool users' e-mails as *** (Redact).
+// cannot lease, browsers that do not launch (with BrowserProviderStart.WithSession, the default; with OnFirstLease the
+// provider starts at the first browser a scope asks for), an unknown device, a reporter that refuses its settings or a
+// target the setup's check refuses (AutomationSessionOptions.TargetCheck) stop the run before any test, and before a
+// reporter creates a run; a failure after the reporters started completes their runs and disposes them. No static
+// state of its own (the adapter keeps the current session), but Playwright's Expect timeout is process-wide: run one
+// session per process at a time. Every report it creates, and the message of a failed target check, shows the
+// settings' secrets and the pool users' e-mails as *** (Redact).
 public sealed class AutomationSession : IAsyncDisposable
 {
     private const string RunIdCharacters = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -140,7 +141,7 @@ public sealed class AutomationSession : IAsyncDisposable
         };
 
         var createProvider = options.BrowserProviderFactory ?? BrowserProviderFactory.CreateAsync;
-        var browserProvider = await createProvider(providerContext, cancellationToken);
+        var browserProvider = await CreateBrowserProviderAsync(settings, options.BrowserProviderStart, providerContext, createProvider, logger, cancellationToken);
 
         IReadOnlyList<ITestRunReporter> reporters = [];
         ReportingDispatcher? reporting = null;
@@ -167,7 +168,7 @@ public sealed class AutomationSession : IAsyncDisposable
 
             if (options.TargetCheck is { } check)
             {
-                await session.CheckTargetAsync(check, cancellationToken);
+                await session.CheckTargetAsync(check, options.TargetCheckUsesBrowser, cancellationToken);
             }
 
             reportingStarted = true;
@@ -274,10 +275,12 @@ public sealed class AutomationSession : IAsyncDisposable
         return new ArtifactCollector(FileSystem, RunDirectory, test, attempt);
     }
 
-    // A report with the session's properties (provider, engine, device, seed) under the given ones. A failure caused by
-    // a missing user or browser becomes Blocked; any other outcome than Passed carries the exception as its failure,
-    // except that a skip keeps only its reason (the exception's message), without a type or stack trace. The failure's
-    // message and stack trace and the output go through Redact: a Playwright call log keeps what a fill typed.
+    // A report with the session's properties (provider, engine and device unless browser is false, seed) under the
+    // given ones. A failure caused by a missing user or browser becomes Blocked; any other outcome than Passed carries
+    // the exception as its failure, except that a skip keeps only its reason (the exception's message), without a type
+    // or stack trace. The failure's message and stack trace and the output go through Redact: a Playwright call log
+    // keeps what a fill typed. browser: false for a test that used no browser (TestScopeOptions.Browser false and no
+    // TestScope.OpenBrowserAsync), whose report names no provider, engine or device.
     public TestResultReport CreateReport(
         TestIdentity test,
         TestOutcome outcome,
@@ -287,19 +290,21 @@ public sealed class AutomationSession : IAsyncDisposable
         Exception? exception = null,
         string? output = null,
         IReadOnlyList<TestArtifact>? artifacts = null,
-        IReadOnlyDictionary<string, string>? properties = null)
+        IReadOnlyDictionary<string, string>? properties = null,
+        bool browser = true)
     {
         ArgumentNullException.ThrowIfNull(test);
 
-        var values = new Dictionary<string, string>(StringComparer.Ordinal)
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (browser)
         {
-            [TestRunProperties.Provider] = Settings.Browser.Provider.ToString(),
-            [TestRunProperties.Engine] = ContextOptions.Engine.ToString().ToLowerInvariant(),
-            [TestRunProperties.Seed] = Seed.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            [TestRunProperties.Attempt] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        };
+            values[TestRunProperties.Provider] = Settings.Browser.Provider.ToString();
+            values[TestRunProperties.Engine] = ContextOptions.Engine.ToString().ToLowerInvariant();
+        }
 
-        if (ContextOptions.Device is { } device)
+        values[TestRunProperties.Seed] = Seed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        values[TestRunProperties.Attempt] = attempt.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (browser && ContextOptions.Device is { } device)
         {
             values[TestRunProperties.Device] = device;
         }
@@ -463,13 +468,40 @@ public sealed class AutomationSession : IAsyncDisposable
         };
     }
 
-    // The setup's check of the target, once, before any reporter creates a run: in a scope of its own
-    // (TargetCheckContext.Test) with a leased user and a signed-in page, whose artifacts follow the Execution policies
-    // and which is not reported. Any exception of the check becomes a TargetCheckException that names its artifacts; its
-    // message goes through Redact, and an exception whose text holds a secret is not kept as its inner exception.
-    private async Task CheckTargetAsync(Func<TargetCheckContext, CancellationToken, Task> check, CancellationToken cancellationToken)
+    // The provider of the settings, started now (BrowserProviderStart.WithSession, or a session with Browser:Device,
+    // whose descriptors come from Playwright's driver), or at the first lease a scope asks for.
+    private static async Task<IBrowserProvider> CreateBrowserProviderAsync(
+        UiAutomationSettings settings,
+        BrowserProviderStart start,
+        BrowserProviderContext context,
+        Func<BrowserProviderContext, CancellationToken, Task<IBrowserProvider>> create,
+        ILogger logger,
+        CancellationToken cancellationToken)
     {
-        await using var scope = TestScope.Create(this, TargetCheckContext.Test);
+        if (start == BrowserProviderStart.OnFirstLease)
+        {
+            if (string.IsNullOrWhiteSpace(settings.Browser.Device))
+            {
+                return new LazyBrowserProvider(settings, token => create(context, token), logger);
+            }
+
+            logger.LogInformation(
+                "Browser:Device '{Device}' needs the device descriptors of Playwright's driver: the {Provider} browser provider starts with the session.",
+                settings.Browser.Device,
+                settings.Browser.Provider);
+        }
+
+        return await create(context, cancellationToken);
+    }
+
+    // The setup's check of the target, once, before any reporter creates a run: in a scope of its own
+    // (TargetCheckContext.Test) with a leased user and, unless usesBrowser is false, a signed-in page, whose artifacts
+    // follow the Execution policies and which is not reported. Any exception of the check becomes a TargetCheckException
+    // that names its artifacts; its message goes through Redact, and an exception whose text holds a secret is not kept
+    // as its inner exception.
+    private async Task CheckTargetAsync(Func<TargetCheckContext, CancellationToken, Task> check, bool usesBrowser, CancellationToken cancellationToken)
+    {
+        await using var scope = TestScope.Create(this, TargetCheckContext.Test, new TestScopeOptions { Browser = usesBrowser });
         Exception? failure = null;
         try
         {

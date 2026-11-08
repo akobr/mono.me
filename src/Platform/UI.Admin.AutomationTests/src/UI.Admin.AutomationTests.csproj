@@ -26,6 +26,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Libraries\Testing\UI.Automation.Reporting.Testiny\src\UI.Automation.Reporting.Testiny.csproj" />
     <ProjectReference Include="..\..\..\Libraries\Testing\UI.Automation.Runtime.TUnit\src\UI.Automation.Runtime.TUnit.csproj" />
+    <ProjectReference Include="..\..\Automation.Shared\src\Automation.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Role, [UserRole], PlatformRoles and PlatformTargetSettings of the shared Platform library, so a test writes
+         [UserRole(Role.Reader)] without a using. -->
+    <Using Include="_42.Platform.Automation.Shared" />
   </ItemGroup>
 
   <ItemGroup>

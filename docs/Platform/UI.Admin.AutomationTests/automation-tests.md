@@ -42,7 +42,7 @@ dotnet test --solution 42.mono.slnx                                             
 
 The layers, from the bottom: `testsettings.json`, `testsettings.<profile>.json` (each profile of `UITESTS_PROFILE` or `--test-parameter Profile=…`), `testsettings.local.json` (git-ignored), the user secrets of the project (`UserSecretsId` `3d07d28d-5b62-432e-9cfc-b53b6b883740`), `UITESTS_*` variables (`UITESTS_Target__BaseUrl`), `--test-parameter Section:Key=value`. The library's [settings reference](../../Libraries/Testing/UI.Automation/readme.md#settings) lists every key of `Browser`, `Execution`, `Users`, `BrowserStack` and `Reporting`; the committed `testsettings.json` sets every one of them, with these Platform values over the library's defaults: `Target:SignIn` `AuthKit`, `Browser:TimeZone` `Europe/Prague`, `BrowserStack:Project` `2S Platform - admin UI`.
 
-The Platform's keys of `Target` (`PlatformTarget`, read with `Settings.Bind<PlatformTarget>("Target")`), with their committed values:
+The Platform's keys of `Target` (`PlatformTarget`, read with `Settings.Bind<PlatformTarget>("Target")`; `Organization`, `Project`, `View` and `RoleProjects` and their checks come from `PlatformTargetSettings` of the shared library `42.Platform.Automation.Shared`, `src/Platform/Automation.Shared`, which the CLI's suite uses too), with their committed values:
 
 | Key | `testsettings.json` | Meaning |
 |---|---|---|
@@ -100,7 +100,7 @@ dotnet user-secrets set "Reporting:Testiny:ApiKey" "…"                        
 
 ## Users and roles
 
-`Users:Pool` lists pre-provisioned users; a test leases one for its duration, so the pool bounds the parallelism (`Execution:MaxParallelTests` is lowered to the pool size). `Roles` are the user's roles in the target's organization and project. A test asks for a role with `[UserRole(Role.<role>)]` on its method (or its class), which `PlatformTest.RequiredUser` maps to the pool:
+`Users:Pool` lists pre-provisioned users; a test leases one for its duration, so the pool bounds the parallelism (`Execution:MaxParallelTests` is lowered to the pool size). `Roles` are the user's roles in the target's organization and project. A test asks for a role with `[UserRole(Role.<role>)]` on its method (or its class), which `PlatformTest.RequiredUser` maps to the pool (`Role`, `[UserRole]` and the mapping, `PlatformRoles.RequirementOf`, are in the shared library `42.Platform.Automation.Shared`, imported globally by the project):
 
 | `Role` | Leases | Used by |
 |---|---|---|
@@ -117,7 +117,7 @@ The committed `testsettings.json` holds a pool of 8 users (their e-mails and rol
 
 ## AuthKit checklist
 
-`Target:SignIn` `AuthKit` (`Access/AuthKitSignIn.cs`) signs each pool user in once per run, through `/login`, "Continue with AuthKit" and the AuthKit hosted page (Email, Continue or Continue with email, also with its "Last used" badge, Password, Sign in, WorkOS' labels; the e-mail and the password are typed, not filled, because BrowserStack can mask only a typed value in its logs), then gives the user's later tests the captured storage state; authkit-js rotates the refresh token on every page load, so the cookies and the `workos:*` local storage items of a test that ended signed in carry over to the user's next test. The AuthKit environment of the target needs, by hand:
+`Target:SignIn` `AuthKit` (`Access/AuthKitSignIn.cs`, on `AuthKitSignInFlow` and `AuthKitHostedPage` of the shared library `42.Platform.Automation.Shared`) signs each pool user in once per run, through `/login`, "Continue with AuthKit" and the AuthKit hosted page (Email, Continue or Continue with email, also with its "Last used" badge, Password, Sign in, WorkOS' labels; the e-mail and the password are typed, not filled, because BrowserStack can mask only a typed value in its logs), then gives the user's later tests the captured storage state; authkit-js rotates the refresh token on every page load, so the cookies and the `workos:*` local storage items of a test that ended signed in carry over to the user's next test. The AuthKit environment of the target needs, by hand:
 
 - password authentication enabled;
 - no MFA (and no other second step) for the pool users;

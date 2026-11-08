@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Automation.Shared</AssemblyName>
+    <RootNamespace>_42.Platform.Automation.Shared</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- The Platform's pieces of its automation test projects (the admin UI's and the CLI's), referenced by them only. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The engine-neutral runtime only (pool users, sign-in flows, the Target section, Playwright); no test engine. -->
+    <ProjectReference Include="..\..\..\Libraries\Testing\UI.Automation.Runtime\src\UI.Automation.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>

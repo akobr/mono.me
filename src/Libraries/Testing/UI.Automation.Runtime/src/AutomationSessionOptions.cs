@@ -42,8 +42,18 @@ public sealed class AutomationSessionOptions
     // BrowserProviderFactory.CreateAsync when unset; a seam for other providers and for tests.
     public Func<BrowserProviderContext, CancellationToken, Task<IBrowserProvider>>? BrowserProviderFactory { get; set; }
 
+    // When the browser provider starts: with the session (the default; a browser that does not launch fails the start),
+    // or at the first browser a scope asks for, so a session whose tests never ask for one never starts Playwright and
+    // needs no installed browser. Browser:Device needs the device descriptors of Playwright's driver, so a session that
+    // sets it starts its provider with the session either way.
+    public BrowserProviderStart BrowserProviderStart { get; set; } = BrowserProviderStart.WithSession;
+
     // The check of the target that ends the start (IUiAutomationSetup.CheckTargetAsync); none when unset.
     public Func<TargetCheckContext, CancellationToken, Task>? TargetCheck { get; set; }
+
+    // Whether the check's scope opens a signed-in page up front (IUiAutomationSetup.TargetCheckUsesBrowser); false leases
+    // its user only, and the check opens a browser when it needs one (TargetCheckContext.OpenBrowserAsync).
+    public bool TargetCheckUsesBrowser { get; set; } = true;
 
     // The setup's flows, reporters and services, and its target check when it implements one.
     public static AutomationSessionOptions FromSetup(IUiAutomationSetup setup)
@@ -56,6 +66,7 @@ public sealed class AutomationSessionOptions
             ReporterProviders = setup.ReporterProviders,
             Services = setup.Services,
             TargetCheck = ImplementsTargetCheck(setup) ? setup.CheckTargetAsync : null,
+            TargetCheckUsesBrowser = setup.TargetCheckUsesBrowser,
         };
     }
 
