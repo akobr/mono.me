@@ -127,11 +127,11 @@ public class StorytellerEditCommand : BaseContextCommand
     private async Task<(EditSource? Source, int ExitCode)> ReadAsync(AnnotationKey annotationKey)
     {
         var key = annotationKey.ToString();
-        var stored = await ReadActiveAsync(key);
+        var (stored, etag) = await ReadVersionedAsync(key);
 
         if (stored is not null)
         {
-            return (new EditSource(stored, IsActive: true, Restore: []), ExitCodes.SUCCESS);
+            return (new EditSource(stored, IsActive: true, Restore: [], etag), ExitCodes.SUCCESS);
         }
 
         var deleted = await _annotationsApi.FindDeletedAnnotationsAsync(
@@ -196,12 +196,12 @@ public class StorytellerEditCommand : BaseContextCommand
             // Built first, so a body that cannot be built changes nothing.
             var body = AnnotationEditDocument.ToAnnotation(annotationKey, Context.GetFullKey(annotationKey), edited).ToSdkAnnotation();
 
-            // Until the API has a precondition (424-210): another write while the editor was open would be lost.
-            if (await HasChangedAsync(annotationKey, source, original))
+            // Another write while the editor was open must not be lost. The write is conditioned on the version the
+            // edit opened (If-Match), or on the key still missing (If-None-Match: *); only a read without an ETag (an
+            // older API) and a restore, which makes a new version, are checked by reading again first.
+            if (NeedsReadCheck(source) && await HasChangedAsync(annotationKey, source, original))
             {
-                Console.WriteImportant($"The annotation '{key}' changed while you edited it, so your edit was not saved.");
-                KeepEdit(key, edited, restored);
-                return ExitCodes.ERROR_WRONG_INPUT;
+                return Changed(key, edited, restored);
             }
 
             if (source.Restore.Count > 0)
@@ -215,7 +215,11 @@ public class StorytellerEditCommand : BaseContextCommand
                 }
             }
 
-            await WriteAsync(key, body);
+            if (!await TryWriteAsync(annotationKey, body, source, original))
+            {
+                return Changed(key, edited, restored);
+            }
+
             Console.WriteImportant($"Annotation '{key}' has been saved.");
             return ExitCodes.SUCCESS;
         }
@@ -240,6 +244,70 @@ public class StorytellerEditCommand : BaseContextCommand
         }
     }
 
+    // The write under its condition; false when the annotation is not what the edit opened. A version that changed only
+    // in what the document does not show (the relation arrays: a child created or deleted) is written over, once.
+    private async Task<bool> TryWriteAsync(AnnotationKey annotationKey, SdkAnnotation body, EditSource source, JObject original)
+    {
+        try
+        {
+            await WriteAsync(annotationKey.ToString(), body, source);
+            return true;
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.PreconditionFailed && source.IsActive)
+        {
+            var (current, etag) = await ReadVersionedAsync(annotationKey.ToString());
+
+            if (current is null
+                || string.IsNullOrEmpty(etag)
+                || !JToken.DeepEquals(AnnotationEditDocument.Create(annotationKey, current), original))
+            {
+                return false;
+            }
+
+            try
+            {
+                await WriteAsync(annotationKey.ToString(), body, source with { ETag = etag });
+                return true;
+            }
+            catch (ApiException again) when (again.StatusCode == (int)HttpStatusCode.PreconditionFailed)
+            {
+                return false;
+            }
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.PreconditionFailed)
+        {
+            // a key created meanwhile, or restored after the check of a restore
+            return false;
+        }
+    }
+
+    // The write cannot carry the condition: a read without an ETag, or a restore, whose new version the edit never saw.
+    private static bool NeedsReadCheck(EditSource source)
+    {
+        return source.Restore.Count > 0 || (source.IsActive && string.IsNullOrEmpty(source.ETag));
+    }
+
+    private int Changed(string key, JObject edited, bool restored)
+    {
+        Console.WriteImportant($"The annotation '{key}' changed while you edited it, so your edit was not saved.");
+        KeepEdit(key, edited, restored);
+        return ExitCodes.ERROR_WRONG_INPUT;
+    }
+
+    // The annotation whatever its status, with the ETag of its version; (null, null) when it is missing or deleted.
+    private async Task<(SdkAnnotation? Annotation, string? ETag)> ReadVersionedAsync(string key)
+    {
+        try
+        {
+            var read = await _annotationsApi.GetAnnotationVersionedAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, includeInactive: true);
+            return (read.Result, read.ETag);
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
+        {
+            return (null, null);
+        }
+    }
+
     // Whether the annotation is not what the edit started from: its content changed, or it appeared or went away.
     private async Task<bool> HasChangedAsync(AnnotationKey annotationKey, EditSource source, JObject original)
     {
@@ -256,15 +324,21 @@ public class StorytellerEditCommand : BaseContextCommand
         return _annotationsApi.TryGetAnnotationAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key);
     }
 
-    // A replace (not a merge): what the document does not hold is cleared on the server as well.
-    private Task<SdkAnnotation> WriteAsync(string key, SdkAnnotation body)
+    // A replace (not a merge): what the document does not hold is cleared on the server as well. Only of the version the
+    // edit opened, or only a create of a key that is still missing; after a restore, without a condition (checked before).
+    private Task<SdkAnnotation> WriteAsync(string key, SdkAnnotation body, EditSource source)
     {
+        var ifMatch = source.IsActive && !string.IsNullOrEmpty(source.ETag) ? source.ETag : null;
+        var ifNoneMatch = !source.IsActive && source.Restore.Count == 0 ? "*" : null;
+
         return _annotationsApi.SetAnnotationAsync(
             Context.OrganizationName,
             Context.ProjectName,
             Context.ViewName,
             key,
-            body);
+            body,
+            ifMatch,
+            ifNoneMatch);
     }
 
     // Restores the deleted keys alone, right before the write: whether all of them were restored, and whether any was.
@@ -354,7 +428,7 @@ public class StorytellerEditCommand : BaseContextCommand
         }
     }
 
-    // What the edit starts from: the annotation (null for an empty document), whether it is the active one, and the
-    // deleted keys to restore before the write.
-    private sealed record class EditSource(SdkAnnotation? Annotation, bool IsActive, IReadOnlyList<string> Restore);
+    // What the edit starts from: the annotation (null for an empty document), whether it is the active one, the deleted
+    // keys to restore before the write, and the ETag of the version opened (an active annotation).
+    private sealed record class EditSource(SdkAnnotation? Annotation, bool IsActive, IReadOnlyList<string> Restore, string? ETag = null);
 }

@@ -62,6 +62,8 @@ The review of PR #174 confirmed these, now fixed:
 
 - **Every create completes the relation arrays it lost:** `CreateCoreAsync` itself, when a later wave loses to a change of a parent after the keys committed, completes the arrays under fresh ETags (`CompleteParentRelationsWithRetriesAsync`, three tries) instead of handing the failure to the retry of the whole create. So a bulk create reports the key, the single create no longer answers `409` for its own key, and an import calls it `Created`. Test: `Create_AParentChangedBeforeItsRelationArrays_CompletesThem` for the three paths. The root flags of children of a re-created key, also written in that wave, are not completed this way.
 
+- **`sform story edit`** (added to `main` meanwhile) saves with the precondition instead of its second read: `If-Match` with the `ETag` of the version it opened, `If-None-Match: *` for a new key. A `412` keeps the edit and exits `2`, unless only the relation arrays changed (the editable document read again is what was opened), when it writes once more with the new tag. A restore, and a read without an `ETag`, still read again before the write. Tests: `StorytellerEditCommandTests` (the calls, the conditions, the relation-only retry) and `StorytellerEditBodyTests` (the headers on the wire, the `412`).
+
 Not changed: the tag helper keeps `BindingDependency.Absent` as the marker of no item, which is what the service answers; a `304` on the annotation read stays out of scope; the two copies of the OpenAPI document are the convention of the two SDK folders.
 
 ### Not done here

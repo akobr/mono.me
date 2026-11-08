@@ -38,6 +38,8 @@ public class StorytellerEditBodyTests
     private const string ExecutionKey = "exe.northwind.billing.prod";
     private const string UnitKey = "unt.billing.export";
     private const string NotFound = """{ "Message": "The annotation does not exist.", "ErrorCode": "AnnotationNotFound" }""";
+    private const string PreconditionFailed = """{ "Message": "The annotation changed since it was read.", "ErrorCode": "AnnotationPreconditionFailed" }""";
+    private const string ETag = "\"a1.dmVyc2lvbg\"";
 
     // As a read answers them: date-like strings unparsed, the relation arrays and the stamps included.
     private const string StoredExecution = """
@@ -188,16 +190,17 @@ public class StorytellerEditBodyTests
     }
 
     [Fact]
-    public async Task TheRequests_AreTheRead_TheGuard_ThenTheWriteToTheRouteOfTheKey()
+    public async Task TheRequests_AreTheRead_ThenTheWriteOfThatVersionToTheRouteOfTheKey()
     {
         await EditStoredAsync(ExecutionKey, StoredExecution, document => document["Title"] = "Changed");
 
-        _http.Requests.Count.ShouldBe(3);
+        _http.Requests.Count.ShouldBe(2);
         _http.Requests[0].Method.ShouldBe(HttpMethod.Get);
         _http.Requests[0].Uri.Query.ShouldContain("includeInactive=true");
-        _http.Requests[1].Method.ShouldBe(HttpMethod.Get);
-        _http.Requests[1].Uri.Query.ShouldContain("includeInactive=true");
-        _http.Requests[2].Uri.AbsolutePath.ShouldBe($"/api/v1/{AnnotationCommandFixture.Organization}/{AnnotationCommandFixture.Project}/{AnnotationCommandFixture.View}/annotations/{ExecutionKey}");
+        _http.Requests[1].Method.ShouldBe(HttpMethod.Post);
+        _http.Requests[1].Headers!["If-Match"].ShouldBe(ETag);
+        _http.Requests[1].Headers!.ContainsKey("If-None-Match").ShouldBeFalse();
+        _http.Requests[1].Uri.AbsolutePath.ShouldBe($"/api/v1/{AnnotationCommandFixture.Organization}/{AnnotationCommandFixture.Project}/{AnnotationCommandFixture.View}/annotations/{ExecutionKey}");
     }
 
     [Fact]
@@ -205,9 +208,56 @@ public class StorytellerEditBodyTests
     {
         await EditNewAsync(ExecutionKey, document => document["Title"] = "New");
 
-        _http.Requests.Count.ShouldBe(4);
+        _http.Requests.Count.ShouldBe(3);
         _http.Requests[1].Method.ShouldBe(HttpMethod.Post);
         _http.Requests[1].Uri.AbsolutePath.ShouldEndWith("/annotations/deleted/lookup");
+    }
+
+    // A new key is created only while it is still missing.
+    [Fact]
+    public async Task ANewKey_IsWrittenWithIfNoneMatchAny()
+    {
+        await EditNewAsync(ExecutionKey, document => document["Title"] = "New");
+
+        var write = _http.Requests[^1];
+        write.Method.ShouldBe(HttpMethod.Post);
+        write.Headers!["If-None-Match"].ShouldBe("*");
+        write.Headers!.ContainsKey("If-Match").ShouldBeFalse();
+    }
+
+    // Someone else changed the annotation meanwhile: the write answers 412, the edit is kept and nothing is written again.
+    [Fact]
+    public async Task AChangeWhileTheEditorWasOpen_AnswersPreconditionFailed_AndKeepsTheEdit()
+    {
+        _http.Respond(HttpStatusCode.OK, StoredExecution, ("ETag", ETag));
+        _http.Respond(HttpStatusCode.PreconditionFailed, PreconditionFailed);
+        _http.Respond(HttpStatusCode.OK, StoredExecution.Replace("\"Stored\"", "\"Changed by someone else\"", StringComparison.Ordinal), ("ETag", "\"a1.b3RoZXI\""));
+        SetupEditor(document => document["Description"] = "Mine", null);
+
+        var exitCode = await Command(ExecutionKey, Client(), _editor.Object).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _http.Requests.Count.ShouldBe(3);
+        _http.Requests[1].Headers!["If-Match"].ShouldBe(ETag);
+        _http.Requests[2].Method.ShouldBe(HttpMethod.Get);
+        _fixture.Console.Lines.ShouldContain($"! The annotation '{ExecutionKey}' changed while you edited it, so your edit was not saved.");
+        _fileSystem.AllFiles.ShouldHaveSingleItem().ShouldContain($"annotation-{ExecutionKey}");
+    }
+
+    // Only a relation array changed meanwhile (a child was added): the edit is written again over the new version.
+    [Fact]
+    public async Task AChangeOfTheRelationsOnly_WritesAgainWithTheNewETag()
+    {
+        _http.Respond(HttpStatusCode.OK, StoredExecution, ("ETag", ETag));
+        _http.Respond(HttpStatusCode.PreconditionFailed, PreconditionFailed);
+        _http.Respond(HttpStatusCode.OK, StoredExecution.Replace("\"UnitNames\": [\"export\"]", "\"UnitNames\": [\"export\", \"import\"]", StringComparison.Ordinal), ("ETag", "\"a1.bmV3\""));
+        _http.Respond(HttpStatusCode.OK, Answer(ExecutionKey));
+
+        var body = await EditAsync(ExecutionKey, document => document["Title"] = "Changed", null);
+
+        body["Title"]!.Value<string>().ShouldBe("Changed");
+        _http.Requests.Count.ShouldBe(4);
+        _http.Requests[3].Headers!["If-Match"].ShouldBe("\"a1.bmV3\"");
     }
 
     // The lookup answers the base members only, as the API writes its list; the read of one deleted record has the rest.
@@ -240,8 +290,7 @@ public class StorytellerEditBodyTests
     {
         using var error = new StringWriter();
         _fixture.InnerConsole.SetupGet(console => console.Error).Returns(error);
-        _http.Respond(HttpStatusCode.OK, StoredExecution);
-        _http.Respond(HttpStatusCode.OK, StoredExecution);
+        _http.Respond(HttpStatusCode.OK, StoredExecution, ("ETag", ETag));
         SetupEditor(document => document["Title"] = "Changed", null);
 
         var exitCode = await Command(ExecutionKey, new UnwritableBodyClient(new HttpClient(_http)), _editor.Object).OnExecuteAsync();
@@ -254,8 +303,7 @@ public class StorytellerEditBodyTests
     [Fact]
     public async Task EndToEnd_AnEditInTheEditor_IsSaved()
     {
-        _http.Respond(HttpStatusCode.OK, StoredExecution);
-        _http.Respond(HttpStatusCode.OK, StoredExecution);
+        _http.Respond(HttpStatusCode.OK, StoredExecution, ("ETag", ETag));
         _http.Respond(HttpStatusCode.OK, Answer(ExecutionKey));
         string edit = """
             {
@@ -295,8 +343,7 @@ public class StorytellerEditBodyTests
     [Fact]
     public async Task EndToEnd_ADocumentThatBreaksARule_ReopensTheEditor()
     {
-        _http.Respond(HttpStatusCode.OK, StoredUnit);
-        _http.Respond(HttpStatusCode.OK, StoredUnit);
+        _http.Respond(HttpStatusCode.OK, StoredUnit, ("ETag", ETag));
         _http.Respond(HttpStatusCode.OK, Answer(UnitKey));
         var editor = new ScriptedEditor(_fileSystem, [
             """{ "DocumentationLink": "wiki.example.com/export", "UnitType": "time", "UnitDefinition": "0 2 * * *" }""",
@@ -311,21 +358,19 @@ public class StorytellerEditBodyTests
         Sent()["DocumentationLink"]!.Value<string>().ShouldBe("https://wiki.example.com/export");
     }
 
-    // The read and the guard, with the stored annotation, then the write.
+    // The read of the stored annotation with its ETag, then the write of that version.
     private Task<JObject> EditStoredAsync(string key, string stored, Action<JObject> change, Action<JObject>? opened = null)
     {
-        _http.Respond(HttpStatusCode.OK, stored);
-        _http.Respond(HttpStatusCode.OK, stored);
+        _http.Respond(HttpStatusCode.OK, stored, ("ETag", ETag));
         _http.Respond(HttpStatusCode.OK, Answer(key));
         return EditAsync(key, change, opened);
     }
 
-    // The read (404), the lookup of deleted keys (none), the guard (404), and the write.
+    // The read (404), the lookup of deleted keys (none), and the create (If-None-Match: *).
     private Task<JObject> EditNewAsync(string key, Action<JObject> change)
     {
         _http.Respond(HttpStatusCode.NotFound, NotFound);
         _http.Respond(HttpStatusCode.OK, "[]");
-        _http.Respond(HttpStatusCode.NotFound, NotFound);
         _http.Respond(HttpStatusCode.OK, Answer(key));
         return EditAsync(key, change, null);
     }
