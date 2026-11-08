@@ -26,7 +26,7 @@ The catalogue (phase 4) is aligned with the CLI of phase 1 ([review](../Cli/spec
 
 Rules shared by every case:
 
-- A test starts with no default project: it passes `-p <org>.<project>` (and `-v` when it says so) to every context command whose steps do not give the target themselves. So `-p` of each context command is covered by the command's own cases and is not repeated in Covers; a machine case (mode M) is targeted by its variables instead. `--projectKey`, `-v` and `--view` of each context command are covered by the context case of its section (`MCH-CTX-01`, `CRT-SHC-06`, `ANN-CTX-01`, `CFG-CTX-01`, `TPL-TPL-09`, `SCH-CTX-01`, `KV-CTX-01`, `KV-CTX-02`, and `ACC-TLS-01` for `account ca`). The context cases in [Context and Errors](#context-and-errors) check the precedence of the options.
+- A test starts with no default project: it passes `-p <org>.<project>` (and `-v` when it says so) to every context command whose steps do not give the target themselves. So `-p` of each context command is covered by the command's own cases and is not repeated in Covers; a machine case (mode M) is targeted by its variables instead. `--projectKey`, `-v` and `--view` of each context command are covered by the context case of its section (`MCH-CTX-01`, `CRT-SHC-06`, `ANN-CTX-01`, `ANN-CTX-02`, `CFG-CTX-01`, `TPL-TPL-09`, `SCH-CTX-01`, `KV-CTX-01`, `KV-CTX-02`, and `ACC-TLS-01` for `account ca`). The context cases in [Context and Errors](#context-and-errors) check the precedence of the options.
 - In the context cases `<A>` is the default project (`account set -p <A>`), `<B>` the project the commands target, and `<view>` a view of `<B>` other than `default` (a view exists by its data).
 - `<reader project>` and `<contributor project>` are the projects of `Target:RoleProjects` for Reader and Contributor, where every pool user holds exactly that role. A case of another role runs its steps "as a Reader" or "as a Contributor" there, with `-p` of that project.
 - `<AuthKit organization id>` is the WorkOS organization id of `Target:AuthKitOrganizationId`. `account -o` takes that id, not the 2S organization of `-p <org>.<project>`. Without the setting, a test runs `account` without `-o` (a pool user in one organization needs none).
@@ -44,16 +44,16 @@ Cases per section:
 | Section | Folder | Cases |
 |---|---|---|
 | [Sign-in](#sign-in) | `Tests/SignIn` | 14 |
-| [Account and Access Points](#account-and-access-points) | `Tests/Account` | 15 |
+| [Account and Access Points](#account-and-access-points) | `Tests/Account` | 26 |
 | [Machines](#machines) | `Tests/Machines` | 30 |
 | [Shared Certificates](#shared-certificates) | `Tests/SharedCertificates` | 6 |
-| [Annotations](#annotations) | `Tests/Annotations` | 38 |
-| [Configurations](#configurations) | `Tests/Configurations` | 32 |
+| [Annotations](#annotations) | `Tests/Annotations` | 48 |
+| [Configurations](#configurations) | `Tests/Configurations` | 33 |
 | [Templates](#templates) | `Tests/Templates` | 9 |
 | [Schemas](#schemas) | `Tests/Schemas` | 21 |
 | [Key-Values](#key-values) | `Tests/KeyValues` | 54 |
 | [Context and Errors](#context-and-errors) | `Tests/General` | 10 |
-| **Total** | | **229** |
+| **Total** | | **251** |
 
 ## Sign-in
 

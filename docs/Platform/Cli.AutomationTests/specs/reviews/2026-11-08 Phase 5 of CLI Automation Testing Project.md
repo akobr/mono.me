@@ -307,3 +307,21 @@ Reviewers read the case tests against the catalogue, sform and the API, and pred
 **Testiny:** cases 368 (the expected results of both steps), 416 (the Contributor's refusal), 445 (the precondition: mode `P, X:ByokApplication` and the requirement) and 462 (the expected results of the `byok-setup` and `byok-verify` steps) were edited in project 2. Only the text concerned changed, and no title. No edit was denied.
 
 **Verified:** the build of `src/Platform/Cli.AutomationTests/src` has no errors and no warnings in the project. `dotnet test --project src/Platform/Cli.AutomationTests/src` ran 313 tests: 84 succeeded (the self tests and the coverage and catalogue checks) and 229 case tests skipped without a target. As before, none of the changed case tests has run against a target.
+
+## After the rebase onto #170 to #176
+
+The branch was rebased onto `main` after seven pull requests merged. Their descriptions and code were checked for the cases they affect. The coverage and catalogue checks found the structural effects (new commands and options, removed options); the behavioural ones were found by reading the changes.
+
+| Pull request | Effect on the cases | What changed here |
+|---|---|---|
+| #170 (424-214) Hosting: who am I and a catalog for any annotation | None: no sform change | — |
+| #171 (424-216) Short help of export and import; `TimeProvider` | None: GEN-CLI-01 checks the forms in the help, not the descriptions. Its `story kv` crash fix is the one of section 14 of the defects review, so the two `Startup` registrations became one, and `StartupTests` and `CommandConstructionTests` both stay | — |
+| #172 (424-213) `-x` names are paths | CFG-SET-01: `-x b.c=true` now nests | Its test and row check `{ "b": { "c": true } }`, and `-x "['e.f']=2"` for a dotted name (Testiny 395) |
+| #173 (424-217) `sform story edit` | A new command, uncovered | A new sub-folder **Edit** (`AnnotationEditorTests`, Testiny folder 121) with ANN-EDT-01 to 08 (464 to 471), and ANN-CTX-02 (473) for its context options; two self tests run `story edit` against the stub API in a pseudo terminal and with redirected streams |
+| #174 (424-210) ETags, `If-Match` and a merge `PATCH` | `story set` merges by default and has `--replace` | ANN-SET-10 (472) covers `--replace`; ANN-SET-06 (290) now checks that `--restore-deleted` keeps and merges the restored content. The other `story set` steps only add to new keys, so they stay as they are |
+| #175 (424-220) `story config export` | `--github-env`, `--mask`, `--allow-unprefixed` and `--allow-unresolved` left `story config` | CFG-GHA-01 to 05 (436 to 440) and GEN-CLI-05 (396) run `config export`; CFG-GHA-06 (463) covers `-e` and every `--format`; CFG-CTX-01 (441) adds the export's context options; `coverage-values.json` moves `--mask` to `config export` and adds its formats |
+| #176 (424-218) `sform account settings` and `sform.settings.json` | New commands; the default project and the editor moved into the settings file | `SformHome` resets and reads `sform.settings.json`, the fake editor is set in its `editor` section, and the tests read the default project from it; a new sub-folder **Settings** (`AccountSettingsTests`, Testiny folder 122) with ACC-STG-01 to 11 (474 to 484); SGN-OUT-04, ACC-PNT-04, ACC-SET-04, GEN-CTX-02 and GEN-CLI-03 follow the new file and messages. `coverage-values.json` can now list the fixed values of an argument (`argN=value`): the editor type and the keys of `set` and `unset` |
+
+The catalogue has **251 cases** (22 new, all created in Testiny 2SC, no edit denied), each automated; sform has 105 commands, 35 aliases, 618 option forms, 87 arguments and 147 fixed values, 992 items, every one covered. In sform itself the rebase joined `CliPaths` with the settings store of #176 (see the review of phase 1), and the newest OpenAPI document of the TypeScript SDK (`open.api.v0.10.31.json`) describes `Pkcs12` as base64 like the C# one, so a new generation keeps the generated files as they are.
+
+Noted, not changed: the redirected-input stop of `story edit` (43) is a plain line on standard output, not the "! sform cannot ask for …" of the other prompts on standard error (ANN-EDT-04 expects what the code does).
