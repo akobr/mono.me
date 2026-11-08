@@ -13,9 +13,10 @@ namespace _42.Platform.Storyteller.Annotating;
 // Parsed up front; Apply is pure, so a write can run it again on every attempt against fresh state.
 public sealed class AnnotationPatch
 {
-    // The most a document may weigh while a JSON Patch builds it (about its size in characters). A copy doubles a value
-    // with a few bytes of patch, so the weight of every value an operation adds is counted before it is added.
-    internal const long MaxDocumentWeight = 16 * 1024 * 1024;
+    // The most a document may weigh while a JSON Patch builds it (about its size in characters): the 4 MiB of an
+    // annotation body, which a full write cannot pass either. A copy doubles a value with a few bytes of patch, so the
+    // weight of every value an operation adds is counted before it is added.
+    internal const long MaxDocumentWeight = 4 * 1024 * 1024;
 
     // The deepest a JSON Patch may nest a value of the document, the root being 1: the depth the API reads a body to.
     internal const int MaxDocumentDepth = 64;
@@ -291,7 +292,9 @@ public sealed class AnnotationPatch
             case OperationType.Copy:
             case OperationType.Move:
                 // a missing source fails in the operation itself
-                if (!TryResolve(root, GetSegments(operation.From), GetSegments(operation.From).Length, out value))
+                var from = GetSegments(operation.From);
+
+                if (!TryResolve(root, from, from.Length, out value))
                 {
                     return null;
                 }
