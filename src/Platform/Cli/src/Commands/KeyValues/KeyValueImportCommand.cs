@@ -26,7 +26,9 @@ public class KeyValueImportCommand : KeyValueCommandBase
 
         The plan, a dry run on the server, is shown first and then confirmed: -y skips
         the confirmation, and --dry-run stops after the plan. A replace that deletes
-        keys asks you to type the view name. The exit code is 45 when an item failed.
+        keys asks you to type the view name. An item that is not valid, such as a new
+        secret without its value, stops the import at the plan: nothing is written and
+        the exit code is 2. The exit code is 45 when the write of an item failed.
 
         A Contributor imports public pairs. Secret values, changes to or from a secret
         level, and a replace that deletes a secret need ContributorWithSecrets. A

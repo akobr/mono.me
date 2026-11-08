@@ -58,11 +58,11 @@ public class StorytellerTransferCommandTests
     [InlineData(
         typeof(StorytellerExportCommand),
         "Export the view (for administrators).",
-        "A machine needs no role but Configuration.Transfer and the read scope of every included kind: Annotation.Read for annotations, and Configuration.Read for schemas, templates and configurations.")]
+        "A machine needs no role but the scope Configuration.Transfer and the read scope of every included kind: Annotation.Read for annotations, and Configuration.Read for schemas, templates and configurations.")]
     [InlineData(
         typeof(StorytellerImportCommand),
         "Import into the view (for administrators).",
-        "A machine needs no role but Configuration.Transfer and the write scopes of every included kind: Annotation.Write and Annotation.Manage for annotations, Configuration.Write and Schema.Write for schemas, Configuration.Write and Template.Write for templates, and Configuration.Write for configurations.")]
+        "A machine needs no role but the scope Configuration.Transfer and, for every included kind, the scopes of its direct writes: Annotation.Write and Annotation.Manage for annotations, Configuration.Write and Schema.Write for schemas, Configuration.Write and Template.Write for templates, and Configuration.Write for configurations.")]
     public void Commands_NameTheAdministratorRole_AndWhatAMachineNeeds(Type command, string description, string machine)
     {
         var attribute = command.GetCustomAttribute<CommandAttribute>()!;
