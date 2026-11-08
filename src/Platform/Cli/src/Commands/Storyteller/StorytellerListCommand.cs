@@ -18,6 +18,7 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 [Subcommand(
     typeof(StorytellerGetCommand),
     typeof(StorytellerSetCommand),
+    typeof(StorytellerEditCommand),
     typeof(StorytellerDeleteCommand),
     typeof(StorytellerRestoreCommand),
     typeof(StorytellerDeletedCommand),
