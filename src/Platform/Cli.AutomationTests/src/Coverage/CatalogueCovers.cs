@@ -73,11 +73,19 @@ public static class CatalogueCovers
         return differences;
     }
 
-    // An option, a value or an argument token ("-r", "--protection=public", "arg0"); a command or an alias otherwise.
+    // An option, a value or an argument token ("-r", "--protection=public", "arg0", "arg0=vscode"); a command or an alias
+    // otherwise.
     public static bool IsItem(string token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        return token.StartsWith('-') || (token.StartsWith("arg", StringComparison.Ordinal) && token.Length > 3 && token[3..].All(char.IsDigit));
+        if (token.StartsWith('-'))
+        {
+            return true;
+        }
+
+        var separator = token.IndexOf('=', StringComparison.Ordinal);
+        var argument = separator < 0 ? token : token[..separator];
+        return argument.StartsWith("arg", StringComparison.Ordinal) && argument.Length > 3 && argument[3..].All(char.IsDigit);
     }
 
     private static string Times(int count) => count > 1 ? $" {count} times" : string.Empty;

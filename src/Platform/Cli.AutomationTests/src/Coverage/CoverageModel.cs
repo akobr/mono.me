@@ -11,7 +11,8 @@ namespace _42.Platform.Cli.AutomationTests.Coverage;
 //     --projectKey, -v and --view need a case of their own.
 //   - Its items belong to that command: an option form as written ("-r" and "--resolved" are two items), a value of an
 //     option with a fixed set as "--option=value" (any form of the option, the value in any case, from
-//     coverage-values.json), a positional argument as arg0, arg1, ….
+//     coverage-values.json), a positional argument as arg0, arg1, …, and a value of an argument with a fixed set as
+//     "arg0=value" (the value in any case, from coverage-values.json).
 //   - A [Covers] counts whether its test runs or skips; an item that only feature-gated tests ([RequiresFeature]) or
 //     skipped ones ([Skip]) cover belongs in coverage-exceptions.json.
 public sealed partial class CoverageModel
@@ -118,6 +119,36 @@ public sealed partial class CoverageModel
         }
 
         token = token.Trim();
+        if (ArgumentValueToken().Match(token) is { Success: true } argumentValue)
+        {
+            var argumentToken = argumentValue.Groups[1].Value;
+            var index = int.Parse(argumentValue.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+            if (index >= command.Arguments.Count)
+            {
+                problem = command.Arguments.Count == 0
+                    ? $"'{command.Path}' takes no argument, so there is no {argumentToken}."
+                    : $"'{command.Path}' takes {command.Arguments.Count} argument(s): {string.Join(", ", command.Arguments.Select(item => $"{item.Token} ({item.Name})"))}; there is no {argumentToken}.";
+                return null;
+            }
+
+            var value = argumentValue.Groups[3].Value;
+            var entry = Values.For(command, command.Arguments[index]);
+            if (entry is null)
+            {
+                problem = $"{argumentToken} of '{command.Path}' has no fixed set of values in {CoverageValues.FileName}, so {token} is no item; cover the argument as {argumentToken}.";
+                return null;
+            }
+
+            var canonical = entry.Values.FirstOrDefault(known => string.Equals(known, value, StringComparison.OrdinalIgnoreCase));
+            if (canonical is null)
+            {
+                problem = $"'{value}' is not a value of {argumentToken} of '{command.Path}' ({string.Join(", ", entry.Values)}).";
+                return null;
+            }
+
+            return new CoverageItem(command, CoverageKind.Value, $"{argumentToken}={canonical}", command.Arguments[index].Name);
+        }
+
         if (ArgumentToken().Match(token) is { Success: true } argument)
         {
             var index = int.Parse(argument.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
@@ -267,10 +298,10 @@ public sealed partial class CoverageModel
         return new CoverageReport(this, coveredBy.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<CoversUsage>)pair.Value, StringComparer.Ordinal), uncovered, gatedOnly, unlisted, stale, invalid, usages.Count);
     }
 
-    // What is wrong with coverage-values.json against the CLI: an entry that names no command or option, writes its command
-    // with an alias (For would never find it), has no values or source, lists a value twice, or differs from its enum
-    // ("enum", or the option's own enum type, but "except" and "refused", plus "extra"); and an option whose type is an
-    // enum but has no entry.
+    // What is wrong with coverage-values.json against the CLI: an entry that names no command, or not exactly one option or
+    // argument the command has, writes its command with an alias (For would never find it), has no values or source, lists
+    // a value twice, or differs from its enum ("enum", or the option's own enum type, but "except" and "refused", plus
+    // "extra"); and an option whose type is an enum but has no entry.
     public IReadOnlyList<string> CheckValues()
     {
         var problems = new List<string>();
@@ -290,16 +321,40 @@ public sealed partial class CoverageModel
                 continue;
             }
 
-            var option = entry.Option is null ? null : command.FindOption(entry.Option);
-            if (option is null)
+            if ((entry.Option is null) == (entry.Argument is null))
             {
-                problems.Add($"{entry}: '{command.Path}' has no option {entry.Option} (its options: {string.Join(", ", command.Options)}).");
+                problems.Add($"{entry}: name either an \"option\" or an \"argument\" (arg0, arg1, …) of '{command.Path}'.");
                 continue;
             }
 
-            if (!seen.Add($"{command.Path}|{option.Name}"))
+            CliOption? option = null;
+            if (entry.Argument is not null)
             {
-                problems.Add($"{entry}: the option is listed twice.");
+                var argument = command.Arguments.FirstOrDefault(item => string.Equals(item.Token, entry.Argument, StringComparison.Ordinal));
+                if (argument is null)
+                {
+                    problems.Add($"{entry}: '{command.Path}' has no argument {entry.Argument} (its arguments: {(command.Arguments.Count == 0 ? "none" : string.Join(", ", command.Arguments.Select(item => $"{item.Token} ({item.Name})")))}).");
+                    continue;
+                }
+
+                if (!seen.Add($"{command.Path}|{argument.Token}"))
+                {
+                    problems.Add($"{entry}: the argument is listed twice.");
+                }
+            }
+            else
+            {
+                option = command.FindOption(entry.Option!);
+                if (option is null)
+                {
+                    problems.Add($"{entry}: '{command.Path}' has no option {entry.Option} (its options: {string.Join(", ", command.Options)}).");
+                    continue;
+                }
+
+                if (!seen.Add($"{command.Path}|{option.Name}"))
+                {
+                    problems.Add($"{entry}: the option is listed twice.");
+                }
             }
 
             if (entry.Values.Count == 0)
@@ -318,12 +373,12 @@ public sealed partial class CoverageModel
                 problems.Add($"{entry}: {string.Join(", ", duplicates)} listed twice.");
             }
 
-            if (option.EnumType is not null && entry.Enum is not null && entry.Enum != option.EnumType)
+            if (option?.EnumType is not null && entry.Enum is not null && entry.Enum != option.EnumType)
             {
                 problems.Add($"{entry}: \"enum\" is {entry.Enum}, but the option's type is the enum {option.EnumType}.");
             }
 
-            var enumType = entry.Enum ?? option.EnumType;
+            var enumType = entry.Enum ?? option?.EnumType;
             if (enumType is null)
             {
                 if (entry.Except.Count > 0 || entry.Refused.Count > 0 || entry.Extra.Count > 0)
@@ -334,7 +389,7 @@ public sealed partial class CoverageModel
                 continue;
             }
 
-            var names = entry.Enum is null ? option.EnumNames : Tree.Enums.GetValueOrDefault(entry.Enum);
+            var names = entry.Enum is null ? option?.EnumNames : Tree.Enums.GetValueOrDefault(entry.Enum);
             if (names is null)
             {
                 problems.Add($"{entry}: the enum {enumType} is not in 42.Platform.Cli.dll or the 42.*.dll next to it.");
@@ -388,6 +443,10 @@ public sealed partial class CoverageModel
     [GeneratedRegex(@"^arg(\d+)$")]
     private static partial Regex ArgumentToken();
 
+    // A value of a positional argument with a fixed set: "arg0=vscode".
+    [GeneratedRegex(@"^(arg(\d+))=(.+)$")]
+    private static partial Regex ArgumentValueToken();
+
     private IEnumerable<CoverageItem> BuildItems()
     {
         foreach (var command in Tree.Commands)
@@ -418,6 +477,17 @@ public sealed partial class CoverageModel
                     foreach (var value in entry.Values)
                     {
                         yield return new CoverageItem(command, CoverageKind.Value, $"{option.Name}={value}");
+                    }
+                }
+            }
+
+            foreach (var argument in command.Arguments)
+            {
+                if (Values.For(command, argument) is { } entry)
+                {
+                    foreach (var value in entry.Values)
+                    {
+                        yield return new CoverageItem(command, CoverageKind.Value, $"{argument.Token}={value}", argument.Name);
                     }
                 }
             }
