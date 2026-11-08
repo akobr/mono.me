@@ -1,5 +1,6 @@
 using _42.Platform.Cli.AutomationTests.Data;
 using _42.Platform.Cli.AutomationTests.Running;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.KeyValues;
@@ -13,6 +14,7 @@ public sealed class KeyValueSecretTests : CliTest
     // (not Public); story kv get <key> returns the pair without its value, and story kv --prefix <key> lists the key; the
     // secret's value is in none of the runs' outputs.
     [Test]
+    [TestCase(380)]
     [Elementary]
     [UserRole(Role.Secrets)]
     [Covers("story kv set", "--secret")]

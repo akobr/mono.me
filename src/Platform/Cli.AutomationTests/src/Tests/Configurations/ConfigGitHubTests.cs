@@ -1,5 +1,6 @@
 using _42.Platform.Cli.AutomationTests.Data;
 using _42.Platform.Cli.AutomationTests.Running;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Configurations;
@@ -14,6 +15,7 @@ public sealed class ConfigGitHubTests : CliTest
     // and APP_TOKEN there in the heredoc form (NAME<<ghadelimiter_…), prints ::add-mask:: for the bound secret only, and
     // prints no content (neither value is on the standard output but in that mask).
     [Test]
+    [TestCase(436)]
     [Elementary]
     [UserRole(Role.Secrets)]
     [Covers("story config", "--github-env", "--env-prefix")]

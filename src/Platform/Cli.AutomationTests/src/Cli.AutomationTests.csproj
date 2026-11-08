@@ -33,6 +33,17 @@
          process); OutputItemType hands its build output (the 42.Platform.Cli.dll of the same configuration) to the
          RecordSformPath target below. -->
     <ProjectReference Include="..\..\Cli\src\Cli.csproj" ReferenceOutputAssembly="false" Private="false" OutputItemType="SformBuildOutput" />
+
+    <!-- The fake editor of mode E (spec §4.3), built with the tests the same way: sform starts its apphost as the custom
+         command of editor.config.json. RecordSformPath records the path of its 42.Platform.Cli.AutomationTests.Editor.dll
+         as EditorPath (FakeEditor turns it into the apphost next to it). -->
+    <ProjectReference Include="..\editor\Cli.AutomationTests.Editor.csproj" ReferenceOutputAssembly="false" Private="false" OutputItemType="EditorBuildOutput" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- System.Reflection.MetadataLoadContext reads the command tree of 42.Platform.Cli.dll for CommandCoverageTests
+         without running any of its code. -->
+    <PackageReference Include="System.Reflection.MetadataLoadContext" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,17 +54,26 @@
 
   <ItemGroup>
     <None Update="testsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- What CommandCoverageTests reads besides the [Covers] of the tests: the options with a fixed set of values, and the
+         items only feature-gated tests cover (docs/Platform/Cli.AutomationTests/automation-tests.md#command-coverage). -->
+    <None Update="coverage-values.json;coverage-exceptions.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- The path of the built sform, recorded by MSBuild instead of guessed from bin/<Configuration>: the referenced project's
        target output becomes [assembly: AssemblyMetadata("SformPath", "<full path of 42.Platform.Cli.dll>")], which
-       SformLocator reads when Cli:Path is not set. -->
+       SformLocator reads when Cli:Path is not set (and CommandCoverageTests always). The fake editor's dll the same way,
+       as EditorPath. -->
   <Target Name="RecordSformPath" AfterTargets="ResolveProjectReferences" BeforeTargets="GetAssemblyAttributes;CoreGenerateAssemblyInfo">
     <ItemGroup>
       <_SformBuildPath Include="@(SformBuildOutput->'%(FullPath)')" Condition="'%(Extension)' == '.dll'" />
       <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition="'@(_SformBuildPath)' != ''">
         <_Parameter1>SformPath</_Parameter1>
         <_Parameter2>@(_SformBuildPath)</_Parameter2>
+      </AssemblyAttribute>
+      <_EditorBuildPath Include="@(EditorBuildOutput->'%(FullPath)')" Condition="'%(Extension)' == '.dll'" />
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition="'@(_EditorBuildPath)' != ''">
+        <_Parameter1>EditorPath</_Parameter1>
+        <_Parameter2>@(_EditorBuildPath)</_Parameter2>
       </AssemblyAttribute>
     </ItemGroup>
   </Target>

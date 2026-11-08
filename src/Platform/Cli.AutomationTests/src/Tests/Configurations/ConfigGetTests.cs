@@ -1,3 +1,4 @@
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Configurations;
@@ -10,6 +11,7 @@ public sealed class ConfigGetTests : CliTest
     // An Editor creates <rst> with a configuration (story set, config set -x); as a Reader, story config <rst> prints the
     // model with the content and its version, and story configuration <rst> (the alias) the same content.
     [Test]
+    [TestCase(368)]
     [Elementary]
     [UserRole(Role.Reader)]
     [Covers("story config", "arg0")]
@@ -37,6 +39,7 @@ public sealed class ConfigGetTests : CliTest
     // pair (@<key>); as a Reader, story config <unt> -r (and --resolved) has the parent's value merged in and the pair's
     // value in place of the binding, while the plain read keeps the binding expression.
     [Test]
+    [TestCase(369)]
     [Elementary]
     [UserRole(Role.Reader)]
     [Covers("story config", "-r", "--resolved")]

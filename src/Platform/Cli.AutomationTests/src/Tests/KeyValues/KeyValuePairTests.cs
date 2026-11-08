@@ -1,3 +1,4 @@
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.KeyValues;
@@ -10,6 +11,7 @@ public sealed class KeyValuePairTests : CliTest
     // As an Editor, story kv set <key> <value> --protection public says the pair is at version 1 (Public), and
     // story kv get <key> returns it with the value, the level Public and version 1.
     [Test]
+    [TestCase(349)]
     [Elementary]
     [UserRole(Role.Editor)]
     [Covers("story kv set", "arg0", "arg1", "--protection", "--protection=public")]

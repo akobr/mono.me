@@ -4,7 +4,7 @@ Tests of the real `sform` executable against a real Storyteller deployment: the 
 
 `Cli.UnitTests` (`src/Platform/Cli/test`) stays the hermetic, in-process suite of the CLI; this suite covers the integrated system.
 
-Spec: [2026-11-08 CLI Automation Testing Project](specs/2026-11-08%20CLI%20Automation%20Testing%20Project.md) (Linear [424-215](https://linear.app/424fun/issue/424-215/create-cli-automation-testing-project-sform-against-a-real-backend)); the reviews of its phases: [Phase 1](../Cli/specs/reviews/2026-11-08%20Phase%201%20of%20CLI%20Automation%20Testing%20Project.md) (the CLI changes: `SFORM_HOME`, `SFORM_TOKEN_STORE`, `-o`, no hangs, the device code as JSON), [Phase 2](../../Libraries/Testing/UI.Automation/specs/reviews/2026-11-08%20Phase%202%20of%20CLI%20Automation%20Testing%20Project.md) (tests without a browser, the shared library) and [Phase 3](specs/reviews/2026-11-08%20Phase%203%20of%20CLI%20Automation%20Testing%20Project.md) (this project). The test cases: [test-cases.md](test-cases.md) (Testiny project `2SC`).
+Spec: [2026-11-08 CLI Automation Testing Project](specs/2026-11-08%20CLI%20Automation%20Testing%20Project.md) (Linear [424-215](https://linear.app/424fun/issue/424-215/create-cli-automation-testing-project-sform-against-a-real-backend)); the reviews of its phases: [Phase 1](../Cli/specs/reviews/2026-11-08%20Phase%201%20of%20CLI%20Automation%20Testing%20Project.md) (the CLI changes: `SFORM_HOME`, `SFORM_TOKEN_STORE`, `-o`, no hangs, the device code as JSON), [Phase 2](../../Libraries/Testing/UI.Automation/specs/reviews/2026-11-08%20Phase%202%20of%20CLI%20Automation%20Testing%20Project.md) (tests without a browser, the shared library) [Phase 3](specs/reviews/2026-11-08%20Phase%203%20of%20CLI%20Automation%20Testing%20Project.md) (this project) and [Phase 4](specs/reviews/2026-11-08%20Phase%204%20of%20CLI%20Automation%20Testing%20Project.md) (the catalogue, the cases in Testiny, the coverage and catalogue checks, the fake editor). The test cases: [test-cases.md](test-cases.md) (Testiny project `2SC`).
 
 ## Run
 
@@ -12,11 +12,12 @@ Spec: [2026-11-08 CLI Automation Testing Project](specs/2026-11-08%20CLI%20Autom
 dotnet build src/Platform/Cli.AutomationTests/src          # builds sform (src/Platform/Cli/src) too
 pwsh src/Platform/Cli.AutomationTests/src/bin/Debug/net10.0/playwright.ps1 install chromium   # once: the device page's browser (Linux: install --with-deps chromium)
 
-dotnet test --project src/Platform/Cli.AutomationTests/src                                                   # without a target: the self tests run, every CliTest is skipped
+dotnet test --project src/Platform/Cli.AutomationTests/src                                                   # without a target: the self tests and coverage checks run, every CliTest is skipped
 UITESTS_PROFILE=dev dotnet run --project src/Platform/Cli.AutomationTests/src                                # against the local API (Aspire or func start, :7071)
 dotnet run --project src/Platform/Cli.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"    # the PR gate set
 dotnet run --project src/Platform/Cli.AutomationTests/src -- --treenode-filter "/**[Category=Area-KeyValues]"
 dotnet run --project src/Platform/Cli.AutomationTests/src -- --treenode-filter "/**[Category=SelfTest]"      # the suite's own machinery, no target needed
+dotnet run --project src/Platform/Cli.AutomationTests/src -- --treenode-filter "/**[Category=Coverage]"      # the command coverage and the catalogue check, no target needed
 dotnet run --project src/Platform/Cli.AutomationTests/src -- --treenode-filter "/**[Category!=DisposableProject]"
 dotnet run --project src/Platform/Cli.AutomationTests/src -- --test-parameter Target:BaseUrl=https://<host>/api --test-parameter Execution:Seed=1383911092
 dotnet run --project src/Platform/Cli.AutomationTests/src -- --maximum-parallel-tests 1 --test-parameter Browser:Headless=false
@@ -24,7 +25,7 @@ dotnet test --solution 42.mono.slnx                                             
 ```
 
 - **`dotnet test`** runs on Microsoft.Testing.Platform (`global.json`): `--project src/Platform/Cli.AutomationTests/src <options>` takes the options of `dotnet run` without the `--`; TUnit's options (`--treenode-filter`, `--test-parameter`, `--maximum-parallel-tests`) go only with `--project`. `dotnet test` prints the suite's output only when it fails; `dotnet run` shows the `ui-automation:` lines (the run id, the seed, the effective settings with secrets as `***`, the target check, the totals and the Testiny run).
-- **Without a target** (`Target:BaseUrl` empty, the committed default) every `CliTest` is skipped with `UITESTS_Target__BaseUrl is not configured; see docs/Platform/Cli.AutomationTests/automation-tests.md.`, the **self tests** (`SelfTests/`, category `SelfTest`) still run against the built `sform` (no network: their API is a closed port), and the run exits `0`, also in `dotnet test --solution 42.mono.slnx`. The self tests of the device page skip without Playwright's Chromium, those of the terminal where no pseudo terminal is supported.
+- **Without a target** (`Target:BaseUrl` empty, the committed default) every `CliTest` is skipped with `UITESTS_Target__BaseUrl is not configured; see docs/Platform/Cli.AutomationTests/automation-tests.md.`, the **self tests** (`SelfTests/`, category `SelfTest`) still run against the built `sform` (no network: their API is a closed port or a stub on the loopback), and so do the **coverage checks** (`Coverage/`, category `Coverage`: [the command coverage](#command-coverage) and [the catalogue check](#the-catalogue-check)), also in `dotnet test --solution 42.mono.slnx`. The self tests of the device page skip without Playwright's Chromium, those of the terminal where no pseudo terminal is supported. **Until phase 5 has automated every case**, `EveryCommandOptionArgumentAndValue_IsCovered` and `EveryCase_IsAutomated` fail with the list of what is missing, so the run (and the solution's run) exits non-zero; every other test passes or skips.
 - **The `dev` profile** targets `http://localhost:7071/api`: start the API first (`dotnet run --project src/Platform/Aspire.Host/src`, or `func start` in `src/Platform/Storyteller/Api.Functions/src`). A Debug build of the API skips the role checks of users (`DEV_AUTH`, [access.md](../Storyteller/access.md#roles)), so the Reader and Contributor refusals show only against a Release API. sform signs in against AuthKit staging (its `app.config.json`), so the committed pool users and their passwords are needed locally too.
 - Results go to `src/Platform/Cli.AutomationTests/src/bin/<configuration>/net10.0/TestResults/` (git-ignored) under `dotnet run`, or `TestResults/` of the current directory under `dotnet test`: TUnit's HTML report, and `artifacts/<runId>/` with `results.jsonl` and a folder per test (`Tests.Annotations.AnnotationEditTests/Story_SetGet_RoundTrip/`) with its `sform-<n>.txt` runs (and `work-files.txt` when its working directory was kept). The homes of sform and the working directories of the tests are **not** there but under `<temp>/sform-automation/<runId>/` ([below](#homes-and-working-directories)), as they hold plain sessions, private keys and resolved secrets.
 
@@ -147,7 +148,7 @@ A failure fails every CLI test at once with a message that says what to fix (`Th
 
 ## Write a test
 
-Derive from `CliTest` (`src/Platform/Cli.AutomationTests/src/CliTest*.cs`), put it in `Tests/<Section>/<Class>.cs` (one folder per section of the catalogue, one class per sub-folder), start the comment above it with the case's reference, and mark it with its role, its modes and what it covers:
+Derive from `CliTest` (`src/Platform/Cli.AutomationTests/src/CliTest*.cs`), put it in `Tests/<Section>/<Class>.cs` (one folder per section of the catalogue, one class per sub-folder), start the comment above it with the case's reference, and mark it with its Testiny case, its role, its modes and what it covers; [the catalogue check](#the-catalogue-check) compares all of it with the case's row:
 
 ```csharp
 [Area(Area.Annotations)]
@@ -155,6 +156,7 @@ public sealed class AnnotationEditTests : CliTest
 {
     // ANN-SET-01: story set creates an annotation, and story get returns it.
     [Test]
+    [TestCase(275)]
     [Elementary]
     [UserRole(Role.Editor)]
     [Covers("story set", "arg0")]
@@ -188,6 +190,7 @@ public sealed class AnnotationEditTests : CliTest
 | `CreateDisposableProjectAsync(actInIt = true)` | `<Target:Organization>.<generated>` through `sform account points create` in a pseudo terminal, as the leased Owner (`[UserRole(Role.Owner)]`, `[DisposableProject]`: every P case of the catalogue); with `actInIt` the test acts in it (`UseProject`); the project stays |
 | `GrantAsync(accountId, role, projectKey?)`, `AsGrantedUserAsync(role, requirement?, projectKey?)` | `account points grant <id> -p <project> -r <role>` as the leased user, only in a project of the test's own; another pool user granted the role there (the "second user" of a P case) |
 | `CliData` | Seeded names: `ResponsibilityKey()` (`rst.cli-<runId>-<hex>-<words>`, `<rst>` of the catalogue), `UnitKeyOf(rst)`, `AnnotationKey(code, parts…)`, `KeyValueKey()` (`cli_<runId>.<word>_<hex>`, also a binding path), `Value()`, `LabelName()`, `ProjectName()`, `ViewName()`, `MachineName()`, `SecretValue()` (random), `EnvironmentPrefix()` |
+| `UseEditorAsync(home?)`, `UseEditorAsync(customCommand, home?)` | Mode E: the [fake editor](#the-fake-editor-mode-e) (a `FakeEditor`) or another program becomes the editor of the home's `editor.config.json` |
 | `WorkingDirectory`, `WriteFileAsync(path, text)`, `ReadFileAsync(path)`, `AttachFileAsync(path)`, `FileSystem` | The test's working directory (outside the artifacts, [above](#homes-and-working-directories)) and its files; `AttachFileAsync` attaches a text file redacted |
 | `AddSecret(value)` | A secret the test came by (a value it set): masked in the attachments, the report and the assertion messages |
 | `OnCleanUp(Func<Task>)`, `CleanUpAsync()` | Cleanups at the end, in reverse order; an override calls the base |
@@ -229,7 +232,7 @@ await terminal.SendLineAsync("nightly");
 
 | Attribute | Effect |
 |---|---|
-| `[Test]`, `[Elementary]`, `[TestCase("<id>")]` | TUnit's test; the PR gate set; the Testiny case (added once the cases exist in `2SC`) |
+| `[Test]`, `[Elementary]`, `[TestCase(<id>)]` | TUnit's test; the PR gate set (priority Elementary); the Testiny case of the row, its id from the catalogue's Testiny column (`[TestCase(275)]`) |
 | `[UserRole(Role.X)]` | The role the test acts as (shared library) |
 | `[Area(Area.X)]` | Category `Area-<section>`: `SignIn`, `Account`, `Machines`, `SharedCertificates`, `Annotations`, `Configurations`, `Templates`, `Schemas`, `KeyValues`, `General` |
 | `[MachineOnly]` | Mode M: leases no pool user |
@@ -238,9 +241,9 @@ await terminal.SendLineAsync("nightly");
 | `[DisposableProject]` | Mode P: creates its own project (`CreateDisposableProjectAsync`, needs a pseudo terminal) |
 | `[RequiresFeature("<Feature>")]` | Mode X: skipped unless `Target:Features` lists it |
 | `[RequiresMachine("<name>")]` | Skipped unless `Machines:<name>` is configured with a credential |
-| `[Covers("<command path>", "<item>", …)]` | What the test exercises: the command path as typed (an alias in the path covers that alias), and the options (each form), fixed values (`--protection=public`) and arguments (`arg0`) whose effect it checks; repeat it per command. Phase 4's `CommandCoverageTests` reads them |
+| `[Covers("<command path>", "<item>", …)]` | What the test exercises: the command path as typed after sform, and the options (each form), fixed values (`--protection=public`) and arguments (`arg0`) of that command whose effect it checks; repeat it per command, or put it on the class for all its tests. The rules of [the command coverage](#command-coverage) |
 
-Categories (`CliCategories`): `MachineOnly`, `FreshSignIn`, `Terminal`, `DisposableProject`, `Requires-<Feature>`, `Machine-<name>`, `SelfTest`, plus the library's `Elementary`, `Serial`, `Area-<section>`.
+Categories (`CliCategories`): `MachineOnly`, `FreshSignIn`, `Terminal`, `DisposableProject`, `Requires-<Feature>`, `Machine-<name>`, `SelfTest`, `Coverage`, plus the library's `Elementary`, `Serial`, `Area-<section>`.
 
 ### Data and secrets
 
@@ -336,23 +339,74 @@ public async Task Machine_ManageAsContributorWithSecrets_Refused()
 }
 ```
 
-Mode E: `UseEditorAsync(customCommand, home?)` writes `editor.config.json` (`{ "editor": { "EditorType": "Custom", "CustomCommand": "<program> [arguments]" } }`) into the home, and `ResetDefaults` removes it before the next test of that home. sform appends the quoted path of the file to edit and splits the command at its first space (`EditorService.ParseCustomCommand`), so the program's path must contain no space. The fake editor helper of spec §4.3 (which applies a change from a file named by a variable, or leaves the file untouched) comes with phase 4:
-
 ```csharp
+// An edit through the fake editor (mode E): the change applied, the file sform gave the editor.
 [Test]
 [UserRole(Role.Editor)]
-public async Task Config_Edit_AppliesTheChange()
+public async Task Config_Edit_StoresChange()
 {
     var key = CliData.ResponsibilityKey();
     (await Sform(InProject("story", "config", "set", key, "-x", "a=1"))).ShouldSucceed();
-    await UseEditorAsync("<fake editor of phase 4>");            // placeholder: the helper's command line
-    var change = await WriteFileAsync("change.json", "{ \"a\": 2 }");
-    (await Sform(new SformRunOptions { Environment = { ["<the helper's variable>"] = change } }, InProject("story", "config", "edit", key, "-y")))
+    var editor = await UseEditorAsync();
+    var options = editor.With(EditorChange.Merge("""{ "a": 2 }"""));    // one With per sform run
+    (await Sform(options, InProject("story", "config", "edit", key, "-y")))
         .ShouldSucceed();                                          // -y saves without "Do you want to save these changes"
+    await Assert.That(editor.ReadLog(options).Single().OriginalJson()!["a"]!.GetValue<int>()).IsEqualTo(1);
     var saved = (await Sform(InProject("story", "config", key, "--content-only"))).ShouldSucceed().JsonNode();
     await Assert.That(saved["a"]!.GetValue<int>()).IsEqualTo(2);
 }
 ```
+
+### The fake editor (mode E)
+
+The `edit` commands (`config edit`, `template edit`, `schema type|annotation|descendant edit`) open the editor of `editor.config.json` in `SFORM_HOME`. The tests make it the **fake editor**, `src/Platform/Cli.AutomationTests/editor` (`42.Platform.Cli.AutomationTests.Editor`, a console app built with the tests through a project reference with `ReferenceOutputAssembly="false"`; MSBuild records the path of its dll as `[assembly: AssemblyMetadata("EditorPath", …)]` next to `SformPath`).
+
+How sform runs a custom editor (`EditorService`): the `CustomCommand` is split at its **first space** into the program and its arguments (`ParseCustomCommand`), the quoted path of a temporary file (`<temp>/<prefix>-<random>.json`, e.g. `config-<key>-1a2b3c4d.json`, holding the document indented) is appended, the program starts without a shell or a window with sform's standard streams, and sform **waits** for it: exit 0 makes sform read the file back, any other code ends with "Editor exited with code N." and 1. A document equal to the one it wrote is "No changes detected." and 42; one that is not JSON is "Invalid JSON: …" and "Nothing was saved." with 2 on redirected input (in a terminal sform offers to open the editor again); a changed one is shown as a diff and saved with `-y` (else after "Do you want to save these changes", which redirected input refuses with 43). The temporary file is deleted after the run.
+
+So the custom command is the fake editor's **apphost** (`42.Platform.Cli.AutomationTests.Editor.exe` on Windows, without the extension elsewhere), never `dotnet <dll>`; a path with a space cannot be a custom command, so when the build's path has one (a checkout under `D:\My Projects`, where a data volume usually has no 8.3 names, or anywhere on Linux) `FakeEditor` copies the editor's build output once per build to `<temp>/sform-automation/fake-editor/<hash>/` and uses that apphost (on Windows through the short 8.3 path of a temporary folder with a space); only when the temporary folder has a space too does it throw with what to change. sform's environment is built from scratch but passes the machine's `DOTNET_ROOT` (and `DOTNET_ROOT_<ARCH>`) on; when the machine has none, `FakeEditor.With` sets `DOTNET_ROOT` to the installation of the dotnet the tests use, with links followed (`/usr/bin/dotnet` is often a link to `/usr/lib/dotnet/dotnet`) and only when it has `host/fxr`; otherwise it leaves it out and the apphost finds the global installation itself (a wrong `DOTNET_ROOT` would stop it with 131). What the editor does comes from variables of the run, which it inherits from sform:
+
+| Variable | Meaning |
+|---|---|
+| `CLI_EDITOR_MODE` | The step of each invocation, comma-separated; the n-th time sform opens the editor in a run it does the n-th step, and the last step repeats: `replace` (the file becomes the step's file), `merge` (the step's file is an RFC 7396 JSON merge patch applied to the document: members merge, `null` removes one, anything else replaces the document), `none` (the file stays as it is), `invalid` (the file becomes text that is not JSON), `exit[:<code>]` (the file stays, the editor exits with the code, 1 by default) |
+| `CLI_EDITOR_FILE_<n>`, `CLI_EDITOR_FILE` | The file of the n-th step (`replace`, `merge`), else of every step |
+| `CLI_EDITOR_LOG` | A file that gets one JSON line per invocation: `invocation`, `run`, `time`, `file` (the temporary file sform gave), `arguments`, `step`, `changeFile`, `exitCode`, `original` (the document sform wrote), `written` (what the editor wrote, `null` when it left the file), `error`. Its lines count the invocations |
+| `CLI_EDITOR_RUN` | A name of the run, written into each line; invocations count per run, so one log serves several runs of a test |
+
+The fake editor writes nothing to its standard output, which it shares with sform; a problem goes to the standard error and the log, with its own exit codes (sform then says "Editor exited with code N."): 64 no file argument, 65 `CLI_EDITOR_MODE` missing or unknown (a test that forgot the change), 66 the file to edit or the step's file missing, 67 `merge` on a document that is not JSON.
+
+The tests use it through `Editing/`:
+
+- `await UseEditorAsync(home?)` writes `editor.config.json` with `EditorType` `Custom` and the apphost as `CustomCommand` into the home (`Home` by default; `ResetDefaults` removes it before the next test of a pool user's home) and returns a `FakeEditor` with a folder of its own in the test's working directory (`fake-editor/<id>/`, outside the artifacts) for its log (`editor.log`) and change files, so two editors of one test (one per home) never mix. `UseEditorAsync(customCommand, home?)` sets another program.
+- `editor.With(change, options?)` returns the options of **one run** of sform: the variables of the change (its files, `<run>-step-<n>.json`; `CLI_EDITOR_RUN` `run-<n>`, a new run per call, so the steps count from the first again; `DOTNET_ROOT` when needed), over the given options' variables. Call it once per sform run: reusing its result for a second run continues the same run (a `Sequence` goes on where it stopped, and the log puts both runs under one name).
+- `EditorChange`: `Replace(content)`, `Merge(mergePatch)` (text or a `JsonNode`), `None`, `Invalid`, `Exit(code)`, `Sequence(changes…)` (one per invocation, e.g. `Sequence(Invalid, Merge(…))` for a terminal case that opens the editor again after invalid JSON).
+- `editor.ReadLog(options)` returns the `EditorLog` of the run of those options (`FakeEditor.RunOf(options)` is its name), `editor.ReadLog()` that of every run: `Invocations`, `Count`, `Run`, `Single()` (throws with the log unless sform opened the editor once in it), `Last()`, `OfRun("run-1")` or `OfRun(options)`; an `EditorInvocation` has `File`, `FileName`, `Arguments`, `Step`, `ExitCode`, `Original`/`OriginalJson()`, `Written`/`WrittenJson()`, `Error`, `Run`, `Invocation`.
+
+The catalogue's E cases run `edit` two to six times each with one editor, so each run gets its own `With` and its log is read with `ReadLog(options)`. A run that must save needs a change against the document stored at that moment: merging the same patch again is "No changes detected." and 42.
+
+| Case | The `edit` runs of its steps, and the change of each |
+|---|---|
+| CFG-HIS-05 | `config edit <rst> -y` with `Merge({"a":5})`, `config edit <rst> --yes` with `Merge({"a":6})`: two new versions |
+| CFG-HIS-06 | `config edit <rst> -y` with `None`: 42, no version; then a schema-breaking `Merge`: `-y` refused with 2, `-y -f` stored, and `--yes --force` with another breaking `Merge` stored |
+| TPL-TPL-06 | `template edit unt -y` with `Merge` adding `x`, `template edit unt --yes` with `Merge` adding `y` |
+| SCH-TYP-04, SCH-ANN-04, SCH-DSC-04 | `schema type edit`, `schema annotation edit`, `schema descendant edit` (`-y`) with a `Merge` adding a property; a breaking `Merge` with `-y -f`, another with `--yes --force`: a version each |
+| CFG-CTX-01, TPL-TPL-09 | `config edit <rst>`/`<rst2>` (`template edit unt`/`sbt`) `-y` with `--projectKey <B>` and `--view <view>`, then `-v <view>`, each with a `Merge` adding a property: `ReadLog(options).Single().OriginalJson()` is the document of `<view>` in `<B>` |
+| SCH-CTX-01 | the six `schema … edit -y` of its steps (two each of type, annotation and descendant), each with a `Merge` adding a property, half with `--view`, half with `-v` |
+
+```csharp
+// CFG-HIS-05: the fake editor sets a to 5, then to 6.
+var editor = await UseEditorAsync();
+var five = editor.With(EditorChange.Merge("""{ "a": 5 }"""));
+(await Sform(five, InProject("story", "config", "edit", rst, "-y"))).ShouldSucceed().ShouldContain($"Configuration for '{rst}' has been saved (version");
+var six = editor.With(EditorChange.Merge("""{ "a": 6 }"""));
+(await Sform(six, InProject("story", "config", "edit", rst, "--yes"))).ShouldSucceed();
+await Assert.That(editor.ReadLog(six).Single().OriginalJson()!["a"]!.GetValue<int>()).IsEqualTo(5);   // the editor got the stored document
+
+// CFG-HIS-06: no change.
+var unchanged = editor.With(EditorChange.None);
+(await Sform(unchanged, InProject("story", "config", "edit", rst, "-y"))).ShouldExitWith(CliExit.NoWorkNeeded).ShouldContain("No changes detected.");
+```
+
+Mode E is not an attribute, so [the catalogue check](#the-catalogue-check) does not check it.
 
 ## The Elementary set
 
@@ -360,11 +414,134 @@ The PR gate set, `--treenode-filter "/**[Category=Elementary]"`, 12 cases: SGN-D
 
 ## Self tests
 
-`SelfTests/` (category `SelfTest`): plain TUnit tests of the suite's own machinery that need no target and run in every run: the built sform starts (`--version`, `--help`), an unknown command ends with -1, a prompt on the redirected input ends at once with 43, the API of a run is the one given (a closed port is 3), the input is written and closed, the outer `STORYTELLER_*` variables do not leak, the environment is built from scratch, a timeout kills the process tree, a child left running does not hold the run and is killed, the input and output of a .NET child on Windows in the OEM code page (and the decoder of mixed UTF-8 and OEM bytes), the escape sequences are removed, the JSON is found behind the gutter and WriteJson's 80-column folds are joined (the lines Spectre renders for an API key, a unit key, wrapped text), 255 is read as -1 off Windows, the ::add-mask:: values are found, an assertion message masks what it looked for, the environment without SFORM_HOME, the device code is parsed (JSON and text), the printed credentials are found, the command lines are quoted for Windows and the shell, the device page's steps on a stand-in of AuthKit (skipped without Chromium), and `assist key` answered in a pseudo terminal (skipped where none is supported).
+`SelfTests/` (category `SelfTest`): plain TUnit tests of the suite's own machinery that need no target and run in every run: the built sform starts (`--version`, `--help`), an unknown command ends with -1, a prompt on the redirected input ends at once with 43, the API of a run is the one given (a closed port is 3), the input is written and closed, the outer `STORYTELLER_*` variables do not leak, the environment is built from scratch, a timeout kills the process tree, a child left running does not hold the run and is killed, the input and output of a .NET child on Windows in the OEM code page (and the decoder of mixed UTF-8 and OEM bytes), the escape sequences are removed, the JSON is found behind the gutter and WriteJson's 80-column folds are joined (the lines Spectre renders for an API key, a unit key, wrapped text), 255 is read as -1 off Windows, the ::add-mask:: values are found, an assertion message masks what it looked for, the environment without SFORM_HOME, the device code is parsed (JSON and text), the printed credentials are found, the command lines are quoted for Windows and the shell, the device page's steps on a stand-in of AuthKit (skipped without Chromium), `assist key` answered in a pseudo terminal (skipped where none is supported), the [fake editor](#the-fake-editor-mode-e) started as sform starts a custom editor (`FakeEditorSelfTests`: built and recorded without a space in its path, each change, the steps of a sequence counted per run, the log of one run (`ReadLog(options)`), two editors of one test kept apart, a build path with a space copied to a folder without one, `DOTNET_ROOT` only for a real installation, the failure without a mode, a quoted path with spaces), the rules of [the command coverage](#command-coverage) and of [the catalogue check](#the-catalogue-check) on a small command tree built by hand (`CoverageRulesSelfTests`: aliases in the middle and at the end of a path, help-only groups, the implicit `-p`, values in any form and case, the problems of a `[Covers]`, listed, unlisted and stale exceptions, the drift checks of `coverage-values.json`, the strict loading of both json files, and `CatalogueCovers` on a context row, a value listed once for several commands and a token listed twice), and mode E end to end (`EditorThroughSformSelfTests`: the built sform runs `story config edit -y` as a machine with an API key against a stub of the API on the loopback (`StubApi`), with the fake editor in `editor.config.json`: a merge is saved with the merged content, `none` is 42, `invalid` is 2, a failing editor is 1).
+
+## Command coverage
+
+Spec §4.2: every command, alias, option form, positional argument and fixed option value of sform is covered by a `[Covers]` of a test. `CommandCoverageTests` (`Coverage/`, category `Coverage`, not Elementary, no target) checks it in every run, also in `dotnet test --solution 42.mono.slnx`, so a new option of the CLI without a test fails the run.
+
+**The command tree** comes from the build of `src/Platform/Cli/src` that the tests' build made (the `SformPath` metadata; `Cli:Path` is not used, the coverage is that of the source): `CommandTreeReader` opens `42.Platform.Cli.dll` with `System.Reflection.MetadataLoadContext` (metadata only, no code of the CLI or of McMaster runs) and follows what McMaster.Extensions.CommandLineUtils 5.1 builds by reflection (sform's build has no generated command metadata):
+
+- the commands from the root `_42.Platform.Cli.Commands.PlatformCommand` along the `[Subcommand(typeof(…), …)]` attributes, named by `[Command(name, aliases…)]` (or `Name =`; without a name, the class name without `Command` in kebab case);
+- the options of `[Option]` and `[VersionOption]` on the properties (and fields) of the class and its base classes, so `-p|--projectKey` and `-v|--view` of `BaseContextCommand` belong to every context command (also through `SchemaApiCommand` or `KeyValueCommandBase`). The forms come from the template (`-p|--projectKey <KEY>`, `--name=<V>`, `-n|--name:<V>`); without a template from `ShortName`/`LongName`, else from the member name in kebab case and its first letter (`FooBar` is `-f|--foo-bar`, as McMaster's reflection derives it; its source-generated metadata, which sform does not use, would derive `--foobar`). `[HelpOption]` and the `-?|-h|--help` of McMaster's conventions are no items;
+- the positional arguments of `[Argument(order, name)]`, sorted by order: `arg0`, `arg1`, …;
+- a group that only prints its help (its `OnExecute`/`OnExecuteAsync` calls `ShowHelp`, read from the IL): `sform`, `storyteller schema`, `schema type`, `schema annotation` and `schema descendant`.
+
+At the CLI of phase 1 (with the fixes of `b38d72a5`) that is 99 commands, 35 aliases, 600 option forms, 81 arguments and 131 fixed values: 946 items.
+
+**The rules** (the catalogue's, the Covers column of [test-cases.md](test-cases.md)):
+
+| `[Covers]` | Covers |
+|---|---|
+| The path, as typed after sform (`"story kv set"`, `"sform"` for the root) | Its command when the path ends with the command's canonical name (`story config` covers `config`, `story configuration` only the alias); every alias it types, anywhere (`story kv set` covers the alias `story`); every help-only group it names (`story schema type set` covers `schema` and `schema type`) |
+| (implicit) | The context option `-p` of the path's command when it is a context command: every case passes `-p` (the catalogue's rule), so any case of the command covers it; `--projectKey`, `-v` and `--view` need a case of their own |
+| An option form, `"-r"`, `"--resolved"` | That form of an option of the path's command (each form is an item) |
+| `"--option=value"` | That value of an option with a fixed set ([coverage-values.json](#coverage-valuesjson)); any form of the option, the value in any case |
+| `"arg0"`, `"arg1"`, … | The positional argument at that position |
+
+Every `[Covers]` of the assembly counts, on a method or a class, whether its test runs or skips. The tests:
+
+| Test | Checks |
+|---|---|
+| `CommandTree_IsReadFromTheCli` | The reader on stable commands: the root and its `--version`, the alias `story`, the inherited context options, the own `-p` of `account set`, the help-only groups, the arguments of `config diff` |
+| `Covers_NameOnlyWhatSformHas` | Every `[Covers]` names a path, options, values and arguments sform has, and sits on a `[Test]`; the message says what the command has instead |
+| `CoverageValues_MatchTheCli` | [coverage-values.json](#coverage-valuesjson) against the CLI |
+| `CoverageExceptions_ListTheFeatureGatedItems` | [coverage-exceptions.json](#coverage-exceptionsjson) against the tests |
+| `EveryCommandOptionArgumentAndValue_IsCovered` | The gap: every item no `[Covers]` covers, grouped by command in the tree's order, one line per kind |
+
+The message of the gap is the to-do list of phase 5:
+
+```text
+907 of 946 items of sform's command tree are covered by no [Covers] of the tests (15 [Covers] read): commands 90 of 99, aliases 33 of 35, option forms 580 of 600, arguments 74 of 81, values 130 of 131.
+…
+account points grant [AccessPointGrantCommand]
+  command   grant
+  option    -p, --point, -r, --role
+  argument  arg0 (AccountId)
+  value     --role=Reader, --role=Contributor, --role=ContributorWithSecrets, --role=Administrator, --role=Owner
+```
+
+### `coverage-values.json`
+
+`src/Platform/Cli.AutomationTests/src/coverage-values.json` (copied to the output) lists the options whose values come from a fixed set (spec §4.1); each value is an item, covered as `--option=value`:
+
+```json
+{
+  "command": "storyteller kv protect",
+  "option": "--protection",
+  "values": [ "standard", "hsm", "byok" ],
+  "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+  "except": [ "Public", "Hyok" ],
+  "source": "KeyValueProtectCommand (KeyValueBulkCommands.cs): KeyValueLevels.Parse, then public and hyok are refused …"
+}
+```
+
+- `command`: the canonical path without sform (an alias in it fails the test: the entry would add no value to cover); `option`: its long form; `values`: as the catalogue writes them, compared without case; `source`: where the set lives in the CLI's code, and who refuses the members left out (required).
+- **`values` are every value the CLI accepts and acts on**, however odd: each is an item a case has to cover, so the case shows what it does.
+- sform's options are strings validated in code, so for most of them the file is the source of the set. When the code parses the value into an enum, `enum` names it (in `42.Platform.Cli.dll` or a `42.*.dll` next to it, such as the SDK's), and the test checks that `values` are exactly its members, but those in `except` and `refused`, plus those in `extra` (`config -f` takes `json` besides `ConfigurationFormat`): a member added to the enum in the SDK or the CLI fails the test until the file (and a case) has it.
+  - `except`: members **the CLI itself refuses** with exit 2 before any call (`kv protect --protection` public and hyok, `kv policy rotate --protection` public, byok and hyok, the runtime scopes of `machine create -m`).
+  - `refused`: members the CLI **sends and the platform refuses** (`points grant` and `revoke -r None`, `kv policy set --default public`, `kv import --protection hyok`); `source` says where the API refuses them. They are no items: nothing of the CLI acts on them.
+  - A member in both, or a name the enum does not have, fails the test; so do `except`, `refused` or `extra` on an entry without an enum.
+- An option whose own type is an enum (none at phase 1) must be listed, with exactly the enum's names (but `except` and `refused`); the test names any that is not.
+- The test also fails for an entry that names no command or option, has no values or no source, or lists an option or a value twice. A field the file does not know (a misspelling) fails the load with the file's name; `"$comment"` is allowed on the file and on each entry.
+
+At phase 4 it has the 30 options of the catalogue's fixed sets (`points grant|revoke -r`, `machine create --scope|-m|-k`, `machine-auth -k|-d`, `story -b`, `export -f|-i`, `import -i|-e`, `config -f|--mask`, `kv --protection`, `kv set|protect|export|import --protection`, `kv export|import --format`, `kv import --mode`, `kv policy set --allow|--default|--require-mtls`, `kv policy rotate --protection`, `kv audit --operation`, and `--format` of the three schema diffs), 24 of them checked against an enum. `kv import --protection` takes `public` (it imports the keys `--secret` matches as public values), so `--protection=public` of `kv import` is an item that no row of the catalogue covers yet: a case (or a CLI that refuses it, which moves it to `except`) is still to come.
+
+### `coverage-exceptions.json`
+
+`src/Platform/Cli.AutomationTests/src/coverage-exceptions.json` (copied to the output) lists the items that only tests a target may lack the feature for (`[RequiresFeature]`, mode X) or that never run (`[Skip]`) cover, each with the reason; their tests exist and skip where `Target:Features` lacks the feature:
+
+```json
+{ "command": "storyteller kv set", "item": "--protection=byok", "feature": "Byok", "reason": "KV-POL-07: a value at the byok level needs the customer key of KV-POL-05." }
+```
+
+`item` is an option form, a `--option=value`, an `argN` or an alias, and missing for the command itself; `feature` is one of `CliFeatures`. `CoverageExceptions_ListTheFeatureGatedItems` fails for an item covered only by such tests that the file does not list, and for a stale entry: one that names nothing sform has, has no reason, names a feature that is none of `CliFeatures`, is listed twice (also through an alias path), is covered by a test that runs against every target, or names another feature than its tests require. A field the file does not know fails the load, as in `coverage-values.json`. An entry whose item no test covers yet is no error (the item is in the gap until its test comes). At phase 4 the file has the 13 items that only the BYOK (KV-POL-05, KV-POL-07) and HSM (KV-POL-08) cases cover: `--byok-key`, `--byok-tenant`, `--allow=byok|hsm` and `--default=byok|hsm` of `kv policy set`, `--protection=byok|hsm` of `kv set`, `kv protect` and `kv import`, and `--protection=hsm` of `kv policy rotate`. The other X cases (SGN-DEV-06, SGN-OUT-04) cover nothing that an ungated case does not cover too.
+
+## The catalogue check
+
+`CatalogueTests` (`Coverage/`, category `Coverage`, no target) compares [test-cases.md](test-cases.md) with the tests of `Tests/`. It finds the repository from the test assembly (the first folder above it with `42.mono.slnx`) and skips with the reason when the assembly runs outside it (a copy of the output).
+
+| Test | Checks |
+|---|---|
+| `Catalogue_IsWellFormed` | Every row parses (8 cells, under a section of the "Cases per section" table and a sub-folder heading `### <Title> (<Class> in backticks)`); unique references, Testiny ids (numbers) and planned tests; known priorities, roles, modes and features; the counts of the section table; every P case an Owner case, every Machine case mode M; no empty Covers |
+| `EveryCase_IsAutomated` | The gap: every row whose planned method does not exist yet, grouped by class, with the attributes it needs and its Covers |
+| `EveryAutomatedCase_MatchesItsRow` | Every row whose test exists, by the rules below |
+| `EveryTest_HasACase` | Every `[Test]` of `Tests/` is planned by a row, its folder is a section, and its `[TestCase]` ids are ids of rows |
+
+A row's test matches it when:
+
+- **Place**: the method of the Test column is in the class of the row's sub-folder heading, `_42.Platform.Cli.AutomationTests.Tests.<Folder>.<Class>` in `Tests/<Folder>/<Class>.cs` (the folder from the section table), and a source file of the folder holds the comment `// <Reference>:` (the comment above the test starts with the reference).
+- **`[TestCase(<id>)]`**: exactly the row's Testiny id (method and class).
+- **Role** (`[UserRole]` of the method or the class, `Role.Any` without one): Any, Reader, Contributor, Editor, Secrets, Admin and Owner are `Role.<the same>`; Machine is `[MachineOnly]` (and no `[UserRole]`); only a Machine case has `[MachineOnly]`.
+- **Modes**: F is `[FreshSignIn]`, T `[Terminal]`, P `[DisposableProject]`, `X:<f>` `[RequiresFeature(CliFeatures.<f>)]`, each in both directions. M is `[MachineOnly]` for the role Machine (above) and a machine run (`AsMachine`) otherwise, E a run with the fake editor, U the default: no attribute shows them, so they are not checked.
+- **Priority**: Elementary is `[Elementary]`, in both directions.
+- **Covers** (`CatalogueCovers`): the `[Covers]` of the method and the class, resolved as [the command coverage](#command-coverage) does.
+  - Every command or alias token of the row is covered by a `[Covers]`: a path that ends with the command's name, types the alias anywhere, or names the help-only group.
+  - A `[Covers]` without items covers a command token of the row by its last word.
+  - Every option, value and argument token of the row is an item of **at least as many commands** of the test as the row lists it. A token the row lists twice (`arg0` of `set` and of `get`) needs two commands that cover it; a token the row lists once may be covered on any number of commands. That is how a context case works: it lists `--projectKey`, `-v` and `--view` once and covers them on every command of its steps; and KV-POL-07 lists `--protection=byok` once for `kv set`, `kv protect` and `kv import`. Two paths to one command (`story config` and `story configuration`) are one command.
+  - Every item token of a `[Covers]` is listed by the row.
+  - Option forms compare exactly (`-r` is not `--role`); a value compares as the catalogue writes it, by the option's long form and the value of `coverage-values.json` (`-r=reader` is `--role=Reader`).
+  - A `[Covers]` that names nothing of sform is a mismatch too.
+
+`EveryCase_IsAutomated` fails until phase 5 has written every test (12 of 229 at phase 4); `EveryAutomatedCase_MatchesItsRow` and `EveryTest_HasACase` pass for the 12 Elementary tests.
+
+## Automating a case (phase 5)
+
+1. Run the coverage checks: `dotnet run --project src/Platform/Cli.AutomationTests/src -- --treenode-filter "/**[Category=Coverage]"` (or `dotnet test --project … --treenode-filter …`).
+2. Take a class of `EveryCase_IsAutomated`: create `Tests/<Folder>/<Class>.cs` (`[Area(Area.<section>)]`, `: CliTest`) and, for each of its rows, the method with the comment `// <Reference>: <title>` and the attributes the message names (`[Test] [TestCase(<id>)] [UserRole(Role.X)]` or `[MachineOnly]`, `[FreshSignIn]`, `[Terminal]`, `[DisposableProject]`, `[RequiresFeature(CliFeatures.X)]`, `[Elementary]`).
+3. Write the `[Covers]` from the Covers column: one per command of the steps, its path as the steps type it (with `story` for the area commands the catalogue writes without it: `kv get` is `"story kv get"`), and as items the row's tokens that this command's steps use: option forms as written (`-r` and `--resolved` are two items), a fixed value as `--option=value` (any form of the option, the value in any case: `-r=reader` of `account points grant` is `--role=Reader`, also for the row comparison), positional arguments as `arg0`, `arg1`, …. A command token of the row is the path's last word, or an alias in the path (`[Covers("story configuration", "arg0")]` covers the alias `configuration`, not `config`).
+   - A row like `set`, `arg0`, `get`, `arg0` is `[Covers("story set", "arg0")]` and `[Covers("story get", "arg0")]`.
+   - A token the row lists once that the steps use on several commands goes on each of them: the context cases put `--projectKey`, `-v` and `--view` on every command their steps run with them (`[Covers("account machine create", "--projectKey", "-v", "--view")]`, …), which is what covers those forms of every context command; KV-POL-07 puts `--protection` and `--protection=byok` on `kv set`, `kv protect` and `kv import`.
+   - A command the case only uses for its setup gets no `[Covers]` (a `[Covers]` without items claims the command and must be in the row).
+   - `-p` of a context command counts with any `[Covers]` of the command; GEN-CTX-01 and GEN-CTX-03, which list `-p`, write it as an item.
+4. Run the checks again: `EveryAutomatedCase_MatchesItsRow` names every difference from the row, `Covers_NameOnlyWhatSformHas` a `[Covers]` that names something sform does not have, and the gap of `EveryCommandOptionArgumentAndValue_IsCovered` shrinks.
+5. A case gated by a feature (X) whose items no other case covers: `CoverageExceptions_ListTheFeatureGatedItems` lists the items to add to `coverage-exceptions.json` (with the feature, and the case in the reason); a stale entry is to be removed.
+6. A new fixed set (an option whose values the code restricts): add it to `coverage-values.json` with its source (and its enum), and a case per value to the catalogue.
+7. When a row changes in the catalogue, the same checks show what its test has to follow; the catalogue stays the source of truth, also for Testiny.
 
 ## Testiny
 
-Project **`2SC`** (id 2), created by hand in the Testiny app; its cases come from [test-cases.md](test-cases.md) (phase 4), and `[TestCase("<id>")]` links each test to its case. `UITESTS_PROFILE=<target>,reporting-testiny` with `Reporting:Testiny:ApiKey` in the user secrets reports a run as a classic Testiny test run (the [library's Testiny reporter](../../Libraries/Testing/UI.Automation/readme.md#testiny)); the attachments are the redacted `sform-*.txt` runs and the device page's screenshot and text of a failure.
+Project **`2SC`** (id 2), created by hand in the Testiny app. Its 229 cases were created from [test-cases.md](test-cases.md) through the Testiny API in phase 4 (10 top-level folders, one per section, with one sub-folder per test class); their ids are in the catalogue's Testiny column, and `[TestCase(<id>)]` links each test to its case (checked by [the catalogue check](#the-catalogue-check)). `UITESTS_PROFILE=<target>,reporting-testiny` with `Reporting:Testiny:ApiKey` in the user secrets reports a run as a classic Testiny test run (the [library's Testiny reporter](../../Libraries/Testing/UI.Automation/readme.md#testiny)); the attachments are the redacted `sform-*.txt` runs and the device page's screenshot and text of a failure.
 
 ## CI
 
@@ -385,3 +562,9 @@ Phase 5 adds `.github/workflows/cli-automation.yml` (`workflow_dispatch` and `wo
 | `Terminal: A pseudo terminal on Linux needs util-linux script …` (skipped) | Install util-linux (`bsdutils`) |
 | `Playwright's Chromium is not installed` (a self test skipped), or a sign-in Blocked with `BrowserUnavailableException` | `pwsh bin/<configuration>/net10.0/playwright.ps1 install chromium` |
 | `SformTimeoutException: sform … did not end within 120 s` | A run waited (e.g. a device code nobody approved); the attachment shows how far it came |
+| `EveryCommandOptionArgumentAndValue_IsCovered` or `EveryCase_IsAutomated` fails | The gap until phase 5 has automated every case; see [Automating a case](#automating-a-case-phase-5) |
+| `Editor exited with code 65.` in an E case | The test ran `edit` without `editor.With(EditorChange.…)`: the fake editor has no `CLI_EDITOR_MODE` |
+| `The fake editor's path '…' contains a space, and so does the temporary folder` | sform splits the custom command at its first space; the editor is copied to `<temp>/sform-automation/fake-editor/` when the build's path has a space, which needs a temporary folder without one (or with an 8.3 name on Windows): point `TEMP`/`TMPDIR` to one, or build the repository in a folder without spaces |
+| `Editor exited with code 131.` in an E case | The editor's apphost found no .NET runtime: a `DOTNET_ROOT` of the machine that is not an installation, or a dotnet the tests use outside the global location without `host/fxr` next to it; set `DOTNET_ROOT` to the installation |
+| `… coverage-values.json does not read as …` or `… coverage-exceptions.json does not read as …` | A misspelled or unknown field (or invalid JSON) in the file; the message names it |
+| `CatalogueTests` skipped: `The test assembly runs outside the repository …` | The assembly runs from a copy of the output; run it from the repository's build |
