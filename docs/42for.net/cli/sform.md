@@ -107,8 +107,8 @@ A machine can do what its scopes allow, and it gets them when it is created. **R
 
 | `--scope` | Scope | Enum name | Group | Needed by |
 |---|---|---|---|---|
-| `annotation-read` | `Annotation.Read` | `AnnotationRead` | Runtime | `sform story` (the list), `get`, `deleted` and `history` |
-| `annotation-write` | `Annotation.Write` | `AnnotationWrite` | Runtime | `sform story set` |
+| `annotation-read` | `Annotation.Read` | `AnnotationRead` | Runtime | `sform story` (the list), `get`, `deleted` and `history`, and the reads of `edit` |
+| `annotation-write` | `Annotation.Write` | `AnnotationWrite` | Runtime | `sform story set` and `edit` |
 | `configuration-read` | `Configuration.Read` | `ConfigurationRead` | Runtime | the reads of `sform story config`, `schema`, `template` and `kv` |
 | `configuration-write` | `Configuration.Write` | `ConfigurationWrite` | Runtime | the writes of `sform story config` and `kv`; with `schema-write` or `template-write`, those of `schema` and `template` |
 | `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config <key> --resolved`, `sform story kv export --include-secrets` |
@@ -116,7 +116,7 @@ A machine can do what its scopes allow, and it gets them when it is created. **R
 | `configuration-transfer` | `Configuration.Transfer` | `ConfigurationTransfer` | Management | `sform story export` and `import`, `sform story kv export` and `import`; an import of a view also needs `schema-write`, `template-write` and `annotation-manage` for those kinds |
 | `schema-write` | `Schema.Write` | `SchemaWrite` | Management | the writes and deletes of `sform story schema`, and `sform story import` of schemas |
 | `template-write` | `Template.Write` | `TemplateWrite` | Management | `sform story template set`, `edit` and `delete`, and `sform story import` of templates |
-| `annotation-manage` | `Annotation.Manage` | `AnnotationManage` | Management | `sform story delete` and `restore`, `sform story set --restore-deleted`, and `sform story import` of annotations |
+| `annotation-manage` | `Annotation.Manage` | `AnnotationManage` | Management | `sform story delete` and `restore`, `sform story set --restore-deleted`, the **Restore and edit** of `sform story edit`, and `sform story import` of annotations |
 | `keyvalue-manage` | `KeyValue.Manage` | `KeyValueManage` | Management | `sform story kv protect` and `restore` |
 
 ``` powershell
