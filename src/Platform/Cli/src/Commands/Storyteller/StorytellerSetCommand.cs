@@ -200,7 +200,7 @@ public class StorytellerSetCommand : BaseContextCommand
             }
 
             return IsReplaceRequested
-                ? await ReplaceAsync(annotationKey, annotation)
+                ? await ReplaceAsync(annotationKey, annotation, createNew)
                 : await MergeAsync(annotationKey, annotation, createNew);
         }
         catch (JsonException e)
@@ -307,8 +307,9 @@ public class StorytellerSetCommand : BaseContextCommand
     }
 
     // The input replaces the content of the version read, whatever its status, so a change after the read answers 412
-    // instead of being overwritten. A missing or deleted key is only created, so one created meanwhile is not replaced.
-    private async Task<int> ReplaceAsync(_42.Platform.Storyteller.AnnotationKey annotationKey, _42.Platform.Storyteller.Annotation annotation)
+    // instead of being overwritten. A missing key is only created, so one created meanwhile is not replaced. A key, or an
+    // ancestor, deleted after the lookup is not re-created unless the user chose Create new: a run again asks.
+    private async Task<int> ReplaceAsync(_42.Platform.Storyteller.AnnotationKey annotationKey, _42.Platform.Storyteller.Annotation annotation, bool createNew)
     {
         string? ifMatch = null;
         string? ifNoneMatch = null;
@@ -322,11 +323,24 @@ public class StorytellerSetCommand : BaseContextCommand
                 annotationKey,
                 includeInactive: true);
 
-            // without a tag the write has no condition
+            // without a tag the write could not be of the version read: nothing is written
+            if (string.IsNullOrEmpty(stored.ETag))
+            {
+                Console.WriteLine($"The API answered the annotation {annotationKey} without an ETag, so --replace cannot write only the version it read; nothing was written.");
+                return ExitCodes.ERROR_SERVICE_FAILURE;
+            }
+
             ifMatch = stored.ETag;
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
+            // the read does not tell a missing key from a deleted one, the lookup does
+            if (!createNew && (await FindDeletedAsync(annotationKey)) is { Count: > 0 })
+            {
+                Console.WriteLine($"The annotation {annotationKey} or an ancestor was deleted meanwhile; run the command again to choose what happens to it.");
+                return ExitCodes.ERROR_CRASH;
+            }
+
             ifNoneMatch = AnyVersion;
         }
 
@@ -343,21 +357,27 @@ public class StorytellerSetCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 
-    // A write to a deleted key, or below a deleted ancestor, re-creates it empty. Before that happens, the user chooses:
-    // restore the deleted keys and update them, or create them new. Returns an exit code when the write must not go on,
-    // and whether the write creates the deleted keys new.
-    private async Task<(int? ExitCode, bool CreateNew)> HandleDeletedKeysAsync(_42.Platform.Storyteller.AnnotationKey annotationKey)
+    // The deleted annotations among the key and its ancestors.
+    private async Task<ICollection<_42.Platform.Storyteller.Sdk.Annotation>> FindDeletedAsync(_42.Platform.Storyteller.AnnotationKey annotationKey)
     {
         var keys = annotationKey.GetAllAncestorKeys()
             .Append(annotationKey)
             .Select(key => key.ToString())
             .ToList();
 
-        var deleted = await _annotationsApi.FindDeletedAnnotationsAsync(
+        return await _annotationsApi.FindDeletedAnnotationsAsync(
             Context.OrganizationName,
             Context.ProjectName,
             Context.ViewName,
             new _42.Platform.Storyteller.Sdk.AnnotationKeysRequest { Keys = keys });
+    }
+
+    // A write to a deleted key, or below a deleted ancestor, re-creates it empty. Before that happens, the user chooses:
+    // restore the deleted keys and update them, or create them new. Returns an exit code when the write must not go on,
+    // and whether the write creates the deleted keys new.
+    private async Task<(int? ExitCode, bool CreateNew)> HandleDeletedKeysAsync(_42.Platform.Storyteller.AnnotationKey annotationKey)
+    {
+        var deleted = await FindDeletedAsync(annotationKey);
 
         if (deleted is not { Count: > 0 })
         {
