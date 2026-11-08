@@ -1,3 +1,4 @@
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Configurations;
@@ -11,6 +12,7 @@ public sealed class ConfigWriteTests : CliTest
     // property, it does not nest); config set <rst> --properties d=x merges d="x" into it as a new version, keeping a
     // and b.c, and story config <rst> --content-only returns the merged content.
     [Test]
+    [TestCase(395)]
     [Elementary]
     [UserRole(Role.Editor)]
     [Covers("story config set", "arg0", "-x", "--properties")]

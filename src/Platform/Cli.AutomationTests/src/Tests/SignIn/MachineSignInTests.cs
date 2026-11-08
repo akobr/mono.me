@@ -1,5 +1,6 @@
 using _42.Platform.Cli.AutomationTests.Access;
 using _42.Platform.Cli.AutomationTests.Running;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.SignIn;
@@ -14,6 +15,7 @@ public sealed class MachineSignInTests : CliTest
     // <org>.<project> with <view> view." and "The API checks the credentials on the first call."; no device code, the
     // key in no output, and no session or default project in the home.
     [Test]
+    [TestCase(243)]
     [Elementary]
     [MachineOnly]
     [RequiresMachine(MachineCatalog.ApiKeyMachine)]

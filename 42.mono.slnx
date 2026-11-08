@@ -94,6 +94,7 @@
     <Project Path="src/Platform/Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
     <Project Path="src/Platform/Automation.Shared/src/Automation.Shared.csproj" />
     <Project Path="src/Platform/Automation.Shared/test/Automation.Shared.UnitTests.csproj" />
+    <Project Path="src/Platform/Cli.AutomationTests/editor/Cli.AutomationTests.Editor.csproj" />
     <Project Path="src/Platform/Cli.AutomationTests/src/Cli.AutomationTests.csproj" />
     <Project Path="src/Platform/Cli/src/Cli.csproj" />
     <Project Path="src/Platform/Cli/test/Cli.UnitTests.csproj" />

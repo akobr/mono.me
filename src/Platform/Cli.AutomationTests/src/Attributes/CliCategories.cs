@@ -22,4 +22,7 @@ public static class CliCategories
 
     // The self tests of the suite's own machinery, which need no target (SelfTests/).
     public const string SelfTest = "SelfTest";
+
+    // The checks of the coverage of sform's command tree and of the catalogue (Coverage/), which need no target.
+    public const string Coverage = "Coverage";
 }

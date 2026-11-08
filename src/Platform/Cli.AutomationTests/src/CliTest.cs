@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using _42.Platform.Cli.AutomationTests.Access;
 using _42.Platform.Cli.AutomationTests.Data;
+using _42.Platform.Cli.AutomationTests.Editing;
 using _42.Platform.Cli.AutomationTests.Running;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
@@ -174,11 +175,26 @@ public abstract partial class CliTest : AutomationTest
         await Scope.AttachTextAsync(name ?? FileSystem.Path.GetFileName(full), text, ArtifactKind.Other);
     }
 
-    // Mode E: the editor of the home (Home by default) becomes the custom command, in editor.config.json
-    // ({ "editor": { "EditorType": "Custom", "CustomCommand": "<program> [arguments]" } }); ResetDefaults removes it before
-    // the next test of the home. sform appends the quoted path of the file to edit and splits the command at its first
-    // space (EditorService.ParseCustomCommand), so the program's path must contain no space. The fake editor helper of
-    // spec §4.3 comes with phase 4.
+    // Mode E: the fake editor (src/Platform/Cli.AutomationTests/editor) becomes the editor of the home (Home by default).
+    // Pass what it does to each run with editor.With(EditorChange.Replace(…) | Merge(…) | None | Invalid | Exit(n) |
+    // Sequence(…)) (one With call per sform run), and read what sform gave it in that run with editor.ReadLog(options);
+    // its log and the changes' files are in the working directory (fake-editor/<id>/). Call it once per home: a second
+    // call for the same home makes a new FakeEditor with a log of its own.
+    //   var editor = await UseEditorAsync();
+    //   var options = editor.With(EditorChange.Merge("""{ "a": 2 }"""));
+    //   (await Sform(options, InProject("story", "config", "edit", key, "-y"))).ShouldSucceed();
+    //   await Assert.That(editor.ReadLog(options).Single().OriginalJson()!["a"]!.GetValue<int>()).IsEqualTo(1);
+    protected async Task<FakeEditor> UseEditorAsync(SformHome? home = null)
+    {
+        var editor = new FakeEditor(WorkingDirectory, FileSystem);
+        await UseEditorAsync(editor.Command, home);
+        return editor;
+    }
+
+    // Mode E with another program: the editor of the home (Home by default) becomes the custom command, in
+    // editor.config.json ({ "editor": { "EditorType": "Custom", "CustomCommand": "<program> [arguments]" } }); ResetDefaults
+    // removes it before the next test of the home. sform appends the quoted path of the file to edit and splits the command
+    // at its first space (EditorService.ParseCustomCommand), so the program's path must contain no space.
     protected async Task UseEditorAsync(string customCommand, SformHome? home = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(customCommand);

@@ -1,3 +1,4 @@
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Machines;
@@ -13,6 +14,7 @@ public sealed class MachineLifecycleTests : CliTest
     // the machine in, and sform story get reads an annotation the Editor created. The machine is deleted when the test
     // ends.
     [Test]
+    [TestCase(259)]
     [Elementary]
     [UserRole(Role.Editor)]
     [Covers("account machine create", "-r")]

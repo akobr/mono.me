@@ -2,18 +2,19 @@
 
 Tests of the real `sform` CLI (the build of `src/Platform/Cli/src`, started out of process) against a real Storyteller deployment: pool users signed in through the AuthKit device code (approved by Playwright on the AuthKit page) and machines signed in from the `STORYTELLER_*` variables, under **TUnit**, on the reusable libraries `42.Testing.UI.Automation.*` (`src/Libraries/Testing/UI.Automation.*`) as tests without a browser, and the shared Platform pieces of [`42.Platform.Automation.Shared`](../Automation.Shared/README.md).
 
-**Documentation:** [CLI Automation Tests](../../../docs/Platform/Cli.AutomationTests/automation-tests.md) (running, settings and profiles, users and machines, the sign-in, running sform, the target check, writing a test, the self tests, Testiny, troubleshooting) and, for every setting of the framework, [UI Automation](../../../docs/Libraries/Testing/UI.Automation/readme.md). Spec: [CLI Automation Testing Project](../../../docs/Platform/Cli.AutomationTests/specs/2026-11-08%20CLI%20Automation%20Testing%20Project.md). Every case and its test: [test-cases.md](../../../docs/Platform/Cli.AutomationTests/test-cases.md).
+**Documentation:** [CLI Automation Tests](../../../docs/Platform/Cli.AutomationTests/automation-tests.md) (running, settings and profiles, users and machines, the sign-in, running sform, the target check, writing a test, the fake editor, the self tests, the command coverage and the catalogue check, Testiny, troubleshooting) and, for every setting of the framework, [UI Automation](../../../docs/Libraries/Testing/UI.Automation/readme.md). Spec: [CLI Automation Testing Project](../../../docs/Platform/Cli.AutomationTests/specs/2026-11-08%20CLI%20Automation%20Testing%20Project.md). Every case and its test: [test-cases.md](../../../docs/Platform/Cli.AutomationTests/test-cases.md).
 
 ```bash
 dotnet build src/Platform/Cli.AutomationTests/src                                                           # builds sform too
 pwsh src/Platform/Cli.AutomationTests/src/bin/Debug/net10.0/playwright.ps1 install chromium                 # once: the device page's browser
 
-dotnet test --project src/Platform/Cli.AutomationTests/src                                                  # without Target:BaseUrl: self tests run, CLI tests skipped
+dotnet test --project src/Platform/Cli.AutomationTests/src                                                  # without Target:BaseUrl: self tests and coverage checks run, CLI tests skipped
 UITESTS_PROFILE=dev dotnet run --project src/Platform/Cli.AutomationTests/src                               # against the local API (:7071)
 dotnet run --project src/Platform/Cli.AutomationTests/src -- --treenode-filter "/**[Category=Elementary]"   # the PR gate set
+dotnet run --project src/Platform/Cli.AutomationTests/src -- --treenode-filter "/**[Category=Coverage]"     # command coverage and catalogue check (no target)
 ```
 
-Run it with `dotnet run` (options after `--`) or `dotnet test --project src/Platform/Cli.AutomationTests/src` (options without `--`); `dotnet test --solution 42.mono.slnx` runs it with the rest of the repository's tests on Microsoft.Testing.Platform: its self tests run, every CLI test is skipped without `Target:BaseUrl` (the committed default).
+Run it with `dotnet run` (options after `--`) or `dotnet test --project src/Platform/Cli.AutomationTests/src` (options without `--`); `dotnet test --solution 42.mono.slnx` runs it with the rest of the repository's tests on Microsoft.Testing.Platform. Without `Target:BaseUrl` (the committed default) every CLI test is skipped, while the self tests (category `SelfTest`) and the coverage checks (category `Coverage`) run. **Until phase 5 has automated every case**, two of the coverage checks fail with the list of what is missing, `EveryCommandOptionArgumentAndValue_IsCovered` (the items of sform no `[Covers]` covers) and `EveryCase_IsAutomated` (the rows of the catalogue without a test), so both the project's run and the solution's run exit non-zero; see [Automating a case (phase 5)](../../../docs/Platform/Cli.AutomationTests/automation-tests.md#automating-a-case-phase-5).
 
 | Path | Contents |
 |---|---|
@@ -25,5 +26,9 @@ Run it with `dotnet run` (options after `--`) or `dotnet test --project src/Plat
 | `src/Access/` | The homes (`SFORM_HOME`) and working directories (outside the artifacts), the device code sign-in and the AuthKit device page, the machines (`Machines` settings, `MachineCredentials`, `MachineCreation`, `CreatedMachine`), another pool user (`SformActor`, `AccountOutput`) |
 | `src/Attributes/` | `[Area]`, `[MachineOnly]`, `[FreshSignIn]`, `[Terminal]`, `[DisposableProject]`, `[RequiresFeature]`, `[RequiresMachine]`, `[Covers]`; `Role` and `[UserRole]` come from the shared library (imported globally) |
 | `src/Data/` | `CliData`, the seeded names (`rst.cli-<runId>-…`, `cli_<runId>.…`) |
-| `src/SelfTests/` | Plain TUnit tests of the machinery that need no target (category `SelfTest`) |
+| `src/Editing/` | Mode E: `FakeEditor` (the fake editor as the custom command of `editor.config.json`, its variables for a run), `EditorChange` (`Replace`, `Merge`, `None`, `Invalid`, `Exit`, `Sequence`), `EditorLog` and `EditorInvocation` (what sform gave the editor) |
+| `src/Coverage/` | `CommandCoverageTests` (every command, alias, option form, argument and fixed value of sform covered by a `[Covers]`; the command tree read from `42.Platform.Cli.dll` with `MetadataLoadContext`) and `CatalogueTests` (every row of the catalogue against its test, the `[Covers]` by `CatalogueCovers`), category `Coverage`, no target |
+| `src/coverage-values.json`, `src/coverage-exceptions.json` | The options with a fixed set of values (and where the CLI keeps each set), and the items only feature-gated tests cover |
+| `src/SelfTests/` | Plain TUnit tests of the machinery that need no target (category `SelfTest`): the fake editor's, mode E through sform against a stub of the API, and the coverage and catalogue rules on a hand-built command tree among them |
 | `src/Tests/<Section>/` | The tests: one folder per section of the catalogue, one class per sub-folder |
+| `editor/` | The fake editor (`42.Platform.Cli.AutomationTests.Editor`), a console app built with the tests: replaces, merges (RFC 7396), leaves, breaks the file sform gives it or exits with a code, per `CLI_EDITOR_*` variables, and logs each invocation |

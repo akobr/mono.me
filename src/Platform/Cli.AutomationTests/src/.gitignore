@@ -4,3 +4,8 @@ testsettings.local.json
 
 # TUnit's reports and the runs' artifacts (results.jsonl, the sform-*.txt runs, the homes of sform with their sessions)
 TestResults/
+
+# The inputs of CommandCoverageTests (the fixed values and the exceptions), committed: the root's coverage*.json (coverage
+# results) does not apply to them
+!coverage-values.json
+!coverage-exceptions.json

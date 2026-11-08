@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Cli.AutomationTests.Editor</AssemblyName>
+    <RootNamespace>_42.Platform.Cli.AutomationTests.Editor</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+
+    <!-- The fake editor of the CLI automation tests (mode E): sform starts it as the custom command of editor.config.json
+         with the path of the file to edit, and waits for it. The tests start its apphost (42.Platform.Cli.AutomationTests.Editor
+         or .exe), never "dotnet <dll>": sform splits the custom command at its first space. Built with the tests through
+         their project reference (docs/Platform/Cli.AutomationTests/automation-tests.md#the-fake-editor-mode-e). -->
+    <OutputType>Exe</OutputType>
+    <UseAppHost>true</UseAppHost>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" />
+  </ItemGroup>
+
+</Project>

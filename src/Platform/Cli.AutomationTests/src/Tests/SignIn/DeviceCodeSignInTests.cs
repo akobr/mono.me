@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using _42.Platform.Cli.AutomationTests.Access;
 using _42.Platform.Cli.AutomationTests.Running;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.SignIn;
@@ -15,6 +16,7 @@ public sealed class DeviceCodeSignInTests : CliTest
     // "<name> @ <email>", the account id and the access points, says that no default project is set, and ends with 43.
     // A second sform account (with the same -o) reuses the session: "You are already logged in as <email>" and no code.
     [Test]
+    [TestCase(234)]
     [Elementary]
     [FreshSignIn]
     [UserRole(Role.Any)]

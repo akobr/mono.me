@@ -1,4 +1,5 @@
 using _42.Platform.Cli.AutomationTests.Running;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Annotations;
@@ -11,6 +12,7 @@ public sealed class AnnotationEditTests : CliTest
     // As an Editor, story set <rst> in the project prints the new annotation, and story get <rst> returns it with its key,
     // its type (Responsibility) and its name (the part after rst.), in the project and view of the run.
     [Test]
+    [TestCase(275)]
     [Elementary]
     [UserRole(Role.Editor)]
     [Covers("story set", "arg0")]
@@ -34,6 +36,7 @@ public sealed class AnnotationEditTests : CliTest
     // As a Reader of the project (Target:RoleProjects:Reader, or a Reader of Target:Project), story set <rst> ends with 44
     // and creates nothing: story get <rst> finds no annotation.
     [Test]
+    [TestCase(293)]
     [Elementary]
     [UserRole(Role.Reader)]
     [Covers("story set")]

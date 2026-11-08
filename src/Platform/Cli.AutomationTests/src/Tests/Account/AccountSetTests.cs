@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using _42.Platform.Cli.AutomationTests.Running;
+using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Account;
@@ -16,6 +17,7 @@ public sealed class AccountSetTests : CliTest
     // ("Currently the default project is set to … and view is <view>.") and switches the view to default, as account and
     // the file show.
     [Test]
+    [TestCase(268)]
     [Elementary]
     [UserRole(Role.Any)]
     [Covers("account set", "-p", "--projectKey", "-v", "--viewName")]
