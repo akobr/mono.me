@@ -261,6 +261,12 @@ Case: CFG-SET-05. It now checks that the four forms end with `-1` and store noth
 
 The same cases were edited in Testiny `2SC`: their preconditions and steps, and the title of 315. The title of 401 still reads "`-c` and `-l` are accepted and ignored: the write stores only the content" and needs the catalogue's title.
 
+### 12. Formatted JSON no longer folds at 80 columns
+
+The phase 3 runner found that the themed JSON of `WriteJson` (`Output/ExtendedConsoleExtensions.cs`) was rendered by a capture console without a width, so Spectre.Console used 80 columns and folded every longer token inside its string, whatever the terminal's width or `COLUMNS`. A machine's printed key or a long value then reached a reader of the output broken in two. The capture console now has a width of 1,000,000 columns; the terminal wraps long lines itself. The runner of the automation tests still joins such folds (`Running/WrappedJson.cs`), so it reads the output of an older `sform` too.
+
+Not changed: on Windows, `sform` writes redirected output in the console's code page (often the OEM one), not UTF-8. The runner decodes it (`ConsoleOutputDecoder`); switching a redirected `sform` to UTF-8 would change what a pipeline in `cmd` receives, so it is left for a decision of its own.
+
 ### Not fixed, out of scope
 
 - `sform --version` prints the version of `42.CLI.Toolkit`, not of `sform` (`Assembly.GetExecutingAssembly()` in the toolkit).

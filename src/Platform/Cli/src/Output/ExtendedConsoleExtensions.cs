@@ -16,6 +16,8 @@ namespace _42.Platform.Cli.Output;
 
 public static class ExtendedConsoleExtensions
 {
+    private const int CaptureWidth = 1_000_000;
+
     public static void WriteJson(this IExtendedConsole @this, object data)
     {
         var sb = new StringBuilder();
@@ -33,6 +35,10 @@ public static class ExtendedConsoleExtensions
             ColorSystem = ColorSystemSupport.TrueColor,
             Ansi = AnsiSupport.Yes,
         });
+
+        // Without a width the capture console renders 80 columns and folds a longer token inside its string, which
+        // breaks the JSON for a reader of the output (a machine's key, a long value); the terminal wraps the lines anyway.
+        captureConsole.Profile.Width = CaptureWidth;
         captureConsole.Write(new JsonText(json));
 
         var lines = captureWriter.ToString()
