@@ -211,7 +211,14 @@ public partial class AnnotationsHttpTests
         members.Select(member => member.Name).ShouldBe(
             ["IsDisabled", "ValidFrom", "ExpiresAt", "TimeZone", "Title", "Description", "DocumentationLink", "Labels", "Values", "UnitType", "UnitDefinition"],
             ignoreOrder: true);
-        members.ShouldAllBe(member => member.Value.GetProperty("nullable").GetBoolean());
+        members.Where(member => member.Name is not ("UnitType" or "UnitDefinition")).Select(member => IsNullable(member.Value)).ShouldAllBe(nullable => nullable);
+        members.Where(member => member.Name is "UnitType" or "UnitDefinition").Select(member => IsNullable(member.Value)).ShouldAllBe(nullable => !nullable);
+        operation.GetProperty("parameters")[4].GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.IfMatchAnnotationPatch);
+    }
+
+    private static bool IsNullable(System.Text.Json.JsonElement schema)
+    {
+        return schema.TryGetProperty("nullable", out var nullable) && nullable.GetBoolean();
     }
 
     private static TestHttpRequestData Patch(string body, string? contentType)

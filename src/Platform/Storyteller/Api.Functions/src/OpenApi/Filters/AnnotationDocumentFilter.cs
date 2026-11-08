@@ -14,14 +14,14 @@ public class AnnotationDocumentFilter : IDocumentFilter
             return;
         }
 
-        // a merge patch: every member is optional, and null clears it (RFC 7396)
+        // a merge patch: every member is optional, and null clears it (RFC 7396), except the members a unit always has
         if (document.Components.Schemas.TryGetValue(nameof(AnnotationMergePatch), out var mergePatchSchema))
         {
             mergePatchSchema.Required = new HashSet<string>();
 
-            foreach (var property in mergePatchSchema.Properties.Values)
+            foreach (var (name, property) in mergePatchSchema.Properties)
             {
-                property.Nullable = true;
+                property.Nullable = name is not (nameof(AnnotationMergePatch.UnitType) or nameof(AnnotationMergePatch.UnitDefinition));
             }
         }
 

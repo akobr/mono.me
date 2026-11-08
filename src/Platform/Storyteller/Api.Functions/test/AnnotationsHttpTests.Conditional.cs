@@ -57,6 +57,19 @@ public partial class AnnotationsHttpTests
         ConfigurationConditionalReadTests.Headers(request).ContainsKey(HeaderNames.ETag).ShouldBeFalse();
     }
 
+    // sform story set --replace reads with includeInactive and writes with the tag of that read.
+    [Fact]
+    public async Task GetAnnotation_ThatIsInactive_ReadWithIncludeInactive_AnswersItsTag()
+    {
+        var annotations = new RecordingAnnotations { Stored = Subject("sbt.northwind") with { IsDisabled = true }, StoredMarker = StoredMarker };
+        var request = WithContext(Request("GET"));
+
+        var result = await Http(annotations).GetAnnotation(request, "acme", "billing", "default", "sbt.northwind", includeInactive: true);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        ConfigurationConditionalReadTests.Headers(request).ETag.ToString().ShouldBe(StoredTag);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("absent")]
