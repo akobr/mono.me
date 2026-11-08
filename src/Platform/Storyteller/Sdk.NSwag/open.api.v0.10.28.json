@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.15.18712"
+    "version": "0.10.28.26699"
   },
   "servers": [
     {
@@ -1601,7 +1601,15 @@
         ],
         "responses": {
           "200": {
-            "description": "The requested annotation.",
+            "description": "The requested annotation, with the ETag of its version (none for a deleted one read with includeDeleted).",
+            "headers": {
+              "ETag": {
+                "description": "Strong entity tag of the annotation's version, for If-Match (a write of only that version) and If-None-Match. It changes with every change of the annotation, also when a child is created or deleted under it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1680,7 +1688,7 @@
         "tags": [
           "Annotations"
         ],
-        "description": "Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.",
+        "description": "Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body replaces the editable content: what it does not hold is cleared (PatchAnnotation changes single members). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored. If-Match writes only the version of an earlier read and never re-creates; If-None-Match: * only creates.",
         "operationId": "SetAnnotation",
         "parameters": [
           {
@@ -1718,6 +1726,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "*, so the write only creates: a missing or deleted key; 412 when the annotation exists. A list of entity tags refuses those versions. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1728,11 +1752,20 @@
                 "$ref": "#/components/schemas/Annotation"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "The stored annotation.",
+            "description": "The stored annotation, with the ETag of its new version (POST; a PUT answers none, as its body is normalized).",
+            "headers": {
+              "ETag": {
+                "description": "Strong entity tag of the annotation's version, for If-Match (a write of only that version) and If-None-Match. It changes with every change of the annotation, also when a child is created or deleted under it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -1751,8 +1784,204 @@
               }
             }
           },
+          "412": {
+            "description": "A condition of the write does not hold (ErrorCode AnnotationPreconditionFailed): If-Match names another version, or the annotation does not exist or is deleted; If-None-Match: * and the annotation exists. Read it again and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "400": {
             "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scope Annotation.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Annotations"
+        ],
+        "description": "Changes members of the annotation, whatever its status, merged on the server against its current state, so a concurrent change of another member is kept. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json): a member left out keeps its value, null clears it, Values merge name by name (null removes a name), arrays are replaced whole; member names match case-insensitively, the members a write ignores (keys, names, relation arrays, stamps) are ignored. Or a JSON Patch (RFC 6902, application/json-patch+json) over the editable document {IsDisabled, ValidFrom, ExpiresAt, TimeZone, Title, Description, DocumentationLink, Labels, Values, UnitType, UnitDefinition}, in which Labels and Values are always present (add /Labels/- appends a label, add /Values/plan sets a value) and a test operation is a precondition. With application/json, an object is a merge patch and an array a JSON Patch. Labels keep their first occurrence, a unit keeps UnitType and UnitDefinition, and the result is validated as a full write. A patch never creates or re-creates a key; If-Match writes only the version of an earlier read.",
+        "operationId": "PatchAnnotation",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "A JSON Merge Patch of the annotation (application/merge-patch+json), or a JSON Patch of its editable document (application/json-patch+json).",
+          "content": {
+            "application/merge-patch+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationMergePatch"
+              }
+            },
+            "application/json-patch+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The stored annotation, with the ETag of its version.",
+            "headers": {
+              "ETag": {
+                "description": "Strong entity tag of the annotation's version, for If-Match (a write of only that version) and If-None-Match. It changes with every change of the annotation, also when a child is created or deleted under it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is not JSON or not a patch (ErrorCode PatchInvalid), a JSON Patch operation failed or the patched annotation is not valid (ErrorCode PatchInvalid or InvalidAnnotation), or a condition header is not valid (ErrorCode InvalidPrecondition).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The annotation does not exist (ErrorCode AnnotationNotFound) or is deleted (ErrorCode AnnotationDeleted); a patch never creates it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The annotations changed concurrently three times in a row (Conflict); try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "If-Match names another version of the annotation (ErrorCode AnnotationPreconditionFailed), or a JSON Patch test operation did not match (ErrorCode PatchTestFailed). Read it again and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is neither application/merge-patch+json, application/json-patch+json nor application/json (ErrorCode InvalidContentType); Accept-Patch lists the patch formats.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5083,7 +5312,7 @@
             }
           },
           "404": {
-            "description": "The configuration doesn't exist or has no content to patch.",
+            "description": "The configuration has no stored version to patch: it was never written, or it was deleted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16327,6 +16556,63 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "AnnotationMergePatch": {
+        "type": "object",
+        "properties": {
+          "IsDisabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "ValidFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "TimeZone": {
+            "type": "string",
+            "nullable": true
+          },
+          "Title": {
+            "type": "string",
+            "nullable": true
+          },
+          "Description": {
+            "type": "string",
+            "nullable": true
+          },
+          "DocumentationLink": {
+            "type": "string",
+            "nullable": true
+          },
+          "Labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "Values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object"
+            },
+            "nullable": true
+          },
+          "UnitType": {
+            "type": "string",
+            "nullable": true
+          },
+          "UnitDefinition": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

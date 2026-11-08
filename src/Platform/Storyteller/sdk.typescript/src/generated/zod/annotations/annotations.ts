@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.15.18712
+ * OpenAPI spec version: 0.10.28.26699
  */
 import * as zod from "zod";
 
@@ -450,13 +450,28 @@ export const GetAnnotationResponse = zod.object({
 });
 
 /**
- * Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+ * Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body replaces the editable content: what it does not hold is cleared (PatchAnnotation changes single members). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored. If-Match writes only the version of an earlier read and never re-creates; If-None-Match: * only creates.
  */
 export const SetAnnotationParams = zod.object({
   organization: zod.string().describe("Target organization name."),
   project: zod.string().describe("Target project name."),
   view: zod.string().describe("The target view inside the project."),
   key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const SetAnnotationHeader = zod.object({
+  "If-Match": zod
+    .string()
+    .optional()
+    .describe(
+      "One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
+    ),
+  "If-None-Match": zod
+    .string()
+    .optional()
+    .describe(
+      "*, so the write only creates: a missing or deleted key; 412 when the annotation exists. A list of entity tags refuses those versions. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
+    ),
 });
 
 export const setAnnotationBodyAnnotationTypeDefault = `Responsibility`;
@@ -629,6 +644,133 @@ export const SetAnnotationResponse = zod.object({
           Kind: zod
             .enum(["Account", "Machine", "System"])
             .default(setAnnotationResponseDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
+});
+
+/**
+ * Changes members of the annotation, whatever its status, merged on the server against its current state, so a concurrent change of another member is kept. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json): a member left out keeps its value, null clears it, Values merge name by name (null removes a name), arrays are replaced whole; member names match case-insensitively, the members a write ignores (keys, names, relation arrays, stamps) are ignored. Or a JSON Patch (RFC 6902, application/json-patch+json) over the editable document {IsDisabled, ValidFrom, ExpiresAt, TimeZone, Title, Description, DocumentationLink, Labels, Values, UnitType, UnitDefinition}, in which Labels and Values are always present (add /Labels/- appends a label, add /Values/plan sets a value) and a test operation is a precondition. With application/json, an object is a merge patch and an array a JSON Patch. Labels keep their first occurrence, a unit keeps UnitType and UnitDefinition, and the result is validated as a full write. A patch never creates or re-creates a key; If-Match writes only the version of an earlier read.
+ */
+export const PatchAnnotationParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const PatchAnnotationHeader = zod.object({
+  "If-Match": zod
+    .string()
+    .optional()
+    .describe(
+      "One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
+    ),
+});
+
+export const PatchAnnotationBody = zod.object({
+  IsDisabled: zod.boolean().nullish(),
+  ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
+  ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
+  TimeZone: zod.string().nullish(),
+  Title: zod.string().nullish(),
+  Description: zod.string().nullish(),
+  DocumentationLink: zod.string().nullish(),
+  Labels: zod.array(zod.string()).nullish(),
+  Values: zod.record(zod.string(), zod.unknown()).nullish(),
+  UnitType: zod.string().nullish(),
+  UnitDefinition: zod.string().nullish(),
+});
+
+export const patchAnnotationResponseAnnotationTypeDefault = `Responsibility`;
+export const patchAnnotationResponseTitleMax = 200;
+
+export const patchAnnotationResponseDescriptionMax = 10000;
+
+export const patchAnnotationResponseDocumentationLinkMax = 2048;
+
+export const patchAnnotationResponseCreatedByKindDefault = `Account`;
+export const patchAnnotationResponseModifiedByKindDefault = `Account`;
+export const patchAnnotationResponseDeletionDeletedByKindDefault = `Account`;
+
+export const PatchAnnotationResponse = zod.object({
+  ProjectName: zod.string(),
+  ViewName: zod.string(),
+  AnnotationKey: zod.string(),
+  Name: zod.string(),
+  AnnotationType: zod
+    .enum([
+      "Responsibility",
+      "Unit",
+      "Subject",
+      "Usage",
+      "Context",
+      "Execution",
+      "UnitOfExecution",
+    ])
+    .default(patchAnnotationResponseAnnotationTypeDefault),
+  IsDisabled: zod.boolean().nullish(),
+  ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
+  ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
+  TimeZone: zod.string().optional(),
+  Title: zod.string().max(patchAnnotationResponseTitleMax).optional(),
+  Description: zod
+    .string()
+    .max(patchAnnotationResponseDescriptionMax)
+    .optional(),
+  DocumentationLink: zod
+    .string()
+    .max(patchAnnotationResponseDocumentationLinkMax)
+    .optional(),
+  Labels: zod.array(zod.string()).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(patchAnnotationResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(patchAnnotationResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(patchAnnotationResponseDeletionDeletedByKindDefault),
           Id: zod.string().optional(),
           Name: zod.string().optional(),
           Via: zod.string().optional(),

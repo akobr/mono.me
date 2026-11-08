@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.15.18712
+ * OpenAPI spec version: 0.10.28.26699
  */
 
 export * from "./accessPoint";
@@ -32,6 +32,8 @@ export * from "./annotationHistoryState";
 export * from "./annotationKeyFailure";
 export * from "./annotationKeysRequest";
 export * from "./annotationLabelChanges";
+export * from "./annotationMergePatch";
+export * from "./annotationMergePatchValues";
 export * from "./annotationPurgeResult";
 export * from "./annotationRestoreRequest";
 export * from "./annotationRestoreResult";

@@ -3,13 +3,14 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.15.18712
+ * OpenAPI spec version: 0.10.28.26699
  */
 import type {
   Annotation,
   AnnotationDeletionResult,
   AnnotationHistory,
   AnnotationKeysRequest,
+  AnnotationMergePatch,
   AnnotationPurgeResult,
   AnnotationRestoreRequest,
   AnnotationRestoreResult,
@@ -176,14 +177,14 @@ export const getSetAnnotationUrl = (
 };
 
 /**
- * Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+ * Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body replaces the editable content: what it does not hold is cleared (PatchAnnotation changes single members). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored. If-Match writes only the version of an earlier read and never re-creates; If-None-Match: * only creates.
  */
 export const setAnnotation = async (
   organization: string,
   project: string,
   view: string,
   key: string,
-  annotation?: Annotation,
+  annotation: Annotation,
   options?: Parameters<typeof storytellerFetch>[1],
 ): Promise<Annotation> => {
   const getHeaders = (
@@ -217,6 +218,61 @@ export const setAnnotation = async (
         ...getHeaders(options?.headers),
       },
       body: JSON.stringify(annotation),
+    },
+  );
+};
+
+export const getPatchAnnotationUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
+};
+
+/**
+ * Changes members of the annotation, whatever its status, merged on the server against its current state, so a concurrent change of another member is kept. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json): a member left out keeps its value, null clears it, Values merge name by name (null removes a name), arrays are replaced whole; member names match case-insensitively, the members a write ignores (keys, names, relation arrays, stamps) are ignored. Or a JSON Patch (RFC 6902, application/json-patch+json) over the editable document {IsDisabled, ValidFrom, ExpiresAt, TimeZone, Title, Description, DocumentationLink, Labels, Values, UnitType, UnitDefinition}, in which Labels and Values are always present (add /Labels/- appends a label, add /Values/plan sets a value) and a test operation is a precondition. With application/json, an object is a merge patch and an array a JSON Patch. Labels keep their first occurrence, a unit keeps UnitType and UnitDefinition, and the result is validated as a full write. A patch never creates or re-creates a key; If-Match writes only the version of an earlier read.
+ */
+export const patchAnnotation = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  annotationMergePatch: AnnotationMergePatch,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Annotation> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<Annotation>(
+    getPatchAnnotationUrl(organization, project, view, key),
+    {
+      ...options,
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/merge-patch+json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(annotationMergePatch),
     },
   );
 };

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.15.18712
+ * OpenAPI spec version: 0.10.28.26699
  */
 import { faker } from "@faker-js/faker";
 
@@ -543,6 +543,170 @@ export const getGetAnnotationResponseMock = (
 });
 
 export const getSetAnnotationResponseMock = (
+  overrideResponse: Partial<Extract<Annotation, object>> = {},
+): Annotation => ({
+  ProjectName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  ViewName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  AnnotationKey: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Name: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  AnnotationType: faker.helpers.arrayElement([
+    "Responsibility",
+    "Unit",
+    "Subject",
+    "Usage",
+    "Context",
+    "Execution",
+    "UnitOfExecution",
+  ] as const),
+  IsDisabled: faker.helpers.arrayElement([faker.datatype.boolean(), null]),
+  ValidFrom: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
+  ExpiresAt: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
+  TimeZone: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Title: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 200 } }),
+    undefined,
+  ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 10000 } }),
+    undefined,
+  ]),
+  DocumentationLink: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 2048 } }),
+    undefined,
+  ]),
+  Labels: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    undefined,
+  ]),
+  Values: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: {},
+    },
+    undefined,
+  ]),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  Deletion: faker.helpers.arrayElement([
+    {
+      DeletionId: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      RootKey: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DeletedAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      DeletedBy: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      IsRoot: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
+      DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+      PurgeAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getPatchAnnotationResponseMock = (
   overrideResponse: Partial<Extract<Annotation, object>> = {},
 ): Annotation => ({
   ProjectName: faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -3688,6 +3852,30 @@ export const getSetAnnotationMockHandler = (
   );
 };
 
+export const getPatchAnnotationMockHandler = (
+  overrideResponse?:
+    | Annotation
+    | ((
+        info: Parameters<Parameters<typeof http.patch>[1]>[0],
+      ) => Promise<Annotation> | Annotation),
+  options?: RequestHandlerOptions,
+) => {
+  return http.patch(
+    "*/api/v1/:organization/:project/:view/annotations/:key",
+    async (info: Parameters<Parameters<typeof http.patch>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getPatchAnnotationResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getDeleteAnnotationMockHandler = (
   overrideResponse?:
     | AnnotationDeletionResult
@@ -4153,6 +4341,7 @@ export const getAnnotationsMock = () => [
   getSetAnnotationsMockHandler(),
   getGetAnnotationMockHandler(),
   getSetAnnotationMockHandler(),
+  getPatchAnnotationMockHandler(),
   getDeleteAnnotationMockHandler(),
   getGetDescendantsMockHandler(),
   getSetAnnotationsSimpleMockHandler(),

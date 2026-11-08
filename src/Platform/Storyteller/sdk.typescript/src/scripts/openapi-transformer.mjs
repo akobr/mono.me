@@ -15,11 +15,17 @@
 // as text/plain, application/yaml or a JSON object of strings. Orval would add a params argument before options and turn
 // the return type into Configuration | string, so the transformer removes the parameter and the other media types of the
 // 200: the generated functions, hooks, schemas and mocks keep the envelope, and lib/conditional.ts reads the formats.
+//
+// The PATCH of an annotation takes a JSON Merge Patch (application/merge-patch+json) or a JSON Patch
+// (application/json-patch+json). With two media types Orval sends no Content-Type, and fetch then sends text/plain, which
+// the API refuses (415). The generated patchAnnotation keeps the merge patch; lib/annotations.ts sends either format.
 
 const jsonPatchContentType = 'application/json-patch+json'
 const deprecatedOperations = new Set(['GrantUserAccess', 'RevokeUserAccess'])
 const formattedOperations = new Set(['GetConfiguration', 'GetResolvedConfiguration'])
 const jsonContentType = 'application/json'
+const mergePatchContentType = 'application/merge-patch+json'
+const mergePatchOnlyOperations = new Set(['PatchAnnotation'])
 
 const jsonPatchOperation = {
   type: 'object',
@@ -49,6 +55,11 @@ export default function transform(document) {
   for (const pathItem of Object.values(document.paths ?? {})) {
     for (const operation of Object.values(pathItem ?? {})) {
       const requestBody = operation?.requestBody
+
+      if (mergePatchOnlyOperations.has(operation?.operationId) && requestBody?.content?.[mergePatchContentType]) {
+        delete requestBody.content[jsonPatchContentType]
+      }
+
       const content = requestBody?.content?.[jsonPatchContentType]
 
       if (content) {

@@ -5342,22 +5342,38 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The requested annotation.</returns>
+        /// <returns>The requested annotation, with the ETag of its version (none for a deleted one read with includeDeleted).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body replaces the editable content: what it does not hold is cleared (PatchAnnotation changes single members). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored. If-Match writes only the version of an earlier read and never re-creates; If-None-Match: * only creates.
         /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="body">The annotation to create or update.</param>
-        /// <returns>The stored annotation.</returns>
+        /// <param name="if_Match">One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
+        /// <param name="if_None_Match">*, so the write only creates: a missing or deleted key; 412 when the annotation exists. A list of entity tags refuses those versions. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
+        /// <returns>The stored annotation, with the ETag of its new version (POST; a PUT answers none, as its body is normalized).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body, string if_Match = null, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Changes members of the annotation, whatever its status, merged on the server against its current state, so a concurrent change of another member is kept. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json): a member left out keeps its value, null clears it, Values merge name by name (null removes a name), arrays are replaced whole; member names match case-insensitively, the members a write ignores (keys, names, relation arrays, stamps) are ignored. Or a JSON Patch (RFC 6902, application/json-patch+json) over the editable document {IsDisabled, ValidFrom, ExpiresAt, TimeZone, Title, Description, DocumentationLink, Labels, Values, UnitType, UnitDefinition}, in which Labels and Values are always present (add /Labels/- appends a label, add /Values/plan sets a value) and a test operation is a precondition. With application/json, an object is a merge patch and an array a JSON Patch. Labels keep their first occurrence, a unit keeps UnitType and UnitDefinition, and the result is validated as a full write. A patch never creates or re-creates a key; If-Match writes only the version of an earlier read.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="body">A JSON Merge Patch of the annotation (application/merge-patch+json), or a JSON Patch of its editable document (application/json-patch+json).</param>
+        /// <param name="if_Match">One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
+        /// <returns>The stored annotation, with the ETag of its version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Annotation> PatchAnnotationAsync(string organization, string project, string view, string key, AnnotationMergePatch body, string if_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -5921,7 +5937,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
         /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
-        /// <returns>The requested annotation.</returns>
+        /// <returns>The requested annotation, with the ETag of its version (none for a deleted one read with includeDeleted).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive = null, bool? includeDeleted = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
@@ -6068,16 +6084,18 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body replaces the editable content: what it does not hold is cleared (PatchAnnotation changes single members). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored. If-Match writes only the version of an earlier read and never re-creates; If-None-Match: * only creates.
         /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="body">The annotation to create or update.</param>
-        /// <returns>The stored annotation.</returns>
+        /// <param name="if_Match">One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
+        /// <param name="if_None_Match">*, so the write only creates: a missing or deleted key; 412 when the annotation exists. A list of entity tags refuses those versions. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
+        /// <returns>The stored annotation, with the ETag of its new version (POST; a PUT answers none, as its body is normalized).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body, string if_Match = null, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6091,12 +6109,21 @@ namespace _42.Platform.Storyteller.Sdk
             if (key == null)
                 throw new System.ArgumentNullException("key");
 
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
             var client_ = _httpClient;
             var disposeClient_ = false;
             try
             {
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
+
+                    if (if_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-Match", ConvertToString(if_Match, System.Globalization.CultureInfo.InvariantCulture));
+
+                    if (if_None_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-None-Match", ConvertToString(if_None_Match, System.Globalization.CultureInfo.InvariantCulture));
                     var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
                     var content_ = new System.Net.Http.StringContent(json_);
                     content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
@@ -6183,6 +6210,201 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("The annotations changed concurrently three times in a row (Conflict); try again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 412)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A condition of the write does not hold (ErrorCode AnnotationPreconditionFailed): If-Match names another version, or the annotation does not exist or is deleted; If-None-Match: * and the annotation exists. Read it again and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Changes members of the annotation, whatever its status, merged on the server against its current state, so a concurrent change of another member is kept. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json): a member left out keeps its value, null clears it, Values merge name by name (null removes a name), arrays are replaced whole; member names match case-insensitively, the members a write ignores (keys, names, relation arrays, stamps) are ignored. Or a JSON Patch (RFC 6902, application/json-patch+json) over the editable document {IsDisabled, ValidFrom, ExpiresAt, TimeZone, Title, Description, DocumentationLink, Labels, Values, UnitType, UnitDefinition}, in which Labels and Values are always present (add /Labels/- appends a label, add /Values/plan sets a value) and a test operation is a precondition. With application/json, an object is a merge patch and an array a JSON Patch. Labels keep their first occurrence, a unit keeps UnitType and UnitDefinition, and the result is validated as a full write. A patch never creates or re-creates a key; If-Match writes only the version of an earlier read.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="body">A JSON Merge Patch of the annotation (application/merge-patch+json), or a JSON Patch of its editable document (application/json-patch+json).</param>
+        /// <param name="if_Match">One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
+        /// <returns>The stored annotation, with the ETag of its version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<Annotation> PatchAnnotationAsync(string organization, string project, string view, string key, AnnotationMergePatch body, string if_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (if_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-Match", ConvertToString(if_Match, System.Globalization.CultureInfo.InvariantCulture));
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/merge-patch+json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PATCH");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/annotations/{key}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/annotations/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<Annotation>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The body is not JSON or not a patch (ErrorCode PatchInvalid), a JSON Patch operation failed or the patched annotation is not valid (ErrorCode PatchInvalid or InvalidAnnotation), or a condition header is not valid (ErrorCode InvalidPrecondition).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scope Annotation.Write (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The annotation does not exist (ErrorCode AnnotationNotFound) or is deleted (ErrorCode AnnotationDeleted); a patch never creates it.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The annotations changed concurrently three times in a row (Conflict); try again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 412)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("If-Match names another version of the annotation (ErrorCode AnnotationPreconditionFailed), or a JSON Patch test operation did not match (ErrorCode PatchTestFailed). Read it again and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 415)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The body is neither application/merge-patch+json, application/json-patch+json nor application/json (ErrorCode InvalidContentType); Accept-Patch lists the patch formats.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -10139,7 +10361,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("The configuration doesn\'t exist or has no content to patch.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("The configuration has no stored version to patch: it was never written, or it was deleted.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -22336,6 +22558,54 @@ namespace _42.Platform.Storyteller.Sdk
 
         [Newtonsoft.Json.JsonProperty("Removed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.ICollection<string> Removed { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationMergePatch
+    {
+
+        [Newtonsoft.Json.JsonProperty("IsDisabled", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? IsDisabled { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ValidFrom", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? ValidFrom { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ExpiresAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? ExpiresAt { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("TimeZone", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TimeZone { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Title", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Title { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Description", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Description { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("DocumentationLink", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string DocumentationLink { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Labels", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> Labels { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Values", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.IDictionary<string, object> Values { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("UnitType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string UnitType { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("UnitDefinition", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string UnitDefinition { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
