@@ -157,6 +157,10 @@ public partial class CosmosAnnotationService : IAnnotationService
         AnnotationRules.Validate(annotation);
         var fullKey = annotation.GetFullKey(organization);
 
+        // The version of the key that an earlier attempt of this write committed. A create runs in waves, and a later
+        // wave (the relation arrays of a parent) can lose to a concurrent change after the key's own batch committed.
+        string? committed = null;
+
         return RetryAsync(async () =>
         {
             var store = Store(organization);
@@ -165,7 +169,11 @@ public partial class CosmosAnnotationService : IAnnotationService
 
             // The original condition, on every attempt, against the item this attempt replaces under its ETag: a write
             // in between fails the batch, and the next attempt fails the condition instead of overwriting the write.
-            condition.Check(fullKey.Annotation, exists, node.ETag);
+            // The version this write committed itself passed the condition already, so it is not checked again.
+            if (committed is null || !string.Equals(node.ETag, committed, StringComparison.Ordinal))
+            {
+                condition.Check(fullKey.Annotation, exists, node.ETag);
+            }
 
             if (exists)
             {
@@ -174,7 +182,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             }
 
             // the create replaces (or creates) the very item the condition was checked against
-            var created = await CreateCoreAsync(store, fullKey, annotation, actor, node);
+            var created = await CreateCoreAsync(store, fullKey, annotation, actor, node, marker => committed = marker);
             return new AnnotationWriteResult(created.Annotations[^1], created.TargetMarker);
         });
     }
@@ -384,8 +392,15 @@ public partial class CosmosAnnotationService : IAnnotationService
     // Creates the annotation and its ancestors that are not active. A missing key is created; a deleted one is
     // re-created: its item is replaced, its configuration goes to the versions, and its audit continues. loadedTarget:
     // the item of the key as the caller read it, so the write creates or replaces exactly that version (a change in
-    // between fails the batch). Returns the written annotations, the key last, and the marker of the key's item.
-    private async Task<CreateResult> CreateCoreAsync(AnnotationItemStore store, FullKey fullKey, Annotation input, AuditActor actor, AnnotationNode? loadedTarget = null)
+    // between fails the batch). targetCommitted: told the marker of the key's item as soon as its batch commits, also
+    // when a later wave fails. Returns the written annotations, the key last, and the marker of the key's item.
+    private async Task<CreateResult> CreateCoreAsync(
+        AnnotationItemStore store,
+        FullKey fullKey,
+        Annotation input,
+        AuditActor actor,
+        AnnotationNode? loadedTarget = null,
+        Action<string?>? targetCommitted = null)
     {
         var key = fullKey.Annotation;
         var target = AnnotationFactory.Normalize(input, key);
@@ -455,7 +470,13 @@ public partial class CosmosAnnotationService : IAnnotationService
             var operations = new List<BatchOperation>();
             var stream = plan.Keep(_serializer.WriteAnnotation(write.Entity));
             var payloadBytes = stream.Length;
-            var keepMarker = IsSameKey(node.Key.Annotation, key) ? KeepETag(etag => targetMarker = etag) : null;
+            var keepMarker = IsSameKey(node.Key.Annotation, key)
+                ? KeepETag(etag =>
+                {
+                    targetMarker = etag;
+                    targetCommitted?.Invoke(etag);
+                })
+                : null;
 
             if (node.State == AnnotationItemState.Missing)
             {

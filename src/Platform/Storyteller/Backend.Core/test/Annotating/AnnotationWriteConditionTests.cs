@@ -64,6 +64,14 @@ public class AnnotationWriteConditionTests
             .Message.ShouldContain("does not exist or is deleted");
         Should.Throw<PreconditionFailedException>(() => AnnotationWriteCondition.CreateOnly.Check(Key, true, Current))
             .Message.ShouldContain("already exists");
+
+        // with both, the part that failed: here If-Match holds and If-None-Match does not
+        Should.Throw<PreconditionFailedException>(() => Condition("match any and none match any").Check(Key, true, Current))
+            .Message.ShouldContain("already exists");
+        Should.Throw<PreconditionFailedException>(() => new AnnotationWriteCondition { IfMatch = AnnotationVersionMatch.Of(Current), IfNoneMatch = AnnotationVersionMatch.Of(Current) }.Check(Key, true, Current))
+            .Message.ShouldContain("a version that If-None-Match names");
+        Should.Throw<PreconditionFailedException>(() => Condition("match any and none match any").Check(Key, false, null))
+            .Message.ShouldContain("does not exist or is deleted");
     }
 
     [Fact]
