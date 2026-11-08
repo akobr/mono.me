@@ -4,7 +4,7 @@
 The platform is under development, see [the road map](/platform/road-map).
 :::
 
-The Storyteller configuration action brings the resolved configuration of an annotation into a GitHub Actions job: into the environment of the job, where every later step finds its values as variables, into a file, or both. It installs [`sform`](/cli/sform) and runs `sform story config <key> --resolved` once, so the names, the masks and the refusals are those of [Export to GitHub Actions](/cli/sform#export-to-github-actions).
+The Storyteller configuration action brings the resolved configuration of an annotation into a GitHub Actions job: into the environment of the job, where every later step finds its values as variables, into a file, or both. It installs [`sform`](/cli/sform) and runs `sform story config export <key>` once, so the names, the masks and the refusals are those of [Export to GitHub Actions](/cli/sform#export-to-github-actions).
 
 ``` yaml
 # The later steps read APP_DB__HOST, APP_DB__PASSWORD, …
@@ -22,7 +22,7 @@ The Storyteller configuration action brings the resolved configuration of an ann
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
-The action lives in the [mono.me repository](https://github.com/akobr/mono.me/tree/main/src/Platform/GitHubAction) and has no release tags yet: pin a commit. It runs on Linux, macOS and Windows runners. No `sform` on NuGet has these options yet, so every example installs the one the workflow packed in an earlier step `sform` (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
+The action lives in the [mono.me repository](https://github.com/akobr/mono.me/tree/main/src/Platform/GitHubAction) and has no release tags yet: pin a commit. It runs on Linux, macOS and Windows runners. No `sform` on NuGet has `story config export` yet, so every example installs the one the workflow packed in an earlier step `sform` (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
 
 ## Inputs
 
@@ -36,6 +36,7 @@ The action lives in the [mono.me repository](https://github.com/akobr/mono.me/tr
 | `export-env` | `false` | Export the resolved configuration into the environment of the job |
 | `env-prefix` | | A prefix of every name, for example `APP_`; with `export-env`, and for `output-file` in the `env` format |
 | `allow-unprefixed` | `false` | Let `export-env` write the names of the configuration without a prefix |
+| `allow-unresolved` | `false` | Export binding expressions that were not resolved as they are, instead of failing |
 | `mask` | `bound` | `bound` masks the values that bindings produced, `all` every string and number |
 | `output-file` | | Also write the resolved configuration to this file, best under `$RUNNER_TEMP`; a relative path is relative to the workspace |
 | `format` | `env` | The format of `output-file`: `env`, `flat`, `properties`, `yaml`, or `json` for the content alone |
@@ -49,9 +50,9 @@ Set `export-env`, `output-file` or both; without either, the action fails before
 1. It checks the inputs.
 2. When the runner has no .NET 10 SDK, it runs `actions/setup-dotnet@v6` (see [.NET on the runner](#net-on-the-runner)).
 3. It installs the `cli-version` of `sform` into a folder of its own under `$RUNNER_TEMP`, from nuget.org and `cli-source`, without reading the `nuget.config` of your repository. A second use of the action in the job reuses that folder.
-4. It runs `sform` once, with one resolved and one effective read: `sform` writes the `::add-mask::` commands first, then the variables to `GITHUB_ENV` with `export-env`, then `output-file`, and a summary with the names of the variables and the number of masked values, never a value.
+4. It runs `sform story config export` once, with one resolved and one effective read: `sform` writes the `::add-mask::` commands first, then the variables to `GITHUB_ENV` with `export-env`, then `output-file`, and a summary with the names of the variables and the number of masked values, never a value.
 
-The step fails with the exit code of `sform`, `2` when it refuses the configuration or the options; see [Read a configuration](/cli/sform#read-a-configuration). `sform` sends anonymous usage data unless the job sets `DO_NOT_TRACK: 1`, see [Telemetry](/cli/sform#telemetry).
+The step fails with the exit code of `sform`, `2` when it refuses the configuration or the options; see [Export to GitHub Actions](/cli/sform#export-to-github-actions). `sform` sends anonymous usage data unless the job sets `DO_NOT_TRACK: 1`, see [Telemetry](/cli/sform#telemetry).
 
 ## Sign-in
 
@@ -105,7 +106,7 @@ A configuration whose bindings read secrets reaches the job only when the machin
 
 The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values, and every machine with `Secrets.Write` write secrets, without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
 
-Without `Secrets.Read` or such a sign-in, the API withholds the secrets or returns the expressions of the secret bindings, and the action stops with exit code `2` before it exports or writes anything.
+Without `Secrets.Read` or such a sign-in, the API withholds the secrets or returns the expressions of the secret bindings, and the action stops with exit code `2` before it exports or writes anything. `allow-unresolved: true` exports such expressions as they are; withheld secrets always stop the action.
 
 ### Set up a certificate machine
 
@@ -144,7 +145,7 @@ Either way, `sform` refuses names that the runner reserves or that change how la
 
 ## Until sform is published
 
-The `sform` on nuget.org is older than these options. Until a release has them, the workflow packs `sform` from the repository and passes the folder as `cli-source` and the packed version as `cli-version`:
+The `sform` on nuget.org is older than `story config export`. Until a release has it, the workflow packs `sform` from the repository and passes the folder as `cli-source` and the packed version as `cli-version`. The action of a commit runs `story config export`, so pack `sform` from the same commit or a newer one: an older `sform` has no such command and fails.
 
 ``` yaml
 steps:

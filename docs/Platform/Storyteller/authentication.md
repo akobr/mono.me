@@ -489,14 +489,14 @@ jobs:
 
 A job whose application reads its configuration with the provider can set `STORYTELLER_KEY: "@acme.billing.production.sbt.northwind"` instead of `STORYTELLER_PROJECT` (quoted, because YAML reserves `@`). `sform` then works on `acme.billing` with the `production` view, and the provider reads that key.
 
-A step can also read a configuration into the job. `sform story config <key> -r --github-env --env-prefix APP_` reads the resolved and the effective configuration, writes `::add-mask::` for the values that bindings produced, and only then appends the resolved values to `GITHUB_ENV`, where every later step finds them (see [Read a configuration](https://42for.net/cli/sform#read-a-configuration)):
+A step can also read a configuration into the job. `sform story config export <key> --github-env --prefix APP_` reads the resolved and the effective configuration, writes `::add-mask::` for the values that bindings produced, and only then appends the resolved values to `GITHUB_ENV`, where every later step finds them (see [Export to GitHub Actions](https://42for.net/cli/sform#export-to-github-actions)):
 
 ```yaml
-      - run: sform story config exe.northwind.invoicing.production -r --github-env --env-prefix APP_
+      - run: sform story config export exe.northwind.invoicing.production --github-env --prefix APP_
       - run: ./deploy.sh   # reads APP_DB__HOST, APP_DB__PASSWORD, …
 ```
 
-`--github-env` and the other options of reading a configuration are newer than the `sform` on NuGet, which `--prerelease` installs in the jobs above and which ends this step as an unrecognized option. Until a release has them, install a `sform` packed from the repository, as [Until sform is published](https://42for.net/cli/github-action#until-sform-is-published) shows.
+`sform story config export` is newer than the `sform` on NuGet, which `--prerelease` installs in the jobs above and which ends this step as an unrecognized argument. Until a release has it, install a `sform` packed from the repository, as [Until sform is published](https://42for.net/cli/github-action#until-sform-is-published) shows.
 
 **Secrets in CI.** A job that receives secret values, such as a resolved configuration with secret bindings, needs a machine with `Secrets.Read` and one of these sign-ins:
 
@@ -506,7 +506,7 @@ A step can also read a configuration into the job. `sform story config <key> -r 
 
 The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values, and every machine with `Secrets.Write` write secrets, without mTLS, with an API key, client credentials or a federated token, not only the machine of the job.
 
-A `Federated` machine, like an API key or client credentials, has no certificate. When it has `Secrets.Read` and the project keeps the default policy, the API withholds secret values from it and answers every resolved read with `X-2S-Secrets-Withheld: mtls-required`, whatever the configuration holds (see [Secret delivery](key-values.md#secret-delivery)). `--github-env` then stops with exit code `2` and writes nothing, and so it does for the expressions of secret bindings that a machine without `Secrets.Read` gets. A federated job in a project that keeps the policy on therefore uses a machine without `Secrets.Read` and reads a configuration without secret bindings.
+A `Federated` machine, like an API key or client credentials, has no certificate. When it has `Secrets.Read` and the project keeps the default policy, the API withholds secret values from it and answers every resolved read with `X-2S-Secrets-Withheld: mtls-required`, whatever the configuration holds (see [Secret delivery](key-values.md#secret-delivery)). `sform story config export` then stops with exit code `2` and writes nothing, and so it does for the expressions of secret bindings that a machine without `Secrets.Read` gets. A federated job in a project that keeps the policy on therefore uses a machine without `Secrets.Read` and reads a configuration without secret bindings.
 
 **A `Certificate` machine for CI.** `machine create` without `-k` creates the default kind of the project, and a project that never stored a [machine authentication policy](#machine-authentication-policy) enables only `MachineAuth:DefaultCredentialKind`, `ApiKey` by default. So an Administrator enables `Certificate` first. `machine-auth -k` sets the whole policy: it names the kinds the project enables already, the default kind first, then `certificate`, and `-l` when the project has a certificate lifetime of its own. A user with `ContributorWithSecrets` then creates the machine with `-k certificate`. `machine create` prints the password of the certificate once; the repository keeps it as the secret `STORYTELLER_CERTIFICATE_PASSWORD`, and the file, in base64 on one line, as `STORYTELLER_CERTIFICATE_BASE64`:
 
