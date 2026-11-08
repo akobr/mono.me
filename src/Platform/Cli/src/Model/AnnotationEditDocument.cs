@@ -65,12 +65,13 @@ public static class AnnotationEditDocument
     /// <param name="annotation">The annotation as the API answered it, or null for a new one.</param>
     public static JObject Create(AnnotationKey key, Sdk.Annotation? annotation)
     {
+        // The labels without duplicates, as Normalize gives them, so an untouched document of a stored duplicate is no change.
         var document = new JObject
         {
             [Title] = Text(annotation?.Title),
             [Description] = Text(annotation?.Description),
             [DocumentationLink] = Text(annotation?.DocumentationLink),
-            [Labels] = new JArray((annotation?.Labels ?? []).Select(label => new JValue(label))),
+            [Labels] = new JArray((annotation?.Labels ?? []).Distinct(StringComparer.Ordinal).Select(label => new JValue(label))),
             [Values] = ToValues(annotation?.Values),
             [IsDisabled] = annotation?.IsDisabled is { } isDisabled ? new JValue(isDisabled) : JValue.CreateNull(),
             [ValidFrom] = Date(annotation?.ValidFrom),
@@ -282,9 +283,15 @@ public static class AnnotationEditDocument
         switch (value.Type)
         {
             case JTokenType.Date:
-                // a document parsed with dates (not the editor's file): a DateTime without an offset is local
-                date = ((JValue)value).Value is DateTimeOffset offset ? offset : new DateTimeOffset(value.Value<DateTime>());
-                return true;
+                // a document parsed with dates (not the editor's file): only a DateTimeOffset has an explicit offset
+                if (((JValue)value).Value is DateTimeOffset offset)
+                {
+                    date = offset;
+                    return true;
+                }
+
+                date = default;
+                return false;
 
             case JTokenType.String:
                 var text = value.Value<string>()!;
