@@ -148,10 +148,10 @@
     {
       "command": "storyteller kv import",
       "option": "--protection",
-      "values": [ "public", "standard", "hsm", "byok" ],
+      "values": [ "standard", "hsm", "byok" ],
       "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
-      "refused": [ "Hyok" ],
-      "source": "KeyValueImportCommand.ResolveSecretLevelAsync: KeyValueLevels.Parse takes every level for the keys --secret matches. public is accepted and stores those keys as public values (nothing refuses it, so it is a value a case has to show); hyok is sent, and the API refuses a value that is not a client-encrypted document (EnvelopeValueProtector, ClientEncryptedValueValidator), which kv import does not produce."
+      "except": [ "Public", "Hyok" ],
+      "source": "KeyValueImportCommand.ResolveSecretLevelAsync: the level of the keys --secret matches; public and hyok end with exit 2 (the keys are secrets, and hyok needs values encrypted on the client)."
     },
     {
       "command": "storyteller kv import",
