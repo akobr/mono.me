@@ -233,7 +233,9 @@ public class CosmosAnnotationConditionalWriteTests(Startup startup)
         competed.Should().BeTrue();
         created.Annotation.Title.Should().Be("ours");
         created.Marker.Should().Be(await ItemETagAsync(project, "unt.billing.invoice"));
-        (await Annotations.GetAnnotationAsync(FullKeyOf(project, "rst.billing")))!.Title.Should().Be("theirs");
+        var parent = (Responsibility)(await Annotations.GetAnnotationAsync(FullKeyOf(project, "rst.billing")))!;
+        parent.Title.Should().Be("theirs");
+        parent.UnitNames.Should().Contain("invoice", "the retry completes the relation array the failed wave did not write");
     }
 
     // Without a condition, a create that loses to a concurrent create becomes an update on the retry.

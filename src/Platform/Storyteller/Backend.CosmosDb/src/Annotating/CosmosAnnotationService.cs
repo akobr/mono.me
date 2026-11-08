@@ -169,10 +169,18 @@ public partial class CosmosAnnotationService : IAnnotationService
 
             // The original condition, on every attempt, against the item this attempt replaces under its ETag: a write
             // in between fails the batch, and the next attempt fails the condition instead of overwriting the write.
-            // The version this write committed itself passed the condition already, so it is not checked again.
-            if (committed is null || !string.Equals(node.ETag, committed, StringComparison.Ordinal))
+            // The version this write committed itself passed the condition already, so it is not checked again; the
+            // relation arrays its failed wave did not write are completed instead.
+            var isOwnCreate = committed is not null && string.Equals(node.ETag, committed, StringComparison.Ordinal);
+
+            if (!isOwnCreate)
             {
                 condition.Check(fullKey.Annotation, exists, node.ETag);
+            }
+
+            if (isOwnCreate)
+            {
+                await CompleteParentRelationsAsync(store, fullKey);
             }
 
             if (exists)
@@ -470,21 +478,21 @@ public partial class CosmosAnnotationService : IAnnotationService
             var operations = new List<BatchOperation>();
             var stream = plan.Keep(_serializer.WriteAnnotation(write.Entity));
             var payloadBytes = stream.Length;
-            var keepMarker = IsSameKey(node.Key.Annotation, key)
-                ? KeepETag(etag =>
+            Action<string?> keepMarker = IsSameKey(node.Key.Annotation, key)
+                ? etag =>
                 {
                     targetMarker = etag;
                     targetCommitted?.Invoke(etag);
-                })
-                : null;
+                }
+                : _ => { };
 
             if (node.State == AnnotationItemState.Missing)
             {
-                operations.Add(new BatchOperation(batch => batch.CreateItemStream(stream), keepMarker));
+                operations.Add(BatchOperation.KeepingETag(batch => batch.CreateItemStream(stream), keepMarker));
             }
             else
             {
-                operations.Add(new BatchOperation(
+                operations.Add(BatchOperation.KeepingETag(
                     batch => batch.ReplaceItemStream(node.AnnotationId, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = node.ETag }),
                     keepMarker));
 
@@ -513,9 +521,49 @@ public partial class CosmosAnnotationService : IAnnotationService
         return new CreateResult(writes.Select(write => write.Entity.ToModel()).ToList(), targetMarker);
     }
 
-    private static Action<TransactionalBatchOperationResult> KeepETag(Action<string?> keep)
+    // The active parents of the key and its ancestors list them in their relation arrays: what a create writes in its
+    // last wave, which can lose to a concurrent change of a parent after the keys themselves committed. Each parent is
+    // replaced under its ETag, so a change in between is retried.
+    private async Task CompleteParentRelationsAsync(AnnotationItemStore store, FullKey fullKey)
     {
-        return result => keep(result.ETag);
+        var nodes = new Dictionary<string, AnnotationNode>(StringComparer.Ordinal);
+        var updates = new Dictionary<string, AnnotationEntity>(StringComparer.Ordinal);
+
+        foreach (var child in fullKey.Annotation.GetAllAncestorKeys().Append(fullKey.Annotation))
+        {
+            foreach (var (parent, array, value) in AnnotationRelations.GetParentRelations(child))
+            {
+                var parentText = parent.ToString();
+
+                if (!nodes.TryGetValue(parentText, out var parentNode))
+                {
+                    parentNode = await store.LoadAsync(FullKey.Create(parent, fullKey), withConfiguration: false, withAudit: false);
+                    nodes[parentText] = parentNode;
+                }
+
+                if (parentNode.State != AnnotationItemState.Active)
+                {
+                    continue;
+                }
+
+                var current = updates.GetValueOrDefault(parentText) ?? parentNode.Entity!;
+                var updated = AnnotationRelations.Add(current, array, value);
+
+                if (!ReferenceEquals(updated, current))
+                {
+                    updates[parentText] = updated;
+                }
+            }
+        }
+
+        if (updates.Count == 0)
+        {
+            return;
+        }
+
+        using var plan = new BatchPlan(store.Container);
+        AddRelationUpdates(plan, nodes, updates);
+        await plan.ExecuteAsync();
     }
 
     // The node holds the annotation and its audit, read with their ETags. Returns the stored annotation with the marker

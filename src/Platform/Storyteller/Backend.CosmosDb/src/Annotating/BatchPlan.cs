@@ -128,13 +128,28 @@ internal sealed class BatchPlan : IDisposable
 
             if (response.IsSuccessStatusCode)
             {
-                // the results come in the order of the operations
-                for (var index = 0; index < operations.Count && index < response.Count; index++)
+                // the results come in the order of the operations, one each: a result paired with another operation
+                // would hand on the wrong ETag
+                if (response.Count != operations.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"A transactional batch in partition '{partitionKey}' answered {response.Count} results for {operations.Count} operations.");
+                }
+
+                for (var index = 0; index < operations.Count; index++)
                 {
                     operations[index].Committed?.Invoke(response[index]);
                 }
 
                 return;
+            }
+
+            // an item larger than Cosmos DB stores (2 MB): the content of the write, not a failure of the store
+            if (response.StatusCode == HttpStatusCode.RequestEntityTooLarge)
+            {
+                throw new InvalidInputException(
+                    "The annotation is larger than the store keeps; write less content.",
+                    ErrorCodes.BodyTooLarge);
             }
 
             if (response.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict or HttpStatusCode.NotFound)
