@@ -2,7 +2,7 @@
 
 The functional test cases of the `sform` CLI in Testiny project `2SC` (id 2), and the automated test of each in `src/Platform/Cli.AutomationTests/src/Tests/`. Every case has type Functional, status Ready for Test and automation Automated. Each Testiny folder is a folder of `Tests/`, and each sub-folder is a test class. The plan is [2026-11-08 CLI Automation Testing Project](specs/2026-11-08%20CLI%20Automation%20Testing%20Project.md) (Linear [424-215](https://linear.app/424fun/issue/424-215/create-cli-automation-testing-project-sform-against-a-real-backend)).
 
-This is the **draft** of the catalogue (phase 4). The **Testiny** column is filled in when the cases are created in Testiny, and the **Test** column holds the planned method names until the tests exist.
+The catalogue (phase 4) is aligned with the CLI of phase 1 ([review](../Cli/specs/reviews/2026-11-08%20Phase%201%20of%20CLI%20Automation%20Testing%20Project.md)): the messages and exit codes are those the code prints, also where it has a known defect (see the rules). Every case exists in Testiny project `2SC`, and the **Testiny** column holds its id. The **Test** column holds the planned method names until the tests exist.
 
 - **Reference**: `<section>-<sub-folder>-<n>`. It starts the Testiny precondition and the comment above the test.
 - **Priority**: Elementary (in the PR-gate set, `[Elementary]`), High, Medium or Low.
@@ -12,7 +12,7 @@ This is the **draft** of the catalogue (phase 4). The **Testiny** column is fill
   - Editor: Contributor or higher.
   - Secrets: ContributorWithSecrets or higher.
   - Admin: Administrator or Owner.
-  - Owner.
+  - Owner: an Owner of the target project and of its organization; every P case.
   - Machine: no user. Machine credentials (`STORYTELLER_*`) with the scopes the case names.
 - **Mode**:
   - U: the leased user's signed-in `SFORM_HOME`. This is the default; the column lists the other modes.
@@ -20,16 +20,31 @@ This is the **draft** of the catalogue (phase 4). The **Testiny** column is fill
   - M: machine credentials, no user state.
   - T: run in a pseudo terminal (`SformRunOptions.Terminal`), with the prompt answered by the test.
   - E: the fake editor of `editor.config.json` (spec §4.3).
-  - P: in a disposable project (`[DisposableProject]`).
-  - X:`<Feature>`: skips unless `Target:Features` lists the feature, and the gap is in `coverage-exceptions.json`. The features: `Byok` (a customer key in an Azure Key Vault), `Hsm` (HSM-backed keys), `KeyVaultReference` (a vault that the target can read), `Registration` (an unregistered pool user whose account the run may create), `MultiOrganization` (a pool user in two organizations).
-- **Covers**: the options, arguments and aliases the case checks the effect of (`[Covers]`, spec §4.2). `arg0`, `arg1`, … are the positional arguments. Every command, option, argument and alias of the CLI appears at least once in this column; `CommandCoverageTests` enforces it.
+  - P: in a disposable project (`[DisposableProject]`). The leased user creates it in `Target:Organization` with `account points create`, which needs an Owner of the organization, so every P case has Role Owner and acts as the Owner of the project. A step "as the second user" runs as another pool user to whom the Owner granted a role in the project in the Pre (`account points grant <id> -p <org>.<project> -r <role>`), in that user's own `SFORM_HOME`. A disposable project starts with the default policies: machines of the credential kind ApiKey only; key/values at the levels public and standard, mTLS required for secret delivery, and no recipient. A P case that needs more sets it in its Pre.
+  - X:`<Feature>`: skips unless `Target:Features` lists the feature, and the gap is in `coverage-exceptions.json`. The features: `Byok` (a customer key in an Azure Key Vault), `Hsm` (HSM-backed keys), `Registration` (an unregistered pool user whose account the run may create), `MultiOrganization` (a pool user in two organizations).
+- **Covers**: the options, arguments and aliases the case checks the effect of (`[Covers]`, spec §4.2). `arg0`, `arg1`, … are the positional arguments. A token belongs to the command of the steps that uses it. An option with a fixed set of values (spec §4.1) also lists each value the case checks as `--option=value`, whichever form the steps use. Every command, alias, argument, option form and fixed value of the CLI appears at least once in this column, except `-p` of the context commands (see the rules); `CommandCoverageTests` enforces it.
 
 Rules shared by every case:
 
-- A test starts with no default project: it passes `-p <org>.<project>` (and `-v` when it says so), so the context options of `BaseContextCommand` are part of every context command's cases. The context cases in [Context and Errors](#context-and-errors) check the options themselves.
-- The expected exit codes are those of `src/Platform/Cli/src/ExitCodes.cs`: 0 success, -1 input parsing, 1 crash, 2 wrong input, 3 service failure, 40 aborted, 42 no work needed, 43 interaction needed, 44 unauthorized, 45 partial result. "Fails" without a code means a non-zero code other than 1; a crash (1) fails every case.
-- Annotation keys, names and values are generated (Bogus, seeded) under the target project and are not deleted, except where a case deletes them. `<rst>` stands for a generated responsibility key such as `rst.cli-3f9a`, and `<key>` for a generated key-value key.
-- Steps are written as the command line, without `sform`. An expectation on output is a check on stdout unless it says stderr.
+- A test starts with no default project: it passes `-p <org>.<project>` (and `-v` when it says so) to every context command whose steps do not give the target themselves. So `-p` of each context command is covered by the command's own cases and is not repeated in Covers; a machine case (mode M) is targeted by its variables instead. `--projectKey`, `-v` and `--view` of each context command are covered by the context case of its section (`MCH-CTX-01`, `CRT-SHC-06`, `ANN-CTX-01`, `CFG-CTX-01`, `TPL-TPL-09`, `SCH-CTX-01`, `KV-CTX-01`, `KV-CTX-02`, and `ACC-TLS-01` for `account ca`). The context cases in [Context and Errors](#context-and-errors) check the precedence of the options.
+- In the context cases `<A>` is the default project (`account set -p <A>`), `<B>` the project the commands target, and `<view>` a view of `<B>` other than `default` (a view exists by its data).
+- `<reader project>` and `<contributor project>` are the projects of `Target:RoleProjects` for Reader and Contributor, where every pool user holds exactly that role. A case of another role runs its steps "as a Reader" or "as a Contributor" there, with `-p` of that project.
+- `<AuthKit organization id>` is the WorkOS organization id of `Target:AuthKitOrganizationId`. `account -o` takes that id, not the 2S organization of `-p <org>.<project>`. Without the setting, a test runs `account` without `-o` (a pool user in one organization needs none).
+- The expected exit codes are those of `src/Platform/Cli/src/ExitCodes.cs`: 0 success, -1 input parsing, 1 crash, 2 wrong input, 3 service failure, 40 aborted, 42 no work needed, 43 interaction needed, 44 unauthorized, 45 partial result. "Fails" without a code means a non-zero code other than 1; a crash (1) fails every case, except a step marked with a known CLI defect (the last rule).
+- A prompt on redirected input ends the command at once: with 2 when it asks for a value an option gives, with 43 for a confirmation that `-y|--yes` skips or a command that needs a terminal. stderr then has "! sform cannot ask for `<question>`: the input is redirected." and a hint that names the option.
+- A machine with an API key or a certificate is checked by the API on its first call: `account` prints "The API checks the credentials on the first call." and exits 0. A case checks such a credential with a read (`story get <rst>`).
+- The target project enables every machine credential kind (`account machine machine-auth -p <org>.<project> -k ApiKey,Certificate,CertificateAndApiKey,ClientCredentials,Federated`), so the cases outside mode P create machines of any kind and issue shared certificates there. A case deletes the machines it creates and revokes the shared certificates it issues.
+- Annotation keys, names and values are generated (Bogus, seeded) under the target project and are not deleted, except where a case deletes them. `<rst>` stands for a generated responsibility key such as `rst.cli-3f9a`, `<unt>` for a generated unit of it (`unt.<name of rst>.<unit>`, such as `unt.cli-3f9a.job`; `<unt1>` is a unit of `<rst1>`), and `<key>` for a generated key-value key.
+- Steps are written as the command line, without `sform`. The area subcommands of `story` (`config`, `kv`, `template`, `schema`, `export` and `import`) are written without `story` too (`kv get <key>` is `sform story kv get <key>`); every other command is written with its whole path (`account machine create`, `story set`). A step that is only options (`--properties d=x`) repeats the command and the arguments of the step before it with those options. An expectation on output is a check on stdout unless it says stderr. A file the steps write into `out/` assumes that the folder exists.
+- Formatted text printed without `--content-only` (`config -f flat`, `-f env`, `-f yaml`, …) has a line-number gutter (`N │ `) on each line, which a test strips before it parses the text.
+- Known CLI defects. A step marked with one expects what the CLI does today, the crash code 1 included, and the case changes when the defect is fixed:
+  - D1: `config set` reports every API refusal but 401 as "Error occurred: …" with exit 1, so a 403 (a Reader, a machine without Configuration.Write) is a crash (CFG-SET-12).
+  - D2: the schema writes (`schema … set`, `create`, `edit`) print a 403 with the server's message and "Error code: AccessDenied", then end with exit 1 instead of 44 (SCH-DEF-02, SCH-DEF-03).
+  - D3: `config patch` ends every API failure but 400, 404 and a schema violation with exit 1, so a failing `test` operation (412 PatchTestFailed) is a crash (CFG-SET-10).
+  - D4: `story get` does not catch the API's 400 InvalidKey for a key it cannot parse: "Total mayhem" and exit 1 (ANN-SET-07).
+  - D5: `account machine renew` writes no certificate. The API returns it as `Certificate` and `CertificatePassword`, and the SDK reads `Pkcs12` and `Password`, so sform prints only "Last renewed at: …" and the renewed certificate is lost (the old one stays valid until the overlap ends). A renewal before the window (400 NotInRenewalWindow, the window opens 30 days before expiry) is not caught either (exit 1), so the cases renew certificates of at most 29 days (MCH-CRD-05, MCH-CTX-01).
+  - D6: `config set -c|--custom-properties` and `-l|--labels` are parsed and never sent (CFG-SET-05).
+  - The catalogue avoids these paths, which crash too: `account points revoke -r` with a role lower than the member's (409); `account shared-cert issue` in a project without CertificateAndApiKey (400); a file that is not JSON for `-i` of `story set`, `config set`, `template set` and the schema sets, or a JSON array for `story set -i`. Not a crash, and checked only loosely by GEN-CLI-01: `sform --version` prints the version of `42.CLI.Toolkit`, not of sform (`Assembly.GetExecutingAssembly()` in the toolkit).
 
 Cases per section:
 
@@ -37,15 +52,15 @@ Cases per section:
 |---|---|---|
 | [Sign-in](#sign-in) | `Tests/SignIn` | 14 |
 | [Account and Access Points](#account-and-access-points) | `Tests/Account` | 15 |
-| [Machines](#machines) | `Tests/Machines` | 29 |
-| [Shared Certificates](#shared-certificates) | `Tests/SharedCertificates` | 5 |
-| [Annotations](#annotations) | `Tests/Annotations` | 37 |
-| [Configurations](#configurations) | `Tests/Configurations` | 31 |
-| [Templates](#templates) | `Tests/Templates` | 8 |
-| [Schemas](#schemas) | `Tests/Schemas` | 20 |
-| [Key-Values](#key-values) | `Tests/KeyValues` | 50 |
+| [Machines](#machines) | `Tests/Machines` | 30 |
+| [Shared Certificates](#shared-certificates) | `Tests/SharedCertificates` | 6 |
+| [Annotations](#annotations) | `Tests/Annotations` | 38 |
+| [Configurations](#configurations) | `Tests/Configurations` | 32 |
+| [Templates](#templates) | `Tests/Templates` | 9 |
+| [Schemas](#schemas) | `Tests/Schemas` | 21 |
+| [Key-Values](#key-values) | `Tests/KeyValues` | 54 |
 | [Context and Errors](#context-and-errors) | `Tests/General` | 10 |
-| **Total** | | **219** |
+| **Total** | | **229** |
 
 ## Sign-in
 
@@ -53,47 +68,47 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| SGN-DEV-01 | – | A pool user signs in with the device code and sees the account summary | Elementary | Any | F | `account`, `-o` | `DeviceCode_SignIn_ShowsAccount` |
-| SGN-DEV-02 | – | The aliases `access` and `login` report the signed-in user like `account` | Medium | Any | | `access`, `login` | `Account_Aliases_ReportSignedInUser` |
-| SGN-DEV-03 | – | Without `SFORM_DEVICE_CODE_OUTPUT` the prompt is text with the URL, the code, the complete URL and the expiry | Medium | Any | F | `account` | `DeviceCode_TextPrompt_ShowsCodeAndExpiry` |
-| SGN-DEV-04 | – | `-b` opens the complete URL; without an opener the CLI says to open it by hand | Low | Any | F | `-b`, `--browser` | `DeviceCode_Browser_OpensSignInPage` |
-| SGN-DEV-05 | – | A sign-in declined on the device page ends with exit 44 and stores no session | Medium | Any | F | `account` | `DeviceCode_Declined_StoresNoSession` |
-| SGN-DEV-06 | – | A user in several organizations without `-o` gets exit 2 and the list of organizations on redirected input | High | Any | F, X:MultiOrganization | `-o` | `DeviceCode_SeveralOrganizations_RequiresOrganization` |
-| SGN-DEV-07 | – | `-o` with an organization the user is not a member of fails with exit 2 | Medium | Any | F | `--organization` | `DeviceCode_UnknownOrganization_Fails` |
+| SGN-DEV-01 | 234 | A pool user signs in with the device code and sees the account summary | Elementary | Any | F | `account` | `DeviceCode_SignIn_ShowsAccount` |
+| SGN-DEV-02 | 236 | The aliases `access` and `login` report the signed-in user like `account` | Medium | Any | | `access`, `login` | `Account_Aliases_ReportSignedInUser` |
+| SGN-DEV-03 | 237 | Without `SFORM_DEVICE_CODE_OUTPUT` the prompt is text with the URL, the code, the complete URL and the expiry | Medium | Any | F | `account` | `DeviceCode_TextPrompt_ShowsCodeAndExpiry` |
+| SGN-DEV-04 | 238 | `-b` opens the complete URL; without an opener the CLI says to open it by hand | Low | Any | F | `-b`, `--browser` | `DeviceCode_Browser_OpensSignInPage` |
+| SGN-DEV-05 | 239 | A sign-in declined on the device page ends with exit 44 and stores no session | Medium | Any | F | `account` | `DeviceCode_Declined_StoresNoSession` |
+| SGN-DEV-06 | 240 | A user in several organizations without `-o` gets exit 2 and the list of organizations on redirected input, and `-o` picks one | High | Any | F, X:MultiOrganization | `-o` | `DeviceCode_SeveralOrganizations_RequiresOrganization` |
+| SGN-DEV-07 | 241 | `-o` with an organization the user is not a member of fails with exit 2, on a sign-in and against a stored session | Medium | Any | F | `-o`, `--organization` | `DeviceCode_UnknownOrganization_Fails` |
 
-- `SGN-DEV-01`: *Pre:* an empty `SFORM_HOME`, `SFORM_DEVICE_CODE_OUTPUT=json`. *Steps:* `account -o <org>`; read the JSON prompt on stderr; approve `verificationUriComplete` in the browser as the leased user. *Expect:* "You have been logged in as `<email>`", the account name and id, "You have access to N access points", "No default project is set" and exit 43. A second `account` run says "You are already logged in" and never prompts.
+- `SGN-DEV-01`: *Pre:* an empty `SFORM_HOME`, `SFORM_DEVICE_CODE_OUTPUT=json`. *Steps:* `account -o <AuthKit organization id>`; read the JSON prompt, the first line on stderr; approve `verificationUriComplete` in the browser as the leased user. *Expect:* "You have been logged in as `<email>`", the header `<name> @ <email>`, "Account ID: #`<id>`", "You have access to N access points.", "No default project is set, please call sform account set command." and exit 43. A second `account` run says "You are already logged in as `<email>`" and never prompts.
 - `SGN-DEV-02`: *Steps:* `access`, then `login`. *Expect:* both print "You are already logged in as `<email>`" and the same account id as `account`.
-- `SGN-DEV-03`: *Steps:* `account -o <org>`, read stdout until the code appears, approve it. *Expect:* the text has the verification URI, the user code, "with the code filled in" with the complete URI, and "The code expires in N minute(s)". No JSON line on stderr.
-- `SGN-DEV-04`: *Pre:* (a) `SFORM_BROWSER` set to a recording helper program; (b) `SFORM_BROWSER` set to a program that does not exist. *Steps:* `account -o <org> -b` in (a), and `account -o <org> --browser` in (b), approving each code. *Expect:* (a) the helper received `verificationUriComplete` as its only argument; (b) "The browser could not be opened, please open the address manually." and the sign-in still succeeds.
-- `SGN-DEV-05`: *Steps:* `account -o <org>`; decline the request on the device page. *Expect:* exit 44 and a message about the declined sign-in; a following `account` prompts for a new code.
-- `SGN-DEV-06`: *Steps:* `account` without `-o`, with input redirected. *Expect:* exit 2 within the timeout (no hang). stderr lists both organizations with their ids and names `-o|--organization`.
-- `SGN-DEV-07`: *Steps:* `account --organization <generated id>`, approve the code. *Expect:* exit 2, the organization is named in the error, and no session is stored.
+- `SGN-DEV-03`: *Steps:* `account -o <AuthKit organization id>`, read stdout until the code appears, approve it. *Expect:* "To sign in, open `<verification URI>` and enter the code `<code>`.", "Or open `<complete URI>` with the code filled in." and "The code expires in N minute(s)." No JSON line on stderr.
+- `SGN-DEV-04`: *Pre:* (a) `SFORM_BROWSER` set to a recording helper program; (b) `SFORM_BROWSER` set to a program that does not exist. *Steps:* `account -o <AuthKit organization id> -b` in (a), and `account -o <AuthKit organization id> --browser` in (b), approving each code. *Expect:* (a) the helper received `verificationUriComplete` as its only argument; (b) "The browser could not be opened, please open the address manually." and the sign-in still succeeds.
+- `SGN-DEV-05`: *Steps:* `account -o <AuthKit organization id>`; decline the request on the device page. *Expect:* "The sign-in was declined." and exit 44; no session is stored, and a following `account` prompts for a new code.
+- `SGN-DEV-06`: *Pre:* a pool user in two organizations. *Steps:* `account` without `-o`, with input redirected; approve the code. Then `account -o <id of the second organization>` and approve the code. *Expect:* exit 2 within the timeout (no hang), and no session stored. stderr has "! sform cannot ask for the organization to sign in to: the input is redirected." and "You belong to several organizations; pass one with -o|--organization <id>:", then both organizations with their ids and names. The second run signs in to the second organization and exits 43.
+- `SGN-DEV-07`: *Steps:* `account -o <generated id>`, approve the code; `account --organization <generated id>`, approve the code. Then sign in as in SGN-DEV-01 and run `account --organization <generated id>` against the stored session. *Expect:* both sign-ins end with exit 2 and "You are not a member of the organization '`<generated id>`'", followed by the user's organizations (or "WorkOS signed you in to your only organization, '`<id>`'."), and store no session. Against the stored session: exit 2 before any call, with "You are signed in as `<email>` to the organization '`<id>`', and -o|--organization asks for '`<generated id>`'." (or "… without an organization, …") and "Sign out with sform account logout, then sign in with -o."
 
 ### Machine Sign-in (`MachineSignInTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| SGN-MSI-01 | – | A machine with an API key signs in from the `STORYTELLER_*` variables without a prompt | Elementary | Machine | M | `account` | `Machine_ApiKey_SignsIn` |
-| SGN-MSI-02 | – | `STORYTELLER_KEY` gives the machine its project and view, and `-p` wins over it | Medium | Machine | M | `account`, `-p` | `Machine_StorytellerKey_SetsTarget` |
-| SGN-MSI-03 | – | Wrong machine credentials fail with exit 44 and name the variable | High | Machine | M | `account` | `Machine_WrongCredentials_Unauthorized` |
+| SGN-MSI-01 | 243 | A machine with an API key signs in from the `STORYTELLER_*` variables without a prompt | Elementary | Machine | M | `account` | `Machine_ApiKey_SignsIn` |
+| SGN-MSI-02 | 244 | `STORYTELLER_KEY` gives the machine its project and view, and `-p` wins over it | Medium | Machine | M | `get`, `-p` | `Machine_StorytellerKey_SetsTarget` |
+| SGN-MSI-03 | 245 | Wrong machine credentials fail on the first call with exit 44 and name the variable | High | Machine | M | `account` | `Machine_WrongCredentials_Unauthorized` |
 
-- `SGN-MSI-01`: *Pre:* `STORYTELLER_ENDPOINT` and the API key variable of the configured machine. *Steps:* `account`. *Expect:* exit 0, the machine's id and project in the output, and no file in `SFORM_HOME`.
-- `SGN-MSI-02`: *Steps:* `story get <rst>` with `STORYTELLER_KEY=<org>.<project>.<view>.<rst>`; then with `-p <org>.<other>`. *Expect:* the first reads from the key's project. The second targets the other project, and is refused when the machine has no access to it.
-- `SGN-MSI-03`: *Steps:* `account` with a modified API key. *Expect:* exit 44, and the message names the credential variable, not its value.
+- `SGN-MSI-01`: *Pre:* `STORYTELLER_ENDPOINT` and the API key variable of the configured machine. *Steps:* `account`. *Expect:* exit 0; "Signed in as machine `<id>` with an API key (`<variables>`).", "Project `<org>.<project>` with `<view>` view." and "The API checks the credentials on the first call."; no device code and no session in `SFORM_HOME`.
+- `SGN-MSI-02`: *Steps:* `story get <rst>` with `STORYTELLER_KEY=@<org>.<project>.<view>.<rst>`; then `story get <rst> -p <org>.<other>`. *Expect:* the first reads `<rst>` from the key's project and view. The second targets the other project: it stops before any call with exit 2 and "The machine credentials in `<variables>` belong to `<org>.<project>`, not `<org>.<other>`."
+- `SGN-MSI-03`: *Steps:* `account` with a modified API key; then `story get <rst>`. *Expect:* `account` exits 0, as the key is not checked before the first call. The read ends with exit 44, "You are not authorized to execute the command or you don't have access to requested resources." and "sform signed in as a machine with `<variables>`. …", which names the credential variable, not its value.
 
 ### Logout and Registration (`LogoutTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| SGN-OUT-01 | – | `account logout` removes the session, and the next command asks for a sign-in | High | Any | F | `logout` | `Logout_SignedIn_RemovesSession` |
-| SGN-OUT-02 | – | `account logout` without a session or with machine credentials changes nothing and exits 0 | Low | Any | F, M | `logout` | `Logout_NoSessionOrMachine_NothingToDo` |
-| SGN-OUT-03 | – | `account register` for a registered user says so and exits 0; without a sign-in it asks for `sform login` | Medium | Any | F | `register` | `Register_RegisteredOrSignedOut_Reports` |
-| SGN-OUT-04 | – | `account register` creates the account, the first project and the default project of a new user | Low | Any | F, T, X:Registration | `register` | `Register_NewUser_CreatesAccountAndProject` |
+| SGN-OUT-01 | 246 | `account logout` removes the session, and the next command is refused | High | Any | F | `logout` | `Logout_SignedIn_RemovesSession` |
+| SGN-OUT-02 | 248 | `account logout` without a session or with machine credentials changes nothing and exits 0 | Low | Any | F, M | `logout` | `Logout_NoSessionOrMachine_NothingToDo` |
+| SGN-OUT-03 | 249 | `account register` for a registered user says so and exits 0; without a sign-in the API refuses it with exit 44 | Medium | Any | F | `register` | `Register_RegisteredOrSignedOut_Reports` |
+| SGN-OUT-04 | 250 | `account register` creates the account, the first project and the default project of a new user; on redirected input it stops at the prompt | Low | Any | F, T, X:Registration | `register` | `Register_NewUser_CreatesAccountAndProject` |
 
-- `SGN-OUT-01`: *Steps:* sign in as in SGN-DEV-01, `account logout`, then `story -p <org>.<project>`. *Expect:* logout prints the user and exits 0; the token store in `SFORM_HOME` is empty; the read fails with exit 44 and asks for `sform login`.
-- `SGN-OUT-02`: *Steps:* `account logout` in an empty `SFORM_HOME`; then with machine variables. *Expect:* "No account is logged in this CLI instance."; then "sform uses the machine credentials in `STORYTELLER_…`". Both exit 0.
-- `SGN-OUT-03`: *Steps:* `account register` as the signed-in user; then in an empty `SFORM_HOME`. *Expect:* "You are already registered as `<email>` #`<id>`" and exit 0; then "You are not logged in, please call sform login first." and exit 43.
-- `SGN-OUT-04`: *Pre:* an unregistered pool user, signed in. *Steps:* `account register` in a terminal; answer the organization and project prompts with generated names. *Expect:* "Account … has been created", the default project set to `<org>.<project>` with the default view, and `access.default.json` written.
+- `SGN-OUT-01`: *Steps:* sign in as in SGN-DEV-01, `account logout`, then `story -p <org>.<project>`. *Expect:* "You have been logged out from account: `<name>`" and exit 0; the token store in `SFORM_HOME` is empty; the read goes without a token and fails with exit 44 and "You are not authorized to execute the command or you don't have access to requested resources."
+- `SGN-OUT-02`: *Steps:* `account logout` in an empty `SFORM_HOME`; then with machine variables. *Expect:* "No account is logged in this CLI instance."; then "sform uses the machine credentials in `STORYTELLER_…`. Nothing is stored, so there is nothing to log out; unset the variables to sign in as a user." Both exit 0.
+- `SGN-OUT-03`: *Steps:* sign in as in SGN-DEV-01, then `account register`; then `account register` in another, empty `SFORM_HOME`. *Expect:* "You are already registered as `<email>` #`<id>`" and exit 0, without a prompt; then the account call goes without a token: exit 44 and "You are not authorized to execute the command or you don't have access to requested resources."
+- `SGN-OUT-04`: *Pre:* an unregistered pool user, signed in. *Steps:* `account register` with input redirected; then `account register` in a terminal, answering the organization and project prompts with generated names. *Expect:* the first ends with exit 43 at the prompt and creates nothing; stderr has "! sform cannot ask for the organization and the project of the new account: the input is redirected." and "Run sform account register in a terminal." The second prints "Account `<email>` (`<name>`) has been created." and "Default project set to `<org>.<project>` with default view.", and writes `access.default.json`.
 
 ## Account and Access Points
 
@@ -101,49 +116,49 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| ACC-SET-01 | – | `account set -p -v` stores the default project and view, and later commands use them | Elementary | Any | | `set`, `-p`, `--projectKey`, `-v`, `--viewName` | `AccountSet_ProjectAndView_BecomeDefault` |
-| ACC-SET-02 | – | `account set` in a terminal offers the user's projects and stores the choice | Low | Any | T | `set` | `AccountSet_Interactive_SelectsProject` |
-| ACC-SET-03 | – | `account set` without `-p` on redirected input fails with exit 2 | Medium | Any | | `set` | `AccountSet_RedirectedWithoutProject_Fails` |
-| ACC-SET-04 | – | `account set -p` with a project the user has no access to fails and keeps the old default | Medium | Any | | `-p` | `AccountSet_UnknownProject_KeepsDefault` |
+| ACC-SET-01 | 268 | `account set -p -v` stores the default project and view, and later commands use them | Elementary | Any | | `set`, `-p`, `--projectKey`, `-v`, `--viewName` | `AccountSet_ProjectAndView_BecomeDefault` |
+| ACC-SET-02 | 269 | `account set` in a terminal offers the user's projects and stores the choice | Low | Any | T | `set` | `AccountSet_Interactive_SelectsProject` |
+| ACC-SET-03 | 270 | `account set` without `-p` on redirected input fails with exit 2 | Medium | Any | | `set` | `AccountSet_RedirectedWithoutProject_Fails` |
+| ACC-SET-04 | 271 | `account set -p` checks only the format: a key without a dot fails with exit 2, an unknown project is stored | Medium | Any | | `-p` | `AccountSet_ProjectKey_ChecksFormatOnly` |
 
-- `ACC-SET-01`: *Steps:* `account set -p <org>.<project> -v <view>`; `account`; `story` (no `-p`); then `account set --projectKey <org>.<project> --viewName default`. *Expect:* `account` prints "Default project set to `<org>.<project>` with `<view>` view" and exit 0. `story` lists the annotations of that view. The second set switches to `default`.
-- `ACC-SET-02`: *Steps:* `account set` in a terminal; pick the target project from the list. *Expect:* the list shows the user's projects with the current default preselected, and the choice is stored.
-- `ACC-SET-03`: *Steps:* `account set` with input redirected. *Expect:* exit 2 within the timeout; stderr names `-p`.
-- `ACC-SET-04`: *Steps:* `account set -p <org>.<generated>`. *Expect:* a non-zero exit with the project named; `access.default.json` unchanged.
+- `ACC-SET-01`: *Steps:* `account set -p <org>.<project> -v <view>`; `account`; `story` (no `-p`); then `account set --projectKey <org>.<project> --viewName default`. *Expect:* the set prints "Default project set to `<org>.<project>` with view `<view>`." and `account` prints "Default project set to `<org>.<project>` with `<view>` view." and exits 0. `story` lists the annotations of that view. The second set prints "Currently the default project is set to `<org>.<project>` and view is `<view>`." and switches to `default`.
+- `ACC-SET-02`: *Pre:* `account set -p <org>.<project>`. *Steps:* `account set` in a terminal; pick the target project from the list. *Expect:* the list shows the user's projects with `<org>.<project>` preselected, and the choice is stored.
+- `ACC-SET-03`: *Steps:* `account set` with input redirected. *Expect:* exit 2 within the timeout, before any call; stderr has "! sform cannot ask for the default project: the input is redirected." and "Pass it with -p|--projectKey <organizationName>.<projectName>."
+- `ACC-SET-04`: *Pre:* a default project is set. *Steps:* `account set -p only-org`; then `account set -p <org>.<generated>`. *Expect:* the first ends with exit 2 before any call, with "The project key 'only-org' is not in the format <organizationName>.<projectName>.", and `access.default.json` is unchanged. The second is not checked against the account: it stores the generated project as the default and exits 0.
 
 ### Access Points (`AccessPointTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| ACC-PNT-01 | – | `account points` lists the user's access points with the roles | High | Any | | `points` | `Points_List_ShowsRoles` |
-| ACC-PNT-02 | – | `points get -p` shows the members and roles of a project to an Administrator | High | Admin | | `get`, `-p`, `--pointKey` | `Points_Get_ShowsMembers` |
-| ACC-PNT-03 | – | `points get` by a Contributor is refused with exit 44 | Medium | Contributor | | `get` | `Points_GetAsContributor_Unauthorized` |
-| ACC-PNT-04 | – | `points create` creates a project the creator owns | Medium | Any | T, P | `create` | `Points_Create_CreatesOwnedProject` |
-| ACC-PNT-05 | – | `points grant` gives each role, Reader to Owner, to another pool user | High | Owner | P | `grant`, `arg0`, `-p`, `--point`, `-r`, `--role` | `Points_Grant_EachRole` |
-| ACC-PNT-06 | – | `points revoke -r` removes one role, and `revoke` without `-r` removes all | High | Owner | P | `revoke`, `arg0`, `-p`, `--point`, `-r`, `--role` | `Points_Revoke_OneOrAllRoles` |
-| ACC-PNT-07 | – | An Administrator cannot grant Owner, and an unknown role fails with exit 2 | Medium | Admin | P | `grant`, `-r` | `Points_GrantOwnerAsAdmin_Refused` |
+| ACC-PNT-01 | 272 | `account points` lists the user's access points with the roles | High | Any | | `points` | `Points_List_ShowsRoles` |
+| ACC-PNT-02 | 273 | `points get -p` shows the members and roles of a project to an Administrator; an unknown key fails with exit 2 | High | Admin | | `get`, `-p`, `--pointKey` | `Points_Get_ShowsMembers` |
+| ACC-PNT-03 | 274 | `points get` by a Contributor fails with exit 2 | Medium | Contributor | | `get` | `Points_GetAsContributor_Refused` |
+| ACC-PNT-04 | 295 | `points create` creates a project the creator owns and makes it the default project | Medium | Owner | T, P | `create` | `Points_Create_CreatesOwnedProject` |
+| ACC-PNT-05 | 296 | `points grant` gives each role, Reader to Owner, to another pool user | High | Owner | P | `grant`, `arg0`, `-p`, `--point`, `-r`, `--role`, `--role=Reader`, `--role=Contributor`, `--role=ContributorWithSecrets`, `--role=Administrator`, `--role=Owner` | `Points_Grant_EachRole` |
+| ACC-PNT-06 | 297 | `points revoke -r` removes a member of that role, and `revoke` without `-r` removes a Reader | High | Owner | P | `revoke`, `arg0`, `-p`, `--point`, `-r`, `--role`, `--role=Reader`, `--role=Contributor`, `--role=ContributorWithSecrets`, `--role=Administrator`, `--role=Owner` | `Points_Revoke_EachRole` |
+| ACC-PNT-07 | 298 | An Administrator cannot grant Owner, and an unknown or missing role grants Contributor | Medium | Owner | P | `grant`, `-r` | `Points_GrantAsAdministrator_RoleRules` |
 
-- `ACC-PNT-01`: *Steps:* `account points`. *Expect:* the target project with the user's role; exit 0.
-- `ACC-PNT-02`: *Steps:* `account points get -p <org>.<project>`; `account points get --pointKey <org>`. *Expect:* each lists the members with their roles, the leased user among them.
-- `ACC-PNT-03`: *Steps:* `account points get -p <org>.<contributor project>`. *Expect:* exit 44.
-- `ACC-PNT-04`: *Steps:* `account points create` in a terminal; enter a generated organization and project (or a project in the disposable organization). *Expect:* the project exists, and `points get` lists the user as Owner.
-- `ACC-PNT-05`: *Pre:* the account id of a second pool user (from `account` as that user). *Steps:* `points grant <id> -p <org>.<project> -r Reader`, then `--point … --role Contributor`, `Administrator`, `Owner`. *Expect:* after each, `points get` shows the granted role.
-- `ACC-PNT-06`: *Steps:* grant Contributor and Administrator, `points revoke <id> -p … -r Administrator`, then `points revoke <id> --point …`. *Expect:* first only Contributor remains, then the user is not a member.
-- `ACC-PNT-07`: *Steps:* as an Administrator, `points grant <id> -p … -r Owner`; then `-r Superuser`. *Expect:* the first is refused (exit 44); the second fails with exit 2 and lists the roles.
+- `ACC-PNT-01`: *Steps:* `account points`. *Expect:* "- `<org>.<project>` [`<role>`]" for the target project; exit 0.
+- `ACC-PNT-02`: *Steps:* `account points get -p <org>.<project>`; `account points get --pointKey <org>.<project>`; `account points get -p <org>.<generated>`. *Expect:* the first two list the members' account ids with their roles, the leased user's id among them. The third ends with exit 2 and "No access point with key '`<org>.<generated>`' has been found."
+- `ACC-PNT-03`: *Steps:* `account points get -p <org>.<contributor project>`. *Expect:* exit 2 and "You don't have administration permissions to the access point '`<org>.<contributor project>`'.", without a call for the members.
+- `ACC-PNT-04`: *Steps:* `account points create` in a terminal; pick "Create new" and enter a generated organization and project (or pick the disposable organization). *Expect:* the project exists, `account points get` lists the user as Owner, and `access.default.json` names it as the default project.
+- `ACC-PNT-05`: *Pre:* the account id of a second pool user (from `account` as that user). *Steps:* `account points grant <id> -p <org>.<project> -r Reader`, then `account points grant <id> --point <org>.<project> --role Contributor`, then the same with `-r ContributorWithSecrets`, `-r Administrator` and `-r Owner`. *Expect:* each prints "Access granted to `<id>` with role `<role>` to `<org>.<project>`.", and `account points get -p <org>.<project>` then shows that role (a grant only raises the role).
+- `ACC-PNT-06`: *Pre:* as ACC-PNT-05. *Steps:* for each role, a grant and a revoke of that role: `account points grant <id> -p <org>.<project> -r <role>`, then `account points revoke <id> -p <org>.<project> -r <role>` with `-r Reader`, `--role Contributor`, `-r ContributorWithSecrets`, `-r Administrator` and `-r Owner`. Then `account points grant <id> -p <org>.<project> -r Reader` and `account points revoke <id> --point <org>.<project>`. *Expect:* each revoke prints "Access revoked to `<id>` with role `<role>` to `<org>.<project>`.", and `account points get -p <org>.<project>` no longer lists the user. The revoke without `-r` sends the role Reader, which removes the Reader.
+- `ACC-PNT-07`: *Pre:* the account ids `<id2>` and `<id3>` of a second and a third pool user; `account points grant <id2> -p <org>.<project> -r Administrator` by the Owner. *Steps:* as the second user, an Administrator of the project: `account points grant <id3> -p <org>.<project> -r Owner`, then `account points grant <id3> -p <org>.<project> -r Superuser`. Then the Owner runs `account points revoke <id3> -p <org>.<project> -r Contributor`, and the second user `account points grant <id3> -p <org>.<project>` without `-r`. *Expect:* the first is refused with exit 44, "The account '`<id2>`' can't manage the role Owner on '`<org>.<project>`'." and "Error code: AccessDenied", and `<id3>` gets no role. The other two grants print "Access granted to `<id3>` with role Contributor to `<org>.<project>`." and exit 0, and `account points get -p <org>.<project>` shows `<id3>` as Contributor: an unknown role, or none, grants Contributor.
 
 ### Certificate Authority and Assistance (`AccountToolsTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| ACC-TLS-01 | – | `account ca` prints the CA certificate as PEM, and `-o` writes it to a file | Medium | Any | | `ca`, `-o`, `--output` | `Ca_Download_WritesPem` |
-| ACC-TLS-02 | – | `assist key` builds a valid annotation key from the answers | Low | Any | T | `assist`, `assistance`, `key` | `AssistKey_Answers_PrintsKey` |
-| ACC-TLS-03 | – | `assist key` on redirected input fails fast instead of waiting | Low | Any | | `key` | `AssistKey_Redirected_FailsFast` |
-| ACC-TLS-04 | – | `supervisor` and `scheduler` (and `supervise`, `schedule`) print that they are not available yet | Low | Any | | `supervisor`, `supervise`, `scheduler`, `schedule` | `Placeholders_PrintNotAvailable` |
+| ACC-TLS-01 | 312 | `account ca` prints the CA certificate as PEM without a sign-in, `-o` writes it to a file, and the context options change nothing | Medium | Any | F | `ca`, `-o`, `--output`, `-p`, `--projectKey`, `-v`, `--view` | `Ca_Download_WritesPem` |
+| ACC-TLS-02 | 314 | `assist key` builds a valid annotation key from the answers | Low | Any | T | `assistance`, `key` | `AssistKey_Answers_PrintsKey` |
+| ACC-TLS-03 | 317 | `assist` and `assist key` on redirected input end with exit 43 instead of waiting | Low | Any | | `assist`, `key` | `Assist_Redirected_FailsFast` |
+| ACC-TLS-04 | 319 | `supervisor` and `scheduler` (and `supervise`, `schedule`) print that they are not available yet | Low | Any | | `supervisor`, `supervise`, `scheduler`, `schedule` | `Placeholders_PrintNotAvailable` |
 
-- `ACC-TLS-01`: *Steps:* `account ca -p <org>.<project>`; `account ca -p … -o ca.pem`; `account ca -p … --output out/ca.pem`. *Expect:* a PEM block on stdout, then the same certificate in each file (it parses as X.509 and has the CA flag).
-- `ACC-TLS-02`: *Steps:* `assist key` in a terminal; pick Unit; answer `my-app` and `nightly`. Then `assistance key`, picking Responsibility. *Expect:* the printed key is `unt.my-app.nightly` (and a responsibility key), which `story set` accepts.
-- `ACC-TLS-03`: *Steps:* `assist key` with input redirected. *Expect:* a non-zero exit within the timeout, naming the interactive prompt.
-- `ACC-TLS-04`: *Steps:* each of the four names. *Expect:* "Under the development, will be implemented in version 1.1" and exit 0.
+- `ACC-TLS-01`: *Steps:* in an empty `SFORM_HOME`: `account ca`; `account ca -o ca.pem`; `account ca --output ca2.pem -p <org>.<project> -v <view>`; `account ca --projectKey <org>.<generated> --view <generated>`. *Expect:* a PEM block on stdout; "CA certificate written to ca.pem" and "CA certificate written to ca2.pem"; the same certificate each time (it parses as X.509 and has the CA flag) and exit 0. The certificate authority belongs to no project: no sign-in is needed, and `-p`, `--projectKey`, `-v` and `--view` change nothing.
+- `ACC-TLS-02`: *Steps:* `assist key` in a terminal; pick Unit; answer `my-app` and `nightly`. Then `assistance key`, picking Responsibility. *Expect:* "Your annotation key should be `unt.my-app.nightly`" (and a responsibility key), which `story set` accepts.
+- `ACC-TLS-03`: *Steps:* `assist key`, then `assist`, with input redirected. *Expect:* each ends with exit 43 within the timeout. stderr has "! sform cannot ask for the parts of the annotation key: the input is redirected." and "Run sform assist key in a terminal.", then "! sform cannot ask for the assist command to run: the input is redirected." and "Name it: sform assist key."
+- `ACC-TLS-04`: *Steps:* `supervisor`, `supervise`, `scheduler`, `schedule`. *Expect:* "Under the development, will be implemented in version 1.0" for `supervisor` and `supervise`, "Under the development, will be implemented in version 1.1" for `scheduler` and `schedule`; exit 0.
 
 ## Machines
 
@@ -151,83 +166,91 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| MCH-LIF-01 | – | `account machine` lists the project's machines with kind and scopes | High | Editor | | `machine` | `Machines_List_ShowsKindAndScopes` |
-| MCH-LIF-02 | – | `account agent` is the same list, and a Reader is refused | Medium | Reader | | `agent` | `Machines_ListAsReader_Unauthorized` |
-| MCH-LIF-03 | – | A created API key machine signs in with its key and reads with the default read-only scopes | Elementary | Editor | | `create`, `-r` | `Machine_CreateApiKey_ReadsOnly` |
-| MCH-LIF-04 | – | `-w` gives read and write scopes, and the machine writes a configuration | High | Editor | | `-w`, `--write` | `Machine_CreateWrite_WritesConfiguration` |
-| MCH-LIF-05 | – | `-r` read-only is refused a write with exit 44 | High | Editor | | `--read-only` | `Machine_ReadOnly_WriteRefused` |
-| MCH-LIF-06 | – | `-a` restricts the machine to one annotation and its descendants | High | Editor | | `-a`, `--annotation` | `Machine_Annotation_RestrictsAccess` |
-| MCH-LIF-07 | – | `--scope` accepts the enum name, the scope string and kebab case, repeated or comma-separated | Medium | Secrets | | `--scope` | `Machine_ScopeSyntaxes_Accepted` |
-| MCH-LIF-08 | – | A `Secrets.*` scope needs ContributorWithSecrets: a Contributor is refused | High | Contributor | | `--scope` | `Machine_SecretsScopeAsContributor_Refused` |
-| MCH-LIF-09 | – | `-m` grants each management scope, with an Administrator only | High | Admin | | `-m`, `--manage` | `Machine_ManagementScopes_Granted` |
-| MCH-LIF-10 | – | `-m` by a ContributorWithSecrets is refused | Medium | Secrets | | `-m` | `Machine_ManageAsNonAdmin_Refused` |
-| MCH-LIF-11 | – | `machine set` is an alias of `create` | Low | Editor | | `set` | `Machine_SetAlias_Creates` |
-| MCH-LIF-12 | – | `machine reset` issues a new API key, and the old one stops working | High | Editor | | `reset`, `arg0` | `Machine_Reset_RotatesKey` |
-| MCH-LIF-13 | – | `machine delete` (and `remove`) removes the machine, and its key stops working | High | Editor | | `delete`, `remove`, `arg0` | `Machine_Delete_RevokesAccess` |
+| MCH-LIF-01 | 242 | `account machine` (and `agent`) lists the project's machines with kind and scopes | High | Editor | | `machine`, `agent` | `Machines_List_ShowsKindAndScopes` |
+| MCH-LIF-02 | 258 | A Reader is refused the machine list | Medium | Reader | | `machine`, `agent` | `Machines_ListAsReader_Unauthorized` |
+| MCH-LIF-03 | 259 | A created API key machine reads with its key and the default read-only scopes | Elementary | Editor | | `create`, `-r` | `Machine_CreateApiKey_ReadsOnly` |
+| MCH-LIF-04 | 260 | `-w` gives read and write scopes, and the machine writes a configuration | High | Editor | | `-w`, `--write` | `Machine_CreateWrite_WritesConfiguration` |
+| MCH-LIF-05 | 261 | `--read-only` gives no write scope: a write is refused with exit 44 | High | Editor | | `--read-only` | `Machine_ReadOnly_WriteRefused` |
+| MCH-LIF-06 | 262 | `-a` restricts the machine to one annotation and its descendants | High | Editor | | `-a`, `--annotation` | `Machine_Annotation_RestrictsAccess` |
+| MCH-LIF-07 | 263 | `--scope` accepts the enum name, the scope string and kebab case, repeated or comma-separated; an unknown scope fails with exit 2 | Medium | Secrets | | `--scope`, `--scope=AnnotationRead`, `--scope=AnnotationWrite`, `--scope=ConfigurationRead`, `--scope=ConfigurationWrite`, `--scope=SecretsRead`, `--scope=SecretsWrite` | `Machine_ScopeSyntaxes_Accepted` |
+| MCH-LIF-08 | 279 | A `Secrets.*` scope needs ContributorWithSecrets: a Contributor is refused | High | Contributor | | `--scope` | `Machine_SecretsScopeAsContributor_Refused` |
+| MCH-LIF-09 | 281 | `-m` grants each management scope, with an Administrator only; `--scope` grants them too, and `-m` refuses a runtime scope | High | Admin | | `-m`, `--manage`, `--manage=ConfigurationTransfer`, `--manage=SchemaWrite`, `--manage=TemplateWrite`, `--manage=AnnotationManage`, `--manage=KeyValueManage`, `--scope=ConfigurationTransfer`, `--scope=SchemaWrite`, `--scope=TemplateWrite`, `--scope=AnnotationManage`, `--scope=KeyValueManage` | `Machine_ManagementScopes_Granted` |
+| MCH-LIF-10 | 283 | `-m` by a ContributorWithSecrets is refused | Medium | Owner | P | `-m` | `Machine_ManageAsNonAdmin_Refused` |
+| MCH-LIF-11 | 287 | `machine set` is an alias of `create` | Low | Editor | | `set` | `Machine_SetAlias_Creates` |
+| MCH-LIF-12 | 289 | `machine reset` issues a new API key, and the old one stops working | High | Editor | | `reset`, `arg0` | `Machine_Reset_RotatesKey` |
+| MCH-LIF-13 | 291 | `machine delete` (and `remove`) removes the machine, and its key stops working | High | Editor | | `delete`, `remove`, `arg0` | `Machine_Delete_RevokesAccess` |
 
-- `MCH-LIF-01`: *Steps:* create a machine, `account machine -p <org>.<project>`. *Expect:* the machine with its id, kind ApiKey and scopes.
-- `MCH-LIF-02`: *Steps:* `account agent -p …` as an Editor, then as a Reader. *Expect:* the same list; the Reader gets exit 44.
-- `MCH-LIF-03`: *Steps:* `machine create -p … -r`; capture the id and the key; `account` and `story get <rst>` with the key in the variables. *Expect:* scopes AnnotationRead and ConfigurationRead; the machine signs in and reads.
-- `MCH-LIF-04`: *Steps:* `machine create -p … -w` (and `--write`); `config set <rst> -x a=1` as the machine. *Expect:* AnnotationRead/Write and ConfigurationRead/Write; the write succeeds.
-- `MCH-LIF-05`: *Steps:* `machine create -p … --read-only`; `config set <rst> -x a=1` as the machine. *Expect:* exit 44 naming Configuration.Write.
-- `MCH-LIF-06`: *Steps:* `machine create -p … -w -a <rst>`, then `--annotation <rst>`; as the machine, read `<rst>.<unt>` and another responsibility. *Expect:* the descendant reads; the other is refused (exit 44).
-- `MCH-LIF-07`: *Steps:* `machine create -p … --scope SecretsRead --scope Secrets.Write`; another with `--scope secrets-read,configuration-read`. *Expect:* the stored scopes equal the requested ones plus the read scopes the server adds.
-- `MCH-LIF-08`: *Steps:* `machine create -p <contributor project> --scope SecretsRead`. *Expect:* exit 44.
-- `MCH-LIF-09`: *Steps:* `machine create -p … -w -m ConfigurationTransfer,SchemaWrite -m TemplateWrite --manage AnnotationManage --manage KeyValueManage`. *Expect:* all five management scopes are stored, next to the runtime scopes.
-- `MCH-LIF-10`: *Steps:* `machine create -p … -m SchemaWrite` as a ContributorWithSecrets. *Expect:* exit 44.
-- `MCH-LIF-11`: *Steps:* `machine set -p … -r`. *Expect:* a machine is created as by `create`.
-- `MCH-LIF-12`: *Steps:* create; `machine reset <id>`; sign in with the old key, then with the new one. *Expect:* old key exit 44, new key exit 0.
-- `MCH-LIF-13`: *Steps:* create two; `machine delete <id1>`; `machine remove <id2>`. *Expect:* neither is listed, and both keys get exit 44.
+- `MCH-LIF-01`: *Steps:* create a machine; `account machine -p <org>.<project>`; `account agent -p <org>.<project>`. *Expect:* both list the machine with its id, kind ApiKey and scopes.
+- `MCH-LIF-02`: *Steps:* as a Reader, `account machine -p <org>.<project>`, then `account agent -p <org>.<project>`. *Expect:* both end with exit 44, "No Contributor access to '`<org>.<project>`'." and "Error code: AccessDenied".
+- `MCH-LIF-03`: *Steps:* `account machine create -p … -r`; capture the id and the key; `account` and `story get <rst>` with the key in the variables. *Expect:* scopes AnnotationRead and ConfigurationRead, "Make sure to copy the access key (secret), it is not stored anywhere." and the variables to set; the machine signs in and reads.
+- `MCH-LIF-04`: *Steps:* `account machine create -p … -w` (and `--write`); `config set <rst> -x a=1` as the machine. *Expect:* AnnotationRead/Write and ConfigurationRead/Write; the write succeeds.
+- `MCH-LIF-05`: *Steps:* `account machine create -p … --read-only`; `story set <new rst>` as the machine. *Expect:* exit 44, "This operation needs the scope Annotation.Write, which the machine was not created with." and "Error code: AccessDenied"; the annotation is not created.
+- `MCH-LIF-06`: *Steps:* `account machine create -p … -w -a <rst>`, then `--annotation <rst>`; as each machine, `story get <unt>` (a unit of `<rst>`) and `story get <rst2>` (another responsibility). *Expect:* the unit reads; the other is refused (exit 44).
+- `MCH-LIF-07`: *Steps:* `account machine create -p … --scope AnnotationRead,annotation-write --scope Configuration.Read --scope configuration-write --scope SecretsRead --scope Secrets.Write`; another with `--scope secrets-read,configuration-read`; then `--scope Superuser`. *Expect:* the stored scopes equal the requested ones plus the read scopes the server adds. The last ends with exit 2 before any call: "Unknown machine scope 'Superuser'. Use AnnotationRead, AnnotationWrite, …".
+- `MCH-LIF-08`: *Steps:* `account machine create -p <contributor project> --scope SecretsRead`. *Expect:* exit 44, "No ContributorWithSecrets access to '`<contributor project>`'." and "Error code: AccessDenied"; no machine is created.
+- `MCH-LIF-09`: *Steps:* `account machine create -p … -w -m ConfigurationTransfer,SchemaWrite -m TemplateWrite --manage AnnotationManage --manage KeyValueManage`; `account machine create -p … -w --scope ConfigurationTransfer,SchemaWrite,TemplateWrite,AnnotationManage,KeyValueManage`; `account machine create -p … -m SecretsRead`. *Expect:* both machines store all five management scopes next to the runtime scopes. The last ends with exit 2 before any call: "Secrets.Read is not a management scope; give it with --scope. --manage takes ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage."
+- `MCH-LIF-10`: *Pre:* the account id `<id2>` of a second pool user; `account points grant <id2> -p <org>.<project> -r ContributorWithSecrets` by the Owner. *Steps:* as the second user, `account machine create -p <org>.<project> -m SchemaWrite`. *Expect:* exit 44, "No Administrator access to '`<org>.<project>`'." and "Error code: AccessDenied"; no machine is created.
+- `MCH-LIF-11`: *Steps:* `account machine set -p … -r`. *Expect:* a machine is created as by `create`.
+- `MCH-LIF-12`: *Steps:* create a machine; `account machine reset <id>`; read as the machine (`story get <rst>`) with the old key, then with the new one. *Expect:* the old key gets exit 44, the new key exit 0.
+- `MCH-LIF-13`: *Steps:* create two machines; `account machine delete <id1>`; `account machine remove <id2>`. *Expect:* neither is listed by `account machine`, and a read (`story get <rst>`) with either key gets exit 44.
 
 ### Credential Kinds (`MachineCredentialTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| MCH-CRD-01 | – | `-k Certificate` with `-o` writes a .pfx, and the machine signs in over mTLS | High | Editor | | `-k`, `--credential-kind`, `-o`, `--output`, `-l`, `--lifetime-days` | `Machine_Certificate_SignsInWithPfx` |
-| MCH-CRD-02 | – | `-k CertificateAndApiKey` needs both, and `-s` uses a shared certificate with the API key | Medium | Editor | | `-k`, `-s`, `--shared-certificate` | `Machine_CertificateAndApiKey_SharedCertificate` |
-| MCH-CRD-03 | – | `-k ClientCredentials` returns a client id and secret that sign in | Medium | Editor | | `-k` | `Machine_ClientCredentials_SignsIn` |
-| MCH-CRD-04 | – | `-k ApiKey` explicitly, and a kind the project does not enable fails with exit 2 | Medium | Editor | P | `-k` | `Machine_DisabledKind_Fails` |
-| MCH-CRD-05 | – | `machine renew -c -o` renews the certificate of a certificate machine | High | Editor | | `renew`, `arg0`, `-c`, `--certificate`, `-o`, `--output` | `Machine_Renew_WritesNewPfx` |
+| MCH-CRD-01 | 304 | `-k Certificate` with `-o` writes a .pfx, and the machine reads over mTLS | High | Editor | | `-k`, `--credential-kind`, `--credential-kind=Certificate`, `-o`, `--output`, `-l`, `--lifetime-days` | `Machine_Certificate_SignsInWithPfx` |
+| MCH-CRD-02 | 305 | `-k CertificateAndApiKey` needs both, and `-s` uses a shared certificate with the API key | Medium | Owner | P | `-k`, `--credential-kind=CertificateAndApiKey`, `-s`, `--shared-certificate` | `Machine_CertificateAndApiKey_SharedCertificate` |
+| MCH-CRD-03 | 306 | `-k ClientCredentials` returns a client id and secret that sign in | Medium | Editor | | `-k`, `--credential-kind=ClientCredentials` | `Machine_ClientCredentials_SignsIn` |
+| MCH-CRD-04 | 307 | `-k ApiKey` explicitly; a kind the project does not enable fails with exit 2, an unknown kind with the parse code | Medium | Owner | P | `-k`, `--credential-kind=ApiKey` | `Machine_DisabledOrUnknownKind_Fails` |
+| MCH-CRD-05 | 308 | `machine renew -c --password-stdin -o` renews the certificate of a certificate machine inside the renewal window | High | Editor | | `renew`, `arg0`, `-c`, `--certificate`, `--password-stdin`, `-o`, `--output` | `Machine_Renew_WritesNewPfx` |
 
-- `MCH-CRD-01`: *Steps:* `machine create -p … -r -k Certificate -l 7 -o m.pfx`; a second with `--credential-kind Certificate --lifetime-days 30 --output m2.pfx`; sign in with the certificate variables. *Expect:* the .pfx files exist, with expiry in 7 and 30 days; the machine signs in.
-- `MCH-CRD-02`: *Pre:* a shared certificate (CRT-SHC-02). *Steps:* `machine create -p … -k CertificateAndApiKey -o m.pfx`; then `-k CertificateAndApiKey -s`; sign in with the shared .pfx and each key. *Expect:* the first has its own certificate; the `-s` machine has no .pfx and signs in with the shared certificate and its key.
-- `MCH-CRD-03`: *Steps:* `machine create -p … -r -k ClientCredentials`; sign in with the client id and secret variables. *Expect:* the client credentials are printed once and work.
-- `MCH-CRD-04`: *Pre:* `machine-auth -k ApiKey` on the disposable project. *Steps:* `machine create -p … -k ApiKey`; then `-k Certificate`. *Expect:* the first works; the second fails with exit 2 and lists the enabled kinds.
-- `MCH-CRD-05`: *Steps:* create a certificate machine; `machine renew <id> -c m.pfx -o renewed.pfx`; then `--certificate renewed.pfx --output r2.pfx`. *Expect:* each new .pfx has a later expiry and signs in; the old certificate stops working (or the documented overlap applies).
+- `MCH-CRD-01`: *Steps:* `account machine create -p … -r -k Certificate -l 7 -o m.pfx`; a second with `--credential-kind Certificate --lifetime-days 30 --output m2.pfx`; read as each machine with the certificate variables. *Expect:* "Certificate written to m.pfx" and the certificate password, printed once; the .pfx files exist, with expiry in 7 and 30 days; the machines read.
+- `MCH-CRD-02`: *Pre:* in the disposable project, `account machine machine-auth -p <org>.<project> -k ApiKey,CertificateAndApiKey`, `account shared-cert issue s1 -p <org>.<project> -o s.pfx` and `<rst>`. *Steps:* `account machine create -p … -k CertificateAndApiKey -o m.pfx`; `account machine create -p … -s`; `account machine create -p … -k CertificateAndApiKey --shared-certificate`; `account machine create -p … -k ApiKey -s`; a read (`story get <rst>`) as each created machine with its certificate and its key. *Expect:* the first has its own certificate and a key. The `-s` machines are CertificateAndApiKey machines without a .pfx ("The machine has no certificate of its own: it presents a shared certificate of the project with its API key (sform account shared-cert).") and read with s.pfx and their keys. `-k ApiKey -s` ends with exit -1 before any call: "A shared certificate is used only by certificate-and-api-key machines, not ApiKey."
+- `MCH-CRD-03`: *Steps:* `account machine create -p … -r -k ClientCredentials`; `account` and a read with the client id and secret variables. *Expect:* "Client ID:", "Client secret:" and "Token URL:", printed once, and "Make sure to copy the client secret, it is not stored anywhere."; `account` gets a token and the machine reads.
+- `MCH-CRD-04`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey` on the disposable project. *Steps:* `account machine create -p … -k ApiKey`; then `-k Certificate`; then `-k Password`. *Expect:* the first works. The second fails with exit 2 and "The credential kind Certificate is not enabled in the project `<org>.<project>`." The third ends with exit -1 before any call: "Unknown credential kind 'Password'. Use ApiKey, Certificate, CertificateAndApiKey, ClientCredentials, or Federated."
+- `MCH-CRD-05`: *Steps:* `account machine create -p … -r -k Certificate -l 7 -o m.pfx` (inside the renewal window, which opens 30 days before expiry); `account machine renew <id> -c m.pfx --password-stdin -o renewed.pfx` with the certificate password as the first line of stdin; then `account machine renew <id> --certificate m.pfx --password-stdin --output r2.pfx` with the same password. *Expect:* (defect D5) the first renews on the server and exits 0 with "Last renewed at: `<time>`", and writes no renewed.pfx (with the fix: "Renewed certificate written to renewed.pfx" and the new password, printed once). The second presents the replaced certificate: "The certificate for this machine access was already renewed at …" and "Last renewed at: `<time>`", exit 0, no r2.pfx. m.pfx still reads during the overlap. Without `--password-stdin` on redirected input, see GEN-CLI-03.
 
 ### Authentication Policy (`MachineAuthPolicyTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| MCH-POL-01 | – | `machine machine-auth` shows the project's policy | Medium | Editor | | `machine-auth` | `MachineAuth_Show_PrintsPolicy` |
-| MCH-POL-02 | – | `machine-auth -k -d -l` sets the kinds, the default kind and the lifetime | High | Admin | P | `-k`, `--credential-kind`, `-d`, `--default-kind`, `-l`, `--lifetime-days` | `MachineAuth_Set_ChangesPolicy` |
-| MCH-POL-03 | – | A default kind that is not enabled fails with exit 2 | Low | Admin | P | `-d` | `MachineAuth_DefaultNotEnabled_Fails` |
+| MCH-POL-01 | 329 | `machine machine-auth` shows the project's policy | Medium | Editor | | `machine-auth` | `MachineAuth_Show_PrintsPolicy` |
+| MCH-POL-02 | 330 | `machine-auth -k -d -l` sets the kinds, the default kind and the lifetime, each kind in turn | High | Owner | P | `-k`, `--credential-kind`, `-d`, `--default-kind`, `-l`, `--lifetime-days`, `--credential-kind=ApiKey`, `--credential-kind=Certificate`, `--credential-kind=CertificateAndApiKey`, `--credential-kind=ClientCredentials`, `--credential-kind=Federated`, `--default-kind=ApiKey`, `--default-kind=Certificate`, `--default-kind=CertificateAndApiKey`, `--default-kind=ClientCredentials`, `--default-kind=Federated` | `MachineAuth_Set_ChangesPolicy` |
+| MCH-POL-03 | 331 | A default kind that is not enabled, or `-d` without `-k`, fails with the parse code and changes nothing | Low | Owner | P | `-d` | `MachineAuth_DefaultNotEnabled_Fails` |
 
-- `MCH-POL-01`: *Steps:* `account machine machine-auth -p …`. *Expect:* the enabled kinds, the default kind and the lifetime.
-- `MCH-POL-02`: *Steps:* `machine-auth -p … -k ApiKey -k Certificate -d Certificate -l 14`; then `--credential-kind ApiKey,ClientCredentials --default-kind ApiKey --lifetime-days 30`; create a machine without `-k`. *Expect:* the policy shows each change, and the new machine gets the default kind.
-- `MCH-POL-03`: *Steps:* `machine-auth -p … -k ApiKey -d Certificate`. *Expect:* exit 2, the policy unchanged.
+- `MCH-POL-01`: *Steps:* `account machine machine-auth -p …`. *Expect:* "Machine authentication policy of `<org>.<project>`:" with the enabled kinds, the default kind and the lifetime.
+- `MCH-POL-02`: *Steps:* `account machine machine-auth -p … -k ApiKey -k Certificate -d Certificate -l 14`; `account machine create -p … -r` (without `-k`); `account machine machine-auth -p … --credential-kind ApiKey,ClientCredentials --default-kind ClientCredentials --lifetime-days 30`; `account machine machine-auth -p … -k CertificateAndApiKey,Federated -d CertificateAndApiKey`; `account machine machine-auth -p … -k Federated,ApiKey -d Federated`; `account machine machine-auth -p … -k ApiKey -d ApiKey`. *Expect:* each change prints the policy with the enabled kinds, the default kind and the lifetime; the machine created without `-k` gets the default kind, Certificate.
+- `MCH-POL-03`: *Steps:* `account machine machine-auth -p … -k ApiKey -d Certificate`; `account machine machine-auth -p … -d ApiKey`. *Expect:* exit -1 and "The --default-kind has to be one of the enabled kinds: ApiKey."; then exit -1 and "At least one --credential-kind is required: ApiKey, Certificate, CertificateAndApiKey, ClientCredentials, or Federated."; the policy is unchanged.
 
 ### Federation (`MachineFederationTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| MCH-FED-01 | – | `machine issuer set` with `--jwks-file` stores an issuer, and `issuer list` shows it | High | Admin | P | `issuer`, `issuers`, `set`, `list`, `arg0`, `--issuer`, `--jwks-file`, `--max-lifetime`, `--require-claim`, `--description` | `Issuer_SetWithJwksFile_Listed` |
-| MCH-FED-02 | – | `issuer create --jwks-uri` replaces settings not given, and the issuer URL of an existing issuer cannot change | Medium | Admin | P | `create`, `--jwks-uri` | `Issuer_Replace_ClearsSettings` |
-| MCH-FED-03 | – | `issuer list` works for a Contributor; `issuer set` by a Contributor is refused | Medium | Contributor | | `list`, `set` | `Issuer_ContributorRights` |
-| MCH-FED-04 | – | `issuer delete` (and `remove`) deletes an issuer, even with rules referencing it | Medium | Admin | P | `delete`, `remove`, `arg0` | `Issuer_Delete_Removes` |
-| MCH-FED-05 | – | A federated machine created with `--issuer --audience --subject --claim` exchanges a token the test signs | High | Admin | P | `--issuer`, `--audience`, `--subject`, `--claim` | `Machine_Federated_ExchangesToken` |
-| MCH-FED-06 | – | A federated machine from `--rules-file` matches one of several rules | Medium | Admin | P | `--rules-file` | `Machine_FederatedRulesFile_Matches` |
-| MCH-FED-07 | – | `machine rules` shows the rules, and replaces them with options or a file | High | Admin | P | `rules`, `arg0`, `--issuer`, `--audience`, `--subject`, `--claim`, `--rules-file` | `MachineRules_ShowAndReplace` |
-| MCH-FED-08 | – | A token with a wrong subject, a missing claim or a lifetime above `--max-lifetime` is refused | Medium | Admin | P | `--subject`, `--require-claim`, `--max-lifetime` | `Machine_FederatedWrongToken_Refused` |
+| MCH-FED-01 | 337 | `machine issuer set` with `--jwks-file` stores an issuer, and `issuer list` and `issuer` show it | High | Owner | P | `issuer`, `issuers`, `set`, `list`, `arg0`, `--issuer`, `--jwks-file`, `--max-lifetime`, `--require-claim`, `--description` | `Issuer_SetWithJwksFile_Listed` |
+| MCH-FED-02 | 338 | `issuer create --jwks-uri` replaces settings not given, and the issuer URL of an existing issuer cannot change | Medium | Owner | P | `create`, `--jwks-uri` | `Issuer_Replace_ClearsSettings` |
+| MCH-FED-03 | 339 | `issuer list` works for a Contributor; `issuer set` by a Contributor is refused | Medium | Contributor | | `list`, `set` | `Issuer_ContributorRights` |
+| MCH-FED-04 | 340 | `issuer delete` (and `remove`) deletes an issuer, even with rules referencing it | Medium | Owner | P | `delete`, `remove`, `arg0` | `Issuer_Delete_Removes` |
+| MCH-FED-05 | 357 | A federated machine created with `--issuer --audience --subject --claim` exchanges a token the test signs | High | Owner | P | `--issuer`, `--audience`, `--subject`, `--claim` | `Machine_Federated_ExchangesToken` |
+| MCH-FED-06 | 358 | A federated machine from `-k Federated --rules-file` matches one of several rules | Medium | Owner | P | `--rules-file`, `--credential-kind=Federated` | `Machine_FederatedRulesFile_Matches` |
+| MCH-FED-07 | 359 | `machine rules` shows the rules, and replaces them with options or a file | High | Owner | P | `rules`, `arg0`, `--issuer`, `--audience`, `--subject`, `--claim`, `--rules-file` | `MachineRules_ShowAndReplace` |
+| MCH-FED-08 | 360 | A token with a wrong subject, a missing claim or a lifetime above `--max-lifetime` is refused | Medium | Owner | P | `--subject`, `--require-claim`, `--max-lifetime` | `Machine_FederatedWrongToken_Refused` |
 
-- `MCH-FED-01`: *Pre:* the test generates an RSA key pair and a JWKS file. *Steps:* `machine issuer set ci --issuer https://issuer.test/ --jwks-file jwks.json --max-lifetime 600 --require-claim repo=a --require-claim repo=b --description "CLI tests"`; `machine issuers list`. *Expect:* the issuer with its settings; the alternatives of `repo` listed.
-- `MCH-FED-02`: *Steps:* `issuer create ci --issuer https://issuer.test/ --jwks-uri https://…/jwks`; then the same name with another `--issuer`. *Expect:* the description and the claims are cleared; the change of the issuer URL fails with exit 2.
-- `MCH-FED-03`: *Steps:* as a Contributor, `issuer list`, then `issuer set x --issuer …`. *Expect:* the list works; the set gets exit 44.
-- `MCH-FED-04`: *Steps:* create two issuers and a rule on one; `issuer delete <a>`, `issuer remove <b>`. *Expect:* both are gone from the list.
-- `MCH-FED-05`: *Steps:* `machine create -p … -r --issuer ci --audience <token endpoint> --subject repo:x:* --claim env=prod`; sign a JWT with the matching claims; sign in as the machine with the federated token variables. *Expect:* kind Federated (implied by the rule); the exchange succeeds and the machine reads.
-- `MCH-FED-06`: *Steps:* write a rules file with two rules; `machine create -p … -r --rules-file rules.json`; sign in with tokens for each rule. *Expect:* both are accepted.
-- `MCH-FED-07`: *Steps:* `machine rules <id>`; `machine rules <id> --issuer ci --audience … --subject sub-2 --claim k=v`; `machine rules <id> --rules-file rules.json`. *Expect:* each call shows the current rules, and the token of an old rule is refused after a replace.
-- `MCH-FED-08`: *Steps:* exchange tokens with a wrong `sub`, without the required claim, and with `exp - iat` above 600 seconds. *Expect:* each sign-in fails with exit 44.
+- `MCH-FED-01`: *Pre:* the test generates an RSA key pair and a JWKS file. *Steps:* `account machine issuer set ci --issuer https://issuer.test/ --jwks-file jwks.json --max-lifetime 600 --require-claim repo=a --require-claim repo=b --description "CLI tests"`; `account machine issuers list`; `account machine issuer`. *Expect:* both lists show the issuer with its settings; the alternatives of `repo` listed.
+- `MCH-FED-02`: *Pre:* the test's JWKS file; `account machine issuer set ci --issuer https://issuer.test/ --jwks-file jwks.json --description "CLI tests" --require-claim repo=a`. *Steps:* `account machine issuer create ci --issuer https://issuer.test/ --jwks-uri https://…/jwks`; then `account machine issuer create ci --issuer https://other.test/ --jwks-uri https://…/jwks`. *Expect:* the first replaces the issuer: its keys come from the JWKS URL, and the description and the claims are cleared. The change of the issuer URL fails with exit 2 and the server's message.
+- `MCH-FED-03`: *Steps:* as a Contributor, `account machine issuer list`, then `account machine issuer set x --issuer https://issuer.test/`. *Expect:* the list works; the set gets exit 44.
+- `MCH-FED-04`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey,Federated`; the test's JWKS file. *Steps:* `account machine issuer set a --issuer https://a.test/ --jwks-file jwks.json`; `account machine issuer set b --issuer https://b.test/ --jwks-file jwks.json`; a federated machine with a rule on `a` (`account machine create -p … -r --issuer a --audience <token endpoint> --subject s`); `account machine issuer delete a`; `account machine issuer remove b`. *Expect:* both are gone from `account machine issuer list`.
+- `MCH-FED-05`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey,Federated`; the test's RSA key pair and JWKS file, and `account machine issuer set ci --issuer https://issuer.test/ --jwks-file jwks.json`. *Steps:* `account machine create -p … -r --issuer ci --audience <token endpoint> --subject repo:x:* --claim env=prod`; sign a JWT with the matching claims; `account` and a read as the machine with the federated token variables. *Expect:* kind Federated (implied by the rule); the exchange succeeds and the machine reads.
+- `MCH-FED-06`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey,Federated`; the test's RSA key pair and JWKS file, and `account machine issuer set ci --issuer https://issuer.test/ --jwks-file jwks.json`. *Steps:* write a rules file with two rules on `ci`; `account machine create -p … -r -k Federated --rules-file rules.json`; sign in with tokens for each rule. *Expect:* kind Federated; both tokens are accepted.
+- `MCH-FED-07`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey,Federated`; the test's RSA key pair and JWKS file, and `account machine issuer set ci --issuer https://issuer.test/ --jwks-file jwks.json`, and a federated machine `<id>` with a rule on `ci` (as in MCH-FED-05). *Steps:* `account machine rules <id>`; `account machine rules <id> --issuer ci --audience … --subject sub-2 --claim k=v`; `account machine rules <id> --rules-file rules.json`. *Expect:* each call shows the current rules, and the token of an old rule is refused after a replace.
+- `MCH-FED-08`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey,Federated`; the test's RSA key pair and JWKS file. *Steps:* `account machine issuer set ci --issuer https://issuer.test/ --jwks-file jwks.json --max-lifetime 600 --require-claim repo=a`; `account machine create -p … -r --issuer ci --audience <token endpoint> --subject repo:x:main`; then `account` as the machine with a token with a wrong `sub`, one without the `repo` claim, and one whose `exp - iat` is above 600 seconds. *Expect:* each sign-in fails with exit 44.
+
+### Context (`MachineContextTests`)
+
+| Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
+|---|---|---|---|---|---|---|---|
+| MCH-CTX-01 | 363 | Every machine command takes its project from `--projectKey`; `-v` and `--view` change nothing | Medium | Owner | P | `--projectKey`, `-v`, `--view` | `MachineCommands_ContextOptions_TargetProject` |
+
+- `MCH-CTX-01`: *Pre:* `<A>` is the target project, `<B>` the disposable project with `account machine machine-auth -p <B> -k ApiKey,Certificate,Federated`; the test generates an RSA key pair and a JWKS file. *Steps:* `account machine create --projectKey <B> --view <view> -r -k Certificate -l 7 -o c.pfx`; `account machine create --projectKey <B> -v <view> -r`; `account machine --projectKey <B> --view <view>`; `account machine --projectKey <B> -v <view>`; `account machine reset <id2> --projectKey <B> --view <view>`; `account machine reset <id2> --projectKey <B> -v <view>`; `account machine renew <id1> -c c.pfx --password-stdin --projectKey <B> --view <view>`; `account machine renew <id1> -c c.pfx --password-stdin --projectKey <B> -v <view>` (each with the password of c.pfx on stdin); `account machine machine-auth --projectKey <B> --view <view>`; `account machine machine-auth --projectKey <B> -v <view>`; `account machine issuer set ci --issuer https://issuer.test/ --jwks-file jwks.json --projectKey <B> --view <view>`; `account machine issuer set ci2 --issuer https://issuer2.test/ --jwks-file jwks.json --projectKey <B> -v <view>`; `account machine issuer --projectKey <B> --view <view>`; `account machine issuer --projectKey <B> -v <view>`; `account machine issuer list --projectKey <B> --view <view>`; `account machine issuer list --projectKey <B> -v <view>`; `account machine create --projectKey <B> -r --issuer ci --audience <token endpoint of B> --subject sub-1`; `account machine rules <id3> --projectKey <B> --view <view>`; `account machine rules <id3> --projectKey <B> -v <view>`; `account machine delete <id1> --projectKey <B> --view <view>`; `account machine delete <id2> --projectKey <B> -v <view>`; `account machine issuer delete ci2 --projectKey <B> --view <view>`; `account machine issuer delete ci --projectKey <B> -v <view>`. *Expect:* each command acts in B: the machines, the policy and the issuers are those of B and never appear in `account machine` or `account machine issuer list` of A. The first renew prints "Last renewed at: …" and the second that the certificate was already renewed (defect D5). `-v` and `--view` change nothing, as machines, issuers and the policy belong to the project.
 
 ## Shared Certificates
 
@@ -235,17 +258,19 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| CRT-SHC-01 | – | `account shared-cert` (and `certificate`) lists the project's shared certificates | Medium | Editor | | `shared-cert`, `certificate` | `SharedCert_List_ShowsCertificates` |
-| CRT-SHC-02 | – | `shared-cert issue -l -o` writes a .pfx with the label and the lifetime | High | Admin | P | `issue`, `arg0`, `-l`, `--lifetime-days`, `-o`, `--output` | `SharedCert_Issue_WritesPfx` |
-| CRT-SHC-03 | – | `shared-cert create` is an alias of `issue` | Low | Admin | P | `create` | `SharedCert_CreateAlias_Issues` |
-| CRT-SHC-04 | – | `shared-cert revoke` (and `delete`) by thumbprint stops the certificate | High | Admin | P | `revoke`, `delete`, `arg0` | `SharedCert_Revoke_StopsSignIn` |
-| CRT-SHC-05 | – | Issuing a shared certificate below the needed role is refused | Medium | Contributor | | `issue` | `SharedCert_IssueAsContributor_Refused` |
+| CRT-SHC-01 | 321 | `account shared-cert` (and `certificate`) lists the project's shared certificates | Medium | Admin | | `shared-cert`, `certificate` | `SharedCert_List_ShowsCertificates` |
+| CRT-SHC-02 | 323 | `shared-cert issue -l -o` writes a .pfx with the label and the lifetime | High | Owner | P | `issue`, `arg0`, `-l`, `--lifetime-days`, `-o`, `--output` | `SharedCert_Issue_WritesPfx` |
+| CRT-SHC-03 | 332 | `shared-cert create` is an alias of `issue` | Low | Owner | P | `create` | `SharedCert_CreateAlias_Issues` |
+| CRT-SHC-04 | 333 | `shared-cert revoke` (and `delete`) by thumbprint stops the certificate | High | Owner | P | `revoke`, `delete`, `arg0` | `SharedCert_Revoke_StopsSignIn` |
+| CRT-SHC-05 | 334 | Issuing a shared certificate below the needed role is refused | Medium | Contributor | | `issue` | `SharedCert_IssueAsContributor_Refused` |
+| CRT-SHC-06 | 335 | Every shared certificate command takes its project from `--projectKey`; `-v` and `--view` change nothing | Low | Owner | P | `--projectKey`, `-v`, `--view` | `SharedCertCommands_ContextOptions_TargetProject` |
 
-- `CRT-SHC-01`: *Steps:* issue one; `account shared-cert -p …`; `account certificate -p …`. *Expect:* both list it with its label, thumbprint and expiry.
-- `CRT-SHC-02`: *Steps:* `shared-cert issue lbl-1 -p … -l 10 -o s.pfx`; `issue lbl-2 --lifetime-days 20 --output s2.pfx`. *Expect:* two .pfx files with those lifetimes; the list shows both labels.
-- `CRT-SHC-03`: *Steps:* `shared-cert create lbl-3 -o s3.pfx`. *Expect:* as issue.
-- `CRT-SHC-04`: *Steps:* `shared-cert revoke <thumbprint 1>`; `shared-cert delete <thumbprint 2>`; sign in a `-s` machine with each. *Expect:* both revoked; the sign-ins fail with exit 44.
-- `CRT-SHC-05`: *Steps:* `shared-cert issue x -p <contributor project>`. *Expect:* exit 44.
+- `CRT-SHC-01`: *Steps:* `account shared-cert issue l-list -p … -o l.pfx`; `account shared-cert -p …`; `account certificate -p …`; at the end `account shared-cert revoke <thumbprint>`. *Expect:* both lists show it with its label, the start of its thumbprint, its expiry and Active.
+- `CRT-SHC-02`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey,CertificateAndApiKey`. *Steps:* `account shared-cert issue lbl-1 -p … -l 10 -o s.pfx`; `account shared-cert issue lbl-2 --lifetime-days 20 --output s2.pfx`. *Expect:* two .pfx files with those lifetimes; the list shows both labels.
+- `CRT-SHC-03`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey,CertificateAndApiKey`. *Steps:* `account shared-cert create lbl-3 -o s3.pfx`. *Expect:* as `issue`: s3.pfx, and lbl-3 in the list.
+- `CRT-SHC-04`: *Pre:* `account machine machine-auth -p <org>.<project> -k ApiKey,CertificateAndApiKey`; two shared certificates issued, and a `-s` machine (`account machine create -p … -s`). *Steps:* `account shared-cert revoke <thumbprint 1>`; `account shared-cert delete <thumbprint 2>`; a read (`story get <rst>`) as the `-s` machine with each certificate and its key. *Expect:* both revoked; the reads fail with exit 44.
+- `CRT-SHC-05`: *Steps:* `account shared-cert issue x -p <contributor project>`. *Expect:* exit 44.
+- `CRT-SHC-06`: *Pre:* `<A>` is the target project, `<B>` the disposable project with `account machine machine-auth -p <B> -k ApiKey,CertificateAndApiKey`. *Steps:* `account shared-cert issue l1 -o a.pfx --projectKey <B> --view <view>`; `account shared-cert issue l2 -o b.pfx --projectKey <B> -v <view>`; `account shared-cert --projectKey <B> --view <view>`; `account shared-cert --projectKey <B> -v <view>`; `account shared-cert revoke <thumbprint 1> --projectKey <B> --view <view>`; `account shared-cert revoke <thumbprint 2> --projectKey <B> -v <view>`. *Expect:* the certificates are issued, listed and revoked in B, and never appear in the list of A. `-v` and `--view` change nothing, as shared certificates belong to the project.
 
 ## Annotations
 
@@ -253,21 +278,21 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| ANN-LST-01 | – | `storyteller` (and `story`, `annotations`) lists the annotations of the view | High | Reader | | `storyteller`, `story`, `annotations` | `Story_List_ShowsAnnotations` |
-| ANN-LST-02 | – | `-r` and `-s` query responsibilities and subjects by name | Medium | Reader | | `-r`, `--responsibilities`, `-s`, `--subjects` | `Story_QueryByName_Filters` |
-| ANN-LST-03 | – | `-u` adds the usages of the queried responsibilities or subjects | Medium | Reader | | `-u`, `--usages` | `Story_Usages_Combined` |
-| ANN-LST-04 | – | `-c` queries contexts, and `-e` adds executions | Medium | Reader | | `-c`, `--contexts`, `-e`, `--executions` | `Story_ContextsAndExecutions` |
-| ANN-LST-05 | – | `-d` lists the descendants of one annotation | Medium | Reader | | `-d`, `--descendants` | `Story_Descendants_Listed` |
-| ANN-LST-06 | – | `-t` renders a tree by subjects, and `-b` picks the tree's root type | Low | Reader | | `-t`, `--tree`, `-b`, `--tree-root` | `Story_Tree_Rendered` |
-| ANN-LST-07 | – | `-k` continues a long list with the printed continuation token | Medium | Reader | P | `-k`, `--continuation-token` | `Story_ContinuationToken_NextPage` |
-| ANN-LST-08 | – | `-i`, `--deleted` and `-a` include inactive, deleted, or all annotations | Medium | Reader | | `-i`, `--inactive`, `--deleted`, `-a`, `--all` | `Story_IncludeInactiveDeletedAll` |
+| ANN-LST-01 | 235 | `storyteller` (and `story`, `annotations`) lists the annotations of the view | High | Reader | | `storyteller`, `story`, `annotations` | `Story_List_ShowsAnnotations` |
+| ANN-LST-02 | 251 | `-r` and `-s` query responsibilities and subjects by name | Medium | Reader | | `-r`, `--responsibilities`, `-s`, `--subjects` | `Story_QueryByName_Filters` |
+| ANN-LST-03 | 252 | `-u` adds the usages of the queried responsibilities or subjects | Medium | Reader | | `-u`, `--usages` | `Story_Usages_Combined` |
+| ANN-LST-04 | 253 | `-c` queries contexts, and `-e` adds executions | Medium | Reader | | `-c`, `--contexts`, `-e`, `--executions` | `Story_ContextsAndExecutions` |
+| ANN-LST-05 | 254 | `-d` lists the descendants of one annotation | Medium | Reader | | `-d`, `--descendants` | `Story_Descendants_Listed` |
+| ANN-LST-06 | 255 | `-t` renders a tree by subjects, and `-b` picks the tree's root type | Low | Reader | | `-t`, `--tree`, `-b`, `--tree-root`, `--tree-root=sbt`, `--tree-root=rst`, `--tree-root=responsibility` | `Story_Tree_Rendered` |
+| ANN-LST-07 | 256 | `-k` continues a long list with the printed continuation token | Medium | Owner | P | `-k`, `--continuation-token` | `Story_ContinuationToken_NextPage` |
+| ANN-LST-08 | 257 | `-i`, `--deleted` and `-a` include inactive, deleted, or all annotations | Medium | Reader | | `-i`, `--inactive`, `--deleted`, `-a`, `--all` | `Story_IncludeInactiveDeletedAll` |
 
 - `ANN-LST-01`: *Pre:* `<rst>` with a unit. *Steps:* `storyteller -p …`, `story -p …`, `annotations -p …`. *Expect:* the same list, `<rst>` in it.
 - `ANN-LST-02`: *Pre:* generated responsibilities and subjects with a common name part. *Steps:* `story -r <name>`, `--responsibilities <name>`, `-s <name>`, `--subjects <name>`. *Expect:* only the matching annotations of the type.
 - `ANN-LST-03`: *Pre:* a usage below a subject. *Steps:* `story -s <name> -u`; `story -r <name> --usages`. *Expect:* the usages appear with their owners.
 - `ANN-LST-04`: *Pre:* a context and an execution. *Steps:* `story -c <name>`, `--contexts <name> -e`, `-r <name> --executions`. *Expect:* contexts, then their executions.
 - `ANN-LST-05`: *Steps:* `story -d <rst>`, `--descendants <rst>`. *Expect:* the descendants of `<rst>` only.
-- `ANN-LST-06`: *Steps:* `story -t`, `story --tree -b sbt`, `--tree-root rst`. *Expect:* an indented tree rooted at the type.
+- `ANN-LST-06`: *Steps:* `story -t`; `story --tree -b sbt`; `story -t --tree-root rst`; `story -t -b responsibility`. *Expect:* the first two print "Tree of subjects" (subject, context, responsibility); the last two print "Tree of responsibilities" (responsibility, subject, context). `-b` takes effect with `-t` only, and any other value renders the subject tree.
 - `ANN-LST-07`: *Pre:* more annotations than a page in the disposable project. *Steps:* `story`; then `story -k <token>`; `--continuation-token <token 2>`. *Expect:* each page continues the previous, with no repeated keys.
 - `ANN-LST-08`: *Pre:* a disabled, a scheduled and a deleted annotation. *Steps:* `story`, `story -i`, `--inactive`, `--deleted`, `-a`, `--all`. *Expect:* the default list has none of them; `-i` adds disabled and scheduled; `--deleted` adds deleted; `-a` has all three.
 
@@ -275,23 +300,23 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| ANN-SET-01 | – | `story set` creates an annotation, and `story get` returns it | Elementary | Editor | | `set`, `arg0`, `get`, `arg0` | `Story_SetGet_RoundTrip` |
-| ANN-SET-02 | – | `story create` is an alias of `set`, and a second set updates | Medium | Editor | | `create` | `Story_CreateAlias_Updates` |
-| ANN-SET-03 | – | `-c` sets custom properties with typed values, and `-l` sets labels | High | Editor | | `-c`, `--custom-properties`, `-l`, `--labels` | `Story_CustomPropertiesAndLabels` |
-| ANN-SET-04 | – | `-i` imports one or several annotations from a file | High | Editor | | `-i`, `--import` | `Story_Import_FromFile` |
-| ANN-SET-05 | – | `get -e` saves the annotation into a file | Medium | Reader | | `-e`, `--export` | `Story_GetExport_WritesFile` |
-| ANN-SET-06 | – | Setting a deleted annotation fails without an option, `--restore-deleted` restores it, `--recreate` creates it new | High | Editor | | `--restore-deleted`, `--recreate` | `Story_SetDeleted_RestoreOrRecreate` |
-| ANN-SET-07 | – | An invalid key fails with exit 2, an unknown key with a not-found error | Medium | Reader | | `arg0` | `Story_InvalidOrUnknownKey_Fails` |
-| ANN-SET-08 | – | A Reader's `story set` is refused with exit 44 | Elementary | Reader | | `set` | `Story_SetAsReader_Unauthorized` |
-| ANN-SET-09 | – | A machine with Annotation.Write sets, and without it is refused | Medium | Machine | M | `set` | `Story_MachineScopes_Decide` |
+| ANN-SET-01 | 275 | `story set` creates an annotation, and `story get` returns it | Elementary | Editor | | `set`, `arg0`, `get`, `arg0` | `Story_SetGet_RoundTrip` |
+| ANN-SET-02 | 276 | `story create` is an alias of `set`, and a second set updates | Medium | Editor | | `create` | `Story_CreateAlias_Updates` |
+| ANN-SET-03 | 278 | `-c` sets custom properties with typed values, and `-l` sets labels | High | Editor | | `-c`, `--custom-properties`, `-l`, `--labels` | `Story_CustomPropertiesAndLabels` |
+| ANN-SET-04 | 284 | `-i` imports one annotation from a file under the given key | High | Editor | | `-i`, `--import` | `Story_Import_FromFile` |
+| ANN-SET-05 | 286 | `get -e` saves the annotation into a file | Medium | Reader | | `-e`, `--export` | `Story_GetExport_WritesFile` |
+| ANN-SET-06 | 290 | Setting a deleted annotation fails without an option, `--restore-deleted` restores it, `--recreate` creates it new | High | Editor | | `--restore-deleted`, `--recreate` | `Story_SetDeleted_RestoreOrRecreate` |
+| ANN-SET-07 | 292 | An unknown key fails with exit 2 and a not-found message; an invalid key is refused by the API | Medium | Reader | | `arg0` | `Story_InvalidOrUnknownKey_Fails` |
+| ANN-SET-08 | 293 | A Reader's `story set` is refused with exit 44 | Elementary | Reader | | `set` | `Story_SetAsReader_Unauthorized` |
+| ANN-SET-09 | 294 | A machine with Annotation.Write sets, and without it is refused | Medium | Machine | M | `set` | `Story_MachineScopes_Decide` |
 
 - `ANN-SET-01`: *Steps:* `story set <rst>`; `story get <rst>`. *Expect:* exit 0 both; get shows the key, the type and the name.
 - `ANN-SET-02`: *Steps:* `story create <rst>`; `story set <rst> -l a`. *Expect:* one annotation, updated.
 - `ANN-SET-03`: *Steps:* `story set <rst> -c owner=team-a -c count=3 -c on=true -c since=2026-11-01 --custom-properties ttl=1:30:00 -l x -l y --labels z`. *Expect:* get shows the properties as string, number, boolean, date and duration, and the labels x, y, z.
-- `ANN-SET-04`: *Steps:* write a file with three annotations; `story set -i anns.json`, then a single one with `--import one.json`. *Expect:* all are created as in the file.
-- `ANN-SET-05`: *Steps:* `story get <rst> -e a.json`; `--export out/b.json`. *Expect:* the files hold the annotation JSON.
-- `ANN-SET-06`: *Pre:* `<rst>` with a configuration, deleted. *Steps:* `story set <rst>`; `story set <rst> --restore-deleted -l r`; delete again; `story set <rst> --recreate`. *Expect:* the first fails and names both options; the restore brings back the configuration and history with the label; the recreate has an empty configuration.
-- `ANN-SET-07`: *Steps:* `story get not-a-key`; `story get rst.<generated>`. *Expect:* exit 2 for the first; a not-found message and a non-zero exit for the second.
+- `ANN-SET-04`: *Steps:* write `one.json` and `two.json`, each one annotation object with custom properties and labels; `story set <rst> -i one.json`; `story set <rst2> --import two.json`. *Expect:* `story get` shows the properties and labels of each file under the key given as the argument, which replaces the key and the name in the file.
+- `ANN-SET-05`: *Steps:* `story get <rst> -e a.json`; `--export out/b.json`; `story get <rst> -e a.json` again with input redirected. *Expect:* the files hold the annotation JSON; the third run rewrites a.json without asking and says "The file 'a.json' already exists and is rewritten."
+- `ANN-SET-06`: *Pre:* `<rst>` with a configuration, deleted. *Steps:* `story set <rst>`; `story set <rst> --restore-deleted -l r`; delete again; `story set <rst> --recreate`. *Expect:* without a terminal the first ends with exit 2; stderr has "! sform cannot ask for what happens to the deleted annotations: the input is redirected." and names both options. The restore brings back the configuration and history with the label; the recreate has an empty configuration.
+- `ANN-SET-07`: *Steps:* `story get rst.<generated>`; `story get not-a-key`. *Expect:* the first ends with exit 2 and "The annotation 'rst.`<generated>`' has not been found." The API refuses the second with 400 InvalidKey, which `story get` does not catch: "Total mayhem" and exit 1 (defect D4).
 - `ANN-SET-08`: *Steps:* `story set <rst>` in the Reader project. *Expect:* exit 44.
 - `ANN-SET-09`: *Steps:* as a `-w` machine, then a `-r` machine, `story set <rst>`. *Expect:* success, then exit 44 naming Annotation.Write.
 
@@ -299,21 +324,21 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| ANN-DEL-01 | – | `story delete` soft-deletes an annotation with its descendants | High | Editor | | `delete`, `arg0` | `Story_Delete_SoftDeletesTree` |
-| ANN-DEL-02 | – | `story remove` is an alias of `delete` | Low | Editor | | `remove` | `Story_RemoveAlias_Deletes` |
-| ANN-DEL-03 | – | `--permanent -y` deletes for good as an Administrator | High | Admin | | `--permanent`, `-y`, `--yes` | `Story_PermanentDelete_Admin` |
-| ANN-DEL-04 | – | `--permanent` asks for a confirmation in a terminal; No aborts with exit 40 | Medium | Admin | T | `--permanent` | `Story_PermanentDelete_ConfirmOrAbort` |
-| ANN-DEL-05 | – | `--permanent` without `-y` on redirected input fails fast, and by a Contributor is refused | Medium | Contributor | | `--permanent` | `Story_PermanentDelete_RedirectedOrContributor` |
-| ANN-DEL-06 | – | `story restore` restores several keys with their descendants | High | Editor | | `restore`, `arg0` | `Story_Restore_WithDescendants` |
-| ANN-DEL-07 | – | `restore --without-descendants` keeps the descendants deleted | Medium | Editor | | `--without-descendants` | `Story_RestoreWithoutDescendants` |
-| ANN-DEL-08 | – | `story deleted` (and `trash`) lists the deleted keys; `-a` lists every deleted annotation, `-k` pages | Medium | Reader | P | `deleted`, `trash`, `-a`, `--all`, `-k`, `--continuation-token` | `Story_Deleted_ListsTrash` |
-| ANN-DEL-09 | – | `story history` shows who changed what; `-n` limits it and `--json` writes JSON | Medium | Reader | | `history`, `arg0`, `-n`, `--top`, `--json` | `Story_History_ShowsChanges` |
+| ANN-DEL-01 | 309 | `story delete` soft-deletes an annotation with its descendants | High | Editor | | `delete`, `arg0` | `Story_Delete_SoftDeletesTree` |
+| ANN-DEL-02 | 310 | `story remove` is an alias of `delete` | Low | Editor | | `remove` | `Story_RemoveAlias_Deletes` |
+| ANN-DEL-03 | 311 | `--permanent -y` deletes for good as an Administrator | High | Admin | | `--permanent`, `-y`, `--yes` | `Story_PermanentDelete_Admin` |
+| ANN-DEL-04 | 313 | `--permanent` asks for a confirmation in a terminal; No aborts with exit 40 | Medium | Admin | T | `--permanent` | `Story_PermanentDelete_ConfirmOrAbort` |
+| ANN-DEL-05 | 315 | `--permanent` without `-y` on redirected input ends with exit 43, and a Contributor's permanent delete fails with exit 2 | Medium | Contributor | | `--permanent` | `Story_PermanentDelete_RedirectedOrContributor` |
+| ANN-DEL-06 | 316 | `story restore` restores several keys with their descendants | High | Editor | | `restore`, `arg0` | `Story_Restore_WithDescendants` |
+| ANN-DEL-07 | 318 | `restore --without-descendants` keeps the descendants deleted | Medium | Editor | | `--without-descendants` | `Story_RestoreWithoutDescendants` |
+| ANN-DEL-08 | 320 | `story deleted` (and `trash`) lists the deleted keys; `-a` lists every deleted annotation, `-k` pages | Medium | Owner | P | `deleted`, `trash`, `-a`, `--all`, `-k`, `--continuation-token` | `Story_Deleted_ListsTrash` |
+| ANN-DEL-09 | 322 | `story history` shows who changed what; `-n` limits it and `--json` writes JSON | Medium | Reader | | `history`, `arg0`, `-n`, `--top`, `--json` | `Story_History_ShowsChanges` |
 
-- `ANN-DEL-01`: *Steps:* `story delete <rst>`. *Expect:* `<rst>` and its unit are gone from `story` and appear in `story deleted`.
+- `ANN-DEL-01`: *Steps:* `story delete <rst>`. *Expect:* `<rst>` and its unit are gone from `story`; `story deleted` lists `<rst>` with 1 descendant, and `story deleted -a` lists the unit too.
 - `ANN-DEL-02`: *Steps:* `story remove <rst2>`. *Expect:* as delete.
 - `ANN-DEL-03`: *Steps:* `story delete <rst> --permanent -y`; another with `--yes`. *Expect:* not listed in `deleted`; `restore` fails.
-- `ANN-DEL-04`: *Steps:* `story delete <rst> --permanent` in a terminal; answer No, then Yes. *Expect:* exit 40 and the annotation still there; then deleted.
-- `ANN-DEL-05`: *Steps:* `story delete <rst> --permanent` with input redirected; then as a Contributor with `-y`. *Expect:* a fast non-zero exit naming `--yes`; exit 44.
+- `ANN-DEL-04`: *Steps:* `story delete <rst> --permanent` in a terminal; answer No, then Yes. *Expect:* "Nothing was deleted.", exit 40 and the annotation still there; then "Deleted '`<rst>`' … permanently."
+- `ANN-DEL-05`: *Steps:* as a Contributor, `story delete <rst> --permanent` of an existing key with input redirected; then `story delete <rst> --permanent -y`. *Expect:* the first ends with exit 43 within the timeout and `<rst>` stays; stderr has "! sform cannot ask for the confirmation of the permanent delete: the input is redirected." and "Pass -y|--yes to delete without asking." The second ends with exit 2 and "Only an Administrator or Owner can delete permanently."
 - `ANN-DEL-06`: *Steps:* delete `<rst1>` and `<rst2>`; `story restore <rst1> <rst2>`. *Expect:* both, with their units, are back.
 - `ANN-DEL-07`: *Steps:* delete `<rst>`; `story restore <rst> --without-descendants`. *Expect:* `<rst>` is back, its unit is still deleted.
 - `ANN-DEL-08`: *Pre:* a deleted parent with deleted children; more deleted keys than a page. *Steps:* `story deleted`, `story trash`, `story deleted -a`, `--all`, `-k <token>`, `--continuation-token <token>`. *Expect:* the default shows the requested keys, newest first; `-a` adds the children; the pages continue.
@@ -323,29 +348,37 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| ANN-TRN-01 | – | `story export` saves the view as a folder zip with the server's file name | High | Admin | P | `export` | `Export_Default_SavesZip` |
-| ANN-TRN-02 | – | `-f git` exports a git repository with every version as a commit | Medium | Admin | P | `-f`, `--format` | `Export_Git_HasCommits` |
-| ANN-TRN-03 | – | `-i` limits the kinds, comma-separated or repeated | Medium | Admin | P | `-i`, `--include` | `Export_IncludeKinds_Limits` |
-| ANN-TRN-04 | – | `-o` saves to a file or a folder, and `-x` unpacks into an empty folder | Medium | Admin | P | `-o`, `--output`, `-x`, `--extract` | `Export_OutputAndExtract` |
-| ANN-TRN-05 | – | `--timeout` stops waiting while the export continues on the server | Low | Admin | P | `--timeout` | `Export_Timeout_StopsWaiting` |
-| ANN-TRN-06 | – | `story import` imports a zip into another view, all four kinds | High | Admin | P | `import`, `arg0` | `Import_Zip_ImportsView` |
-| ANN-TRN-07 | – | `import` of a folder packs its JSON files without hidden files | Medium | Admin | P | `arg0` | `Import_Folder_SkipsHidden` |
-| ANN-TRN-08 | – | `-e skip` keeps existing documents, `-e overwrite` writes new versions | Medium | Admin | P | `-e`, `--existing` | `Import_ExistingMode_SkipOrOverwrite` |
-| ANN-TRN-09 | – | `--dry-run` reports every outcome and writes nothing | Medium | Admin | P | `--dry-run` | `Import_DryRun_WritesNothing` |
-| ANN-TRN-10 | – | Without `--force` a breaking schema fails and the rest imports; `--force` stores it with a warning | Medium | Admin | P | `--force`, `-i`, `--include`, `--timeout` | `Import_Force_StoresBreaking` |
-| ANN-TRN-11 | – | Export and import by a Contributor are refused; a machine needs Configuration.Transfer | Medium | Contributor | M | `export`, `import` | `Transfer_RolesAndScopes` |
+| ANN-TRN-01 | 341 | `story export` saves the view as a folder zip with the server's file name | High | Owner | P | `export` | `Export_Default_SavesZip` |
+| ANN-TRN-02 | 342 | `-f git` exports a git repository with every version as a commit | Medium | Owner | P | `-f`, `--format`, `--format=git`, `--format=folder` | `Export_Git_HasCommits` |
+| ANN-TRN-03 | 343 | `-i` limits the kinds, comma-separated or repeated | Medium | Owner | P | `-i`, `--include`, `--include=annotations`, `--include=schemas`, `--include=templates`, `--include=configurations` | `Export_IncludeKinds_Limits` |
+| ANN-TRN-04 | 344 | `-o` saves to a file or a folder, and `-x` unpacks into an empty folder | Medium | Owner | P | `-o`, `--output`, `-x`, `--extract` | `Export_OutputAndExtract` |
+| ANN-TRN-05 | 345 | `--timeout` stops waiting while the export continues on the server | Low | Owner | P | `--timeout` | `Export_Timeout_StopsWaiting` |
+| ANN-TRN-06 | 346 | `story import` imports a zip into another view, all four kinds or those of `-i` | High | Owner | P | `import`, `arg0`, `--include=annotations`, `--include=templates` | `Import_Zip_ImportsView` |
+| ANN-TRN-07 | 347 | `import` of a folder packs its JSON files without hidden files | Medium | Owner | P | `arg0` | `Import_Folder_SkipsHidden` |
+| ANN-TRN-08 | 348 | `-e skip` keeps existing documents, `-e overwrite` writes new versions | Medium | Owner | P | `-e`, `--existing`, `--existing=skip`, `--existing=overwrite` | `Import_ExistingMode_SkipOrOverwrite` |
+| ANN-TRN-09 | 350 | `--dry-run` reports every outcome and writes nothing | Medium | Owner | P | `--dry-run` | `Import_DryRun_WritesNothing` |
+| ANN-TRN-10 | 352 | Without `--force` a breaking schema fails and the rest imports; `--force` stores it with a warning | Medium | Owner | P | `--force`, `-i`, `--include`, `--timeout`, `--include=schemas`, `--include=configurations` | `Import_Force_StoresBreaking` |
+| ANN-TRN-11 | 354 | Export and import by a Contributor are refused; a machine needs Configuration.Transfer | Medium | Contributor | M | `export`, `import` | `Transfer_RolesAndScopes` |
 
 - `ANN-TRN-01`: *Pre:* a project with annotations, a schema, a template and configurations. *Steps:* `story export -p …`. *Expect:* a zip in the working folder with the server's name; it holds JSON files of the four kinds with versions.
 - `ANN-TRN-02`: *Steps:* `story export -f git`, `--format folder`. *Expect:* the git zip has a repository whose log has a commit per version; the folder zip as in 01.
 - `ANN-TRN-03`: *Steps:* `story export -i annotations,schemas`; `--include templates --include configurations`. *Expect:* only those kinds in each zip.
 - `ANN-TRN-04`: *Steps:* `export -o out.zip`; `--output dir/`; `-x -o unpacked`; `--extract --output unpacked2`. *Expect:* the zip at the path, in the folder, and the unpacked files.
-- `ANN-TRN-05`: *Pre:* a project big enough to take longer than the shortest timeout. *Steps:* `story export --timeout 0`. *Expect:* the CLI stops waiting with a message naming the job, and the job ends on the server.
-- `ANN-TRN-06`: *Steps:* export view A; `story import a.zip -p … -v B`. *Expect:* view B has the documents of A; the report lists the created documents.
+- `ANN-TRN-05`: *Pre:* a project big enough to take longer than the shortest timeout. *Steps:* `story export --timeout 0`. *Expect:* the CLI stops waiting with exit 40 and "The export `<id>` is still `<status>`; it continues on the server.", and the job ends on the server.
+- `ANN-TRN-06`: *Steps:* export view A; `story import a.zip -p … -v B`; `story import a.zip -p … -v C -i annotations,templates`. *Expect:* view B has the documents of A, and the report lists the created documents; view C has only the annotations and the templates.
 - `ANN-TRN-07`: *Steps:* a folder with JSON files plus `.git/` and `._x.json`; `story import folder/`. *Expect:* only the visible JSON files are imported.
 - `ANN-TRN-08`: *Steps:* change a configuration in B; `import a.zip -e skip`; `--existing overwrite`. *Expect:* skip keeps the change; overwrite writes A's content as a new version.
 - `ANN-TRN-09`: *Steps:* `import a.zip --dry-run`. *Expect:* every outcome and warning reported; `story`, `config versions` unchanged.
 - `ANN-TRN-10`: *Pre:* a zip with a schema the target's configurations break. *Steps:* `import x.zip -i schemas,configurations --timeout 10`; `import x.zip --include schemas --force`. *Expect:* the schema fails, and the configurations are imported; then the schema is stored with a warning.
 - `ANN-TRN-11`: *Steps:* `story export` and `story import` as a Contributor; as a machine with and without `-m ConfigurationTransfer` (plus the read scopes). *Expect:* exit 44 for the Contributor and the machine without the scope; the machine with it exports.
+
+### Context (`AnnotationContextTests`)
+
+| Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
+|---|---|---|---|---|---|---|---|
+| ANN-CTX-01 | 367 | Every annotation command takes its project from `--projectKey` and its view from `-v` or `--view` | Medium | Owner | P | `--projectKey`, `-v`, `--view` | `AnnotationCommands_ContextOptions_TargetProjectAndView` |
+
+- `ANN-CTX-01`: *Pre:* `<A>` is the target project, `<B>` the disposable project. *Steps:* `story set <rst1> --projectKey <B> --view <view>`; `story set <rst2> --projectKey <B> -v <view>`; `story --projectKey <B> --view <view>`; `story --projectKey <B> -v <view>`; `story get <rst1> --projectKey <B> --view <view>`; `story get <rst2> --projectKey <B> -v <view>`; `story history <rst1> --projectKey <B> --view <view>`; `story history <rst2> --projectKey <B> -v <view>`; `story export -o b1.zip --projectKey <B> --view <view>`; `story export -o b2.zip --projectKey <B> -v <view>`; `story delete <rst1> --projectKey <B> --view <view>`; `story delete <rst2> --projectKey <B> -v <view>`; `story deleted --projectKey <B> --view <view>`; `story deleted --projectKey <B> -v <view>`; `story restore <rst1> --projectKey <B> --view <view>`; `story restore <rst2> --projectKey <B> -v <view>`; `story import b1.zip --projectKey <B> --view <view2>`; `story import b2.zip --projectKey <B> -v <view3>`. *Expect:* each command acts in `<view>` of B: the annotations, their history and the trash are there and never in A or in the view `default` of B; the zips hold them, and the imports bring them into `<view2>` and `<view3>` of B.
 
 ## Configurations
 
@@ -353,87 +386,95 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| CFG-GET-01 | – | `story config` (and `configuration`) returns the configuration model | Elementary | Reader | | `config`, `configuration`, `arg0` | `Config_Get_ReturnsModel` |
-| CFG-GET-02 | – | `-r` returns the resolved configuration with bindings and inheritance applied | Elementary | Reader | | `-r`, `--resolved` | `Config_Resolved_AppliesBindings` |
-| CFG-GET-03 | – | `-f` prints the content as flat, properties, env, yaml and json | High | Reader | | `-f`, `--format` | `Config_Formats_RenderContent` |
-| CFG-GET-04 | – | `--content-only` prints the content alone, and messages go to stderr | Medium | Reader | | `--content-only` | `Config_ContentOnly_PipesContent` |
-| CFG-GET-05 | – | `-e` saves the model, or the formatted content with `-f`, into a file | Medium | Reader | | `-e`, `--export` | `Config_Export_WritesFile` |
-| CFG-GET-06 | – | `--version` returns the stored content of an old version | Medium | Reader | | `--version` | `Config_Version_ReturnsOld` |
-| CFG-GET-07 | – | `--env-prefix` prefixes every env name, and an invalid prefix fails with exit 2 | Medium | Reader | | `--env-prefix` | `Config_EnvPrefix_Prefixes` |
-| CFG-GET-08 | – | A resolved configuration with a secret binding needs ContributorWithSecrets | High | Contributor | | `-r` | `Config_ResolvedSecretAsContributor_Refused` |
+| CFG-GET-01 | 368 | `story config` (and `configuration`) returns the configuration model | Elementary | Reader | | `config`, `configuration`, `arg0` | `Config_Get_ReturnsModel` |
+| CFG-GET-02 | 369 | `-r` returns the resolved configuration with bindings and inheritance applied | Elementary | Reader | | `-r`, `--resolved` | `Config_Resolved_AppliesBindings` |
+| CFG-GET-03 | 370 | `-f` prints the content as flat, properties, env and yaml, and `-f json` the model | High | Reader | | `-f`, `--format`, `--format=flat`, `--format=properties`, `--format=env`, `--format=yaml`, `--format=json` | `Config_Formats_RenderContent` |
+| CFG-GET-04 | 371 | `--content-only` prints the content alone, and messages go to stderr | Medium | Reader | | `--content-only` | `Config_ContentOnly_PipesContent` |
+| CFG-GET-05 | 372 | `-e` saves the model, or the formatted content with `-f`, into a file | Medium | Reader | | `-e`, `--export` | `Config_Export_WritesFile` |
+| CFG-GET-06 | 373 | `--version` returns the stored content of an old version | Medium | Reader | | `--version` | `Config_Version_ReturnsOld` |
+| CFG-GET-07 | 375 | `--env-prefix` prefixes every env name, and an invalid prefix fails with exit 2 | Medium | Reader | | `--env-prefix` | `Config_EnvPrefix_Prefixes` |
+| CFG-GET-08 | 377 | A secret binding stays unresolved for a Contributor, with a warning, and resolves for ContributorWithSecrets | High | Owner | P | `-r` | `Config_ResolvedSecretAsContributor_LeftUnresolved` |
 
 - `CFG-GET-01`: *Pre:* `<rst>` with a configuration. *Steps:* `story config <rst>`; `story configuration <rst>`. *Expect:* the model with the content, version and labels.
-- `CFG-GET-02`: *Pre:* a parent configuration and a binding to a public key-value. *Steps:* `config <rst>.<unt> -r`, `--resolved`. *Expect:* the inherited values merged and the binding replaced by the value.
-- `CFG-GET-03`: *Steps:* `config <rst> -f flat`, `--format properties`, `-f env`, `-f yaml`, `-f json`. *Expect:* each output parses in its format and has the same values (per `docs/Platform/Storyteller/configuration-formats.md`).
+- `CFG-GET-02`: *Pre:* a parent configuration and a binding to a public key-value. *Steps:* `config <unt> -r`, `--resolved`. *Expect:* the inherited values merged and the binding replaced by the value.
+- `CFG-GET-03`: *Steps:* `config <rst> -f flat --content-only`, `--format properties --content-only`, `-f env --content-only`, `-f yaml --content-only` and `-f json --content-only`; then `config <rst> -f yaml` and `config <rst> -f json`. *Expect:* each `--content-only` output parses in its format and has the same values (per `docs/Platform/Storyteller/configuration-formats.md`); for json it is the content JSON. Without `--content-only`, `-f yaml` prints the YAML with the line-number gutter, and `-f json` prints the model, as without `-f`.
 - `CFG-GET-04`: *Steps:* `config <rst> --content-only`; `config <rst> -f yaml --content-only`. *Expect:* stdout is the content JSON alone (no model), then the YAML alone; nothing else on stdout.
-- `CFG-GET-05`: *Steps:* `config <rst> -e m.json`; `--export c.env -f env`. *Expect:* the model in the first file; the env content in the second; no content on stdout.
+- `CFG-GET-05`: *Steps:* `config <rst> -e m.json`; `config <rst> --export c.env -f env`. *Expect:* the first prints the model and writes it to m.json; the second writes the env content to c.env and leaves stdout empty.
 - `CFG-GET-06`: *Pre:* three versions. *Steps:* `config <rst> --version 1`. *Expect:* the content of version 1.
 - `CFG-GET-07`: *Steps:* `config <rst> -f env --env-prefix APP_`; `--env-prefix 1X`. *Expect:* every name starts with `APP_`; the second fails with exit 2.
-- `CFG-GET-08`: *Pre:* a binding to a secret. *Steps:* `config <rst> -r` as a Contributor, then as ContributorWithSecrets. *Expect:* refused (exit 44) with the secret named; then resolved.
+- `CFG-GET-08`: *Pre:* in the disposable project, a secret `<s>` (`kv set <s> x --secret`), a configuration of `<rst>` with `"password": "@<s>"`, and a second pool user granted Contributor (`account points grant <id2> -p <org>.<project> -r Contributor`). *Steps:* `config <rst> -r` as the second user, then as the Owner. *Expect:* the Contributor's read exits 0 with `"password": "@<s>"` as stored, and stderr has "Warning: these values are binding expressions that were not resolved: …" naming `password`, and "The caller may lack Secrets.Read."; the Owner's read has the value `x` and no warning.
 
 ### Set, Patch and Delete (`ConfigWriteTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| CFG-SET-01 | – | `config set -x` merges inline properties into the stored content | Elementary | Editor | | `set`, `arg0`, `-x`, `--properties` | `Config_SetProperties_Merges` |
-| CFG-SET-02 | – | `config create` is an alias of `set` | Low | Editor | | `create` | `Config_CreateAlias_Sets` |
-| CFG-SET-03 | – | `--replace` removes the properties that are not given | High | Editor | | `--replace` | `Config_Replace_RemovesOthers` |
-| CFG-SET-04 | – | `-i` imports the content from a file | High | Editor | | `-i`, `--import` | `Config_Import_FromFile` |
-| CFG-SET-05 | – | `-c` and `-l` set custom properties and labels on the configuration | Medium | Editor | | `-c`, `--custom-properties`, `-l`, `--labels` | `Config_CustomPropertiesAndLabels` |
-| CFG-SET-06 | – | `set -r` prints the resolved configuration after the write | Medium | Editor | | `-r`, `--resolved` | `Config_SetResolved_PrintsResolved` |
-| CFG-SET-07 | – | A content that violates the schema fails, and `-f` stores it | High | Editor | | `-f`, `--force` | `Config_SchemaViolation_Force` |
-| CFG-SET-08 | – | `config patch -i -y` applies a JSON Patch | High | Editor | | `patch`, `arg0`, `-i`, `--import`, `-y`, `--yes` | `Config_Patch_Applies` |
-| CFG-SET-09 | – | `patch` shows the change and asks in a terminal; No aborts with exit 40 | Medium | Editor | T | `patch` | `Config_Patch_ConfirmOrAbort` |
-| CFG-SET-10 | – | `patch -f` stores a patched content that violates the schema; a failing `test` op changes nothing | Medium | Editor | | `-f`, `--force` | `Config_Patch_ForceAndTest` |
-| CFG-SET-11 | – | `config delete` (and `remove`) deletes the configuration | Medium | Editor | | `delete`, `remove`, `arg0` | `Config_Delete_Removes` |
-| CFG-SET-12 | – | A Reader's `config set` is refused with exit 44 | High | Reader | | `set` | `Config_SetAsReader_Unauthorized` |
+| CFG-SET-01 | 395 | `config set -x` merges inline properties into the stored content | Elementary | Editor | | `set`, `arg0`, `-x`, `--properties` | `Config_SetProperties_Merges` |
+| CFG-SET-02 | 397 | `config create` is an alias of `set` | Low | Editor | | `create` | `Config_CreateAlias_Sets` |
+| CFG-SET-03 | 399 | `--replace` removes the properties that are not given | High | Editor | | `--replace` | `Config_Replace_RemovesOthers` |
+| CFG-SET-04 | 400 | `-i` imports the content from a file | High | Editor | | `-i`, `--import` | `Config_Import_FromFile` |
+| CFG-SET-05 | 401 | `-c` and `-l` are accepted and ignored: the write stores only the content | Medium | Editor | | `-c`, `--custom-properties`, `-l`, `--labels` | `Config_CustomPropertiesAndLabels_Ignored` |
+| CFG-SET-06 | 402 | `set -r` prints the resolved configuration after the write | Medium | Editor | | `-r`, `--resolved` | `Config_SetResolved_PrintsResolved` |
+| CFG-SET-07 | 403 | A content that violates the schema fails, and `-f` stores it | High | Editor | | `-f`, `--force` | `Config_SchemaViolation_Force` |
+| CFG-SET-08 | 404 | `config patch -i -y` applies a JSON Patch | High | Editor | | `patch`, `arg0`, `-i`, `--import`, `-y`, `--yes` | `Config_Patch_Applies` |
+| CFG-SET-09 | 405 | `patch` shows the change and asks in a terminal; No aborts with exit 40 | Medium | Editor | T | `patch` | `Config_Patch_ConfirmOrAbort` |
+| CFG-SET-10 | 406 | `patch -f` stores a patched content that violates the schema; a failing `test` op changes nothing | Medium | Editor | | `-f`, `--force` | `Config_Patch_ForceAndTest` |
+| CFG-SET-11 | 407 | `config delete` (and `remove`) deletes the configuration | Medium | Editor | | `delete`, `remove`, `arg0` | `Config_Delete_Removes` |
+| CFG-SET-12 | 408 | A Reader's `config set` is refused and stores nothing | High | Reader | | `set` | `Config_SetAsReader_Refused` |
 
 - `CFG-SET-01`: *Steps:* `config set <rst> -x a=1 -x b.c=true`; `--properties d=x`. *Expect:* the content has a=1, b.c=true and d="x"; a new version.
 - `CFG-SET-02`: *Steps:* `config create <rst> -x e=2`. *Expect:* as set.
 - `CFG-SET-03`: *Steps:* `config set <rst> -x only=1 --replace`. *Expect:* the content is `{ "only": 1 }`.
-- `CFG-SET-04`: *Steps:* `config set <rst> -i c.json`; `--import c2.yaml` (when YAML is accepted, else JSON). *Expect:* the content of the files merged.
-- `CFG-SET-05`: *Steps:* `config set <rst> -x a=1 -c owner=t --custom-properties n=2 -l x --labels y`. *Expect:* the model shows them.
-- `CFG-SET-06`: *Steps:* `config set <rst>.<unt> -x a=1 -r`; `--resolved`. *Expect:* the printed configuration includes the inherited values.
-- `CFG-SET-07`: *Pre:* a type schema requiring `a` to be a number. *Steps:* `config set <rst> -x a=text`; `-f`; `--force`. *Expect:* exit 2 with the violation; then stored with a warning.
+- `CFG-SET-04`: *Steps:* `config set <rst> -i c.json`; `--import c2.json`. *Expect:* the content of the files merged.
+- `CFG-SET-05`: *Steps:* `config set <rst> -x a=1 -c owner=t --custom-properties n=2 -l x --labels y`. *Expect:* exit 0 and a new version with `a=1`; the model has no custom properties or labels from the options (defect D6).
+- `CFG-SET-06`: *Steps:* `config set <unt> -x a=1 -r`; `--resolved`. *Expect:* the printed configuration includes the inherited values.
+- `CFG-SET-07`: *Pre:* a type schema requiring `a` to be a number. *Steps:* `config set <rst> -x a=text`; `-f`; `--force`. *Expect:* exit 2 with the violation and no new version; then `-f` and `--force` store it, a new version each, printed as the model (sform prints no warning).
 - `CFG-SET-08`: *Steps:* `config patch <rst> -i p.json -y` (replace, add, remove); `--import p2.json --yes`. *Expect:* the content changed as patched; a version each.
 - `CFG-SET-09`: *Steps:* `config patch <rst> -i p.json` in a terminal; No; then Yes. *Expect:* exit 40 and no new version; then applied.
-- `CFG-SET-10`: *Steps:* a patch that breaks the schema with and without `-f`; a patch with a failing `test` op. *Expect:* refused, then stored; the `test` failure changes nothing.
+- `CFG-SET-10`: *Pre:* a type schema requiring `a` to be a number. *Steps:* `config patch <rst> -i break.json -y`, a patch that sets `a` to a text; then `config patch <rst> -i break.json -y -f` and `config patch <rst2> -i break.json --yes --force`; `config patch <rst> -i failing-test.json -y`, a patch with a failing `test` op. *Expect:* the first is refused with exit 2 and the violation; `-f` and `--force` store it: "Configuration for '`<rst>`' patched: version N → M." and the model, without a warning. The failing `test` op changes nothing: the API answers 412 PatchTestFailed, and sform prints its message and ends with exit 1 (defect D3).
 - `CFG-SET-11`: *Steps:* `config delete <rst>`; `config remove <rst2>`. *Expect:* `config <rst>` returns no configuration.
-- `CFG-SET-12`: *Steps:* `config set <rst> -x a=1` in the Reader project. *Expect:* exit 44.
+- `CFG-SET-12`: *Steps:* `config set <rst> -x a=1` in the Reader project. *Expect:* no new version; sform prints "Error occurred: …" and ends with exit 1 (defect D1; 44 with the server's message once fixed).
 
 ### Versions, Diff, Composition and Edit (`ConfigHistoryTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| CFG-HIS-01 | – | `config versions` lists the versions newest first | Medium | Reader | | `versions`, `arg0` | `Config_Versions_Listed` |
-| CFG-HIS-02 | – | `config diff` compares the latest with its previous version, or two given versions | High | Reader | | `diff`, `arg0`, `arg1`, `arg2` | `Config_Diff_Versions` |
-| CFG-HIS-03 | – | `diff --view-to-compare` compares with another view | Medium | Reader | | `--view-to-compare` | `Config_DiffView_ComparesViews` |
-| CFG-HIS-04 | – | `config composition` shows the merged documents and the step that set each line; `-e` saves it | Medium | Reader | | `composition`, `arg0`, `-e`, `--export` | `Config_Composition_ShowsSteps` |
-| CFG-HIS-05 | – | `config edit` stores the editor's change as a new version | High | Editor | E | `edit`, `arg0` | `Config_Edit_StoresChange` |
-| CFG-HIS-06 | – | `edit` without a change stores nothing; a schema violation needs `-f` | Medium | Editor | E | `-f`, `--force` | `Config_Edit_NoChangeOrForce` |
+| CFG-HIS-01 | 428 | `config versions` lists the versions newest first | Medium | Reader | | `versions`, `arg0` | `Config_Versions_Listed` |
+| CFG-HIS-02 | 430 | `config diff` compares the latest with its previous version, or two given versions | High | Reader | | `diff`, `arg0`, `arg1`, `arg2` | `Config_Diff_Versions` |
+| CFG-HIS-03 | 432 | `diff --view-to-compare` compares with another view | Medium | Reader | | `--view-to-compare` | `Config_DiffView_ComparesViews` |
+| CFG-HIS-04 | 433 | `config composition` shows the merged documents and the step that set each line; `-e` saves it | Medium | Reader | | `composition`, `arg0`, `-e`, `--export` | `Config_Composition_ShowsSteps` |
+| CFG-HIS-05 | 434 | `config edit -y` stores the editor's change as a new version | High | Editor | E | `edit`, `arg0`, `-y`, `--yes` | `Config_Edit_StoresChange` |
+| CFG-HIS-06 | 435 | `edit` without a change stores nothing; a schema violation needs `-f` | Medium | Editor | E | `-f`, `--force` | `Config_Edit_NoChangeOrForce` |
 
 - `CFG-HIS-01`: *Pre:* three versions. *Steps:* `config versions <rst>`. *Expect:* 3, 2, 1 with times and authors.
 - `CFG-HIS-02`: *Steps:* `config diff <rst>`; `config diff <rst> 3 1`; `config diff <rst> 2`. *Expect:* 3 against 2; 3 against 1; 2 against 1, each showing the changed lines.
 - `CFG-HIS-03`: *Pre:* the configuration differs in view B. *Steps:* `config diff <rst> -v A --view-to-compare B`. *Expect:* A as from, B as to.
-- `CFG-HIS-04`: *Pre:* a type template, a parent configuration and the own content. *Steps:* `config composition <rst>.<unt>`; `-e comp.json`; `--export comp2.json`. *Expect:* the documents in merge order and the step per line; the same in the files.
-- `CFG-HIS-05`: *Pre:* the fake editor sets `a` to 5. *Steps:* `config edit <rst>`. *Expect:* a new version with a=5.
-- `CFG-HIS-06`: *Steps:* the editor leaves the file unchanged; then it writes a schema-breaking value, with and without `-f` / `--force`. *Expect:* "no change" (exit 42) and no version; refused, then stored.
+- `CFG-HIS-04`: *Pre:* a type template, a parent configuration and the own content. *Steps:* `config composition <unt>`; `-e comp.json`; `--export comp2.json`. *Expect:* the documents in merge order and the step per line; the same in the files.
+- `CFG-HIS-05`: *Pre:* the fake editor sets `a` to 5, then to 6. *Steps:* `config edit <rst> -y`; `config edit <rst> --yes`. *Expect:* "Configuration for '`<rst>`' has been saved (version N)." and a new version with a=5, then a=6. Without `-y` on redirected input, see GEN-CLI-03.
+- `CFG-HIS-06`: *Steps:* the editor leaves the file unchanged: `config edit <rst> -y`. Then it writes a schema-breaking value: `config edit <rst> -y`, `config edit <rst> -y -f` and `config edit <rst> --yes --force`. *Expect:* "No changes detected." (exit 42) and no version; then refused with exit 2 and the violation; then stored, a version each.
 
 ### GitHub Actions and Masking (`ConfigGitHubTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| CFG-GHA-01 | – | `--github-env` with `--env-prefix` writes the resolved values into `GITHUB_ENV` and masks bound values | Elementary | Secrets | | `--github-env`, `--env-prefix` | `GitHubEnv_Prefixed_ExportsAndMasks` |
-| CFG-GHA-02 | – | `--github-env` without `--env-prefix` fails, and `--allow-unprefixed` allows it | Medium | Secrets | | `--allow-unprefixed` | `GitHubEnv_Unprefixed_NeedsAllow` |
-| CFG-GHA-03 | – | `--mask bound` and `--mask all` print `::add-mask::` for bound values or every value | Medium | Secrets | | `--mask` | `Mask_BoundOrAll` |
-| CFG-GHA-04 | – | An unresolved binding fails the export, and `--allow-unresolved` exports it as it is | Medium | Secrets | | `--allow-unresolved` | `GitHubEnv_Unresolved_NeedsAllow` |
-| CFG-GHA-05 | – | `--github-env` or `--mask` without `-r` fails with exit 2 | Low | Reader | | `--github-env`, `--mask` | `GitHubEnv_WithoutResolved_Fails` |
+| CFG-GHA-01 | 436 | `--github-env` with `--env-prefix` writes the resolved values into `GITHUB_ENV` and masks bound values | Elementary | Secrets | | `--github-env`, `--env-prefix` | `GitHubEnv_Prefixed_ExportsAndMasks` |
+| CFG-GHA-02 | 437 | `--github-env` without `--env-prefix` fails, and `--allow-unprefixed` allows it | Medium | Secrets | | `--allow-unprefixed` | `GitHubEnv_Unprefixed_NeedsAllow` |
+| CFG-GHA-03 | 438 | `--mask bound` and `--mask all` print `::add-mask::` for bound values or every value | Medium | Secrets | | `--mask`, `--mask=bound`, `--mask=all` | `Mask_BoundOrAll` |
+| CFG-GHA-04 | 439 | An unresolved binding fails the export, and `--allow-unresolved` exports it as it is | Medium | Secrets | | `--allow-unresolved` | `GitHubEnv_Unresolved_NeedsAllow` |
+| CFG-GHA-05 | 440 | `--github-env` or `--mask` without `-r` fails with exit 2 | Low | Reader | | `--github-env`, `--mask` | `GitHubEnv_WithoutResolved_Fails` |
 
 - `CFG-GHA-01`: *Pre:* `GITHUB_ENV` set to a temp file; a configuration with a secret binding. *Steps:* `config <rst> -r --github-env --env-prefix APP_`. *Expect:* the file has `APP_…` lines (multiline values in heredoc form); stdout has `::add-mask::` for the bound value only; no content printed.
-- `CFG-GHA-02`: *Steps:* `config <rst> -r --github-env`; then with `--allow-unprefixed`. *Expect:* exit 2 naming both options; then names without a prefix.
+- `CFG-GHA-02`: *Pre:* `GITHUB_ENV` set to a temp file. *Steps:* `config <rst> -r --github-env`; then with `--allow-unprefixed`. *Expect:* exit 2 naming both options; then names without a prefix.
 - `CFG-GHA-03`: *Steps:* `config <rst> -r --mask bound`; `--mask all`. *Expect:* masks for the bound values, then for every string and number.
-- `CFG-GHA-04`: *Pre:* a binding to a missing key. *Steps:* `config <rst> -r --github-env --env-prefix A_`; then `--allow-unresolved`. *Expect:* a non-zero exit naming the binding; then the expression is exported as it is.
+- `CFG-GHA-04`: *Pre:* `GITHUB_ENV` set to a temp file; a binding to a missing key. *Steps:* `config <rst> -r --github-env --env-prefix A_`; then `--allow-unresolved`. *Expect:* a non-zero exit naming the binding; then the expression is exported as it is.
 - `CFG-GHA-05`: *Steps:* `config <rst> --github-env --env-prefix A_`; `config <rst> --mask all`. *Expect:* exit 2 naming `--resolved`.
+
+### Context (`ConfigContextTests`)
+
+| Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
+|---|---|---|---|---|---|---|---|
+| CFG-CTX-01 | 441 | Every configuration command takes its project from `--projectKey` and its view from `-v` or `--view` | Medium | Owner | E, P | `--projectKey`, `-v`, `--view` | `ConfigCommands_ContextOptions_TargetProjectAndView` |
+
+- `CFG-CTX-01`: *Pre:* `<A>` is the target project, `<B>` the disposable project with `<rst>` and `<rst2>` in `<view>`; the fake editor adds a property; `p.json` is a JSON Patch. *Steps:* `config set <rst> -x a=1 --projectKey <B> --view <view>`; `config set <rst2> -x a=1 --projectKey <B> -v <view>`; `config <rst> --projectKey <B> --view <view>`; `config <rst2> --projectKey <B> -v <view>`; `config edit <rst> -y --projectKey <B> --view <view>`; `config edit <rst2> -y --projectKey <B> -v <view>`; `config patch <rst> -i p.json -y --projectKey <B> --view <view>`; `config patch <rst2> -i p.json -y --projectKey <B> -v <view>`; `config versions <rst> --projectKey <B> --view <view>`; `config versions <rst2> --projectKey <B> -v <view>`; `config diff <rst> --projectKey <B> --view <view>`; `config diff <rst2> --projectKey <B> -v <view>`; `config composition <rst> --projectKey <B> --view <view>`; `config composition <rst2> --projectKey <B> -v <view>`; `config delete <rst> --projectKey <B> --view <view>`; `config delete <rst2> --projectKey <B> -v <view>`. *Expect:* each command acts on the configurations in `<view>` of B: three versions there, and no configuration of `<rst>` or `<rst2>` in A or in the view `default` of B.
 
 ## Templates
 
@@ -441,23 +482,25 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| TPL-TPL-01 | – | `story template` (and `templates`) returns the template of a type | High | Reader | | `template`, `templates`, `arg0` | `Template_Get_Returns` |
-| TPL-TPL-02 | – | `template set -x` merges properties, and `--replace` replaces the content | High | Editor | P | `set`, `arg0`, `-x`, `--properties`, `--replace` | `Template_Set_MergeOrReplace` |
-| TPL-TPL-03 | – | `template create -i` imports a template from a file | Medium | Editor | P | `create`, `-i`, `--import` | `Template_Import_FromFile` |
-| TPL-TPL-04 | – | `template -e` saves it, and `--version` returns an old version | Medium | Reader | P | `-e`, `--export`, `--version` | `Template_ExportAndVersion` |
-| TPL-TPL-05 | – | `template versions` and `template diff` show the history | Medium | Reader | P | `versions`, `arg0`, `diff`, `arg0`, `arg1`, `arg2` | `Template_VersionsAndDiff` |
-| TPL-TPL-06 | – | `template edit` stores the editor's change | Medium | Editor | E, P | `edit`, `arg0` | `Template_Edit_StoresChange` |
-| TPL-TPL-07 | – | `template delete` (and `remove`) deletes it, and the history stays | Medium | Editor | P | `delete`, `remove`, `arg0` | `Template_Delete_KeepsHistory` |
-| TPL-TPL-08 | – | An unknown type code fails with exit 2; a Reader's set is refused | Medium | Reader | | `arg0`, `set` | `Template_InvalidTypeOrReader_Fails` |
+| TPL-TPL-01 | 417 | `story template` (and `templates`) returns the template of a type | High | Reader | | `template`, `templates`, `arg0` | `Template_Get_Returns` |
+| TPL-TPL-02 | 418 | `template set -x` merges properties, and `--replace` replaces the content | High | Owner | P | `set`, `arg0`, `-x`, `--properties`, `--replace` | `Template_Set_MergeOrReplace` |
+| TPL-TPL-03 | 419 | `template create -i` imports a template from a file | Medium | Owner | P | `create`, `-i`, `--import` | `Template_Import_FromFile` |
+| TPL-TPL-04 | 420 | `template -e` saves it, and `--version` returns an old version | Medium | Owner | P | `-e`, `--export`, `--version` | `Template_ExportAndVersion` |
+| TPL-TPL-05 | 421 | `template versions` and `template diff` show the history | Medium | Owner | P | `versions`, `arg0`, `diff`, `arg0`, `arg1`, `arg2` | `Template_VersionsAndDiff` |
+| TPL-TPL-06 | 422 | `template edit -y` stores the editor's change | Medium | Owner | E, P | `edit`, `arg0`, `-y`, `--yes` | `Template_Edit_StoresChange` |
+| TPL-TPL-07 | 423 | `template delete` (and `remove`) deletes it, and the history stays | Medium | Owner | P | `delete`, `remove`, `arg0` | `Template_Delete_KeepsHistory` |
+| TPL-TPL-08 | 424 | An unknown type code fails with exit 2; a Reader's set is refused | Medium | Reader | | `arg0`, `set` | `Template_InvalidTypeOrReader_Fails` |
+| TPL-TPL-09 | 425 | Every template command takes its project from `--projectKey` and its view from `-v` or `--view` | Low | Owner | E, P | `--projectKey`, `-v`, `--view` | `TemplateCommands_ContextOptions_TargetProjectAndView` |
 
 - `TPL-TPL-01`: *Pre:* a template for `unt`. *Steps:* `story template unt`; `story templates unt`. *Expect:* the template content.
 - `TPL-TPL-02`: *Steps:* `template set unt -x a=1`; `--properties b=2`; `-x c=3 --replace`. *Expect:* {a,b} after the merges, {c} after the replace.
 - `TPL-TPL-03`: *Steps:* `template create sbt -i t.json`; `--import t2.json`. *Expect:* the file's content.
-- `TPL-TPL-04`: *Steps:* `template unt -e t.json`; `--export t2.json`; `template unt --version 1`. *Expect:* the files hold it; version 1's content.
-- `TPL-TPL-05`: *Steps:* `template versions unt`; `template diff unt`; `template diff unt 3 1`. *Expect:* the versions; the diffs.
-- `TPL-TPL-06`: *Steps:* the fake editor adds `x`; `template edit unt`. *Expect:* a new version with `x`.
-- `TPL-TPL-07`: *Steps:* `template delete unt`; `template remove sbt`; `template versions unt`. *Expect:* no current template; the versions still listed.
-- `TPL-TPL-08`: *Steps:* `template xyz`; `template set unt -x a=1` as a Reader. *Expect:* exit 2 listing the codes; exit 44.
+- `TPL-TPL-04`: *Pre:* a template of `unt` with three versions (`template set unt -x v=1`, then `-x v=2` and `-x v=3`). *Steps:* `template unt -e t.json`; `--export t2.json`; `template unt --version 1`. *Expect:* the files hold it; version 1's content.
+- `TPL-TPL-05`: *Pre:* as TPL-TPL-04. *Steps:* `template versions unt`; `template diff unt`; `template diff unt 3 1`. *Expect:* the versions; the diffs.
+- `TPL-TPL-06`: *Steps:* the fake editor adds `x`; `template edit unt -y`; then it adds `y`; `template edit unt --yes`. *Expect:* a new version with `x`, then one with `y`.
+- `TPL-TPL-07`: *Pre:* templates of `unt` and `sbt`. *Steps:* `template delete unt`; `template remove sbt`; `template versions unt`. *Expect:* no current template; the versions still listed.
+- `TPL-TPL-08`: *Steps:* `template xyz`; `template set unt -x a=1` as a Reader. *Expect:* exit 2, "Please specify a valid annotation type code." and "Known codes: …"; exit 44.
+- `TPL-TPL-09`: *Pre:* `<A>` is the target project, `<B>` the disposable project; the fake editor adds a property. *Steps:* `template set unt -x a=1 --projectKey <B> --view <view>`; `template set sbt -x a=1 --projectKey <B> -v <view>`; `template unt --projectKey <B> --view <view>`; `template sbt --projectKey <B> -v <view>`; `template edit unt -y --projectKey <B> --view <view>`; `template edit sbt -y --projectKey <B> -v <view>`; `template versions unt --projectKey <B> --view <view>`; `template versions sbt --projectKey <B> -v <view>`; `template diff unt --projectKey <B> --view <view>`; `template diff sbt --projectKey <B> -v <view>`; `template delete unt --projectKey <B> --view <view>`; `template delete sbt --projectKey <B> -v <view>`. *Expect:* each command acts on the templates in `<view>` of B: two versions each there, and no template of `unt` or `sbt` in A or in the view `default` of B from these steps.
 
 ## Schemas
 
@@ -465,61 +508,73 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| SCH-TYP-01 | – | `schema type set -i` stores a type schema, and `schema type get` returns it | High | Editor | P | `schema`, `type`, `set`, `arg0`, `-i`, `--import`, `get`, `arg0` | `SchemaType_SetGet` |
-| SCH-TYP-02 | – | `schema type create` is an alias, and a schema the configurations break fails without `-f` | Medium | Editor | P | `create`, `-f`, `--force` | `SchemaType_Breaking_NeedsForce` |
-| SCH-TYP-03 | – | `get --version`, `versions` and `diff` with `--format json` and `unified` | Medium | Reader | P | `--version`, `versions`, `arg0`, `diff`, `arg0`, `arg1`, `arg2`, `--format` | `SchemaType_History` |
-| SCH-TYP-04 | – | `schema type edit` stores the editor's change; `-f` for a breaking change | Medium | Editor | E, P | `edit`, `arg0`, `-f`, `--force` | `SchemaType_Edit` |
-| SCH-TYP-05 | – | `schema type delete` (and `remove`) deletes it | Medium | Editor | P | `delete`, `remove`, `arg0` | `SchemaType_Delete` |
+| SCH-TYP-01 | 247 | `schema type set -i` stores a type schema, and `schema type get` returns it | High | Owner | P | `schema`, `type`, `set`, `arg0`, `-i`, `--import`, `get`, `arg0` | `SchemaType_SetGet` |
+| SCH-TYP-02 | 264 | `schema type create` is an alias, and a schema the configurations break fails without `-f` | Medium | Owner | P | `create`, `-f`, `--force` | `SchemaType_Breaking_NeedsForce` |
+| SCH-TYP-03 | 265 | `get --version`, `versions` and `diff` with `--format json` and `unified` | Medium | Owner | P | `--version`, `versions`, `arg0`, `diff`, `arg0`, `arg1`, `arg2`, `--format`, `--format=json`, `--format=unified` | `SchemaType_History` |
+| SCH-TYP-04 | 266 | `schema type edit -y` stores the editor's change; `-f` for a breaking change | Medium | Owner | E, P | `edit`, `arg0`, `-f`, `--force`, `-y`, `--yes` | `SchemaType_Edit` |
+| SCH-TYP-05 | 267 | `schema type delete` (and `remove`) deletes it | Medium | Owner | P | `delete`, `remove`, `arg0` | `SchemaType_Delete` |
 
 - `SCH-TYP-01`: *Steps:* `story schema type set unt -i s.json`; `--import s2.json`; `schema type get unt`. *Expect:* the stored schema equals s2.json.
-- `SCH-TYP-02`: *Pre:* a `unt` configuration without `req`. *Steps:* `schema type create unt -i requires-req.json`; then `-f`; `--force`. *Expect:* refused with the non-complying keys; then stored with a warning.
-- `SCH-TYP-03`: *Steps:* three versions; `schema type get unt --version 1`; `schema type versions unt`; `schema type diff unt`; `diff unt 3 1 --format unified`; `--format json`. *Expect:* version 1; 3 versions; a JSON diff and a unified diff.
-- `SCH-TYP-04`: *Steps:* the fake editor adds a property; `schema type edit unt`; a breaking edit with `-f` and `--force`. *Expect:* new versions.
-- `SCH-TYP-05`: *Steps:* `schema type delete unt`; `schema type remove sbt`. *Expect:* `get` reports no schema; `versions` still lists the history.
+- `SCH-TYP-02`: *Pre:* a `unt` configuration without `req`. *Steps:* `schema type create unt -i requires-req.json`; then `-f`; `--force`. *Expect:* refused with exit 2 and the non-complying keys; then stored with a warning.
+- `SCH-TYP-03`: *Steps:* three versions; `schema type get unt --version 1`; `schema type versions unt`; `schema type diff unt`; `schema type diff unt 3 1 --format unified`; `schema type diff unt 2 1 --format json`. *Expect:* version 1; 3 versions; a JSON diff, a unified diff and a JSON diff.
+- `SCH-TYP-04`: *Steps:* the fake editor adds a property; `schema type edit unt -y`; a breaking edit with `schema type edit unt -y -f` and `schema type edit unt --yes --force`. *Expect:* "Schema for … has been saved (version N)." each time, a new version each. Without `-y` on redirected input, see GEN-CLI-03.
+- `SCH-TYP-05`: *Pre:* type schemas of `unt` and `sbt`. *Steps:* `schema type delete unt`; `schema type remove sbt`. *Expect:* "The schema for … has been deleted."; `get` reports no schema; `versions` still lists the history.
 
 ### Annotation Schemas (`SchemaAnnotationTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| SCH-ANN-01 | – | `schema annotation set` and `get` for one annotation | High | Editor | P | `annotation`, `set`, `arg0`, `-i`, `--import`, `get`, `arg0` | `SchemaAnnotation_SetGet` |
-| SCH-ANN-02 | – | `create` alias, `-f` for configurations that break it | Medium | Editor | P | `create`, `-f`, `--force` | `SchemaAnnotation_Breaking_NeedsForce` |
-| SCH-ANN-03 | – | `get --version`, `versions` and `diff` with both formats | Medium | Reader | P | `--version`, `versions`, `arg0`, `diff`, `arg0`, `arg1`, `arg2`, `--format` | `SchemaAnnotation_History` |
-| SCH-ANN-04 | – | `edit` with the fake editor, `-f` for a breaking change | Medium | Editor | E, P | `edit`, `arg0`, `-f`, `--force` | `SchemaAnnotation_Edit` |
-| SCH-ANN-05 | – | `delete` and `remove` | Low | Editor | P | `delete`, `remove`, `arg0` | `SchemaAnnotation_Delete` |
+| SCH-ANN-01 | 277 | `schema annotation set` and `get` for one annotation | High | Owner | P | `annotation`, `set`, `arg0`, `-i`, `--import`, `get`, `arg0` | `SchemaAnnotation_SetGet` |
+| SCH-ANN-02 | 280 | `create` alias, `-f` for configurations that break it | Medium | Owner | P | `create`, `-f`, `--force` | `SchemaAnnotation_Breaking_NeedsForce` |
+| SCH-ANN-03 | 282 | `get --version`, `versions` and `diff` with both formats | Medium | Owner | P | `--version`, `versions`, `arg0`, `diff`, `arg0`, `arg1`, `arg2`, `--format`, `--format=json`, `--format=unified` | `SchemaAnnotation_History` |
+| SCH-ANN-04 | 285 | `edit -y` with the fake editor, `-f` for a breaking change | Medium | Owner | E, P | `edit`, `arg0`, `-f`, `--force`, `-y`, `--yes` | `SchemaAnnotation_Edit` |
+| SCH-ANN-05 | 288 | `delete` and `remove` | Low | Owner | P | `delete`, `remove`, `arg0` | `SchemaAnnotation_Delete` |
 
-- `SCH-ANN-01` … `SCH-ANN-05`: as `SCH-TYP-01` … `05` with `schema annotation <rst>` instead of `schema type <code>`. The schema applies to `<rst>` only: a configuration of another responsibility that breaks it still saves.
+- `SCH-ANN-01`: *Steps:* `schema annotation set <rst> -i s.json`; `schema annotation set <rst> --import s2.json`; `schema annotation get <rst>`. *Expect:* the stored schema equals s2.json. The schema applies to `<rst>` only: a configuration of another responsibility that breaks it still saves.
+- `SCH-ANN-02`: *Pre:* a configuration of `<rst>` without `req`. *Steps:* `schema annotation create <rst> -i requires-req.json`; then `-f`; `--force`. *Expect:* refused with exit 2 and the non-complying key; then stored with a warning.
+- `SCH-ANN-03`: *Steps:* three versions; `schema annotation get <rst> --version 1`; `schema annotation versions <rst>`; `schema annotation diff <rst>`; `schema annotation diff <rst> 3 1 --format unified`; `schema annotation diff <rst> 2 1 --format json`. *Expect:* version 1; 3 versions; a JSON diff, a unified diff and a JSON diff.
+- `SCH-ANN-04`: *Steps:* the fake editor adds a property; `schema annotation edit <rst> -y`; a breaking edit with `schema annotation edit <rst> -y -f` and `schema annotation edit <rst> --yes --force`. *Expect:* new versions.
+- `SCH-ANN-05`: *Pre:* annotation schemas of `<rst>` and `<rst2>`. *Steps:* `schema annotation delete <rst>`; `schema annotation remove <rst2>`. *Expect:* "The schema for … has been deleted."; `get` reports no schema; `versions` still lists the history.
 
 ### Descendant Schemas (`SchemaDescendantTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| SCH-DSC-01 | – | `schema descendant set` and `get` for a type below an ancestor | High | Editor | P | `descendant`, `set`, `arg0`, `arg1`, `-i`, `--import`, `get`, `arg0`, `arg1` | `SchemaDescendant_SetGet` |
-| SCH-DSC-02 | – | A type that cannot descend from the ancestor fails with InvalidKey | Medium | Editor | P | `arg1` | `SchemaDescendant_InvalidType_Fails` |
-| SCH-DSC-03 | – | `create` alias, `-f`, `get --version`, `versions` and `diff` with both formats | Medium | Editor | P | `create`, `-f`, `--force`, `--version`, `versions`, `arg0`, `arg1`, `diff`, `arg0`, `arg1`, `arg2`, `arg3`, `--format` | `SchemaDescendant_History` |
-| SCH-DSC-04 | – | `edit` with the fake editor, `-f` for a breaking change | Medium | Editor | E, P | `edit`, `arg0`, `arg1`, `-f`, `--force` | `SchemaDescendant_Edit` |
-| SCH-DSC-05 | – | `delete` and `remove` | Low | Editor | P | `delete`, `remove`, `arg0`, `arg1` | `SchemaDescendant_Delete` |
+| SCH-DSC-01 | 299 | `schema descendant set` and `get` for a type below an ancestor | High | Owner | P | `descendant`, `set`, `arg0`, `arg1`, `-i`, `--import`, `get`, `arg0`, `arg1` | `SchemaDescendant_SetGet` |
+| SCH-DSC-02 | 300 | A type that cannot descend from the ancestor fails with InvalidKey | Medium | Owner | P | `arg1` | `SchemaDescendant_InvalidType_Fails` |
+| SCH-DSC-03 | 301 | `create` alias, `-f`, `get --version`, `versions` and `diff` with both formats | Medium | Owner | P | `create`, `-f`, `--force`, `--version`, `versions`, `arg0`, `arg1`, `diff`, `arg0`, `arg1`, `arg2`, `arg3`, `--format`, `--format=json`, `--format=unified` | `SchemaDescendant_History` |
+| SCH-DSC-04 | 302 | `edit -y` with the fake editor, `-f` for a breaking change | Medium | Owner | E, P | `edit`, `arg0`, `arg1`, `-f`, `--force`, `-y`, `--yes` | `SchemaDescendant_Edit` |
+| SCH-DSC-05 | 303 | `delete` and `remove` | Low | Owner | P | `delete`, `remove`, `arg0`, `arg1` | `SchemaDescendant_Delete` |
 
 - `SCH-DSC-01`: *Steps:* `schema descendant set <rst> unt -i s.json`; `--import`; `schema descendant get <rst> unt`. *Expect:* the schema applies to the units below `<rst>` only.
 - `SCH-DSC-02`: *Steps:* `schema descendant set <rst> sbt -i s.json`. *Expect:* a non-zero exit with InvalidKey.
-- `SCH-DSC-03`: *Steps:* `create`, a breaking set with `-f`/`--force`, `get <rst> unt --version 1`, `versions <rst> unt`, `diff <rst> unt`, `diff <rst> unt 3 1 --format unified`. *Expect:* as `SCH-TYP-03`.
-- `SCH-DSC-04`: *Steps:* `schema descendant edit <rst> unt` with the fake editor; a breaking edit with `-f`/`--force`. *Expect:* new versions.
-- `SCH-DSC-05`: *Steps:* `schema descendant delete <rst> unt`; `remove <rst> usg`. *Expect:* no current schema; the history kept.
+- `SCH-DSC-03`: *Pre:* a unit of `<rst>` with a configuration without `req`. *Steps:* `schema descendant create <rst> unt -i requires-req.json`; `schema descendant set <rst> unt -i requires-req.json -f`; `schema descendant set <rst> unt -i requires-req2.json --force` (another breaking schema); `schema descendant set <rst> unt -i s3.json -f` (a third version); `schema descendant get <rst> unt --version 1`; `schema descendant versions <rst> unt`; `schema descendant diff <rst> unt`; `schema descendant diff <rst> unt 3 1 --format unified`; `schema descendant diff <rst> unt 2 1 --format json`. *Expect:* the `create` is refused with exit 2 and the non-complying key; the three forced sets store versions 1 to 3; then as `SCH-TYP-03`: version 1, three versions, a JSON diff, a unified diff and a JSON diff.
+- `SCH-DSC-04`: *Steps:* the fake editor adds a property; `schema descendant edit <rst> unt -y`; a breaking edit with `schema descendant edit <rst> unt -y -f` and `schema descendant edit <rst> unt --yes --force`. *Expect:* new versions.
+- `SCH-DSC-05`: *Pre:* descendant schemas of `unt` and `usg` under `<rst>`. *Steps:* `schema descendant delete <rst> unt`; `schema descendant remove <rst> usg`. *Expect:* no current schema; the history kept.
 
 ### Combined Schema (`SchemaDefinitionTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| SCH-DEF-01 | – | `schema definition` returns the combined schema of type, ancestor and annotation schemas | Medium | Reader | P | `definition`, `arg0` | `SchemaDefinition_CombinesSchemas` |
-| SCH-DEF-02 | – | A Reader reads schemas, and a Reader's `schema type set` is refused | High | Reader | | `get`, `set` | `Schema_ReaderRights` |
-| SCH-DEF-03 | – | A machine needs Schema.Write with Configuration.Write to set a schema | Medium | Machine | M | `set` | `Schema_MachineScopes` |
-| SCH-DEF-04 | – | A non-JSON-Schema file fails with exit 2 and stores nothing | Low | Editor | P | `-i` | `Schema_InvalidFile_Fails` |
-| SCH-DEF-05 | – | A type code outside rst, unt, sbt, usg, cnt, exe, uxe fails with exit 2 | Low | Reader | | `arg0` | `Schema_InvalidTypeCode_Fails` |
+| SCH-DEF-01 | 324 | `schema definition` returns the combined schema of type, ancestor and annotation schemas | Medium | Owner | P | `definition`, `arg0` | `SchemaDefinition_CombinesSchemas` |
+| SCH-DEF-02 | 325 | A Reader reads schemas, and a Reader's `schema type set` is refused | High | Reader | | `get`, `set` | `Schema_ReaderRights` |
+| SCH-DEF-03 | 326 | A machine needs Schema.Write with Configuration.Write to set a schema | Medium | Machine | M | `set` | `Schema_MachineScopes` |
+| SCH-DEF-04 | 327 | A file that is not a valid JSON Schema fails with exit 2 and stores nothing | Low | Owner | P | `-i` | `Schema_InvalidFile_Fails` |
+| SCH-DEF-05 | 328 | A type code outside rst, unt, sbt, usg, cnt, exe, uxe fails with exit 2 | Low | Reader | | `arg0` | `Schema_InvalidTypeCode_Fails` |
 
-- `SCH-DEF-01`: *Pre:* a type schema of `unt`, a descendant schema under `<rst>` and an annotation schema of `<rst>.<unt>`. *Steps:* `schema definition <rst>.<unt>`. *Expect:* one schema with the constraints of all three.
-- `SCH-DEF-02`: *Steps:* `schema type get unt` and `schema type set unt -i s.json` as a Reader. *Expect:* the get works; the set gets exit 44.
-- `SCH-DEF-03`: *Steps:* as a `-w` machine, then a `-w -m SchemaWrite` machine, `schema type set unt -i s.json`. *Expect:* exit 44 naming Schema.Write; then stored.
-- `SCH-DEF-04`: *Steps:* `schema type set unt -i not-a-schema.txt`. *Expect:* exit 2, no new version.
-- `SCH-DEF-05`: *Steps:* `schema type get abc`. *Expect:* exit 2 listing the codes.
+- `SCH-DEF-01`: *Pre:* a type schema of `unt`, a descendant schema under `<rst>` and an annotation schema of `<unt>`. *Steps:* `schema definition <unt>`. *Expect:* one schema with the constraints of all three.
+- `SCH-DEF-02`: *Steps:* `schema type get unt` and `schema type set unt -i s.json` as a Reader. *Expect:* the get works; the set is refused with the server's message and "Error code: AccessDenied", and ends with exit 1 (defect D2; 44 once fixed).
+- `SCH-DEF-03`: *Steps:* as a `-w` machine, then a `-w -m SchemaWrite` machine, `schema type set unt -i s.json`. *Expect:* the first is refused with "This operation needs the scope Schema.Write, which the machine was not created with." and "Error code: AccessDenied", and ends with exit 1 (defect D2; 44 once fixed); the second stores the schema.
+- `SCH-DEF-04`: *Steps:* `schema type set unt -i not-a-schema.json`, a JSON document that is not a valid JSON Schema (for example a `$ref` that does not resolve). *Expect:* exit 2, "Invalid JSON Schema: …" and "Error code: InvalidSchema"; no new version.
+- `SCH-DEF-05`: *Steps:* `schema type get abc`. *Expect:* exit 2, "Please specify a valid annotation type code." and "Known codes: …".
+
+### Context (`SchemaContextTests`)
+
+| Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
+|---|---|---|---|---|---|---|---|
+| SCH-CTX-01 | 336 | Every schema command takes its project from `--projectKey` and its view from `-v` or `--view` | Medium | Owner | E, P | `--projectKey`, `-v`, `--view` | `SchemaCommands_ContextOptions_TargetProjectAndView` |
+
+- `SCH-CTX-01`: *Pre:* `<A>` is the target project, `<B>` the disposable project with `<rst1>`, `<rst2>` and a unit `<unt1>` of `<rst1>` in `<view>`; the fake editor adds a property. *Steps:* `schema type set unt -i s.json --projectKey <B> --view <view>`; `schema type set sbt -i s.json --projectKey <B> -v <view>`; `schema type get unt --projectKey <B> --view <view>`; `schema type get sbt --projectKey <B> -v <view>`; `schema type edit unt -y --projectKey <B> --view <view>`; `schema type edit sbt -y --projectKey <B> -v <view>`; `schema type versions unt --projectKey <B> --view <view>`; `schema type versions sbt --projectKey <B> -v <view>`; `schema type diff unt --projectKey <B> --view <view>`; `schema type diff sbt --projectKey <B> -v <view>`; `schema annotation set <rst1> -i s.json --projectKey <B> --view <view>`; `schema annotation set <rst2> -i s.json --projectKey <B> -v <view>`; `schema annotation get <rst1> --projectKey <B> --view <view>`; `schema annotation get <rst2> --projectKey <B> -v <view>`; `schema annotation edit <rst1> -y --projectKey <B> --view <view>`; `schema annotation edit <rst2> -y --projectKey <B> -v <view>`; `schema annotation versions <rst1> --projectKey <B> --view <view>`; `schema annotation versions <rst2> --projectKey <B> -v <view>`; `schema annotation diff <rst1> --projectKey <B> --view <view>`; `schema annotation diff <rst2> --projectKey <B> -v <view>`; `schema descendant set <rst1> unt -i s.json --projectKey <B> --view <view>`; `schema descendant set <rst1> usg -i s.json --projectKey <B> -v <view>`; `schema descendant get <rst1> unt --projectKey <B> --view <view>`; `schema descendant get <rst1> usg --projectKey <B> -v <view>`; `schema descendant edit <rst1> unt -y --projectKey <B> --view <view>`; `schema descendant edit <rst1> usg -y --projectKey <B> -v <view>`; `schema descendant versions <rst1> unt --projectKey <B> --view <view>`; `schema descendant versions <rst1> usg --projectKey <B> -v <view>`; `schema descendant diff <rst1> unt --projectKey <B> --view <view>`; `schema descendant diff <rst1> usg --projectKey <B> -v <view>`; `schema definition <unt1> --projectKey <B> --view <view>`; `schema definition <unt1> --projectKey <B> -v <view>`; then the deletes: `schema type delete unt --projectKey <B> --view <view>`; `schema type delete sbt --projectKey <B> -v <view>`; `schema annotation delete <rst1> --projectKey <B> --view <view>`; `schema annotation delete <rst2> --projectKey <B> -v <view>`; `schema descendant delete <rst1> unt --projectKey <B> --view <view>`; `schema descendant delete <rst1> usg --projectKey <B> -v <view>`. *Expect:* each command acts on the schemas in `<view>` of B: two versions each there, the definition combines them, and A and the view `default` of B get no schema from these steps.
 
 ## Key-Values
 
@@ -527,143 +582,157 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| KV-PAR-01 | – | `kv set` with `--protection public` and `kv get` round-trip a public pair | Elementary | Editor | | `kv`, `set`, `arg0`, `arg1`, `--protection`, `get`, `arg0` | `Kv_SetGetPublic_RoundTrip` |
-| KV-PAR-02 | – | `kv create` is an alias, and an update without `--protection` keeps the level | Medium | Editor | | `create`, `--protection` | `Kv_UpdateKeepsLevel` |
-| KV-PAR-03 | – | A new key without `--protection` fails with exit 2 | Medium | Editor | | `--protection` | `Kv_NewWithoutLevel_Fails` |
-| KV-PAR-04 | – | `--stdin` and `-i` read the value from standard input and from a file | High | Editor | | `--stdin`, `-i`, `--import` | `Kv_ValueSources_StdinAndFile` |
-| KV-PAR-05 | – | `--content-type` stores the content type | Low | Editor | | `--content-type` | `Kv_ContentType_Stored` |
-| KV-PAR-06 | – | `--expected-version` writes only at that version, and 0 only when the key does not exist | High | Editor | | `--expected-version` | `Kv_ExpectedVersion_Concurrency` |
-| KV-PAR-07 | – | `kv get --value-only` prints the value alone, and `-e` saves the pair as JSON | Medium | Reader | | `--value-only`, `-e`, `--export` | `Kv_GetValueOnlyAndExport` |
-| KV-PAR-08 | – | `kv get --version` returns an old version, and `--deleted` finds a soft-deleted key | Medium | Reader | | `--version`, `--deleted` | `Kv_GetVersionAndDeleted` |
-| KV-PAR-09 | – | `--reference` stores a Key Vault reference as a public pair that a binding resolves | Low | Editor | X:KeyVaultReference | `--reference` | `Kv_Reference_Resolves` |
-| KV-PAR-10 | – | A Reader's `kv set` is refused, and a machine needs Configuration.Write | Medium | Reader | M | `set` | `Kv_WriteRights` |
+| KV-PAR-01 | 349 | `kv set` with `--protection public` and `kv get` round-trip a public pair | Elementary | Editor | | `set`, `arg0`, `arg1`, `--protection`, `--protection=public`, `get`, `arg0` | `Kv_SetGetPublic_RoundTrip` |
+| KV-PAR-02 | 351 | `kv create` is an alias, and an update without `--protection` keeps the level | Medium | Secrets | | `create` | `Kv_UpdateKeepsLevel` |
+| KV-PAR-03 | 353 | A new key without `--protection` or `--secret` is stored as public | Medium | Editor | | `set` | `Kv_NewWithoutLevel_StoredPublic` |
+| KV-PAR-04 | 355 | `--stdin` and `-i` read the value from standard input and from a file | High | Editor | | `--stdin`, `-i`, `--import` | `Kv_ValueSources_StdinAndFile` |
+| KV-PAR-05 | 356 | `--content-type` stores the content type | Low | Editor | | `--content-type` | `Kv_ContentType_Stored` |
+| KV-PAR-06 | 361 | `--expected-version` writes only at that version, and 0 only when the key does not exist | High | Editor | | `--expected-version` | `Kv_ExpectedVersion_Concurrency` |
+| KV-PAR-07 | 362 | `kv get --value-only` prints the value alone, and `-e` saves the pair as JSON | Medium | Reader | | `--value-only`, `-e`, `--export` | `Kv_GetValueOnlyAndExport` |
+| KV-PAR-08 | 364 | `kv get --version` returns an old version, and `--deleted` finds a soft-deleted key | Medium | Reader | | `--version`, `--deleted` | `Kv_GetVersionAndDeleted` |
+| KV-PAR-09 | 365 | `--reference` stores a Key Vault reference as a public pair, and a binding inserts it as text | Low | Editor | | `--reference` | `Kv_Reference_StoredAsText` |
+| KV-PAR-10 | 366 | A Reader's `kv set` is refused, and a machine needs Configuration.Write | Medium | Reader | M | `set` | `Kv_WriteRights` |
 
-- `KV-PAR-01`: *Steps:* `story kv set <key> v1 --protection public`; `kv get <key>`. *Expect:* the pair with value `v1`, level public, version 1.
-- `KV-PAR-02`: *Steps:* `kv create <key> v2` on an existing standard secret. *Expect:* version 2, still standard.
-- `KV-PAR-03`: *Steps:* `kv set <new key> v`. *Expect:* exit 2 naming `--protection`.
+- `KV-PAR-01`: *Steps:* `story kv set <key> v1 --protection public`; `kv get <key>`. *Expect:* "'`<key>`' is at version 1 (Public)."; get shows the pair with value `v1`, level public, version 1.
+- `KV-PAR-02`: *Steps:* `kv set <key> v1 --protection standard`; `kv create <key> v2`. *Expect:* "'`<key>`' is at version 2 (Standard).": the update keeps the stored level.
+- `KV-PAR-03`: *Steps:* `kv set <new key> v`. *Expect:* "New key, stored as Public; use --secret or --protection for a secret." and "'`<new key>`' is at version 1 (Public)."; exit 0.
 - `KV-PAR-04`: *Steps:* `kv set <key> --protection public --stdin` with `v3` on stdin; `kv set <key> -i v.txt`; `--import v2.txt`. *Expect:* the values of stdin and the files; no value in the command line.
 - `KV-PAR-05`: *Steps:* `kv set <key> '{"a":1}' --protection public --content-type application/json`. *Expect:* get shows application/json.
-- `KV-PAR-06`: *Steps:* `kv set <new> v --protection public --expected-version 0` twice; `kv set <new> w --expected-version 1`; again `--expected-version 1`. *Expect:* first succeeds, second fails (conflict); then succeeds, then fails.
+- `KV-PAR-06`: *Steps:* `kv set <new> v --protection public --expected-version 0` twice; `kv set <new> w --expected-version 1`; again `--expected-version 1`. *Expect:* the first succeeds, the second fails with exit 2 (conflict); then it succeeds, then fails with exit 2.
 - `KV-PAR-07`: *Steps:* `kv get <key> --value-only`; `kv get <key> -e p.json`; `--export p2.json`. *Expect:* only the value on stdout; the pair in the files.
-- `KV-PAR-08`: *Steps:* `kv get <key> --version 1`; delete; `kv get <key>`; `kv get <key> --deleted`. *Expect:* v1; not found; the deleted pair with its expiry.
-- `KV-PAR-09`: *Steps:* `kv set <key> kv://<vault>/<name> --reference`; a configuration binding to `<key>`; `config -r`. *Expect:* level public, and the resolved value comes from the vault.
+- `KV-PAR-08`: *Steps:* `kv get <key> --version 1`; delete; `kv get <key>`; `kv get <key> --deleted`. *Expect:* v1; not found (exit 2); the deleted pair with its expiry.
+- `KV-PAR-09`: *Steps:* `kv set <key> kv://<vault>/<name> --reference`; `kv get <key>`; a configuration of `<rst>` with `"secret": "@<key>"`; `config <rst> -r`; then `kv set <key2> kv://<vault>/<name> --reference --secret`. *Expect:* "'`<key>`' is at version 1 (Public)."; get shows the level public and the content type `application/vnd.2s.secret-reference`; the resolved configuration has the text `kv://<vault>/<name>`, as the platform never resolves a reference. The last ends with exit 2 and "A reference is a public pair; the platform never resolves it. Drop --protection or --secret."
 - `KV-PAR-10`: *Steps:* `kv set <key> v --protection public` as a Reader; as a `-r` machine. *Expect:* exit 44 both.
 
 ### Secrets (`KeyValueSecretTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| KV-SEC-01 | – | `--secret` stores a secret at the project's default level, and `get` hides its value | Elementary | Secrets | | `--secret` | `Kv_Secret_HiddenByDefault` |
-| KV-SEC-02 | – | `get --reveal` returns the secret's value to ContributorWithSecrets | High | Secrets | | `--reveal` | `Kv_Reveal_ReturnsValue` |
-| KV-SEC-03 | – | A Contributor can neither set nor reveal a secret | High | Contributor | | `--secret`, `--reveal` | `Kv_SecretAsContributor_Refused` |
-| KV-SEC-04 | – | A secret without a value source asks with hidden input in a terminal, and fails fast on redirected input | Medium | Secrets | T | `set` | `Kv_SecretPrompt_HiddenInput` |
-| KV-SEC-05 | – | `--protection standard` and `hsm` store secrets at those levels | Medium | Secrets | X:Hsm | `--protection` | `Kv_ServerSideLevels` |
-| KV-SEC-06 | – | A machine reads secrets only with Secrets.Read, over mTLS when the policy requires it | High | Machine | M | `--reveal` | `Kv_MachineSecrets_ScopeAndMtls` |
+| KV-SEC-01 | 380 | `--secret` stores a secret at the project's default level, and `get` hides its value | Elementary | Secrets | | `--secret` | `Kv_Secret_HiddenByDefault` |
+| KV-SEC-02 | 381 | `get --reveal` returns the secret's value to ContributorWithSecrets | High | Secrets | | `--reveal` | `Kv_Reveal_ReturnsValue` |
+| KV-SEC-03 | 382 | A Contributor can neither set nor reveal a secret | High | Contributor | | `--secret`, `--reveal` | `Kv_SecretAsContributor_Refused` |
+| KV-SEC-04 | 383 | A secret without a value source asks with hidden input in a terminal, and fails fast on redirected input | Medium | Secrets | T | `set` | `Kv_SecretPrompt_HiddenInput` |
+| KV-SEC-05 | 384 | `--protection standard` stores a server-side secret at that level | Medium | Secrets | | `--protection`, `--protection=standard` | `Kv_StandardLevel_Stored` |
+| KV-SEC-06 | 385 | A machine reads secrets only with Secrets.Read, over mTLS when the policy requires it | High | Owner | P, M | `--reveal` | `Kv_MachineSecrets_ScopeAndMtls` |
 
 - `KV-SEC-01`: *Steps:* `kv set <key> s3cr3t --secret`; `kv get <key>`; `kv`. *Expect:* the default secret level; the value masked in get and list; the value never in the run's stdout.
 - `KV-SEC-02`: *Steps:* `kv get <key> --reveal`; `--reveal --value-only`. *Expect:* the value; then the value alone.
 - `KV-SEC-03`: *Steps:* `kv set <key> x --secret`, `kv get <secret> --reveal` as a Contributor. *Expect:* exit 44 both.
-- `KV-SEC-04`: *Steps:* `kv set <key> --secret` in a terminal; type the value. Then with input redirected and no value. *Expect:* the typed value is not echoed and is stored; the redirected run fails fast with a hint to `--stdin`.
-- `KV-SEC-05`: *Steps:* `kv set <k1> v --protection standard`; `kv set <k2> v --protection hsm`. *Expect:* the levels in get and list.
-- `KV-SEC-06`: *Steps:* as an API key machine with `--scope SecretsRead`, `kv get <secret> --reveal`; then with the policy `--require-mtls true`; then as a certificate machine. *Expect:* revealed; refused without mTLS; revealed over mTLS.
+- `KV-SEC-04`: *Steps:* `kv set <key> --secret` in a terminal; type the value. Then `kv set <key2> --secret` with input redirected and no value. *Expect:* the typed value is not echoed and is stored. The redirected run ends with exit 2 within the timeout, with "! sform cannot ask for the value of '`<key2>`': the input is redirected." and "Pass it with --stdin, with -i|--import <file>, or as an argument." on stderr.
+- `KV-SEC-05`: *Steps:* `kv set <k1> v --protection standard`; `kv get <k1>`; `kv`. *Expect:* "'`<k1>`' is at version 1 (Standard)."; level standard in get and list, the value masked.
+- `KV-SEC-06`: *Pre:* in the disposable project, `account machine machine-auth -p <org>.<project> -k ApiKey,Certificate`, a secret `<secret>`, `kv policy set --require-mtls false`, and three machines: an API key machine with `--scope SecretsRead`, an API key machine with `-r` only, and a certificate machine (`-k Certificate`) with `--scope SecretsRead`. *Steps:* `kv get <secret> --reveal` as the `-r` machine and as the `SecretsRead` API key machine; the Owner runs `kv policy set --require-mtls true`; then `kv get <secret> --reveal` as the API key machine again and as the certificate machine. *Expect:* the `-r` machine is refused (exit 44); the API key machine gets the value while mTLS is not required; after the change it is refused with exit 44, "Error code: MtlsRequired" and the hint; the certificate machine gets the value over mTLS.
 
 ### List, Delete and Bulk (`KeyValueBulkTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| KV-BLK-01 | – | `kv` (and `key-values`) lists the keys of the view; `--prefix` filters | High | Reader | | `kv`, `key-values`, `--prefix` | `Kv_List_Prefix` |
-| KV-BLK-02 | – | `--protection` filters by levels, and `--values` shows public values with secrets masked | Medium | Reader | | `--protection`, `--values` | `Kv_List_LevelsAndValues` |
-| KV-BLK-03 | – | `--deleted` lists only soft-deleted keys, `--all` both, `-k` pages | Medium | Reader | P | `--deleted`, `--all`, `-k`, `--continuation-token` | `Kv_List_DeletedAllPages` |
-| KV-BLK-04 | – | `kv delete` (and `remove`) soft-deletes, with `--expected-version` | High | Editor | | `delete`, `remove`, `arg0`, `--expected-version` | `Kv_Delete_SoftDeletes` |
-| KV-BLK-05 | – | `delete --permanent -y` removes every version as an Administrator; a terminal asks first | Medium | Admin | T | `--permanent`, `-y`, `--yes` | `Kv_PermanentDelete` |
-| KV-BLK-06 | – | `kv restore` restores keys by list or `--prefix` | High | Editor | | `restore`, `arg0`, `--prefix` | `Kv_Restore_KeysAndPrefix` |
-| KV-BLK-07 | – | `kv purge -y` removes soft-deleted keys for good (Administrator), and Contributors are refused | Medium | Admin | | `purge`, `arg0`, `--prefix`, `-y`, `--yes` | `Kv_Purge_Admin` |
-| KV-BLK-08 | – | `kv protect --protection` moves keys to another level as a new version | Medium | Secrets | | `protect`, `arg0`, `--prefix`, `--protection` | `Kv_Protect_ChangesLevel` |
-| KV-BLK-09 | – | `kv versions` and `kv diff` show the history of a key | Medium | Reader | | `versions`, `arg0`, `diff`, `arg0`, `arg1`, `arg2` | `Kv_VersionsAndDiff` |
+| KV-BLK-01 | 386 | `kv` (and `key-values`) lists the keys of the view; `--prefix` filters | High | Reader | | `kv`, `key-values`, `--prefix` | `Kv_List_Prefix` |
+| KV-BLK-02 | 387 | `--protection` filters by levels, and `--values` shows public values with secrets masked | Medium | Reader | | `--protection`, `--values`, `--protection=public`, `--protection=standard`, `--protection=hsm`, `--protection=byok`, `--protection=hyok` | `Kv_List_LevelsAndValues` |
+| KV-BLK-03 | 388 | `--deleted` lists only soft-deleted keys, `--all` both, `-k` pages | Medium | Owner | P | `--deleted`, `--all`, `-k`, `--continuation-token` | `Kv_List_DeletedAllPages` |
+| KV-BLK-04 | 389 | `kv delete` (and `remove`) soft-deletes, with `--expected-version` | High | Editor | | `delete`, `remove`, `arg0`, `--expected-version` | `Kv_Delete_SoftDeletes` |
+| KV-BLK-05 | 390 | `delete --permanent -y` removes every version as an Administrator; a terminal asks for the key first | Medium | Admin | T | `--permanent`, `-y`, `--yes` | `Kv_PermanentDelete` |
+| KV-BLK-06 | 409 | `kv restore` restores keys by list or `--prefix` | High | Editor | | `restore`, `arg0`, `--prefix` | `Kv_Restore_KeysAndPrefix` |
+| KV-BLK-07 | 410 | `kv purge -y` removes soft-deleted keys for good (Administrator), and Contributors are refused | Medium | Admin | | `purge`, `arg0`, `--prefix`, `-y`, `--yes` | `Kv_Purge_Admin` |
+| KV-BLK-08 | 411 | `kv protect --protection` keeps a key already at the level unchanged, and refuses public | Medium | Secrets | | `protect`, `arg0`, `--prefix`, `--protection`, `--protection=standard` | `Kv_Protect_SameLevelUnchanged` |
+| KV-BLK-09 | 412 | `kv versions` and `kv diff` show the history of a key | Medium | Reader | | `versions`, `arg0`, `diff`, `arg0`, `arg1`, `arg2` | `Kv_VersionsAndDiff` |
 
 - `KV-BLK-01`: *Pre:* keys `app/a`, `app/b`, `other/c`. *Steps:* `kv`; `key-values --prefix app/`. *Expect:* all three; then the two `app/` keys.
-- `KV-BLK-02`: *Steps:* `kv --protection public`; `--protection public --protection standard`; `kv --values`. *Expect:* only the levels; values shown for public pairs and masked for secrets.
+- `KV-BLK-02`: *Steps:* `kv --protection public`; `--protection public --protection standard`; `kv --protection hsm --protection byok --protection hyok`; `kv --values`. *Expect:* only the keys of those levels (the third has none of the public and standard keys); values shown for public pairs and masked for secrets.
 - `KV-BLK-03`: *Steps:* `kv --deleted`; `kv --all`; `kv -k <token>`; `--continuation-token <token>`. *Expect:* deleted with expiry; active and deleted; pages without repeats.
-- `KV-BLK-04`: *Steps:* `kv delete <k1>`; `kv remove <k2> --expected-version 1` at version 2, then at 2. *Expect:* k1 soft-deleted; the first k2 delete conflicts, the second succeeds.
-- `KV-BLK-05`: *Steps:* `kv delete <k> --permanent -y`; another in a terminal with `--permanent`, answer Yes; `--yes`. *Expect:* gone from `--deleted`; `get --deleted` not found.
+- `KV-BLK-04`: *Steps:* `kv delete <k1>`; `kv remove <k2> --expected-version 1` at version 2, then at 2. *Expect:* k1 soft-deleted; the first k2 delete conflicts (exit 2), the second succeeds.
+- `KV-BLK-05`: *Steps:* `kv delete <k> --permanent -y`; `kv delete <k2> --permanent` in a terminal, typing a wrong text, then again typing `<k2>`; `kv delete <k3> --permanent --yes`. *Expect:* the wrong text prints "Aborted, nothing was removed." with exit 40, and `<k2>` stays. The other runs print "'`<k>`' and every version of it were removed.", and the keys are gone from `kv --deleted` and `kv get <k> --deleted`.
 - `KV-BLK-06`: *Steps:* delete `app/a`, `app/b`, `x`; `kv restore x`; `kv restore --prefix app/`. *Expect:* all three active at their latest versions.
-- `KV-BLK-07`: *Steps:* `kv purge <k> -y`; `kv purge --prefix tmp/ --yes`; as a Contributor `kv purge <k2> -y`. *Expect:* purged; exit 44 for the Contributor.
-- `KV-BLK-08`: *Steps:* `kv protect <secret> --protection standard`; `kv protect --prefix sec/ --protection standard`. *Expect:* a new version per key at the level.
+- `KV-BLK-07`: *Steps:* `kv purge <k> -y`; `kv purge --prefix tmp/ --yes`; `kv purge <k2> -y` in `<contributor project>` as a Contributor. *Expect:* purged; exit 44 for the Contributor.
+- `KV-BLK-08`: *Pre:* `<secret>` and two secrets under `sec/`, all at the default level standard. *Steps:* `kv protect <secret> --protection standard`; `kv protect --prefix sec/ --protection standard`; `kv protect <secret> --protection public`. *Expect:* standard is the only server-side level of a target without HSM and BYOK, so each key has the outcome Unchanged and keeps its version: "N of N keys protected." and "Older versions keep their previous level until they expire.", exit 0. The last ends with exit 2 and "Only standard, hsm and byok can be reached on the server; public and hyok need a new value with 'set'." The move to another level is checked in KV-POL-07 and KV-POL-08.
 - `KV-BLK-09`: *Steps:* three versions; `kv versions <k>`; `kv diff <k>`; `kv diff <k> 3 1`; `kv diff <k> 1 0`. *Expect:* 3 versions; text diffs, the last against the empty text.
 
 ### Export and Import (`KeyValueTransferTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| KV-TRN-01 | – | `kv export` writes a json document to stdout, and `-o` to a file | High | Reader | | `export`, `-o`, `--output` | `KvExport_JsonDocument` |
-| KV-TRN-02 | – | `--format flat` and `env`, and the format guessed from the file name | Medium | Reader | | `--format` | `KvExport_FlatAndEnv` |
-| KV-TRN-03 | – | `--prefix` and `--protection` limit the export | Medium | Reader | | `--prefix`, `--protection` | `KvExport_Filters` |
-| KV-TRN-04 | – | Secrets have no value without `--include-secrets`, and with it for ContributorWithSecrets only | High | Secrets | | `--include-secrets` | `KvExport_IncludeSecrets` |
-| KV-TRN-05 | – | `kv import -y` merges a json document | High | Editor | | `import`, `arg0`, `-y`, `--yes` | `KvImport_MergeJson` |
-| KV-TRN-06 | – | `--format flat` and `env` imports, `--secret` globs and `--protection` for the secrets | Medium | Secrets | | `--format`, `--secret`, `--protection` | `KvImport_FlatEnvSecrets` |
-| KV-TRN-07 | – | `--mode replace --prefix` deletes the other active keys under the prefix | Medium | Editor | P | `--mode`, `--prefix` | `KvImport_ReplaceUnderPrefix` |
-| KV-TRN-08 | – | `--dry-run` shows the plan and writes nothing; a terminal asks before writing | Medium | Editor | T | `--dry-run` | `KvImport_DryRunAndConfirm` |
+| KV-TRN-01 | 413 | `kv export` writes a json document to stdout, and `-o` to a file | High | Reader | | `export`, `-o`, `--output`, `--format=json` | `KvExport_JsonDocument` |
+| KV-TRN-02 | 414 | `--format flat` and `env`, and the format guessed from the file name | Medium | Reader | | `--format`, `--format=flat`, `--format=env` | `KvExport_FlatAndEnv` |
+| KV-TRN-03 | 415 | `--prefix` and `--protection` limit the export | Medium | Reader | | `--prefix`, `--protection`, `--protection=public`, `--protection=standard`, `--protection=hsm`, `--protection=byok`, `--protection=hyok` | `KvExport_Filters` |
+| KV-TRN-04 | 416 | Secrets have no value without `--include-secrets`; a Contributor exports without them and is refused `--include-secrets` | High | Secrets | | `--include-secrets` | `KvExport_IncludeSecrets` |
+| KV-TRN-05 | 426 | `kv import -y` merges a json document | High | Editor | | `import`, `arg0`, `-y`, `--yes`, `--format=json` | `KvImport_MergeJson` |
+| KV-TRN-06 | 427 | `--format flat` and `env` imports, `--secret` globs and `--protection` for the secrets | Medium | Secrets | | `--format`, `--secret`, `--protection`, `--format=flat`, `--format=env`, `--protection=standard` | `KvImport_FlatEnvSecrets` |
+| KV-TRN-07 | 429 | `--mode replace --prefix` deletes the other active keys under the prefix | Medium | Owner | P | `--mode`, `--prefix`, `--mode=replace`, `--mode=merge` | `KvImport_ReplaceUnderPrefix` |
+| KV-TRN-08 | 431 | `--dry-run` shows the plan and writes nothing; a terminal asks before writing | Medium | Editor | T | `--dry-run` | `KvImport_DryRunAndConfirm` |
 
-- `KV-TRN-01`: *Steps:* `kv export`; `kv export -o kv.json`; `--output out/kv.json`. *Expect:* the key/value document on stdout and in the files.
+- `KV-TRN-01`: *Steps:* `kv export`; `kv export --format json`; `kv export -o kv.json`; `--output out/kv.json`. *Expect:* the key/value document on stdout and in the files.
 - `KV-TRN-02`: *Steps:* `kv export --format flat`; `--format env`; `-o kv.env` without `--format`. *Expect:* a flat object; .env lines; .env lines guessed from the name.
-- `KV-TRN-03`: *Steps:* `kv export --prefix app/`; `--protection public --protection standard`. *Expect:* only those keys.
-- `KV-TRN-04`: *Steps:* `kv export`; `kv export --include-secrets`; the same as a Contributor. *Expect:* secrets listed without values; with values; exit 44 for the Contributor.
-- `KV-TRN-05`: *Steps:* `kv import kv.json -y`; `--yes`. *Expect:* the listed keys written; other keys untouched.
-- `KV-TRN-06`: *Steps:* `kv import a.flat.json --format flat --secret '*_TOKEN' --protection standard -y`; `kv import .env --format env --secret 'DB_*' -y`. *Expect:* matching keys are standard secrets, the others public.
+- `KV-TRN-03`: *Steps:* `kv export --prefix app/`; `--protection public --protection standard`; `kv export --protection hsm --protection byok --protection hyok`. *Expect:* only those keys (the last has none of the public and standard keys).
+- `KV-TRN-04`: *Steps:* `kv export`; `kv export --include-secrets`; then both in `<contributor project>` as a Contributor. *Expect:* the secrets listed without values, then with values. The Contributor's `kv export` works and lists its secrets without values; its `--include-secrets` ends with exit 44 and "The caller has no rights to export secrets."
+- `KV-TRN-05`: *Steps:* `kv import kv.json -y`; `kv import kv2.json --format json --yes`. *Expect:* the listed keys written; other keys untouched.
+- `KV-TRN-06`: *Steps:* `kv import a.flat.json --format flat --secret '*_TOKEN' --protection standard -y`; `kv import .env --format env --secret 'DB_*' -y`. *Expect:* matching keys are standard secrets (the second at the project's default secret level), the others public.
 - `KV-TRN-07`: *Steps:* `kv import kv.json --mode replace --prefix app/ -y`; `--mode merge`. *Expect:* keys under `app/` not in the file are deleted, others kept; merge deletes nothing.
-- `KV-TRN-08`: *Steps:* `kv import kv.json --dry-run`; `kv import kv.json` in a terminal, No, then Yes. *Expect:* the plan and no write; exit 40 and no write; then written.
+- `KV-TRN-08`: *Steps:* `kv import kv.json --dry-run`; `kv import kv.json` in a terminal, No, then Yes. *Expect:* the plan and no write; "Aborted, nothing was written." with exit 40; then written. A plan with nothing to change ends with exit 42 and writes nothing.
 
 ### Policy and Encryption (`KeyValuePolicyTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| KV-POL-01 | – | `kv policy` shows the allowed levels, the mTLS rule, the keys and the recipients | Medium | Reader | | `policy` | `KvPolicy_Show` |
-| KV-POL-02 | – | `policy set --allow --default --require-mtls --hsm-rotation-days` changes the policy | High | Admin | P | `set`, `--allow`, `--default`, `--require-mtls`, `--hsm-rotation-days` | `KvPolicy_Set_Changes` |
-| KV-POL-03 | – | `policy set --expected-version` changes only at that version; a Contributor and a machine are refused | Medium | Admin | P, M | `--expected-version`, `set` | `KvPolicy_ExpectedVersionAndRights` |
-| KV-POL-04 | – | `policy byok-setup` prints the application to consent to and the role to grant | Low | Admin | P | `byok-setup` | `KvPolicy_ByokSetup_PrintsSteps` |
-| KV-POL-05 | – | `--byok-key --byok-tenant` set the customer key, `byok-verify` checks it, an empty `--byok-key` removes it | Low | Admin | P, X:Byok | `--byok-key`, `--byok-tenant`, `byok-verify` | `KvPolicy_Byok_SetVerifyRemove` |
-| KV-POL-06 | – | `policy rotate --protection standard` (and `hsm`) rotates the key and the values stay readable | Medium | Admin | P | `rotate`, `--protection` | `KvPolicy_Rotate_KeepsValues` |
-| KV-POL-07 | – | `kv set --protection byok` and `kv protect --protection byok` with the customer key | Low | Secrets | P, X:Byok | `--protection` | `Kv_Byok_StoresAndMoves` |
+| KV-POL-01 | 442 | `kv policy` shows the allowed levels, the mTLS rule, the keys and the recipients | Medium | Reader | | `policy` | `KvPolicy_Show` |
+| KV-POL-02 | 443 | `policy set --allow --default --require-mtls --hsm-rotation-days` changes the policy | High | Owner | P | `set`, `--allow`, `--default`, `--require-mtls`, `--hsm-rotation-days`, `--allow=public`, `--allow=standard`, `--allow=hyok`, `--default=standard`, `--default=hyok`, `--require-mtls=true`, `--require-mtls=false` | `KvPolicy_Set_Changes` |
+| KV-POL-03 | 444 | `policy set --expected-version` changes only at that version; a Contributor and a machine are refused | Medium | Owner | P, M | `--expected-version`, `set`, `--require-mtls=false` | `KvPolicy_ExpectedVersionAndRights` |
+| KV-POL-04 | 445 | `policy byok-setup` prints the application to consent to and the role to grant; `byok-verify` without a customer key fails with exit 2 | Low | Owner | P | `byok-setup`, `byok-verify` | `KvPolicy_ByokSetup_PrintsSteps` |
+| KV-POL-05 | 446 | `--byok-key --byok-tenant` set the customer key, `byok-verify` checks it, an empty `--byok-key` removes it | Low | Owner | P, X:Byok | `--byok-key`, `--byok-tenant`, `byok-verify`, `--operation`, `--operation=ByokVerify` | `KvPolicy_Byok_SetVerifyRemove` |
+| KV-POL-06 | 447 | `policy rotate --protection standard` rotates the key and the values stay readable | Medium | Owner | P | `rotate`, `--protection`, `--protection=standard` | `KvPolicy_Rotate_KeepsValues` |
+| KV-POL-07 | 448 | BYOK: `--allow byok --default byok`, and `kv set`, `protect`, `import`, the list and the export at level byok | Low | Owner | P, X:Byok | `--allow=byok`, `--default=byok`, `--protection`, `--protection=byok`, `--operation`, `--operation=Reprotect` | `Kv_Byok_StoresAndMoves` |
+| KV-POL-08 | 449 | HSM: `--allow hsm --default hsm`, and `kv set`, `protect`, `import`, `rotate`, the list and the export at level hsm | Low | Owner | P, X:Hsm | `--allow=hsm`, `--default=hsm`, `--protection`, `--protection=hsm`, `--operation`, `--operation=Reprotect` | `Kv_Hsm_StoresMovesRotates` |
 
 - `KV-POL-01`: *Steps:* `kv policy`. *Expect:* the levels, the mTLS rule, the key information, the version.
-- `KV-POL-02`: *Steps:* `kv policy set --allow standard --allow hyok --default standard --require-mtls true --hsm-rotation-days 30`. *Expect:* `kv policy` shows each change; members not given keep their values.
-- `KV-POL-03`: *Steps:* `policy set --require-mtls false --expected-version <old>`; with the current version; as a Contributor; as a machine. *Expect:* conflict; changed; exit 44; exit 44.
-- `KV-POL-04`: *Steps:* `kv policy byok-setup`. *Expect:* the application id and the role to grant.
-- `KV-POL-05`: *Steps:* `policy set --byok-key https://<vault>/keys/<name> --byok-tenant <tenant>`; `policy byok-verify`; `policy set --byok-key ""`. *Expect:* the key set; verification passes; the settings removed.
-- `KV-POL-06`: *Steps:* `kv policy rotate --protection standard`; `--protection hsm` (with `X:Hsm`, otherwise only standard); `kv get <secret> --reveal`. *Expect:* a new key version and the re-wrap started; the value still readable.
-- `KV-POL-07`: *Steps:* `kv set <k> v --protection byok`; `kv protect <k2> --protection byok`. *Expect:* level byok, values readable.
+- `KV-POL-02`: *Pre:* the test generates an RSA-3072 key; `kv recipients add --name r --public-key r.pem`, the enabled recipient that hyok needs. *Steps:* `kv policy set --allow public --allow standard --allow hyok --default standard --require-mtls false --hsm-rotation-days 30`; `kv policy set --require-mtls true`; `kv policy set --default hyok`; `kv policy set --default standard`; `kv policy set`. *Expect:* "The policy of `<org>.<project>` is at version N." and `kv policy` shows each change (mTLS off, then on again); members not given keep their values. The last ends with exit 2 and "Nothing to change; give at least one of --allow, --default, --require-mtls, --byok-key, --byok-tenant or --hsm-rotation-days."
+- `KV-POL-03`: *Pre:* a machine of the disposable project (`account machine create -p <org>.<project> -w`). *Steps:* `kv policy set --require-mtls false --expected-version <old>`; the same with the current version; `kv policy set --require-mtls true` in `<contributor project>` as a Contributor; `kv policy set --require-mtls true` as the machine. *Expect:* a conflict (exit 2); changed; exit 44; exit 44.
+- `KV-POL-04`: *Steps:* `kv policy byok-setup`; `kv policy byok-verify` in the project without a customer key. *Expect:* "Bring your own key" with the consent URL, the role to grant and the application id; then exit 2 with the server's message and "Error code: ByokNotConfigured".
+- `KV-POL-05`: *Steps:* `kv policy set --byok-key https://<vault>/keys/<name> --byok-tenant <tenant>`; `kv policy byok-verify`; `kv audit --operation byokverify`; `kv policy set --byok-key ""`. *Expect:* the key set; "The customer key `<uri>` is `<health>` …"; the audit lists the ByokVerify event of the verify and no other operation; the settings removed.
+- `KV-POL-06`: *Steps:* `kv policy rotate --protection standard`; `kv get <secret> --reveal`; `kv policy rotate --protection byok`. *Expect:* "The Standard key is at version N; the re-wrap of the stored values has started." and the value still readable; the last ends with exit 2 and "Only standard and hsm keys are rotated by the platform."
+- `KV-POL-07`: *Pre:* the customer key of KV-POL-05. *Steps:* `kv policy set --allow byok --default byok`; `kv set <k> v --protection byok`; `kv protect <k2> --protection byok`; `kv import b.env --format env --secret 'B_*' --protection byok -y`; `kv --protection byok`; `kv export --protection byok`; `kv audit --operation reprotect`. *Expect:* level byok for each key, the values readable with `--reveal`; the list and the export hold only the byok keys; the audit lists the Reprotect of `<k2>` and no other operation.
+- `KV-POL-08`: *Steps:* `kv policy set --allow hsm --default hsm`; `kv set <k> v --protection hsm`; `kv protect <k2> --protection hsm`; `kv import h.env --format env --secret 'H_*' --protection hsm -y`; `kv policy rotate --protection hsm`; `kv --protection hsm`; `kv export --protection hsm`; `kv audit --operation reprotect`. *Expect:* level hsm for each key; "The Hsm key is at version N; the re-wrap of the stored values has started."; the values stay readable; the list and the export hold only the hsm keys; the audit lists the Reprotect of `<k2>` and no other operation.
 
 ### Client Encryption (`KeyValueRecipientTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| KV-HYK-01 | – | `kv recipients add` registers an RSA key from a PEM file, inline, or as JWK, with `--id` | High | Admin | P | `recipients`, `add`, `--name`, `--public-key`, `--id` | `Recipients_Add_PemJwkInline` |
-| KV-HYK-02 | – | A key below 3072 bits is refused | Low | Admin | P | `--public-key` | `Recipients_SmallKey_Refused` |
-| KV-HYK-03 | – | `kv set --protection hyok` encrypts locally, and `get --private-key --kid` decrypts | High | Secrets | P | `--protection`, `--private-key`, `--kid` | `Hyok_SetAndDecrypt` |
-| KV-HYK-04 | – | `recipients disable` stops new values for the recipient, and `enable` resumes them | Medium | Admin | P | `disable`, `enable`, `arg0` | `Recipients_DisableEnable` |
-| KV-HYK-05 | – | `recipients remove -y` (and `delete`) removes a recipient, and a terminal asks first | Medium | Admin | P, T | `remove`, `delete`, `arg0`, `-y`, `--yes` | `Recipients_Remove` |
-| KV-HYK-06 | – | `kv reencrypt --private-key --kid` encrypts values again for the current recipients | Medium | Secrets | P | `reencrypt`, `arg0`, `--prefix`, `--private-key`, `--kid` | `Hyok_Reencrypt_ForNewRecipients` |
+| KV-HYK-01 | 450 | `kv recipients add` registers an RSA key from a PEM file, inline, or as JWK, with `--id` | High | Owner | P | `recipients`, `add`, `--name`, `--public-key`, `--id` | `Recipients_Add_PemJwkInline` |
+| KV-HYK-02 | 451 | A key below 3072 bits is refused | Low | Owner | P | `--public-key` | `Recipients_SmallKey_Refused` |
+| KV-HYK-03 | 452 | `kv set --protection hyok` encrypts locally, and `get --private-key --kid` decrypts | High | Owner | P | `--protection`, `--protection=hyok`, `--private-key`, `--kid` | `Hyok_SetAndDecrypt` |
+| KV-HYK-04 | 453 | `recipients disable` stops new values for the recipient, and `enable` resumes them | Medium | Owner | P | `disable`, `enable`, `arg0` | `Recipients_DisableEnable` |
+| KV-HYK-05 | 454 | `recipients remove -y` (and `delete`) removes a recipient, and a terminal asks first | Medium | Owner | P, T | `remove`, `delete`, `arg0`, `-y`, `--yes` | `Recipients_Remove` |
+| KV-HYK-06 | 455 | `kv reencrypt --private-key --kid` encrypts values again for the current recipients | Medium | Owner | P | `reencrypt`, `arg0`, `--prefix`, `--private-key`, `--kid` | `Hyok_Reencrypt_ForNewRecipients` |
 
-- `KV-HYK-01`: *Pre:* the test generates RSA-3072 keys. *Steps:* `kv recipients add --name a --public-key a.pem`; `add --name b --public-key b.jwk --id kid-b`; `add --name c --public-key "<inline PEM>"`; `kv recipients`. *Expect:* three recipients, `kid-b` with its given id.
-- `KV-HYK-02`: *Steps:* `recipients add --name s --public-key rsa2048.pem`. *Expect:* exit 2 naming the size.
-- `KV-HYK-03`: *Steps:* `kv set <k> v --protection hyok`; `kv get <k> --private-key a.pem --kid <a>`; `get <k>` without the key. *Expect:* stored encrypted; decrypted to `v`; without the key the value is not shown.
-- `KV-HYK-04`: *Steps:* `recipients disable <b>`; set a hyok value; decrypt with b; `recipients enable <b>`; set again. *Expect:* b cannot decrypt the value set while disabled; it can after enable.
-- `KV-HYK-05`: *Steps:* `recipients remove <c> -y`; `recipients delete <b> --yes`; one more in a terminal, Yes. *Expect:* removed; old values still decrypt with the removed key.
-- `KV-HYK-06`: *Steps:* add recipient d; `kv reencrypt <k> --private-key a.pem --kid <a>`; `reencrypt --prefix hyok/ --private-key a.pem --kid <a>`; decrypt with d. *Expect:* d decrypts the re-encrypted values.
+- `KV-HYK-01`: *Pre:* the test generates RSA-3072 keys. *Steps:* `kv recipients add --name a --public-key a.pem`; `kv recipients add --name b --public-key b.jwk --id kid-b`; `kv recipients add --name c --public-key "<inline PEM>"`; `kv recipients`. *Expect:* three recipients, `kid-b` with its given id.
+- `KV-HYK-02`: *Steps:* `kv recipients add --name s --public-key rsa2048.pem`. *Expect:* exit 2 naming the size.
+- `KV-HYK-03`: *Pre:* recipient `a` (as in KV-HYK-01), then `kv policy set --allow public --allow standard --allow hyok`, which needs an enabled recipient. *Steps:* `kv set <k> v --protection hyok`; `kv get <k> --private-key a.pem --kid <a>`; `kv get <k>` without the key; `kv --protection hyok`; `kv export --protection hyok`. *Expect:* "Encrypted locally for 1 recipient(s); the platform cannot read the value." and stored encrypted; decrypted to `v`; without the key the value is not shown; the list and the export hold only the hyok keys.
+- `KV-HYK-04`: *Pre:* recipients `a` and `b`, and hyok allowed as in KV-HYK-03. *Steps:* `kv recipients disable <b>`; `kv set <k1> v --protection hyok`; decrypt `<k1>` with b; `kv recipients enable <b>`; `kv set <k2> v --protection hyok`; decrypt `<k2>` with b. *Expect:* b cannot decrypt the value set while it was disabled; it can after enable.
+- `KV-HYK-05`: *Pre:* recipients `a`, `b`, `c` and `d`, hyok allowed as in KV-HYK-03, and a hyok value `<k>` set for all four. *Steps:* `kv recipients remove <c> -y`; `kv recipients delete <b> --yes`; `kv recipients remove <d>` in a terminal, answering Yes. *Expect:* each is removed, and `a` stays as the enabled recipient that hyok needs; `<k>` still decrypts with the removed key of d.
+- `KV-HYK-06`: *Pre:* recipient `a`, hyok allowed as in KV-HYK-03, and hyok values `<k>` and two under `hyok/`. *Steps:* `kv recipients add --name d --public-key d.pem`; `kv reencrypt <k> --private-key a.pem --kid <a>`; `kv reencrypt --prefix hyok/ --private-key a.pem --kid <a>`; decrypt each with d. *Expect:* d decrypts the re-encrypted values.
 
 ### Audit and Usage (`KeyValueAuditTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| KV-AUD-01 | – | `kv audit` lists the secrets' audit trail newest first, and `--key`, `--operation`, `--from`, `--to` filter it | Medium | Admin | | `audit`, `--key`, `--operation`, `--from`, `--to` | `KvAudit_Filters` |
-| KV-AUD-02 | – | `kv audit -v` filters by view, and `-k` pages | Low | Admin | P | `-v`, `-k`, `--continuation-token` | `KvAudit_ViewAndPages` |
-| KV-AUD-03 | – | `kv usage` shows the last 30 days, and `--from --to` a range | Low | Admin | | `usage`, `--from`, `--to` | `KvUsage_Range` |
-| KV-AUD-04 | – | A Contributor's `kv audit` and `kv usage` are refused | Low | Contributor | | `audit`, `usage` | `KvAudit_Contributor_Refused` |
+| KV-AUD-01 | 456 | `kv audit` lists the secrets' audit trail newest first, and `--key`, `--operation`, `--from`, `--to` filter it | Medium | Admin | | `audit`, `--key`, `--operation`, `--from`, `--to` | `KvAudit_Filters` |
+| KV-AUD-02 | 457 | `kv audit -v` filters by view, and `-k` pages | Low | Owner | P | `-v`, `-k`, `--continuation-token` | `KvAudit_ViewAndPages` |
+| KV-AUD-03 | 458 | `kv usage` shows the totals of the last 30 days, and `--from --to` those of a range | Low | Admin | | `usage`, `--from`, `--to` | `KvUsage_Range` |
+| KV-AUD-04 | 459 | A Contributor's `kv audit` and `kv usage` are refused | Low | Contributor | | `audit`, `usage` | `KvAudit_Contributor_Refused` |
+| KV-AUD-05 | 460 | `kv audit --operation` filters each of the nineteen operations, and an unknown one fails with exit 2 | Low | Owner | P | `--operation`, `--operation=Reveal`, `--operation=Export`, `--operation=BindingRead`, `--operation=Create`, `--operation=Update`, `--operation=Delete`, `--operation=Restore`, `--operation=PermanentDelete`, `--operation=Purge`, `--operation=Reprotect`, `--operation=Import`, `--operation=PolicyChange`, `--operation=Rotate`, `--operation=Rewrap`, `--operation=ByokVerify`, `--operation=ByokUnavailable`, `--operation=RecipientAdded`, `--operation=RecipientChanged`, `--operation=RecipientRemoved` | `KvAudit_EachOperation_Filters` |
 
 - `KV-AUD-01`: *Pre:* a reveal and an update of `<secret>` in this run. *Steps:* `kv audit`; `--key <secret>`; `--operation reveal`; `--from <run start> --to <now>`. *Expect:* the events with user and time; each filter narrows to the matching events.
-- `KV-AUD-02`: *Pre:* events in two views and more than a page. *Steps:* `kv audit -v B`; `-k <token>`; `--continuation-token <token>`. *Expect:* view B only; pages continue.
-- `KV-AUD-03`: *Steps:* `kv usage`; `--from <day-7> --to <today>`. *Expect:* daily counts (and charges when priced) for 30 days, then for 8 days.
+- `KV-AUD-02`: *Pre:* events in two views and more than a page. *Steps:* `kv audit -v B`; `-k <token>`; `--continuation-token <token>`. *Expect:* view B only (without `-v`, every view of the project); pages continue.
+- `KV-AUD-03`: *Steps:* `kv usage`; `--from <day-7> --to <today>`. *Expect:* "Key/value usage `<from>` to `<to>` (N days with data)" and the totals per meter (and the estimated charges when priced), first for the last 30 days, then from `<day-7>` to `<today>`.
 - `KV-AUD-04`: *Steps:* `kv audit`, `kv usage` as a Contributor. *Expect:* exit 44 both.
+- `KV-AUD-05`: *Pre:* `<rst>` with a configuration bound to `<s>`; the test generates an RSA-3072 key. *Steps:* in the disposable project: `kv set <s> a --secret` (create); `kv set <s> b` (update); `kv get <s> --reveal`; `kv export --include-secrets`; `config <rst> -r` (binding read); `kv import s.env --format env --secret 'S_*' -y`; `kv delete <s>`; `kv restore <s>`; `kv delete <s2>` and `kv purge <s2> -y`; `kv delete <s3> --permanent -y`; `kv policy set --require-mtls false` (policy change); `kv policy rotate --protection standard` (rotate, then the re-wrap); `kv recipients add --name r --public-key r.pem`, `kv recipients disable <r>` and `kv recipients remove <r> -y`. Then `kv audit --operation reveal`, `--operation export`, `--operation bindingread`, `--operation create`, `--operation update`, `--operation delete`, `--operation restore`, `--operation permanentdelete`, `--operation purge`, `--operation import`, `--operation policychange`, `--operation rotate`, `--operation rewrap`, `--operation recipientadded`, `--operation recipientchanged`, `--operation recipientremoved`, `--operation reprotect`, `--operation byokverify`, `--operation byokunavailable`; and `kv audit --operation nope`. *Expect:* each filter lists only the events of its operation, the one its step caused among them (the re-wrap once it ran). A project without HSM and BYOK causes no reprotect, byokverify or byokunavailable event, so those three print "No audit events." (KV-POL-05, KV-POL-07 and KV-POL-08 check them with events). `--operation nope` ends with exit 2 and "Unknown operation 'nope'."
+
+### Context (`KeyValueContextTests`)
+
+| Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
+|---|---|---|---|---|---|---|---|
+| KV-CTX-01 | 461 | Every key-value command of a view takes its project from `--projectKey` and its view from `-v` or `--view` | Medium | Owner | P | `--projectKey`, `-v`, `--view` | `KvCommands_ContextOptions_TargetProjectAndView` |
+| KV-CTX-02 | 462 | The policy, recipient, audit and usage commands take their project from `--projectKey`; `-v` and `--view` change only the audit | Low | Owner | P | `--projectKey`, `-v`, `--view` | `KvProjectCommands_ContextOptions_TargetProject` |
+
+- `KV-CTX-01`: *Pre:* `<A>` is the target project, `<B>` the disposable project; the test generates two RSA-3072 key pairs. *Steps:* `kv set <k1> v --protection public --projectKey <B> --view <view>`; `kv set <k2> v --protection public --projectKey <B> -v <view>`; `kv set <s1> x --secret --projectKey <B> --view <view>`; `kv set <s2> x --secret --projectKey <B> -v <view>`; `kv --projectKey <B> --view <view>`; `kv --projectKey <B> -v <view>`; `kv get <k1> --projectKey <B> --view <view>`; `kv get <k2> --projectKey <B> -v <view>`; `kv versions <k1> --projectKey <B> --view <view>`; `kv versions <k2> --projectKey <B> -v <view>`; `kv diff <k1> --projectKey <B> --view <view>`; `kv diff <k2> --projectKey <B> -v <view>`; `kv protect <s1> --protection standard --projectKey <B> --view <view>`; `kv protect <s2> --protection standard --projectKey <B> -v <view>`; `kv export -o b1.json --include-secrets --projectKey <B> --view <view>`; `kv export -o b2.json --include-secrets --projectKey <B> -v <view>`; `kv import b1.json -y --projectKey <B> --view <view2>`; `kv import b2.json -y --projectKey <B> -v <view3>`; `kv delete <k1> --projectKey <B> --view <view>`; `kv delete <k2> --projectKey <B> -v <view>`; `kv restore <k1> --projectKey <B> --view <view>`; `kv restore <k2> --projectKey <B> -v <view>`; `kv delete <s1> --projectKey <B> --view <view>`; `kv delete <s2> --projectKey <B> -v <view>`; `kv purge <s1> -y --projectKey <B> --view <view>`; `kv purge <s2> -y --projectKey <B> -v <view>`. Then, with a recipient in B and hyok allowed (`kv recipients add --name a --public-key a.pem --projectKey <B>` and `kv policy set --allow public --allow standard --allow hyok --projectKey <B>`), `kv set <h1> v --protection hyok --projectKey <B> --view <view>`, a second recipient, `kv reencrypt <h1> --private-key a.pem --kid <a> --projectKey <B> --view <view>` and `kv reencrypt <h1> --private-key a.pem --kid <a> --projectKey <B> -v <view>`. *Expect:* each command acts on the pairs in `<view>` of B: they are listed, versioned, found by `kv protect` (outcome Unchanged, as they are standard already), exported with their values, deleted, restored and purged there and never appear in A or in the view `default` of B; the imports bring them into `<view2>` and `<view3>`.
+- `KV-CTX-02`: *Pre:* `<A>` is the target project, `<B>` the disposable project; the test generates two RSA-3072 key pairs. *Steps:* `kv policy --projectKey <B> --view <view>`; `kv policy --projectKey <B> -v <view>`; `kv policy set --require-mtls false --projectKey <B> --view <view>`; `kv policy set --require-mtls true --projectKey <B> -v <view>`; `kv policy byok-setup --projectKey <B> --view <view>`; `kv policy byok-setup --projectKey <B> -v <view>`; `kv policy byok-verify --projectKey <B> --view <view>`; `kv policy byok-verify --projectKey <B> -v <view>`; `kv policy rotate --protection standard --projectKey <B> --view <view>`; `kv policy rotate --protection standard --projectKey <B> -v <view>`; `kv recipients add --name r1 --public-key r1.pem --projectKey <B> --view <view>`; `kv recipients add --name r2 --public-key r2.pem --projectKey <B> -v <view>`; `kv recipients --projectKey <B> --view <view>`; `kv recipients --projectKey <B> -v <view>`; `kv recipients disable <r1> --projectKey <B> --view <view>`; `kv recipients disable <r2> --projectKey <B> -v <view>`; `kv recipients enable <r1> --projectKey <B> --view <view>`; `kv recipients enable <r2> --projectKey <B> -v <view>`; `kv recipients remove <r1> -y --projectKey <B> --view <view>`; `kv recipients remove <r2> -y --projectKey <B> -v <view>`; `kv audit --projectKey <B> --view <view>`; `kv audit --projectKey <B> -v <view>`; `kv usage --projectKey <B> --view <view>`; `kv usage --projectKey <B> -v <view>`. *Expect:* each command acts on B: its policy changes and its key rotates, `byok-verify` reports on B's customer key (without one: exit 2 and "Error code: ByokNotConfigured"), and the recipients, the audit events and the usage are those of B, while A's stay unchanged. `-v` and `--view` change nothing for the policy, the recipients and the usage, which belong to the project; for `kv audit` they filter the events to the view.
 
 ## Context and Errors
 
@@ -671,30 +740,30 @@ Cases per section:
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| GEN-CTX-01 | – | `-p` and `-v` win over the default project and view | High | Any | | `-p`, `--projectKey`, `-v`, `--view` | `Context_ExplicitWinsOverDefault` |
-| GEN-CTX-02 | – | Without a default project and without `-p` a context command asks for `sform account set` and exits 43 | High | Any | | `-p` | `Context_NoProject_InteractionNeeded` |
-| GEN-CTX-03 | – | A malformed `-p` fails with exit 2, an unknown view with a not-found error | Medium | Any | | `-p`, `-v` | `Context_InvalidProjectOrView_Fails` |
-| GEN-CTX-04 | – | `STORYTELLER_PROJECT` and `STORYTELLER_VIEW` target a machine, and `-p`/`-v` win over them | Medium | Machine | M | `-p`, `-v` | `Context_MachineVariables_Target` |
+| GEN-CTX-01 | 374 | `-p` and `-v` win over the default project and view | High | Any | | `-p`, `--projectKey`, `-v`, `--view` | `Context_ExplicitWinsOverDefault` |
+| GEN-CTX-02 | 376 | Without a default project and without `-p` a context command targets `house.main` with the view `default` | High | Any | | `story` | `Context_NoProject_TargetsHouseMain` |
+| GEN-CTX-03 | 378 | A `-p` without a dot is ignored, and a view without data is empty | Medium | Any | | `-p`, `-v` | `Context_ProjectWithoutDotOrEmptyView` |
+| GEN-CTX-04 | 379 | `STORYTELLER_PROJECT` and `STORYTELLER_VIEW` target a machine, and `-p`/`-v` win over them | Medium | Machine | M | `-p`, `-v` | `Context_MachineVariables_Target` |
 
 - `GEN-CTX-01`: *Pre:* the default set to project A, view `default`. *Steps:* `story -p <B>`; `story --projectKey <B> --view <v2>`; `story -v <v2>`. *Expect:* B's annotations; B's view v2; A's view v2.
-- `GEN-CTX-02`: *Steps:* `story` with no default. *Expect:* exit 43 and the hint `sform account set`.
-- `GEN-CTX-03`: *Steps:* `story -p only-org`; `story -p <A> -v <generated>`. *Expect:* exit 2 naming the format `<organizationName>.<projectName>`; a not-found error naming the view.
-- `GEN-CTX-04`: *Steps:* as a machine with `STORYTELLER_PROJECT` and `STORYTELLER_VIEW`, `story`; then `-v default`. *Expect:* the variables' view; then `default`.
+- `GEN-CTX-02`: *Pre:* no `access.default.json`; the leased user is not a member of `house.main`. *Steps:* `story`. *Expect:* the request goes to `house.main` with the view `default`, and the API refuses it: exit 44, "No Reader access to 'house.main'." and "Error code: AccessDenied". Only `account` names `sform account set`.
+- `GEN-CTX-03`: *Pre:* the default set to project A. *Steps:* `story -p only-org`; `story -p <A> -v <generated>`. *Expect:* the first ignores `-p` and lists A's annotations with exit 0; the second prints "No annotation exists yet." and exits 0 (a view exists by its data).
+- `GEN-CTX-04`: *Steps:* as a machine with `STORYTELLER_PROJECT` and `STORYTELLER_VIEW`, `story`; then `story -v default`; then `story -p <org>.<other>`. *Expect:* the variables' view; then `default`; then exit 2 before any call: "The machine credentials in `<variables>` belong to `<org>.<project>`, not `<org>.<other>`."
 
 ### Command Line and Exit Codes (`CommandLineTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Covers | Test |
 |---|---|---|---|---|---|---|---|
-| GEN-CLI-01 | – | `sform` without a command, and `--help` on every command, print help and exit 0 | Medium | Any | F | `sform` | `Help_EveryCommand_Prints` |
-| GEN-CLI-02 | – | An unknown command or option fails with the parse code and a suggestion | Medium | Any | F | `sform` | `Parse_Unknown_Fails` |
-| GEN-CLI-03 | – | No command waits for input when stdin is redirected | High | Any | | `sform` | `RedirectedInput_NeverHangs` |
-| GEN-CLI-04 | – | An unreachable API fails with a service failure, not a crash | Medium | Any | F | `sform` | `Api_Unreachable_ServiceFailure` |
-| GEN-CLI-05 | – | No secret, API key or token appears in the output, the log file or the artifacts of a run | High | Secrets | M | `sform` | `Output_NeverLeaksSecrets` |
-| GEN-CLI-06 | – | `SFORM_HOME` keeps every file of the CLI; `SFORM_TOKEN_STORE=file` without `SFORM_HOME` is ignored | Medium | Any | F | `sform` | `StateDirectory_IsolatesFiles` |
+| GEN-CLI-01 | 391 | `sform` without a command, `--version`, and `--help` on every command print the usage or the version and exit 0 | Medium | Any | F | `sform`, `-v`, `--version` | `Help_EveryCommand_Prints` |
+| GEN-CLI-02 | 392 | An unknown command or option fails with the parse code and a suggestion | Medium | Any | F | `sform` | `Parse_Unknown_Fails` |
+| GEN-CLI-03 | 393 | No command waits for input when stdin is redirected | High | Editor | | `sform` | `RedirectedInput_NeverHangs` |
+| GEN-CLI-04 | 394 | An unreachable API fails with a service failure, not a crash | Medium | Any | F | `sform` | `Api_Unreachable_ServiceFailure` |
+| GEN-CLI-05 | 396 | No secret, API key or token appears in the output, the log file or the artifacts of a run | High | Secrets | U, M | `sform` | `Output_NeverLeaksSecrets` |
+| GEN-CLI-06 | 398 | `SFORM_HOME` keeps every file of the CLI; `SFORM_TOKEN_STORE=file` without `SFORM_HOME` is ignored | Medium | Any | F | `sform` | `StateDirectory_IsolatesFiles` |
 
-- `GEN-CLI-01`: *Steps:* `sform`; then `<path> --help` for every command path of the command tree (read by the coverage test). *Expect:* the usage of each, listing its options and subcommands; exit 0.
-- `GEN-CLI-02`: *Steps:* `sform storytelr`; `sform story --nope`. *Expect:* exit -1 (input parsing), with "Did you mean storyteller?" for the first.
-- `GEN-CLI-03`: *Steps:* every command with a prompt (`account set`, `assist key`, `story delete --permanent`, `config patch`, `kv delete --permanent`, `kv import`, `kv purge`, `kv recipients remove`, `kv set --secret`, `points create`, `account register`) without its `--yes` or value, with input redirected. *Expect:* each ends within 10 seconds with a non-zero code and names the option to use.
-- `GEN-CLI-04`: *Steps:* `story -p …` with `general:baseUrl` pointing to a closed port. *Expect:* exit 3 (or the documented service code), a readable message, no stack trace.
-- `GEN-CLI-05`: *Steps:* run `kv get --reveal`, machine sign-in with an API key, `config -r --github-env` and `account` with `--verbose` where available. *Expect:* only the revealed value where asked; the API key, tokens and the session never appear in stdout, stderr, the log file in `SFORM_HOME/logs` or the redacted artifacts.
-- `GEN-CLI-06`: *Steps:* sign in and set a default in `SFORM_HOME`; list the CLI's build folder and the user's `.42for.net`. Then set `SFORM_TOKEN_STORE=file` without `SFORM_HOME`. *Expect:* every file is under `SFORM_HOME`, nothing next to the CLI or in the user folder. The second run uses the protected store and warns that the variable was ignored.
+- `GEN-CLI-01`: *Steps:* `sform`; `sform --version`; `sform -v`; then `<path> --help` for every command path of the command tree (read by the coverage test). *Expect:* the usage of each, listing its options and subcommands; for `--version` and `-v` the version line (file and informational version); exit 0.
+- `GEN-CLI-02`: *Steps:* `sform storytelr`; `sform story --nope`. *Expect:* exit -1 (input parsing); the first names the unknown command and prints "The most similar command/argument is" with `storyteller`.
+- `GEN-CLI-03`: *Pre:* `<rst>` with a configuration, `p.json` a patch with a change, a deleted annotation `<del>`, and `kv.json` with a change for the view. *Steps:* with input redirected, each without `-y|--yes`, the option or the value: `account set`; `account points get`; `account points grant <id>`; `account points revoke <id>`; `account points create`; `assist`; `assist key`; `story set <del>`; `story delete <rst> --permanent`; `config patch <rst> -i p.json`; `config patch <rst>`; `config edit <rst>`; `template edit unt`; `schema type edit unt`; `schema annotation edit <rst>`; `schema descendant edit <rst> unt`; `kv delete <key> --permanent`; `kv purge <key>`; `kv recipients remove <id>`; `kv import kv.json`; `kv set <new key> --secret`; `account machine renew <id> -c m.pfx`. *Expect:* each ends within 10 seconds without a write. A value ends with exit 2 (`account set`, the three `points` commands with an argument or none, `story set`, `kv set`, `account machine renew`), a confirmation or a terminal with exit 43 (the others). stderr has "! sform cannot ask for …: the input is redirected." and names the option to use (`-p|--projectKey`, `-p|--pointKey`, `-p|--point`, `--restore-deleted` or `--recreate`, `-y|--yes`, `--stdin` or `-i|--import`, `--password-stdin`) or says to run the command in a terminal (`points create`, `assist`, `assist key`). `account register` of a registered pool user ends with 0 without a prompt (SGN-OUT-03); its prompt is checked in SGN-OUT-04.
+- `GEN-CLI-04`: *Steps:* `story -p …` with `SFORM_general__baseUrl` pointing to a closed port. *Expect:* exit 3, "! The 2S platform could not be reached: `<reason>`" and "The API is `<base URL>` (general.baseUrl, SFORM_general__baseUrl, or STORYTELLER_ENDPOINT for a machine); check the address and the network.", no stack trace.
+- `GEN-CLI-05`: *Pre:* `GITHUB_ENV` set to a temp file; a secret `<secret>`, a configuration of `<rst>` bound to it, and an API key machine of the project. *Steps:* as the user, `kv get <secret> --reveal` and `config <rst> -r --github-env --env-prefix APP_`; as the machine (mode M), `account` and `story get <rst>`. *Expect:* only the revealed value where asked; the API key, tokens and the session never appear in stdout, stderr, the log file in `SFORM_HOME/logs` or the redacted artifacts.
+- `GEN-CLI-06`: *Steps:* `account -o <AuthKit organization id>` and `account set -p <org>.<project>` in `SFORM_HOME`; list the CLI's build folder and the user's `.42for.net`. Then `account` with `SFORM_TOKEN_STORE=file` and without `SFORM_HOME`, stopped after its first line. *Expect:* every file of the first runs is under `SFORM_HOME`, and nothing new is next to the CLI or in the user folder. The second run uses the protected store and prints "SFORM_TOKEN_STORE=file is ignored without SFORM_HOME; the session is kept in the protected store." first; other commands do not print it. The protected store needs a keyring on Linux (or Windows).
