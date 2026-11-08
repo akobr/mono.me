@@ -319,14 +319,21 @@ public sealed class UserSettingsStore : IUserSettingsStore
     // A settings file that is a link (to dotfiles kept elsewhere) stays a link: the file it points to is replaced.
     private string GetWritePath()
     {
+        // Followed link by link, so a link to a file that does not exist yet (dotfiles linked before they are written)
+        // is followed too; a relative target is relative to the folder of its link. A path that is still a link (a loop,
+        // or a link that cannot be read) is never written over: the change fails instead.
+        const int maxLinks = 40;
+        var path = FilePath;
+
         try
         {
-            // Followed link by link, so a link to a file that does not exist yet (dotfiles linked before they are written)
-            // is followed too; a relative target is relative to the folder of its link.
-            var path = FilePath;
-
-            for (var hop = 0; hop < 16 && _fileSystem.FileInfo.New(path).LinkTarget is { } target; hop++)
+            for (var hop = 0; _fileSystem.FileInfo.New(path).LinkTarget is { } target; hop++)
             {
+                if (hop == maxLinks)
+                {
+                    throw new UserSettingsException($"The settings file {FilePath} cannot be written: it is a chain of more than {maxLinks} links.", isDamaged: false);
+                }
+
                 path = _fileSystem.Path.GetFullPath(_fileSystem.Path.Combine(_fileSystem.Path.GetDirectoryName(path) ?? string.Empty, target));
             }
 
@@ -334,10 +341,8 @@ public sealed class UserSettingsStore : IUserSettingsStore
         }
         catch (Exception exception) when (exception is ArgumentException || IsFileFailure(exception))
         {
-            // The link cannot be followed: the path itself is written.
+            throw new UserSettingsException($"The settings file {FilePath} cannot be written: its link {path} cannot be followed: {exception.Message}", isDamaged: false, exception);
         }
-
-        return FilePath;
     }
 
     private bool LegacyFileExists(string section)
