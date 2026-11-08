@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.Storyteller;
 using _42.Platform.Storyteller.Sdk;
+using McMaster.Extensions.CommandLineUtils;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -111,6 +113,24 @@ public class StorytellerListCommandTests
         await command.OnExecuteAsync();
 
         Listed().ShouldBe(["- cnt.northwind.prod [disabled]"]);
+    }
+
+    // The command line as the host builds it: edit is a sub-command of sform story, and its help lists it.
+    [Fact]
+    public void Edit_IsASubCommandOfStory_AndItsHelpListsIt()
+    {
+        var app = new CommandLineApplication<StorytellerListCommand>(NullConsole.Singleton);
+        app.Conventions.UseDefaultConventions();
+
+        var edit = app.Commands.Single(command => command.Name == "edit");
+
+        // the help wraps the descriptions to the width of the console
+        var help = Regex.Replace(app.GetHelpText(), @"\s+", " ");
+
+        edit.ShouldBeAssignableTo<CommandLineApplication<StorytellerEditCommand>>();
+        edit.Arguments.Single().Name.ShouldBe(nameof(StorytellerEditCommand.AnnotationKey));
+        edit.Options.ShouldNotContain(option => option.LongName == "force");
+        help.ShouldContain("edit Edit the content of an annotation in your preferred editor. The saved document replaces the content.");
     }
 
     private static Annotation Inactive(string key, Action<Annotation> change)
