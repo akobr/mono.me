@@ -325,7 +325,7 @@ So an archive that changes a schema and its configurations together imports with
 1. **Content** (`ViewAnnotationDocument.TryRead`):
    - Member names match in any case, as in the API. Two spellings of one member fail with `InvalidDocument`.
    - The other members of the key's type, which a `GET` response has, are ignored: the key and the names, the relation arrays, the stamps, `Deletion`. So a response body can be saved as a file. An `AnnotationKey` member must be the key of the file name (the type code in any case), or the file fails with `InvalidDocument`.
-   - Any other member fails with `InvalidDocument`: `Unknown member 'X'.`, or `Unknown members 'a', 'b'.` That includes `UnitType` outside units and `$patch` and `$remove` (annotations have no merge). It also catches a configuration document read as an annotation.
+   - Any other member fails with `InvalidDocument`: `Unknown member 'X'.`, or `Unknown members 'a', 'b'.` That includes `UnitType` outside units and `$patch` and `$remove`: an annotation file replaces the content and has no merge directives (the API merges with `PATCH`, [annotation-lifecycle.md](annotation-lifecycle.md#merge-writes-patch)). It also catches a configuration document read as an annotation.
    - Values are typed like the API's request body (System.Text.Json). A value of a wrong type fails with `InvalidDocument`.
    - A member missing from the file is cleared, because an import replaces the content. A unit without `UnitType` or `UnitDefinition` gets the defaults of a create (`event`, `unknown`). `{}` is a valid annotation: the key without content.
    - `AnnotationRules` apply ([annotation-lifecycle.md](annotation-lifecycle.md#validation)). A violation fails with `InvalidAnnotation`.
