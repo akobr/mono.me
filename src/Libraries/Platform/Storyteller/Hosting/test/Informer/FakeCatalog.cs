@@ -45,6 +45,7 @@ internal sealed class FakeCatalog
     private readonly ConcurrentDictionary<string, JObject> _annotations = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Func<HttpResponseMessage>> _failures = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, bool> _unlisted = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _keyGates = new(StringComparer.Ordinal);
     private TaskCompletionSource? _gate;
     private int _writes;
     private int _inFlight;
@@ -153,6 +154,20 @@ internal sealed class FakeCatalog
     public void ReleaseReads()
     {
         Volatile.Read(ref _gate)?.TrySetResult();
+    }
+
+    // Point reads of one key wait from now until ReleaseRead(key).
+    public void HoldRead(string annotationKey)
+    {
+        _keyGates[annotationKey] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    public void ReleaseRead(string annotationKey)
+    {
+        if (_keyGates.TryRemove(annotationKey, out var gate))
+        {
+            gate.TrySetResult();
+        }
     }
 
     // Gone, as after a purge: a point read answers 404 without a body.
@@ -300,7 +315,7 @@ internal sealed class FakeCatalog
 
             var slash = target.IndexOf('/', StringComparison.Ordinal);
 
-            if (slash < 0 && target != ResponsibilityKey && Volatile.Read(ref _gate) is { } gate)
+            if (slash < 0 && (_keyGates.TryGetValue(target, out var gate) || (target != ResponsibilityKey && (gate = Volatile.Read(ref _gate)) is not null)))
             {
                 Interlocked.Increment(ref _held);
 

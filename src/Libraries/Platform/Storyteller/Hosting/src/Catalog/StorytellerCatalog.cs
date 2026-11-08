@@ -42,15 +42,20 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
     }
 
     // The mapper builds the snapshot of the key's type, so a key of TAnnotation's type reads as a TAnnotation.
+    // StorytellerAnnotation takes any key; a type of the application that derives from it names no annotation type,
+    // and throws as Find<T>() of who am I does.
     public async Task<TAnnotation?> GetAsync<TAnnotation>(string key, CancellationToken cancellationToken = default)
         where TAnnotation : StorytellerAnnotation
     {
+        AnnotationType? type = typeof(TAnnotation) == typeof(StorytellerAnnotation)
+            ? null
+            : SnapshotTypes.Require<TAnnotation>(nameof(TAnnotation));
         var fullKey = CatalogKeys.Parse(key, _settings.Key, nameof(key));
 
-        if (SnapshotTypes.TypeOf(typeof(TAnnotation)) is { } type && fullKey.Annotation.Type != type)
+        if (type is { } expected && fullKey.Annotation.Type != expected)
         {
             throw new ArgumentException(
-                $"'{fullKey}' does not name {AnnotationTypeFacts.Singular(type)}, {AnnotationTypeFacts.Pattern(type)}.",
+                $"'{fullKey}' does not name {AnnotationTypeFacts.Singular(expected)}, {AnnotationTypeFacts.Pattern(expected)}.",
                 nameof(key));
         }
 
@@ -70,6 +75,11 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
         catch (StorytellerConfigurationException exception) when (CatalogReader.IsMissing(exception))
         {
             throw scope.DoesNotExist(exception);
+        }
+        catch (StorytellerConfigurationException exception) when (CatalogReader.IsRestricted(exception))
+        {
+            // A machine restricted below the ancestor: the list answers the same 403, in the words of what listing
+            // needs.
         }
 
         var items = await ListPaging.ReadAllAsync(

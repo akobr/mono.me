@@ -163,7 +163,8 @@ internal sealed class DescendantPollingSource
         return new DescendantBatch(changes);
     }
 
-    // The list of an ancestor that does not exist is empty, which would read as no descendants for ever.
+    // The list of an ancestor that does not exist is empty, which would read as no descendants for ever. A machine
+    // restricted below the ancestor may not read it: the list answers the same 403, in the words of what listing needs.
     private async Task CheckAncestorAsync(PollState poll, CancellationToken cancellationToken)
     {
         try
@@ -173,6 +174,10 @@ internal sealed class DescendantPollingSource
         catch (StorytellerConfigurationException exception) when (CatalogReader.IsMissing(exception))
         {
             throw poll.Scope.DoesNotExist(exception);
+        }
+        catch (StorytellerConfigurationException exception) when (CatalogReader.IsRestricted(exception))
+        {
+            _logger.LogDebug("The machine may not read {Key}; the list tells what it needs.", poll.Scope.Ancestor.ToString());
         }
     }
 
