@@ -43,14 +43,27 @@ Phase 3 of [Conditional and Merge Writes of Annotations](../2026-11-08%20Conditi
 
 A review of the whole branch (five reviewers, each finding checked by a skeptic) confirmed these, now fixed:
 
-- **A create that loses its parent's relation wave** (`CosmosAnnotationService.SetAnnotationAsync`): the key's batch commits before the relation arrays of its parent (wave 10). When the parent changed in between, the retry found the key this write had created and answered `412` to `If-None-Match: *`. The version an earlier attempt committed (`CreateCoreAsync`'s new `targetCommitted` callback) is not checked again; the retry is a no-op update that answers `200` and the marker. Test: `IfNoneMatchAny_AParentChangedBeforeItsRelationArrays_StillAnswersTheCreate`. The parent still misses the child's name in that case, as before this branch.
+- **A create that loses its parent's relation wave** (`CosmosAnnotationService.SetAnnotationAsync`): the key's batch commits before the relation arrays of its parent (wave 10). When the parent changed in between, the retry found the key this write had created and answered `412` to `If-None-Match: *`. The version an earlier attempt committed (`CreateCoreAsync`'s new `targetCommitted` callback) is not checked again; the retry is a no-op update that answers `200` and the marker. Test: `IfNoneMatchAny_AParentChangedBeforeItsRelationArrays_StillAnswersTheCreate`. A later review of the PR added that the retry also completes the relation arrays the failed wave did not write (`CompleteParentRelationsAsync`), and the test checks the parent lists the child.
 - **The `412` message** named `If-Match` when both headers were given and `If-None-Match` failed; it now names the part that failed. `AnnotationVersionMatch` moved to its own file.
 - **The growth of a JSON Patch:** a `copy` doubles a value with a few bytes of patch, so a 1 KB request could build gigabytes. `AnnotationPatch` weighs every value an operation adds (`MaxDocumentWeight`, 16 Mi characters) and the depth it ends at (`MaxDocumentDepth`, 64), and fails the operation with `400 PatchInvalid`. A patch value nested deeper than a body is read is an invalid patch, and `Values` that a patch nests too deep are `400 InvalidAnnotation`, both instead of `500`.
 - **Legacy nulls:** a full write lets a `null` label, or a `null` `UnitType` or `UnitDefinition`, in. Such a record no longer fails every patch: the null label is dropped, and a null unit member stays null until a patch sets it.
 - **The OpenAPI document:** the `If-Match` of `PatchAnnotation` has its own description (a missing or deleted key answers `404` first), and `UnitType` and `UnitDefinition` of `AnnotationMergePatch` are not nullable. The SDKs are regenerated from `open.api.v0.10.30.json`, which replaces the `0.10.28` snapshot of this branch.
 - **Tests and docs:** the double of the deleted read tells a marker, as Cosmos DB does, so the test checks that no `ETag` goes out; a test of the tag of an inactive read with `includeInactive`; the leading-zero index tested where the number would address an item; the keys of the TypeScript README examples (`sbt`, not `sbj`), its list of generator corrections, and the wording about merges in `export-import.md`.
 
+### Review of the pull request
+
+The review of PR #174 confirmed these, now fixed:
+
+- **`sform story set --replace`** no longer re-creates a key deleted after the lookup: after the read's `404` it looks up the key and its ancestors again and stops (exit `1`) unless **Create new** was chosen. A read answered without an `ETag` writes nothing (exit `3`) instead of writing without a condition.
+- **The size of a patched annotation:** `MaxDocumentWeight` is 4 Mi characters, the limit of a body; a batch that Cosmos DB refuses as too large (`413`, an item above 2 MB) is `400 BodyTooLarge` instead of a `500`.
+- **`BatchPlan`** checks that a batch answered one result per operation before it hands on the ETags.
+- **Docs:** a busy parent changes its tag with every child, so `annotation-lifecycle.md` advises a `PATCH` without `If-Match` to change its members; the SDK README and its NuGet readme name the breaking change of the generated `SetAnnotationAsync`, and the description of `PatchAnnotation` (the remarks of the generated method) says that a model that leaves nulls out cannot clear a member. The SDKs are regenerated from `open.api.v0.10.31.json`.
+- Small: `GetSegments` is called once per source, and `CreateCoreAsync` uses `BatchOperation.KeepingETag` instead of a second helper.
+
+Not changed: the tag helper keeps `BindingDependency.Absent` as the marker of no item, which is what the service answers; a `304` on the annotation read stays out of scope; the two copies of the OpenAPI document are the convention of the two SDK folders.
+
 ### Not done here
 
 - **The admin UI** still writes whole bodies (`useAnnotationActions.save`, `saveMany`, the restore dialog). It can move to `PATCH`, which needs no readable `ETag`; its mock API needs a `PATCH` handler first.
 - **Configuration `PATCH`** keeps the JsonPatch.Net escaping bug described in the phase 2 review.
+- **The version of the .NET SDK:** the break of the generated `SetAnnotationAsync` is documented; whether it takes a breaking-change version bump is the owner's call.

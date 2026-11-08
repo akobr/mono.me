@@ -19,7 +19,7 @@ Use the version that generated `src/ApiSdk.g.cs` (its header names it); another 
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.10.30.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true /GenerateOptionalParameters:true
+nswag openapi2csclient /input:open.api.v0.10.31.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true /GenerateOptionalParameters:true
 ```
 
 `/GenerateOptionalParameters:true` gives each operation one method: the parameters the document marks optional (query, header, and a body it does not mark `required`) come last with `= null`, and `cancellationToken` with `= default`. A required body therefore comes before the optional parameters (`ImportKeyValuesAsync(organization, project, view, body, mode, dryRun, keyPrefix)`, `StartViewImportAsync(organization, project, view, body, include, …)`). Leave out what you don't send, and pass a later argument by name: `GetConfigurationAsync(organization, project, view, key, cancellationToken: cancellationToken)`. The compiler also lets you leave out a body the document does not mark `required`, but the client then sends the JSON `null`, which most operations answer with `400`.
@@ -127,6 +127,8 @@ if (!patch.IsEmpty)
 * `AddLabel(label)` appends a label; the server keeps a label once, so one the annotation has changes nothing.
 * Names are escaped per RFC 6901 (`Escape`). The values are written by the `JsonSerializer` given to the constructor, by default one that writes a `DateTimeOffset` in ISO 8601 with its offset.
 * `ToJson()` returns a copy of the operations, `IsEmpty` and `Count` tell how many there are.
+
+**A breaking change of 0.10.31:** the generated `SetAnnotationAsync` takes `body` as a required argument, and `if_Match` and `if_None_Match` come before `cancellationToken`. A call that passed its cancellation token by position, `SetAnnotationAsync(organization, project, view, key, body, cancellationToken)`, no longer compiles: pass it by name (`cancellationToken: cancellationToken`). A test double that overrides the method or a Moq setup of it needs the two new arguments.
 
 The generated `SetAnnotationAsync(organization, project, view, key, body, if_Match, if_None_Match)` sends the same conditions, by `POST`, and throws `ApiException<ErrorResponse>` for a `412`, but it returns the body without the `ETag`. The generated `PatchAnnotationAsync(organization, project, view, key, body, if_Match)` sends an `AnnotationMergePatch` as a merge patch: it sets members, values and the whole `Labels`, but it cannot clear anything, because the DTO leaves its `null`s out. Use `PatchAnnotationVersionedAsync` with a `JObject` or an `AnnotationJsonPatch` to clear.
 
