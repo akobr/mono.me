@@ -35,6 +35,7 @@ public class RouteDispatchTests
     [InlineData("GET", Annotations, nameof(AnnotationsHttp.GetAnnotations))]
     [InlineData("POST", Annotations + "/rst.billing", nameof(AnnotationsHttp.SetAnnotation))]
     [InlineData("PUT", Annotations + "/rst.billing", nameof(AnnotationsHttp.SetAnnotation))]
+    [InlineData("PATCH", Annotations + "/rst.billing", nameof(AnnotationsHttp.PatchAnnotation))]
     [InlineData("GET", Annotations + "/rst.billing", nameof(AnnotationsHttp.GetAnnotation))]
     [InlineData("DELETE", Annotations + "/rst.billing", nameof(AnnotationsHttp.DeleteAnnotation))]
     [InlineData("GET", Annotations + "/deleted", nameof(AnnotationsHttp.GetDeletedAnnotations))]

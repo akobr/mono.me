@@ -1317,6 +1317,26 @@ public partial class AnnotationsHttpTests
             return Task.FromResult(new MarkedRead<Annotation>(Stored, Stored is null ? null : StoredMarker));
         }
 
+        // The patch of the last PatchAnnotationAsync, which applies it to Stored.
+        public AnnotationPatch? LastPatch { get; private set; }
+
+        public Task<AnnotationWriteResult> PatchAnnotationAsync(FullKey fullKey, AnnotationPatch patch, AuditActor actor, AnnotationWriteCondition condition)
+        {
+            Calls.Add($"patch:{fullKey.OrganizationName}:{fullKey.Annotation}");
+            LastPatch = patch;
+            LastCondition = condition;
+            LastActor = actor;
+
+            if (Failure is not null)
+            {
+                return Task.FromException<AnnotationWriteResult>(Failure);
+            }
+
+            return Stored is null
+                ? Task.FromException<AnnotationWriteResult>(new NotFoundException($"The annotation '{fullKey.Annotation}' does not exist.", ErrorCodes.AnnotationNotFound))
+                : Task.FromResult(new AnnotationWriteResult(patch.Apply(Stored), WrittenMarker));
+        }
+
         public async Task<AnnotationWriteResult> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor, AnnotationWriteCondition condition)
         {
             LastCondition = condition;

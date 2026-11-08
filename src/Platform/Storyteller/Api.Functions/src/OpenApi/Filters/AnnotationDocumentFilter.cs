@@ -1,4 +1,5 @@
-﻿using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
+﻿using _42.Platform.Storyteller.Api.Models;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 
@@ -11,6 +12,29 @@ public class AnnotationDocumentFilter : IDocumentFilter
         if (document.Components.Schemas == null)
         {
             return;
+        }
+
+        // a merge patch: every member is optional, and null clears it (RFC 7396)
+        if (document.Components.Schemas.TryGetValue(nameof(AnnotationMergePatch), out var mergePatchSchema))
+        {
+            mergePatchSchema.Required = new HashSet<string>();
+
+            foreach (var property in mergePatchSchema.Properties.Values)
+            {
+                property.Nullable = true;
+            }
+        }
+
+        // the PATCH of an annotation takes a JSON Patch (RFC 6902) as well; the attribute declares one media type
+        foreach (var operation in document.Paths.Values.SelectMany(path => path.Operations.Values))
+        {
+            if (operation.OperationId == Definitions.RouteIds.Annotations.PatchAnnotation && operation.RequestBody is { } body)
+            {
+                body.Content[Definitions.ContentTypes.JsonPatch] = new OpenApiMediaType
+                {
+                    Schema = new OpenApiSchema { Type = "array", Items = new OpenApiSchema { Type = "object" } },
+                };
+            }
         }
 
         // a restore brings the descendants back unless the client says otherwise; generated clients keep the default
