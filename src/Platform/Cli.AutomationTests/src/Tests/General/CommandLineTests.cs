@@ -191,7 +191,7 @@ public sealed partial class CommandLineTests : CliTest
     // GEN-CLI-05: No secret, API key or token appears in the output, the log file or the artifacts of a run.
     // As a ContributorWithSecrets: a secret pair <secret>, a configuration of <rst> bound to it, an API key machine of the
     // project (-r -k ApiKey) and GITHUB_ENV naming an empty file. As the user, sform story kv get <secret> --reveal (the
-    // value, where asked) and sform story config <rst> -r --github-env --env-prefix APP_ (the value only in its
+    // value, where asked) and sform story config export <rst> --github-env --prefix APP_ (the value only in its
     // ::add-mask:: line); as the machine, sform account and sform story get <rst>. The API key and the tokens of the user's
     // session appear in no standard output or error of these runs, the secret only where asked, and none of them in a log
     // file of the homes (SFORM_HOME/logs) or in an artifact of the test (the redacted runs).
@@ -217,7 +217,7 @@ public sealed partial class CommandLineTests : CliTest
         await Assert.That(revealed.JsonNode()["Value"]?.GetValue<string>()).IsEqualTo(secret);
         var exported = (await Sform(
                 new SformRunOptions { Environment = { [SformProcessEnvironment.GitHubEnv] = githubEnv } },
-                InProject("story", "config", key, "-r", "--github-env", "--env-prefix", "APP_")))
+                InProject("story", "config", "export", key, "--github-env", "--prefix", "APP_")))
             .ShouldSucceed()
             .ShouldContain($"::add-mask::{secret}");
         var asMachine = AsMachine(machine.ApiKeyCredentials);

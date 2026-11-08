@@ -8,8 +8,8 @@ namespace _42.Platform.Cli.AutomationTests.Running;
 //     "CertificatePassword", "AccessToken", "RefreshToken" (not the placeholders "[see below]" and "[written to file]");
 //   - the lines "Client secret:     <value>" and "Certificate password: <value>";
 //   - anything shaped like a structured API key, 2s.<machine segment>.<secret>;
-//   - the values of the GitHub Actions mask commands, "::add-mask::<value>" (config -r --github-env/--mask, which sform
-//     prints for exactly the values it treats as secret), with the workflow command escaping (%25, %0D, %0A) undone.
+//   - the values of the GitHub Actions mask commands, "::add-mask::<value>" (config export --github-env/--mask, which
+//     sform prints for exactly the values it treats as secret), with the workflow command escaping (%25, %0D, %0A) undone.
 // The runner scans the plain standard output, where the folds of WriteJson's 80 columns are joined already
 // (SformResult.PlainStdOut), so a key the renderer split over two lines is found whole.
 public static partial class SecretScanner

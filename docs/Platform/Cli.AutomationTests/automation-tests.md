@@ -441,7 +441,7 @@ Mode E is not an attribute, so [the catalogue check](#the-catalogue-check) does 
 
 ## The Elementary set
 
-The PR gate set, `--treenode-filter "/**[Category=Elementary]"`, 12 cases: SGN-DEV-01 (device code sign-in), SGN-MSI-01 (machine sign-in), ACC-SET-01 (`account set`), MCH-LIF-03 (a created API key machine reads), ANN-SET-01 and ANN-SET-08 (annotation round trip, Reader refused), CFG-GET-01, CFG-GET-02 and CFG-SET-01 (configuration model, resolved, set), CFG-GHA-01 (`--github-env`), KV-PAR-01 and KV-SEC-01 (a public pair, a secret). They need the pool passwords, `Machines:apikey`, and a Reader who reads `Target:Project` (the Reader cases arrange their data as an Editor there).
+The PR gate set, `--treenode-filter "/**[Category=Elementary]"`, 12 cases: SGN-DEV-01 (device code sign-in), SGN-MSI-01 (machine sign-in), ACC-SET-01 (`account set`), MCH-LIF-03 (a created API key machine reads), ANN-SET-01 and ANN-SET-08 (annotation round trip, Reader refused), CFG-GET-01, CFG-GET-02 and CFG-SET-01 (configuration model, resolved, set), CFG-GHA-01 (`config export --github-env`), KV-PAR-01 and KV-SEC-01 (a public pair, a secret). They need the pool passwords, `Machines:apikey`, and a Reader who reads `Target:Project` (the Reader cases arrange their data as an Editor there).
 
 ## Self tests
 
@@ -516,7 +516,7 @@ account points grant [AccessPointGrantCommand]
 - An option whose own type is an enum (none at phase 1) must be listed, with exactly the enum's names (but `except` and `refused`); the test names any that is not.
 - The test also fails for an entry that names no command or option, has no values or no source, or lists an option or a value twice. A field the file does not know (a misspelling) fails the load with the file's name; `"$comment"` is allowed on the file and on each entry.
 
-It has the 30 options of the catalogue's fixed sets (`points grant|revoke -r`, `machine create --scope|-m|-k`, `machine-auth -k|-d`, `story -b`, `export -f|-i`, `import -i|-e`, `config -f|--mask`, `kv --protection`, `kv set|protect|export|import --protection`, `kv export|import --format`, `kv import --mode`, `kv policy set --allow|--default|--require-mtls`, `kv policy rotate --protection`, `kv audit --operation`, and `--format` of the three schema diffs), 24 of them checked against an enum. `kv import --protection` takes `standard`, `hsm` and `byok`; `public` and `hyok` end with exit 2 (the keys `--secret` matches are secrets), so they are in `except`.
+It has the 31 options of the catalogue's fixed sets (`points grant|revoke -r`, `machine create --scope|-m|-k`, `machine-auth -k|-d`, `story -b`, `export -f|-i`, `import -i|-e`, `config -f`, `config export -f|--mask`, `kv --protection`, `kv set|protect|export|import --protection`, `kv export|import --format`, `kv import --mode`, `kv policy set --allow|--default|--require-mtls`, `kv policy rotate --protection`, `kv audit --operation`, and `--format` of the three schema diffs), 25 of them checked against an enum. `kv import --protection` takes `standard`, `hsm` and `byok`; `public` and `hyok` end with exit 2 (the keys `--secret` matches are secrets), so they are in `except`.
 
 ### `coverage-exceptions.json`
 
