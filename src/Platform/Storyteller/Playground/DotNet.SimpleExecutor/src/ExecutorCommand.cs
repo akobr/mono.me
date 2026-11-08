@@ -9,8 +9,8 @@ using Microsoft.Extensions.Hosting;
 namespace _42.Platform.Storyteller.Playground.DotNet.SimpleExecutor;
 
 // Renders who the process is, the executions in the scope of its key, and their units and units of execution, each with
-// its document in a format of ConfigurationFormats. The catalog lists no units, so they come from the UnitNames of the
-// executions, and a unit without a unit of execution does not show.
+// its document in a format of ConfigurationFormats. For a responsibility's key the units come from IStorytellerCatalog,
+// so a unit that no execution names shows too; for the other keys they come from the UnitNames of the executions.
 //
 // Prints the values of the documents, so run it with a machine without Secrets.Read.
 [Command("simple-executor", Description = "Renders who this process is, its executions, their units and units of execution.")]
@@ -30,6 +30,7 @@ public sealed class ExecutorCommand : BaseCommand
 
     private readonly IExecutionContext _self;
     private readonly ISubscriptionCatalog _catalog;
+    private readonly IStorytellerCatalog _annotations;
     private readonly IStorytellerDocuments _documents;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ExecutionRenderer _renderer;
@@ -41,12 +42,14 @@ public sealed class ExecutorCommand : BaseCommand
         IExtendedConsole console,
         IExecutionContext self,
         ISubscriptionCatalog catalog,
+        IStorytellerCatalog annotations,
         IStorytellerDocuments documents,
         IHostApplicationLifetime lifetime)
         : base(console)
     {
         _self = self;
         _catalog = catalog;
+        _annotations = annotations;
         _documents = documents;
         _lifetime = lifetime;
         _renderer = new ExecutionRenderer(console.Console.Out);
@@ -138,9 +141,22 @@ public sealed class ExecutorCommand : BaseCommand
 
         var context = key.ContextName.Length > 0 ? key.ContextName : Context;
 
-        if (context is null)
+        // A responsibility's units need no context either: with units alone and no --context, they are all.
+        var listsUnits = key.Type == AnnotationType.Responsibility && What is All or Units;
+
+        if (context is null && !(listsUnits && What == Units))
         {
             return Refuse($"{self.Key} names no context: add --context.");
+        }
+
+        if (listsUnits)
+        {
+            await WriteUnitsOfAsync(key.ResponsibilityName, format, stopping);
+        }
+
+        if (context is null)
+        {
+            return Result();
         }
 
         if (key.Type is AnnotationType.Execution or AnnotationType.UnitOfExecution && !Watch)
@@ -218,6 +234,30 @@ public sealed class ExecutorCommand : BaseCommand
                 var unitOfExecution = AnnotationKey.CreateUnitOfExecution(execution.SubjectName, execution.ResponsibilityName, execution.ContextName, unit);
                 await WriteDocumentAsync(unitOfExecution.ToString(), format, stopping);
             }
+        }
+    }
+
+    // The units of the responsibility, by key, listed once per run from the catalog, with --watch too. A unit that no
+    // execution names shows as well. A failed list does not stop the executions, and fails the run.
+    private async Task WriteUnitsOfAsync(string responsibility, ConfigurationFormat format, CancellationToken stopping)
+    {
+        var target = StorytellerTarget.UnitsOf(AnnotationKey.CreateResponsibility(responsibility).ToString());
+        IReadOnlyList<StorytellerUnit> units;
+
+        try
+        {
+            units = await _annotations.ListAsync(target, stopping);
+        }
+        catch (StorytellerConfigurationException exception) when (!stopping.IsCancellationRequested)
+        {
+            Console.Console.Error.WriteLine($"! {target}: {exception.Message}");
+            _anyDocumentFailed = true;
+            return;
+        }
+
+        foreach (var unit in units)
+        {
+            await WriteUnitAsync(unit.ResponsibilityName, unit.UnitName, format, stopping);
         }
     }
 
