@@ -289,12 +289,15 @@ Tools carry the MCP hints: reads are read-only; deletes, purges, resets and repl
 | --- | --- |
 | `list_annotations`, `find_annotations`, `list_descendants`, `list_deleted_annotations` | Paged lists in a compact form (key, type, name, title, status, labels, modified) |
 | `get_annotation`, `get_annotation_history` | One annotation; its audit trail |
-| `set_annotation` | Creates or updates one annotation; omitted fields keep their stored values as stored, `clearFields` removes some. A create refuses a deleted key or ancestor and names `restore_annotations`, unless `recreateDeleted` is set |
+| `set_annotation` | Creates or updates one annotation; omitted fields keep their stored values, `clearFields` removes some. A create refuses a deleted key or ancestor and names `restore_annotations`, unless `recreateDeleted` is set |
 | `create_annotations` | Up to 100 keys or compact lines at once; existing keys are skipped |
 | `delete_annotation`, `restore_annotations`, `purge_annotation` | Soft delete with descendants, restore, permanent delete (Administrator) |
 
 - `find_annotations` lists the annotations of one type and filters them by the names in their keys (`responsibility`, `subject`, `context`, `unit`) in the server, page by page. An exact name ignores case. A filter that starts with `^` or ends with `$` is a .NET regular expression, case-sensitive unless it starts with `(?i)`, with a match timeout of 100 ms; an invalid or too slow pattern is refused. The tool does not use the API's name queries ([annotation-lifecycle.md](annotation-lifecycle.md)), which compare exact names case-sensitively and run patterns on the non-backtracking engine.
 - `list_deleted_annotations` with a `deletionId` lists everything that delete removed, descendants included, unless `roots` is `true`.
+- `set_annotation` does not read the annotation first. It sends one `PATCH` with a JSON Patch of the given fields ([Merge writes](annotation-lifecycle.md#merge-writes-patch)). The server merges it with the stored annotation, so a concurrent change of another field is kept. `labels` and `values` replace their whole set, and each field in `clearFields` is set to `null`.
+  - A missing or deleted key (`404 AnnotationNotFound` or `AnnotationDeleted`) takes the create path. A unit needs `unitType` and `unitDefinition`, new names follow the rule, and deleted keys and ancestors are looked up unless `recreateDeleted` is set. Then the tool writes the whole body with `POST` and `If-None-Match: *`, so it creates the key only while the key does not exist.
+  - A key created meanwhile (`412`) is patched again. After three rounds the tool returns the last error.
 - New names follow the rule of `sform`: 1 to 50 letters, numbers, dashes or underscores. A name is new when its responsibility, subject, context or unit does not exist yet, deleted ones included; existing names are used as they are.
 
 See [annotation-lifecycle.md](annotation-lifecycle.md).

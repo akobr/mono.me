@@ -2,6 +2,7 @@ using _42.Platform.Storyteller.Mcp.Tools;
 
 using Moq;
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using static _42.Platform.Storyteller.Mcp.UnitTests.Support.ToolFixtures;
@@ -10,15 +11,34 @@ namespace _42.Platform.Storyteller.Mcp.UnitTests;
 
 public class AnnotationToolsTests
 {
+    private static readonly IReadOnlyDictionary<string, IEnumerable<string>> NoHeaders = new Dictionary<string, IEnumerable<string>>();
+
     private readonly Mock<Sdk.IAnnotationsApiClient> _api = new(MockBehavior.Strict);
     private readonly List<Sdk.AnnotationKeysRequest> _lookups = [];
-    private Sdk.Annotation? _sent;
+    private readonly List<(string Key, JArray Patch)> _patches = [];
+    private readonly List<(Sdk.Annotation Body, string? IfMatch, string? IfNoneMatch)> _creates = [];
+
+    // The failure of a patch of a key (null: it is patched), and of a create (null: it is created).
+    private Func<string, Exception?> _patchFailure = _ => null;
+    private Func<Exception?> _createFailure = () => null;
 
     public AnnotationToolsTests()
     {
+        // without If-Match: the tool patches whatever version is stored
+        _api.Setup(api => api.PatchAnnotationVersionedAsync(Organization, Project, ViewName, It.IsAny<string>(), It.IsAny<JToken>(), null, It.IsAny<CancellationToken>()))
+            .Returns((string _, string _, string _, string key, JToken patch, string? _, CancellationToken _) =>
+            {
+                _patches.Add((key, (JArray)patch));
+                return _patchFailure(key) is { } failure
+                    ? Task.FromException<Sdk.VersionedResponse<Sdk.Annotation>>(failure)
+                    : Task.FromResult(new Sdk.VersionedResponse<Sdk.Annotation>(200, AnnotationBodies.Create(AnnotationKey.Parse(key), Project, ViewName), NoHeaders));
+            });
         _api.Setup(api => api.SetAnnotationAsync(Organization, Project, ViewName, It.IsAny<string>(), It.IsAny<Sdk.Annotation>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, string, Sdk.Annotation, string, string, CancellationToken>((_, _, _, _, body, _, _, _) => _sent = body)
-            .ReturnsAsync((string _, string _, string _, string _, Sdk.Annotation body, string _, string _, CancellationToken _) => body);
+            .Returns((string _, string _, string _, string _, Sdk.Annotation body, string? ifMatch, string? ifNoneMatch, CancellationToken _) =>
+            {
+                _creates.Add((body, ifMatch, ifNoneMatch));
+                return _createFailure() is { } failure ? Task.FromException<Sdk.Annotation>(failure) : Task.FromResult(body);
+            });
         _api.Setup(api => api.FindDeletedAnnotationsAsync(Organization, Project, ViewName, It.IsAny<Sdk.AnnotationKeysRequest>(), It.IsAny<CancellationToken>()))
             .Callback<string, string, string, Sdk.AnnotationKeysRequest, CancellationToken>((_, _, _, request, _) => _lookups.Add(request))
             .ReturnsAsync([]);
@@ -27,57 +47,91 @@ public class AnnotationToolsTests
     private AnnotationTools Tools => new(_api.Object);
 
     [Fact]
-    public async Task SetAnnotation_Update_KeepsOmittedFields_AndClearsClearFields()
+    public async Task SetAnnotation_ExistingKey_SendsOneJsonPatchOfTheGivenFields_WithoutARead()
     {
-        Stored(new Sdk.Subject
-        {
-            AnnotationKey = "sbt.northwind",
-            Name = "northwind",
-            Title = "Northwind",
-            Description = "A customer.",
-            Labels = ["eu"],
-            Values = new Dictionary<string, object> { ["tier"] = "gold" },
-            TimeZone = "Europe/Prague",
-            ContextNames = ["prod"],
-        });
+        var result = await Tools.SetAnnotation(
+            Organization,
+            Project,
+            "sbt.northwind",
+            title: "Northwind Ltd.",
+            labels: ["eu", "b2b"],
+            values: Element("""{"b":{"deep":[1,2]},"since":"2026-11-01T10:00:00.000+02:00"}"""),
+            isDisabled: false,
+            validFrom: "2026-11-01T00:00:00+01:00",
+            timeZone: "Europe/Prague",
+            clearFields: ["Description", "expiresAt"]);
 
-        await Tools.SetAnnotation(Organization, Project, "sbt.northwind", title: "Northwind Ltd.", clearFields: ["Description"]);
-
-        var sent = _sent.ShouldBeOfType<Sdk.Subject>();
-        sent.AnnotationKey.ShouldBe("sbt.northwind");
-        sent.Title.ShouldBe("Northwind Ltd.");
-        sent.Description.ShouldBeNull();
-        sent.Labels.ShouldBe(new[] { "eu" });
-        sent.Values!["tier"].ShouldBe("gold");
-        sent.TimeZone.ShouldBe("Europe/Prague");
-        sent.ContextNames.ShouldBeNull();
+        // labels and values replace their whole sets, a cleared field is null; date-like values stay as given
+        var (key, patch) = _patches.ShouldHaveSingleItem();
+        key.ShouldBe("sbt.northwind");
+        patch.ToString(Formatting.None).ShouldBe(
+            """[{"op":"add","path":"/Title","value":"Northwind Ltd."},{"op":"add","path":"/Labels","value":["eu","b2b"]},"""
+            + """{"op":"add","path":"/Values","value":{"b":{"deep":[1,2]},"since":"2026-11-01T10:00:00.000+02:00"}},"""
+            + """{"op":"add","path":"/IsDisabled","value":false},{"op":"add","path":"/ValidFrom","value":"2026-11-01T00:00:00+01:00"},"""
+            + """{"op":"add","path":"/TimeZone","value":"Europe/Prague"},{"op":"add","path":"/Description","value":null},"""
+            + """{"op":"add","path":"/ExpiresAt","value":null}]""");
+        _creates.ShouldBeEmpty();
         _lookups.ShouldBeEmpty();
+        result.Structured().Value<string>("AnnotationKey").ShouldBe("sbt.northwind");
     }
 
     [Fact]
-    public async Task SetAnnotation_Values_ReplaceTheWholeSet()
+    public async Task SetAnnotation_ClearedLabelsAndValues_AreSetToNull_Once()
     {
-        Stored(new Sdk.Subject { AnnotationKey = "sbt.northwind", Name = "northwind", Values = new Dictionary<string, object> { ["a"] = 1 } });
+        await Tools.SetAnnotation(Organization, Project, "sbt.northwind", clearFields: ["labels", "VALUES", " timeZone ", "labels"]);
 
-        await Tools.SetAnnotation(Organization, Project, "sbt.northwind", values: Element("""{"b":{"deep":[1,2]}}"""));
-
-        _sent!.Values!.Keys.ShouldBe(new[] { "b" });
-        ((JToken)_sent.Values["b"]).ToString(Newtonsoft.Json.Formatting.None).ShouldBe("""{"deep":[1,2]}""");
+        _patches.ShouldHaveSingleItem().Patch.ToString(Formatting.None).ShouldBe(
+            """[{"op":"add","path":"/Labels","value":null},{"op":"add","path":"/Values","value":null},{"op":"add","path":"/TimeZone","value":null}]""");
     }
 
     [Fact]
-    public async Task SetAnnotation_Create_LooksUpTheKeyAndItsAncestors()
+    public async Task SetAnnotation_ExistingUnit_PatchesItsTypeAlone()
+    {
+        // an existing unit has its definition, so only a create needs both
+        await Tools.SetAnnotation(Organization, Project, "unt.billing.nightly", unitType: "time");
+
+        _patches.ShouldHaveSingleItem().Patch.ToString(Formatting.None).ShouldBe("""[{"op":"add","path":"/UnitType","value":"time"}]""");
+        _creates.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SetAnnotation_NoFields_SendsAnEmptyPatch()
+    {
+        await Tools.SetAnnotation(Organization, Project, "sbt.northwind");
+
+        _patches.ShouldHaveSingleItem().Patch.ShouldBeEmpty();
+        _creates.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SetAnnotation_MissingKey_IsCreatedWhole_OnlyWhileItDoesNotExist()
     {
         Missing("exe.northwind.billing.prod");
 
-        await Tools.SetAnnotation(Organization, Project, "exe.northwind.billing.prod", validFrom: "2026-11-01T00:00:00Z");
+        var result = await Tools.SetAnnotation(
+            Organization,
+            Project,
+            "exe.northwind.billing.prod",
+            labels: ["eu"],
+            values: Element("""{"retries":3}"""),
+            validFrom: "2026-11-01T00:00:00Z",
+            clearFields: ["title"]);
 
+        _patches.ShouldHaveSingleItem();
         _lookups.ShouldHaveSingleItem().Keys.ShouldBe(
             new[] { "rst.billing", "sbt.northwind", "usg.northwind.billing", "cnt.northwind.prod", "exe.northwind.billing.prod" },
             ignoreOrder: true);
-        var sent = _sent.ShouldBeOfType<Sdk.Execution>();
+        var (body, ifMatch, ifNoneMatch) = _creates.ShouldHaveSingleItem();
+        ifNoneMatch.ShouldBe("*");
+        ifMatch.ShouldBeNull();
+        var sent = body.ShouldBeOfType<Sdk.Execution>();
+        sent.AnnotationKey.ShouldBe("exe.northwind.billing.prod");
         sent.UsageKey.ShouldBe("usg.northwind.billing");
         sent.ValidFrom.ShouldBe(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero));
+        sent.Labels.ShouldBe(new[] { "eu" });
+        ((JToken)sent.Values!["retries"]).Value<int>().ShouldBe(3);
+        sent.Title.ShouldBeNull();
+        result.Structured().Value<string>("AnnotationKey").ShouldBe("exe.northwind.billing.prod");
     }
 
     [Fact]
@@ -91,18 +145,86 @@ public class AnnotationToolsTests
         exception.Message.ShouldContain("sbt.northwind (deleted 2026-10-20 08:00:00Z by Ada)");
         exception.Message.ShouldContain("restore_annotations");
         exception.Message.ShouldContain("recreateDeleted");
-        _sent.ShouldBeNull();
+        _creates.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task SetAnnotation_Create_WithRecreateDeleted_SkipsTheLookup()
+    public async Task SetAnnotation_DeletedKey_IsRefusedAsAMissingOne()
     {
-        Missing("sbt.northwind");
+        // a patch does not re-create a deleted key; the create path finds it among the deleted ones
+        Missing("sbt.northwind", "AnnotationDeleted");
+        DeletedAmongLookups(new Sdk.Subject { AnnotationKey = "sbt.northwind", Name = "northwind", Deletion = Deletion("sbt.northwind") });
 
-        await Tools.SetAnnotation(Organization, Project, "sbt.northwind", recreateDeleted: true);
+        var exception = await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", title: "Northwind"));
+
+        exception.Message.ShouldContain("sbt.northwind (deleted");
+        exception.Message.ShouldContain("restore_annotations");
+        _creates.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SetAnnotation_DeletedKey_WithRecreateDeleted_IsCreatedWithoutTheLookup()
+    {
+        Missing("sbt.northwind", "AnnotationDeleted");
+
+        await Tools.SetAnnotation(Organization, Project, "sbt.northwind", title: "Northwind", recreateDeleted: true);
 
         _lookups.ShouldBeEmpty();
-        _sent.ShouldBeOfType<Sdk.Subject>();
+        var (body, _, ifNoneMatch) = _creates.ShouldHaveSingleItem();
+        body.ShouldBeOfType<Sdk.Subject>().Title.ShouldBe("Northwind");
+        ifNoneMatch.ShouldBe("*");
+    }
+
+    [Fact]
+    public async Task SetAnnotation_KeyCreatedMeanwhile_IsPatched()
+    {
+        var patches = 0;
+        _patchFailure = _ => patches++ == 0 ? ApiError(404, "AnnotationNotFound") : null;
+        _createFailure = () => ApiError(412, "AnnotationPreconditionFailed");
+
+        var result = await Tools.SetAnnotation(Organization, Project, "sbt.northwind", title: "Northwind");
+
+        _patches.Count.ShouldBe(2);
+        _patches.ShouldAllBe(patch => patch.Patch.ToString(Formatting.None) == """[{"op":"add","path":"/Title","value":"Northwind"}]""");
+        _creates.ShouldHaveSingleItem();
+        result.IsError.ShouldNotBe(true);
+    }
+
+    [Fact]
+    public async Task SetAnnotation_KeyCreatedAndDeletedEveryRound_FailsAfterThreeRounds()
+    {
+        _patchFailure = _ => ApiError(404, "AnnotationNotFound");
+        _createFailure = () => ApiError(412, "AnnotationPreconditionFailed");
+
+        var exception = await Should.ThrowAsync<Sdk.ApiException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", title: "Northwind"));
+
+        exception.StatusCode.ShouldBe(412);
+        _patches.Count.ShouldBe(3);
+        _creates.Count.ShouldBe(3);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("ViewNotFound")]
+    public async Task SetAnnotation_Other404_IsNotACreate(string? errorCode)
+    {
+        _patchFailure = _ => errorCode is null ? NotFound() : ApiError(404, errorCode);
+
+        (await Should.ThrowAsync<Sdk.ApiException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", title: "Northwind")))
+            .StatusCode.ShouldBe(404);
+        _creates.ShouldBeEmpty();
+        _lookups.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SetAnnotation_PatchFailure_IsNotRetried()
+    {
+        _patchFailure = _ => ApiError(412, "PatchTestFailed");
+
+        (await Should.ThrowAsync<Sdk.ApiException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", title: "Northwind")))
+            .StatusCode.ShouldBe(412);
+        _patches.ShouldHaveSingleItem();
+        _creates.ShouldBeEmpty();
     }
 
     [Fact]
@@ -112,11 +234,13 @@ public class AnnotationToolsTests
 
         (await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "unt.billing.nightly", unitType: "time")))
             .Message.ShouldContain("needs unitType and unitDefinition");
+        _creates.ShouldBeEmpty();
 
         await Tools.SetAnnotation(Organization, Project, "unt.billing.nightly", unitType: "time", unitDefinition: "0 2 * * *");
 
-        var sent = _sent.ShouldBeOfType<Sdk.Unit>();
+        var sent = _creates.ShouldHaveSingleItem().Body.ShouldBeOfType<Sdk.Unit>();
         sent.UnitType.ShouldBe("time");
+        sent.UnitDefinition.ShouldBe("0 2 * * *");
         sent.ResponsibilityKey.ShouldBe("rst.billing");
     }
 
@@ -128,7 +252,7 @@ public class AnnotationToolsTests
 
         (await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.north wind")))
             .Message.ShouldContain("'north wind'");
-        _sent.ShouldBeNull();
+        _creates.ShouldBeEmpty();
     }
 
     [Fact]
@@ -140,7 +264,7 @@ public class AnnotationToolsTests
         var exception = await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "exe.north wind.billing.prod"));
 
         exception.Message.ShouldContain("'north wind' of the new key 'sbt.north wind'");
-        _sent.ShouldBeNull();
+        _creates.ShouldBeEmpty();
     }
 
     [Theory]
@@ -155,17 +279,17 @@ public class AnnotationToolsTests
 
         await Tools.SetAnnotation(Organization, Project, key);
 
-        _sent.ShouldNotBeNull().AnnotationKey.ShouldBe(key);
+        _creates.ShouldHaveSingleItem().Body.AnnotationKey.ShouldBe(key);
     }
 
     [Fact]
     public async Task SetAnnotation_ExistingNameOutsideTheRule_IsAddressedAsItIs()
     {
-        Stored(new Sdk.Subject { AnnotationKey = "sbt.north wind", Name = "north wind" });
-
+        // an existing key is patched, so its names are not looked up
         await Tools.SetAnnotation(Organization, Project, "sbt.north wind", title: "Legacy");
 
-        _sent!.Title.ShouldBe("Legacy");
+        _patches.ShouldHaveSingleItem().Key.ShouldBe("sbt.north wind");
+        _creates.ShouldBeEmpty();
     }
 
     [Theory]
@@ -175,18 +299,29 @@ public class AnnotationToolsTests
     {
         (await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", title: "x", clearFields: [field])))
             .Message.ShouldContain("both given and in clearFields");
+        _patches.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task SetAnnotation_UnknownClearField_IsRefused()
     {
-        await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", clearFields: ["name"]));
+        (await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", clearFields: ["name"])))
+            .Message.ShouldContain("among title, description, documentationLink, labels, values, isDisabled, validFrom, expiresAt, timeZone");
+        _patches.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task SetAnnotation_UnitTypeOnAnotherType_IsRefused()
     {
         await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", unitType: "time"));
+        _patches.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SetAnnotation_ValuesThatAreNotAnObject_AreRefused()
+    {
+        await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", values: Element("[1]")));
+        _patches.ShouldBeEmpty();
     }
 
     [Theory]
@@ -197,6 +332,7 @@ public class AnnotationToolsTests
     {
         (await Should.ThrowAsync<ToolInputException>(() => Tools.SetAnnotation(Organization, Project, "sbt.northwind", validFrom: validFrom)))
             .Message.ShouldContain("with an offset");
+        _patches.ShouldBeEmpty();
     }
 
     [Fact]
@@ -469,16 +605,15 @@ public class AnnotationToolsTests
         return page["Items"]!.Select(item => item.Value<string>("AnnotationKey"));
     }
 
-    private void Stored(Sdk.Annotation annotation)
+    private static Sdk.ApiException<Sdk.ErrorResponse> ApiError(int status, string errorCode)
     {
-        _api.Setup(api => api.GetAnnotationAsync(Organization, Project, ViewName, annotation.AnnotationKey, true, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(annotation);
+        return new Sdk.ApiException<Sdk.ErrorResponse>("Refused.", status, string.Empty, NoHeaders, new Sdk.ErrorResponse { Message = "Refused.", ErrorCode = errorCode }, null);
     }
 
-    private void Missing(string key)
+    // A patch of the key answers 404 with the code (the key is missing or deleted); other keys are patched.
+    private void Missing(string key, string errorCode = "AnnotationNotFound")
     {
-        _api.Setup(api => api.GetAnnotationAsync(Organization, Project, ViewName, key, true, null, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(NotFound());
+        _patchFailure = patched => patched == key ? ApiError(404, errorCode) : null;
     }
 
     // The lookups of the name rule, which count deleted annotations as existing.

@@ -19,6 +19,13 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         "A new name (of a responsibility, subject, context or unit that does not exist yet) has 1 to 50 letters, "
         + "numbers, dashes or underscores; existing names are used as they are.";
 
+    // How many times set_annotation patches and creates when its create finds the key created meanwhile.
+    private const int MaxWriteRounds = 3;
+
+    // The 404s of a patch that take the create path: the key does not exist, or it is deleted.
+    private const string AnnotationNotFoundCode = "AnnotationNotFound";
+    private const string AnnotationDeletedCode = "AnnotationDeleted";
+
     private const string DeletedRule =
         "Before a create, the keys and their ancestors are looked up among the deleted annotations; when one is deleted "
         + "the call is refused with the list, because a create would re-create it empty and leave its other descendants "
@@ -37,8 +44,19 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         [AnnotationTypeCodes.UnitOfExecution] = ["subject", "responsibility", "context", "unit"],
     };
 
-    private static readonly string[] ClearableFields =
-        ["title", "description", "documentationLink", "labels", "values", "isDisabled", "validFrom", "expiresAt", "timeZone"];
+    // The fields clearFields takes and their members in the editable document of a patch.
+    private static readonly (string Field, string Member)[] ClearableFields =
+    [
+        ("title", nameof(Sdk.Annotation.Title)),
+        ("description", nameof(Sdk.Annotation.Description)),
+        ("documentationLink", nameof(Sdk.Annotation.DocumentationLink)),
+        ("labels", nameof(Sdk.Annotation.Labels)),
+        ("values", nameof(Sdk.Annotation.Values)),
+        ("isDisabled", nameof(Sdk.Annotation.IsDisabled)),
+        ("validFrom", nameof(Sdk.Annotation.ValidFrom)),
+        ("expiresAt", nameof(Sdk.Annotation.ExpiresAt)),
+        ("timeZone", nameof(Sdk.Annotation.TimeZone)),
+    ];
 
     // How long one name may take to match a find_annotations pattern.
     private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(100);
@@ -224,11 +242,12 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
 
     [McpServerTool(Name = "set_annotation", Title = "Create or update an annotation", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description(
-        "Creates or updates one annotation; the body is built from the key (its type, name and the keys and names of "
-        + "its ancestors). On an update the fields left out keep their stored values, clearFields removes fields, and "
-        + "values replaces the whole set of values; annotation fields keep no versions and there is no rollback: "
+        "Creates or updates one annotation. An update changes only the given fields, merged on the server, so concurrent "
+        + "changes of other fields are kept: the fields left out keep their stored values, clearFields removes fields, and "
+        + "labels and values replace their whole sets; annotation fields keep no versions and there is no rollback: "
         + "get_annotation_history shows earlier fields, labels and simple values for a manual restore, but only flags a changed "
-        + "description, so a replaced description is lost. On a create: " + NameRule + " A unit needs unitType and "
+        + "description, so a replaced description is lost. On a create the body is built from the key (its type, name and "
+        + "the keys and names of its ancestors): " + NameRule + " A unit needs unitType and "
         + "unitDefinition. Missing ancestors are created by the API with the validity window, time zone, disabled flag "
         + "and labels of this annotation (a unit created that way gets UnitType \"event\" and UnitDefinition "
         + "\"unknown\"). " + DeletedRule + " Needs the Contributor role. Returns the stored annotation.")]
@@ -274,51 +293,72 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
             ["timeZone"] = timeZone is not null,
         };
         var cleared = ParseClearFields(clearFields, given);
-        var newValues = IsGiven(values) ? ToValues(values.GetValueOrDefault()) : null;
+        var newValues = IsGiven(values) ? ToolArguments.ToObject(values.GetValueOrDefault(), "values") : null;
         var newValidFrom = ParseInstant(validFrom, nameof(validFrom));
         var newExpiresAt = ParseInstant(expiresAt, nameof(expiresAt));
 
-        var stored = await TryGetAsync(organization, project, view, keyText, cancellationToken);
-        var body = AnnotationBodies.Create(annotationKey, project, view);
+        // An update is one JSON Patch of the given fields, merged on the server against the stored annotation, so a
+        // concurrent change of another field is kept; labels and values replace their whole set, a cleared field is null.
+        var patch = new Sdk.AnnotationJsonPatch();
+        SetGiven(patch, nameof(Sdk.Annotation.Title), title);
+        SetGiven(patch, nameof(Sdk.Annotation.Description), description);
+        SetGiven(patch, nameof(Sdk.Annotation.DocumentationLink), documentationLink);
+        SetGiven(patch, nameof(Sdk.Annotation.Labels), labels);
+        SetGiven(patch, nameof(Sdk.Annotation.Values), newValues);
+        SetGiven(patch, nameof(Sdk.Annotation.IsDisabled), isDisabled);
+        SetGiven(patch, nameof(Sdk.Annotation.ValidFrom), newValidFrom);
+        SetGiven(patch, nameof(Sdk.Annotation.ExpiresAt), newExpiresAt);
+        SetGiven(patch, nameof(Sdk.Annotation.TimeZone), timeZone);
+        SetGiven(patch, nameof(Sdk.Unit.UnitType), unitType);
+        SetGiven(patch, nameof(Sdk.Unit.UnitDefinition), unitDefinition);
 
-        if (stored is not null)
+        foreach (var member in cleared)
         {
-            AnnotationBodies.CopyEditable(stored, body);
+            patch.Clear(member);
         }
-        else
+
+        // A patch never creates: a missing or deleted key is written whole, only while it still does not exist
+        // (If-None-Match: *); a key created meanwhile is patched in the next round.
+        for (var round = 1; ; round++)
         {
-            if (isUnit && (string.IsNullOrWhiteSpace(unitType) || string.IsNullOrWhiteSpace(unitDefinition)))
+            try
             {
-                throw new ToolInputException($"The new unit '{keyText}' needs unitType and unitDefinition.");
+                var patched = await annotations.PatchAnnotationVersionedAsync(organization, project, view, keyText, patch.ToJson(), cancellationToken: cancellationToken);
+                return ToolResults.Json(patched.Result);
+            }
+            catch (Sdk.ApiException exception) when (IsMissing(exception))
+            {
+                // created below
             }
 
-            await AnnotationGuards.EnsureNewNamesAsync(annotations, organization, project, view, [annotationKey], cancellationToken);
+            await EnsureCreatableAsync(organization, project, view, annotationKey, unitType, unitDefinition, recreateDeleted, cancellationToken);
 
-            if (!recreateDeleted)
+            var body = AnnotationBodies.Create(annotationKey, project, view);
+            body.Title = title ?? body.Title;
+            body.Description = description ?? body.Description;
+            body.DocumentationLink = documentationLink ?? body.DocumentationLink;
+            body.Labels = labels is null ? body.Labels : [.. labels];
+            body.Values = newValues is null ? body.Values : ToValues(newValues);
+            body.IsDisabled = isDisabled ?? body.IsDisabled;
+            body.ValidFrom = newValidFrom ?? body.ValidFrom;
+            body.ExpiresAt = newExpiresAt ?? body.ExpiresAt;
+            body.TimeZone = timeZone ?? body.TimeZone;
+
+            if (body is Sdk.Unit unitBody)
             {
-                var deleted = await AnnotationGuards.FindDeletedAsync(annotations, organization, project, view, AnnotationGuards.WithAncestors([annotationKey]), cancellationToken);
-                AnnotationGuards.EnsureNoneDeleted(deleted);
+                unitBody.UnitType = unitType ?? unitBody.UnitType;
+                unitBody.UnitDefinition = unitDefinition ?? unitBody.UnitDefinition;
+            }
+
+            try
+            {
+                return ToolResults.Json(await annotations.SetAnnotationAsync(organization, project, view, keyText, body, if_None_Match: "*", cancellationToken: cancellationToken));
+            }
+            catch (Sdk.ApiException exception) when (exception.StatusCode == 412 && round < MaxWriteRounds)
+            {
+                // created meanwhile: patched in the next round
             }
         }
-
-        body.Title = title ?? body.Title;
-        body.Description = description ?? body.Description;
-        body.DocumentationLink = documentationLink ?? body.DocumentationLink;
-        body.Labels = labels is null ? body.Labels : [.. labels];
-        body.Values = newValues ?? body.Values;
-        body.IsDisabled = isDisabled ?? body.IsDisabled;
-        body.ValidFrom = newValidFrom ?? body.ValidFrom;
-        body.ExpiresAt = newExpiresAt ?? body.ExpiresAt;
-        body.TimeZone = timeZone ?? body.TimeZone;
-
-        if (body is Sdk.Unit unitBody)
-        {
-            unitBody.UnitType = unitType ?? unitBody.UnitType;
-            unitBody.UnitDefinition = unitDefinition ?? unitBody.UnitDefinition;
-        }
-
-        Clear(body, cleared);
-        return ToolResults.Json(await annotations.SetAnnotationAsync(organization, project, view, keyText, body, cancellationToken: cancellationToken));
     }
 
     [McpServerTool(Name = "create_annotations", Title = "Create annotations", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
@@ -568,66 +608,53 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         return element is { ValueKind: not JsonValueKind.Null and not JsonValueKind.Undefined };
     }
 
-    private static Dictionary<string, object> ToValues(JsonElement element)
+    private static Dictionary<string, object> ToValues(JObject values)
     {
-        return ToolArguments.ToObject(element, "values").Properties().ToDictionary(property => property.Name, property => (object)property.Value, StringComparer.Ordinal);
+        return values.Properties().ToDictionary(property => property.Name, property => (object)property.Value, StringComparer.Ordinal);
     }
 
-    private static HashSet<string> ParseClearFields(string[]? clearFields, Dictionary<string, bool> given)
+    private static void SetGiven(Sdk.AnnotationJsonPatch patch, string member, object? value)
     {
-        var cleared = new HashSet<string>(StringComparer.Ordinal);
+        if (value is not null)
+        {
+            patch.Set(member, value);
+        }
+    }
+
+    // A 404 of a patch that a create answers; a deleted key counted as missing before too, and the create path refuses
+    // it unless recreateDeleted. Any other 404 is an error.
+    private static bool IsMissing(Sdk.ApiException exception)
+    {
+        return exception.StatusCode == 404
+            && ApiErrors.GetErrorCode(exception) is AnnotationNotFoundCode or AnnotationDeletedCode;
+    }
+
+    // The members to clear, in the order given.
+    private static List<string> ParseClearFields(string[]? clearFields, Dictionary<string, bool> given)
+    {
+        var cleared = new List<string>();
 
         foreach (var field in clearFields ?? [])
         {
-            var name = ClearableFields.FirstOrDefault(candidate => string.Equals(candidate, field?.Trim(), StringComparison.OrdinalIgnoreCase))
-                ?? throw new ToolInputException($"'clearFields' names fields among {string.Join(", ", ClearableFields)} ('{field}').");
+            var (name, member) = ClearableFields.FirstOrDefault(candidate => string.Equals(candidate.Field, field?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (name is null)
+            {
+                throw new ToolInputException($"'clearFields' names fields among {string.Join(", ", ClearableFields.Select(candidate => candidate.Field))} ('{field}').");
+            }
 
             if (given[name])
             {
                 throw new ToolInputException($"'{name}' is both given and in clearFields.");
             }
 
-            cleared.Add(name);
+            if (!cleared.Contains(member, StringComparer.Ordinal))
+            {
+                cleared.Add(member);
+            }
         }
 
         return cleared;
-    }
-
-    private static void Clear(Sdk.Annotation body, HashSet<string> cleared)
-    {
-        foreach (var field in cleared)
-        {
-            switch (field)
-            {
-                case "title":
-                    body.Title = null;
-                    break;
-                case "description":
-                    body.Description = null;
-                    break;
-                case "documentationLink":
-                    body.DocumentationLink = null;
-                    break;
-                case "labels":
-                    body.Labels = null;
-                    break;
-                case "values":
-                    body.Values = null;
-                    break;
-                case "isDisabled":
-                    body.IsDisabled = null;
-                    break;
-                case "validFrom":
-                    body.ValidFrom = null;
-                    break;
-                case "expiresAt":
-                    body.ExpiresAt = null;
-                    break;
-                case "timeZone":
-                    body.TimeZone = null;
-                    break;
-            }
-        }
     }
 
     // An instant needs its offset: without one the host's time zone would decide it.
@@ -648,15 +675,29 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
     [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$", RegexOptions.IgnoreCase)]
     private static partial Regex InstantPattern();
 
-    private async Task<Sdk.Annotation?> TryGetAsync(string organization, string project, string view, string key, CancellationToken cancellationToken)
+    // The rules of a create: a unit has its type and definition, a new name follows the rule, and a deleted key or
+    // ancestor is refused unless recreateDeleted.
+    private async Task EnsureCreatableAsync(
+        string organization,
+        string project,
+        string view,
+        AnnotationKey key,
+        string? unitType,
+        string? unitDefinition,
+        bool recreateDeleted,
+        CancellationToken cancellationToken)
     {
-        try
+        if (key.Type == AnnotationType.Unit && (string.IsNullOrWhiteSpace(unitType) || string.IsNullOrWhiteSpace(unitDefinition)))
         {
-            return await annotations.GetAnnotationAsync(organization, project, view, key, true, cancellationToken: cancellationToken);
+            throw new ToolInputException($"The new unit '{key}' needs unitType and unitDefinition.");
         }
-        catch (Sdk.ApiException exception) when (exception.StatusCode == 404)
+
+        await AnnotationGuards.EnsureNewNamesAsync(annotations, organization, project, view, [key], cancellationToken);
+
+        if (!recreateDeleted)
         {
-            return null;
+            var deleted = await AnnotationGuards.FindDeletedAsync(annotations, organization, project, view, AnnotationGuards.WithAncestors([key]), cancellationToken);
+            AnnotationGuards.EnsureNoneDeleted(deleted);
         }
     }
 }

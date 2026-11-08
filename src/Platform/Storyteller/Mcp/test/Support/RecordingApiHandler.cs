@@ -20,7 +20,18 @@ internal sealed class RecordingApiHandler : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
-        Requests.Enqueue(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), body));
+
+        // the raw values: a tag such as * or "a1.x" must not be reformatted
+        var headers = request.Headers.NonValidated.ToDictionary(
+            header => header.Key,
+            header => string.Join(", ", header.Value),
+            StringComparer.OrdinalIgnoreCase);
+
+        Requests.Enqueue(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), body)
+        {
+            ContentType = request.Content?.Headers.ContentType?.MediaType,
+            Headers = headers,
+        });
         return Respond?.Invoke(request) ?? Json("{}");
     }
 }
