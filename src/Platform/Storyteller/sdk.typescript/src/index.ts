@@ -8,6 +8,7 @@ export {
   type StorytellerConfig,
   type StorytellerRequestInit,
 } from './lib/fetcher'
+export * from './lib/annotations'
 export * from './lib/conditional'
 export * from './lib/configuration-formats'
 export * from './lib/errors'
