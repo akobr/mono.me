@@ -17144,7 +17144,7 @@
           },
           "Pkcs12": {
             "type": "string",
-            "format": "binary"
+            "format": "byte"
           },
           "Password": {
             "type": "string"
