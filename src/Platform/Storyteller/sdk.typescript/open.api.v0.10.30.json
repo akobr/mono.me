@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.28.26699"
+    "version": "0.10.30.65254"
   },
   "servers": [
     {
@@ -1896,7 +1896,7 @@
           {
             "name": "If-Match",
             "in": "header",
-            "description": "One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
+            "description": "One or more entity tags of reads of the annotation, or *. The patch is written only when the annotation is at one of these versions (any version for *); otherwise 412 (ErrorCode AnnotationPreconditionFailed). A missing or deleted annotation answers 404 first (AnnotationNotFound, AnnotationDeleted), whatever the header. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
             "schema": {
               "type": "string"
             }
@@ -16607,12 +16607,10 @@
             "nullable": true
           },
           "UnitType": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "UnitDefinition": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           }
         }
       },

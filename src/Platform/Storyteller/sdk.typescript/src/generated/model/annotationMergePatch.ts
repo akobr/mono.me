@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.28.26699
+ * OpenAPI spec version: 0.10.30.65254
  */
 import type { AnnotationMergePatchValues } from "./annotationMergePatchValues";
 
@@ -26,8 +26,6 @@ export interface AnnotationMergePatch {
   Labels?: string[] | null;
   /** @nullable */
   Values?: AnnotationMergePatchValues;
-  /** @nullable */
-  UnitType?: string | null;
-  /** @nullable */
-  UnitDefinition?: string | null;
+  UnitType?: string;
+  UnitDefinition?: string;
 }

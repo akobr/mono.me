@@ -5370,7 +5370,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="body">A JSON Merge Patch of the annotation (application/merge-patch+json), or a JSON Patch of its editable document (application/json-patch+json).</param>
-        /// <param name="if_Match">One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
+        /// <param name="if_Match">One or more entity tags of reads of the annotation, or *. The patch is written only when the annotation is at one of these versions (any version for *); otherwise 412 (ErrorCode AnnotationPreconditionFailed). A missing or deleted annotation answers 404 first (AnnotationNotFound, AnnotationDeleted), whatever the header. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
         /// <returns>The stored annotation, with the ETag of its version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<Annotation> PatchAnnotationAsync(string organization, string project, string view, string key, AnnotationMergePatch body, string if_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
@@ -6260,7 +6260,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="body">A JSON Merge Patch of the annotation (application/merge-patch+json), or a JSON Patch of its editable document (application/json-patch+json).</param>
-        /// <param name="if_Match">One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
+        /// <param name="if_Match">One or more entity tags of reads of the annotation, or *. The patch is written only when the annotation is at one of these versions (any version for *); otherwise 412 (ErrorCode AnnotationPreconditionFailed). A missing or deleted annotation answers 404 first (AnnotationNotFound, AnnotationDeleted), whatever the header. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).</param>
         /// <returns>The stored annotation, with the ETag of its version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<Annotation> PatchAnnotationAsync(string organization, string project, string view, string key, AnnotationMergePatch body, string if_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
@@ -22601,10 +22601,10 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Values", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.IDictionary<string, object> Values { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("UnitType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("UnitType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string UnitType { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("UnitDefinition", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("UnitDefinition", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string UnitDefinition { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
