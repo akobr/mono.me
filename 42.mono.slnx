@@ -92,6 +92,8 @@
   <Folder Name="/Platform/">
     <Project Path="src/Platform/Aspire.Host/src/Aspire.Host.Platform.csproj" />
     <Project Path="src/Platform/Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
+    <Project Path="src/Platform/Automation.Shared/src/Automation.Shared.csproj" />
+    <Project Path="src/Platform/Automation.Shared/test/Automation.Shared.UnitTests.csproj" />
     <Project Path="src/Platform/Cli/src/Cli.csproj" />
     <Project Path="src/Platform/Cli/test/Cli.UnitTests.csproj" />
     <Project Path="src/Platform/UI.Admin.AutomationTests/src/UI.Admin.AutomationTests.csproj" />

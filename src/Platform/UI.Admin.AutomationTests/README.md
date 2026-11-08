@@ -20,8 +20,8 @@ Run it with `dotnet run` (options after `--`) or `dotnet test --project src/Plat
 |---|---|
 | `src/PlatformAutomationSetup.cs` | The setup (`[assembly: UiAutomationSetup<…>]` and the other assembly attributes): AuthKit sign-in, the Testiny reporter, the settings' checks |
 | `src/PlatformTargetCheck.cs` | The check of the target before the first test |
-| `src/PlatformTarget.cs`, `src/testsettings*.json` | The Platform's `Target` keys, the committed defaults and the profiles |
+| `src/PlatformTarget.cs`, `src/testsettings*.json` | The admin UI's `Target` keys (over the shared `PlatformTargetSettings`), the committed defaults and the profiles |
 | `src/PlatformTest*.cs` | The tests' base class: its target and routes, the roles and `Target:RoleProjects` with the mode skips (`PlatformTest.Roles.cs`), the helpers (`PlatformTest.Helpers.cs`), and the sections' partials |
-| `src/Attributes/` | `[Area]`, `Role` and `[UserRole]`, `[DesktopOnly]`, `[PhoneOnly]`, `[MockOnly]`, `[DisposableProject]` |
+| `src/Attributes/` | `[Area]`, `[DesktopOnly]`, `[PhoneOnly]`, `[MockOnly]`, `[DisposableProject]`; `Role` and `[UserRole]` come from the shared [`42.Platform.Automation.Shared`](../Automation.Shared/README.md) (imported globally) |
 | `src/Access/`, `src/Data/`, `src/Pages/`, `src/Support/` | The AuthKit sign-in flow, the generated data, the page objects (one partial file per section that extends a shared one), and the test support (`MockApi`, the clipboard and request recorders, downloads, `Eventually`) |
 | `src/Tests/<Area>/` | The tests: one folder per Testiny section, one class per sub-folder |

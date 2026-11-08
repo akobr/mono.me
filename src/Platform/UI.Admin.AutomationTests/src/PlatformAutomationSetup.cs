@@ -34,10 +34,9 @@ public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(errors);
 
+        // The Platform's shared keys first: the organization, project and view, and Target:RoleProjects.
         var target = settings.Bind<PlatformTarget>(PlatformTarget.Section);
-        RequireName(target.Organization, "Target:Organization", errors);
-        RequireName(target.Project, "Target:Project", errors);
-        RequireName(target.View, "Target:View", errors);
+        target.Validate(errors);
 
         if (target.MockScenario is { } scenario && !ScenarioPattern().IsMatch(scenario))
         {
@@ -47,11 +46,6 @@ public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
         if (string.IsNullOrWhiteSpace(target.EmailDomain) || target.EmailDomain.Contains('@', StringComparison.Ordinal))
         {
             errors.Add("Target:EmailDomain must be a domain such as example.com.");
-        }
-
-        foreach (var (role, project) in target.RoleProjects)
-        {
-            CheckRoleProject(role, project, errors);
         }
 
         if (target.ApiTimeoutMs < 1)
@@ -88,34 +82,6 @@ public sealed partial class PlatformAutomationSetup : IUiAutomationSetup
         ArgumentNullException.ThrowIfNull(context);
         return new PlatformTargetCheck(context.Page, context.Settings.Bind<PlatformTarget>(PlatformTarget.Section), context.User).RunAsync();
     }
-
-    // A Target:RoleProjects entry: a role of [UserRole] (not Any) and "<org>/<project>[/<view>]" of Platform names.
-    private static void CheckRoleProject(string role, string project, ICollection<string> errors)
-    {
-        if (!role.All(char.IsLetter) || !Enum.TryParse<Role>(role, ignoreCase: true, out var parsed) || parsed == Role.Any)
-        {
-            var roles = string.Join(", ", Enum.GetNames<Role>().Where(name => name != nameof(Role.Any)));
-            errors.Add($"Target:RoleProjects:{role} is not a role a test acts as; use one of {roles}.");
-        }
-
-        var parts = (project ?? string.Empty).Split('/');
-        if (parts.Length is not (2 or 3) || !parts.All(part => NamePattern().IsMatch(part)))
-        {
-            errors.Add($"Target:RoleProjects:{role} '{project}' is not <organization>/<project>[/<view>] of Platform names: 2 to 63 lower-case letters, digits and hyphens each.");
-        }
-    }
-
-    private static void RequireName(string value, string setting, ICollection<string> errors)
-    {
-        if (!NamePattern().IsMatch(value))
-        {
-            errors.Add($"{setting} '{value}' is not a Platform name: 2 to 63 lower-case letters, digits and hyphens, not starting with a hyphen.");
-        }
-    }
-
-    // NameRules.Pattern of Backend.Core.
-    [GeneratedRegex(@"^[a-z0-9][a-z0-9-]{1,62}\z", RegexOptions.CultureInvariant)]
-    private static partial Regex NamePattern();
 
     [GeneratedRegex(@"^[a-z][a-z0-9-]*\z", RegexOptions.CultureInvariant)]
     private static partial Regex ScenarioPattern();

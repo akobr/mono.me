@@ -13,7 +13,7 @@
     <TUnitImplicitUsings>false</TUnitImplicitUsings>
 
     <IsPackable>true</IsPackable>
-    <Description>TUnit adapter of the 42 UI automation framework: the UiTest base class, the session hooks, the Elementary, Area, Serial, RequiresProvider, RequiresEngine and ConfiguredRetry attributes, and the receiver that reports every result.</Description>
+    <Description>TUnit adapter of the 42 UI automation framework: the AutomationTest and UiTest base classes (tests without and with a browser page), the session hooks, the Elementary, Area, Serial, RequiresProvider, RequiresEngine and ConfiguredRetry attributes, and the receiver that reports every result.</Description>
     <PackageTags>$(PackageTags);testing;ui;automation;playwright;tunit</PackageTags>
   </PropertyGroup>
 

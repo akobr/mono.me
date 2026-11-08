@@ -10,8 +10,15 @@ public sealed class TestScopeOptions
     // False for a test that needs no user at all (e.g. a public page). A leased user also bounds the parallelism.
     public bool LeaseUser { get; set; } = true;
 
+    // Whether BeginAsync opens the test's browser context and page (a lease of the session's browser). False for a test
+    // without a browser (e.g. one that runs a command line): BeginAsync leases the user and creates the data and the
+    // artifacts collector only; Browser, Context and Page throw; the Execution policies of the screenshot, trace and video
+    // do not apply, and the artifacts are what the test attaches (TestScope.AttachTextAsync, TestScope.Artifacts). Such
+    // a test opens a browser when it needs one (TestScope.OpenBrowserAsync).
+    public bool Browser { get; set; } = true;
+
     // Start the context signed in as the user (cached storage state); false for a test that signs in itself.
-    // Ignored for Target:SignIn None; needs LeaseUser.
+    // Ignored for Target:SignIn None and without Browser; needs LeaseUser.
     public bool SignedIn { get; set; } = true;
 
     // 1-based; the engine adapter passes its retry attempt + 1.

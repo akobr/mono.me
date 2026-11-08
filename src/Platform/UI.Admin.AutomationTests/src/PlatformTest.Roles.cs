@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-using System.Reflection;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation.Runtime;
 using _42.Testing.UI.Automation.Runtime.Users;
@@ -14,24 +12,16 @@ namespace _42.Platform.UI.Admin.AutomationTests;
 // [PhoneOnly], and a role the mock cannot act as, skip the test before its lease (GetSkipReason).
 public abstract partial class PlatformTest
 {
-    // The project roles of the Platform, as Users:Pool lists them.
-    private const string OwnerRole = "Owner";
-    private const string AdministratorRole = "Administrator";
-    private const string ContributorWithSecretsRole = "ContributorWithSecrets";
-    private const string ContributorRole = "Contributor";
-    private const string ReaderRole = "Reader";
-
-    // [UserRole] of a test method, else of its class, by class and method; reflection, because TUnit's metadata keeps
-    // only attributes related to TUnit types.
-    private static readonly ConcurrentDictionary<(Type Type, string Method), Role> TestRoles = new();
+    // The project roles of the Platform, as Users:Pool lists them (PlatformRoles of 42.Platform.Automation.Shared).
+    private const string OwnerRole = PlatformRoles.Owner;
 
     private Role? actingRole;
 
     // Administrator or Owner.
-    protected static UserRequirement AdminUser { get; } = UserRequirement.WithAnyRole(OwnerRole, AdministratorRole);
+    protected static UserRequirement AdminUser => PlatformRoles.Admin;
 
     // ContributorWithSecrets, Administrator or Owner: may handle secrets.
-    protected static UserRequirement SecretsUser { get; } = UserRequirement.WithAnyRole(OwnerRole, AdministratorRole, ContributorWithSecretsRole);
+    protected static UserRequirement SecretsUser => PlatformRoles.Secrets;
 
     // The role the running test acts as: its [UserRole], Role.Any without one.
     protected Role ActingRole
@@ -45,13 +35,13 @@ public abstract partial class PlatformTest
 
             // Outside a test (no context) only the class's attribute is known; not kept.
             var method = TestContext.Current?.Metadata.TestDetails.MethodName;
-            return method is null ? RoleOf(GetType(), null) : (actingRole = RoleOf(GetType(), method)).Value;
+            return method is null ? UserRoleAttribute.Of(GetType(), null) : (actingRole = UserRoleAttribute.Of(GetType(), method)).Value;
         }
     }
 
     // "<org>/<project>[/<view>]" that Target:RoleProjects maps the acting role to; null for Role.Any and a role without
     // an entry.
-    protected string? RoleProject => ActingRole != Role.Any && Target.RoleProjects.TryGetValue(ActingRole.ToString(), out var project) ? project : null;
+    protected string? RoleProject => Target.RoleProjectOf(ActingRole);
 
     // The routes of the project the test acts in: the role's project of Target:RoleProjects (its view, or default), or
     // the target's organization, project and view.
@@ -59,19 +49,10 @@ public abstract partial class PlatformTest
 
     // The pool user of the acting role: any user in a project of Target:RoleProjects (every pool user holds the role
     // there); otherwise Editor is EditingUser, Admin AdminUser, Secrets SecretsUser, and Owner, Contributor and Reader
-    // that role.
+    // that role (PlatformRoles.RequirementOf).
     protected override UserRequirement RequiredUser => RoleProject is not null
         ? UserRequirement.Any
-        : ActingRole switch
-        {
-            Role.Editor => EditingUser,
-            Role.Admin => AdminUser,
-            Role.Secrets => SecretsUser,
-            Role.Owner => UserRequirement.WithRole(OwnerRole),
-            Role.Contributor => UserRequirement.WithRole(ContributorRole),
-            Role.Reader => UserRequirement.WithRole(ReaderRole),
-            _ => UserRequirement.Any,
-        };
+        : PlatformRoles.RequirementOf(ActingRole);
 
     // Before the lease: [DesktopOnly] below App.DockedSidebarWidth, [PhoneOnly] at App.PhoneWidth and wider (the session's
     // viewport, the device's or Browser:Viewport), and on the mock a role that no pool user holds and Target:RoleProjects
@@ -81,7 +62,7 @@ public abstract partial class PlatformTest
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(session);
 
-        actingRole ??= RoleOf(GetType(), context.Metadata.TestDetails.MethodName);
+        actingRole ??= UserRoleAttribute.Of(GetType(), context.Metadata.TestDetails.MethodName);
         if (base.GetSkipReason(context, session) is { } reason)
         {
             return reason;
@@ -109,21 +90,5 @@ public abstract partial class PlatformTest
         }
 
         return null;
-    }
-
-    private static Role RoleOf(Type type, string? method)
-    {
-        return method is null
-            ? type.GetCustomAttribute<UserRoleAttribute>(inherit: true)?.Role ?? Role.Any
-            : TestRoles.GetOrAdd((type, method), static key =>
-            {
-                const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-                return key.Type.GetMethods(flags)
-                    .Where(candidate => string.Equals(candidate.Name, key.Method, StringComparison.Ordinal))
-                    .Select(candidate => candidate.GetCustomAttribute<UserRoleAttribute>(inherit: true))
-                    .FirstOrDefault(attribute => attribute is not null)?.Role
-                    ?? key.Type.GetCustomAttribute<UserRoleAttribute>(inherit: true)?.Role
-                    ?? Role.Any;
-            });
     }
 }
