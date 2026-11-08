@@ -208,7 +208,7 @@ public class CommandContextTests
 
         var context = CreateContext();
 
-        // The credential names no project, and access.default.json may be left over from another job.
+        // The credential names no project, and the settings may be left over from another job.
         context.IsProjectKnown.ShouldBeFalse();
         (context.OrganizationName, context.ProjectName, context.ViewName).ShouldBe(("house", "main", "default"));
     }

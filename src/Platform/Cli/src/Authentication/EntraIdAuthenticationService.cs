@@ -4,6 +4,7 @@ using System.IO.Abstractions;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Cli.Configuration;
 using _42.Utils.Async;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
@@ -132,7 +133,7 @@ public class EntraIdAuthenticationService : IAuthenticationService
 #if DEBUG && !TESTING
         cacheFileName += ".plaintext";
 #endif
-        var cacheDirectory = _fileSystem.Path.Combine(MsalCacheHelper.UserRootDirectory, ".42for.net");
+        var cacheDirectory = UserSettingsLocation.GetDirectory(_fileSystem);
 
         var storageProperties = new StorageCreationPropertiesBuilder(cacheFileName, cacheDirectory)
 #if DEBUG && !TESTING

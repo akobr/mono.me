@@ -3,7 +3,7 @@ using System.IO;
 using System.IO.Abstractions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Identity.Client.Extensions.Msal;
+using _42.Platform.Cli.Configuration;
 
 namespace _42.Platform.Cli.Telemetry;
 
@@ -18,7 +18,7 @@ public sealed class InstallationIdStore
     private readonly string _filePath;
 
     public InstallationIdStore(IFileSystem fileSystem)
-        : this(fileSystem, fileSystem.Path.Combine(MsalCacheHelper.UserRootDirectory, ".42for.net"))
+        : this(fileSystem, UserSettingsLocation.GetDirectory(fileSystem))
     {
     }
 

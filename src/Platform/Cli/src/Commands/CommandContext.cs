@@ -9,14 +9,14 @@ namespace _42.Platform.Cli.Commands;
 
 // The organization, project and view a command works on. The first that applies wins:
 // -p/-v, then STORYTELLER_PROJECT/STORYTELLER_VIEW, then for a machine STORYTELLER_KEY and then the project of its
-// credential, for a user access.default.json. The view of STORYTELLER_KEY belongs to the project of the key, as the view
-// of access.default.json belongs to the project of the file. A machine never falls back to access.default.json or
+// credential, for a user the default project of the settings (sform.settings.json). The view of STORYTELLER_KEY belongs to
+// the project of the key, as the view of the settings belongs to their project. A machine never falls back to the settings or
 // house.main, as the file survives between jobs on a self-hosted runner.
 public class CommandContext : ICommandContext
 {
     private readonly IMachineSignIn _machine;
 
-    // The project whose view came from access.default.json; that view belongs to it only.
+    // The project whose view came from the settings; that view belongs to it only.
     private readonly string? _fileViewProjectKey;
 
     // STORYTELLER_KEY of a machine; a user never reads it.

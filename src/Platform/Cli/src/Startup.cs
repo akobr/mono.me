@@ -57,6 +57,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IAuthenticationConfigurationResolver, AuthenticationConfigurationResolver>();
             services.AddSingleton<IAuthenticationService, AuthenticationServiceSelector>();
             services.AddSingleton<ICommandContext, CommandContext>();
+            services.AddSingleton<IUserSettingsStore, UserSettingsStore>();
             services.AddSingleton<IEditorService, EditorService>();
             services.AddSingleton<TransferPolling>();
 
@@ -68,7 +69,9 @@ namespace _42.Platform.Cli
 
         /// <summary>
         /// Sets default Newtonsoft.Json serializer settings (ignore null values and use indented formatting)
-        /// and adds the application's JSON configuration files to the provided configuration builder.
+        /// and adds the application's JSON configuration file and the user's settings to the provided configuration builder.
+        /// The settings (sform.settings.json in the .42for.net folder, or the legacy access.default.json and editor.config.json
+        /// next to the assembly) come after app.config.json, so they win.
         /// </summary>
         /// <param name="builder">The configuration builder to which application JSON files are added.</param>
         public void ConfigureApplication(IConfigurationBuilder builder)
@@ -80,8 +83,7 @@ namespace _42.Platform.Cli
             };
 
             builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
-            builder.AddJsonFile(Constants.ACCESS_DEFAULT_JSON, true, false);
-            builder.AddJsonFile(Constants.EDITOR_CONFIG_JSON, true, false);
+            builder.Add(new UserSettingsConfigurationSource(() => new UserSettingsStore(new FileSystem()), WriteSettingsWarning));
 
             // Development only (DOTNET_ENVIRONMENT, a run from source): user secrets override app.config.json.
             if (Environment.IsDevelopment())
@@ -196,6 +198,12 @@ namespace _42.Platform.Cli
             services.Configure<GeneralOptions>(configuration.GetSection(ConfigurationSections.GENERAL));
             services.Configure<EditorOptions>(configuration.GetSection(ConfigurationSections.EDITOR));
             services.Configure<TelemetryOptions>(configuration.GetSection(ConfigurationSections.TELEMETRY));
+        }
+
+        // On standard error, so a redirected standard output stays as the command writes it.
+        private static void WriteSettingsWarning(string message)
+        {
+            System.Console.Error.WriteLine($"! {message}");
         }
 
         // The local Functions host has no TLS handshake to carry a client certificate, so the

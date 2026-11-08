@@ -1,4 +1,3 @@
-using System.IO.Abstractions;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -19,18 +18,18 @@ public class AccountRegisterCommand : BaseCommand
 
     private readonly IAccessApiClient _accessApi;
     private readonly IAuthenticationService _authentication;
-    private readonly IFileSystem _fileSystem;
+    private readonly IUserSettingsStore _settings;
 
     public AccountRegisterCommand(
         IExtendedConsole console,
         IAccessApiClient accessApi,
         IAuthenticationService authentication,
-        IFileSystem fileSystem)
+        IUserSettingsStore settings)
         : base(console)
     {
         _accessApi = accessApi;
         _authentication = authentication;
-        _fileSystem = fileSystem;
+        _settings = settings;
     }
 
     public override async Task<int> OnExecuteAsync()
@@ -88,14 +87,7 @@ public class AccountRegisterCommand : BaseCommand
             Platform.Storyteller.Constants.DefaultViewName.ThemedHighlight(Console.Theme),
             " view.");
 
-        AccountSetCommand.CreateAccessDefaultConfigFile(
-            new AccessDefaultOptions
-            {
-                OrganizationName = organizationName,
-                ProjectName = projectName,
-                ViewName = Platform.Storyteller.Constants.DefaultViewName,
-            },
-            _fileSystem);
+        AccountSetCommand.SaveDefaultProject(Console, _settings, organizationName, projectName);
         return ExitCodes.SUCCESS;
     }
 

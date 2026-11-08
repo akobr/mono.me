@@ -1,8 +1,5 @@
-using System;
-using System.IO.Abstractions;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
@@ -10,7 +7,6 @@ using _42.Platform.Cli.Configuration;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.Account;
@@ -19,18 +15,18 @@ namespace _42.Platform.Cli.Commands.Account;
 public class AccountSetCommand : BaseCommand
 {
     private readonly IAccessApiClient _accessApi;
-    private readonly IFileSystem _fileSystem;
+    private readonly IUserSettingsStore _settings;
     private readonly AccessDefaultOptions _accessDefault;
 
     public AccountSetCommand(
         IExtendedConsole console,
         IAccessApiClient accessApi,
         IOptions<AccessDefaultOptions> accessDefaultOptions,
-        IFileSystem fileSystem)
+        IUserSettingsStore settings)
         : base(console)
     {
         _accessApi = accessApi;
-        _fileSystem = fileSystem;
+        _settings = settings;
         _accessDefault = accessDefaultOptions.Value;
     }
 
@@ -42,6 +38,12 @@ public class AccountSetCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
+        if (ProjectKey is not null && !UserSettingDefinitions.TrySplitProjectKey(ProjectKey, out _, out _))
+        {
+            Console.WriteImportant($"'{ProjectKey}' is no project key; it takes <organization>.<project>.");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
         _42.Platform.Storyteller.Sdk.Account account;
 
         try
@@ -68,13 +70,23 @@ public class AccountSetCommand : BaseCommand
                 ".");
         }
 
-        var projectKey = ProjectKey ?? SelectPossibleProject(account);
-        var projectSeparatorIndex = projectKey.IndexOf('.');
-        _accessDefault.ProjectName = projectKey[(projectSeparatorIndex + 1)..];
-        _accessDefault.OrganizationName = projectKey[..projectSeparatorIndex];
+        var projectKey = (ProjectKey ?? SelectPossibleProject(account)).Trim();
+        UserSettingDefinitions.TrySplitProjectKey(projectKey, out var organizationName, out var projectName);
+        _accessDefault.ProjectName = projectName;
+        _accessDefault.OrganizationName = organizationName;
         _accessDefault.ViewName = ViewName ?? _accessDefault.ViewName ?? Platform.Storyteller.Constants.DefaultViewName;
 
-        CreateAccessDefaultConfigFile(_accessDefault, _fileSystem);
+        try
+        {
+            _settings.Update(
+                ConfigurationSections.ACCESS,
+                UserSettingsSchema.AccessChanges(_accessDefault.OrganizationName, _accessDefault.ProjectName, _accessDefault.ViewName));
+        }
+        catch (UserSettingsException exception)
+        {
+            Console.WriteImportant($"The default project could not be saved: {exception.Message}");
+            return exception.ExitCode;
+        }
 
         Console.WriteLine(
             "Default project set to ",
@@ -85,15 +97,19 @@ public class AccountSetCommand : BaseCommand
         return ExitCodes.SUCCESS;
     }
 
-    public static void CreateAccessDefaultConfigFile(AccessDefaultOptions options, IFileSystem fileSystem)
+    // After the main work of register and access-point create, which a failure to save does not undo.
+    internal static void SaveDefaultProject(IExtendedConsole console, IUserSettingsStore settings, string organizationName, string projectName)
     {
-        var config = new { access = options };
-        var serializer = JsonSerializer.Create(new JsonSerializerSettings { Formatting = Formatting.Indented });
-        var appDirectory = fileSystem.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? Environment.CurrentDirectory;
-        var fullPath = fileSystem.Path.Combine(appDirectory, Constants.ACCESS_DEFAULT_JSON);
-        using var fileWriter = fileSystem.File.CreateText(fullPath);
-        var jWriter = new JsonTextWriter(fileWriter);
-        serializer.Serialize(jWriter, config);
+        try
+        {
+            settings.Update(
+                ConfigurationSections.ACCESS,
+                UserSettingsSchema.AccessChanges(organizationName, projectName, Platform.Storyteller.Constants.DefaultViewName));
+        }
+        catch (UserSettingsException exception)
+        {
+            console.WriteImportant($"The default project could not be saved: {exception.Message}");
+        }
     }
 
     private string SelectPossibleProject(_42.Platform.Storyteller.Sdk.Account account)
