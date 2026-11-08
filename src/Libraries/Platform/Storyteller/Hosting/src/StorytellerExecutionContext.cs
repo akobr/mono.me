@@ -1,12 +1,16 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
+using _42.Platform.Storyteller.Sdk.Hosting.Reading;
 
 namespace _42.Platform.Storyteller.Sdk.Hosting;
 
 // Who am I: the annotation of the key and those of its ancestors that were read, as of ReadAt. A key of any type: an
 // execution (a service of one subject), a unit of execution (a job), or a responsibility (a worker that discovers its
-// subjects through the catalog). Immutable: Ancestors and Unreadable are copied from an initializer, so an application
-// can build one for a test double of who am I and change its own collections afterwards.
+// subjects through the catalog). A read puts the typed snapshot of each type here (StorytellerResponsibility,
+// StorytellerUnit, …), with the names of its relations; the members stay typed StorytellerAnnotation, so a test double
+// may put base snapshots here, and Find<T>() gives the typed one. Immutable: Ancestors and Unreadable are copied from an
+// initializer, so an application can build one for a test double of who am I and change its own collections
+// afterwards.
 public sealed class StorytellerExecutionContext
 {
     private readonly IReadOnlyDictionary<AnnotationType, StorytellerAnnotation> _ancestors = ReadOnlyDictionary<AnnotationType, StorytellerAnnotation>.Empty;
@@ -30,11 +34,11 @@ public sealed class StorytellerExecutionContext
     // The full key, with the type code lower-cased.
     public required string Key { get; init; }
 
-    // Of the key; a StorytellerExecution for an exe key.
+    // Of the key: the snapshot of its type when read, such as a StorytellerExecution for an exe key.
     public required StorytellerAnnotation Annotation { get; init; }
 
-    // The ancestors that were read, by their type. One that the credential may not read is in Unreadable; one deleted
-    // after the key was read is in neither. Never null.
+    // The ancestors that were read, by their type, each the snapshot of its type. One that the credential may not read
+    // is in Unreadable; one deleted after the key was read is in neither. Never null.
     public IReadOnlyDictionary<AnnotationType, StorytellerAnnotation> Ancestors
     {
         get => _ancestors;
@@ -51,7 +55,8 @@ public sealed class StorytellerExecutionContext
 
     public required DateTimeOffset ReadAt { get; init; }
 
-    // The annotation of each type: the key's own, or an ancestor.
+    // The annotation of each type: the key's own, or an ancestor. A StorytellerSubject, StorytellerResponsibility,
+    // StorytellerUsage or StorytellerContext when read; Find<T>() gives it typed.
     public StorytellerAnnotation? Subject => Find(AnnotationType.Subject);
 
     public StorytellerAnnotation? Responsibility => Find(AnnotationType.Responsibility);
@@ -62,6 +67,15 @@ public sealed class StorytellerExecutionContext
 
     // The key's own for an exe key, its parent for a uxe key.
     public StorytellerExecution? Execution => Find(AnnotationType.Execution) as StorytellerExecution;
+
+    // The annotation of the type of TAnnotation, the key's own or an ancestor, such as Find<StorytellerUnit>() for the
+    // unit of a uxe key: null when it was not read, or when it is not a TAnnotation (a test double's base snapshot).
+    // StorytellerAnnotation itself names no type and throws ArgumentException.
+    public TAnnotation? Find<TAnnotation>()
+        where TAnnotation : StorytellerAnnotation
+    {
+        return Find(SnapshotTypes.Require<TAnnotation>("TAnnotation")) as TAnnotation;
+    }
 
     // Is it active: Deleted when the key's annotation or its execution is deleted; else the first status that is not
     // active among the key's annotation, its execution and its usage; Unknown when all that were read are active but
