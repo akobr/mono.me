@@ -55,6 +55,96 @@ public class ExecutorTests
         run.Output.Split("--- unt.playground.nightly-export,").Length.ShouldBe(2);
     }
 
+    // The catalog lists the units of a responsibility, so a unit that no execution names shows, before the executions.
+    [Fact]
+    public async Task All_OnAResponsibilitysKey_RendersAUnitThatNoExecutionNames()
+    {
+        await using var api = await FakeApi.StartAsync();
+
+        var run = await RunAsync(api, Responsibility, "all", "--context", "production");
+
+        run.ExitCode.ShouldBe(ExecutorCommand.Succeeded);
+        run.Output.ShouldContain("--- unt.playground.archive, version 1, yaml");
+        run.Output.ShouldContain("schedule: \"0 3 * * 0\"");
+        run.Output.IndexOf("--- unt.playground.archive,", StringComparison.Ordinal).ShouldBeLessThan(run.Output.IndexOf("--- unt.playground.nightly-export,", StringComparison.Ordinal));
+        run.Output.IndexOf("--- unt.playground.nightly-export,", StringComparison.Ordinal).ShouldBeLessThan(run.Output.IndexOf("Added exe.", StringComparison.Ordinal));
+        api.Requests.Count(path => path == FakeApi.ListPath("units")).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Units_OnAResponsibilitysKey_NeedsNoContext()
+    {
+        await using var api = await FakeApi.StartAsync();
+
+        var run = await RunAsync(api, Responsibility, "units");
+
+        run.ExitCode.ShouldBe(ExecutorCommand.Succeeded);
+        run.Output.Split('\n').Select(line => line.TrimEnd('\r')).Where(line => line.StartsWith("--- ", StringComparison.Ordinal))
+            .ShouldBe(["--- unt.playground.archive, version 1, yaml", "--- unt.playground.nightly-export, version 1, yaml"]);
+        api.Requests.ShouldNotContain(FakeApi.ListPath("executions"));
+    }
+
+    [Theory]
+    [InlineData("executions")]
+    [InlineData("units-of-execution")]
+    public async Task WhatNamesNoUnits_ListsNoUnits(string what)
+    {
+        await using var api = await FakeApi.StartAsync();
+
+        await RunAsync(api, Responsibility, what, "--context", "production");
+
+        api.Requests.ShouldNotContain(FakeApi.ListPath("units"));
+    }
+
+    [Fact]
+    public async Task OtherKeys_ListNoUnits_AndKeepTheUnitsOfTheirExecutions()
+    {
+        await using var api = await FakeApi.StartAsync();
+
+        var run = await RunAsync(api, "usg.northwind.playground", "--context", "production");
+
+        run.ExitCode.ShouldBe(ExecutorCommand.Succeeded);
+        run.Output.ShouldContain("--- unt.playground.nightly-export, version 1, yaml");
+        run.Output.ShouldNotContain("unt.playground.archive");
+        api.Requests.ShouldNotContain(FakeApi.ListPath("units"));
+    }
+
+    [Fact]
+    public async Task AListOfUnitsThatFails_IsReported_TheExecutionsGoOn_AndTheRunFails()
+    {
+        await using var api = await FakeApi.StartAsync();
+        api.RemoveList("units");
+
+        var run = await RunAsync(api, Responsibility, "--context", "production");
+
+        run.ExitCode.ShouldBe(ExecutorCommand.Failed);
+        run.Error.ShouldContain("! the units of rst.playground: ");
+        run.Output.ShouldContain($"Added {NorthwindExecution}: Active");
+        run.Output.ShouldContain("--- unt.playground.nightly-export, version 1, yaml");
+    }
+
+    [Fact]
+    public async Task Who_OfAResponsibility_RendersItsUnits()
+    {
+        await using var api = await FakeApi.StartAsync();
+
+        var run = await RunAsync(api, Responsibility, "who");
+
+        run.ExitCode.ShouldBe(ExecutorCommand.Succeeded);
+        run.Output.ShouldContain("Type: Responsibility");
+        run.Output.ShouldContain("  Units: nightly-export, archive");
+    }
+
+    [Fact]
+    public async Task Who_OfAUnit_RendersItsType()
+    {
+        await using var api = await FakeApi.StartAsync();
+
+        var run = await RunAsync(api, "unt.playground.nightly-export", "who");
+
+        run.Output.ShouldContain("  Unit type: job");
+    }
+
     [Theory]
     [InlineData("executions", "exe.")]
     [InlineData("units", "unt.")]

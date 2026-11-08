@@ -26,6 +26,7 @@ public sealed class ExecutionRenderer
         }
 
         _output.WriteLine($"  Status: {self.GetSubscriptionStatus(now)}");
+        WriteMembers(self.Annotation);
 
         if (self.Ancestors.Count > 0)
         {
@@ -76,5 +77,40 @@ public sealed class ExecutionRenderer
     private static string Escape(object? value)
     {
         return JsonConvert.ToString(value?.ToString() ?? string.Empty)[1..^1];
+    }
+
+    // What the typed snapshot of who am I carries besides the annotation: the names of its relations, a unit's type.
+    private void WriteMembers(StorytellerAnnotation annotation)
+    {
+        switch (annotation)
+        {
+            case StorytellerResponsibility responsibility:
+                WriteNames("Units", responsibility.UnitNames);
+                break;
+            case StorytellerSubject subject:
+                WriteNames("Contexts", subject.ContextNames);
+                WriteNames("Responsibilities", subject.ResponsibilityNames);
+                break;
+            case StorytellerUsage usage:
+                WriteNames("Contexts", usage.ContextNames);
+                break;
+            case StorytellerContext context:
+                WriteNames("Responsibilities", context.ResponsibilityNames);
+                break;
+            case StorytellerExecution execution:
+                WriteNames("Units", execution.UnitNames);
+                break;
+            case StorytellerUnit { UnitType: { Length: > 0 } unitType }:
+                _output.WriteLine($"  Unit type: {Escape(unitType)}");
+                break;
+        }
+    }
+
+    private void WriteNames(string label, IReadOnlyList<string> names)
+    {
+        if (names.Count > 0)
+        {
+            _output.WriteLine($"  {label}: {string.Join(", ", names.Select(Escape))}");
+        }
     }
 }
