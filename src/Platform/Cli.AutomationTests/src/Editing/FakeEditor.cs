@@ -9,10 +9,10 @@ using _42.Platform.Cli.AutomationTests.Running;
 namespace _42.Platform.Cli.AutomationTests.Editing;
 
 // The fake editor of mode E (spec §4.3) as a test uses it: src/Platform/Cli.AutomationTests/editor, built with the tests,
-// whose apphost is the custom command of editor.config.json (CliTest.UseEditorAsync()). What it does in a run comes from
-// the variables With(change) adds to the run's options (EditorChange), and every invocation leaves a line in its log
-// (ReadLog: which file sform gave it, what was in it, what it wrote, its exit code). One With call is one run: its steps
-// count from the first again, and ReadLog(options) reads the invocations of that run only:
+// whose apphost is the custom command of the editor section of sform.settings.json (CliTest.UseEditorAsync()). What it
+// does in a run comes from the variables With(change) adds to the run's options (EditorChange), and every invocation
+// leaves a line in its log (ReadLog: which file sform gave it, what was in it, what it wrote, its exit code). One With
+// call is one run: its steps count from the first again, and ReadLog(options) reads the invocations of that run only:
 //   var editor = await UseEditorAsync();
 //   var options = editor.With(EditorChange.Replace("""{ "a": 2 }"""));
 //   var result = await Sform(options, InProject("story", "config", "edit", key, "-y"));
@@ -54,7 +54,7 @@ public sealed class FakeEditor
         .GetCustomAttributes<AssemblyMetadataAttribute>()
         .FirstOrDefault(attribute => attribute.Key == MetadataKey)?.Value;
 
-    // The custom command of editor.config.json: the apphost, without a space.
+    // The custom command of the editor section of sform.settings.json: the apphost, without a space.
     public string Command { get; }
 
     // The folder of this editor's log and of its changes' files.
@@ -182,7 +182,7 @@ public sealed class FakeEditor
         if (temp.Contains(' ', StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"The fake editor's path '{appHost}' contains a space, and so does the temporary folder '{temp}' it would be copied to; sform splits the custom command of editor.config.json at its first space (EditorService.ParseCustomCommand). Build the repository in a folder without spaces, or point TEMP/TMPDIR to one.");
+                $"The fake editor's path '{appHost}' contains a space, and so does the temporary folder '{temp}' it would be copied to; sform splits the custom command of its editor at its first space (EditorService.ParseCustomCommand). Build the repository in a folder without spaces, or point TEMP/TMPDIR to one.");
         }
 
         var source = fileSystem.Path.GetDirectoryName(appHost)!;

@@ -1,5 +1,5 @@
 {
-  "$comment": "The options of sform whose values come from a fixed set (spec §4.1): each value is an item CommandCoverageTests wants covered as [Covers(\"<command>\", \"<option>=<value>\")]. command: the canonical path without sform (no alias); option: its long form; values: as the catalogue writes them (compared without case), every value the CLI accepts and acts on; source: where the CLI's code keeps the set, and who refuses the members left out; enum: the enum the code parses the value into (the test checks the values against its members, but those in except (the CLI refuses them) and refused (the CLI sends them, the platform refuses them), plus those in extra). Unknown fields fail the test. See docs/Platform/Cli.AutomationTests/automation-tests.md#coverage-valuesjson.",
+  "$comment": "The options of sform whose values come from a fixed set (spec §4.1): each value is an item CommandCoverageTests wants covered as [Covers(\"<command>\", \"<option>=<value>\")]. command: the canonical path without sform (no alias); option: its long form, or argument: arg0, arg1, … for a positional argument with a fixed set, whose values are covered as \"arg0=<value>\"; values: as the catalogue writes them (compared without case), every value the CLI accepts and acts on; source: where the CLI's code keeps the set, and who refuses the members left out; enum: the enum the code parses the value into (the test checks the values against its members, but those in except (the CLI refuses them) and refused (the CLI sends them, the platform refuses them), plus those in extra). Unknown fields fail the test. See docs/Platform/Cli.AutomationTests/automation-tests.md#coverage-valuesjson.",
   "options": [
     {
       "command": "account points grant",
@@ -16,6 +16,25 @@
       "enum": "_42.Platform.Storyteller.Sdk.PermissionRole",
       "refused": [ "None" ],
       "source": "AccessPointRevokeCommand: Enum.TryParse<PermissionRole>(ignoreCase), and an unknown or missing role revokes Reader; None is sent, and the API refuses it (AccessHttp: \"The role None can't be granted or revoked.\")."
+    },
+    {
+      "command": "account settings editor",
+      "argument": "arg0",
+      "values": [ "vscode", "neovim", "vim", "custom" ],
+      "enum": "_42.Platform.Cli.Configuration.EditorType",
+      "source": "AccountSettingsEditorCommand: UserSettingDefinitions.ParseEditorName (Configuration/UserSettingDefinitions.cs, EditorNames: a name per member of EditorType, in any case); another type ends with exit 2 (\"'<type>' is no editor sform knows; use vscode, neovim, vim, custom.\"). Without a type the command asks in a terminal (EditorService.PromptEditorPreference)."
+    },
+    {
+      "command": "account settings set",
+      "argument": "arg0",
+      "values": [ "editor.type", "editor.command", "access.project", "access.view" ],
+      "source": "AccountSettingsSetCommand.FindDefinition: UserSettingDefinitions.Find (Configuration/UserSettingDefinitions.cs, UserSettingDefinitions.All, the key in any case); another key, or none, ends with exit 2 (\"'<key>' is no setting sform knows; the settings are editor.type, editor.command, access.project, access.view.\")."
+    },
+    {
+      "command": "account settings unset",
+      "argument": "arg0",
+      "values": [ "editor.type", "editor.command", "access.project", "access.view" ],
+      "source": "AccountSettingsUnsetCommand: AccountSettingsSetCommand.FindDefinition, as for set (UserSettingDefinitions.All); another key, or none, ends with exit 2."
     },
     {
       "command": "account machine create",

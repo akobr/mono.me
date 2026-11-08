@@ -35,7 +35,7 @@
     <ProjectReference Include="..\..\Cli\src\Cli.csproj" ReferenceOutputAssembly="false" Private="false" OutputItemType="SformBuildOutput" />
 
     <!-- The fake editor of mode E (spec §4.3), built with the tests the same way: sform starts its apphost as the custom
-         command of editor.config.json. RecordSformPath records the path of its 42.Platform.Cli.AutomationTests.Editor.dll
+         command of the editor section of sform.settings.json. RecordSformPath records the path of its 42.Platform.Cli.AutomationTests.Editor.dll
          as EditorPath (FakeEditor turns it into the apphost next to it). -->
     <ProjectReference Include="..\editor\Cli.AutomationTests.Editor.csproj" ReferenceOutputAssembly="false" Private="false" OutputItemType="EditorBuildOutput" />
   </ItemGroup>
