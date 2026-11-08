@@ -5,6 +5,7 @@ using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.Account;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
@@ -29,6 +30,11 @@ public class AccessPointCreateCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
+        // The organization and the project are asked for; there are no options for them yet.
+        Console.EnsureInteractive(
+            "the organization and the name of the new project",
+            "Run sform account points create in a terminal.");
+
         _42.Platform.Storyteller.Sdk.Account account;
 
         try

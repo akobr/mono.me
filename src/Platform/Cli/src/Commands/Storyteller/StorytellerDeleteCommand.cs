@@ -97,6 +97,9 @@ public class StorytellerDeleteCommand : BaseContextCommand
 
         if (!Yes)
         {
+            // After the lookup, so an unknown key ends with its own code also without a terminal.
+            Console.EnsureInteractive("the confirmation of the permanent delete", "Pass -y|--yes to delete without asking.");
+
             var descendants = active is not null
                 ? await DescribeActiveDescendantsAsync(annotationKey)
                 : DescribeDeletedDescendants(deleted!.Deletion);

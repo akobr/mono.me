@@ -3,6 +3,7 @@ using System.IO.Abstractions;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +40,9 @@ public class MachineRenewCommand : BaseContextCommand
     [Option("-o|--output", CommandOptionType.SingleValue, Description = "Output file path for the renewed PKCS#12 certificate (.pfx).")]
     public string? OutputPath { get; set; }
 
+    [Option("--password-stdin", CommandOptionType.NoValue, Description = "Read the password of the -c certificate from the first line of the standard input (an empty line for none) instead of asking.")]
+    public bool PasswordFromStdin { get; set; }
+
     protected override async Task<int> ExecuteAsync()
     {
         if (string.IsNullOrWhiteSpace(MachineId))
@@ -47,12 +51,15 @@ public class MachineRenewCommand : BaseContextCommand
             return ExitCodes.ERROR_INPUT_PARSING;
         }
 
+        if (PasswordFromStdin && string.IsNullOrWhiteSpace(CertificatePath))
+        {
+            Console.WriteImportant("--password-stdin reads the password of the certificate given with -c|--certificate.");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
         if (!string.IsNullOrWhiteSpace(CertificatePath))
         {
-            var password = Console.Password(new PasswordOptions
-            {
-                Message = "Certificate password (press Enter if none)",
-            });
+            var password = ReadCertificatePassword();
             var cert = X509CertificateLoader.LoadPkcs12FromFile(CertificatePath, password);
             ((SdkConfiguration)_sdkConfiguration).ClientCertificate = cert;
         }
@@ -87,5 +94,24 @@ public class MachineRenewCommand : BaseContextCommand
         }
 
         return ExitCodes.SUCCESS;
+    }
+
+    // Standard input is read only when --password-stdin asks for it, and only its first line, so a pipe that stays open
+    // does not keep sform waiting. Without it, a redirected input stops the command before any call.
+    private string ReadCertificatePassword()
+    {
+        if (PasswordFromStdin)
+        {
+            return Console.Console.In.ReadLine() ?? string.Empty;
+        }
+
+        Console.EnsureInteractiveValue(
+            "the password of the certificate",
+            "Pass it as the first line of the standard input with --password-stdin (an empty line for none).");
+
+        return Console.Password(new PasswordOptions
+        {
+            Message = "Certificate password (press Enter if none)",
+        });
     }
 }

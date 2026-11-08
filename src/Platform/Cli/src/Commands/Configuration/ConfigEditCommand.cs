@@ -41,6 +41,9 @@ public class ConfigEditCommand : BaseContextCommand
     [Option("-f|--force", CommandOptionType.NoValue, Description = "Store the configuration even when it violates the schema.")]
     public bool Force { get; set; }
 
+    [Option("-y|--yes", CommandOptionType.NoValue, Description = "Save the edited configuration without asking for confirmation.")]
+    public bool Yes { get; set; }
+
     /// <summary>
     /// Opens the stored content of the configuration (without inherited values and templates) in the configured editor,
     /// and replaces the stored content with the edited document when the user confirms.
@@ -54,6 +57,12 @@ public class ConfigEditCommand : BaseContextCommand
     /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
+        // The changes are confirmed before they are saved: without a terminal, fail before any call or editor.
+        if (!Yes)
+        {
+            Console.EnsureInteractive("the confirmation of the changes", "Pass -y|--yes to save them without asking.");
+        }
+
         var storedContent = await _configurationApi.GetStoredConfigurationContentAsync(
             Context.OrganizationName,
             Context.ProjectName,
@@ -70,7 +79,8 @@ public class ConfigEditCommand : BaseContextCommand
             _editorOptions,
             storedContent ?? new JObject(),
             $"config-{AnnotationKey}",
-            storedContent is null);
+            storedContent is null,
+            confirm: !Yes);
 
         if (result.Edited is null)
         {

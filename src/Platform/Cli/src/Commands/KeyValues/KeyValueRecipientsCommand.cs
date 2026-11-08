@@ -130,6 +130,11 @@ public class KeyValueRecipientRemoveCommand : KeyValueCommandBase
     {
         var id = RequireKey(Id);
 
+        if (!Yes)
+        {
+            Console.EnsureInteractive("the confirmation of the removal", "Pass -y|--yes to remove the recipient without asking.");
+        }
+
         if (!Yes && !Console.Confirm($"Remove the recipient '{id}'? Values encrypted for it stay readable with its private key.", false))
         {
             Console.WriteLine("Aborted.");

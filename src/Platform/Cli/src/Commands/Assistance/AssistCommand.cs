@@ -1,5 +1,7 @@
+using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Output;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Assistance;
@@ -15,5 +17,11 @@ public class AssistCommand : BaseParentCommand
     {
         // no operation
     }
-}
 
+    // Without a subcommand the base class asks which one to run.
+    public override async Task<int> OnExecuteAsync()
+    {
+        Console.EnsureInteractive("the assist command to run", "Name it: sform assist key.");
+        return await base.OnExecuteAsync();
+    }
+}

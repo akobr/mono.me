@@ -8,15 +8,27 @@ A simple CLI interface for developers, dev ops engineers, and your infrastructur
 
 ## Sign in
 
-Sign in with your account. The tool prints an address and a code, and waits while you confirm them in a browser. `--browser` opens the address for you.
+Sign in with your account. The tool prints an address and a code, and waits while you confirm them in a browser. `-b` or `--browser` opens the address for you, without a shell:
+
+- with the program in `SFORM_BROWSER`, when it is set. The variable names the program only, a name on the `PATH` or a full path, without arguments, and gets the address as its only argument; a program that needs arguments goes into a small script;
+- else with `BROWSER`, read as other tools read it: a list of commands separated by `:` (`;` on Windows), each a program that gets the address, or a command line with `%s` where the address goes, such as `BROWSER='firefox --new-window %s'`. The commands are tried in order, then your default browser;
+- else with your default browser.
+
+When the browser cannot be started, `sform` says so and waits for the sign-in all the same.
 
 ``` powershell
 sform account
+sform account --browser
+sform account -o org_01JC3W6ZT4B2Q5N8M0R7K9X1YD
 ```
+
+If you belong to several organizations, `sform` asks which one to sign in to after you confirm the code. `-o` or `--organization` with the id of the organization answers it up front, and is required where `sform` has no terminal to ask in (see [Run without a terminal](#run-without-a-terminal)): then `sform` stops with exit code `2` and lists your organizations with their ids and names on standard error. An id you are not a member of also ends with exit code `2`, the organization named, and no session is kept. `-o` takes the id of the organization in the sign-in service (WorkOS), not the name of a 2S organization of `-p <organization>.<project>`. With a stored session, `-o` checks that the session belongs to that organization: another one, or none, ends with exit code `2`, and `sform account logout` comes first. A deployment that signs in with Entra ID has no organizations, and refuses `-o`.
+
+A declined sign-in ends with exit code `44`, a code that expired before you confirmed it with `2`, and a sign-in service that cannot be reached with `3`.
 
 Every other command uses the stored session and refreshes it silently. `sform account logout` signs you out.
 
-`sform account set` picks the default project and view of the commands without `-p` and `-v`. They are kept with your other preferences in `sform.settings.json`, see [Settings](#settings).
+`sform account set -p <organization>.<project>` picks the default project and view of the commands without `-p` and `-v`; without `-p` it offers your projects to choose from, in a terminal. They are kept with your other preferences in `sform.settings.json`, see [Settings](#settings).
 
 ## Sign in from a pipeline
 
@@ -334,6 +346,72 @@ An unquoted `a['b.c']=1` reaches `sform` as `a[b.c]=1`, and an expanded `$bindin
 
 **Changed.** The name of `-x` used to be a top-level property as written. Now a name that is not plain (with a dot, a space, `:`, `$`, a leading digit or `-`, or a letter outside ASCII) is written `['name']`, and an empty name is refused: `-x "['a.b']=1"` sets the property `a.b`, as `-x a.b=1` did before. The `IConfiguration` spelling `-x "Logging:LogLevel:Default=Warning"` now fails; write `Logging.LogLevel.Default`. A name matches a property of the file in any case, as `IConfiguration` keys do, and keeps the spelling of the file. A date-like value of `-x` becomes a date, while one of the `-i` file stays its text.
 
+## Run without a terminal
+
+`sform` never waits for an answer that cannot come. When its standard input is redirected, as in a pipe, from a file, in a CI job or in a script started by another program, a command that would ask something stops instead: it writes what it would have asked and the option that answers it to standard error, and ends with an exit code.
+
+| Command | Asks for | Without a terminal | Exit code |
+|---|---|---|---|
+| `sform account` | the organization, when you belong to several | pass `-o` (`--organization`) with its id | `2` |
+| `sform account set` | the default project | pass `-p` (`--projectKey`) with `<organization>.<project>` | `2` |
+| `sform account points get`, `grant`, `revoke` | the access point | pass `-p` (`--pointKey`, `--point`) | `2` |
+| `sform story set` | what happens to deleted annotations | pass `--restore-deleted` or `--recreate` | `2` |
+| `sform story kv set` | the value of a secret | pass `--stdin`, `-i` (`--import`) with a file, or the value | `2` |
+| `sform account machine renew -c` | the password of the certificate | pass `--password-stdin` and the password as the first line of standard input (an empty line for none) | `2` |
+| `sform story delete --permanent`, `story kv delete --permanent`, `story kv purge`, `story kv import`, `story kv recipients remove` | a confirmation | pass `-y` (`--yes`); `kv import` also takes `--dry-run` | `43` |
+| `sform story config patch` | a confirmation of the patch | pass `-y` (`--yes`) | `43` |
+| `sform story config edit`, `template edit`, `schema type edit`, `schema annotation edit`, `schema descendant edit` | a confirmation of the changes | pass `-y` (`--yes`) | `43` |
+| `sform account register`, `sform account points create`, `sform assist` and `assist key` | names and choices without options | run them in a terminal | `43` |
+
+A missing value ends with `2`, as when it is missing on the command line; a confirmation, or a command that needs a terminal, with `43`. A command still checks what comes before its question and ends with that code: `sform account register` of a registered user says so and ends with `0`, `story kv import` with nothing to change and `story config patch -i` with an empty patch end with `42`, and an unknown key or a missing file with `2`; `story kv import` shows its plan before it stops. The edit commands, and `story config patch` without `-i`, stop before the editor opens, so no edit is lost to a question nobody can answer. An edit command without a configured editor (and without `$VISUAL` or `$EDITOR`) stops with `43` too and names `sform account settings editor` to set one. `-e` of a `get` command rewrites an existing file without asking. Standard input is read only where an option asks for it (`--stdin`, `--password-stdin`).
+
+Without any console at all, as when a program redirects standard input, output and error, `sform` writes its output as plain text: lines of at most `COLUMNS` characters (250 when it is not set), without trailing spaces.
+
+### The device code for programs
+
+A program that runs `sform account` and confirms the code itself, such as an automated test, sets `SFORM_DEVICE_CODE_OUTPUT=json`. The prompt is then also written to standard error as one JSON line, at once, before any other output of the prompt and before `sform` starts to wait:
+
+``` json
+{"userCode":"BCDF-GHJK","verificationUri":"https://auth.example.com/device","verificationUriComplete":"https://auth.example.com/device?user_code=BCDF-GHJK","expiresIn":599}
+```
+
+`verificationUriComplete` is `null` where the provider has no such address, and `expiresIn` is in seconds. Only the value `json`, in any case, turns it on; the text prompt stays the same either way.
+
+## Where sform keeps its files
+
+| File | Default location |
+|---|---|
+| `sform.settings.json` (the editor and the default project, see [Settings](#settings)), the session (`authkit.cache`, or `msal.cache` for Entra ID) and `telemetry.json` | your `.42for.net` folder: `%LOCALAPPDATA%\.42for.net` on Windows, `~/.42for.net` elsewhere |
+| `auth.discovery.json` (the sign-in settings of the server), `logs/`, and the `access.default.json` and `editor.config.json` of earlier versions, which are still read | next to `sform` itself, the folder of the tool |
+
+`SFORM_HOME` moves every one of them into one folder, so that two sessions, two default projects or two users can live side by side, each in its own folder. It must be an absolute path: a relative one, or a path to a file, stops every command with exit code `2` before anything is read or written. A folder that does not exist yet is created by the first command that writes to it. `app.config.json` stays next to `sform`.
+
+``` bash
+export SFORM_HOME="$HOME/.sform/staging"
+sform account
+```
+
+The session is encrypted for your user: with DPAPI on Windows, in the Keychain on macOS and with libsecret on Linux. The DPAPI file lives in the folder; a Keychain item or a libsecret entry does not, so with `SFORM_HOME` the item of the session is named after the folder, and each folder keeps a session of its own (without `SFORM_HOME` the names stay as they were, and so does your session). This holds for the AuthKit session; a deployment that signs in with Entra ID keeps sessions apart on macOS and Linux only with `SFORM_TOKEN_STORE=file`. A machine without any of them, such as a CI container without a keyring, sets `SFORM_TOKEN_STORE=file` next to `SFORM_HOME`: the session is then a plain file in `SFORM_HOME` (`authkit.cache.plaintext`, `msal.cache.plaintext`) that only your user may read, and `sform account` warns that it is in use. Treat that folder like a password and delete it when the job ends. Without `SFORM_HOME` the variable is ignored, and `sform account` says so; `file` is its only value.
+
+| Variable | Effect |
+|---|---|
+| `SFORM_HOME` | The folder of every file `sform` writes, and of the session |
+| `SFORM_TOKEN_STORE` | `file`: the session as a plain file in `SFORM_HOME`; ignored without `SFORM_HOME` |
+| `SFORM_DEVICE_CODE_OUTPUT` | `json`: the device code prompt also as one JSON line on standard error |
+| `SFORM_BROWSER`, then `BROWSER` | The program `sform account --browser` opens the sign-in page with, see [Sign in](#sign-in) |
+| `SFORM_<section>__<key>` | A setting of `app.config.json` for this run, e.g. `SFORM_general__baseUrl` for the address of the API; it wins over the files |
+| `COLUMNS` | The width of the output when `sform` has no console at all |
+| `DO_NOT_TRACK`, `SFORM_TELEMETRY_OPTOUT` | Turn telemetry off, see [Telemetry](#telemetry) |
+
+``` bash
+# One run against the local API
+SFORM_general__baseUrl=http://localhost:7071/api sform story -p acme.billing
+```
+
+An API that cannot be reached, a refused connection, a name that does not resolve or a request that times out, ends a command with exit code `3` and names the address `sform` called.
+
+A build of `sform` from source (Debug) runs as `Development` and reads the user secrets of the CLI, unless `DOTNET_ENVIRONMENT` names another environment; a released `sform` always runs as `Production`.
+
 ## Telemetry
 
 `sform` sends anonymous usage data to PostHog in the EU cloud: which commands run, how they end and how long they take. It sends one event per run, after the command has finished. The output and the exit code stay the same, the run waits for the event about two seconds at most, and an event that cannot be sent is dropped.
@@ -351,7 +429,7 @@ An unquoted `a['b.c']=1` reaches `sform` as `a[b.c]=1`, and an expanded `$bindin
 
 Never sent: arguments, option values, error messages, names of organizations, projects, views or keys, addresses, file paths, your name or e-mail, the name of the machine, and tokens. The events create no person profile, and PostHog does not look up a location for them.
 
-The installation id is a random number, not derived from the machine or your account. It is kept in `telemetry.json`, next to the stored session: in `%LOCALAPPDATA%\.42for.net` on Windows and in `~/.42for.net` elsewhere, so it survives tool updates. On the first run `sform` creates it and prints a notice to standard error. When `sform` reports a failure to Sentry, the report carries the same id.
+The installation id is a random number, not derived from the machine or your account. It is kept in `telemetry.json`, next to the stored session: in `%LOCALAPPDATA%\.42for.net` on Windows and in `~/.42for.net` elsewhere, so it survives tool updates, or in `SFORM_HOME` when it is set. On the first run `sform` creates it and prints a notice to standard error. When `sform` reports a failure to Sentry, the report carries the same id.
 
 Set `DO_NOT_TRACK` or `SFORM_TELEMETRY_OPTOUT` to `1`, `true`, `yes` or `on` to turn telemetry off. `DO_NOT_TRACK` is honoured by other tools too, `SFORM_TELEMETRY_OPTOUT` only by `sform`. With telemetry off, `sform` sends nothing and creates no id.
 
@@ -367,7 +445,7 @@ In a pipeline, set the variable in the `env` of the job like the sign-in variabl
 
 ## Settings
 
-`sform` keeps your preferences in `sform.settings.json`, in the same folder as the stored session and `telemetry.json`: `%LOCALAPPDATA%\.42for.net` on Windows and `~/.42for.net` elsewhere. Tool updates keep it.
+`sform` keeps your preferences in `sform.settings.json`, in the same folder as the stored session and `telemetry.json`: `%LOCALAPPDATA%\.42for.net` on Windows and `~/.42for.net` elsewhere., or `SFORM_HOME` when it is set (see [Where sform keeps its files](#where-sform-keeps-its-files)). Tool updates keep it.
 
 | Key | Values | When it is not set |
 |---|---|---|

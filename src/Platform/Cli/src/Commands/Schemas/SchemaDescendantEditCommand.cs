@@ -36,6 +36,9 @@ public class SchemaDescendantEditCommand : SchemaApiCommand
     [Option("-f|--force", CommandOptionType.NoValue, Description = "Store the schema even when existing configurations in the view do not comply.")]
     public bool Force { get; set; }
 
+    [Option("-y|--yes", CommandOptionType.NoValue, Description = "Save the edited schema without asking for confirmation.")]
+    public bool Yes { get; set; }
+
     protected override Task<int> ExecuteAsync()
     {
         var annotationKey = Console.ValidateAnnotationKey(AnnotationKey);
@@ -49,6 +52,7 @@ public class SchemaDescendantEditCommand : SchemaApiCommand
             SchemaLayer.Descendant,
             annotationType,
             annotationKey,
-            Force);
+            Force,
+            !Yes);
     }
 }

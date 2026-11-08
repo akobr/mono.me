@@ -11,18 +11,21 @@ using Microsoft.Identity.Client.Extensions.Msal;
 
 namespace _42.Platform.Cli.Authentication;
 
-// Entra ID sign-in through MSAL, with the token cache in ~/.42for.net/msal.cache.
+// Entra ID sign-in through MSAL, with the token cache msal.cache in the directory of TokenStorage (the user's
+// .42for.net folder, or SFORM_HOME); a plain file with SFORM_TOKEN_STORE=file.
 public class EntraIdAuthenticationService : IAuthenticationService
 {
     private readonly IFileSystem _fileSystem;
     private readonly ResolvedAuthentication _settings;
+    private readonly TokenStorage _storage;
     private readonly AsyncLazy<IPublicClientApplication> _publicClientApp;
     private readonly string[] _scopes;
 
-    public EntraIdAuthenticationService(IFileSystem fileSystem, ResolvedAuthentication settings)
+    public EntraIdAuthenticationService(IFileSystem fileSystem, ResolvedAuthentication settings, TokenStorage storage)
     {
         _fileSystem = fileSystem;
         _settings = settings;
+        _storage = storage;
         _publicClientApp = new AsyncLazy<IPublicClientApplication>(BuildPublicClientApplication);
 
         _scopes = GetScopes(settings);
@@ -43,8 +46,17 @@ public class EntraIdAuthenticationService : IAuthenticationService
     public async Task<SignedInUser> LoginWithDeviceCodeAsync(
         Func<DeviceCodePrompt, Task> onPrompt,
         Func<IReadOnlyList<OrganizationChoice>, Task<string>>? selectOrganization = null,
+        string? organizationId = null,
         CancellationToken cancellationToken = default)
     {
+        // The tenant is fixed by the settings: there is no organization to pick, so asking for one is a mistake.
+        if (organizationId is not null)
+        {
+            throw new AuthenticationException(
+                AuthenticationFailureReason.Configuration,
+                "-o|--organization picks an AuthKit organization, and this deployment signs in with Entra ID; sign in without it.");
+        }
+
         var pca = await _publicClientApp;
 
         try
@@ -129,17 +141,18 @@ public class EntraIdAuthenticationService : IAuthenticationService
 
     private async Task<IPublicClientApplication> BuildPublicClientApplication()
     {
-        var cacheFileName = "msal.cache";
+        var storage = _storage;
 #if DEBUG && !TESTING
-        cacheFileName += ".plaintext";
+        storage = storage with { IsUnprotected = true };
 #endif
-        var cacheDirectory = UserSettingsLocation.GetDirectory(_fileSystem);
 
-        var storageProperties = new StorageCreationPropertiesBuilder(cacheFileName, cacheDirectory)
-#if DEBUG && !TESTING
-                .WithUnprotectedFile()
-#endif
-            .Build();
+        // SFORM_HOME may not exist yet.
+        _fileSystem.Directory.CreateDirectory(storage.Directory);
+
+        var builder = new StorageCreationPropertiesBuilder(storage.MsalCacheFileName, storage.Directory);
+        var storageProperties = storage.IsUnprotected
+            ? builder.WithUnprotectedFile().Build()
+            : builder.Build();
 
         var pca = PublicClientApplicationBuilder
             .Create(_settings.ClientId)

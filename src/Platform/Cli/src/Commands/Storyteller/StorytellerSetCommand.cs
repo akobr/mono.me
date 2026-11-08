@@ -403,13 +403,12 @@ public class StorytellerSetCommand : BaseContextCommand
         {
             choice = CreateNewChoice;
         }
-        else if (Console.Console?.IsInputRedirected == true)
-        {
-            Console.WriteLine("Choose what happens to them: --restore-deleted restores and updates them, --recreate creates them new.");
-            return (ExitCodes.ERROR_WRONG_INPUT, false);
-        }
         else
         {
+            Console.EnsureInteractiveValue(
+                "what happens to the deleted annotations",
+                "Choose with an option: --restore-deleted restores and updates them, --recreate creates them new.");
+
             choice = Console.Select(new SelectOptions<string>
             {
                 Message = "What do you want to do",

@@ -5,6 +5,7 @@ using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
@@ -64,6 +65,11 @@ public class AccountRegisterCommand : BaseCommand
         }
 
         var identifier = user.UserName;
+
+        // A registered or a signed-out user is told so above, also without a terminal.
+        Console.EnsureInteractive(
+            "the organization and the project of the new account",
+            "Run sform account register in a terminal.");
 
         var organizationName = Console.Input(new InputOptions<string>
         {

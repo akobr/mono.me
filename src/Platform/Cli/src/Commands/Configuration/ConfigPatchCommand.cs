@@ -57,6 +57,14 @@ public class ConfigPatchCommand : BaseContextCommand
     /// </summary>
     protected override async Task<int> ExecuteAsync()
     {
+        // The patch is confirmed before it is applied. A patch made in the editor would be lost at a confirmation that
+        // cannot be answered, so without a terminal that path stops before the editor and any call; a patch file is
+        // checked first (the missing configuration, the empty patch) and stops at the confirmation.
+        if (!Yes && ImportFilePath is null)
+        {
+            EnsurePatchCanBeConfirmed();
+        }
+
         JArray? patchFromFile = null;
 
         if (ImportFilePath is not null)
@@ -137,6 +145,8 @@ public class ConfigPatchCommand : BaseContextCommand
 
         if (!Yes)
         {
+            EnsurePatchCanBeConfirmed();
+
             var shouldApply = Console.Confirm(new ConfirmOptions
             {
                 Message = $"Apply this patch to '{AnnotationKey}'",
@@ -175,6 +185,11 @@ public class ConfigPatchCommand : BaseContextCommand
         {
             return WritePatchError(exception);
         }
+    }
+
+    private void EnsurePatchCanBeConfirmed()
+    {
+        Console.EnsureInteractive("the confirmation of the patch", "Pass -y|--yes to apply it without asking.");
     }
 
     private int WritePatchError(ApiException exception)

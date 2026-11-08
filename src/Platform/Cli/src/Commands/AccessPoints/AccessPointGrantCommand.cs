@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
@@ -48,6 +49,12 @@ public class AccessPointGrantCommand : BaseCommand
         if (AccountId.StartsWith('#'))
         {
             AccountId = AccountId[1..];
+        }
+
+        // The list to choose from needs a terminal: without one, fail before any call.
+        if (string.IsNullOrWhiteSpace(ProjectKey))
+        {
+            Console.EnsureInteractiveValue("the access point", "Pass it with -p|--point <organizationName>[.<projectName>].");
         }
 
         _42.Platform.Storyteller.Sdk.Account account;
