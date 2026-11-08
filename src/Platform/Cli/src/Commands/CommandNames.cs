@@ -12,6 +12,8 @@ public static class CommandNames
     public const string GRANT = "grant";
     public const string REVOKE = "revoke";
     public const string POINTS = "points";
+    public const string SETTINGS = "settings";
+    public const string EDITOR = "editor";
 
     public const string STORYTELLER = "storyteller";
     public const string SUPERVISOR = "supervisor";
@@ -39,6 +41,7 @@ public static class CommandNames
 
     public const string GET = "get";
     public const string SET = "set";
+    public const string UNSET = "unset";
     public const string EDIT = "edit";
     public const string PATCH = "patch";
     public const string DELETE = "delete";
