@@ -318,7 +318,7 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
         }
 
         Clear(body, cleared);
-        return ToolResults.Json(await annotations.SetAnnotationAsync(organization, project, view, keyText, body, cancellationToken));
+        return ToolResults.Json(await annotations.SetAnnotationAsync(organization, project, view, keyText, body, cancellationToken: cancellationToken));
     }
 
     [McpServerTool(Name = "create_annotations", Title = "Create annotations", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]

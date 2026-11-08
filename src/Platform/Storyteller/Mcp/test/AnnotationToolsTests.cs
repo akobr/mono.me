@@ -16,9 +16,9 @@ public class AnnotationToolsTests
 
     public AnnotationToolsTests()
     {
-        _api.Setup(api => api.SetAnnotationAsync(Organization, Project, ViewName, It.IsAny<string>(), It.IsAny<Sdk.Annotation>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, string, Sdk.Annotation, CancellationToken>((_, _, _, _, body, _) => _sent = body)
-            .ReturnsAsync((string _, string _, string _, string _, Sdk.Annotation body, CancellationToken _) => body);
+        _api.Setup(api => api.SetAnnotationAsync(Organization, Project, ViewName, It.IsAny<string>(), It.IsAny<Sdk.Annotation>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, string, string, Sdk.Annotation, string, string, CancellationToken>((_, _, _, _, body, _, _, _) => _sent = body)
+            .ReturnsAsync((string _, string _, string _, string _, Sdk.Annotation body, string _, string _, CancellationToken _) => body);
         _api.Setup(api => api.FindDeletedAnnotationsAsync(Organization, Project, ViewName, It.IsAny<Sdk.AnnotationKeysRequest>(), It.IsAny<CancellationToken>()))
             .Callback<string, string, string, Sdk.AnnotationKeysRequest, CancellationToken>((_, _, _, request, _) => _lookups.Add(request))
             .ReturnsAsync([]);
