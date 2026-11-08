@@ -19,6 +19,9 @@ public sealed partial class CommandLineTests : CliTest
     // GEN-CLI-06: what sform account prints first without SFORM_HOME when SFORM_TOKEN_STORE=file asks for a plain session.
     private const string IgnoredTokenStore = "SFORM_TOKEN_STORE=file is ignored without SFORM_HOME; the session is kept in the protected store.";
 
+    // GEN-CLI-03: the hint of an edit that has no editor to open (EditorService.PromptEditorPreference).
+    private const string NoEditorHint = "Choose one with sform account settings editor in a terminal, set it with sform account settings set editor.type, or set $VISUAL or $EDITOR.";
+
     // GEN-CLI-03: each command ends within this time on redirected input.
     private static readonly TimeSpan RedirectedTimeout = TimeSpan.FromSeconds(10);
 
@@ -96,8 +99,10 @@ public sealed partial class CommandLineTests : CliTest
     // recipients remove <id>; kv import kv.json; kv set <new key> --secret; account machine renew <id> -c m.pfx ends within
     // 10 seconds: a value with 2, a confirmation or a terminal with 43, stderr saying "! sform cannot ask for …: the input is
     // redirected." and the option to use, or what to run instead (points create and assist key in a terminal, assist with
-    // its subcommand). Nothing was written: <rst> and its configuration, <del>, <key>, the new key and the default project
-    // are as before.
+    // its subcommand). Without an editor (the home has none, and the run no $VISUAL or $EDITOR), config edit <rst> -y passes
+    // the confirmation and stops with 43 at the question for the editor, naming sform account settings editor and $VISUAL or
+    // $EDITOR. Nothing was written: <rst> and its configuration, <del>, <key>, the new key and the default project are as
+    // before.
     [Test]
     [TestCase(393)]
     [UserRole(Role.Editor)]
@@ -142,6 +147,7 @@ public sealed partial class CommandLineTests : CliTest
             new(InProject("story", "kv", "import", "kv.json"), CliExit.InteractionNeeded, ["Pass -y|--yes to import without asking, or --dry-run to see the plan."]),
             new(InProject("story", "kv", "set", newPair, "--secret"), CliExit.WrongInput, ["Pass it with --stdin, with -i|--import <file>, or as an argument."]),
             new(InProject("account", "machine", "renew", CliData.MachineName(), "-c", "m.pfx"), CliExit.WrongInput, ["--password-stdin"]),
+            new(InProject("story", "config", "edit", key, "-y"), CliExit.InteractionNeeded, [NoEditorHint]),
         ];
 
         foreach (var step in steps)

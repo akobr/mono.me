@@ -11,8 +11,8 @@ using System.Text.Json.Nodes;
 namespace _42.Platform.Cli.AutomationTests.Editor;
 
 // The fake editor of the CLI automation tests (spec §4.3, mode E of docs/Platform/Cli.AutomationTests/test-cases.md).
-// sform starts the custom command of editor.config.json with the quoted path of the file to edit appended
-// (EditorService.ParseCustomCommand) and waits for it to exit: 0 makes sform read the file back, any other code makes it
+// sform starts the custom command of its editor (the editor section of sform.settings.json) with the quoted path of the
+// file to edit appended (EditorService.ParseCustomCommand) and waits for it to exit: 0 makes sform read the file back, any other code makes it
 // say "Editor exited with code N." and end with 1. What this editor does comes from the variables the test sets for the
 // run of sform (inherited by the editor; FakeEditor and EditorChange of the tests write them):
 //   CLI_EDITOR_MODE      the step of each invocation, comma-separated; the n-th invocation of a run does the n-th step and

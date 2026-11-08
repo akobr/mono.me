@@ -13,12 +13,14 @@ public sealed class ConfigWriteTests : CliTest
     private const string ANumberSchema = """{ "type": "object", "properties": { "a": { "type": "number" } } }""";
 
     // CFG-SET-01: config set -x merges inline properties into the stored content.
-    // As an Editor, config set <rst> -x a=1 -x b.c=true stores a=1 (a number) and "b.c"=true (a boolean; -x names a
-    // property, it does not nest); config set <rst> --properties d=x merges d="x" into it as a new version, keeping a
-    // and b.c (its printed model has the stored content), and story config <rst> --content-only returns the merged
-    // content. The model the first write prints has no Content: the API answers the create of a configuration with its
-    // calculated content, which a new configuration does not have yet (CosmosConfigurationService.WriteConfigurationAsync
-    // returns ToConfiguration() there, ToConfigurationFromContent() on every later write).
+    // As an Editor, config set <rst> -x a=1 -x b.c=true -x "['e.f']=2" stores a=1 (a number), b as the object
+    // { "c": true } (the name of -x is a JSON path, so b.c nests) and a property named "e.f" with 2 (a name with a dot is
+    // written in ['…']); config set <rst> --properties d=x merges d="x" into it as a new version, keeping a, b.c and e.f
+    // (its printed model has the stored content), and story config <rst> --content-only returns the merged content, with
+    // no property named "b.c". The model the first write prints has no Content: the API answers the create of a
+    // configuration with its calculated content, which a new configuration does not have yet
+    // (CosmosConfigurationService.WriteConfigurationAsync returns ToConfiguration() there, ToConfigurationFromContent()
+    // on every later write).
     [Test]
     [TestCase(395)]
     [Elementary]
@@ -29,19 +31,15 @@ public sealed class ConfigWriteTests : CliTest
         var key = CliData.ResponsibilityKey();
         (await Sform(InProject("story", "set", key))).ShouldSucceed();
 
-        var first = (await Sform(InProject("story", "config", "set", key, "-x", "a=1", "-x", "b.c=true"))).ShouldSucceed().JsonNode();
+        var first = (await Sform(InProject("story", "config", "set", key, "-x", "a=1", "-x", "b.c=true", "-x", "['e.f']=2"))).ShouldSucceed().JsonNode();
         var firstVersion = first["Version"]!.GetValue<int>();
 
         var second = (await Sform(InProject("story", "config", "set", key, "--properties", "d=x"))).ShouldSucceed().JsonNode();
         await Assert.That(second["Version"]!.GetValue<int>()).IsGreaterThan(firstVersion);
-        await Assert.That(second["Content"]?["a"]?.GetValue<long>()).IsEqualTo(1L);
-        await Assert.That(second["Content"]?["b.c"]?.GetValue<bool>()).IsTrue();
-        await Assert.That(second["Content"]?["d"]?.GetValue<string>()).IsEqualTo("x");
+        await AssertMergedAsync(second["Content"]);
 
         var content = (await Sform(InProject("story", "config", key, "--content-only"))).ShouldSucceed().JsonNode();
-        await Assert.That(content["a"]?.GetValue<long>()).IsEqualTo(1L);
-        await Assert.That(content["b.c"]?.GetValue<bool>()).IsTrue();
-        await Assert.That(content["d"]?.GetValue<string>()).IsEqualTo("x");
+        await AssertMergedAsync(content);
     }
 
     // CFG-SET-02: config create is an alias of set.
@@ -394,4 +392,14 @@ public sealed class ConfigWriteTests : CliTest
     }
 
     private static string Text(long version) => version.ToString(CultureInfo.InvariantCulture);
+
+    // CFG-SET-01: the content after both writes: a=1, b={ "c": true } (no property named "b.c"), "e.f"=2 and d="x".
+    private static async Task AssertMergedAsync(System.Text.Json.Nodes.JsonNode? content)
+    {
+        await Assert.That(content?["a"]?.GetValue<long>()).IsEqualTo(1L);
+        await Assert.That(content?["b"]?["c"]?.GetValue<bool>()).IsTrue();
+        await Assert.That(content?["b.c"]).IsNull();
+        await Assert.That(content?["e.f"]?.GetValue<long>()).IsEqualTo(2L);
+        await Assert.That(content?["d"]?.GetValue<string>()).IsEqualTo("x");
+    }
 }
