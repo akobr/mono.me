@@ -22,8 +22,8 @@ public class StorytellerExportCommand : BaseContextCommand
         (--format git).
 
         A user needs the Administrator role on the project. A machine needs no role
-        but Configuration.Transfer and the read scope of every included kind:
-        Annotation.Read for annotations, and Configuration.Read for schemas,
+        but the scope Configuration.Transfer and the read scope of every included
+        kind: Annotation.Read for annotations, and Configuration.Read for schemas,
         templates and configurations.
         """;
 

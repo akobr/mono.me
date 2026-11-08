@@ -23,10 +23,10 @@ public class StorytellerImportCommand : BaseContextCommand
         versions, and nothing is deleted.
 
         A user needs the Administrator role on the project. A machine needs no role
-        but Configuration.Transfer and the write scopes of every included kind:
-        Annotation.Write and Annotation.Manage for annotations, Configuration.Write
-        and Schema.Write for schemas, Configuration.Write and Template.Write for
-        templates, and Configuration.Write for configurations.
+        but the scope Configuration.Transfer and, for every included kind, the scopes
+        of its direct writes: Annotation.Write and Annotation.Manage for annotations,
+        Configuration.Write and Schema.Write for schemas, Configuration.Write and
+        Template.Write for templates, and Configuration.Write for configurations.
         """;
 
     private readonly ITransfersApiClient _transfersApi;

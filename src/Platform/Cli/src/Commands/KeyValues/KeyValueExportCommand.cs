@@ -18,8 +18,9 @@ public class KeyValueExportCommand : KeyValueCommandBase
 
         The formats are json, the 2s.key-values.v1 document with the levels; flat,
         one JSON object of key: "value"; and env, .env lines (KEY=VALUE, with
-        db.password as DB__PASSWORD). Without --format, a *.json file gets json, any
-        other file env, and the standard output json.
+        db.password as DB__PASSWORD). Without --format, the file name decides: env
+        for .env, *.env and .env.*, json for another *.json, and env for any other
+        name; the standard output gets json.
 
         Secrets have a value only with --include-secrets and the secret rights.
         Without it, json lists them without a value, and flat and env leave them out
