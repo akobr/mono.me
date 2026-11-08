@@ -8,17 +8,21 @@ namespace _42.Platform.Cli.AutomationTests.Running.Processes;
 // writes to script's standard input is typed on the pty. -e returns sform's exit code, -f flushes every write, -q drops
 // script's own lines, /dev/null keeps no typescript. The command runs under /bin/sh with every argument single-quoted
 // (CommandLines.PosixShell) after stty sets the pty's size (script's standard input is no terminal to copy it from).
-// macOS ships BSD script, whose options differ; it is not supported (TerminalSupport says why).
+// macOS ships BSD script, whose options differ; it is not supported (TerminalSupport says why). script answers nothing
+// the program asks its terminal, so a TerminalResponder answers the cursor position requests of .NET and sends the arrows
+// in the cursor key mode the program set.
 [SupportedOSPlatform("linux")]
 internal sealed class ScriptChild : ChildProcess
 {
     public const string ScriptPath = "/usr/bin/script";
 
-    private readonly RedirectedChild inner;
+    private readonly SemaphoreSlim writing = new(1, 1);
+    private readonly TerminalResponder responder;
+    private RedirectedChild inner = null!;
 
-    private ScriptChild(RedirectedChild inner)
+    private ScriptChild(TerminalResponder responder)
     {
-        this.inner = inner;
+        this.responder = responder;
     }
 
     public override int Id => inner.Id;
@@ -40,16 +44,32 @@ internal sealed class ScriptChild : ChildProcess
             ["LINES"] = request.Rows.ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
 
-        var inner = RedirectedChild.Start(
+        var child = new ScriptChild(new TerminalResponder(request.Rows, request.Columns));
+        child.inner = RedirectedChild.Start(
             request with { FileName = script, Arguments = ["-q", "-e", "-f", "-c", command, "/dev/null"], Environment = environment },
-            (_, text) => sink(SformStream.Terminal, text),
+            (stream, text) =>
+            {
+                sink(SformStream.Terminal, text);
+                foreach (var answer in child.responder.Follow(text))
+                {
+                    _ = child.AnswerAsync(answer);
+                }
+            },
             fileSystem);
-        return new ScriptChild(inner);
+        return child;
     }
 
-    public override Task WriteAsync(string text, CancellationToken cancellationToken)
+    public override async Task WriteAsync(string text, CancellationToken cancellationToken)
     {
-        return inner.WriteAsync(text, cancellationToken);
+        await writing.WaitAsync(cancellationToken);
+        try
+        {
+            await inner.WriteAsync(responder.Keys(text), cancellationToken);
+        }
+        finally
+        {
+            writing.Release();
+        }
     }
 
     // The keyboard stays until the end: script ends the session at the end of its input.
@@ -65,5 +85,27 @@ internal sealed class ScriptChild : ChildProcess
     public override void Dispose()
     {
         inner.Dispose();
+        writing.Dispose();
+    }
+
+    // A report the program asked for; lost when the process has ended meanwhile.
+    private async Task AnswerAsync(string answer)
+    {
+        try
+        {
+            await writing.WaitAsync();
+            try
+            {
+                await inner.WriteAsync(answer, CancellationToken.None);
+            }
+            finally
+            {
+                writing.Release();
+            }
+        }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            // the program is gone
+        }
     }
 }
