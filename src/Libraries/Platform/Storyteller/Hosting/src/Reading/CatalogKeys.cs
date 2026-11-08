@@ -38,15 +38,19 @@ internal static class CatalogKeys
     {
         ArgumentNullException.ThrowIfNull(key);
 
-        var typeCode = key.Annotation.TypeCode;
+        var annotation = Normalize(key.Annotation);
+        return ReferenceEquals(annotation, key.Annotation) ? key : FullKey.Create(annotation, key);
+    }
+
+    public static AnnotationKey Normalize(AnnotationKey key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        var typeCode = key.TypeCode;
         var lowerCode = typeCode.ToLowerInvariant();
 
-        if (string.Equals(typeCode, lowerCode, StringComparison.Ordinal))
-        {
-            return key;
-        }
-
-        var annotation = key.Annotation.ToString();
-        return FullKey.Create(AnnotationKey.Parse(lowerCode + annotation[typeCode.Length..]), key);
+        return string.Equals(typeCode, lowerCode, StringComparison.Ordinal)
+            ? key
+            : AnnotationKey.Parse(lowerCode + key.ToString()[typeCode.Length..]);
     }
 }

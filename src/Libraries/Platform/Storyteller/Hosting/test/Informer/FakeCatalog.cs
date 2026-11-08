@@ -6,12 +6,15 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
 
-// The annotations of the fixture's view as the API holds them, for the informer. The descendants routes of a
-// responsibility list its active executions or usages by key in descending order (pages have no order, so the informer
-// must sort what it emits), in pages of PageSize with base64 tokens, with lossy values ("list:" and the stored JSON);
-// point reads honour includeInactive and includeDeleted. Put and Update stamp Modified, as the API's writes do. Answers
-// on the fixture's handler before its routes; the server's clock is the fixture's. Counts the answers in flight, and
-// holds the point reads of executions and usages on request.
+// The annotations of the fixture's view as the API holds them, for the informers and the catalog. The descendants
+// routes of any annotation list the descendants of the segment's type by the graph, active ones unless includeInactive,
+// never deleted ones, by key in descending order (pages have no order, so the informer must sort what it emits), in
+// pages of PageSize with base64 tokens, as the base Annotation the API serializes them as: the discriminator stays, the
+// members of the subtype (relation arrays, a unit's strings) go, and values are lossy ("list:" and the stored JSON).
+// Point reads honour includeInactive and includeDeleted. Put and Update stamp Modified, as the API's writes do; Relate
+// changes a relation array without, as the API's relation maintenance does. Answers on the fixture's handler before its
+// routes; the server's clock is the fixture's. Counts the answers in flight, and holds the point reads of executions
+// and usages on request.
 internal sealed class FakeCatalog
 {
     public const string Responsibility = "invoicing";
@@ -19,6 +22,22 @@ internal sealed class FakeCatalog
     public const string Context = "prod";
 
     private const string AnnotationsPath = "/api/v1/acme/billing/default/annotations/";
+
+    // The members of the base Annotation, the only ones a list item has.
+    private static readonly HashSet<string> ListedMembers = new(StringComparer.Ordinal)
+    {
+        "AnnotationType", "ProjectName", "ViewName", "AnnotationKey", "Name", "IsDisabled", "ValidFrom", "ExpiresAt", "TimeZone",
+        "Title", "Description", "DocumentationLink", "Labels", "Values", "Created", "Modified", "Deletion",
+    };
+
+    private static readonly IReadOnlyDictionary<string, AnnotationType> Segments = new Dictionary<string, AnnotationType>(StringComparer.Ordinal)
+    {
+        ["usages"] = AnnotationType.Usage,
+        ["contexts"] = AnnotationType.Context,
+        ["units"] = AnnotationType.Unit,
+        ["executions"] = AnnotationType.Execution,
+        ["units-of-execution"] = AnnotationType.UnitOfExecution,
+    };
 
     private static readonly DateTimeOffset FirstWrite = new(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);
 
@@ -68,7 +87,12 @@ internal sealed class FakeCatalog
 
     public static string ListPath(string descendants)
     {
-        return HostingFixture.AnnotationPath($"{ResponsibilityKey}/{descendants}");
+        return ListPath(ResponsibilityKey, descendants);
+    }
+
+    public static string ListPath(string parent, string descendants)
+    {
+        return HostingFixture.AnnotationPath($"{parent}/{descendants}");
     }
 
     // The token of the page that starts at offset: base64 with '+', '/' or '=', as the API's tokens may have.
@@ -98,6 +122,12 @@ internal sealed class FakeCatalog
     {
         Put(UsageKey(subject), usage, stamp);
         Put(ExecutionKey(subject, context), execution, stamp);
+    }
+
+    // A relation array of a parent changes, and its Modified stays, as the API's relation maintenance does it.
+    public void Relate(string annotationKey, string array, params string[] names)
+    {
+        Update(annotationKey, json => json[array] = new JArray(names.Cast<object>().ToArray()), stamp: false);
     }
 
     public void Update(string annotationKey, Action<JObject> change, bool stamp = true)
@@ -157,10 +187,10 @@ internal sealed class FakeCatalog
         _failures[annotationKey] = () => StubHttpHandler.Response(HttpStatusCode.OK, json.ToString());
     }
 
-    // The page of the list at token fails; null: the first page.
-    public void FailPage(string descendants, string? token, HttpStatusCode status, string? json = null)
+    // The page of the list at token fails; null: the first page. parent: the responsibility when null.
+    public void FailPage(string descendants, string? token, HttpStatusCode status, string? json = null, string? parent = null)
     {
-        _failures[$"{ResponsibilityKey}/{descendants}#{token}"] = () => StubHttpHandler.Response(status, json);
+        _failures[$"{parent ?? ResponsibilityKey}/{descendants}#{token}"] = () => StubHttpHandler.Response(status, json);
     }
 
     public void Heal()
@@ -175,7 +205,12 @@ internal sealed class FakeCatalog
 
     public IReadOnlyList<RecordedRequest> Lists(string descendants)
     {
-        return _fixture.Http.Requests.Where(request => request.Uri.AbsolutePath == ListPath(descendants)).ToList();
+        return Lists(ResponsibilityKey, descendants);
+    }
+
+    public IReadOnlyList<RecordedRequest> Lists(string parent, string descendants)
+    {
+        return _fixture.Http.Requests.Where(request => request.Uri.AbsolutePath == ListPath(parent, descendants)).ToList();
     }
 
     private static IReadOnlyDictionary<string, string> Query(Uri uri)
@@ -186,10 +221,16 @@ internal sealed class FakeCatalog
             .ToDictionary(pair => Uri.UnescapeDataString(pair[0]), pair => pair.Length > 1 ? Uri.UnescapeDataString(pair[1]) : string.Empty, StringComparer.Ordinal);
     }
 
-    // As the list reads values through another serializer: deterministic, but not what was stored.
+    // As the list reads values through another serializer: deterministic, but not what was stored. The API serializes
+    // a list item as the base Annotation, so the members of its subtype are not in it.
     private static JObject ListItem(JObject stored)
     {
         var item = (JObject)stored.DeepClone();
+
+        foreach (var member in item.Properties().Where(member => !ListedMembers.Contains(member.Name)).ToList())
+        {
+            member.Remove();
+        }
 
         if (item["Values"] is JObject values)
         {
@@ -315,15 +356,16 @@ internal sealed class FakeCatalog
             return failure();
         }
 
-        var responsibility = AnnotationKey.Parse(parent);
-        var type = descendants == "executions" ? AnnotationType.Execution : AnnotationType.Usage;
+        var ancestor = AnnotationKey.Parse(parent);
+        var type = Segments[descendants];
+        var includeInactive = query.GetValueOrDefault("includeInactive") == "true";
         var items = _annotations
             .Where(pair => !_unlisted.ContainsKey(pair.Key))
             .Select(pair => (Key: AnnotationKey.Parse(pair.Key), Json: pair.Value))
             .Where(item => item.Key.Type == type
-                && item.Key.ResponsibilityName == responsibility.Name
+                && item.Key.IsDescendantOf(ancestor)
                 && item.Json["Deletion"] is null
-                && IsActive(item.Json))
+                && (includeInactive || IsActive(item.Json)))
             .OrderByDescending(item => item.Key.ToString(), StringComparer.Ordinal)
             .Select(item => ListItem(item.Json))
             .ToList();

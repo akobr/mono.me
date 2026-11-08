@@ -16,7 +16,7 @@ namespace _42.Platform.Storyteller.Sdk.Hosting.Informer;
 internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
 {
     // A list that pages on past this is a platform that answers its first page again.
-    internal const int MaxPages = 1000;
+    internal const int MaxPages = ListPaging.MaxPages;
 
     // What a poll interval must be, for the messages of the informer and of the subscriptions' options.
     internal const string PollIntervalRule = "zero, for one poll, or 1 second to 45 days";
@@ -131,17 +131,6 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
         };
     }
 
-    private static StorytellerConfigurationException Unending(SubscriptionScope scope, AnnotationList list, string reason)
-    {
-        var key = scope.ResponsibilityKey.ToString();
-        return new StorytellerConfigurationException(
-            $"Listing the {list.ToString().ToLowerInvariant()} of {key} did not end: {reason}. A Storyteller API without the fix that pages annotation lists through their continuation tokens answers the first page again; update the API.",
-            key,
-            null,
-            null,
-            false);
-    }
-
     private static async Task<T> LimitAsync<T>(SemaphoreSlim limiter, Func<Task<T>> read, CancellationToken cancellationToken)
     {
         await limiter.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -216,48 +205,15 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
         }
     }
 
-    // Every page, by annotation key; pages have no order, so a key listed twice keeps the item listed last.
-    private async Task<IReadOnlyDictionary<string, Annotation>> ReadListAsync(PollState poll, AnnotationList list, CancellationToken cancellationToken)
+    // Every page, by annotation key (ListPaging).
+    private Task<IReadOnlyDictionary<string, Annotation>> ReadListAsync(PollState poll, AnnotationList list, CancellationToken cancellationToken)
     {
-        var items = new Dictionary<string, Annotation>(StringComparer.Ordinal);
-        var tokens = new HashSet<string>(StringComparer.Ordinal);
-        string? token = null;
+        var key = poll.Scope.ResponsibilityKey;
 
-        for (var pages = 1; ; pages++)
-        {
-            var from = token;
-            var page = await LimitAsync(
-                    poll.Limiter,
-                    () => _pages.ReadPageAsync(poll.Scope.ResponsibilityKey, list, from, cancellationToken),
-                    cancellationToken)
-                .ConfigureAwait(false);
-
-            foreach (var item in page.Items)
-            {
-                if (!string.IsNullOrEmpty(item.AnnotationKey))
-                {
-                    items[item.AnnotationKey] = item;
-                }
-            }
-
-            // An empty page with a token is legal: Cosmos DB may cut a page short.
-            if (page.ContinuationToken is not { } next)
-            {
-                return items;
-            }
-
-            if (!tokens.Add(next))
-            {
-                throw Unending(poll.Scope, list, "the platform answered a continuation token it had answered before");
-            }
-
-            if (pages >= MaxPages)
-            {
-                throw Unending(poll.Scope, list, $"it had more than {MaxPages} pages");
-            }
-
-            token = next;
-        }
+        return ListPaging.ReadAllAsync(
+            token => LimitAsync(poll.Limiter, () => _pages.ReadPageAsync(key, list, token, cancellationToken), cancellationToken),
+            key.ToString(),
+            $"the {list.ToString().ToLowerInvariant()} of {key}");
     }
 
     // The executions of the responsibility in the context whose usage is listed. The platform ignores a context filter

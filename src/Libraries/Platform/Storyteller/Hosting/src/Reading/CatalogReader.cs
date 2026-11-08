@@ -6,8 +6,8 @@ using _42.Platform.Storyteller.Sdk.Credentials;
 
 namespace _42.Platform.Storyteller.Sdk.Hosting.Reading;
 
-// Point reads and list pages of annotations through the catalog's transport, for who am I, the catalog and the
-// informer. Each request is bounded by ReadTimeout and classified with the provider's ReadFailures in the words of an
+// Point reads and list pages of annotations through the catalog's transport, for who am I, the catalogs and the
+// informers. Each request is bounded by ReadTimeout and classified with the provider's ReadFailures in the words of an
 // annotation read or of a list. Holds no state, so concurrent reads are fine.
 internal sealed class CatalogReader : IAnnotationPages
 {
@@ -72,35 +72,60 @@ internal sealed class CatalogReader : IAnnotationPages
     {
         ArgumentNullException.ThrowIfNull(responsibility);
 
-        var key = responsibility.ToString();
         var descendants = RouteOf(list);
-        var text = $"the {descendants} of {key}";
-        return RunAsync(
-            key,
-            text,
-            $"Listing {text}",
-            token => _transport.Client.GetDescendantsAsync(
-                responsibility.OrganizationName,
-                responsibility.ProjectName,
-                responsibility.ViewName,
-                responsibility.Annotation.ToString(),
-                descendants,
-                continuationToken,
-                includeInactive: null,
-                includeDeleted: null,
-                token),
-            response => new AnnotationPage(
-                (response.Annotations ?? []).Where(item => item is not null).ToList().AsReadOnly(),
-                string.IsNullOrEmpty(response.ContinuationToken) ? null : response.ContinuationToken),
-            DescribeList,
+        return ReadListPageAsync(
+            responsibility,
+            descendants,
+            $"the {descendants} of {responsibility}",
+            includeInactive: false,
+            "so the informer needs one restricted to the responsibility, or an unrestricted one",
+            continuationToken,
             stopping,
             cancellationToken);
     }
 
-    // The informer reads until its own token ends; the container's stop disposes the transport.
+    // One page of the descendants of a type under any annotation, …/annotations/{key}/{segment}, active ones only
+    // unless includeInactive, never deleted ones. Readable by a machine restricted to the ancestor or to an annotation
+    // above it. Throws as ReadAsync does; the exception's Key is the ancestor's.
+    public Task<AnnotationPage> ReadDescendantsPageAsync(FullKey ancestor, AnnotationType descendants, bool includeInactive, string? continuationToken, CancellationToken stopping, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(ancestor);
+
+        return ReadListPageAsync(
+            ancestor,
+            AnnotationTypeFacts.Segment(descendants),
+            $"the {AnnotationTypeFacts.Plural(descendants)} of {ancestor}",
+            includeInactive,
+            $"so listing them needs a machine restricted to {ancestor.Annotation} or to an annotation above it, or an unrestricted one",
+            continuationToken,
+            stopping,
+            cancellationToken);
+    }
+
+    // In any status, deleted ones included, so a deleted annotation is told from a failure: null for one that is
+    // missing or deleted. Throws as ReadAsync does otherwise.
+    public async Task<StorytellerAnnotation?> FindAsync(FullKey key, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var annotation = await ReadAsync(key, includeDeleted: true, CancellationToken.None, cancellationToken).ConfigureAwait(false);
+            return annotation.DeletedAt is null ? annotation : null;
+        }
+        catch (StorytellerConfigurationException exception) when (IsMissing(exception))
+        {
+            return null;
+        }
+    }
+
+    // The informers read until their own token ends; the container's stop disposes the transport.
     Task<AnnotationPage> IAnnotationPages.ReadPageAsync(FullKey responsibility, AnnotationList list, string? continuationToken, CancellationToken cancellationToken)
     {
         return ReadPageAsync(responsibility, list, continuationToken, CancellationToken.None, cancellationToken);
+    }
+
+    Task<AnnotationPage> IAnnotationPages.ReadDescendantsPageAsync(FullKey ancestor, AnnotationType descendants, bool includeInactive, string? continuationToken, CancellationToken cancellationToken)
+    {
+        return ReadDescendantsPageAsync(ancestor, descendants, includeInactive, continuationToken, CancellationToken.None, cancellationToken);
     }
 
     Task<StorytellerAnnotation> IAnnotationPages.ReadAnnotationAsync(FullKey key, bool includeDeleted, CancellationToken cancellationToken)
@@ -113,8 +138,8 @@ internal sealed class CatalogReader : IAnnotationPages
     {
         return list switch
         {
-            AnnotationList.Executions => "executions",
-            AnnotationList.Usages => "usages",
+            AnnotationList.Executions => AnnotationTypeFacts.Segment(AnnotationType.Execution),
+            AnnotationList.Usages => AnnotationTypeFacts.Segment(AnnotationType.Usage),
             _ => throw new ArgumentOutOfRangeException(nameof(list), list, null),
         };
     }
@@ -147,12 +172,13 @@ internal sealed class CatalogReader : IAnnotationPages
         };
     }
 
-    // The words of an answer to a list page; list: "the executions of {responsibility key}".
-    private static string DescribeList(string list, int status, string? errorCode)
+    // The words of an answer to a list page; list: "the executions of {responsibility key}". restricted: what a machine
+    // restricted to an annotation needs to list it, the end of the message of a 403 AnnotationRestricted.
+    private static string DescribeList(string list, int status, string? errorCode, string restricted)
     {
         return status switch
         {
-            403 when errorCode == AnnotationRestricted => $"The machine may not list {list}: a machine restricted to an annotation reads that annotation and its descendants only, so the informer needs one restricted to the responsibility, or an unrestricted one",
+            403 when errorCode == AnnotationRestricted => $"The machine may not list {list}: a machine restricted to an annotation reads that annotation and its descendants only, {restricted}",
             400 => $"The platform does not accept the list of {list} or its continuation token",
             401 => $"The platform refused the credentials of the list of {list}; set the variables of a machine the project knows, or a credential in code",
             403 => $"The machine may not list {list}; it needs Annotation.Read on the project",
@@ -161,6 +187,40 @@ internal sealed class CatalogReader : IAnnotationPages
             _ when ReadFailures.IsSuccessStatus(status) => $"The answer to the list of {list} did not parse as a list of annotations",
             _ => $"Listing {list} failed",
         };
+    }
+
+    // descendants: the path segment. text: what the messages name, "the executions of {key}". restricted: the end of
+    // the message of a 403 AnnotationRestricted.
+    private Task<AnnotationPage> ReadListPageAsync(
+        FullKey ancestor,
+        string descendants,
+        string text,
+        bool includeInactive,
+        string restricted,
+        string? continuationToken,
+        CancellationToken stopping,
+        CancellationToken cancellationToken)
+    {
+        return RunAsync(
+            ancestor.ToString(),
+            text,
+            $"Listing {text}",
+            token => _transport.Client.GetDescendantsAsync(
+                ancestor.OrganizationName,
+                ancestor.ProjectName,
+                ancestor.ViewName,
+                ancestor.Annotation.ToString(),
+                descendants,
+                continuationToken,
+                includeInactive: includeInactive ? true : null,
+                includeDeleted: null,
+                token),
+            response => new AnnotationPage(
+                (response.Annotations ?? []).Where(item => item is not null).ToList().AsReadOnly(),
+                string.IsNullOrEmpty(response.ContinuationToken) ? null : response.ContinuationToken),
+            (list, status, errorCode) => DescribeList(list, status, errorCode, restricted),
+            stopping,
+            cancellationToken);
     }
 
     // key: the exception's Key. text: what the messages name. action: the read as a sentence starts it.
