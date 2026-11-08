@@ -39,6 +39,7 @@ public class StorytellerTransferCommandTests
     private readonly Mock<ITransfersApiClient> _api = new(MockBehavior.Strict);
     private readonly MockFileSystem _fileSystem = new(new Dictionary<string, MockFileData>(), P(@"C:\work"));
 
+    // config export is the export of a resolved configuration into a CI job (ConfigExportCommand), not the view transfer.
     [Fact]
     public void Commands_AreSubcommandsOfStory_AndNoLongerOfConfig()
     {
@@ -47,7 +48,9 @@ public class StorytellerTransferCommandTests
 
         story.ShouldContain(typeof(StorytellerExportCommand));
         story.ShouldContain(typeof(StorytellerImportCommand));
-        config.Select(type => type.GetCustomAttribute<CommandAttribute>()!.Name).ShouldNotContain(CommandNames.EXPORT);
+        config.ShouldNotContain(typeof(StorytellerExportCommand));
+        config.ShouldNotContain(typeof(StorytellerImportCommand));
+        config.Where(type => type.GetCustomAttribute<CommandAttribute>()!.Name == CommandNames.EXPORT).ShouldBe([typeof(ConfigExportCommand)]);
         config.Select(type => type.GetCustomAttribute<CommandAttribute>()!.Name).ShouldNotContain(CommandNames.IMPORT);
         typeof(StorytellerExportCommand).GetCustomAttribute<CommandAttribute>()!.Name.ShouldBe("export");
         typeof(StorytellerImportCommand).GetCustomAttribute<CommandAttribute>()!.Name.ShouldBe("import");

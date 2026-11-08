@@ -17,34 +17,61 @@ public class ProgramTests
 {
     private const string Key = "exe.northwind.invoicing.prod";
 
+    // --mask, --github-env and --allow-unprefixed are options of config export only; config refuses them as unknown.
     [Theory]
     [InlineData("--format")]
     [InlineData("--format", "env", "--format", "yaml")]
     [InlineData("--version", "abc")]
     [InlineData("--mask")]
+    [InlineData("--github-env")]
+    [InlineData("--allow-unprefixed")]
     [InlineData("--bogus")]
     public async Task RunAsync_OfACommandLineThatDoesNotParse_IsInputParsing(params string[] options)
     {
         string[] args = [Key, .. options];
 
-        var exitCode = await Program.RunAsync(
+        var exitCode = await RunAsync(args);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_INPUT_PARSING);
+    }
+
+    [Theory]
+    [InlineData("--mask")]
+    [InlineData("--prefix")]
+    [InlineData("--format", "env", "--format", "yaml")]
+    [InlineData("--resolved")]
+    [InlineData("--env-prefix", "APP_")]
+    [InlineData("--bogus")]
+    public async Task RunAsync_OfAnExportThatDoesNotParse_IsInputParsing(params string[] options)
+    {
+        string[] args = ["export", Key, .. options];
+
+        var exitCode = await RunAsync(args);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_INPUT_PARSING);
+    }
+
+    [Theory]
+    [InlineData("env-prefix", Key, "--env-prefix")]
+    [InlineData("prefix", "export", Key, "--github-env", "--prefix")]
+    [InlineData("mask", "export", Key, "--mask")]
+    public void Parse_OfAMissingValue_ThrowsACommandParsingException(string option, params string[] args)
+    {
+        Should.Throw<CommandParsingException>(() => Parse(args)).Message.ShouldBe($"Missing value for option '{option}'");
+    }
+
+    private static Task<int> RunAsync(string[] args)
+    {
+        return Program.RunAsync(
             () =>
             {
                 Parse(args);
                 return Task.FromResult(ExitCodes.SUCCESS);
             },
             args);
-
-        exitCode.ShouldBe(ExitCodes.ERROR_INPUT_PARSING);
     }
 
-    [Fact]
-    public void Parse_OfAMissingValue_ThrowsACommandParsingException()
-    {
-        Should.Throw<CommandParsingException>(() => Parse(Key, "--env-prefix")).Message.ShouldBe("Missing value for option 'env-prefix'");
-    }
-
-    // The command line of sform story config, as the host builds it.
+    // The command line of sform story config and its subcommands, as the host builds it.
     private static void Parse(params string[] args)
     {
         var fixture = new AnnotationCommandFixture();
