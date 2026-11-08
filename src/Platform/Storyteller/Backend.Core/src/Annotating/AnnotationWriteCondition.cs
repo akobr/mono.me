@@ -1,21 +1,5 @@
 namespace _42.Platform.Storyteller.Annotating;
 
-// The versions an annotation write is conditioned on (If-Match, If-None-Match; RFC 9110 §13.1): Any (*) or a list of
-// storage markers. A tag that names no marker the service knows is left out, so a list can be empty and then matches
-// nothing.
-public sealed record AnnotationVersionMatch(bool Any, IReadOnlyList<string> Markers)
-{
-    public static AnnotationVersionMatch Anything { get; } = new(true, []);
-
-    public static AnnotationVersionMatch Of(params string[] markers) => new(false, markers);
-
-    // Whether an existing annotation of this marker is matched.
-    public bool Matches(string? marker)
-    {
-        return Any || (marker is not null && Markers.Contains(marker, StringComparer.Ordinal));
-    }
-}
-
 // The condition of an annotation write. IfMatch holds when the annotation exists (is not deleted) and its version is
 // matched; IfNoneMatch holds when it does not exist or its version is not matched. Both are checked when both are
 // given, so If-Match with If-None-Match: * never holds. An empty condition always holds.
@@ -56,11 +40,15 @@ public sealed record AnnotationWriteCondition
             return;
         }
 
-        var message = IfMatch is not null
+        // the message of the part that failed: If-Match is checked first
+        var ifMatchFailed = IfMatch is { } ifMatch && !(exists && ifMatch.Matches(marker));
+        var message = ifMatchFailed
             ? exists
                 ? $"The annotation '{key}' changed since it was read (If-Match); read it again and repeat the write."
                 : $"The annotation '{key}' does not exist or is deleted (If-Match)."
-            : $"The annotation '{key}' already exists (If-None-Match); read it and update it instead.";
+            : IfNoneMatch is { Any: true }
+                ? $"The annotation '{key}' already exists (If-None-Match); read it and update it instead."
+                : $"The annotation '{key}' is at a version that If-None-Match names.";
 
         throw new PreconditionFailedException(message, ErrorCodes.AnnotationPreconditionFailed);
     }

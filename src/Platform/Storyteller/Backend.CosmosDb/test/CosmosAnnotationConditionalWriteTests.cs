@@ -206,6 +206,36 @@ public class CosmosAnnotationConditionalWriteTests(Startup startup)
         (await Annotations.GetAnnotationAsync(FullKeyOf(project)))!.Title.Should().Be("theirs");
     }
 
+    // A create commits the key before the relation arrays of its parent (a later wave). When the parent changes in
+    // between, that wave fails and the write is retried: the key is the version this write created, so If-None-Match: *
+    // does not fail on its own create.
+    [Fact]
+    public async Task IfNoneMatchAny_AParentChangedBeforeItsRelationArrays_StillAnswersTheCreate()
+    {
+        const string project = "cw-create-parent";
+        await Annotations.SetAnnotationAsync(TestConstants.Organization, Model(project, "rst.billing"), Actor);
+        var (service, storage) = CreateService();
+        var competed = false;
+
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (!competed && batch.Contains(BatchOperationKind.Replace, $"{View}.rst.billing"))
+            {
+                competed = true;
+                await Annotations.SetAnnotationAsync(TestConstants.Organization, Model(project, "rst.billing") with { Title = "theirs" }, Actor);
+            }
+
+            return null;
+        };
+
+        var created = await service.SetAnnotationAsync(TestConstants.Organization, Model(project, "unt.billing.invoice") with { Title = "ours" }, Actor, AnnotationWriteCondition.CreateOnly);
+
+        competed.Should().BeTrue();
+        created.Annotation.Title.Should().Be("ours");
+        created.Marker.Should().Be(await ItemETagAsync(project, "unt.billing.invoice"));
+        (await Annotations.GetAnnotationAsync(FullKeyOf(project, "rst.billing")))!.Title.Should().Be("theirs");
+    }
+
     // Without a condition, a create that loses to a concurrent create becomes an update on the retry.
     [Fact]
     public async Task Unconditional_ACreateLosingToAConcurrentCreate_UpdatesIt()
