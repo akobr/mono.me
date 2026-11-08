@@ -267,6 +267,10 @@ The phase 3 runner found that the themed JSON of `WriteJson` (`Output/ExtendedCo
 
 Not changed: on Windows, `sform` writes redirected output in the console's code page (often the OEM one), not UTF-8. The runner decodes it (`ConsoleOutputDecoder`); switching a redirected `sform` to UTF-8 would change what a pipeline in `cmd` receives, so it is left for a decision of its own.
 
+### 13. D7: `kv import --protection public` and `hyok`
+
+The coverage test of phase 4 found that `kv import` took every level for the keys a `--secret` glob matches: `public` stored those secrets as plain values, and `hyok` was sent and refused by the API, as an import of flat or env text has no values encrypted on the client. Like `kv protect`, `KeyValueImportCommand.ResolveSecretLevelAsync` now refuses both with exit 2 and "The keys --secret matches are imported as secrets: --protection takes standard, hsm or byok." (unit test `Import_SecretsAsPublicOrHyok_IsWrongInput`). `coverage-values.json` lists them under `except`, and `docs/Platform/Storyteller/key-values.md` names the levels.
+
 ### Not fixed, out of scope
 
 - `sform --version` prints the version of `42.CLI.Toolkit`, not of `sform` (`Assembly.GetExecutingAssembly()` in the toolkit).

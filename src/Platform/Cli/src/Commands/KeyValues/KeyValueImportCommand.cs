@@ -56,7 +56,7 @@ public class KeyValueImportCommand : KeyValueCommandBase
     [Option("--secret", CommandOptionType.MultipleValue, Description = "Keys matching this glob (* and ?) are secrets, in flat and env files (repeatable).")]
     public string[]? SecretGlobs { get; set; }
 
-    [Option("--protection", CommandOptionType.SingleValue, Description = "The level of the secrets; the project's default secret level when missing.")]
+    [Option("--protection", CommandOptionType.SingleValue, Description = "The level of the secrets: standard, hsm or byok; the project's default secret level when missing.")]
     public string? Protection { get; set; }
 
     [Option("--mode", CommandOptionType.SingleValue, Description = "merge (default): write the listed keys; replace: also delete the other active keys (under --prefix, when given).")]
@@ -184,7 +184,17 @@ public class KeyValueImportCommand : KeyValueCommandBase
 
         if (Protection is not null)
         {
-            return KeyValueLevels.To<KeyValueDocumentItemProtection>(KeyValueLevels.Parse(Console, Protection));
+            // The keys --secret matches are secrets: public would store them as plain values, and hyok needs values
+            // encrypted on the client, which an import of flat or env text does not have.
+            var level = KeyValueLevels.Parse(Console, Protection);
+            if (level is KeyValueProtection.Public or KeyValueProtection.Hyok)
+            {
+                var message = "The keys --secret matches are imported as secrets: --protection takes standard, hsm or byok.";
+                Console.WriteImportant(message);
+                throw new WrongInputException(message);
+            }
+
+            return KeyValueLevels.To<KeyValueDocumentItemProtection>(level);
         }
 
         var policy = await KeyValues.GetKeyValuePolicyAsync(Context.OrganizationName, Context.ProjectName);

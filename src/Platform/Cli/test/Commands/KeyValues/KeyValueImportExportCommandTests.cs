@@ -77,6 +77,20 @@ public class KeyValueImportExportCommandTests
         _api.Verify(api => api.ImportKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueDocument>(), "Replace", null, "db."), Times.Once);
     }
 
+    [Theory]
+    [InlineData("public")]
+    [InlineData("hyok")]
+    public async Task Import_SecretsAsPublicOrHyok_IsWrongInput(string protection)
+    {
+        var files = KeyValueTestContext.Files(("prod.env", "DB__PASSWORD=s3cret"));
+
+        var exitCode = await new KeyValueImportCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, files) { File = "prod.env", SecretGlobs = ["*password*"], Protection = protection }.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _imports.ShouldBeEmpty();
+        _console.Lines.ShouldContain(line => line.Contains("--protection takes standard, hsm or byok"));
+    }
+
     [Fact]
     public async Task Import_UnknownModeOrMissingFile_IsWrongInput()
     {
