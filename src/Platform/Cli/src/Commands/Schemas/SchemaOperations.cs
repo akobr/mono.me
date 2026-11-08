@@ -319,32 +319,12 @@ internal static class SchemaOperations
         console.WriteLine("Existing configurations were not required to comply.");
     }
 
+    // The failing configurations of a compliance check, else the server's message and code (the message of the
+    // exception is only the OpenAPI description of the status) with the exit code of the status: a refusal (403) is 44,
+    // a rejected request (400, 404, 409, …) 2, and a failure of the service 3.
     private static int WriteApiError(IExtendedConsole console, ApiException exception)
     {
-        if (SchemaValidationConsole.TryWrite(console, exception))
-        {
-            return ExitCodes.ERROR_WRONG_INPUT;
-        }
-
-        // A status the operation declares: the message of the exception is only its OpenAPI description, the server's
-        // message and code are in the ErrorResponse.
-        if (exception is ApiException<ErrorResponse> error
-            && !string.IsNullOrWhiteSpace(error.Result?.Message))
-        {
-            console.WriteImportant(error.Result.Message);
-
-            if (!string.IsNullOrWhiteSpace(error.Result.ErrorCode))
-            {
-                console.WriteLine($"Error code: {error.Result.ErrorCode}".ThemedLowlight(console.Theme));
-            }
-
-            return exception.StatusCode is (int)HttpStatusCode.BadRequest or (int)HttpStatusCode.NotFound
-                ? ExitCodes.ERROR_WRONG_INPUT
-                : ExitCodes.ERROR_CRASH;
-        }
-
-        console.WriteLine($"Error occurred: {exception.Message}");
-        return ExitCodes.ERROR_CRASH;
+        return SchemaValidationConsole.WriteWriteError(console, exception);
     }
 
     private static Task<ConfigurationSchema> GetCurrentAsync(

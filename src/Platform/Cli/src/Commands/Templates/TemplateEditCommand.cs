@@ -46,7 +46,9 @@ public class TemplateEditCommand : BaseContextCommand
     /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
     /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
     /// - <c>ExitCodes.WARNING_UNAUTHORIZED_ACCESS</c> when the API refused the change with 403, with the server's message;
-    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code or the API rejected the change otherwise.
+    /// - <c>ExitCodes.ERROR_WRONG_INPUT</c> when the API rejected the change (400, 404, 409, 412), with the server's message;
+    /// - <c>ExitCodes.ERROR_SERVICE_FAILURE</c> when the service failed (5xx);
+    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
     /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
@@ -102,15 +104,10 @@ public class TemplateEditCommand : BaseContextCommand
             Console.WriteImportant($"Template for '{annotationType}' has been saved (version {saved.Version}).");
             return ExitCodes.SUCCESS;
         }
-        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
-        {
-            // for example a machine without the management scope Template.Write: the server names it
-            return Console.WriteApiError(e);
-        }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
-            Console.WriteLine($"Error occurred: {e.Message}");
-            return ExitCodes.ERROR_CRASH;
+            // for example a machine without the management scope Template.Write (403): the server names it
+            return SchemaValidationConsole.WriteWriteError(Console, e);
         }
     }
 }

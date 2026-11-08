@@ -540,7 +540,7 @@ public class StorytellerSetBodyTests
         var exitCode = await CreateCommand(Key).OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _fixture.Console.Lines.ShouldContain("Title has 201 characters, at most 200 are allowed.");
+        _fixture.Console.Lines.ShouldContain("! Title has 201 characters, at most 200 are allowed.");
     }
 
     [Fact]

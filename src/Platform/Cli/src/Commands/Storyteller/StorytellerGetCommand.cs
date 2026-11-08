@@ -56,11 +56,22 @@ public class StorytellerGetCommand : BaseContextCommand
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
             // a deleted annotation reads as missing; say so, with the way back
-            var deleted = await _annotationsApi.TryGetDeletedAnnotationAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                AnnotationKey);
+            Annotation? deleted;
+
+            try
+            {
+                deleted = await _annotationsApi.TryGetDeletedAnnotationAsync(
+                    Context.OrganizationName,
+                    Context.ProjectName,
+                    Context.ViewName,
+                    AnnotationKey);
+            }
+            catch (ApiException lookup) when (lookup.StatusCode is not ((int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden))
+            {
+                // a key without a dot matches no route of the read (the host's 404), and the lookup of the deleted
+                // annotation, whose route takes any text, refuses it with 400 InvalidKey
+                return Console.WriteApiError(lookup);
+            }
 
             Console.WriteLine(deleted?.Deletion is { } deletion
                 ? $"The annotation '{AnnotationKey}' is deleted ({AuditConsoleExtensions.FormatDeletion(deletion)})"
@@ -68,6 +79,11 @@ public class StorytellerGetCommand : BaseContextCommand
                   + $". Restore it with 'sform story restore {AnnotationKey}'."
                 : $"The annotation '{AnnotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
+        }
+        catch (ApiException e) when (e.StatusCode is not ((int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden))
+        {
+            // for example 400 InvalidKey of a key the API cannot parse: the server's message and code, exit code 2
+            return Console.WriteApiError(e);
         }
 
         Console.WriteJson(annotation);

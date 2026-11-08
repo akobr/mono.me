@@ -236,7 +236,7 @@ public static class KeyValueConsoleExtensions
         var (message, errorCode) = ReadError(exception);
         var status = (HttpStatusCode)exception.StatusCode;
 
-        @this.WriteImportant(string.IsNullOrEmpty(message) ? $"The request failed with {(int)status} {status}." : message);
+        @this.WriteImportant(MessageOf(message, status));
 
         if (!string.IsNullOrEmpty(errorCode))
         {
@@ -251,13 +251,34 @@ public static class KeyValueConsoleExtensions
         return ExitCodeOf(status);
     }
 
-    // The exit code of a failed API call, the same whatever writes the message.
+    // The line of a failed API call: the server's message, else for a 401 or a 403 the general sentence that Program.Main
+    // prints for a refusal (ApiRefusal), and for any other status the status itself.
+    internal static string MessageOf(string? message, HttpStatusCode status)
+    {
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            return message;
+        }
+
+        return status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden
+            ? ApiRefusal.GeneralMessage
+            : $"The request failed with {(int)status} {status}.";
+    }
+
+    // The exit code of a failed API call, the same whatever writes the message: a refusal of the caller (401, 403) is
+    // 44; a status that a retry may change (408, 429, and every 5xx but 501 and 505) is a failure of the service, 3; any
+    // other 4xx is a request the API rejects (400, 404, 409, 412, 413, 422, …), 2, and so are 501 (a deployment without
+    // the feature, such as ProtectionNotConfigured) and 505, which no retry changes (the transient statuses of the
+    // conformance suite, docs/Platform/Storyteller/conformance.md). Only a status that is no error at all (a 2xx or 3xx
+    // the client could not read) is a crash of the tool, 1.
     internal static int ExitCodeOf(HttpStatusCode status)
     {
-        return status switch
+        return (int)status switch
         {
-            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => ExitCodes.WARNING_UNAUTHORIZED_ACCESS,
-            HttpStatusCode.NotFound or HttpStatusCode.BadRequest or HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed => ExitCodes.ERROR_WRONG_INPUT,
+            401 or 403 => ExitCodes.WARNING_UNAUTHORIZED_ACCESS,
+            501 or 505 => ExitCodes.ERROR_WRONG_INPUT,
+            408 or 429 or (>= 500 and < 600) => ExitCodes.ERROR_SERVICE_FAILURE,
+            >= 400 and < 500 => ExitCodes.ERROR_WRONG_INPUT,
             _ => ExitCodes.ERROR_CRASH,
         };
     }
@@ -268,6 +289,13 @@ public static class KeyValueConsoleExtensions
         if (exception is ApiException<ErrorResponse> { Result: { } error })
         {
             return (error.Message, error.ErrorCode);
+        }
+
+        // A 409 of a configuration or schema write, which the client reads as a SchemaValidationErrorResponse whatever
+        // the server sent (a concurrent change, a deleted annotation): its message and code.
+        if (exception is ApiException<SchemaValidationErrorResponse> { Result: { } validation })
+        {
+            return (validation.Message, validation.ErrorCode);
         }
 
         if (string.IsNullOrWhiteSpace(exception.Response))

@@ -1,5 +1,6 @@
 using System;
 using System.IO.Abstractions;
+using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
@@ -7,6 +8,7 @@ using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json.Linq;
 using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
@@ -65,26 +67,39 @@ public class MachineRenewCommand : BaseContextCommand
         }
 
         var accessApi = _services.GetRequiredService<IAccessApiClient>();
-        var result = await accessApi.RenewMachineCertificateAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            MachineId);
+        CertificateRenewalResult result;
+
+        try
+        {
+            result = await accessApi.RenewMachineCertificateAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                MachineId);
+        }
+        catch (ApiException exception) when (exception.StatusCode != (int)HttpStatusCode.Unauthorized)
+        {
+            // 400 NotInRenewalWindow names when the window opens, 404 a certificate that is not the machine's current
+            // one: the server's message, exit code 2; a 401 (another machine, no certificate) goes to Program.Main
+            return Console.WriteApiError(exception);
+        }
 
         if (!string.IsNullOrEmpty(result.Message))
         {
             Console.WriteImportant(result.Message);
         }
 
-        if (result.Pkcs12 is { Length: > 0 })
+        var (pkcs12, renewedPassword) = ReadCertificate(result);
+
+        if (pkcs12 is { Length: > 0 })
         {
             var filePath = OutputPath ?? $"{MachineId}-renewed.pfx";
-            _fileSystem.File.WriteAllBytes(filePath, result.Pkcs12);
+            _fileSystem.File.WriteAllBytes(filePath, pkcs12);
 
             Console.WriteImportant($"Renewed certificate written to {filePath}");
 
-            if (!string.IsNullOrEmpty(result.Password))
+            if (!string.IsNullOrEmpty(renewedPassword))
             {
-                Console.WriteImportant($"Certificate password: {result.Password}");
+                Console.WriteImportant($"Certificate password: {renewedPassword}");
                 Console.WriteImportant("Make sure to copy the password, it is not stored anywhere.");
             }
         }
@@ -94,6 +109,44 @@ public class MachineRenewCommand : BaseContextCommand
         }
 
         return ExitCodes.SUCCESS;
+    }
+
+    // The renewed PKCS#12 and its password: Pkcs12 and Password of the documented CertificateRenewalResult, or, from an
+    // API deployed before 424-215 that answered with an anonymous object, its base64 Certificate and CertificatePassword
+    // (which the client keeps in AdditionalProperties).
+    private static (byte[]? Pkcs12, string? Password) ReadCertificate(CertificateRenewalResult result)
+    {
+        if (result.Pkcs12 is { Length: > 0 })
+        {
+            return (result.Pkcs12, result.Password);
+        }
+
+        var extra = result.AdditionalProperties;
+
+        if (!extra.TryGetValue("Certificate", out var certificate)
+            || ReadString(certificate) is not { Length: > 0 } base64)
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            return (Convert.FromBase64String(base64), extra.TryGetValue("CertificatePassword", out var secret) ? ReadString(secret) : null);
+        }
+        catch (FormatException)
+        {
+            return (null, null);
+        }
+    }
+
+    private static string? ReadString(object? value)
+    {
+        return value switch
+        {
+            string text => text,
+            JValue { Type: JTokenType.String } token => (string?)token,
+            _ => null,
+        };
     }
 
     // Standard input is read only when --password-stdin asks for it, and only its first line, so a pipe that stays open

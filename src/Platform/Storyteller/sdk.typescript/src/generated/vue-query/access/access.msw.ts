@@ -913,7 +913,7 @@ export const getRenewMachineCertificateResponseMock = (
     "NotFound",
   ] as const),
   Pkcs12: faker.helpers.arrayElement([
-    new Blob([new Uint8Array(faker.number.int({ min: 1, max: 64 }))]),
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
   Password: faker.helpers.arrayElement([

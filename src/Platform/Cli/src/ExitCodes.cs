@@ -11,7 +11,8 @@ public static class ExitCodes
     public const int ERROR_CRASH = 1;
     public const int ERROR_WRONG_INPUT = 2;
 
-    // The identity provider or token endpoint failed; a retry may help.
+    // The API, the identity provider or a token endpoint failed or could not be reached (a 408, a 429, a 5xx but the 501
+    // and 505 of the API, which are ERROR_WRONG_INPUT, a network failure, a timeout); a retry may help.
     public const int ERROR_SERVICE_FAILURE = 3;
 
     // warnings from 40

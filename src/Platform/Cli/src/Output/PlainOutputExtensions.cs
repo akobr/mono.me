@@ -38,7 +38,7 @@ public static class PlainOutputExtensions
         var (message, errorCode) = KeyValueConsoleExtensions.ReadError(exception);
         var status = (HttpStatusCode)exception.StatusCode;
 
-        @this.WriteErrorLine(string.IsNullOrEmpty(message) ? $"The request failed with {(int)status} {status}." : message);
+        @this.WriteErrorLine(KeyValueConsoleExtensions.MessageOf(message, status));
 
         if (!string.IsNullOrEmpty(errorCode))
         {

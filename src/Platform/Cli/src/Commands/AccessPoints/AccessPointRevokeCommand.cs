@@ -81,13 +81,22 @@ public class AccessPointRevokeCommand : BaseCommand
             ? SelectPossiblePoint(account)
             : ProjectKey;
 
-        var point = await _accessApi.RevokeUserAccessAsync(new Permission
+        try
         {
-            CreatedById = account.Id,
-            AccountId = AccountId,
-            AccessPointKey = projectKey,
-            Role = role,
-        });
+            await _accessApi.RevokeUserAccessAsync(new Permission
+            {
+                CreatedById = account.Id,
+                AccountId = AccountId,
+                AccessPointKey = projectKey,
+                Role = role,
+            });
+        }
+        catch (ApiException e) when (e.StatusCode is not ((int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden))
+        {
+            // for example 409 for a role lower than the one the member holds: the server's message, exit code 2; a 401 and a
+            // 403 go to Program.Main
+            return Console.WriteApiError(e);
+        }
 
         Console.WriteLine(
             "Access revoked to ",

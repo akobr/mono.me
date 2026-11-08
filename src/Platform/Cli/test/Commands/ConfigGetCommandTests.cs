@@ -403,7 +403,8 @@ public class ConfigGetCommandTests
 
         var exitCode = await Execute(Key, "--content-only");
 
-        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        // a failure of the service, not a crash of the tool (424-215)
+        exitCode.ShouldBe(ExitCodes.ERROR_SERVICE_FAILURE);
         _error.ToString().ShouldBe("Unexpected error occurred on the service. Retry later.\nError code: Unexpected\n");
         ShouldWriteOnlyThroughTheInnerConsole();
     }

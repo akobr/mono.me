@@ -112,6 +112,6 @@ public class KeyValueBulkAndDeleteCommandTests
         _console.Lines.ShouldContain(line => line.Contains("machine certificate"));
         version.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _console.Lines.ShouldContain(line => line.Contains("KeyValueVersionMismatch"));
-        down.ShouldBe(ExitCodes.ERROR_CRASH);
+        down.ShouldBe(ExitCodes.ERROR_SERVICE_FAILURE);
     }
 }

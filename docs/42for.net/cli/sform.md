@@ -190,10 +190,11 @@ A resolved configuration holds secret values only for a caller with the right to
 | Exit code | When |
 |---|---|
 | `0` | The configuration was printed or written |
-| `2` | Nothing was written: an invalid key, format or prefix; options that do not go together (`--version` with `--resolved`, `--env-prefix` without `--format env`); a configuration or version that does not exist; a request the API rejects (`400`, `409`, `412`); a document the format cannot write; a binding that cannot be evaluated (`422`). Also an `--export` file of the content that cannot be written |
+| `2` | Nothing was written: an invalid key, format or prefix; options that do not go together (`--version` with `--resolved`, `--env-prefix` without `--format env`); a configuration or version that does not exist; a request the API rejects (`400`, `409`, `412`, `501`); a document the format cannot write; a binding that cannot be evaluated (`422`). Also an `--export` file of the content that cannot be written |
 | `-1` | The command line does not parse: an unknown option, an option of `config export` such as `--github-env` or `--mask`, an option without its value, an option that takes a value given twice (`--format env --format yaml`), or `--version abc`. Shells on Linux and macOS show `255` |
 | `44` | The API refused the read (`401`, `403`) |
-| `1` | Another failure of the API (`500` and the other statuses), or a crash |
+| `3` | The service failed (`5xx` but `501` and `505`, `408`, `429`) or could not be reached; a retry may help |
+| `1` | A crash of the tool |
 
 ### Export to GitHub Actions
 
@@ -346,6 +347,21 @@ An unquoted `a['b.c']=1` reaches `sform` as `a[b.c]=1`, and an expanded `$bindin
 
 **Changed.** The name of `-x` used to be a top-level property as written. Now a name that is not plain (with a dot, a space, `:`, `$`, a leading digit or `-`, or a letter outside ASCII) is written `['name']`, and an empty name is refused: `-x "['a.b']=1"` sets the property `a.b`, as `-x a.b=1` did before. The `IConfiguration` spelling `-x "Logging:LogLevel:Default=Warning"` now fails; write `Logging.LogLevel.Default`. A name matches a property of the file in any case, as `IConfiguration` keys do, and keeps the spelling of the file. A date-like value of `-x` becomes a date, while one of the `-i` file stays its text.
 
+**Patch and edit.** `sform story config patch <key>` applies a JSON Patch, from `-i <file>` or from the changes made in the editor, and `sform story config edit <key>` replaces the stored content with what you saved in the editor.
+
+A configuration has no custom properties or labels of its own: they belong to the annotation, and `sform story set <key> -c <name=value> -l <label>` sets them. Earlier versions of `config set` accepted `-c` and `-l` and sent nothing; they are now unknown options, which end the command with `-1`.
+
+| Exit code | When |
+|---|---|
+| `0` | The configuration was stored |
+| `42` | Nothing changed (`--replace`, `patch` and `edit`) |
+| `40` | You declined the confirmation of `patch` or `edit` |
+| `43` | `patch` or `edit` without `-y\|--yes` and without a terminal, see [Run without a terminal](#run-without-a-terminal) |
+| `2` | The content violates the schema, which lists the failing configurations; a file that is not a JSON object; a request the API rejects (`400`, `404`, `409`, `501`); a `test` operation of a patch that fails (`412` `PatchTestFailed`) |
+| `44` | The API refused the write (`401`, or `403` with its message, for example for a Reader or a machine without `Configuration.Write`) |
+| `3` | The service failed (`5xx` but `501` and `505`, `408`, `429`) or could not be reached |
+| `1` | The editor of `edit` or `patch` exited with a non-zero code |
+
 ## Run without a terminal
 
 `sform` never waits for an answer that cannot come. When its standard input is redirected, as in a pipe, from a file, in a CI job or in a script started by another program, a command that would ask something stops instead: it writes what it would have asked and the option that answers it to standard error, and ends with an exit code.
@@ -376,6 +392,23 @@ A program that runs `sform account` and confirms the code itself, such as an aut
 ```
 
 `verificationUriComplete` is `null` where the provider has no such address, and `expiresIn` is in seconds. Only the value `json`, in any case, turns it on; the text prompt stays the same either way.
+
+## Exit codes
+
+Every command ends with one of these codes. A refusal or a failure of the API is never a crash: `sform` prints the server's message and, when the response has one, its error code (`Error code: AccessDenied`), and ends with the code of the status. A refusal without a message of the server prints "You are not authorized to execute the command or you don't have access to requested resources.", any other status without one "The request failed with N Status.". `story export` and `story import` print the message of a refused start or download without the error code.
+
+| Exit code | When |
+|---|---|
+| `0` | Success |
+| `-1` | The command line does not parse: an unknown command or option, or an option without its value. Shells on Linux and macOS show `255` |
+| `2` | Wrong input: a value `sform` refuses before any call, a missing file or a file that is not a JSON object, a key, configuration or version that does not exist, or a request the API rejects (`400`, `404`, `409`, `412`, `413`, `422` and the other `4xx`), for example a key it cannot parse (`InvalidKey`), a certificate renewal before its window (`NotInRenewalWindow`) or the revoke of a role lower than the member's (`ElevatedRole`). Also a `501` or `505`, which no retry changes: a deployment without the feature, such as `story kv policy byok-setup` without a customer-managed key provider (`ProtectionNotConfigured`) |
+| `3` | The service failed or could not be reached: a `5xx` but `501` and `505`, a `408` or `429`, a refused connection, a name that does not resolve, or a timeout. A retry may help |
+| `40` | The command stopped before it finished: you declined a confirmation, or a job of `story export` or `story import` outlasted the wait and continues on the server |
+| `42` | Nothing to do: no changes, or nothing to import or delete |
+| `43` | The command needs a terminal or a confirmation, see [Run without a terminal](#run-without-a-terminal); or your account is not registered yet (`account`, `account set` and the `account points` commands), run `sform account register` |
+| `44` | Not authorized: the sign-in failed or was declined, or the API refused the request (`401`, `403`) |
+| `45` | A partial result, for example a bulk operation that skipped some keys |
+| `1` | A crash of the tool, with the log file named in the output; a job of `story export` or `story import` that failed on the server, with its error; or an editor of an `edit` command (or of `config patch` without `-i`) that exited with a non-zero code |
 
 ## Where sform keeps its files
 

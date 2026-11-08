@@ -9,7 +9,7 @@ import type { CertificateRenewalResultOutcome } from "./certificateRenewalResult
 
 export interface CertificateRenewalResult {
   Outcome?: CertificateRenewalResultOutcome;
-  Pkcs12?: Blob;
+  Pkcs12?: string;
   Password?: string;
   Thumbprint?: string;
   /** @nullable */

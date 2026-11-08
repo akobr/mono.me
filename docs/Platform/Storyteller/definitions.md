@@ -212,14 +212,15 @@ sform story schema definition exe.northwind.invoicing.prod
 
 `set` creates the schema or replaces it. It takes `-i|--import` and sends that file as the body. `edit` opens the current document in the editor and replaces it with the result; there has to be a schema already. `get` takes `--version` to print one stored version. `diff` takes the target version, an optional source version, and `--format`. `definition` is read-only. Add `-f` or `--force` to `set` and `edit` when the new schema should be stored even though configurations already in the view do not comply. See [Force](#force).
 
-When the API refuses a schema command, `sform` prints the server's message where it has one:
+When the API refuses a schema command, `sform` prints the server's message, and its error code on the next line when the response has one (`Error code: InvalidKey`). The exit code follows the status, as in every command of `sform` ([Exit codes](../../42for.net/cli/sform.md#exit-codes)):
 
-- A `400` prints the message, and its error code on the next line when the response has one, for example `Error code: InvalidKey` for a descendant type that cannot descend from the key. The command exits with `2`.
 - A failed compliance check prints the message, then each configuration that does not comply as `annotationKey (view)` with its messages. The command exits with `2`.
 - A `404` of `get`, `delete`, `versions`, `diff`, `definition` or of the read of `edit` prints a sentence of `sform`, such as "The schema for 'exe' has not been found.", and exits with `2`.
-- A `403`, a `500` or the `409` of a concurrent change on `delete` prints the server's message and exits with `1`.
-- A `401` prints the general sentence of `sform` that the request was not authorized and exits with `44`.
-- Anything else prints the text of the error and exits with `1`. This includes the `409` of a concurrent change on `set` or `edit`: the SDK reads that response as a compliance failure without entries, so the server's message is not shown.
+- A `403`, for example for a Reader or a machine without `Schema.Write`, prints the server's message and `Error code: AccessDenied`, and exits with `44`.
+- A `400` (for example `InvalidKey` for a descendant type that cannot descend from the key), the `409` of a concurrent change on `set`, `edit` or `delete`, and any other `4xx` exit with `2`. So do a `501` and a `505`, which no retry changes.
+- A `5xx`, `408` or `429` exits with `3`: the service failed, and a retry may help.
+- A `401` prints the general sentence of `sform` that the request was not authorized and exits with `44`. So does a `403` without a message of the server.
+- A status without a message of the server prints "The request failed with N Status." (for example "The request failed with 500 InternalServerError.").
 
 ## What is checked
 

@@ -6,6 +6,18 @@ namespace _42.Platform.Cli.Output;
 public static class SchemaValidationConsole
 {
     /// <summary>
+    /// Prints a failed write of a configuration, a template or a schema, and returns the exit code of the command: the
+    /// failing configurations of a schema violation (exit code 2), else the server's message and error code with the
+    /// exit code of the status (<see cref="KeyValueConsoleExtensions.WriteApiError"/>).
+    /// </summary>
+    public static int WriteWriteError(IExtendedConsole console, ApiException exception)
+    {
+        return TryWrite(console, exception)
+            ? ExitCodes.ERROR_WRONG_INPUT
+            : console.WriteApiError(exception);
+    }
+
+    /// <summary>
     /// Prints a rejected schema or configuration write: each failing annotation key, its view, and the messages.
     /// </summary>
     /// <returns><c>true</c> when the exception carried compliance details.</returns>

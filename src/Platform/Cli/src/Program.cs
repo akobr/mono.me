@@ -208,6 +208,29 @@ public class Program
 
             return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
         }
+        catch (ApiException exception) when (exception.StatusCode is >= 400 and < 600)
+        {
+            // Any other refusal or failure of the API that the command left to Main, for example a 409 or a 501: the
+            // server's message and code, and the exit code of its status (2 for a rejected request and a 501 or 505, 3 for
+            // a failure of the service). The tool is not broken. Neither the arguments nor the message are logged; an argument may
+            // be a value of a key/value pair.
+            CurrentRun.Exception = exception;
+            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
+                "The API answered {statusCode}",
+                exception.StatusCode)));
+
+            var (message, errorCode) = KeyValueConsoleExtensions.ReadError(exception);
+            var status = (HttpStatusCode)exception.StatusCode;
+            Console.Write("! ", Color.Magenta);
+            Console.WriteLine(KeyValueConsoleExtensions.MessageOf(message, status));
+
+            if (!string.IsNullOrWhiteSpace(errorCode))
+            {
+                Console.WriteLine($"  Error code: {errorCode}", Color.DarkGray);
+            }
+
+            return KeyValueConsoleExtensions.ExitCodeOf(status);
+        }
         catch (HttpRequestException exception)
         {
             // The API did not answer at all: a refused connection, a name that does not resolve, a TLS failure.
