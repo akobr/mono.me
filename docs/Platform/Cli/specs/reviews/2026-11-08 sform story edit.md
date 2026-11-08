@@ -100,3 +100,13 @@ Three mutations of the production code were checked against the tests, and each 
   - its file read (`ToObject` with `JsonSerializer.CreateDefault()`) treats `$ref`, `$id`, `$type` and `$values` as metadata, as the first draft of this command did.
 - **The SDK's reads** (`Sdk.NSwag`) use Newtonsoft's default `MetadataPropertyHandling`. A stored value that starts with `$ref` therefore already reads as `null`, and `edit` (like `set`'s merge) writes that `null` back on the next save. `MetadataPropertyHandling.Ignore` in `UpdateJsonSerializerSettings` of the clients would fix it for every reader of the SDK. That is a change of the published SDK, so it was left out here.
 - **Numbers** in values are still read as `double`, as documented in the row of the command.
+
+### 9. After the review of PR #173
+
+- **Every edit command reads a dated document back unchanged.** `EditCommandsDateTests` opens and saves `config edit`, `config patch`, `template edit` and `schema … edit` without an edit, through the real clients and `EditorService`, for content with date-like strings: each exits with `42` and sends no write.
+- **Stored duplicate labels** are listed once by `Create`, as `Normalize` lists them, so an untouched document of them is no change.
+- **A parsed date token** counts as a date only when it is a `DateTimeOffset`; a `DateTime` has no explicit offset.
+- **Not changed:**
+  - A duplicate property is an error only with the same name. Configuration, template and schema documents are case-sensitive JSON (a schema may hold `Type` and `type`), so a check in any case would refuse valid documents. `sform story edit` checks its members in any case, as planned.
+  - The `TimeZone` is not checked: the server's rules do not check it either.
+  - The parse of each date, the private copy in `set`, the two `virtual` seams and the kept file in the temporary folder stay as described above.
