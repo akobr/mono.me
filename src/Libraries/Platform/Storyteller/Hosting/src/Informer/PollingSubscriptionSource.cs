@@ -108,43 +108,6 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
         return annotation.DeletedAt is null && annotation.GetStatus(now) == AnnotationStatus.Active;
     }
 
-    // Why a confirmation read ends a subscription; null while the annotation is active. A failure other than a 404 has
-    // no answer and is handled before.
-    private static StorytellerRemovalReason? ReasonOf(PointRead read, DateTimeOffset now)
-    {
-        if (read.Annotation is not { } annotation)
-        {
-            return StorytellerRemovalReason.Missing;
-        }
-
-        if (annotation.DeletedAt is not null)
-        {
-            return StorytellerRemovalReason.Deleted;
-        }
-
-        return annotation.GetStatus(now) switch
-        {
-            AnnotationStatus.Disabled => StorytellerRemovalReason.Disabled,
-            AnnotationStatus.Scheduled => StorytellerRemovalReason.Scheduled,
-            AnnotationStatus.Expired => StorytellerRemovalReason.Expired,
-            _ => null,
-        };
-    }
-
-    private static async Task<T> LimitAsync<T>(SemaphoreSlim limiter, Func<Task<T>> read, CancellationToken cancellationToken)
-    {
-        await limiter.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            return await read().ConfigureAwait(false);
-        }
-        finally
-        {
-            limiter.Release();
-        }
-    }
-
     private async Task<SubscriptionBatch> PollAsync(PollState poll, CancellationToken cancellationToken)
     {
         IReadOnlyDictionary<string, Annotation> executions;
@@ -191,7 +154,7 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
 
         try
         {
-            await LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(key, includeDeleted: false, cancellationToken), cancellationToken).ConfigureAwait(false);
+            await PollReads.LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(key, includeDeleted: false, cancellationToken), cancellationToken).ConfigureAwait(false);
         }
         catch (StorytellerConfigurationException exception) when (CatalogReader.IsMissing(exception))
         {
@@ -211,7 +174,7 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
         var key = poll.Scope.ResponsibilityKey;
 
         return ListPaging.ReadAllAsync(
-            token => LimitAsync(poll.Limiter, () => _pages.ReadPageAsync(key, list, token, cancellationToken), cancellationToken),
+            token => PollReads.LimitAsync(poll.Limiter, () => _pages.ReadPageAsync(key, list, token, cancellationToken), cancellationToken),
             key.ToString(),
             $"the {list.ToString().ToLowerInvariant()} of {key}");
     }
@@ -415,7 +378,7 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
                 return null;
             }
 
-            if (ReasonOf(read, now) is { } reason)
+            if (PollReads.ReasonOf(read.Annotation, includeInactive: false, now) is { } reason)
             {
                 return new StorytellerRemoval(read.Key.Annotation.ToString(), reason);
             }
@@ -432,7 +395,7 @@ internal sealed class PollingSubscriptionSource : ISubscriptionChangeSource
     {
         try
         {
-            var annotation = await LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(key, includeDeleted, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var annotation = await PollReads.LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(key, includeDeleted, cancellationToken), cancellationToken).ConfigureAwait(false);
             return new PointRead(key, annotation, null);
         }
         catch (StorytellerConfigurationException exception) when (!cancellationToken.IsCancellationRequested)

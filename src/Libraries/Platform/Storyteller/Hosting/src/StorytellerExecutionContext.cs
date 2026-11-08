@@ -74,7 +74,7 @@ public sealed class StorytellerExecutionContext
     public TAnnotation? Find<TAnnotation>()
         where TAnnotation : StorytellerAnnotation
     {
-        return Find(SnapshotTypes.Require<TAnnotation>("TAnnotation")) as TAnnotation;
+        return Find(SnapshotTypes.Require<TAnnotation>(nameof(TAnnotation))) as TAnnotation;
     }
 
     // Is it active: Deleted when the key's annotation or its execution is deleted; else the first status that is not

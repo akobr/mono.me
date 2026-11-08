@@ -83,7 +83,7 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
         }
 
         var items = await ListPaging.ReadAllAsync(
-                token => LimitAsync(
+                token => PollReads.LimitAsync(
                     limiter,
                     () => _reader.ReadDescendantsPageAsync(scope.Ancestor, scope.Type, scope.IncludeInactive, token, CancellationToken.None, cancellationToken),
                     cancellationToken),
@@ -99,10 +99,10 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
             if (AnnotationKey.TryParse(item.AnnotationKey, out var key)
                 && scope.IsListed(key)
                 && scope.Passes(key)
-                && keys.Add(scope.KeyOf(key).ToString()))
+                && scope.KeyOf(key) is var fullKey
+                && keys.Add(fullKey.ToString()))
             {
-                var fullKey = scope.KeyOf(key);
-                reads.Add(LimitAsync(limiter, () => ReadListedAsync(fullKey, cancellationToken), cancellationToken));
+                reads.Add(PollReads.LimitAsync(limiter, () => ReadListedAsync(fullKey, cancellationToken), cancellationToken));
             }
         }
 
@@ -138,35 +138,33 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
         return WatchAsync<TAnnotation>(source, scope, pollsOnce: interval == TimeSpan.Zero, cancellationToken);
     }
 
-    // pollsOnce: the one poll has no next one to try again, so its failure is thrown rather than an empty answer.
+    // pollsOnce: the one poll has no next one to try again, so its failure is thrown rather than an empty answer. A
+    // definitive failure before any poll completed (a target that does not exist, a credential or a machine that may not
+    // list it) is thrown too: polling again would not fix it, and a watch that never ends would read as an empty target.
+    // After a poll completed, every failure is logged and polled again, as a policy may change back.
     private static async IAsyncEnumerable<StorytellerAnnotationChange<TAnnotation>> WatchAsync<TAnnotation>(DescendantPollingSource source, DescendantScope scope, bool pollsOnce, [EnumeratorCancellation] CancellationToken cancellationToken)
         where TAnnotation : StorytellerAnnotation
     {
+        var hasCompleted = false;
+
         await foreach (var batch in source.ReadAsync(scope, cancellationToken).ConfigureAwait(false))
         {
-            if (batch.Failure is { } failure && pollsOnce)
+            if (batch.Failure is { } failure)
             {
-                ExceptionDispatchInfo.Throw(failure);
+                if (pollsOnce || (!hasCompleted && !failure.IsTransient))
+                {
+                    ExceptionDispatchInfo.Throw(failure);
+                }
+            }
+            else
+            {
+                hasCompleted = true;
             }
 
             foreach (var change in batch.Changes)
             {
                 yield return new StorytellerAnnotationChange<TAnnotation>(change.Kind, (TAnnotation)change.Annotation, change.Removal);
             }
-        }
-    }
-
-    private static async Task<T> LimitAsync<T>(SemaphoreSlim limiter, Func<Task<T>> read, CancellationToken cancellationToken)
-    {
-        await limiter.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            return await read().ConfigureAwait(false);
-        }
-        finally
-        {
-            limiter.Release();
         }
     }
 

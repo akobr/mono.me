@@ -52,6 +52,15 @@ Executes phase 2, the catalog and the descendant informer (sections 3 to 9), of 
 - `FakeCatalog` serves the descendants of any annotation by the graph, with `includeInactive`, list items without the subtype's members as the API serializes them, `Relate` for a relation change without `Modified`, and holds of the reads of one key; `ScriptedPages` refuses the new member.
 - The Hosting tests went from 272 to 344, all passing.
 
+### After the review of the pull request
+
+- **A definitive failure before any poll completed ends a watch.** `WatchAsync` threw only the failure of a zero interval, so a mistyped ancestor, a `401` or a `403` logged a warning every poll and never ended, looking like an empty target. It now throws a definitive failure until a poll has completed; transient failures, and any failure after a poll completed, are still logged and polled again. This differs from `WatchExecutionsAsync`, which keeps its behaviour.
+- **An ancestor deleted after the first poll** was thought to fail every later poll. The API checks access only, not existence, before it lists, so the list answers what is not deleted under it, and the cascade removes the held descendants. A test locks it.
+- **Shared reads.** `Informer/PollReads` holds the read limiter (three copies before) and the removal reason (two), used by both informers and the catalog. The poll loops stay apart: their batches, join and logs differ, and the subscriptions' tests guard theirs.
+- `hosting.md` names the cost of a list over a busy ancestor and says to target the narrowest one; the concurrency of 4 stays fixed.
+- `ListAsync` computes a descendant's full key once, and `Find<T>()` names its parameter with `nameof`.
+- Not changed: keys differing only in the case of the type code (the platform stores lower-cased codes, and the catalog lower-cases its own), the ordinal filters (documented as such), and the playground's units listed once under `--watch` (documented).
+
 ### Deviations
 
 - The ancestor check also lets a `403 AnnotationRestricted` through to the list, which the spec did not foresee.

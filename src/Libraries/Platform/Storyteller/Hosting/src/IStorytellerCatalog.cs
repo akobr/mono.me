@@ -27,7 +27,8 @@ public interface IStorytellerCatalog
     // The informer of a target: Added for every descendant of the first complete poll, then Added, Changed and Removed
     // after every poll, Removed first, then Changed, then Added, each by key. Changed follows Modified, which a new
     // descendant of a descendant does not move, so watch that type itself to follow it. A failed poll emits nothing,
-    // logs a warning and polls again; with a zero interval the one poll's failure is thrown. Each enumeration runs its
+    // logs a warning and polls again; with a zero interval the one poll's failure is thrown, and so is a definitive
+    // failure before any poll completed (an ancestor that does not exist, a 401 or a 403). Each enumeration runs its
     // own loop. pollInterval: 30 s when null, with a jitter of ±10 %, counted from the end of a poll; zero polls once;
     // otherwise 1 second to 45 days, or the call throws ArgumentOutOfRangeException. Without the options' Key, an
     // annotation key throws StorytellerConfigurationException at the call. Ends with OperationCanceledException when the
