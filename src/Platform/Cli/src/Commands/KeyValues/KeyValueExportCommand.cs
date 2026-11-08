@@ -9,9 +9,28 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.KeyValues;
 
-[Command(CommandNames.EXPORT, Description = "Export the pairs of the view as a key/value document (json), a flat JSON object (flat) or .env lines (env).")]
+[Command(CommandNames.EXPORT, Description = "Export the key/value pairs of the view.", ExtendedHelpText = HelpDetail)]
 public class KeyValueExportCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv export --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The formats are json, the 2s.key-values.v1 document with the levels; flat,
+        one JSON object of key: "value"; and env, .env lines (KEY=VALUE, with
+        db.password as DB__PASSWORD). Without --format, a *.json file gets json, any
+        other file env, and the standard output json.
+
+        Secrets have a value only with --include-secrets and the secret rights.
+        Without it, json lists them without a value, and flat and env leave them out
+        with a note.
+
+        A Reader exports the pairs; the values of secrets need ContributorWithSecrets.
+        A machine needs Configuration.Read and Configuration.Transfer, and for the
+        values of secrets Secrets.Read and its mTLS certificate, unless the project's
+        policy turns the mTLS rule off.
+        """;
+
     private readonly IFileSystem _fileSystem;
 
     public KeyValueExportCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, IFileSystem fileSystem)

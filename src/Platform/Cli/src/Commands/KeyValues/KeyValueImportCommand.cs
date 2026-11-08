@@ -10,9 +10,31 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.KeyValues;
 
-[Command(CommandNames.IMPORT, Description = "Import pairs from a key/value document (json), a flat JSON object (flat) or a .env file (env): the plan is shown first, then confirmed.")]
+[Command(CommandNames.IMPORT, Description = "Import key/value pairs into the view.", ExtendedHelpText = HelpDetail)]
 public class KeyValueImportCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv import --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The file is json, the 2s.key-values.v1 document with the levels; flat, one
+        JSON object of key: "value"; or env, .env lines (KEY=VALUE, with DB__PASSWORD
+        as db.password). Without --format, the format is guessed from the file name
+        and the content. flat and env carry no levels: keys matching a --secret glob
+        become secrets of the --protection level, or of the project's default secret
+        level, and the other keys are public.
+
+        The plan, a dry run on the server, is shown first and then confirmed: -y skips
+        the confirmation, and --dry-run stops after the plan. A replace that deletes
+        keys asks you to type the view name. The exit code is 45 when an item failed.
+
+        A Contributor imports public pairs. Secret values, changes to or from a secret
+        level, and a replace that deletes a secret need ContributorWithSecrets. A
+        machine needs Configuration.Write and Configuration.Transfer, and for secrets
+        Secrets.Write and its mTLS certificate, unless the project's policy turns the
+        mTLS rule off.
+        """;
+
     private readonly IFileSystem _fileSystem;
 
     public KeyValueImportCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, IFileSystem fileSystem)
