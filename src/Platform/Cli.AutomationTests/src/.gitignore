@@ -1,0 +1,6 @@
+# Personal overrides of testsettings.json (target, organization id, machines, headed runs); passwords and keys go to the
+# user secrets
+testsettings.local.json
+
+# TUnit's reports and the runs' artifacts (results.jsonl, the sform-*.txt runs, the homes of sform with their sessions)
+TestResults/
