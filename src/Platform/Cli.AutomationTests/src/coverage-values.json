@@ -96,11 +96,19 @@
       "source": "ConfigGetCommand: json (the model, the default), else ConfigurationFormatNames.TryParse into ConfigurationFormat."
     },
     {
-      "command": "storyteller config",
+      "command": "storyteller config export",
+      "option": "--format",
+      "values": [ "env", "flat", "properties", "yaml", "json" ],
+      "enum": "_42.Platform.Storyteller.ConfigurationFormats.ConfigurationFormat",
+      "extra": [ "json" ],
+      "source": "ConfigExportCommand.Validate: env (the default) when --format is missing, else ConfigurationReads.TryParseFormat: json (any case) is the content JSON alone, the other names ConfigurationFormatNames.TryParse into ConfigurationFormat."
+    },
+    {
+      "command": "storyteller config export",
       "option": "--mask",
       "values": [ "bound", "all" ],
       "enum": "_42.Platform.Cli.Commands.Configuration.MaskMode",
-      "source": "ConfigGetCommand: Ascii.EqualsIgnoreCase(Mask, \"bound\" | \"all\") into MaskMode."
+      "source": "ConfigExportCommand.Validate: Ascii.EqualsIgnoreCase(Mask, \"bound\" | \"all\") into MaskMode; bound when --mask is missing."
     },
     {
       "command": "storyteller kv",

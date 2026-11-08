@@ -14,9 +14,9 @@ public sealed class ConfigContextTests : CliTest
     // creates <rst> and <rst2> in a generated view <view> of <B>. Then each configuration command runs once with
     // --projectKey <B> --view <view> on <rst> and once with --projectKey <B> -v <view> on <rst2>: config set (a=1),
     // config (reads a=1), config edit -y (the fake editor adds b), config patch -i p.json -y (adds c), config versions
-    // (three versions), config diff (c added), config composition, config delete. Before the deletes neither key has a
-    // configuration in the default project <A> (its view default or <view>) or in the view default of <B>; after them
-    // the stored content in <view> of <B> is gone ({}).
+    // (three versions), config diff (c added), config composition, config export -e ctx.env (A=1, B=2 and C=3 in the
+    // file), config delete. Before the deletes neither key has a configuration in the default project <A> (its view
+    // default or <view>) or in the view default of <B>; after them the stored content in <view> of <B> is gone ({}).
     [Test]
     [TestCase(441)]
     [UserRole(Role.Owner)]
@@ -28,6 +28,7 @@ public sealed class ConfigContextTests : CliTest
     [Covers("story config versions", "--projectKey", "-v", "--view")]
     [Covers("story config diff", "--projectKey", "-v", "--view")]
     [Covers("story config composition", "--projectKey", "-v", "--view")]
+    [Covers("story config export", "--projectKey", "-v", "--view")]
     [Covers("story config delete", "--projectKey", "-v", "--view")]
     public async Task ConfigCommands_ContextOptions_TargetProjectAndView()
     {
@@ -69,6 +70,12 @@ public sealed class ConfigContextTests : CliTest
             (await Sform(In("story", "config", "composition", annotation)))
                 .ShouldSucceed()
                 .ShouldContain($"Composition of the configuration for '{annotation}'");
+
+            (await Sform(In("story", "config", "export", annotation, "-e", "ctx.env")))
+                .ShouldSucceed()
+                .ShouldContain("Wrote the configuration to ctx.env.", SformStream.StdErr);
+            var exported = ConfigOutput.LinesOf(await ReadFileAsync("ctx.env")).Order(StringComparer.Ordinal);
+            await Assert.That(string.Join('\n', exported)).IsEqualTo("A=1\nB=2\nC=3");
 
             // Nothing went to the default project <A> (its view default or <view>), or to the view default of <B>.
             (await Sform("story", "config", annotation))

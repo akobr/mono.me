@@ -151,7 +151,7 @@ public sealed class CliData
         return "s" + RandomNumberGenerator.GetString(alphabet, 23);
     }
 
-    // An environment prefix of --env-prefix, e.g. APP_1F2E_.
+    // An environment prefix of --env-prefix (story config) or --prefix (story config export), e.g. APP_1F2E_.
     public string EnvironmentPrefix()
     {
         return $"APP_{Data.Hex(HexLength).ToUpperInvariant()}_";

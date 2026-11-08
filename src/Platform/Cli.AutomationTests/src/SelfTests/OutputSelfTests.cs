@@ -226,7 +226,7 @@ public sealed class OutputSelfTests
         await Assert.That(result.Exit).IsEqualTo(CliExit.InputParsing);
     }
 
-    // config -r --github-env/--mask prints ::add-mask:: for exactly the values sform treats as secret.
+    // config export --github-env/--mask prints ::add-mask:: for exactly the values sform treats as secret.
     [Test]
     public async Task Secrets_OfMaskCommandsAreFound()
     {
