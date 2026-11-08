@@ -11,14 +11,16 @@ namespace _42.Platform.Cli.UnitTests.Authentication;
 
 internal sealed class ScriptedHttpHandler : HttpMessageHandler
 {
-    private readonly Queue<(HttpStatusCode Status, string Body)> _responses = new();
+    private readonly Queue<(HttpStatusCode Status, string Body, (string Name, string Value)[] Headers)> _responses = new();
     private readonly Queue<Exception> _failures = new();
 
+    // Each request with its headers; the media type of its body is among them as Content-Type.
     public List<RecordedRequest> Requests { get; } = [];
 
-    public ScriptedHttpHandler Respond(HttpStatusCode status, string body)
+    // The next response, with headers as the server sends them (for example ETag).
+    public ScriptedHttpHandler Respond(HttpStatusCode status, string body, params (string Name, string Value)[] headers)
     {
-        _responses.Enqueue((status, body));
+        _responses.Enqueue((status, body, headers));
         return this;
     }
 
@@ -36,6 +38,12 @@ internal sealed class ScriptedHttpHandler : HttpMessageHandler
             : await request.Content.ReadAsStringAsync(cancellationToken);
         var form = sent is null ? new Dictionary<string, string>() : ParseForm(sent);
         var headers = request.Headers.ToDictionary(header => header.Key, header => string.Join(",", header.Value), StringComparer.OrdinalIgnoreCase);
+
+        if (request.Content?.Headers.ContentType is { } contentType)
+        {
+            headers["Content-Type"] = contentType.ToString();
+        }
+
         Requests.Add(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), form, headers, sent));
 
         if (_failures.Count > 0)
@@ -48,8 +56,19 @@ internal sealed class ScriptedHttpHandler : HttpMessageHandler
             throw new InvalidOperationException($"No scripted response for {request.Method} {request.RequestUri}.");
         }
 
-        var (status, body) = _responses.Dequeue();
-        return new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+        var (status, body, responseHeaders) = _responses.Dequeue();
+        var response = new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+
+        foreach (var (name, value) in responseHeaders)
+        {
+            // a content header (Content-Language, Last-Modified, ...) goes on the content
+            if (!response.Headers.TryAddWithoutValidation(name, value))
+            {
+                response.Content.Headers.TryAddWithoutValidation(name, value);
+            }
+        }
+
+        return response;
     }
 
     private static Dictionary<string, string> ParseForm(string body)

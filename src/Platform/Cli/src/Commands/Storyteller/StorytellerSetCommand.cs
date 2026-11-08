@@ -9,8 +9,8 @@ using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Model;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Services;
-using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -25,6 +25,13 @@ public class StorytellerSetCommand : BaseContextCommand
     internal const string RestoreAndUpdateChoice = "Restore and update (keeps the configuration and the history)";
     internal const string CreateNewChoice = "Create new (starts with an empty configuration)";
     internal const string CancelChoice = "Cancel";
+
+    // The rounds of a merge: a patch of a missing key and its create, which fails when the key is created meanwhile.
+    internal const int MaxWriteRounds = 3;
+
+    private const string AnyVersion = "*";
+    private const string AnnotationNotFound = "AnnotationNotFound";
+    private const string AnnotationDeleted = "AnnotationDeleted";
 
     private readonly AccessDefaultOptions _accessDefault;
     private readonly IAnnotationsApiClient _annotationsApi;
@@ -175,46 +182,26 @@ public class StorytellerSetCommand : BaseContextCommand
 
         if (AreLabelsSpecified)
         {
-            var labels = new HashSet<string>();
-
-            foreach (var label in Labels ?? Array.Empty<string>())
-            {
-                labels.Add(label);
-            }
-
-            if (annotation.Labels is not null)
-            {
-                labels.UnionWith(annotation.Labels);
-            }
-
+            // The options in their order, then the new labels of the file.
             annotation = annotation with
             {
-                Labels = labels.ToList(),
+                Labels = (Labels ?? []).Concat(annotation.Labels ?? []).Distinct(StringComparer.Ordinal).ToList(),
             };
         }
 
         try
         {
             // the lookup and the restore of deleted keys fail like the write: with the server's message
-            var deletedResult = await HandleDeletedKeysAsync(annotationKey);
+            var (exitCode, createNew) = await HandleDeletedKeysAsync(annotationKey);
 
-            if (deletedResult.HasValue)
+            if (exitCode.HasValue)
             {
-                return deletedResult.Value;
+                return exitCode.Value;
             }
 
-            // Read after a restore, so Restore and update merges into the restored record.
-            var stored = IsReplaceRequested ? null : await ReadStoredAsync(annotationKey);
-
-            var resultAnnotation = await _annotationsApi.SetAnnotationAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                annotationKey,
-                annotation.ToSdkAnnotation(stored));
-
-            Console.WriteJson(resultAnnotation);
-            return ExitCodes.SUCCESS;
+            return IsReplaceRequested
+                ? await ReplaceAsync(annotationKey, annotation)
+                : await MergeAsync(annotationKey, annotation, createNew);
         }
         catch (JsonException e)
         {
@@ -234,29 +221,15 @@ public class StorytellerSetCommand : BaseContextCommand
             // for example the restore of --restore-deleted by a machine without the management scope Annotation.Manage
             return Console.WriteApiError(e);
         }
+        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound or (int)HttpStatusCode.PreconditionFailed)
+        {
+            // for example a replace of a version that changed since its read (AnnotationPreconditionFailed)
+            return Console.WriteApiError(e);
+        }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             Console.WriteLine($"Error occurred: {e.Message}");
             return ExitCodes.ERROR_CRASH;
-        }
-    }
-
-    // The annotation to merge into, whatever its status; none when the key does not exist or is deleted. The API has no
-    // merge of its own: a write replaces the content.
-    private async Task<_42.Platform.Storyteller.Sdk.Annotation?> ReadStoredAsync(_42.Platform.Storyteller.AnnotationKey annotationKey)
-    {
-        try
-        {
-            return await _annotationsApi.GetAnnotationAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                annotationKey,
-                includeInactive: true);
-        }
-        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
-        {
-            return null;
         }
     }
 
@@ -268,9 +241,112 @@ public class StorytellerSetCommand : BaseContextCommand
         return _42.Platform.Storyteller.AnnotationKey.Parse(key.TypeCode.ToLowerInvariant() + text[key.TypeCode.Length..]);
     }
 
+    // A patch that found no key, which the merge creates: a missing one, or a deleted one when the user chose Create new.
+    private static bool IsToCreate(ApiException exception, bool createNew)
+    {
+        var errorCode = exception.GetErrorCode();
+        return errorCode == AnnotationNotFound || (createNew && errorCode == AnnotationDeleted);
+    }
+
+    // One patch, merged on the server into the current state, without a read first. A missing key is created with the
+    // input alone, only while it is missing (If-None-Match: *); a key created meanwhile is patched in the next round.
+    // Create new starts with the create, which re-creates the deleted keys. A key deleted after the lookup is not
+    // re-created silently: a run again asks what happens to it.
+    private async Task<int> MergeAsync(_42.Platform.Storyteller.AnnotationKey annotationKey, _42.Platform.Storyteller.Annotation annotation, bool createNew)
+    {
+        var patch = annotation.ToJsonPatch().ToJson();
+
+        for (var round = 1; round <= MaxWriteRounds; round++)
+        {
+            if (round > 1 || !createNew)
+            {
+                try
+                {
+                    var patched = await _annotationsApi.PatchAnnotationVersionedAsync(
+                        Context.OrganizationName,
+                        Context.ProjectName,
+                        Context.ViewName,
+                        annotationKey,
+                        patch);
+
+                    Console.WriteJson(patched.Result);
+                    return ExitCodes.SUCCESS;
+                }
+                catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound && IsToCreate(e, createNew))
+                {
+                    // created below
+                }
+                catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound && e.GetErrorCode() == AnnotationDeleted)
+                {
+                    Console.WriteLine($"The annotation {annotationKey} was deleted meanwhile; run the command again to choose what happens to it.");
+                    return ExitCodes.ERROR_CRASH;
+                }
+            }
+
+            try
+            {
+                var created = await _annotationsApi.SetAnnotationAsync(
+                    Context.OrganizationName,
+                    Context.ProjectName,
+                    Context.ViewName,
+                    annotationKey,
+                    annotation.ToSdkAnnotation(),
+                    if_None_Match: AnyVersion);
+
+                Console.WriteJson(created);
+                return ExitCodes.SUCCESS;
+            }
+            catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.PreconditionFailed)
+            {
+                // created or restored meanwhile: patched in the next round
+            }
+        }
+
+        Console.WriteLine($"The annotation {annotationKey} changed concurrently; try again.");
+        return ExitCodes.ERROR_CRASH;
+    }
+
+    // The input replaces the content of the version read, whatever its status, so a change after the read answers 412
+    // instead of being overwritten. A missing or deleted key is only created, so one created meanwhile is not replaced.
+    private async Task<int> ReplaceAsync(_42.Platform.Storyteller.AnnotationKey annotationKey, _42.Platform.Storyteller.Annotation annotation)
+    {
+        string? ifMatch = null;
+        string? ifNoneMatch = null;
+
+        try
+        {
+            var stored = await _annotationsApi.GetAnnotationVersionedAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                annotationKey,
+                includeInactive: true);
+
+            // without a tag the write has no condition
+            ifMatch = stored.ETag;
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
+        {
+            ifNoneMatch = AnyVersion;
+        }
+
+        var written = await _annotationsApi.SetAnnotationAsync(
+            Context.OrganizationName,
+            Context.ProjectName,
+            Context.ViewName,
+            annotationKey,
+            annotation.ToSdkAnnotation(),
+            ifMatch,
+            ifNoneMatch);
+
+        Console.WriteJson(written);
+        return ExitCodes.SUCCESS;
+    }
+
     // A write to a deleted key, or below a deleted ancestor, re-creates it empty. Before that happens, the user chooses:
-    // restore the deleted keys and update them, or create them new. Returns an exit code when the write must not go on.
-    private async Task<int?> HandleDeletedKeysAsync(_42.Platform.Storyteller.AnnotationKey annotationKey)
+    // restore the deleted keys and update them, or create them new. Returns an exit code when the write must not go on,
+    // and whether the write creates the deleted keys new.
+    private async Task<(int? ExitCode, bool CreateNew)> HandleDeletedKeysAsync(_42.Platform.Storyteller.AnnotationKey annotationKey)
     {
         var keys = annotationKey.GetAllAncestorKeys()
             .Append(annotationKey)
@@ -285,7 +361,7 @@ public class StorytellerSetCommand : BaseContextCommand
 
         if (deleted is not { Count: > 0 })
         {
-            return null;
+            return (null, false);
         }
 
         Console.WriteLine(deleted.Count == 1 ? "This annotation is deleted:" : "These annotations are deleted:");
@@ -310,7 +386,7 @@ public class StorytellerSetCommand : BaseContextCommand
         else if (Console.Console?.IsInputRedirected == true)
         {
             Console.WriteLine("Choose what happens to them: --restore-deleted restores and updates them, --recreate creates them new.");
-            return ExitCodes.ERROR_WRONG_INPUT;
+            return (ExitCodes.ERROR_WRONG_INPUT, false);
         }
         else
         {
@@ -325,12 +401,12 @@ public class StorytellerSetCommand : BaseContextCommand
         if (choice == CancelChoice)
         {
             Console.WriteLine("Nothing was changed.");
-            return ExitCodes.WARNING_ABORTED;
+            return (ExitCodes.WARNING_ABORTED, false);
         }
 
         if (choice == CreateNewChoice)
         {
-            return null;
+            return (null, true);
         }
 
         var result = await _annotationsApi.RestoreAnnotationsAsync(
@@ -350,11 +426,10 @@ public class StorytellerSetCommand : BaseContextCommand
                 Console.WriteLine($"The annotation '{failure.Key}' was not restored: {failure.Message}");
             }
 
-            return ExitCodes.ERROR_WRONG_INPUT;
+            return (ExitCodes.ERROR_WRONG_INPUT, false);
         }
 
         Console.WriteLine($"Restored {string.Join(", ", (result.Annotations ?? []).Select(annotation => annotation.AnnotationKey))}.");
-        return null;
+        return (null, false);
     }
 }
-
