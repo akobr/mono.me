@@ -66,6 +66,7 @@ public sealed class AuthKitAuthenticationService : IAuthenticationService, IDisp
     public async Task<SignedInUser> LoginWithDeviceCodeAsync(
         Func<DeviceCodePrompt, Task> onPrompt,
         Func<IReadOnlyList<OrganizationChoice>, Task<string>>? selectOrganization = null,
+        string? organizationId = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -101,6 +102,8 @@ public sealed class AuthKitAuthenticationService : IAuthenticationService, IDisp
 
                 if (outcome.Session is not null)
                 {
+                    // WorkOS chose the organization itself (the user has one, or none): it has to be the requested one.
+                    EnsureRequestedOrganization(organizationId, outcome.Session.OrganizationId);
                     return await SaveAsync(outcome.Session, cancellationToken);
                 }
 
@@ -116,7 +119,7 @@ public sealed class AuthKitAuthenticationService : IAuthenticationService, IDisp
                     case "expired_token":
                         throw new AuthenticationException(AuthenticationFailureReason.Expired, "The sign-in code expired before the sign-in was completed.");
                     case "organization_selection_required":
-                        return await SelectOrganizationAsync(outcome.Body!, selectOrganization, cancellationToken);
+                        return await SelectOrganizationAsync(outcome.Body!, selectOrganization, organizationId, cancellationToken);
                     default:
                         throw ServiceError(outcome);
                 }
@@ -156,7 +159,7 @@ public sealed class AuthKitAuthenticationService : IAuthenticationService, IDisp
     {
         var user = session.User;
         var name = string.Join(' ', new[] { user.FirstName, user.LastName }.Where(part => !string.IsNullOrWhiteSpace(part)));
-        return new SignedInUser(user.Id, user.Email ?? user.Id, name.Length > 0 ? name : null);
+        return new SignedInUser(user.Id, user.Email ?? user.Id, name.Length > 0 ? name : null, session.OrganizationId);
     }
 
     private static AuthenticationException ServiceError(AuthenticateOutcome outcome)
@@ -245,9 +248,25 @@ public sealed class AuthKitAuthenticationService : IAuthenticationService, IDisp
         throw ServiceError(outcome);
     }
 
+    // A session of another organization than -o is never stored.
+    private static void EnsureRequestedOrganization(string? requested, string? organizationId)
+    {
+        if (requested is null || string.Equals(requested, organizationId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        throw new AuthenticationException(
+            AuthenticationFailureReason.Configuration,
+            organizationId is null
+                ? $"You are not a member of the organization '{requested}': WorkOS signed you in without an organization."
+                : $"You are not a member of the organization '{requested}': WorkOS signed you in to your only organization, '{organizationId}'.");
+    }
+
     private async Task<SignedInUser> SelectOrganizationAsync(
         ErrorResponse error,
         Func<IReadOnlyList<OrganizationChoice>, Task<string>>? selectOrganization,
+        string? requested,
         CancellationToken cancellationToken)
     {
         var organizations = (error.Organizations ?? [])
@@ -260,9 +279,22 @@ public sealed class AuthKitAuthenticationService : IAuthenticationService, IDisp
             throw new AuthenticationException(AuthenticationFailureReason.ServiceError, "WorkOS asked for an organization but offered none.");
         }
 
-        var organizationId = selectOrganization is null
-            ? organizations[0].Id
-            : await selectOrganization(organizations);
+        string organizationId;
+
+        if (requested is not null)
+        {
+            organizationId = organizations
+                .FirstOrDefault(organization => string.Equals(organization.Id, requested, StringComparison.OrdinalIgnoreCase))?.Id
+                ?? throw new AuthenticationException(
+                    AuthenticationFailureReason.Configuration,
+                    $"You are not a member of the organization '{requested}'. Your organizations: {string.Join(", ", organizations.Select(organization => $"{organization.Id} ({organization.Name})"))}.");
+        }
+        else
+        {
+            organizationId = selectOrganization is null
+                ? organizations[0].Id
+                : await selectOrganization(organizations);
+        }
 
         var outcome = await AuthenticateAsync(
             new Dictionary<string, string>

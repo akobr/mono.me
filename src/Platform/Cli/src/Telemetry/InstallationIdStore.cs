@@ -7,8 +7,8 @@ using _42.Platform.Cli.Configuration;
 
 namespace _42.Platform.Cli.Telemetry;
 
-// The anonymous installation id in telemetry.json, in the ~/.42for.net directory of the token store, which survives
-// tool updates. The id is a random Guid, never derived from the machine, the user or a token.
+// The anonymous installation id in telemetry.json, in the user directory of the token store (the user's .42for.net
+// folder, which survives tool updates, or SFORM_HOME). The id is a random Guid, never derived from the machine, the user or a token.
 public sealed class InstallationIdStore
 {
     private static readonly JsonSerializerOptions FileJson = new() { WriteIndented = true };
@@ -17,8 +17,8 @@ public sealed class InstallationIdStore
     private readonly string _directory;
     private readonly string _filePath;
 
-    public InstallationIdStore(IFileSystem fileSystem)
-        : this(fileSystem, UserSettingsLocation.GetDirectory(fileSystem))
+    public InstallationIdStore(IFileSystem fileSystem, CliPaths paths)
+        : this(fileSystem, paths.UserDirectory)
     {
     }
 

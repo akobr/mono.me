@@ -23,7 +23,8 @@ public sealed class AuthenticationServiceSelector : IAuthenticationService, IDis
         IFileSystem fileSystem,
         IHttpClientFactory httpClientFactory,
         ITokenStore tokenStore,
-        MachineAuthenticationService machine)
+        MachineAuthenticationService machine,
+        TokenStorage tokenStorage)
     {
         _resolver = resolver;
         _machine = machine;
@@ -36,7 +37,7 @@ public sealed class AuthenticationServiceSelector : IAuthenticationService, IDis
                     httpClientFactory.CreateClient(nameof(AuthKitAuthenticationService)),
                     tokenStore,
                     settings),
-                _ => new EntraIdAuthenticationService(fileSystem, settings),
+                _ => new EntraIdAuthenticationService(fileSystem, settings, tokenStorage),
             };
         });
     }
@@ -58,11 +59,12 @@ public sealed class AuthenticationServiceSelector : IAuthenticationService, IDis
     public async Task<SignedInUser> LoginWithDeviceCodeAsync(
         Func<DeviceCodePrompt, Task> onPrompt,
         Func<IReadOnlyList<OrganizationChoice>, Task<string>>? selectOrganization = null,
+        string? organizationId = null,
         CancellationToken cancellationToken = default)
     {
         return _machine.IsConfigured
-            ? await _machine.LoginWithDeviceCodeAsync(onPrompt, selectOrganization, cancellationToken)
-            : await (await _inner).LoginWithDeviceCodeAsync(onPrompt, selectOrganization, cancellationToken);
+            ? await _machine.LoginWithDeviceCodeAsync(onPrompt, selectOrganization, organizationId, cancellationToken)
+            : await (await _inner).LoginWithDeviceCodeAsync(onPrompt, selectOrganization, organizationId, cancellationToken);
     }
 
     // Also forgets the discovered provider, so the next sign-in follows a server that switched.

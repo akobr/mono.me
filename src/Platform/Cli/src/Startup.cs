@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO.Abstractions;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
@@ -6,6 +7,7 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.GitHubActions;
+using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller.Sdk.Credentials;
@@ -24,12 +26,22 @@ namespace _42.Platform.Cli
     {
         private const string ClientCertificateHeaderName = "X-ARR-ClientCert";
 
-        public Startup(IHostEnvironment environment)
+        // The paths come from Program.Main, which reports an invalid SFORM_HOME before the host is built; the
+        // properties of the host builder carry them here.
+        public Startup(IHostEnvironment environment, IDictionary<object, object> properties)
         {
             Environment = environment;
+            Paths = properties.TryGetValue(typeof(CliPaths), out var paths) && paths is CliPaths given
+                ? given
+                : CliPaths.FromEnvironment(new FileSystem(), System.Environment.GetEnvironmentVariable);
+            SformEnvironment = SformEnvironment.FromEnvironment(System.Environment.GetEnvironmentVariable, Paths);
         }
 
         public IHostEnvironment Environment { get; }
+
+        public CliPaths Paths { get; }
+
+        public SformEnvironment SformEnvironment { get; }
 
         /// <summary>
         /// Configures dependency injection, logging, application options, the platform file system implementation, core singleton services, and the Storyteller SDK for the CLI host.
@@ -49,10 +61,11 @@ namespace _42.Platform.Cli
                 new ConsoleFileSystemTracer()));
 #endif
 
-            services.AddSingleton<IExtendedConsole, ExtendedConsole>();
+            services.AddSingleton<IExtendedConsole, SformConsole>();
             services.AddHttpClient();
             ConfigureMachineSignIn(services);
             services.AddSingleton(GitHubActionsSettings.FromEnvironment(System.Environment.GetEnvironmentVariable));
+            ConfigureStatePaths(services, Paths, SformEnvironment);
             services.AddSingleton<ITokenStore, ProtectedTokenStore>();
             services.AddSingleton<IAuthenticationConfigurationResolver, AuthenticationConfigurationResolver>();
             services.AddSingleton<IAuthenticationService, AuthenticationServiceSelector>();
@@ -60,6 +73,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IUserSettingsStore, UserSettingsStore>();
             services.AddSingleton(EnvironmentEditor.FromEnvironment(System.Environment.GetEnvironmentVariable));
             services.AddSingleton<IEditorService, EditorService>();
+            services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
             services.AddSingleton<TransferPolling>();
 
             // Needed by KeyValueListCommand: McMaster ignores parameter defaults and resolves every one.
@@ -83,14 +97,55 @@ namespace _42.Platform.Cli
                 Formatting = Formatting.Indented,
             };
 
-            builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
-            builder.Add(new UserSettingsConfigurationSource(() => new UserSettingsStore(new FileSystem()), WriteSettingsWarning));
+            AddConfigurationFiles(builder, Paths);
 
-            // Development only (DOTNET_ENVIRONMENT, a run from source): user secrets override app.config.json.
+            // Development only (a run from source, unless DOTNET_ENVIRONMENT names another environment): user secrets
+            // override app.config.json.
             if (Environment.IsDevelopment())
             {
                 builder.AddUserSecrets(typeof(Startup).Assembly, optional: true);
             }
+
+            AddEnvironmentVariables(builder);
+        }
+
+        /// <summary>
+        /// Adds the SFORM_ variables last, so that they win over every file: SFORM_&lt;section&gt;__&lt;key&gt;, for example
+        /// SFORM_general__baseUrl for general.baseUrl. The variables of sform itself (SFORM_HOME, SFORM_TOKEN_STORE, …) have
+        /// no double underscore and land as top-level keys that nothing reads.
+        /// </summary>
+        /// <param name="builder">The configuration builder.</param>
+        internal static void AddEnvironmentVariables(IConfigurationBuilder builder)
+        {
+            builder.AddEnvironmentVariables(SformVariables.CONFIGURATION_PREFIX);
+        }
+
+        /// <summary>
+        /// Adds the configuration files: app.config.json, which ships next to the assembly (relative to the base path of
+        /// the host), then the user's settings: sform.settings.json in the user directory (the .42for.net folder, or
+        /// SFORM_HOME), or the legacy access.default.json and editor.config.json of the state directory (next to the
+        /// assembly, or SFORM_HOME) while the settings file has no section of their own. A missing SFORM_HOME loads as empty.
+        /// </summary>
+        /// <param name="builder">The configuration builder.</param>
+        /// <param name="paths">The paths resolved from SFORM_HOME.</param>
+        internal static void AddConfigurationFiles(IConfigurationBuilder builder, CliPaths paths)
+        {
+            builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
+            builder.Add(new UserSettingsConfigurationSource(() => new UserSettingsStore(new FileSystem(), paths), WriteSettingsWarning));
+        }
+
+        /// <summary>
+        /// Registers where sform keeps its files and the SFORM_* settings: the paths, the environment, and the token
+        /// storage of the user's sign-in, built on first use so that the user profile is read only when needed.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
+        /// <param name="paths">The paths resolved from SFORM_HOME.</param>
+        /// <param name="environment">The SFORM_* variables.</param>
+        internal static void ConfigureStatePaths(IServiceCollection services, CliPaths paths, SformEnvironment environment)
+        {
+            services.AddSingleton(paths);
+            services.AddSingleton(environment);
+            services.AddSingleton(_ => new TokenStorage(paths.UserDirectory, environment.IsFileTokenStore, paths.IsHomeSet));
         }
 
         /// <summary>
@@ -180,7 +235,7 @@ namespace _42.Platform.Cli
                     .WriteTo.Sentry(
                         minimumEventLevel: Serilog.Events.LogEventLevel.Warning)
                     .WriteTo.File(
-                        options?.GetTemplateLogFullPath() ?? "logs/cli.log",
+                        Paths.GetLogFilePath(options?.LogFilePath),
                         rollingInterval: RollingInterval.Day,
                         rollOnFileSizeLimit: true)
                     .CreateLogger());

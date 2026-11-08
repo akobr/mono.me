@@ -3,7 +3,6 @@ using System.IO;
 using System.IO.Abstractions;
 using System.Net.Http;
 using System.Net.Http.Json;
-using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -36,14 +35,15 @@ public sealed class AuthenticationConfigurationResolver : IAuthenticationConfigu
         IOptions<GeneralOptions> generalOptions,
         IHttpClientFactory httpClientFactory,
         IFileSystem fileSystem,
-        ILogger<AuthenticationConfigurationResolver> logger)
+        ILogger<AuthenticationConfigurationResolver> logger,
+        CliPaths paths)
         : this(
             options,
             generalOptions,
             httpClientFactory,
             fileSystem,
             logger,
-            fileSystem.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? Environment.CurrentDirectory)
+            paths.StateDirectory)
     {
     }
 
@@ -207,6 +207,8 @@ public sealed class AuthenticationConfigurationResolver : IAuthenticationConfigu
             // The answer is already valid. A cache that cannot be written is used on the next sign-in.
             try
             {
+                // The state directory (SFORM_HOME) may not exist yet.
+                _fileSystem.Directory.CreateDirectory(_fileSystem.Path.GetDirectoryName(_cachePath)!);
                 _fileSystem.File.WriteAllText(_cachePath, JsonSerializer.Serialize(discovered, CacheJson));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)

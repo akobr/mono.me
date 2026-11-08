@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.IO.Abstractions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,9 @@ namespace _42.Platform.Cli.UnitTests.Authentication;
 
 public class AuthenticationServiceSelectorTests
 {
+    // Never touched by these tests: the Entra ID service is not created and the AuthKit one gets the in-memory store.
+    private static readonly TokenStorage Storage = new(Path.Combine(Path.GetTempPath(), "sform-unused"), IsUnprotected: false);
+
     [Fact]
     public async Task AuthKitSettings_UseTheAuthKitSessionStore()
     {
@@ -26,7 +30,7 @@ public class AuthenticationServiceSelectorTests
                 User = new AuthKitSessionUser("user_01", "ada@example.com", null, null),
             },
         };
-        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, Machine());
+        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, Machine(), Storage);
 
         (await selector.GetAccessTokenAsync()).ShouldBe("access-fresh");
         (await selector.GetSignedInUserAsync()).ShouldBe(new SignedInUser("user_01", "ada@example.com", null));
@@ -38,7 +42,7 @@ public class AuthenticationServiceSelectorTests
     {
         var resolver = new FixedResolver(AuthenticationProvider.AuthKit);
         var store = new InMemoryTokenStore();
-        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, Machine());
+        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, Machine(), Storage);
 
         await selector.LogoutAsync();
 
@@ -50,7 +54,7 @@ public class AuthenticationServiceSelectorTests
     public async Task ResolutionFailure_ReachesTheCaller()
     {
         var resolver = new FixedResolver(AuthenticationProvider.AuthKit, new AuthenticationException(AuthenticationFailureReason.ServiceError, "no provider"));
-        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), new InMemoryTokenStore(), Machine());
+        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), new InMemoryTokenStore(), Machine(), Storage);
 
         var exception = await Should.ThrowAsync<AuthenticationException>(() => selector.GetAccessTokenAsync());
 
@@ -77,7 +81,7 @@ public class AuthenticationServiceSelectorTests
             [StorytellerVariables.ENDPOINT] = "https://storyteller.example.com/api",
             [StorytellerVariables.API_KEY] = key,
         });
-        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, machine);
+        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), store, machine, Storage);
 
         (await selector.GetAccessTokenAsync()).ShouldBe($"ApiKey {key}");
         (await selector.GetSignedInUserAsync())!.Id.ShouldBe("3f2c");
@@ -88,6 +92,20 @@ public class AuthenticationServiceSelectorTests
         resolver.Forgets.ShouldBe(0);
         store.Clears.ShouldBe(0);
         store.Session.ShouldNotBeNull();
+    }
+
+    // -o reaches the provider of the deployment; Entra ID, which has no organizations, refuses it before any request.
+    [Fact]
+    public async Task Organization_ReachesTheProvider()
+    {
+        var resolver = new FixedResolver(AuthenticationProvider.EntraId);
+        using var selector = new AuthenticationServiceSelector(resolver, new FileSystem(), new StubHttpClientFactory(new ScriptedHttpHandler()), new InMemoryTokenStore(), Machine(), Storage);
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(
+            () => selector.LoginWithDeviceCodeAsync(_ => Task.CompletedTask, organizationId: "org_01"));
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        resolver.Resolutions.ShouldBe(1);
     }
 
     private static MachineAuthenticationService Machine(Dictionary<string, string>? environment = null)

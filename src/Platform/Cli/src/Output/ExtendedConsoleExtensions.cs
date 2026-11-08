@@ -55,7 +55,7 @@ public static class ExtendedConsoleExtensions
     /// <param name="data">The object to serialize to JSON.</param>
     /// <param name="filePath">The path of the file to create or overwrite.</param>
     /// <remarks>
-    /// If the path points to an existing directory, no file is written and the method returns. If the file already exists, the console is prompted to confirm overwriting (default true). The method writes an empty line before and after the JSON output.
+    /// If the path points to an existing directory, no file is written and the method returns. If the file already exists, the console is prompted to confirm overwriting (default true); on redirected input the file is rewritten without a prompt. The method writes an empty line before and after the JSON output.
     /// </remarks>
     public static void WriteJsonToFile(this IExtendedConsole @this, object data, string filePath, IFileSystem fileSystem)
     {
@@ -69,7 +69,12 @@ public static class ExtendedConsoleExtensions
                 return;
             }
 
-            if (fileSystem.File.Exists(filePath))
+            if (fileSystem.File.Exists(filePath) && !@this.IsInteractive())
+            {
+                // Without a terminal the default answer of the prompt applies: the named file is rewritten.
+                Console.WriteLine($"The file '{fileSystem.Path.GetFileName(filePath)}' already exists and is rewritten.");
+            }
+            else if (fileSystem.File.Exists(filePath))
             {
                 var shouldOverride = @this.Confirm(new ConfirmOptions
                 {

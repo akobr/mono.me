@@ -188,14 +188,17 @@ public class StorytellerSetCommandTests
     public async Task DeletedKey_WithRedirectedInputAndNoOption_StopsAndNamesBothOptions()
     {
         DeletedAmong(Key);
-        _fixture.InnerConsole.SetupGet(console => console.IsInputRedirected).Returns(true);
+        _fixture.Console.UseInnerConsole(redirectedInput: true);
 
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _calls.ShouldBeEmpty();
-        _fixture.Line("Choose").ShouldContain("--restore-deleted");
-        _fixture.Line("Choose").ShouldContain("--recreate");
+        _fixture.Console.ErrorLines.ShouldBe(
+        [
+            "! sform cannot ask for what happens to the deleted annotations: the input is redirected.",
+            "  Choose with an option: --restore-deleted restores and updates them, --recreate creates them new.",
+        ]);
         _fixture.Console.Mock.Verify(console => console.Select(It.IsAny<SelectOptions<string>>()), Times.Never);
     }
 

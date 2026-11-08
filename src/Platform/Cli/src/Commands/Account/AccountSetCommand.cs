@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
@@ -30,7 +31,7 @@ public class AccountSetCommand : BaseCommand
         _accessDefault = accessDefaultOptions.Value;
     }
 
-    [Option("-p|--projectKey", CommandOptionType.SingleValue, Description = "A project key to set as default.")]
+    [Option("-p|--projectKey", CommandOptionType.SingleValue, Description = "A project key to set as default, <organizationName>.<projectName>; required without a terminal.")]
     public string? ProjectKey { get; set; }
 
     [Option("-v|--viewName", CommandOptionType.SingleValue, Description = "A view name to set as default.")]
@@ -38,7 +39,12 @@ public class AccountSetCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        if (ProjectKey is not null && !UserSettingDefinitions.TrySplitProjectKey(ProjectKey, out _, out _))
+        // The list to choose from needs a terminal: without one, fail before any call.
+        if (ProjectKey is null)
+        {
+            Console.EnsureInteractiveValue("the default project", "Pass it with -p|--projectKey <organizationName>.<projectName>.");
+        }
+        else if (!UserSettingDefinitions.TrySplitProjectKey(ProjectKey, out _, out _))
         {
             Console.WriteImportant($"'{ProjectKey}' is no project key; it takes <organization>.<project>.");
             return ExitCodes.ERROR_WRONG_INPUT;
@@ -132,4 +138,3 @@ public class AccountSetCommand : BaseCommand
         return projectKey;
     }
 }
-

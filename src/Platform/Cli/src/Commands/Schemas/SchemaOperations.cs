@@ -81,8 +81,15 @@ internal static class SchemaOperations
         SchemaLayer layer,
         string? annotationType,
         string? annotationKey,
-        bool force)
+        bool force,
+        bool confirm = true)
     {
+        // The changes are confirmed before they are saved: without a terminal, fail before any call or editor.
+        if (confirm)
+        {
+            console.EnsureInteractive("the confirmation of the changes", "Pass -y|--yes to save them without asking.");
+        }
+
         var subject = Describe(layer, annotationType, annotationKey);
         ConfigurationSchema current;
 
@@ -105,7 +112,8 @@ internal static class SchemaOperations
             editorOptions,
             ToJObject(current.Content),
             EditorFilePrefix(layer, context.ViewName, annotationType, annotationKey),
-            false);
+            false,
+            confirm);
 
         if (result.Edited is null)
         {

@@ -10,6 +10,7 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.Account;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Services;
 using _42.Platform.Cli.UnitTests.Authentication;
 using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller.Sdk.Credentials;
@@ -442,7 +443,16 @@ public class AccountCommandTests
     {
         var machine = TestMachines.Create(_environment, fileSystem ?? new MockFileSystem(), _http, new ManualTimeProvider(Start));
         var stored = Options.Create(new AccessDefaultOptions { OrganizationName = "house", ProjectName = "stored" });
-        var command = new AccountCommand(_console.Object, _accessApi.Object, _authentication.Object, stored, machine, new CommandContext(stored, machine))
+        var paths = CliPaths.Create(new MockFileSystem(), null, MockUnixSupport.Path(@"C:\tools\sform"), () => MockUnixSupport.Path(@"C:\Users\ada"));
+        var command = new AccountCommand(
+            _console.Object,
+            _accessApi.Object,
+            _authentication.Object,
+            stored,
+            machine,
+            new CommandContext(stored, machine),
+            SformEnvironment.FromEnvironment(_ => null, paths),
+            Mock.Of<IBrowserLauncher>(MockBehavior.Strict))
         {
             OpenBrowser = openBrowser,
         };

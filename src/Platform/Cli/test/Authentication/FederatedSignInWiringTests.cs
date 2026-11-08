@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
+using _42.Platform.Cli.Configuration;
 using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.DependencyInjection;
@@ -156,6 +157,8 @@ public class FederatedSignInWiringTests : IDisposable
         services.AddSingleton<IFileSystem>(new MockFileSystem());
         services.AddHttpClient();
         Startup.ConfigureMachineSignIn(services);
+        var paths = CliPaths.Create(new MockFileSystem(), null, MockUnixSupport.Path(@"C:\tools\sform"), () => MockUnixSupport.Path(@"C:\Users\ada"));
+        Startup.ConfigureStatePaths(services, paths, SformEnvironment.FromEnvironment(_ => null, paths));
 
         // Startup reads the variables of the process, and the SDK credential sends its token requests to the network.
         services.Replace(ServiceDescriptor.Singleton(TestMachines.Settings(environment)));

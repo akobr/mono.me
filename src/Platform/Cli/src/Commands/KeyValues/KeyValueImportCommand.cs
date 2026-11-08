@@ -125,8 +125,12 @@ public class KeyValueImportCommand : KeyValueCommandBase
         return Console.WriteImportResult(result);
     }
 
+    // Reached only with changes to write: a missing file, a wrong input and an import with nothing to change end with their
+    // own codes, also without a terminal; the plan (a dry run of the API) is on the output before the stop.
     private Task<bool> ConfirmAsync(KeyValueImportResult plan)
     {
+        Console.EnsureInteractive("the confirmation of the import", "Pass -y|--yes to import without asking, or --dry-run to see the plan.");
+
         var deletes = plan.Items?.Count(item => item.Action == KeyValueImportItemResultAction.Delete) ?? 0;
 
         if (deletes > 0)

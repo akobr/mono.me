@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -32,6 +33,8 @@ public class KeyValueDeleteCommand : KeyValueCommandBase
 
         if (Permanent && !Yes)
         {
+            Console.EnsureInteractive("the confirmation of the permanent delete", "Pass -y|--yes to remove the key without asking.");
+
             var typed = Console.Input<string>($"Type the key to remove '{key}' with every version for good");
 
             if (!string.Equals(typed?.Trim(), key, StringComparison.OrdinalIgnoreCase))

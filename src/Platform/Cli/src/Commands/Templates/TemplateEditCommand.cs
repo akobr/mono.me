@@ -34,6 +34,9 @@ public class TemplateEditCommand : BaseContextCommand
     [Argument(0, Description = "An annotation type code (rst, unt, sbt, usg, cnt, exe, uxe) to edit the template for.")]
     public string AnnotationType { get; set; } = string.Empty;
 
+    [Option("-y|--yes", CommandOptionType.NoValue, Description = "Save the edited template without asking for confirmation.")]
+    public bool Yes { get; set; }
+
     /// <summary>
     /// Opens the template in the configured editor and replaces the template with the edited document when the user confirms.
     /// </summary>
@@ -48,6 +51,13 @@ public class TemplateEditCommand : BaseContextCommand
     protected override async Task<int> ExecuteAsync()
     {
         var annotationType = Console.ValidateAnnotationType(AnnotationType);
+
+        // The changes are confirmed before they are saved: without a terminal, fail before any call or editor.
+        if (!Yes)
+        {
+            Console.EnsureInteractive("the confirmation of the changes", "Pass -y|--yes to save them without asking.");
+        }
+
         var currentContent = await _templatesApi.GetTemplateContentAsync(
             Context.OrganizationName,
             Context.ProjectName,
@@ -64,7 +74,8 @@ public class TemplateEditCommand : BaseContextCommand
             _editorOptions,
             currentContent ?? new JObject(),
             $"template-{Context.ViewName}-{annotationType}",
-            currentContent is null);
+            currentContent is null,
+            confirm: !Yes);
 
         if (result.Edited is null)
         {

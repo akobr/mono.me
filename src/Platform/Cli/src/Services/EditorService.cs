@@ -73,6 +73,10 @@ public class EditorService : IEditorService
     /// <returns>The constructed <see cref="EditorOptions"/> reflecting the chosen editor; if a custom command was chosen, <see cref="EditorOptions.CustomCommand"/> contains the entered command.</returns>
     public EditorOptions PromptEditorPreference(IExtendedConsole console)
     {
+        console.EnsureInteractive(
+            "the editor to use",
+            "Choose one with sform account settings editor in a terminal, set it with sform account settings set editor.type, or set $VISUAL or $EDITOR.");
+
         var availableEditors = DetectAvailableEditors();
         var selectionItems = new List<string>();
 
@@ -286,6 +290,13 @@ public class EditorService : IEditorService
 
                 console.WriteImportant(problem!);
 
+                // Without a terminal there is nobody to fix it in the editor again.
+                if (!console.IsInteractive())
+                {
+                    console.WriteLine("Nothing was saved.");
+                    return new JsonEditResult(null, ExitCodes.ERROR_WRONG_INPUT);
+                }
+
                 var shouldRetry = console.Confirm(new ConfirmOptions
                 {
                     Message = "Would you like to re-open the editor to fix the issue",
@@ -312,6 +323,8 @@ public class EditorService : IEditorService
             // 6. Confirm upload
             if (confirm)
             {
+                console.EnsureInteractive("the confirmation of the changes", "Pass -y|--yes to save them without asking.");
+
                 var shouldSave = console.Confirm(new ConfirmOptions
                 {
                     Message = "Do you want to save these changes",

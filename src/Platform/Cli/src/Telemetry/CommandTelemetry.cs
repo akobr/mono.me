@@ -26,6 +26,7 @@ internal static class CommandTelemetry
     public static ICommandTelemetry Create(
         TelemetryOptions? options,
         IFileSystem fileSystem,
+        CliPaths paths,
         IHostEnvironment environment,
         MachineSignInSettings? machineSignIn,
         ILogger logger)
@@ -34,7 +35,7 @@ internal static class CommandTelemetry
         {
             return Create(
                 TelemetrySettings.Resolve(options ?? new TelemetryOptions(), System.Environment.GetEnvironmentVariable),
-                new InstallationIdStore(fileSystem),
+                new InstallationIdStore(fileSystem, paths),
                 environment.EnvironmentName,
                 machineSignIn?.IsConfigured == true,
                 logger,

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
@@ -12,6 +11,9 @@ using _42.Platform.Cli.Commands.AccessPoints;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Commands.SharedCertificates;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Output.Exceptions;
+using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller.Sdk.Credentials;
 using McMaster.Extensions.CommandLineUtils;
@@ -38,6 +40,8 @@ public class AccountCommand : BaseCommand
     private readonly AccessDefaultOptions _accessDefault;
     private readonly IMachineSignIn _machine;
     private readonly ICommandContext _context;
+    private readonly SformEnvironment _environment;
+    private readonly IBrowserLauncher _browser;
 
     public AccountCommand(
         IExtendedConsole console,
@@ -45,7 +49,9 @@ public class AccountCommand : BaseCommand
         IAuthenticationService authentication,
         IOptions<AccessDefaultOptions> accessDefaultOptions,
         IMachineSignIn machine,
-        ICommandContext context)
+        ICommandContext context,
+        SformEnvironment environment,
+        IBrowserLauncher browser)
         : base(console)
     {
         _accessApi = accessApi;
@@ -53,10 +59,15 @@ public class AccountCommand : BaseCommand
         _accessDefault = accessDefaultOptions.Value;
         _machine = machine;
         _context = context;
+        _environment = environment;
+        _browser = browser;
     }
 
-    [Option("-b|--browser", CommandOptionType.NoValue, Description = "Open the sign-in page in the default browser.")]
+    [Option("-b|--browser", CommandOptionType.NoValue, Description = "Open the sign-in page in the browser: the program in SFORM_BROWSER or BROWSER, else the default browser.")]
     public bool OpenBrowser { get; set; }
+
+    [Option("-o|--organization", CommandOptionType.SingleValue, Description = "The id of the organization to sign in to, needed without a terminal when you belong to several.")]
+    public string? Organization { get; set; }
 
     public override async Task<int> OnExecuteAsync()
     {
@@ -65,14 +76,31 @@ public class AccountCommand : BaseCommand
             return await SignInMachineAsync();
         }
 
+        if (_environment.TokenStoreNotice is { } notice)
+        {
+            Console.WriteImportant(notice);
+        }
+
+        var organization = string.IsNullOrWhiteSpace(Organization) ? null : Organization.Trim();
+
         try
         {
             var user = await _authentication.GetSignedInUserAsync();
 
             if (user is null)
             {
-                user = await _authentication.LoginWithDeviceCodeAsync(ShowSignInPromptAsync, SelectOrganizationAsync);
+                user = await _authentication.LoginWithDeviceCodeAsync(ShowSignInPromptAsync, SelectOrganizationAsync, organization);
                 Console.WriteImportant($"You have been logged in as {user.UserName}");
+            }
+            else if (organization is not null && !string.Equals(user.OrganizationId, organization, StringComparison.OrdinalIgnoreCase))
+            {
+                // -o is never ignored: a stored session of another organization, or of none (Entra ID), is not the one asked for.
+                Console.WriteImportant(
+                    user.OrganizationId is null
+                        ? $"You are signed in as {user.UserName} without an organization, and -o|--organization asks for '{organization}'."
+                        : $"You are signed in as {user.UserName} to the organization '{user.OrganizationId}', and -o|--organization asks for '{organization}'.");
+                Console.WriteLine("Sign out with sform account logout, then sign in with -o.".ThemedLowlight(Console.Theme));
+                return ExitCodes.ERROR_WRONG_INPUT;
             }
             else
             {
@@ -83,6 +111,11 @@ public class AccountCommand : BaseCommand
         catch (AuthenticationException exception)
         {
             return ReportSignInFailure(exception);
+        }
+        catch (OutputException exception)
+        {
+            // Several organizations on redirected input: the reason is on standard error already.
+            return exception.ExitCode;
         }
 
         _42.Platform.Storyteller.Sdk.Account account;
@@ -239,6 +272,15 @@ public class AccountCommand : BaseCommand
 
     private Task ShowSignInPromptAsync(DeviceCodePrompt prompt)
     {
+        if (_environment.IsDeviceCodeJson)
+        {
+            // The contract for programs, before any other output: one line on standard error, flushed at once.
+            var error = Console.Console.Error;
+            error.Write(prompt.ToJsonLine());
+            error.Write('\n');
+            error.Flush();
+        }
+
         Console.WriteHeader("Sign in");
         Console.WriteLine(
             "To sign in, open ",
@@ -254,16 +296,24 @@ public class AccountCommand : BaseCommand
 
         Console.WriteLine($"The code expires in {Math.Max(1, (int)Math.Round(prompt.ExpiresIn.TotalMinutes))} minute(s).".ThemedLowlight(Console.Theme));
 
-        if (OpenBrowser)
+        if (OpenBrowser && !_browser.TryOpen(prompt.VerificationUriComplete ?? prompt.VerificationUri))
         {
-            OpenInBrowser(prompt.VerificationUriComplete ?? prompt.VerificationUri);
+            Console.WriteLine("The browser could not be opened, please open the address manually.".ThemedLowlight(Console.Theme));
         }
 
         return Task.CompletedTask;
     }
 
+    // Asked only without -o, after the code was confirmed, when WorkOS offers several organizations.
     private Task<string> SelectOrganizationAsync(IReadOnlyList<OrganizationChoice> organizations)
     {
+        Console.EnsureInteractiveValue(
+            "the organization to sign in to",
+            [
+                "You belong to several organizations; pass one with -o|--organization <id>:",
+                .. organizations.Select(choice => $"  {choice.Id}  {choice.Name}"),
+            ]);
+
         var organization = Console.Select(new SelectOptions<OrganizationChoice>
         {
             Message = "You belong to several organizations, which one do you want to sign in to",
@@ -274,38 +324,28 @@ public class AccountCommand : BaseCommand
         return Task.FromResult(organization.Id);
     }
 
-    private void OpenInBrowser(Uri uri)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
-        }
-        catch (Exception exception) when (exception is Win32Exception or InvalidOperationException or PlatformNotSupportedException)
-        {
-            Console.WriteLine("The browser could not be opened, please open the address manually.".ThemedLowlight(Console.Theme));
-        }
-    }
-
     private int ReportSignInFailure(AuthenticationException exception)
     {
         switch (exception.Reason)
         {
             case AuthenticationFailureReason.Cancelled:
                 Console.WriteImportant("The log in operation has been cancelled, please try it again later.");
-                break;
+                return ExitCodes.ERROR_WRONG_INPUT;
             case AuthenticationFailureReason.Expired:
                 Console.WriteImportant("The sign-in code expired before the sign-in was completed, please try it again.");
-                break;
+                return ExitCodes.ERROR_WRONG_INPUT;
             case AuthenticationFailureReason.Denied:
                 Console.WriteImportant("The sign-in was declined.");
-                break;
+                return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
+            case AuthenticationFailureReason.Configuration:
+                // e.g. -o with an organization the user is not a member of: nothing was stored.
+                Console.WriteImportant(exception.Message);
+                return ExitCodes.ERROR_WRONG_INPUT;
             default:
                 Console.WriteImportant("The log in operation failed, please try it again later.");
                 Console.WriteLine();
                 Console.WriteLine(exception.Message);
-                break;
+                return ExitCodes.ERROR_SERVICE_FAILURE;
         }
-
-        return ExitCodes.ERROR_WRONG_INPUT;
     }
 }
