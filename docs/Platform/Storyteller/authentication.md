@@ -1125,7 +1125,7 @@ The scopes come in two groups. The **runtime** scopes are the reads and the per-
 | Scope | `MachineScope` | Group | Operations |
 |---|---|---|---|
 | `Annotation.Read` | `AnnotationRead` | Runtime | The reads of annotations: lists, single annotations, descendants, history, and deleted annotations with their lookup ([annotation-lifecycle.md](annotation-lifecycle.md#api)) |
-| `Annotation.Write` | `AnnotationWrite` | Runtime | The write of one annotation (`PUT …/annotations/{key}`) |
+| `Annotation.Write` | `AnnotationWrite` | Runtime | The write and the patch of one annotation (`PUT`, `POST` and `PATCH …/annotations/{key}`) |
 | `Configuration.Read` | `ConfigurationRead` | Runtime | The reads of configurations (raw, resolved, versions, diffs, composition), schemas, templates, key/values with their policy and recipients ([key-values.md](key-values.md#who-may-do-what)), and the binding catalog |
 | `Configuration.Write` | `ConfigurationWrite` | Runtime | The writes, patches and deletes of configurations, and the writes and soft deletes of key/values |
 | `Secrets.Read` | `SecretsRead` | Runtime | The values of key/value secrets: in a resolved configuration, a reveal, a secret version or diff, and an export with secrets ([key-values.md](key-values.md#secret-delivery)) |
@@ -1785,6 +1785,14 @@ Browser clients, such as the admin UI, call the API from another origin. The dep
 ```bash
 az functionapp cors add --name <function-app> --resource-group <group> --allowed-origins https://admin.42for.net
 ```
+
+[Conditional writes of annotations](annotation-lifecycle.md#versions-and-conditional-writes) need more from a browser on another origin:
+
+* The preflight must allow the request headers `If-Match` and `If-None-Match`, as it allows `Authorization` and `Content-Type`. A proxy or API Management with its own CORS policy has to list them.
+* Script reads the `ETag` of a cross-origin response only when `Access-Control-Expose-Headers` names it. The Function App's CORS settings hold the allowed origins and credentials only, so they cannot expose a response header: a cross-origin browser gets no tag to send back. A same-origin proxy avoids CORS altogether, and API Management in front of the API can add `ETag` to `Access-Control-Expose-Headers`.
+* A [merge `PATCH`](annotation-lifecycle.md#merge-writes-patch) without a condition needs no `ETag`. The preflight has to allow only the method `PATCH` and its `Content-Type` (`application/merge-patch+json` or `application/json-patch+json`), so a cross-origin client can change single members of an annotation without losing concurrent changes of the others.
+
+The admin UI uses neither yet: it writes whole bodies without a condition.
 
 ## Switching an existing deployment
 

@@ -85,8 +85,23 @@ A continuation token pages large catalogs. Name filters on the collection routes
 Send an annotation to:
 
 ```text
-PUT /v1/{org}/{project}/{view}/annotations/{key}
+POST /v1/{org}/{project}/{view}/annotations/{key}
 ```
+
+`PUT` on the same path does the same. The body replaces what you can edit: a field it does not hold is cleared.
+
+To change single fields, send a `PATCH` to the same path instead. Its body is a JSON Merge Patch (`application/merge-patch+json`), where a field left out keeps its value and `null` clears it, or a JSON Patch (`application/json-patch+json`), as for configuration:
+
+```text
+PATCH /v1/{org}/{project}/{view}/annotations/{key}
+Content-Type: application/merge-patch+json
+
+{ "Title": "Invoicing (EU)", "Values": { "plan": "pro" } }
+```
+
+The platform merges the patch into the stored record, so a change another client made to another field at the same time is kept. `Values` merge name by name, and a label you add is kept once. A `PATCH` never creates a record: a missing or deleted key answers `404`.
+
+A read of one record answers its version in the `ETag` header, and so do `POST` and `PATCH` (`PUT` does not). Send it back in `If-Match` to write only that version: when someone changed the record in between, the write answers `412` and changes nothing, so read it again. `If-None-Match: *` on a `POST` only creates, and answers `412` when the key exists.
 
 A batch is `POST /v1/{org}/{project}/{view}/annotations`.
 
@@ -118,7 +133,7 @@ A delete is reversible for 90 days. The deleted records, with their configuratio
 | Remove a deleted record now (Administrator) | `DELETE .../annotations/deleted/{key}` |
 | Who changed a record, and what | `GET .../annotations/{key}/history` |
 
-Writing a key that is deleted creates it again with the new content and an empty configuration. To keep the old configuration, restore the key first and then write it.
+Writing a key that is deleted creates it again with the new content and an empty configuration. To keep the old configuration, restore the key first and then `PATCH` it, so the restored record keeps what you do not change.
 
 ## Writing configuration
 

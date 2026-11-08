@@ -35,6 +35,8 @@ Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (
 
 `src/ApiSdk.Conditional.cs` is hand-written: it copies the route, the `format` query, the hooks and the exceptions of `GetConfigurationAsync` and `GetResolvedConfigurationAsync`, and of `GetConfigurationCompositionAsync` (its twin, `GetConfigurationCompositionConditionalAsync`, returns `ConditionalResponse<ConfigurationComposition>`). After a regeneration, compare it with the two generated methods, and keep the members it uses: `ConvertToString`, `ReadObjectResponseAsync`, `ReadAsStringAsync`, the `PrepareRequest` and `ProcessResponse` hooks, and the messages of the exceptions, which differ per read for a `422`.
 
+`src/ApiSdk.Annotations.cs` is hand-written too: it copies the route, the `includeInactive` query, the hooks and the exceptions, with their messages per status, of `GetAnnotationAsync`, `SetAnnotationAsync` and `PatchAnnotationAsync` (see [Annotation versions](#annotation-versions)). After a regeneration, compare it with the three generated methods: a new documented status or a changed message has to be copied by hand.
+
 ## Conditional reads
 
 `IConfigurationsApiClient` has a conditional twin of each configuration read:
@@ -77,6 +79,56 @@ etag = response.ETag;     // the tag of env, not of the envelope or another form
 * `Accept` follows the format, from a map of the SDK (`flat` → `application/json`, `properties` and `env` → `text/plain`, `yaml` → `application/yaml`, any other value `*/*`); the server goes by the query alone. The SDK does not reference the formats library.
 * `Result` of a `200` is the body as text, whatever its media type: the JSON object of `flat` is not parsed, and an empty body, the `env` or `properties` of a document without values, is `""`. A `304` has no `Result`.
 * The headers, the exceptions and their messages are those of the envelope twins. Each format has its own `ETag`; send a tag back only to the format it came from.
+
+## Annotation versions
+
+`IAnnotationsApiClient` has three hand-written methods (`src/ApiSdk.Annotations.cs`) that return the `ETag` of an annotation with it, for [conditional writes and merge patches](../../../../docs/Platform/Storyteller/annotation-lifecycle.md#versions-and-conditional-writes):
+
+```csharp
+var read = await annotations.GetAnnotationVersionedAsync("acme", "billing", "default", "exe.northwind.invoicing.prod", includeInactive: true);
+var annotation = read.Result;
+annotation.Title = "Invoicing (EU)";
+
+try
+{
+    var written = await annotations.SetAnnotationVersionedAsync("acme", "billing", "default", annotation.AnnotationKey, annotation, ifMatch: read.ETag);
+    etag = written.ETag;   // "a1.…", the version just written
+}
+catch (ApiException<ErrorResponse> e) when (e.StatusCode == 412)
+{
+    // AnnotationPreconditionFailed: it changed since the read; read it again
+}
+```
+
+* `GetAnnotationVersionedAsync(organization, project, view, key, includeInactive, cancellationToken)` is `GET …/annotations/{key}`. A deleted annotation is not read (no `includeDeleted`).
+* `SetAnnotationVersionedAsync(organization, project, view, key, body, ifMatch, ifNoneMatch, cancellationToken)` is `POST …/annotations/{key}`: the body replaces the editable content. `ifMatch: etag` writes only that version and never re-creates; `ifNoneMatch: "*"` only creates (a missing or deleted key).
+* `PatchAnnotationVersionedAsync(organization, project, view, key, patch, ifMatch, cancellationToken)` is the merge `PATCH`. A `JArray` goes as a JSON Patch (`application/json-patch+json`), a `JObject` as a JSON Merge Patch (`application/merge-patch+json`), as it is: its explicit `null`s stay, so a merge patch can clear a member (`["Description"] = JValue.CreateNull()`) or remove a value (`["Values"] = new JObject { ["trial"] = JValue.CreateNull() }`). Any other token throws `ArgumentException`. A patch never creates: a missing or deleted key answers `404` (`AnnotationNotFound`, `AnnotationDeleted`).
+* `ifMatch` and `ifNoneMatch` are sent unchanged; `null` (the default) or an empty string sends none. Send the `ETag` back as it came.
+* `VersionedResponse<Annotation>` has the `StatusCode`, the `Result`, the raw `ETag` (`null` when the answer has none) and all `Headers`, with case-insensitive names.
+* The methods go through the client's `PrepareRequest` and `ProcessResponse` hooks, so `AccessTokenFactory` and a `DelegatingHandler` apply as to the generated methods. They throw what the generated methods throw, with the same messages: `ApiException<ErrorResponse>` for a documented status with a body (a `412` with `AnnotationPreconditionFailed` or `PatchTestFailed`, a `409`, a `415`, and so on), and a plain `ApiException` for a `401`, a `404` without a body (a missing annotation on a read) and anything else.
+
+`AnnotationJsonPatch` builds a JSON Patch of the editable document, for `PatchAnnotationVersionedAsync`:
+
+```csharp
+var patch = new AnnotationJsonPatch()
+    .Set(nameof(Annotation.Title), "Invoicing (EU)")
+    .SetValue("plan", "pro")
+    .AddLabel("eu");
+
+if (!patch.IsEmpty)
+{
+    var patched = await annotations.PatchAnnotationVersionedAsync("acme", "billing", "default", "exe.northwind.invoicing.prod", patch.ToJson());
+}
+```
+
+* Every operation is an `add`, which works whatever was there, because the document always has every member (null when unset, `Labels` and `Values` never null).
+* `Set(member, value)` sets a member by its JSON name (case-sensitive: `nameof(Annotation.Title)`); a whole `Labels` or `Values` replaces the set. `Clear(member)` sets it to null: unset, or no labels or values.
+* `SetValue(name, value)` sets one value of `Values`, replaced whole; a `null` value stays a JSON `null`, which a merge patch cannot write.
+* `AddLabel(label)` appends a label; the server keeps a label once, so one the annotation has changes nothing.
+* Names are escaped per RFC 6901 (`Escape`). The values are written by the `JsonSerializer` given to the constructor, by default one that writes a `DateTimeOffset` in ISO 8601 with its offset.
+* `ToJson()` returns a copy of the operations, `IsEmpty` and `Count` tell how many there are.
+
+The generated `SetAnnotationAsync(organization, project, view, key, body, if_Match, if_None_Match)` sends the same conditions, by `POST`, and throws `ApiException<ErrorResponse>` for a `412`, but it returns the body without the `ETag`. The generated `PatchAnnotationAsync(organization, project, view, key, body, if_Match)` sends an `AnnotationMergePatch` as a merge patch: it sets members, values and the whole `Labels`, but it cannot clear anything, because the DTO leaves its `null`s out. Use `PatchAnnotationVersionedAsync` with a `JObject` or an `AnnotationJsonPatch` to clear.
 
 ## Credentials
 
