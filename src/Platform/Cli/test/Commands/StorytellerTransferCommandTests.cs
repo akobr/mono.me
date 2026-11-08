@@ -66,7 +66,7 @@ public class StorytellerTransferCommandTests
     public void Commands_NameTheAdministratorRole_AndWhatAMachineNeeds(Type command, string description, string machine)
     {
         var attribute = command.GetCustomAttribute<CommandAttribute>()!;
-        var detail = TransferHelpTests.Unwrap(attribute.ExtendedHelpText);
+        var detail = HelpTexts.Unwrap(attribute.ExtendedHelpText);
 
         attribute.Description.ShouldBe(description);
         detail.ShouldContain("A user needs the Administrator role on the project.", Case.Sensitive);
@@ -82,7 +82,7 @@ public class StorytellerTransferCommandTests
         "The zip or folder holds annotations, schemas, templates and configurations, each recognized by its file name. Only current documents are imported, never versions, and nothing is deleted.")]
     public void Commands_SayWhatTheArchiveHolds(Type command, string archive)
     {
-        var detail = TransferHelpTests.Unwrap(command.GetCustomAttribute<CommandAttribute>()!.ExtendedHelpText);
+        var detail = HelpTexts.Unwrap(command.GetCustomAttribute<CommandAttribute>()!.ExtendedHelpText);
 
         detail.ShouldStartWith(archive, Case.Sensitive);
     }
