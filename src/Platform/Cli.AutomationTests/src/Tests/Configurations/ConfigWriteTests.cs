@@ -329,8 +329,10 @@ public sealed class ConfigWriteTests : CliTest
             .ShouldNotContain("Warning");
         await Assert.That(ConfigOutput.LastJson(forced2)["Content"]?["a"]?.GetValue<string>()).IsEqualTo("text");
 
+        // the server's message names the failing operation (the test op is operation 0 of the file)
         (await Sform(At("story", "config", "patch", key, "-i", "failing-test.json", "-y")))
             .ShouldExitWith(CliExit.WrongInput)
+            .ShouldContain("JSON Patch operation 0 failed:")
             .ShouldContain("Error code: PatchTestFailed");
         var kept = (await Sform(At("story", "config", key))).ShouldSucceed().JsonNode();
         await Assert.That(kept["Version"]?.GetValue<long>()).IsEqualTo(after);

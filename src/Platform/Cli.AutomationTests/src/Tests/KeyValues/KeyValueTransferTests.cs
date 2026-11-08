@@ -148,8 +148,9 @@ public sealed class KeyValueTransferTests : CliTest
     // As a ContributorWithSecrets, a public pair and a secret of a group: kv export --prefix <group>. lists the secret
     // without its value, kv export --include-secrets with it. As a Contributor (in <contributor project>, or a Contributor
     // of the target project when Target:RoleProjects maps none, reading the same group), kv export works and lists the
-    // secrets without values, and kv export --include-secrets ends with 44 and "The caller has no rights to export
-    // secrets.".
+    // secrets without values, and kv export --include-secrets ends with 44, "The caller has no rights to the secrets of
+    // the project." and "Error code: AccessDenied" (the API checks the secret read right before the export, so the
+    // service's own "… no rights to export secrets." is never reached).
     [Test]
     [TestCase(416)]
     [UserRole(Role.Secrets)]
@@ -199,7 +200,8 @@ public sealed class KeyValueTransferTests : CliTest
 
         (await AsContributor(["story", "kv", "export", "--include-secrets", .. scope]))
             .ShouldExitWith(CliExit.Unauthorized)
-            .ShouldContain("The caller has no rights to export secrets.")
+            .ShouldContain("The caller has no rights to the secrets of the project.")
+            .ShouldContain("Error code: AccessDenied")
             .ShouldNotContain(secret);
     }
 

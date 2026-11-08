@@ -15,8 +15,9 @@ public sealed partial class CliTarget : PlatformTargetSettings
     public string? AuthKitOrganizationId { get; set; }
 
     // What the target offers beyond the basics, for the cases that need it ([RequiresFeature]): Byok (a customer key in
-    // an Azure Key Vault), Hsm (HSM-backed keys), Registration (an unregistered pool user whose account the run may
-    // create), MultiOrganization (a pool user in two organizations).
+    // an Azure Key Vault), ByokApplication (the platform's BYOK application on the API, which Byok implies), Hsm
+    // (HSM-backed keys), Registration (an unregistered pool user whose account the run may create), MultiOrganization (a
+    // pool user in two organizations).
     // Case-insensitive.
     public List<string> Features
     {
@@ -27,10 +28,12 @@ public sealed partial class CliTarget : PlatformTargetSettings
     // "<organization>.<project>", as sform's -p takes it.
     public string ProjectKey => $"{Organization}.{Project}";
 
+    // Whether Features lists the feature; Byok also stands for ByokApplication (a customer key needs the application).
     public bool HasFeature(string feature)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(feature);
-        return Features.Any(candidate => string.Equals(candidate?.Trim(), feature, StringComparison.OrdinalIgnoreCase));
+        return Lists(feature)
+            || (string.Equals(feature, CliFeatures.ByokApplication, StringComparison.OrdinalIgnoreCase) && Lists(CliFeatures.Byok));
     }
 
     // Adds a message to errors for each CLI key that is wrong, after the shared ones (PlatformTargetSettings.Validate).
@@ -58,4 +61,9 @@ public sealed partial class CliTarget : PlatformTargetSettings
 
     [GeneratedRegex(@"^org_[0-9A-Za-z]{10,40}\z", RegexOptions.CultureInvariant)]
     private static partial Regex OrganizationIdPattern();
+
+    private bool Lists(string feature)
+    {
+        return Features.Any(candidate => string.Equals(candidate?.Trim(), feature, StringComparison.OrdinalIgnoreCase));
+    }
 }
