@@ -175,6 +175,8 @@ jobs:
           CI_MACHINE_APIKEY_API_KEY: ${{ secrets.UITESTS_MACHINE_APIKEY_API_KEY }}
           CI_MACHINE_APIKEY_PROJECT: ${{ vars.UITESTS_MACHINE_APIKEY_PROJECT }}
           CI_MACHINE_APIKEY_VIEW: ${{ vars.UITESTS_MACHINE_APIKEY_VIEW }}
+          CI_KEYVALUES_BYOK_KEY_URI: ${{ vars.UITESTS_KEYVALUES_BYOK_KEY_URI }}
+          CI_KEYVALUES_BYOK_TENANT_ID: ${{ vars.UITESTS_KEYVALUES_BYOK_TENANT_ID }}
           CI_TESTINY_PROJECT_ID: ${{ vars.UITESTS_TESTINY_PROJECT_ID }}
           CI_TESTINY_TEST_PLAN_ID: ${{ vars.UITESTS_TESTINY_TEST_PLAN_ID }}
           CI_TESTINY_API_KEY: ${{ inputs.report_testiny && secrets.UITESTS_TESTINY_API_KEY || '' }}
@@ -232,6 +234,10 @@ jobs:
           set_if UITESTS_Machines__apikey__ApiKey "$CI_MACHINE_APIKEY_API_KEY"
           set_if UITESTS_Machines__apikey__Project "$CI_MACHINE_APIKEY_PROJECT"
           set_if UITESTS_Machines__apikey__View "$CI_MACHINE_APIKEY_VIEW"
+
+          # The customer key of the Byok cases (required when UITESTS_TARGET_FEATURES lists Byok); not secrets.
+          set_if UITESTS_KeyValues__ByokKeyUri "$CI_KEYVALUES_BYOK_KEY_URI"
+          set_if UITESTS_KeyValues__ByokTenantId "$CI_KEYVALUES_BYOK_TENANT_ID"
 
           if [ "$REPORT_TESTINY" = true ]; then
             profiles="$profiles,reporting-testiny"

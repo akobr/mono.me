@@ -12,13 +12,20 @@ namespace _42.Platform.Cli.AutomationTests.Tests.Configurations;
 //   - LinesOf: the lines of a payload (--content-only, a file), NumberedLines those of a --format without --content-only
 //     (WriteNumberedText, the gutter removed), LastJson the last model WriteJson printed (config patch prints the JSON
 //     Patch first, then the saved model);
-//   - Versions: the first cell of each row of a versions table (config versions, template versions), top to bottom;
+//   - ConfigurationVersions, TemplateVersions: the headers of config versions and template versions, whose rows
+//     SformResult.VersionRows reads (top to bottom, the newest first);
 //   - HasDiffLine: a deleted ('-') or added ('+') line of a diff (WriteDiffResult: "<old> <new> │ - <line>");
 //   - SavedVersion: N of "… has been saved (version N)." of config edit and template edit;
 //   - GitHubEnvNames, GitHubEnvValueOf: the heredoc entries of a GITHUB_ENV file (NAME<<ghadelimiter_…, the value, the
 //     delimiter).
 internal static partial class ConfigOutput
 {
+    // The header of config versions <key> ("Versions of the configuration for '<key>'"), for SformResult.VersionRows.
+    public const string ConfigurationVersions = "Versions of the configuration for";
+
+    // The header of template versions <type>, for SformResult.VersionRows.
+    public const string TemplateVersions = "Versions of the template for";
+
     public static string[] In(string projectKey, string view, params string[] arguments)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectKey);
@@ -79,16 +86,6 @@ internal static partial class ConfigOutput
         return last ?? throw result.Fail("printed no JSON object in numbered lines");
     }
 
-    // The versions of a versions table, as the rows list them (the newest first). A row starts with its version, a
-    // number followed by white space; a cell that wraps (a date, an author) never starts a line with such a number.
-    public static IReadOnlyList<long> Versions(SformResult result)
-    {
-        ArgumentNullException.ThrowIfNull(result);
-        return VersionRow().Matches(result.PlainStdOut)
-            .Select(match => long.Parse(match.Groups["version"].Value, CultureInfo.InvariantCulture))
-            .ToList();
-    }
-
     // A line of a diff with the sign ('-' deleted, '+' added) whose text ends with the given text (a trailing comma
     // allowed), e.g. HasDiffLine(diff, '-', "\"a\": 2").
     public static bool HasDiffLine(SformResult result, char sign, string text)
@@ -137,9 +134,6 @@ internal static partial class ConfigOutput
     // A date of a versions table ("yyyy-MM-dd HH:mm"; the time may wrap to the next line of its cell).
     [GeneratedRegex(@"\d{4}-\d{2}-\d{2}", RegexOptions.CultureInvariant)]
     public static partial Regex DatePattern();
-
-    [GeneratedRegex(@"^\s*(?<version>\d+)\s+\S", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
-    private static partial Regex VersionRow();
 
     [GeneratedRegex(@"has been saved \(version (?<version>\d+)\)\.", RegexOptions.CultureInvariant)]
     private static partial Regex SavedPattern();

@@ -32,35 +32,46 @@ public abstract partial class CliTest
     }
 
     // A second pool user for the test (returned at its end), with the user's own home of the session, signed in on its
-    // first run.
+    // first run; never a feature user unless the requirement is one (FeatureUser, WithoutFeatureUsers).
     protected async Task<SformActor> AsAnotherUserAsync(UserRequirement requirement)
     {
         ArgumentNullException.ThrowIfNull(requirement);
 
-        var other = await LeaseAnotherUserAsync(requirement);
+        var other = await LeaseAnotherUserAsync(WithoutFeatureUsers(requirement));
         var otherHome = SformHomes.ForUser(Session, other);
         otherHome.ResetDefaults();
         return new SformActor(other, otherHome, (actor, options, arguments) => Sform(options with { Home = actor.Home, Label = options.Label ?? $"as {actor.User}" }, arguments));
     }
 
     // An Editor (Contributor or higher of Target:Project) who creates the data that the test's role reads, in the acting
-    // project (InProject): the leased user when it may edit, else another pool user (also for a [MachineOnly] test,
-    // which leases nobody). A role project of Target:RoleProjects has no writer (every pool user holds the role there),
-    // so a test that arranges data acts in Target:Project.
-    protected async Task<SformActor> ArrangeAsEditorAsync()
+    // project (InProject): ArrangeAsAsync(EditingUser).
+    protected Task<SformActor> ArrangeAsEditorAsync()
     {
+        return ArrangeAsAsync(EditingUser);
+    }
+
+    // A user of the requirement (of Target:Project: EditingUser, SecretsUser, AdminUser) who creates the data that the
+    // test's role reads or is refused, in the acting project (InProject): the leased user when it satisfies the
+    // requirement, else another pool user (also for a [MachineOnly] test, which leases nobody), e.g. a
+    // ContributorWithSecrets who sets the secret a Contributor's or a Reader's case is refused. A role project of
+    // Target:RoleProjects has no such user (every pool user holds the role there), so a test that arranges data acts in
+    // Target:Project.
+    protected async Task<SformActor> ArrangeAsAsync(UserRequirement requirement)
+    {
+        ArgumentNullException.ThrowIfNull(requirement);
+
         if (RoleProject is { } project)
         {
             throw new InvalidOperationException(
-                $"The test arranges data as an Editor in the project of its role, and Target:RoleProjects:{ActingRole} maps it to '{project}', where every pool user holds {ActingRole}; leave the role unmapped (a {ActingRole} of Target:Project acts) or provision the data there.");
+                $"The test arranges data as a user with {requirement} in the project of its role, and Target:RoleProjects:{ActingRole} maps it to '{project}', where every pool user holds {ActingRole}; leave the role unmapped (a {ActingRole} of Target:Project acts) or provision the data there.");
         }
 
-        if (LeasesUser && EditingUser.IsSatisfiedBy(User))
+        if (LeasesUser && requirement.IsSatisfiedBy(User))
         {
             return new SformActor(User, Home, (actor, options, arguments) => Sform(options, arguments));
         }
 
-        return await AsAnotherUserAsync(EditingUser);
+        return await AsAnotherUserAsync(requirement);
     }
 
     // The user's home is signed in before a user run in it.

@@ -7,9 +7,9 @@ using System.Text.RegularExpressions;
 namespace _42.Platform.Cli.AutomationTests.Running;
 
 // What one finished run of sform gave: its exit code, the whole standard output and error as they were written (StdOut,
-// StdErr) and as text (PlainStdOut, PlainStdErr: without escape sequences, the standard output also with the 80-column
-// folds of WriteJson joined, WrappedJson), both in the order they arrived (Timeline, Output), and how long it took. A run
-// in a pseudo terminal has one screen: StdOut holds it and StdErr is empty.
+// StdErr) and as text (PlainStdOut, PlainStdErr: without escape sequences, the standard output also with any 80-column
+// folds of an older sform's WriteJson joined, WrappedJson), both in the order they arrived (Timeline, Output), and how
+// long it took. A run in a pseudo terminal has one screen: StdOut holds it and StdErr is empty.
 //
 // The assertions (ShouldSucceed, ShouldExitWith, ShouldContain, …) throw an SformAssertionException whose message has
 // the command line, the exit code, what the assertion looked for and the output, with every known secret as *** (the
@@ -20,9 +20,10 @@ namespace _42.Platform.Cli.AutomationTests.Running;
 //
 // JSON (JsonNode, Json<T>): sform prints a whole document only with --content-only, --value-only, --format json/--json,
 // and into a file (-e/--export, -o, the kv export); the read commands (story get, story set, config, config set, kv get,
-// machine create, …) print their model through WriteJson, with a line-number gutter (" 1 │ {") and colours, rendered at
-// 80 columns: a longer value is folded onto the next lines, which PlainStdOut joins again (WrappedJson). A --format other
-// than json prints its text with the gutter too (WriteNumberedText, which writes a "#" as \u0023), unless --content-only.
+// machine create, …) print their model through WriteJson, with a line-number gutter (" 1 │ {") and colours, each JSON
+// line on one line however long (a sform before 80732b66 rendered at 80 columns and folded a longer value onto the next
+// lines, which PlainStdOut still joins again: WrappedJson). A --format other than json prints its text with the gutter
+// too (WriteNumberedText, which writes a "#" as \u0023), unless --content-only.
 // JsonNode takes, in this order: the whole plain standard output when it is a JSON document; else the first block of
 // numbered lines (the gutter removed, a block starts at line 1); else the first balanced {…} or […] in it.
 public sealed partial class SformResult
@@ -81,8 +82,8 @@ public sealed partial class SformResult
 
     public string StdErr { get; }
 
-    // The standard output without escape sequences and with the folds of WriteJson's 80 columns joined (WrappedJson), so
-    // a long key or value is on one line again; AnsiText.Plain(StdOut) is the text exactly as printed.
+    // The standard output without escape sequences, and with the folds of an older sform's 80-column WriteJson joined
+    // (WrappedJson, a safety net: the current sform folds nothing); AnsiText.Plain(StdOut) is the text exactly as printed.
     public string PlainStdOut => plainStdOut ??= WrappedJson.Join(AnsiText.Plain(StdOut));
 
     public string PlainStdErr => plainStdErr ??= AnsiText.Plain(StdErr);
@@ -256,6 +257,35 @@ public sealed partial class SformResult
         return pattern.IsMatch(Text(stream)) ? this : throw Fail($"wrote nothing that matches /{pattern}/ to {Name(stream)}");
     }
 
+    // The negative of ShouldMatch: nothing of the stream matches (e.g. no frame of a stack trace).
+    public SformResult ShouldNotMatch(Regex pattern, SformStream stream = SformStream.StdOut)
+    {
+        ArgumentNullException.ThrowIfNull(pattern);
+        return !pattern.IsMatch(Text(stream)) ? this : throw Fail($"wrote what matches /{pattern}/ to {Name(stream)}, which it must not");
+    }
+
+    // The version numbers of the table of a versions command (config, template and schema … versions:
+    // VersionsConsoleExtensions.WriteVersions, the columns Version, Author, Created and Expires, the newest first), as
+    // listed: the lines after the first one that contains headerStart ("Versions of the configuration for", "Versions of
+    // the template for", "Versions of the schema for") that start with a number and a cell after it. Empty for "… has no
+    // versions."; fails with the output when there is no such header.
+    public IReadOnlyList<long> VersionRows(string headerStart)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(headerStart);
+        var lines = Lines;
+        var header = lines.ToList().FindIndex(line => line.Contains(headerStart, StringComparison.Ordinal));
+        if (header < 0)
+        {
+            throw Fail($"printed no \"{headerStart} …\" header");
+        }
+
+        return lines.Skip(header + 1)
+            .Select(line => VersionRowPattern().Match(line))
+            .Where(match => match.Success)
+            .Select(match => long.Parse(match.Groups["version"].Value, NumberStyles.None, CultureInfo.InvariantCulture))
+            .ToList();
+    }
+
     // A line of the stream equal to text after trimming both.
     public SformResult ShouldHaveLine(string text, SformStream stream = SformStream.StdOut)
     {
@@ -407,4 +437,8 @@ public sealed partial class SformResult
     // "  12 │ text": the number, a space, the bar (│, or | / ? when an encoding lost it), an optional space, the text.
     [GeneratedRegex(@"^\s*(?<n>\d+) [│|?�] ?(?<text>.*)$", RegexOptions.CultureInvariant)]
     private static partial Regex GutterPattern();
+
+    // A row of a versions table: its version, white space and the next cell.
+    [GeneratedRegex(@"^\s*(?<version>\d+)\s+\S", RegexOptions.CultureInvariant)]
+    private static partial Regex VersionRowPattern();
 }

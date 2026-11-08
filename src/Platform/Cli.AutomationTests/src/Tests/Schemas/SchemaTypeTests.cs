@@ -80,9 +80,8 @@ public sealed class SchemaTypeTests : CliTest
     // Three versions of the type schema of unt (each adds a property: first, second, third); schema type get unt
     // --version 1 returns the first; schema type versions unt lists 3, 2 and 1; schema type diff unt shows the JSON diff
     // of version 3 against 2 (third added), diff unt 3 1 --format unified a unified diff of 3 against 1, and diff unt 2 1
-    // --format json the JSON diff of 2 against 1 (second added). The unified diff is checked last: the API answers it as
-    // text/plain, which the SDK's typed client of sform cannot read yet (sform ends with 1 and "The request failed with
-    // 200 OK.").
+    // --format json the JSON diff of 2 against 1 (second added). For the unified diff sform reads the JSON diff and writes
+    // the unified text itself: hunks "@@ -a,b +c,d @@" and +, - and space lines, raw on stdout.
     [Test]
     [TestCase(265)]
     [UserRole(Role.Owner)]

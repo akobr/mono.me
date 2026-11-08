@@ -6,7 +6,8 @@ namespace _42.Platform.Cli.AutomationTests.SelfTests;
 
 // What the tests read from sform's output, without a process: the escape sequences removed, the JSON of WriteJson behind
 // its gutter, the device code of SFORM_DEVICE_CODE_OUTPUT=json and of the text prompt, the credentials sform prints once,
-// the command lines of a pseudo console and of util-linux script, and a machine's id in its API key.
+// the command lines of a pseudo console and of util-linux script, a machine's id in its API key, ShouldNotMatch and the
+// rows of a versions table (VersionRows).
 [Category(CliCategories.SelfTest)]
 public sealed class OutputSelfTests
 {
@@ -257,6 +258,60 @@ public sealed class OutputSelfTests
         await Assert.That(failure).IsNotNull();
         await Assert.That(failure!.Message).DoesNotContain(secret);
         await Assert.That(failure.Message).Contains("wrote '***'");
+    }
+
+    // ShouldNotMatch passes when nothing of the stream matches and fails, with the pattern, when something does.
+    [Test]
+    public async Task ShouldNotMatch_FailsOnlyForAMatch()
+    {
+        var result = Result("Unrecognized command or argument 'storytelr'\n");
+        var frame = new System.Text.RegularExpressions.Regex(@"^\s+at \S+\(", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        await Assert.That(ReferenceEquals(result.ShouldNotMatch(frame), result)).IsTrue();
+        await Assert.That(ReferenceEquals(result.ShouldNotMatch(frame, SformStream.StdErr), result)).IsTrue();
+
+        SformAssertionException? failure = null;
+        try
+        {
+            Result("Unhandled exception.\n   at Program.Main(String[] args)\n").ShouldNotMatch(frame);
+        }
+        catch (SformAssertionException exception)
+        {
+            failure = exception;
+        }
+
+        await Assert.That(failure).IsNotNull();
+        await Assert.That(failure!.Message).Contains("which it must not");
+    }
+
+    // The table of WriteVersions after its header, as config, template and schema … versions print it: the version of each
+    // row, the newest first; nothing for "… has no versions."; a failure without the header.
+    [Test]
+    public async Task VersionRows_ReadTheVersionsTable()
+    {
+        var table = Result(
+            "# Versions of the configuration for 'rst.cli-1'\n\n"
+            + " Version  Author            Created           Expires          \n"
+            + " 3        CLI Owner1        2026-11-08 10:02  —                \n"
+            + " 2        CLI Owner1        2026-11-08 10:01  2026-12-08 10:02 \n"
+            + " 1        cli-test (owner)  2026-11-08 10:00  2026-12-08 10:01 \n");
+        var empty = Result("# Versions of the schema for 'unt'\n\nThe schema has no versions.\n");
+
+        await Assert.That(string.Join(",", table.VersionRows("Versions of the configuration for"))).IsEqualTo("3,2,1");
+        await Assert.That(empty.VersionRows("Versions of the schema for")).IsEmpty();
+
+        SformAssertionException? failure = null;
+        try
+        {
+            table.VersionRows("Versions of the template for");
+        }
+        catch (SformAssertionException exception)
+        {
+            failure = exception;
+        }
+
+        await Assert.That(failure).IsNotNull();
+        await Assert.That(failure!.Message).Contains("printed no \"Versions of the template for …\" header");
     }
 
     // A .NET child on Windows writes its redirected output in the OEM code page of its hidden console, and UTF-8 around a

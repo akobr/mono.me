@@ -33,7 +33,7 @@ public sealed class ConfigHistoryTests : CliTest
             .ShouldSucceed()
             .ShouldContain($"Versions of the configuration for '{key}'")
             .ShouldMatch(ConfigOutput.DatePattern());
-        await Assert.That(Join(ConfigOutput.Versions(listed))).IsEqualTo(Join(written.Reverse()));
+        await Assert.That(Join(listed.VersionRows(ConfigOutput.ConfigurationVersions))).IsEqualTo(Join(written.Reverse()));
     }
 
     // CFG-HIS-02: config diff compares the latest with its previous version, or two given versions.

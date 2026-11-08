@@ -20,7 +20,8 @@ public abstract partial class CliTest
     // ([UserRole(Role.Owner)]), and returns its key ("<org>.<project>"); its default view is "default". With actInIt
     // (the default) the test acts in it from then on (UseProject: ProjectKey, View, InProject and CreateMachineAsync name
     // it); Target.ProjectKey stays the target project (the <A> of a context case). points create sets the new project as
-    // the home's default, which is removed again, as every test starts without one.
+    // the home's default, which is removed again (SformHome.ResetDefaultProject), as every test starts without one; the
+    // editor of the home stays, so a test of modes E and P may call UseEditorAsync before or after.
     protected async Task<string> CreateDisposableProjectAsync(bool actInIt = true)
     {
         if (!User.HasRole(PlatformRoles.Owner))
@@ -39,7 +40,7 @@ public abstract partial class CliTest
         await terminal.SendLineAsync(name);
         (await terminal.WaitForExitAsync()).ShouldSucceed();
 
-        Home.ResetDefaults();
+        Home.ResetDefaultProject();
         var key = $"{Target.Organization}.{name}";
         ownProjects.Add(key);
         Scope.Properties["disposableProject"] = key;

@@ -13,16 +13,19 @@ namespace _42.Platform.Cli.AutomationTests.Tests.Schemas;
 //   - a schema the configurations of the view break ends with 2: the server's message, then "<key> (<view>)" and its
 //     violations for each configuration (SchemaValidationConsole); a configuration write that breaks a schema the same;
 //   - schema … versions prints "# Versions of the schema for <subject>" and a table of Version, Author, Created and
-//     Expires, the newest first, or "The schema has no versions.";
+//     Expires, the newest first (SformResult.VersionRows), or "The schema has no versions.";
 //   - schema … diff prints the API's JSON diff as "+A -D ~U" and hunks "@@ -a,b +c,d @@" with numbered lines
-//     (DiffResultConsoleExtensions.WriteDiffResult).
+//     (DiffResultConsoleExtensions.WriteDiffResult); with --format unified the hunks and their +, - and space lines raw
+//     (WriteUnifiedDiff), "No changes detected." on stderr when nothing changed.
 // The documents are JSON Schemas of an object with string properties; a breaking one requires a property that the
 // configurations of the case lack (they are set with -x a=1).
 internal static class SchemaChecks
 {
+    // The header of schema … versions (SformResult.VersionRows).
+    public const string VersionsHeader = "Versions of the schema for";
+
     private static readonly Regex HunkPattern = new(@"@@ -\d+,\d+ \+\d+,\d+ @@", RegexOptions.CultureInvariant);
     private static readonly Regex StatsPattern = new(@"^\s*\+\d+ -\d+ ~\d+\s*$", RegexOptions.Multiline | RegexOptions.CultureInvariant);
-    private static readonly Regex VersionRowPattern = new(@"^\s*(?<version>\d+)\s+\S", RegexOptions.CultureInvariant);
 
     // {"type":"object","properties":{"<name>":{"type":"string"},…}}: what any configuration of the cases complies with.
     public static string ObjectSchema(params string[] properties)
@@ -82,27 +85,8 @@ internal static class SchemaChecks
             .ShouldContain($"{annotationKey} ({view})");
     }
 
-    // The version numbers of the table of schema … versions, as listed (the newest first); empty for "The schema has no
-    // versions.".
-    public static IReadOnlyList<int> Versions(this SformResult result)
-    {
-        ArgumentNullException.ThrowIfNull(result);
-        var lines = result.Lines;
-        var header = lines.ToList().FindIndex(line => line.Contains("Versions of the schema for", StringComparison.Ordinal));
-        if (header < 0)
-        {
-            throw result.Fail("printed no \"Versions of the schema for …\" header");
-        }
-
-        return lines.Skip(header + 1)
-            .Select(line => VersionRowPattern.Match(line))
-            .Where(match => match.Success)
-            .Select(match => int.Parse(match.Groups["version"].Value, NumberStyles.None, CultureInfo.InvariantCulture))
-            .ToList();
-    }
-
     // schema … versions succeeds and lists exactly these versions, the newest first.
-    public static SformResult ShouldListVersions(this SformResult result, params int[] newestFirst)
+    public static SformResult ShouldListVersions(this SformResult result, params long[] newestFirst)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(newestFirst);
@@ -112,7 +96,7 @@ internal static class SchemaChecks
             return result.ShouldContain("The schema has no versions.");
         }
 
-        var listed = result.Versions();
+        var listed = result.VersionRows(VersionsHeader);
         return listed.SequenceEqual(newestFirst)
             ? result
             : throw result.Fail($"listed the versions {Join(listed)}", expected: $"the versions {Join(newestFirst)}");
@@ -159,7 +143,7 @@ internal static class SchemaChecks
         return schema.ToJsonString();
     }
 
-    private static string Join(IEnumerable<int> versions)
+    private static string Join(IEnumerable<long> versions)
     {
         var list = string.Join(", ", versions.Select(version => version.ToString(CultureInfo.InvariantCulture)));
         return list.Length == 0 ? "(none)" : list;

@@ -4,13 +4,13 @@ using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using _42.Platform.Cli.AutomationTests.Running;
-using _42.Testing.UI.Automation;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.KeyValues;
 
 // What the transfer, policy, client encryption and audit tests of the key/value store share: the documents of
 // kv export and kv import (2s.key-values.v1, .env lines), the RSA keys of the recipients, the ids sform prints for them,
-// the rows and pages of kv audit, and the project of an exact role (Target:RoleProjects).
+// and the rows and pages of kv audit. The project of an exact role is CliTest.RoleProjectOf, the target's customer key
+// KeyValueSettings.
 internal static partial class KeyValuesSupportB
 {
     // The format of a key/value document (KeyValueFormats.DocumentFormat of the CLI).
@@ -146,20 +146,6 @@ internal static partial class KeyValuesSupportB
         return [.. arguments, "-p", projectKey];
     }
 
-    // -p <org>.<project> -v <view> of the project Target:RoleProjects maps the role to (where every pool user holds
-    // exactly that role, e.g. <contributor project> of the catalogue); null when the role has no entry.
-    public static string[]? RoleProjectArguments(CliTarget target, Role role)
-    {
-        ArgumentNullException.ThrowIfNull(target);
-        if (target.RoleProjectOf(role) is not { } mapped)
-        {
-            return null;
-        }
-
-        var parts = mapped.Split('/', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        return ["-p", $"{parts[0]}.{parts[1]}", "-v", parts.Length > 2 ? parts[2] : "default"];
-    }
-
     [GeneratedRegex(@"Recipient '(?<id>[^']+)' \(", RegexOptions.CultureInvariant)]
     private static partial Regex RecipientAddedPattern();
 
@@ -174,16 +160,4 @@ internal static partial class KeyValuesSupportB
 
     // A row of kv audit: the line, its operation and its time (local, to the minute).
     public sealed record AuditRow(string Line, string Operation, DateTime Time);
-
-    // The target's customer key for the cases of the Byok feature (KV-POL-05, KV-POL-07): KeyValues:ByokKeyUri, the
-    // versionless URI of a key in an Azure Key Vault the platform's application may wrap and unwrap with, and
-    // KeyValues:ByokTenantId, the Entra tenant id of the vault. Read only when Target:Features lists Byok.
-    public sealed class KeyValueByokSettings
-    {
-        public const string Section = "KeyValues";
-
-        public string? ByokKeyUri { get; set; }
-
-        public string? ByokTenantId { get; set; }
-    }
 }

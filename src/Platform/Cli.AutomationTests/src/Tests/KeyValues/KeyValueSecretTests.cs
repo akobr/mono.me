@@ -75,7 +75,7 @@ public sealed class KeyValueSecretTests : CliTest
     [Covers("story kv get", "--reveal")]
     public async Task Kv_SecretAsContributor_Refused()
     {
-        var holder = await ArrangeAsSecretsUserAsync();
+        var holder = await ArrangeAsAsync(SecretsUser);
         var secretKey = CliData.KeyValueKey();
         var secret = CliData.SecretValue();
         AddSecret(secret);
@@ -189,12 +189,12 @@ public sealed class KeyValueSecretTests : CliTest
             .ShouldExitWith(CliExit.Unauthorized)
             .ShouldNotContain(secret);
 
-        var withoutMtls = await KeyValuesSupportA.EventuallyAsync(() => Sform(AsMachine(secretsReader.ApiKeyCredentials), reveal), result => result.Succeeded);
+        var withoutMtls = await EventuallyAsync(() => Sform(AsMachine(secretsReader.ApiKeyCredentials), reveal), result => result.Succeeded, KeyValuesSupportA.PolicyCacheWait);
         await Assert.That(withoutMtls.ShouldSucceed().JsonNode()["Value"]?.GetValue<string>()).IsEqualTo(secret);
 
         (await Sform(InProject("story", "kv", "policy", "set", "--require-mtls", "true"))).ShouldSucceed();
 
-        var withMtls = await KeyValuesSupportA.EventuallyAsync(() => Sform(AsMachine(secretsReader.ApiKeyCredentials), reveal), result => !result.Succeeded);
+        var withMtls = await EventuallyAsync(() => Sform(AsMachine(secretsReader.ApiKeyCredentials), reveal), result => !result.Succeeded, KeyValuesSupportA.PolicyCacheWait);
         withMtls
             .ShouldExitWith(CliExit.Unauthorized)
             .ShouldContain("Error code: MtlsRequired")
@@ -203,19 +203,5 @@ public sealed class KeyValueSecretTests : CliTest
 
         var overMtls = (await Sform(AsMachine(certificate.SignInCredentials), reveal)).ShouldSucceed();
         await Assert.That(overMtls.JsonNode()["Value"]?.GetValue<string>()).IsEqualTo(secret);
-    }
-
-    // A ContributorWithSecrets (or higher) of the acting project who sets the secrets the test's role reads or is refused:
-    // another pool user. A project of Target:RoleProjects has nobody who may set a secret (every pool user holds the role
-    // there), so such a test acts in Target:Project, as ArrangeAsEditorAsync does.
-    private async Task<SformActor> ArrangeAsSecretsUserAsync()
-    {
-        if (RoleProject is { } project)
-        {
-            throw new InvalidOperationException(
-                $"The test arranges a secret as a ContributorWithSecrets in the project of its role, and Target:RoleProjects:{ActingRole} maps it to '{project}', where every pool user holds {ActingRole}; leave the role unmapped (a {ActingRole} of Target:Project acts) or provision the data there.");
-        }
-
-        return await AsAnotherUserAsync(SecretsUser);
     }
 }

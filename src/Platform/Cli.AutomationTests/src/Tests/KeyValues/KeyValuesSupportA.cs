@@ -10,15 +10,14 @@ namespace _42.Platform.Cli.AutomationTests.Tests.KeyValues;
 //   - the continuation token of "More keys follow; next page with -k <token>";
 //   - the id of "Recipient '<id>' (<name>) added.";
 //   - RSA-3072 key pairs for the recipients of client-encrypted (hyok) values;
-//   - a wait for the API's cached key/value policy: an instance of the API caches a project's policy for a minute
-//     (CosmosKeyValuePolicyStore), and the writes and the reveals check that copy, so a policy change can reach a call on
-//     another instance up to a minute later.
+//   - the window of the API's cached key/value policy (PolicyCacheWait, for CliTest.EventuallyAsync): an instance of the
+//     API caches a project's policy for a minute (CosmosKeyValuePolicyStore), and the writes and the reveals check that
+//     copy, so a policy change can reach a call on another instance up to a minute later.
 internal static partial class KeyValuesSupportA
 {
-    // A minute of the API's policy cache, and some slack.
+    // A minute of the API's policy cache, and some slack: the window of EventuallyAsync for a call that depends on a
+    // policy change.
     public static readonly TimeSpan PolicyCacheWait = TimeSpan.FromSeconds(90);
-
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
 
     // The row of the key in a table sform printed: the line whose first cell is the key; null when it lists none.
     public static string? RowOf(SformResult result, string key)
@@ -69,27 +68,6 @@ internal static partial class KeyValuesSupportA
     {
         using var rsa = RSA.Create(3072);
         return (rsa.ExportSubjectPublicKeyInfoPem(), rsa.ExportPkcs8PrivateKeyPem());
-    }
-
-    // Runs the command until done says so, at most for the timeout (PolicyCacheWait by default), and returns the last
-    // result: a call that depends on a policy change the instance answering it may not know yet. Each run is attached.
-    public static async Task<SformResult> EventuallyAsync(Func<Task<SformResult>> run, Func<SformResult, bool> done, TimeSpan? timeout = null)
-    {
-        ArgumentNullException.ThrowIfNull(run);
-        ArgumentNullException.ThrowIfNull(done);
-
-        var cancellation = TestContext.Current?.Execution.CancellationToken ?? CancellationToken.None;
-        var deadline = DateTimeOffset.UtcNow + (timeout ?? PolicyCacheWait);
-        while (true)
-        {
-            var result = await run();
-            if (done(result) || DateTimeOffset.UtcNow >= deadline)
-            {
-                return result;
-            }
-
-            await Task.Delay(PollInterval, cancellation);
-        }
     }
 
     private static string? FirstCell(string line)

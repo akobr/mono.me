@@ -284,12 +284,11 @@ public sealed partial class KeyValueAuditTests : CliTest
         }
 
         // the binding read: written by the API's flush, so it is waited for
-        var deadline = DateTimeOffset.UtcNow + BindingReadWait;
-        IReadOnlyList<KeyValuesSupportB.AuditRow> bindingReads;
-        while (!(bindingReads = await AuditOfAsync("bindingread")).Any(row => row.Line.Contains($"/{s}", StringComparison.Ordinal)) && DateTimeOffset.UtcNow < deadline)
-        {
-            await Task.Delay(TimeSpan.FromSeconds(15));
-        }
+        var bindingReads = await EventuallyAsync(
+            () => AuditOfAsync("bindingread"),
+            rows => rows.Any(row => row.Line.Contains($"/{s}", StringComparison.Ordinal)),
+            BindingReadWait,
+            TimeSpan.FromSeconds(15));
 
         await Assert.That(bindingReads.Any(row => row.Line.Contains($"/{s}", StringComparison.Ordinal))).IsTrue();
 

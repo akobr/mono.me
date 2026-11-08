@@ -114,10 +114,10 @@ public sealed class KeyValuePolicyTests : CliTest
         await Assert.That(changed).IsEqualTo(current + 1);
         await Assert.That((await PolicyAsync(changed))["RequireMtlsForSecretDelivery"]?.GetValue<bool>()).IsFalse();
 
-        var roleProject = KeyValuesSupportB.RoleProjectArguments(Target, Role.Contributor);
+        var roleProject = RoleProjectOf(Role.Contributor);
         var contributor = roleProject is null ? await AsGrantedUserAsync(PlatformRoles.Contributor) : null;
         var refused = contributor is null
-            ? await Sform(["story", "kv", "policy", "set", "--require-mtls", "true", .. roleProject!])
+            ? await Sform("story", "kv", "policy", "set", "--require-mtls", "true", "-p", roleProject!.Value.ProjectKey, "-v", roleProject.Value.View)
             : await contributor.Sform(InProject("story", "kv", "policy", "set", "--require-mtls", "true"));
         refused.ShouldExitWith(CliExit.Unauthorized);
 
@@ -390,14 +390,14 @@ public sealed class KeyValuePolicyTests : CliTest
         return policy;
     }
 
-    // The target's customer key of the Byok feature: KeyValues:ByokKeyUri and KeyValues:ByokTenantId.
+    // The target's customer key of the Byok feature: KeyValues:ByokKeyUri and KeyValues:ByokTenantId (KeyValueSettings),
+    // which CliAutomationSetup.Validate requires when Target:Features lists Byok.
     private (string KeyUri, string TenantId) CustomerKey()
     {
-        var settings = Settings.Bind<KeyValuesSupportB.KeyValueByokSettings>(KeyValuesSupportB.KeyValueByokSettings.Section);
+        var settings = Settings.Bind<KeyValueSettings>(KeyValueSettings.Section);
         if (string.IsNullOrWhiteSpace(settings.ByokKeyUri) || string.IsNullOrWhiteSpace(settings.ByokTenantId))
         {
-            throw new InvalidOperationException(
-                $"Target:Features lists {CliFeatures.Byok}, so the test needs the target's customer key: set {KeyValuesSupportB.KeyValueByokSettings.Section}:ByokKeyUri (https://<vault>.vault.azure.net/keys/<name>, a key the platform's application may wrap and unwrap with) and {KeyValuesSupportB.KeyValueByokSettings.Section}:ByokTenantId (the Entra tenant id of the vault) in testsettings.<profile>.json or UITESTS_{KeyValuesSupportB.KeyValueByokSettings.Section}__ByokKeyUri / UITESTS_{KeyValuesSupportB.KeyValueByokSettings.Section}__ByokTenantId.");
+            throw new InvalidOperationException(KeyValueSettings.MissingCustomerKey);
         }
 
         return (settings.ByokKeyUri.Trim(), settings.ByokTenantId.Trim());

@@ -137,7 +137,7 @@ public sealed class TemplateTests : CliTest
             .ShouldSucceed()
             .ShouldContain("Versions of the template for 'unt'")
             .ShouldMatch(ConfigOutput.DatePattern());
-        await Assert.That(string.Join(", ", ConfigOutput.Versions(versions))).IsEqualTo(string.Join(", ", written.Reverse()));
+        await Assert.That(string.Join(", ", versions.VersionRows(ConfigOutput.TemplateVersions))).IsEqualTo(string.Join(", ", written.Reverse()));
 
         var latest = (await Sform(InProject("story", "template", "diff", "unt"))).ShouldSucceed();
         await Assert.That(ConfigOutput.HasDiffLine(latest, '-', "\"v\": 2")).IsTrue().Because(latest.PlainStdOut);
@@ -211,7 +211,7 @@ public sealed class TemplateTests : CliTest
             .ShouldContain("The template for 'sbt' has not been found.");
 
         var history = (await Sform(InProject("story", "template", "versions", "unt"))).ShouldSucceed();
-        await Assert.That(ConfigOutput.Versions(history)).Contains(version);
+        await Assert.That(history.VersionRows(ConfigOutput.TemplateVersions)).Contains(version);
     }
 
     // TPL-TPL-08: An unknown type code fails with exit 2; a Reader's set is refused.
@@ -274,7 +274,7 @@ public sealed class TemplateTests : CliTest
             await Assert.That(editor.ReadLog(added).Single().OriginalJson()!["a"]!.GetValue<long>()).IsEqualTo(1L);
 
             var versions = (await Sform(In("story", "template", "versions", type))).ShouldSucceed();
-            await Assert.That(ConfigOutput.Versions(versions).Count).IsEqualTo(2);
+            await Assert.That(versions.VersionRows(ConfigOutput.TemplateVersions).Count).IsEqualTo(2);
 
             var diff = (await Sform(In("story", "template", "diff", type))).ShouldSucceed();
             await Assert.That(ConfigOutput.HasDiffLine(diff, '+', "\"b\": 2")).IsTrue().Because(diff.PlainStdOut);

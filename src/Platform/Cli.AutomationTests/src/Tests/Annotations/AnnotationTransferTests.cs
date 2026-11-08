@@ -13,6 +13,9 @@ namespace _42.Platform.Cli.AutomationTests.Tests.Annotations;
 [Area(Area.Annotations)]
 public sealed partial class AnnotationTransferTests : CliTest
 {
+    // The header of story config versions, whose rows SformResult.VersionRows reads.
+    private const string ConfigurationVersions = "Versions of the configuration for";
+
     // ANN-TRN-01: story export saves the view as a folder zip with the server's file name.
     // The Owner seeds the disposable project's default view (<rst> with a unit, <rst2>, two versions of the configuration
     // of <rst>, two of the template of rst, the type schema of rst). story export says "Exporting the annotations,
@@ -281,7 +284,7 @@ public sealed partial class AnnotationTransferTests : CliTest
         await Assert.That(ConfigurationRowOf(overwrite, seeded.Responsibility)).Contains("Updated");
         await Assert.That(await ConfigurationValueAsync(seeded.Responsibility, viewB)).IsEqualTo(seeded.ConfigurationValue);
         var newer = (await Sform("story", "config", "versions", seeded.Responsibility, "-p", ProjectKey, "-v", viewB)).ShouldSucceed();
-        await Assert.That(VersionRows(newer)).IsEqualTo(VersionRows(versions) + 1);
+        await Assert.That(newer.VersionRows(ConfigurationVersions).Count).IsEqualTo(versions.VersionRows(ConfigurationVersions).Count + 1);
     }
 
     // ANN-TRN-09: --dry-run reports every outcome and writes nothing.
@@ -490,12 +493,6 @@ public sealed partial class AnnotationTransferTests : CliTest
         return rows.Count > 0 ? rows[0] : throw import.Fail("listed no type schema");
     }
 
-    // The rows of story config versions: the lines that start with a version number.
-    private static int VersionRows(SformResult versions)
-    {
-        return versions.Lines.Count(line => VersionRowPattern().IsMatch(line.Trim()));
-    }
-
     // The value of conf in the stored content of the key's configuration in the view of the acting project.
     private async Task<string?> ConfigurationValueAsync(string key, string view)
     {
@@ -511,9 +508,6 @@ public sealed partial class AnnotationTransferTests : CliTest
 
     [GeneratedRegex(@"^templates/rst\.template\.\d+\.json$", RegexOptions.CultureInvariant)]
     private static partial Regex TemplateVersionPattern();
-
-    [GeneratedRegex(@"^\d+\s", RegexOptions.CultureInvariant)]
-    private static partial Regex VersionRowPattern();
 
     // What SeedViewAsync created: the keys and the current values of the configuration's conf and the template's tmpl.
     private sealed record SeededView(string Responsibility, string Unit, string Other, string ConfigurationValue, string TemplateValue);

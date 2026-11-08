@@ -7,8 +7,10 @@ namespace _42.Platform.Cli.AutomationTests;
 
 // Machines: a pre-provisioned one of Machines:<name> (AsMachine, the test marked [RequiresMachine("<name>")]), or one the
 // test creates (CreateMachineAsync: sform account machine create as the leased user or another pool user, in the acting
-// project or another, its printed secrets registered, deleted when the test ends). A machine's runs get an empty home of
-// their own each, so nothing of a user reaches them.
+// project or another, its printed secrets registered, deleted when the test ends). A command that creates a machine the
+// way the test writes it (the alias set, the context options, a refusal that must create nothing) runs through
+// RunCreatingMachineAsync, which deletes whatever machine it printed when the test ends (DeleteMachineAtCleanup). A
+// machine's runs get an empty home of their own each, so nothing of a user reaches them.
 public abstract partial class CliTest
 {
     // The options of a run as the configured machine Machines:<name>; STORYTELLER_ENDPOINT defaults to Target:BaseUrl.
@@ -63,20 +65,15 @@ public abstract partial class CliTest
         var projectKey = creation.ProjectKey ?? ProjectKey;
         var view = creation.View ?? (creation.ProjectKey is null ? View : "default");
         var creator = creation.As;
-        Task<SformResult> RunAsCreator(SformRunOptions runOptions, params string[] arguments)
-        {
-            return creator is null ? Sform(runOptions, arguments) : creator.Sform(runOptions, arguments);
-        }
-
-        var result = await RunAsCreator(
+        var result = await RunAs(creator)(
             new SformRunOptions { Label = creator is null ? null : $"as {creator}" },
             ["account", "machine", "create", .. options, "-p", projectKey, "-v", view]);
 
         // The id from the text first, so a machine that exists is deleted even when the JSON or a check below fails.
-        var id = MachineIdPattern().Match(result.PlainStdOut) is { Success: true } idMatch ? idMatch.Groups["id"].Value : null;
+        var id = TryMachineIdOf(result);
         if (id is { } printedId && creation.DeleteAtCleanup)
         {
-            OnCleanUp(() => DeleteMachineAsync(printedId, projectKey, view, RunAsCreator));
+            DeleteMachineAtCleanup(printedId, projectKey, view, creator);
         }
 
         result.ShouldSucceed();
@@ -119,6 +116,61 @@ public abstract partial class CliTest
             Result = result,
         };
     }
+
+    // Runs a command that creates a machine (account machine create or set) as the test writes it, as the leased user; the
+    // machine it printed, if any, is deleted when the test ends (DeleteMachineAtCleanup in projectKey, by the leased
+    // user). The result is returned as it is, so the test checks a success or a refusal itself.
+    protected Task<SformResult> RunCreatingMachineAsync(string projectKey, params string[] arguments)
+    {
+        return RunCreatingMachineAsync(projectKey, null, new SformRunOptions(), arguments);
+    }
+
+    // The same as another pool user (the second user of a P case) or with options; the cleanup still runs as the leased
+    // user (the Owner of a disposable project).
+    protected async Task<SformResult> RunCreatingMachineAsync(string projectKey, SformActor? actor, SformRunOptions options, params string[] arguments)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectKey);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        var result = actor is null ? await Sform(options, arguments) : await actor.Sform(options, arguments);
+        if (TryMachineIdOf(result) is { } id)
+        {
+            DeleteMachineAtCleanup(id, projectKey);
+        }
+
+        return result;
+    }
+
+    // A machine deleted when the test ends, by its creator (the leased user by default): account machine delete <id> -p
+    // <projectKey> [-v <view>]; a delete that fails because the machine is gone (the test deleted it; sform ends the 404
+    // with a failure code) counts as done when account machine no longer lists it.
+    protected void DeleteMachineAtCleanup(string id, string projectKey, string? view = null, SformActor? creator = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectKey);
+        OnCleanUp(() => DeleteMachineAsync(id, projectKey, view, RunAs(creator)));
+    }
+
+    // The "Id" of the machine JSON that account machine create, set and reset print; null when the run printed none.
+    protected static string? TryMachineIdOf(SformResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return MachineIdPattern().Match(result.PlainStdOut) is { Success: true } match ? match.Groups["id"].Value : null;
+    }
+
+    protected static string MachineIdOf(SformResult result)
+    {
+        return TryMachineIdOf(result) ?? throw result.Fail("printed no machine (no \"Id\")");
+    }
+
+    // "Certificate written to <path>" of account machine create and renew, and of shared-cert issue.
+    [GeneratedRegex(@"Certificate written to (?<path>.+?)\s*$", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
+    private protected static partial Regex CertificatePathPattern();
+
+    // "Certificate password: <password>" of the same.
+    [GeneratedRegex(@"Certificate password:\s*(?<value>\S+)", RegexOptions.CultureInvariant)]
+    private protected static partial Regex CertificatePasswordPattern();
 
     private static MachineCredentials? CredentialsOf(string kind, string id, string? accessKey, string? certificate, string? password, string? tokenUrl, string? tokenScope, string endpoint, string projectKey, string view)
     {
@@ -166,12 +218,6 @@ public abstract partial class CliTest
     [GeneratedRegex(@"""Id""\s*:\s*""(?<id>[^""]+)""", RegexOptions.CultureInvariant)]
     private static partial Regex MachineIdPattern();
 
-    [GeneratedRegex(@"Certificate written to (?<path>.+?)\s*$", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
-    private static partial Regex CertificatePathPattern();
-
-    [GeneratedRegex(@"Certificate password:\s*(?<value>\S+)", RegexOptions.CultureInvariant)]
-    private static partial Regex CertificatePasswordPattern();
-
     [GeneratedRegex(@"Token URL:\s*(?<value>\S+)", RegexOptions.CultureInvariant)]
     private static partial Regex TokenUrlPattern();
 
@@ -182,21 +228,29 @@ public abstract partial class CliTest
     private static partial Regex PipelineVariablePattern();
 
     // The cleanup of a created machine, as its creator: a delete that fails because the machine is gone (the test deleted
-    // it; sform ends the 404 with a failure code) counts as done when account machine no longer lists it.
-    private static async Task DeleteMachineAsync(string id, string projectKey, string view, Func<SformRunOptions, string[], Task<SformResult>> run)
+    // it; sform ends the 404 with a failure code) counts as done when account machine no longer lists it. Without a view
+    // the commands take -p only.
+    private static async Task DeleteMachineAsync(string id, string projectKey, string? view, Func<SformRunOptions, string[], Task<SformResult>> run)
     {
-        var delete = await run(new SformRunOptions { Label = $"cleanup: delete the machine {id}" }, ["account", "machine", "delete", id, "-p", projectKey, "-v", view]);
+        string[] context = view is null ? ["-p", projectKey] : ["-p", projectKey, "-v", view];
+        var delete = await run(new SformRunOptions { Label = $"cleanup: delete the machine {id}" }, ["account", "machine", "delete", id, .. context]);
         if (delete.Succeeded)
         {
             return;
         }
 
-        var list = await run(new SformRunOptions { Label = $"cleanup: is the machine {id} still there" }, ["account", "machine", "-p", projectKey, "-v", view]);
+        var list = await run(new SformRunOptions { Label = $"cleanup: is the machine {id} still there" }, ["account", "machine", .. context]);
         if (list.Succeeded && !list.PlainStdOut.Contains(id, StringComparison.Ordinal))
         {
             return;
         }
 
         throw delete.Fail($"did not delete the machine {id} the test created (account machine {(list.Succeeded ? "still lists it" : $"ended with {SformResult.Describe(list.ExitCode)}")})");
+    }
+
+    // The runs of a creator: another pool user's, or the leased user's when it is null.
+    private Func<SformRunOptions, string[], Task<SformResult>> RunAs(SformActor? creator)
+    {
+        return (options, arguments) => creator is null ? Sform(options, arguments) : creator.Sform(options, arguments);
     }
 }

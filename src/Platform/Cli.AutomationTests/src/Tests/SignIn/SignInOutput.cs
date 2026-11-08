@@ -1,24 +1,16 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using _42.Platform.Cli.AutomationTests.Running;
-using _42.Testing.UI.Automation.Runtime.Users;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.SignIn;
 
-// What the sign-in cases read of sform's output and how they pick their pool user:
-//   - the name of the account header "# <name> @ <email>" that sform account prints after a sign-in (AccountCommand), which
-//     sform account logout names again ("You have been logged out from account: <name>");
-//   - the pool user of a feature case (mode X): the target marks the user the feature needs with the feature's name among
-//     its Roles in Users:Pool (e.g. { "Email": "…", "Roles": [ "Reader", "MultiOrganization" ] }), so the case leases that
-//     user instead of any; a target that lists the feature without such a user fails the lease with the requirement.
+// What the sign-in cases read of sform's output: the name of the account header "# <name> @ <email>" that sform account
+// prints after a sign-in (AccountCommand), which sform account logout names again ("You have been logged out from account:
+// <name>"); the organizations of a user of several; made-up and tampered API keys. The pool user of a feature case (mode
+// X: SGN-DEV-06, SGN-OUT-04) is CliTest's: a [RequiresFeature] of a user feature leases the user the feature stands for
+// (CliTest.FeatureUser).
 internal static partial class SignInOutput
 {
-    // The pool user a feature case leases: one whose Roles list the feature (CliFeatures.MultiOrganization, Registration).
-    public static UserRequirement FeatureUser(string feature)
-    {
-        return UserRequirement.WithRole(feature);
-    }
-
     // The <name> of "# <name> @ <email>"; throws an SformAssertionException with the output when there is no such header.
     public static string AccountNameOf(SformResult result, string email)
     {

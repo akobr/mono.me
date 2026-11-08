@@ -6,10 +6,8 @@ using _42.Platform.Cli.AutomationTests.Running;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Machines;
 
-// The steps the cases of Machines and Shared Certificates share, on top of CliTest:
-//   - a machine created by a command the test writes itself (the alias set, the context options of MCH-CTX-01, a refusal
-//     that must not create one): RunCreatingMachineAsync deletes whatever machine the run printed when the test ends,
-//     as CreateMachineAsync does for the machines it creates;
+// The steps the cases of Machines and Shared Certificates share, on top of CliTest (whose RunCreatingMachineAsync,
+// DeleteMachineAtCleanup, MachineIdOf and EventuallyAsync they use too):
 //   - shared certificates: IssueSharedCertificateAsync and RunIssuingSharedCertificateAsync revoke every certificate the
 //     test issued when it ends, unless the test revoked it itself (MarkRevoked);
 //   - the machine authentication policy of a disposable project (EnableCredentialKindsAsync), the token endpoint a
@@ -29,7 +27,7 @@ public abstract partial class MachineAccessTest : CliTest
     protected static readonly IReadOnlyList<string> CredentialKindNames = ["ApiKey", "Certificate", "CertificateAndApiKey", "ClientCredentials", "Federated"];
 
     // How long a list of trusted issuers may lag behind a change: the API keeps it in a cache of its instance for 60 s
-    // (CosmosFederatedIssuerStore) and evicts it only on the instance that made the change.
+    // (CosmosFederatedIssuerStore) and evicts it only on the instance that made the change; the window of EventuallyAsync.
     protected static readonly TimeSpan IssuerCacheWindow = TimeSpan.FromSeconds(75);
 
     // The same for the shared certificates of a project: 5 minutes (CosmosSharedCertificateStore).
@@ -75,44 +73,6 @@ public abstract partial class MachineAccessTest : CliTest
             .ShouldSucceed();
     }
 
-    // Runs a command that creates a machine (account machine create or set) as the test writes it, as the leased user;
-    // the machine it printed, if any, is deleted when the test ends (account machine delete <id> -p <projectKey> by the
-    // leased user; one that is gone by then counts as deleted). The result is returned as it is, so a refusal is checked
-    // by the test.
-    protected Task<SformResult> RunCreatingMachineAsync(string projectKey, params string[] arguments)
-    {
-        return RunCreatingMachineAsync(projectKey, null, new SformRunOptions(), arguments);
-    }
-
-    // The same as another pool user (the second user of a P case) or with options; the cleanup still runs as the leased
-    // user, the Owner of a disposable project.
-    protected async Task<SformResult> RunCreatingMachineAsync(string projectKey, SformActor? actor, SformRunOptions options, params string[] arguments)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(projectKey);
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(arguments);
-
-        var result = actor is null ? await Sform(options, arguments) : await actor.Sform(options, arguments);
-        if (TryMachineIdOf(result) is { } id)
-        {
-            DeleteMachineAtCleanup(id, projectKey);
-        }
-
-        return result;
-    }
-
-    // The "Id" of the machine JSON that account machine create, set and reset print; null when the run printed none.
-    protected static string? TryMachineIdOf(SformResult result)
-    {
-        ArgumentNullException.ThrowIfNull(result);
-        return MachineIdPattern().Match(result.PlainStdOut) is { Success: true } match ? match.Groups["id"].Value : null;
-    }
-
-    protected static string MachineIdOf(SformResult result)
-    {
-        return TryMachineIdOf(result) ?? throw result.Fail("printed no machine (no \"Id\")");
-    }
-
     // "Certificate password: <password>" of account machine create or renew (or shared-cert issue).
     protected static string CertificatePasswordOf(SformResult result)
     {
@@ -145,31 +105,6 @@ public abstract partial class MachineAccessTest : CliTest
         {
             await Assert.That(held).Contains(NormalizeScope(scope));
         }
-    }
-
-    // A machine deleted when the test ends, as the leased user: account machine delete <id> -p <project>; a delete that
-    // fails because the machine is gone (the test deleted it) counts as done when account machine no longer lists it.
-    protected void DeleteMachineAtCleanup(string id, string projectKey)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(id);
-        ArgumentException.ThrowIfNullOrWhiteSpace(projectKey);
-
-        OnCleanUp(async () =>
-        {
-            var delete = await Sform(new SformRunOptions { Label = $"cleanup: delete the machine {id}" }, "account", "machine", "delete", id, "-p", projectKey);
-            if (delete.Succeeded)
-            {
-                return;
-            }
-
-            var list = await Sform(new SformRunOptions { Label = $"cleanup: is the machine {id} still there" }, "account", "machine", "-p", projectKey);
-            if (list.Succeeded && !list.PlainStdOut.Contains(id, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            throw delete.Fail($"did not delete the machine {id} the test created");
-        });
     }
 
     // account shared-cert issue <label> -o <output> [options] -p <project> (the acting project by default): a shared
@@ -354,29 +289,6 @@ public abstract partial class MachineAccessTest : CliTest
         return TryRowOf(result, firstCell) is { } row && index < row.Count ? row[index] : null;
     }
 
-    // Runs sform with the arguments as the leased user until the read passes, at most for within (a run every 5 s), and
-    // returns the last result, which the test then checks: a list the API serves from a cache of its instance
-    // (IssuerCacheWindow, SharedCertificateCacheWindow) shows a change another instance made only when that cache
-    // expires. A read that passes at once returns at once.
-    protected async Task<SformResult> EventuallyAsync(Func<SformResult, bool> passes, TimeSpan within, params string[] arguments)
-    {
-        ArgumentNullException.ThrowIfNull(passes);
-        ArgumentNullException.ThrowIfNull(arguments);
-
-        var cancellation = TestContext.Current?.Execution.CancellationToken ?? CancellationToken.None;
-        var deadline = DateTimeOffset.UtcNow + within;
-        while (true)
-        {
-            var result = await Sform(arguments);
-            if (passes(result) || DateTimeOffset.UtcNow >= deadline)
-            {
-                return result;
-            }
-
-            await Task.Delay(TimeSpan.FromSeconds(5), cancellation);
-        }
-    }
-
     // The text after "<label>:" on the first line with it, trimmed ("Enabled kinds", "Default kind", "Keys", …).
     protected static string ValueOf(SformResult result, string label)
     {
@@ -414,15 +326,6 @@ public abstract partial class MachineAccessTest : CliTest
             .Order(StringComparer.Ordinal)
             .ToArray();
     }
-
-    [GeneratedRegex(@"""Id""\s*:\s*""(?<id>[^""]+)""", RegexOptions.CultureInvariant)]
-    private static partial Regex MachineIdPattern();
-
-    [GeneratedRegex(@"Certificate password:\s*(?<value>\S+)", RegexOptions.CultureInvariant)]
-    private static partial Regex CertificatePasswordPattern();
-
-    [GeneratedRegex(@"Certificate written to (?<path>.+?)\s*$", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
-    private static partial Regex CertificatePathPattern();
 
     [GeneratedRegex(@"Thumbprint:\s*(?<value>[0-9A-Fa-f]+)", RegexOptions.CultureInvariant)]
     private static partial Regex ThumbprintPattern();

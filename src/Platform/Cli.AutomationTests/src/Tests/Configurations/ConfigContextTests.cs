@@ -61,7 +61,7 @@ public sealed class ConfigContextTests : CliTest
             await Assert.That(content?["c"]?.GetValue<long>()).IsEqualTo(3L);
 
             var versions = (await Sform(In("story", "config", "versions", annotation))).ShouldSucceed();
-            await Assert.That(ConfigOutput.Versions(versions).Count).IsEqualTo(3);
+            await Assert.That(versions.VersionRows(ConfigOutput.ConfigurationVersions).Count).IsEqualTo(3);
 
             var diff = (await Sform(In("story", "config", "diff", annotation))).ShouldSucceed();
             await Assert.That(ConfigOutput.HasDiffLine(diff, '+', "\"c\": 3")).IsTrue().Because(diff.PlainStdOut);
