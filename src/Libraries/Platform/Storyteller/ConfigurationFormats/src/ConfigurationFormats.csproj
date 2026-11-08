@@ -10,7 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 
     <IsPackable>true</IsPackable>
-    <Description>Renders 2S Platform Storyteller configurations as flat JSON (IConfiguration keys), Spring Boot properties, .env files and YAML, with the flattening rules and the validation of the .NET configuration provider.</Description>
+    <Description>Renders 2S Platform Storyteller configurations as flat JSON (IConfiguration keys), Spring Boot properties, .env files and YAML, with the flattening rules and the validation of the .NET configuration provider, and parses the JSON paths of its messages back into steps.</Description>
     <PackageTags>$(PackageTags);platform;2S;storyteller;configuration;properties;dotenv;yaml</PackageTags>
   </PropertyGroup>
 
