@@ -4,6 +4,7 @@ using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -107,9 +108,10 @@ public class AccountSettingsCommand : BaseCommand
         return value.Note is null ? source : $"{source} ({value.Note})";
     }
 
-    // Plain text on the standard output, for scripts.
+    // Plain text on the standard output, for scripts: in UTF-8, so a path with any character comes out as it is.
     private void WriteOut(string text)
     {
+        using var encoding = Console.UseUtf8Output();
         (Console.Console?.Out ?? System.Console.Out).WriteLine(text);
     }
 }

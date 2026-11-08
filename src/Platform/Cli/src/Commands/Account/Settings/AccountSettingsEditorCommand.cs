@@ -118,7 +118,7 @@ public class AccountSettingsEditorCommand : BaseCommand
             return false;
         }
 
-        if (type == EditorType.Custom && string.IsNullOrWhiteSpace(EditorCommand))
+        if (type == EditorType.Custom && !CustomEditorCommand.IsValid(EditorCommand))
         {
             Console.WriteImportant("A custom editor needs its command line: sform account settings editor custom --command \"code --wait\".");
             return false;
