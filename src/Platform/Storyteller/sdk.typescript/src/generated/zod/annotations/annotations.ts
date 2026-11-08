@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.28.26699
+ * OpenAPI spec version: 0.10.30.65254
  */
 import * as zod from "zod";
 
@@ -671,7 +671,7 @@ export const PatchAnnotationHeader = zod.object({
     .string()
     .optional()
     .describe(
-      "One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
+      "One or more entity tags of reads of the annotation, or *. The patch is written only when the annotation is at one of these versions (any version for *); otherwise 412 (ErrorCode AnnotationPreconditionFailed). A missing or deleted annotation answers 404 first (AnnotationNotFound, AnnotationDeleted), whatever the header. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).",
     ),
 });
 
@@ -685,8 +685,8 @@ export const PatchAnnotationBody = zod.object({
   DocumentationLink: zod.string().nullish(),
   Labels: zod.array(zod.string()).nullish(),
   Values: zod.record(zod.string(), zod.unknown()).nullish(),
-  UnitType: zod.string().nullish(),
-  UnitDefinition: zod.string().nullish(),
+  UnitType: zod.string().optional(),
+  UnitDefinition: zod.string().optional(),
 });
 
 export const patchAnnotationResponseAnnotationTypeDefault = `Responsibility`;
