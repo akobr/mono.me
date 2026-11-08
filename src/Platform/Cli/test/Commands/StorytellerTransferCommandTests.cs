@@ -53,16 +53,38 @@ public class StorytellerTransferCommandTests
         typeof(StorytellerImportCommand).GetCustomAttribute<CommandAttribute>()!.Name.ShouldBe("import");
     }
 
+    // The list of sform story says who may run them; the help of each command says what a user and a machine need.
     [Theory]
-    [InlineData(typeof(StorytellerExportCommand), " A machine needs the read scopes of the included kinds and Configuration.Transfer instead of a role.")]
-    [InlineData(typeof(StorytellerImportCommand), " A machine needs the write scopes of the included kinds, with Annotation.Manage for annotations, Schema.Write for schemas and Template.Write for templates, and Configuration.Transfer instead of a role.")]
-    public void Commands_NameTheAdministratorRole_AndWhatAMachineNeeds(Type command, string machine)
+    [InlineData(
+        typeof(StorytellerExportCommand),
+        "Export the view (for administrators).",
+        "A machine needs no role but Configuration.Transfer and the read scope of every included kind: Annotation.Read for annotations, and Configuration.Read for schemas, templates and configurations.")]
+    [InlineData(
+        typeof(StorytellerImportCommand),
+        "Import into the view (for administrators).",
+        "A machine needs no role but Configuration.Transfer and the write scopes of every included kind: Annotation.Write and Annotation.Manage for annotations, Configuration.Write and Schema.Write for schemas, Configuration.Write and Template.Write for templates, and Configuration.Write for configurations.")]
+    public void Commands_NameTheAdministratorRole_AndWhatAMachineNeeds(Type command, string description, string machine)
     {
-        var description = command.GetCustomAttribute<CommandAttribute>()!.Description;
+        var attribute = command.GetCustomAttribute<CommandAttribute>()!;
+        var detail = TransferHelpTests.Unwrap(attribute.ExtendedHelpText);
 
-        description.ShouldNotBeNull();
-        description.ShouldContain("(Administrator)", Case.Sensitive);
-        description.ShouldEndWith(machine);
+        attribute.Description.ShouldBe(description);
+        detail.ShouldContain("A user needs the Administrator role on the project.", Case.Sensitive);
+        detail.ShouldEndWith(machine, Case.Sensitive);
+    }
+
+    [Theory]
+    [InlineData(
+        typeof(StorytellerExportCommand),
+        "The zip holds the annotations, schemas, templates and configurations of the view, or the kinds of --include: a folder of JSON files with the versions (--format folder), or a git repository with every version as a commit (--format git).")]
+    [InlineData(
+        typeof(StorytellerImportCommand),
+        "The zip or folder holds annotations, schemas, templates and configurations, each recognized by its file name. Only current documents are imported, never versions, and nothing is deleted.")]
+    public void Commands_SayWhatTheArchiveHolds(Type command, string archive)
+    {
+        var detail = TransferHelpTests.Unwrap(command.GetCustomAttribute<CommandAttribute>()!.ExtendedHelpText);
+
+        detail.ShouldStartWith(archive, Case.Sensitive);
     }
 
     [Fact]

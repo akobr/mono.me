@@ -9,9 +9,24 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.EXPORT, Description = "Export the view as a zip (Administrator): its annotations, schemas, templates and configurations, as a folder of JSON files with the versions, or as a git repository with every version as a commit. A machine needs the read scopes of the included kinds and Configuration.Transfer instead of a role.")]
+[Command(CommandNames.EXPORT, Description = "Export the view (for administrators).", ExtendedHelpText = HelpDetail)]
 public class StorytellerExportCommand : BaseContextCommand
 {
+    // After the options of 'sform story export --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The zip holds the annotations, schemas, templates and configurations of the
+        view, or the kinds of --include: a folder of JSON files with the versions
+        (--format folder), or a git repository with every version as a commit
+        (--format git).
+
+        A user needs the Administrator role on the project. A machine needs no role
+        but Configuration.Transfer and the read scope of every included kind:
+        Annotation.Read for annotations, and Configuration.Read for schemas,
+        templates and configurations.
+        """;
+
     private const string ZipExtension = ".zip";
 
     private readonly ITransfersApiClient _transfersApi;
