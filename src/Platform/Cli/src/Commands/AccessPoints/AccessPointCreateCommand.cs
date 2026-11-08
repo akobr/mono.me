@@ -1,4 +1,3 @@
-using System.IO.Abstractions;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -16,16 +15,16 @@ namespace _42.Platform.Cli.Commands.AccessPoints;
 public class AccessPointCreateCommand : BaseCommand
 {
     private readonly IAccessApiClient _accessApi;
-    private readonly IFileSystem _fileSystem;
+    private readonly IUserSettingsStore _settings;
 
     public AccessPointCreateCommand(
         IExtendedConsole console,
         IAccessApiClient accessApi,
-        IFileSystem fileSystem)
+        IUserSettingsStore settings)
         : base(console)
     {
         _accessApi = accessApi;
-        _fileSystem = fileSystem;
+        _settings = settings;
     }
 
     public override async Task<int> OnExecuteAsync()
@@ -58,14 +57,7 @@ public class AccessPointCreateCommand : BaseCommand
             Project = projectName,
         });
 
-        AccountSetCommand.CreateAccessDefaultConfigFile(
-            new AccessDefaultOptions
-            {
-                OrganizationName = organizationName,
-                ProjectName = projectName,
-                ViewName = Platform.Storyteller.Constants.DefaultViewName,
-            },
-            _fileSystem);
+        AccountSetCommand.SaveDefaultProject(Console, _settings, organizationName, projectName);
         return ExitCodes.SUCCESS;
     }
 

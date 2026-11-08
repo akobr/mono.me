@@ -9,11 +9,18 @@ namespace _42.Platform.Cli.Services;
 public interface IEditorService
 {
     /// <summary>
-    /// Configure editor preferences using the provided extended console and produce the resulting options.
+    /// Asks for the editor and saves the choice in the settings file; a choice that cannot be saved is reported and returned.
     /// </summary>
     /// <param name="console">The extended console used to query or display editor preference prompts.</param>
     /// <returns>An <see cref="EditorOptions"/> instance representing the configured editor settings.</returns>
     EditorOptions SetupEditorPreference(IExtendedConsole console);
+
+    /// <summary>
+    /// Asks for the editor (Visual Studio Code, Neovim and Vim when they are installed, or a custom command) without saving it.
+    /// </summary>
+    /// <param name="console">The extended console used to query or display editor preference prompts.</param>
+    /// <returns>The chosen editor; not configured when a custom command was chosen without entering one.</returns>
+    EditorOptions PromptEditorPreference(IExtendedConsole console);
 
     /// <summary>
     /// Opens the specified file using the provided editor options.

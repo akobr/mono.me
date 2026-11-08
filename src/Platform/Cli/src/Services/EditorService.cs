@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
@@ -22,21 +21,53 @@ public class EditorService : IEditorService
     private const int MaxDocumentDepth = 256;
 
     private readonly IFileSystem _fileSystem;
+    private readonly IUserSettingsStore _settings;
 
     /// <summary>
-    /// Initializes a new instance of <see cref="EditorService"/> and stores the provided file system for use in file and path operations.
+    /// Initializes a new instance of <see cref="EditorService"/>.
     /// </summary>
-    public EditorService(IFileSystem fileSystem)
+    /// <param name="fileSystem">The file system of the temporary files.</param>
+    /// <param name="settings">The settings store that keeps the chosen editor.</param>
+    public EditorService(IFileSystem fileSystem, IUserSettingsStore settings)
     {
         _fileSystem = fileSystem;
+        _settings = settings;
     }
 
     /// <summary>
-    /// Interactively prompts the user to choose an editor for editing JSON configuration and saves the selected preference.
+    /// Interactively prompts the user to choose an editor and saves the choice in the settings file. A choice that cannot be
+    /// saved is reported and still returned, so the edit goes on with it.
+    /// </summary>
+    /// <param name="console">Console used to display the selection prompt and to read input for a custom command.</param>
+    /// <returns>The chosen editor; not configured when a custom command was chosen without entering one.</returns>
+    public EditorOptions SetupEditorPreference(IExtendedConsole console)
+    {
+        var options = PromptEditorPreference(console);
+
+        if (!options.IsConfigured)
+        {
+            return options;
+        }
+
+        try
+        {
+            _settings.Update(ConfigurationSections.EDITOR, UserSettingsSchema.EditorChanges(options));
+            console.WriteLine($"Saved in {_settings.FilePath}; change it with sform account settings editor.".ThemedLowlight(console.Theme));
+        }
+        catch (UserSettingsException exception)
+        {
+            console.WriteImportant($"Your choice could not be saved: {exception.Message}");
+        }
+
+        return options;
+    }
+
+    /// <summary>
+    /// Interactively prompts the user to choose an editor, without saving the choice.
     /// </summary>
     /// <param name="console">Console used to display the selection prompt and to read input for a custom command.</param>
     /// <returns>The constructed <see cref="EditorOptions"/> reflecting the chosen editor; if a custom command was chosen, <see cref="EditorOptions.CustomCommand"/> contains the entered command.</returns>
-    public EditorOptions SetupEditorPreference(IExtendedConsole console)
+    public EditorOptions PromptEditorPreference(IExtendedConsole console)
     {
         var availableEditors = DetectAvailableEditors();
         var selectionItems = new List<string>();
@@ -74,12 +105,11 @@ public class EditorService : IEditorService
                 EditorType = Configuration.EditorType.Custom,
                 CustomCommand = console.Input<string>(new InputOptions<string>
                 {
-                    Message = "Enter the command to launch your editor (the config file path will be appended as argument)",
-                }),
+                    Message = "Enter the command to launch your editor (the config file path will be appended as argument), e.g. code --wait",
+                })?.Trim(),
             },
         };
 
-        SaveEditorOptions(options);
         return options;
     }
 
@@ -146,6 +176,12 @@ public class EditorService : IEditorService
         {
             console.WriteImportant("No editor is configured yet. Let's set one up.");
             options = SetupEditorPreference(console);
+
+            if (!options.IsConfigured)
+            {
+                console.WriteImportant("No editor command was entered, edit aborted.");
+                return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+            }
         }
 
         // 2. Write to a temp file
@@ -434,21 +470,5 @@ public class EditorService : IEditorService
         var command = trimmed[..spaceIndex];
         var baseArgs = trimmed[(spaceIndex + 1)..].Trim();
         return (command, $"{baseArgs} \"{filePath}\"");
-    }
-
-    /// <summary>
-    /// Persists the provided editor options to the application's editor configuration JSON file.
-    /// </summary>
-    /// <param name="options">The editor configuration to save; it will be stored under the top-level property "editor".</param>
-    /// <remarks>The file is written as indented JSON to the path [assembly directory or current directory]/Constants.EDITOR_CONFIG_JSON.</remarks>
-    private void SaveEditorOptions(EditorOptions options)
-    {
-        var config = new { editor = options };
-        var serializer = JsonSerializer.Create(new JsonSerializerSettings { Formatting = Formatting.Indented });
-        var appDirectory = _fileSystem.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? Environment.CurrentDirectory;
-        var fullPath = _fileSystem.Path.Combine(appDirectory, Constants.EDITOR_CONFIG_JSON);
-        using var fileWriter = _fileSystem.File.CreateText(fullPath);
-        using var jWriter = new JsonTextWriter(fileWriter);
-        serializer.Serialize(jWriter, config);
     }
 }

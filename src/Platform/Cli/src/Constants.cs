@@ -3,6 +3,9 @@ namespace _42.Platform.Cli;
 public static class Constants
 {
     public const string APPLICATION_CONFIG_JSON = "app.config.json";
+    public const string USER_SETTINGS_JSON = "sform.settings.json";
+
+    // The files of the default project and the editor before sform.settings.json, next to the assembly; only read.
     public const string ACCESS_DEFAULT_JSON = "access.default.json";
     public const string EDITOR_CONFIG_JSON = "editor.config.json";
     public const string AUTH_DISCOVERY_JSON = "auth.discovery.json";

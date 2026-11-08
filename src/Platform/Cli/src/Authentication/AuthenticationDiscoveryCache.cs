@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace _42.Platform.Cli.Authentication;
 
-// The answer of GET v1/auth/configuration, stored next to access.default.json.
+// The answer of GET v1/auth/configuration, a cache next to the assembly that may be lost.
 public sealed record AuthenticationDiscoveryCache
 {
     [JsonPropertyName("baseUrl")]

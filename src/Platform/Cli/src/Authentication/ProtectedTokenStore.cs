@@ -4,6 +4,7 @@ using System.IO.Abstractions;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Cli.Configuration;
 using Microsoft.Identity.Client.Extensions.Msal;
 
 namespace _42.Platform.Cli.Authentication;
@@ -25,7 +26,7 @@ public sealed class ProtectedTokenStore : ITokenStore
     private readonly string _lockFilePath;
 
     public ProtectedTokenStore(IFileSystem fileSystem)
-        : this(fileSystem, fileSystem.Path.Combine(MsalCacheHelper.UserRootDirectory, ".42for.net"))
+        : this(fileSystem, UserSettingsLocation.GetDirectory(fileSystem))
     {
     }
 
