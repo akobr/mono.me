@@ -1,6 +1,6 @@
 # Storyteller hosting for .NET
 
-Reads who a process is in the 2S Platform Storyteller, and the subscriptions of a responsibility. `IExecutionContext` reads the annotation of `STORYTELLER_KEY` and its ancestors, and tells whether the subscription is in effect. `ISubscriptionCatalog` reads executions and streams the subscriptions of a responsibility in a context. `IStorytellerSubscriptions` keeps the resolved document and the named options of every subscription in memory, for a worker that serves many subjects. It builds on the configuration provider `42.Platform.Storyteller.Configuration`.
+Reads who a process is in the 2S Platform Storyteller, any annotation and its descendants, and the subscriptions of a responsibility. `IExecutionContext` reads the annotation of `STORYTELLER_KEY` and its ancestors, each as the typed snapshot of its type, and tells whether the subscription is in effect. `IStorytellerCatalog` reads any annotation, and lists or watches the descendants of any annotation by a target, such as `StorytellerTarget.UnitsOf("rst.invoicing")`. `ISubscriptionCatalog` reads executions and streams the subscriptions of a responsibility in a context. `IStorytellerSubscriptions` keeps the resolved document and the named options of every subscription in memory, for a worker that serves many subjects. It builds on the configuration provider `42.Platform.Storyteller.Configuration`.
 
 ## Install
 
@@ -44,10 +44,11 @@ builder.Services.AddStoryteller()
 - `IStorytellerSubscriptions.WatchAsync` gives `Added` for every current subscription, then `Added`, `Changed` and `Removed` as they happen, each with the subject's execution, usage and document.
 - A watcher catches the failures of `Get(subject)` per subject: `OptionsValidationException` for a subject that left since the event, `StorytellerConfigurationException` for a document that does not bind. One tenant's document must not stop the host that serves every tenant.
 - The settings are the provider's: `STORYTELLER_ENDPOINT`, `STORYTELLER_KEY` and the variables of the machine's credential, or the same options in code.
-- Who am I and the catalog need `Annotation.Read`; the subscriptions also need `Configuration.Read`, and `Secrets.Read` for secrets. The informer needs an unrestricted machine, or one restricted to the responsibility.
+- Who am I and the catalogs need `Annotation.Read`; the subscriptions also need `Configuration.Read`, and `Secrets.Read` for secrets. The informer needs an unrestricted machine, or one restricted to the responsibility. A machine restricted to an annotation targets that annotation and those under it.
+- A new child does not move its parent's `Modified`, so a watch raises no change of the parent for it: watch the children's type instead.
 - The subscriptions poll, every 30 seconds by default, and keep the last good document of a subject when a read fails.
 - It uses internals of `42.Platform.Storyteller.Configuration`, and depends on the Configuration package built from the same commit, which has its own version number. Let Hosting bring it: do not reference or update `42.Platform.Storyteller.Configuration` on its own to another version. The dependency is not pinned exactly yet, so NuGet would accept a newer one, which can fail at run time.
 
 ## Documentation
 
-Who am I, the catalog and the informer, the subscriptions and their named options, scopes, cost and limits: [Hosting for .NET](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/hosting.md).
+Who am I, the catalogs and their informers, the subscriptions and their named options, scopes, cost and limits: [Hosting for .NET](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/hosting.md).

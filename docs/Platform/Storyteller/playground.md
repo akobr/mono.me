@@ -5,7 +5,7 @@ The playground is a set of small applications that run the .NET packages of Stor
 | Project | Shows |
 | --- | --- |
 | `DotNet.SimpleConfiguration` | A responsibility's configuration in `IConfiguration` ([the provider](configuration-provider.md)), and every change that reaches `IOptionsMonitor<T>` |
-| `DotNet.SimpleExecutor` | Who the process is and what it serves: `IExecutionContext` and `ISubscriptionCatalog` ([Hosting](hosting.md)), with each document in a format of [ConfigurationFormats](configuration-formats.md) |
+| `DotNet.SimpleExecutor` | Who the process is and what it serves: `IExecutionContext`, `IStorytellerCatalog` and `ISubscriptionCatalog` ([Hosting](hosting.md)), with each document in a format of [ConfigurationFormats](configuration-formats.md) |
 | `DotNet.AspireHost` | An AppHost that offers both as resources, configured through [the Aspire integration](aspire.md) |
 
 The code is in `src/Platform/Storyteller/Playground/`, with the data in `data/`. The design and its decisions are in [the spec](specs/2026-11-06%20Playground%20for%20Storyteller.md).
@@ -23,7 +23,7 @@ sform account machine create -a rst.playground -k ApiKey
 dotnet user-secrets set Parameters:storyteller-api-key <the key> --project src/Platform/Storyteller/Playground/DotNet.AspireHost/src
 ```
 
-- **The import** creates the responsibility `rst.playground`, the subjects `northwind` and `contoso` with their usages and plans, their executions in the context `production`, the unit `nightly-export` and its units of execution, and the configurations of `data/configurations/`. It creates the ancestors the files do not name, and reports them with the warning `AncestorCreated`.
+- **The import** creates the responsibility `rst.playground`, the subjects `northwind` and `contoso` with their usages and plans, their executions in the context `production`, the unit `nightly-export` and its units of execution, the unit `archive` that no execution runs, and the configurations of `data/configurations/`. It creates the ancestors the files do not name, and reports them with the warning `AncestorCreated`.
 - **The machine** is restricted to the responsibility, so it reads the annotation and its descendants. It has `Annotation.Read` and `Configuration.Read`, and no secrets.
 
 ## Run through the AppHost
@@ -107,9 +107,9 @@ The key of the process decides what it lists:
 
 | Key | Lists | Machine |
 | --- | --- | --- |
-| `rst.R` | The active executions of `R` in `--context`, with one poll of the informer | Restricted to `rst.R`, or unrestricted |
+| `rst.R` | With `all` or `units`, the units of `R` first, listed by `IStorytellerCatalog`, so a unit that no execution runs shows too; with `units` and no `--context`, that is all. Then the active executions of `R` in `--context`, with one poll of the informer | Restricted to `rst.R`, or unrestricted |
 | `usg.S.R` | The same, of the subject `S` | The same |
-| `unt.R.U` | With `all` or `units`, its own document first, and without `--context` that is all. With `--context`, the same as `rst.R` | The same; its own document needs only its key |
+| `unt.R.U` | With `all` or `units`, its own document first, and without `--context` that is all. With `--context`, the executions as for `rst.R`, and their units from their `UnitNames` | The same; its own document needs only its key |
 | `exe.S.R.C`, `uxe.S.R.C.U` | The execution, by `GetExecutionAsync`, in any status | `who`, `executions` and `units-of-execution` work restricted to the execution. `all` and `units` also read `unt.R.U`, and `--watch` lists through the informer, so they need the machine of `rst.R`; a narrower machine gets `! unt.R.U: …` and exit code `1` for the unit |
 | `sbt.S`, `cnt.S.C` | Nothing: they name no responsibility. `who` renders who and exits with `0`; `all` renders who, then exits with `2`; anything else exits with `2` | |
 
@@ -121,6 +121,7 @@ The mode of the reads is `STORYTELLER_MODE`, `Resolved` when unset, so a documen
 Who am I: @42dotnet.main.default.exe.northwind.playground.production
   Type: Execution
   Status: Active
+  Units: nightly-export
   Ancestors: rst.playground, usg.northwind.playground
   Unreadable: @42dotnet.main.default.sbt.northwind, @42dotnet.main.default.cnt.northwind.production
 Execution exe.northwind.playground.production: Active
@@ -146,7 +147,9 @@ schedule: "0 2 * * *"
 target: "northwind-archive"
 ```
 
-With the key `rst.playground` and `--context production`, the informer gives `Added` for both subjects, by key, so `contoso` comes first. A unit's document is written once per run, as several subjects share a unit, so it appears under `contoso`.
+Who am I prints what the snapshot of the key's type carries: the units of a responsibility or of an execution, the contexts and responsibilities of a subject, the contexts of a usage, the responsibilities of a context, the type of a unit.
+
+With the key `rst.playground` and `--context production`, the units of the responsibility come first, `archive` and `nightly-export` by key, listed once per run, with `--watch` too. Then the informer gives `Added` for both subjects, by key, so `contoso` comes first. A unit's document is written once per run, as several subjects share a unit, so the executions do not write `nightly-export` again.
 
 **Exit codes and failures:**
 
@@ -157,6 +160,7 @@ With the key `rst.playground` and `--context production`, the informer gives `Ad
 | Who am I fails, or the one poll fails, such as for a responsibility that does not exist or a machine that may not list | `1`, with the message on standard error |
 | `GetExecutionAsync` finds no execution | `1`, with the message on standard error |
 | A document fails, or a format cannot write it | `! {key}: {message}` on standard error, the run goes on, and `1` at the end. Messages name keys and paths, never values |
+| The list of the units of `rst.R` fails, such as for a machine restricted below the responsibility | `! the units of rst.R: {message}` on standard error, the executions go on, and `1` at the end |
 | One execution or usage cannot be read in the one poll | The informer drops it and logs a warning, so it does not show, and the code stays `0` |
 | Under `--watch`, a poll fails | The informer logs a warning and polls again, for ever |
 | An unknown option, or what to render, a format, a context or settings that are refused | `2`, with the message on standard error. The settings are read before the command line, so `--help` needs them too |
@@ -166,12 +170,12 @@ Logs go to standard error at `Warning` and above, so standard output holds only 
 **What `--watch` sees** is what [the informer](hosting.md#one-poll) sees: `Added`, `Changed` and `Removed` of the active execution and usage of each subject.
 
 - A configuration write raises no event, as it does not move `Modified`. `DotNet.SimpleConfiguration` is the project that follows a document.
-- A new unit of execution raises no event, and `UnitNames` stays old until the execution itself changes, or until a restart.
+- A new unit of execution raises no event, and `UnitNames` stays old until the execution itself changes, or until a restart. The same holds for the units of the responsibility: they are listed once, at the start (see [Freshness](hosting.md#freshness)).
 - A disabled execution leaves the list, as `Removed`. Without `--watch`, an `exe` key still renders it, with its status.
 
 ## Limits
 
-- **Units come from executions.** The catalog lists no units, so a unit without a unit of execution under a listed execution does not show. A process whose key is that unit still renders it.
+- **Units of other keys come from executions.** For a key of `usg`, `unt`, `exe` or `uxe`, the units come from the `UnitNames` of the executions, so a unit that no listed execution runs does not show: listing the units of `rst.R` needs the machine of the responsibility. A process whose key is that unit still renders it.
 - **Only an API key.** The AppHost uses `WithApiKey`. Running a project alone takes any credential of [the contract](configuration-provider.md#credentials).
 - **No secret resolver.** The applications set no `ReferenceResolver`, so references stay as written (see [Secret references](configuration-provider.md#secret-references)).
 - **Not for production.** They print what they read, and the renderer's walk of the provider's keys is there to show every change, not to be copied. Copy the typed binding, and the [worker](hosting.md#a-worker-for-every-subject) for serving subjects.

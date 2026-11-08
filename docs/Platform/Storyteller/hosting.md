@@ -4,19 +4,20 @@ The package `42.Platform.Storyteller.Hosting` adds the catalog to the [configura
 
 | Service | Does |
 | --- | --- |
-| `IExecutionContext` | Who am I: the annotation of `STORYTELLER_KEY` and its ancestors |
+| `IExecutionContext` | Who am I: the annotation of `STORYTELLER_KEY` and its ancestors, each as the snapshot of its type |
+| `IStorytellerCatalog` | Any annotation by its key, and the descendants of any annotation by a target: as a list, or as a stream of changes |
 | `ISubscriptionCatalog` | One execution by its key, and the informer: the subscriptions of a responsibility in a context, as a stream of changes |
 | `IStorytellerSubscriptions` | A hosted informer that keeps the document of every subscription in memory, with `IOptionsMonitor<T>.Get(subject)` over them |
 
-The code is in `src/Libraries/Platform/Storyteller/Hosting/src/`: the public types at its root, the registration (`Container/` and the extension classes), who am I (`Executions/`), the catalog (`Catalog/`), the reads (`Reading/`), the polling informer (`Informer/`), and the subscriptions with their named options (`Subscriptions/`).
+The code is in `src/Libraries/Platform/Storyteller/Hosting/src/`: the public types at its root, the registration (`Container/` and the extension classes), who am I (`Executions/`), the catalogs (`Catalog/`), the reads (`Reading/`), the polling informers (`Informer/`), and the subscriptions with their named options (`Subscriptions/`).
 
-The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md). An Aspire AppHost passes the variables with [the Aspire integration](aspire.md). `DotNet.SimpleExecutor` of [the playground](playground.md) runs who am I and the catalog.
+The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md). The typed snapshots and `IStorytellerCatalog` are in [their own spec](../../Libraries/Platform/Storyteller/specs/2026-11-08%20Hosting%20-%20who%20am%20I%20for%20any%20annotation,%20and%20a%20catalog%20and%20informer%20for%20any%20descendants.md). An Aspire AppHost passes the variables with [the Aspire integration](aspire.md). `DotNet.SimpleExecutor` of [the playground](playground.md) runs who am I and both catalogs.
 
 ## Package
 
 | Package | Namespace | Contents |
 | --- | --- | --- |
-| `42.Platform.Storyteller.Hosting` | `_42.Platform.Storyteller.Sdk.Hosting` | `IExecutionContext`, `ISubscriptionCatalog`, `IStorytellerSubscriptions`, their snapshots, events and options |
+| `42.Platform.Storyteller.Hosting` | `_42.Platform.Storyteller.Sdk.Hosting` | `IExecutionContext`, `IStorytellerCatalog`, `ISubscriptionCatalog`, `IStorytellerSubscriptions`, their snapshots, targets, events and options |
 
 - **Registration needs no `using`.** `services.AddStoryteller(…)`, `IStorytellerHostingBuilder`, `AddSubscriptions` and `AddSubjectOptions` are in `Microsoft.Extensions.DependencyInjection`; `builder.AddStoryteller(…)` on an `IHostApplicationBuilder` is in `Microsoft.Extensions.Hosting`.
 - **The services and snapshots** need `using _42.Platform.Storyteller.Sdk.Hosting;`.
@@ -160,7 +161,7 @@ public sealed class InvoicingWorker : BackgroundService
 
 `services.AddStoryteller(configure)` registers:
 
-- `IExecutionContext` and `ISubscriptionCatalog`;
+- `IExecutionContext`, `IStorytellerCatalog` and `ISubscriptionCatalog`, each on its own: an application that registered one of them first keeps its own and gets the others;
 - `IStorytellerDocuments`, when nothing registered it before; an application that called `AddStorytellerDocuments` first keeps its own;
 - the provider's refresher and logging, with `AddStorytellerConfiguration()`. Its registrations are all `TryAdd`, so this is harmless without a provider.
 
@@ -173,7 +174,7 @@ The options are the provider's `StorytellerConfigurationOptions`, so one delegat
 | Option | In Hosting |
 | --- | --- |
 | `Endpoint`, `Credential` | Every read |
-| `Key` | Optional at registration. Who am I needs it. Its organization, project and view are the scope of annotation keys, of the informer and of the subscriptions. |
+| `Key` | Optional at registration. Who am I needs it. Its organization, project and view are the scope of annotation keys, of targets, of the informer and of the subscriptions. |
 | `Mode` | The mode of `IStorytellerDocuments`, and the default mode of the subscriptions' documents |
 | `ReferenceResolver`, `SecretRefreshInterval` | The documents: the application's `IStorytellerDocuments` and the subscriptions' |
 | `ReadTimeout` | Each request: a point read, a page of a list, a document. It runs on the system clock. |
@@ -185,8 +186,8 @@ The options are the provider's `StorytellerConfigurationOptions`, so one delegat
 
 - **Read at the call.** The options are read and validated when `AddStoryteller` is called. A missing endpoint or an invalid key throws `StorytellerConfigurationException` there, so a misconfigured process fails at its start.
 - **The first registration wins.** A later `services.AddStoryteller(…)` returns a builder over the first one, without reading its options.
-- **One credential.** Who am I, the catalog, `IStorytellerDocuments` and the subscriptions share one bound credential, and with it one token cache. The provider reads its own settings and binds its own copy, and so does an `IStorytellerDocuments` that `AddStorytellerDocuments` registered before.
-- **Separate transports.** The catalog (who am I, `GetExecutionAsync`, the informer), the application's `IStorytellerDocuments` and the subscriptions' documents each have their own `HttpClient` and circuit breaker, built as the provider's is (see [Transport](configuration-provider.md#transport)). A failing tenant cannot open the breaker of the application's own reads.
+- **One credential.** Who am I, the catalogs, `IStorytellerDocuments` and the subscriptions share one bound credential, and with it one token cache. The provider reads its own settings and binds its own copy, and so does an `IStorytellerDocuments` that `AddStorytellerDocuments` registered before.
+- **Separate transports.** The catalog (who am I, both catalogs and their informers), the application's `IStorytellerDocuments` and the subscriptions' documents each have their own `HttpClient` and circuit breaker, built as the provider's is (see [Transport](configuration-provider.md#transport)). A failing tenant cannot open the breaker of the application's own reads.
 
 ### One call
 
@@ -209,6 +210,8 @@ The key may be of any type. The common ones:
 | `uxe.{subject}.{responsibility}.{context}.{unit}` | A job | The same, `unt.{responsibility}.{unit}` and `exe.{subject}.{responsibility}.{context}` |
 | `rst.{responsibility}` | A worker that discovers its subjects through the catalog | None |
 
+Any other key works the same way, `unt`, `sbt`, `usg` and `cnt` included. Each annotation, the key's and its ancestors', is the [snapshot of its type](#snapshots), with the names of its relations as of the read.
+
 ### The snapshot
 
 `StorytellerExecutionContext` is immutable.
@@ -216,17 +219,19 @@ The key may be of any type. The common ones:
 | Member | Content |
 | --- | --- |
 | `Key` | The full key, with the type code lower-cased |
-| `Annotation` | The annotation of the key; a `StorytellerExecution` for an `exe` key |
+| `Annotation` | The annotation of the key, as the snapshot of its type: a `StorytellerExecution` for an `exe` key, a `StorytellerResponsibility` for an `rst` key, … |
 | `Ancestors` | The ancestors that were read, by their `AnnotationType` |
 | `Unreadable` | The full keys of the ancestors the machine may not read |
 | `ReadAt` | When the read started, on the options' `TimeProvider` |
-| `Subject`, `Responsibility`, `Usage`, `Context` | The annotation of that type: the key's own, or an ancestor; `null` when it was not read |
+| `Subject`, `Responsibility`, `Usage`, `Context` | The annotation of that type: the key's own, or an ancestor; `null` when it was not read. Typed `StorytellerAnnotation`; a read puts the snapshot of the type there |
 | `Execution` | The key's own for an `exe` key, its parent for a `uxe` key |
+| `Find<T>()` | The annotation of the snapshot type `T`, the key's own or an ancestor: `context.Find<StorytellerUnit>()?.UnitType`, `context.Find<StorytellerResponsibility>()?.UnitNames`. `null` when it was not read, or when it is not a `T`, as a test double's base snapshot. `Find<StorytellerAnnotation>()` throws `ArgumentException` |
 | `GetSubscriptionStatus(now)` | Whether the subscription is in effect; see below |
 
 ### Reads
 
 - **The key** is read with `includeInactive` and `includeDeleted`: a disabled, scheduled, expired or deleted annotation is an answer, not a failure.
+- **The relations** of the snapshots, such as `UnitNames` of a responsibility, are as of the read: a refresh reads them again.
 - **The ancestors** are read at once, with `includeInactive`.
 - **Each read** is bounded by `ReadTimeout`, and goes through the catalog's transport.
 
@@ -245,7 +250,7 @@ Who am I is stale while revalidate: a refresh never blocks a caller.
 - **The first read.** Concurrent first calls share one read. A failed first read is not kept: the next call reads again.
 - **Later calls** return the snapshot. The first call after `RefreshInterval` has passed, counted from the snapshot's `ReadAt` or from the start of the last background read, starts one background read. One runs at a time, so a failing platform is not asked on every call.
 - **A background read that fails** keeps the snapshot and logs a warning.
-- **A key that is gone.** A deleted key is read with its deletion, so `Annotation.DeletedAt` is the time it was deleted. A background read that gets a `404`, a key that was purged, keeps the previous snapshot with `DeletedAt` set to the time of the read. Either way the status turns `Deleted` instead of staying `Active` for ever. A first read or `RefreshAsync` that gets a `404` throws.
+- **A key that is gone.** A deleted key is read with its deletion, so `Annotation.DeletedAt` is the time it was deleted. A background read that gets a `404`, a key that was purged, keeps the previous snapshot, of its type and with its relations, with `DeletedAt` set to the time of the read. Either way the status turns `Deleted` instead of staying `Active` for ever. A first read or `RefreshAsync` that gets a `404` throws.
 - **The token of `GetAsync`** ends the caller's wait, not the first read that other callers share.
 - **Disposal.** The container disposes the service, which cancels the reads in flight. A call after that throws `ObjectDisposedException`.
 
@@ -279,7 +284,7 @@ The usage `usg.{subject}.{responsibility}` records that a subject may use a capa
 
 ## Snapshots
 
-The catalog hands out immutable snapshots of what the API answered: `StorytellerAnnotation`, and `StorytellerExecution` for an execution.
+Who am I and the catalogs hand out immutable snapshots of what the API answered: a sealed subtype of `StorytellerAnnotation` per annotation type.
 
 | `StorytellerAnnotation` | Content |
 | --- | --- |
@@ -294,17 +299,111 @@ The catalog hands out immutable snapshots of what the API answered: `Storyteller
 | `DeletedAt` | Set only on a deleted annotation, which only who am I reads |
 | `GetStatus(now)` | The `AnnotationStatus` at `now` |
 
-| `StorytellerExecution` adds | Content |
-| --- | --- |
-| `SubjectName`, `ResponsibilityName`, `ContextName` | From the key, never from the answer |
-| `UnitNames` | The units of execution under it, by their unit names |
+| Type | Key | From the key | From the answer |
+| --- | --- | --- | --- |
+| `StorytellerResponsibility` | `rst.{R}` | (`Name`) | `UnitNames`: its units |
+| `StorytellerUnit` | `unt.{R}.{U}` | `ResponsibilityName`, `UnitName` | `UnitType`, `UnitDefinition`, `null` when it has none |
+| `StorytellerSubject` | `sbt.{S}` | (`Name`) | `ContextNames`: its contexts; `ResponsibilityNames`: the responsibilities of its usages |
+| `StorytellerUsage` | `usg.{S}.{R}` | `SubjectName`, `ResponsibilityName` | `ContextNames`: the contexts of its executions |
+| `StorytellerContext` | `cnt.{S}.{C}` | `SubjectName`, `ContextName` | `ResponsibilityNames`: the responsibilities of its executions |
+| `StorytellerExecution` | `exe.{S}.{R}.{C}` | `SubjectName`, `ResponsibilityName`, `ContextName` | `UnitNames`: the units of its units of execution |
+| `StorytellerUnitOfExecution` | `uxe.{S}.{R}.{C}.{U}` | `SubjectName`, `ResponsibilityName`, `ContextName`, `UnitName` | |
 
+- **The type comes from the key.** A read of a `unt` key gives a `StorytellerUnit`, whatever the answer says. The names come from the key, never from the answer.
+- **Relations come from an answer of the key's type.** The API's `AnnotationType` discriminator decides the SDK's type of the answer. An answer without it, or with another one, gives the key's type with empty lists and `null` strings; nothing throws.
+- **Relation names** are never `null`, in the order of the answer, and as of the read: they are the server's arrays of the active children, which do not move `Modified` (see [Freshness](#freshness)).
 - **Point reads only.** Snapshots come from reads of one annotation, never from the items of a list, whose `Values` lose array items, the trailing zeros of decimals and the offsets of date-like strings.
 - **Copies.** A snapshot is shared by every caller, so what a caller could change (`Values`, `Created`, `Modified`) is a copy per access.
 - **`ToString()`** prints the key and the type, never values.
-- **Test doubles.** `StorytellerAnnotation`, `StorytellerExecution` and `StorytellerExecutionContext` have public constructors and `init` members, so a test can build them for a fake `ISubscriptionCatalog` or `IExecutionContext`, a usage with its `Labels` and `Values` included. What an initializer sets is copied (`Labels`, `Values`, `Created`, `Modified`, `UnitNames`, `Ancestors`, `Unreadable`), so a later change of the objects it was given does not reach the snapshot. A `StorytellerSubscription` has no public constructor: its document belongs to the subscriptions, and `StorytellerDocument` has none either.
+- **Test doubles.** `StorytellerAnnotation`, its subtypes and `StorytellerExecutionContext` have public constructors and `init` members, so a test can build them for a fake `IStorytellerCatalog`, `ISubscriptionCatalog` or `IExecutionContext`, a usage with its `Labels` and `Values` included. What an initializer sets is copied (`Labels`, `Values`, `Created`, `Modified`, the relation names, `Ancestors`, `Unreadable`), so a later change of the objects it was given does not reach the snapshot. A test double may put a base `StorytellerAnnotation` in who am I: `Usage` and the other members give it back, `Find<T>()` does not. A `StorytellerSubscription` has no public constructor: its document belongs to the subscriptions, and `StorytellerDocument` has none either.
 
-## The catalog
+## Any annotation and its descendants
+
+`IStorytellerCatalog` reads any annotation by its key, and the descendants of any annotation by a target: the units of a responsibility, the usages, contexts or executions of a subject, the units of execution of an execution.
+
+```csharp
+// The units of a responsibility, as point-read snapshots, by key.
+IReadOnlyList<StorytellerUnit> units = await catalog.ListAsync(StorytellerTarget.UnitsOf("rst.invoicing"), cancellationToken);
+
+// The executions of a subject in one context, as they change.
+await foreach (var change in catalog.WatchAsync(StorytellerTarget.ExecutionsOf("sbt.northwind").WithContext("production"), TimeSpan.FromMinutes(1), cancellationToken))
+{
+    Console.WriteLine($"{change.Kind} {change.Annotation.AnnotationKey} {change.Removal?.Reason}");
+}
+
+// One annotation, typed.
+StorytellerUnit? daily = await catalog.GetAsync<StorytellerUnit>("unt.invoicing.daily", cancellationToken);
+```
+
+| Member | Does |
+| --- | --- |
+| `GetAsync(key)` | One annotation, in any status, as the snapshot of its type; `null` when it does not exist or is deleted |
+| `GetAsync<T>(key)` | The same, typed. A key of another type than `T`'s throws `ArgumentException` before any read; `StorytellerAnnotation` takes any key |
+| `ListAsync(target)` | The descendants of the target, by key, ordinally |
+| `WatchAsync(target, pollInterval)` | The informer of the target: `Added`, `Changed` and `Removed` |
+
+- **Keys.** A key, and the key of a target, is a full key, or an annotation key in the organization, project and view of the options' `Key`. An annotation key without that `Key` throws `StorytellerConfigurationException` naming `STORYTELLER_KEY`, at the call.
+- **Failures** throw `StorytellerConfigurationException`, as the [other reads](#errors-and-logging) do.
+
+### Targets
+
+`StorytellerTarget` makes a target: the descendants of one type under one annotation.
+
+| Factory | Descendants | Under |
+| --- | --- | --- |
+| `UsagesOf(key)` | `StorytellerUsage` | `rst`, `sbt` |
+| `ContextsOf(key)` | `StorytellerContext` | `sbt` |
+| `UnitsOf(key)` | `StorytellerUnit` | `rst` |
+| `ExecutionsOf(key)` | `StorytellerExecution` | `rst`, `sbt`, `usg`, `cnt` |
+| `UnitsOfExecutionOf(key)` | `StorytellerUnitOfExecution` | `rst`, `unt`, `sbt`, `usg`, `cnt`, `exe` |
+
+- **The combinations** are those the API lists, `GET …/annotations/{key}/{descendants}`. Any other one throws `ArgumentException` at the factory, as does a key that does not parse: a responsibility has no contexts, a subject no units, and a unit of execution no descendants.
+- **Filters.** `WithSubject`, `WithResponsibility`, `WithContext` and `WithUnit` keep the descendants whose key has that name, compared ordinally. A filter is one key segment; an empty one, or one with a `.`, throws `ArgumentException`. So does a filter of a name the descendants' keys do not have (`WithContext` on units), or one the ancestor names already (`WithResponsibility` on the executions of `rst.invoicing`).
+- **Filters run in the process.** The API has no filter of descendants, so a filter narrows what was listed, and the list costs the same.
+- **Status.** A target takes active descendants. `IncludingInactive()` adds disabled, scheduled and expired ones. Deleted ones are never listed.
+- **Immutable.** Each `With…` and `IncludingInactive()` returns a new target. `Of`, `Type`, the filters and `IncludeInactive` read it back; `ToString()` describes it: "the executions of sbt.northwind in the context production".
+
+### Lists
+
+`ListAsync(target)`:
+
+1. reads the ancestor. The list of an annotation that does not exist is empty, so a `404` throws a definitive `StorytellerConfigurationException` with status `404`: "The annotation K does not exist, so it has no units to list";
+2. reads every page of `…/annotations/{ancestor}/{descendants}`, with `includeInactive` for a target that includes them, following the continuation tokens as [the informer](#one-poll) does;
+3. keeps the descendants that pass the filters, and point-reads each of them, at most 4 at once;
+4. leaves out one that is gone since the list (`404`), deleted, or inactive when the target takes active ones only, by the process's clock;
+5. returns the snapshots by key. Any other failure of a read throws, once every read ended.
+
+### Watching a target
+
+`WatchAsync(target, pollInterval, cancellationToken)` streams `StorytellerAnnotationChange<T>`:
+
+| `StorytellerAnnotationChange<T>` | Content |
+| --- | --- |
+| `Kind` | `Added`, `Changed` or `Removed` |
+| `Annotation` | The snapshot: of a point read for `Added` and `Changed`, the one held before for `Removed` |
+| `Removal` | For `Removed`: the annotation's own key and the [reason](#the-informer) |
+
+A poll:
+
+1. **The ancestor.** Until a poll has completed, it reads the ancestor; a `404` fails the poll with a definitive "The annotation K does not exist …".
+2. **The list**, every page, as `ListAsync` reads it, and the descendants that pass the filters, fingerprinted by `Modified`, or by a hash of the item without one.
+3. **Diff** against the held ones:
+   - one not held is read; it is `Added` when it is not deleted, and active unless the target includes inactive ones;
+   - a held one whose fingerprint changed is read again, and `Changed` on the same terms; otherwise it stays as it was, and the next poll reads it again;
+   - a held one that is not listed any more is read, deleted ones included: gone gives `Removed` with `Missing`, deleted with `Deleted`, and, unless the target includes inactive ones, disabled, scheduled or expired with that reason. Otherwise the list missed it, and it stays without an event.
+4. **Order.** `Removed`, then `Changed`, then `Added`, each by key.
+
+The interval, the jitter, the zero interval, the checks at the call, failed polls and point reads, and cancellation are those of [`WatchExecutionsAsync`](#the-informer). Each enumeration runs its own loop and holds its own annotations.
+
+### Freshness
+
+`Modified` moves on a create, an update that changes something, and a restore. The server keeps the relation names of a parent (`UnitNames`, `ContextNames`, `ResponsibilityNames`) without moving its `Modified`, and the items of a list do not carry them. So:
+
+- **A new child raises no event of its parent.** A watch of executions gives no `Changed` when a unit of execution is added under one of them, and its `UnitNames` stay as they were read.
+- **Watch the children instead.** `WatchAsync(StorytellerTarget.UnitsOf("rst.invoicing"))` gives `Added` for a new unit, and `UnitsOfExecutionOf("exe.…")` for a new unit of execution.
+- **Point reads are fresh.** `GetAsync`, `ListAsync` and who am I's refresh read the relation names as they are.
+
+## The catalog of executions
 
 `ISubscriptionCatalog` reads executions through the platform's annotations.
 
@@ -532,12 +631,12 @@ var options = serviceProvider.GetRequiredService<IOptionsMonitor<InvoicingOption
 
 ### Which to use
 
-| | `ISubscriptionCatalog.WatchExecutionsAsync` | `IStorytellerSubscriptions.WatchAsync` |
-| --- | --- | --- |
-| Loop | Cold: each enumeration polls on its own | Hot: the one hosted loop |
-| Content | The execution and the usage | The same, with the document |
-| `Added` | When listed and read | When the first document is good |
-| For | Tools and processes that do not keep documents | A worker with `AddSubscriptions` |
+| | `IStorytellerCatalog.WatchAsync` | `ISubscriptionCatalog.WatchExecutionsAsync` | `IStorytellerSubscriptions.WatchAsync` |
+| --- | --- | --- | --- |
+| Loop | Cold: each enumeration polls on its own | Cold: each enumeration polls on its own | Hot: the one hosted loop |
+| Content | The descendants of one type under any annotation, filtered | The execution and the usage of each subject of a responsibility in a context | The same, with the document |
+| `Added` | When listed and read | When listed and read | When the first document is good |
+| For | Tools and processes that follow any part of the graph | Tools and processes that do not keep documents | A worker with `AddSubscriptions` |
 
 The subscriptions' documents are not served by `IStorytellerDocuments`. Its `GetAsync` revalidates on every call, and jobs depend on that; under `AddSubscriptions` the same call would be up to a poll interval old. The application's `IStorytellerDocuments` and the subscriptions' documents are separate instances, with separate caches.
 
@@ -546,12 +645,14 @@ The subscriptions' documents are not served by `IStorytellerDocuments`. Its `Get
 | Service | Scopes of the machine | Restricted machine |
 | --- | --- | --- |
 | Who am I | `Annotation.Read` | Restricted to its key: reads the key; its ancestors are `Unreadable` |
+| `IStorytellerCatalog` | `Annotation.Read` | Targets the annotation it is restricted to, and any annotation under it; gets those annotations |
 | `GetExecutionAsync` | `Annotation.Read` | Reads the executions at or under the key it is restricted to |
 | The informer | `Annotation.Read` | Restricted to `rst.{responsibility}`, or unrestricted |
 | The subscriptions | `Annotation.Read` and `Configuration.Read`; `Secrets.Read` for secrets | Restricted to `rst.{responsibility}`, or unrestricted |
 
 - **A runtime reader** of `sform account machine create` has `Annotation.Read` and `Configuration.Read`, so it runs who am I and the provider. A machine without `Annotation.Read` runs the provider, but who am I fails with `403` `AccessDenied`.
 - **A worker's machine.** `sform account machine create -a rst.invoicing` restricts a machine to the responsibility. It lists and reads the executions and usages of `rst.invoicing`, and their configurations. Add `--scope secrets-read` when the documents need their secrets.
+- **What a restricted machine can target.** A machine restricted to an annotation reads that annotation and its descendants. Its targets are that annotation and the annotations under it: one restricted to `rst.invoicing` lists the units and executions of `rst.invoicing`, and the units of execution of `exe.northwind.invoicing.production`. It cannot target an ancestor of its annotation, nor the other descendants of that ancestor: a machine restricted to `usg.northwind.invoicing` cannot list the executions of `sbt.northwind`. The read answers `403 AnnotationRestricted`, which throws a `StorytellerConfigurationException` saying that listing needs a machine restricted to the ancestor or to an annotation above it, or an unrestricted one.
 - **A machine restricted to its execution** gets who am I without ancestors and the status `Unknown`, and cannot run the informer. The informer's first read, of `rst.{responsibility}`, answers `403` `AnnotationRestricted`, so every poll fails with "The machine may not read …" before any list is requested. The failure is definitive: `WaitUntilReadyAsync`, and a start with `WaitUntilReadyOnStart`, throw it.
 
 See [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines) and [Scopes of machines](authentication.md#scopes-of-machines).
@@ -565,7 +666,7 @@ See [Annotation restriction of machines](authentication.md#annotation-restrictio
 | Category | Logs |
 | --- | --- |
 | `_42.Platform.Storyteller.Sdk.Hosting.ExecutionContext` | Information: the ancestors the machine may not read. Warning: a failed background read, a key that is gone. Error: an unexpected failure of a background read. |
-| `_42.Platform.Storyteller.Sdk.Hosting.Informer` | Warning: a failed poll, a failed point read, executions only in other contexts. Debug: a subscription the list missed, an annotation gone since the list. The informer of `WatchExecutionsAsync` and that of the subscriptions log here. |
+| `_42.Platform.Storyteller.Sdk.Hosting.Informer` | Warning: a failed poll, a failed point read, executions only in other contexts. Debug: a subscription or an annotation the list missed, an annotation gone since the list. The informers of `IStorytellerCatalog.WatchAsync`, of `WatchExecutionsAsync` and of the subscriptions log here. |
 | `_42.Platform.Storyteller.Sdk.Hosting.Subscriptions` | Information: the counts of a poll that changed something. Warning: a failed read of a document, a listener or named options that failed. Error: an informer that broke. |
 | `_42.Platform.Storyteller.Sdk.Configuring.StorytellerDocuments` | The reads of the documents, as for `IStorytellerDocuments` |
 
@@ -578,6 +679,11 @@ See [Annotation restriction of machines](authentication.md#annotation-restrictio
 - point reads for changes only: two per added or removed subscription, one or two per changed one;
 - for the subscriptions, N conditional reads of the documents, `304` while unchanged.
 
+**Cost of `IStorytellerCatalog`:**
+
+- `ListAsync`: one read of the ancestor, one request per page of its descendants of the type, and one point read per descendant that passes the filters;
+- a poll of `WatchAsync`: one request per page, one read of the ancestor until a poll has completed, and point reads for changes only: one per added, changed or removed annotation.
+
 **Limits:**
 
 - **Polling.** A change reaches the process at the next poll, up to the poll interval and its jitter later. The bulk read of many documents and a watch of change events are follow-ups; the informer polls behind an internal seam that either can replace.
@@ -585,7 +691,7 @@ See [Annotation restriction of machines](authentication.md#annotation-restrictio
 - **No last-known-good on disk.** A worker restarted during an outage serves no tenant until the API answers.
 - **One responsibility and one context** per container.
 - **Clocks.** The lists use the platform's clock, `GetStatus(now)` the process's. A skew shows until the next poll.
-- **`UnitNames`** of an informer's execution is read again only when the execution's `Modified` moves, which a new unit of execution does not do.
+- **Relation names** of a watched annotation, such as `UnitNames` of an informer's execution, are read again only when its `Modified` moves, which a new child does not do. See [Freshness](#freshness).
 - **No typed entitlements.** The usage's `Labels` and `Values` are the facts; there is no `IsEntitled`.
 - **Restricted machines.** See [Scopes and restricted machines](#scopes-and-restricted-machines).
 

@@ -639,6 +639,6 @@ public sealed class NightlyExport
 - **Temporary roots must be disposed.** A root that is never disposed keeps its source polling.
 - **A reload from elsewhere can hide a rejection.** A change token delivers a change raised during its callback once that callback returns. When the application calls `IConfigurationRoot.Reload()`, or another provider of the same root reloads, while a Storyteller document is notified, that document's rebind error can surface in the other reload, and the document is kept instead of rolled back.
 - **A switch lasts for the process.** A restart starts from the configured key.
-- **No start without a key.** A job without a fixed key uses `IStorytellerDocuments`, and finds an execution with `ISubscriptionCatalog.GetExecutionAsync` of [Hosting](hosting.md#the-catalog).
+- **No start without a key.** A job without a fixed key uses `IStorytellerDocuments`, and finds an execution with `ISubscriptionCatalog.GetExecutionAsync` of [Hosting](hosting.md#the-catalog-of-executions).
 - **One subject per source.** A worker that serves every subject of a responsibility keeps their documents and binds options per subject with the subscriptions of [Hosting](hosting.md#subscriptions).
 - **No feature flag bridge.** A `feature_management` section of the document reaches `IConfiguration` like any other; there is no FeatureManagement or OpenFeature provider (see [Feature flags](hosting.md#feature-flags)).
