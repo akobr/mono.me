@@ -845,7 +845,7 @@ export const RenewMachineCertificateResponse = zod.object({
   Outcome: zod
     .enum(["Success", "AlreadyRenewed", "NotInRenewalWindow", "NotFound"])
     .default(renewMachineCertificateResponseOutcomeDefault),
-  Pkcs12: zod.instanceof(Blob).optional(),
+  Pkcs12: zod.string().optional(),
   Password: zod.string().optional(),
   Thumbprint: zod.string().optional(),
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),

@@ -45,6 +45,9 @@ public static class ErrorCodes
     // AuthKit machine organization, a permission or app role of a scope, or the Entra ID service principal (501).
     public const string MachineAccessNotConfigured = "MachineAccessNotConfigured";
 
+    // The renewal of a machine certificate before its window opens (400); the message names when it opens.
+    public const string NotInRenewalWindow = "NotInRenewalWindow";
+
     public const string PatchInvalid = "PatchInvalid";
     public const string PatchTestFailed = "PatchTestFailed";
 

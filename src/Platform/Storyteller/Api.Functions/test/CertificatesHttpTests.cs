@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text.Json;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
@@ -145,6 +146,88 @@ public class CertificatesHttpTests
         renewal.Calls.ShouldBe([$"acme.billing:{TestRequests.MachineId}:ABCD"]);
     }
 
+    // The body is the CertificateRenewalResult of the OpenAPI document, which the SDKs read (Pkcs12 in base64 and Password,
+    // not the Certificate and CertificatePassword of a machine create), with its Outcome and without nulls.
+    [Fact]
+    public async Task PostRenewCertificate_Success_AnswersTheDocumentedResultWithTheCertificate()
+    {
+        var renewedAt = new DateTimeOffset(2026, 11, 8, 10, 0, 0, TimeSpan.Zero);
+        var renewal = new RecordingRenewal(new CertificateRenewalResult
+        {
+            Outcome = CertificateRenewalOutcome.Success,
+            Pkcs12 = [1, 2, 3],
+            Password = "pa55",
+            Thumbprint = "RENEWED",
+            LastRenewalAt = renewedAt,
+        });
+        var http = CreateHttp(sharedCertService: null, renewal: renewal);
+
+        var result = await http.PostRenewCertificate(TestRequests.Machine([], "POST", mtls: true), "acme", "billing", TestRequests.MachineId);
+
+        var body = Serialize(result.ShouldBeOfType<OkObjectResult>().Value);
+        PropertyNames(body).ShouldBe(["Outcome", "Pkcs12", "Password", "Thumbprint", "LastRenewalAt"]);
+        body.GetProperty("Outcome").GetString().ShouldBe("Success");
+        body.GetProperty("Pkcs12").GetString().ShouldBe(Convert.ToBase64String([1, 2, 3]));
+        body.GetProperty("Password").GetString().ShouldBe("pa55");
+        body.GetProperty("Thumbprint").GetString().ShouldBe("RENEWED");
+        body.GetProperty("LastRenewalAt").GetDateTimeOffset().ShouldBe(renewedAt);
+    }
+
+    [Fact]
+    public async Task PostRenewCertificate_AlreadyRenewed_AnswersItsOutcomeAndMessageWithoutACertificate()
+    {
+        var renewedAt = new DateTimeOffset(2026, 11, 8, 10, 0, 0, TimeSpan.Zero);
+        var renewal = new RecordingRenewal(new CertificateRenewalResult
+        {
+            Outcome = CertificateRenewalOutcome.AlreadyRenewed,
+            Message = "The certificate for this machine access was already renewed.",
+            LastRenewalAt = renewedAt,
+        });
+        var http = CreateHttp(sharedCertService: null, renewal: renewal);
+
+        var result = await http.PostRenewCertificate(TestRequests.Machine([], "POST", mtls: true), "acme", "billing", TestRequests.MachineId);
+
+        var body = Serialize(result.ShouldBeOfType<OkObjectResult>().Value);
+        PropertyNames(body).ShouldBe(["Outcome", "LastRenewalAt", "Message"]);
+        body.GetProperty("Outcome").GetString().ShouldBe("AlreadyRenewed");
+        body.GetProperty("Message").GetString().ShouldBe("The certificate for this machine access was already renewed.");
+    }
+
+    [Fact]
+    public async Task PostRenewCertificate_BeforeTheWindow_IsABadRequestWithTheMessage()
+    {
+        var renewal = new RecordingRenewal(new CertificateRenewalResult
+        {
+            Outcome = CertificateRenewalOutcome.NotInRenewalWindow,
+            Message = "Renewal is not yet permitted.",
+        });
+        var http = CreateHttp(sharedCertService: null, renewal: renewal);
+
+        var result = await http.PostRenewCertificate(TestRequests.Machine([], "POST", mtls: true), "acme", "billing", TestRequests.MachineId);
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe("Renewal is not yet permitted.");
+        error.ErrorCode.ShouldBe(ErrorCodes.NotInRenewalWindow);
+    }
+
+    // A certificate that is not the machine's current one, or a machine without its expiry.
+    [Fact]
+    public async Task PostRenewCertificate_NotTheCurrentCertificate_IsNotFoundWithTheMessageAndCode()
+    {
+        var renewal = new RecordingRenewal(new CertificateRenewalResult
+        {
+            Outcome = CertificateRenewalOutcome.NotFound,
+            Message = "The presenting certificate does not match the current certificate for this machine access.",
+        });
+        var http = CreateHttp(sharedCertService: null, renewal: renewal);
+
+        var result = await http.PostRenewCertificate(TestRequests.Machine([], "POST", mtls: true), "acme", "billing", TestRequests.MachineId);
+
+        var error = result.ShouldBeOfType<NotFoundObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe("The presenting certificate does not match the current certificate for this machine access.");
+        error.ErrorCode.ShouldBe(ErrorCodes.NotFound);
+    }
+
     // The renewal stays machine-only by identity (spec 7.4): a user, another machine and a machine without its
     // certificate are 401, in every build.
     [Fact]
@@ -158,6 +241,17 @@ public class CertificatesHttpTests
         (await http.PostRenewCertificate(TestRequests.Machine(method: "POST"), "acme", "billing", TestRequests.MachineId)).ShouldBeOfType<UnauthorizedResult>();
 
         renewal.Calls.ShouldBeEmpty();
+    }
+
+    // The body as the API writes it, with its JSON options.
+    private static JsonElement Serialize(object? value)
+    {
+        return JsonSerializer.SerializeToElement(value, FunctionTestDoubles.ApiJsonSerializerOptions);
+    }
+
+    private static List<string> PropertyNames(JsonElement body)
+    {
+        return body.EnumerateObject().Select(property => property.Name).ToList();
     }
 
     private static CertificatesHttp CreateHttp(
@@ -248,12 +342,19 @@ public class CertificatesHttpTests
 
     private sealed class RecordingRenewal : ICertificateRenewalService
     {
+        private readonly CertificateRenewalResult _result;
+
+        public RecordingRenewal(CertificateRenewalResult? result = null)
+        {
+            _result = result ?? new CertificateRenewalResult { Outcome = CertificateRenewalOutcome.Success, Thumbprint = "RENEWED" };
+        }
+
         public List<string> Calls { get; } = [];
 
         public Task<CertificateRenewalResult> RenewAsync(string organization, string project, string machineAccessId, string presentingThumbprint)
         {
             Calls.Add($"{organization}.{project}:{machineAccessId}:{presentingThumbprint}");
-            return Task.FromResult(new CertificateRenewalResult { Outcome = CertificateRenewalOutcome.Success, Thumbprint = "RENEWED" });
+            return Task.FromResult(_result);
         }
     }
 }

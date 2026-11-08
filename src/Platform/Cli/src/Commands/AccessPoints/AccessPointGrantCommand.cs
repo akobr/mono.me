@@ -81,13 +81,22 @@ public class AccessPointGrantCommand : BaseCommand
             ? SelectPossiblePoint(account)
             : ProjectKey;
 
-        var point = await _accessApi.GrantUserAccessAsync(new Permission
+        try
         {
-            CreatedById = account.Id,
-            AccountId = AccountId,
-            AccessPointKey = projectKey,
-            Role = role,
-        });
+            await _accessApi.GrantUserAccessAsync(new Permission
+            {
+                CreatedById = account.Id,
+                AccountId = AccountId,
+                AccessPointKey = projectKey,
+                Role = role,
+            });
+        }
+        catch (ApiException e) when (e.StatusCode is not ((int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden))
+        {
+            // for example 409 or 400 of a role the API does not grant: the server's message, exit code 2; a 401 and a 403 go
+            // to Program.Main
+            return Console.WriteApiError(e);
+        }
 
         Console.WriteLine(
             "Access granted to ",

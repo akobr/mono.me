@@ -996,6 +996,19 @@ A reset changes only the secret: the hash of the API key (or the client secret a
 | `TokenScope` | string | `scope` form field for the token request. Entra ID sets `api://{Auth:ClientId}/.default` on create. AuthKit and Keycloak leave it empty; their tokens carry the machine's scopes without this parameter. Cosmos keeps no copy, so get, list and reset omit it. Always empty for `Federated`. |
 | `FederationRules` | `FederationRule[]` | `Federated` only: the rules a platform token must match, see [Federation rules](#federation-rules). Stored with the machine. |
 
+**Renewing a certificate.** A machine with a certificate of its own renews it with `POST v1/{organization}/{project}/access/machines/{id}/certificate/renew`, presenting its current certificate over mTLS (with its API key too for `CertificateAndApiKey`); `sform account machine renew <id> -c <pfx>` calls it. The window opens `MachineAuth:RenewalWindowDays` (30) days before the certificate expires. The new certificate has the machine's lifetime, and the old one stays valid for `MachineAuth:RenewalOverlapDays` (7) more days, or until it expires when that is sooner. The `200` body is the `CertificateRenewalResult` of the OpenAPI document, without null fields:
+
+| Property | Type | Description |
+|---|---|---|
+| `Outcome` | string | `Success`, or `AlreadyRenewed` when the presented certificate was already replaced by another renewal. |
+| `Pkcs12` | string (`format: byte`) | `Success` only: the new PKCS#12, in base64. The C# SDK reads it into `byte[]`, the TypeScript SDK gives the base64 `string`. The API keeps no copy. |
+| `Password` | string | `Success` only: the password of that PKCS#12, returned once. |
+| `Thumbprint` | string | `Success` only: the thumbprint of the new certificate. |
+| `LastRenewalAt` | date-time | When the certificate was renewed. |
+| `Message` | string | `AlreadyRenewed` only: when the certificate was renewed, and that the new certificate went to the first renewing instance. |
+
+A renewal before the window answers `400` with an `ErrorResponse` whose `ErrorCode` is `NotInRenewalWindow` and whose `Message` names when the window opens; a certificate that is not the machine's current one `404` with `NotFound`; a caller that is not the machine of `{id}`, or presents no certificate, `401`; and a deployment without the renewal service `501`. The OpenAPI document declares the `400` and the `404` without a body, so the generated clients keep the `ErrorResponse` as the text of the response. Older deployments of the API named the certificate `Certificate` and `CertificatePassword` in the `Success` body and sent no `Outcome`, so the generated SDKs, which read `Pkcs12` and `Password`, got no certificate; `sform` reads both shapes.
+
 ### Scopes in the identity providers
 
 A `ClientCredentials` machine carries its [scopes](#scopes-of-machines) in the provider's token: one WorkOS permission, one Entra ID app role or one value of the Keycloak `storyteller_scope` claim per scope. A provider grants exactly the requested scopes, or refuses the creation with `400` before it creates anything.
@@ -1764,8 +1777,9 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `400` | `MachineAccessNotSupported` | A machine of a kind the project does not enable, a shared certificate on a machine of another kind than `CertificateAndApiKey`, a reset of a `Federated` or a `Certificate` machine, or a shared certificate of a project that does not enable `CertificateAndApiKey`. |
 | `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), a `PUT` changes the `Issuer` of a trusted issuer, or the body of a federation `PUT` is not a trusted issuer or a list of federation rules. |
 | `400` | `MachineNotFederated` | Federation rules for a machine of another kind. |
+| `400` | `NotInRenewalWindow` | A certificate renewal before its window opens (see [The `MachineAccess` object](#the-machineaccess-object)); the message names when it opens. |
 | `403` | `ActorRestricted` | Through an actor under `NoSecretReveal`, an operation that gives out credentials that read secrets (see [Restrictions of actors](#restrictions-of-actors)). |
-| `404` | `NotFound` | The target account, the access point or the machine access does not exist, the machine was deleted during its reset, or it has no API key to reset (it is being deleted, or its creation failed). `GET` and `DELETE` of a machine or a trusted issuer that does not exist answer `404` without a body. |
+| `404` | `NotFound` | The target account, the access point or the machine access does not exist, the machine was deleted during its reset, or it has no API key to reset (it is being deleted, or its creation failed). A certificate renewal with a certificate that is not the machine's current one, or of a machine without the expiry of its certificate. `GET` and `DELETE` of a machine or a trusted issuer that does not exist answer `404` without a body. |
 | `409` | `AccountExists`, `AccessPointExists` | The account or project already exists. |
 | `409` | `FederatedIssuerInUse` | Creating a trusted issuer whose name rules of machines still reference. |
 | `409` | `ElevatedRole` | Revoke names a lower role than the member holds. Revoke the stored role instead. |

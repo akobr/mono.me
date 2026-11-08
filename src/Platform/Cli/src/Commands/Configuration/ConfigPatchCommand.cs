@@ -192,24 +192,12 @@ public class ConfigPatchCommand : BaseContextCommand
         Console.EnsureInteractive("the confirmation of the patch", "Pass -y|--yes to apply it without asking.");
     }
 
+    // A schema violation lists the configurations (2). Otherwise the server's message and code: a failing test operation
+    // (412 PatchTestFailed), a concurrent change or a deleted annotation (409), an invalid patch (400) and a missing
+    // configuration (404) are 2, a refusal (403) 44, and a failure of the service 3.
     private int WritePatchError(ApiException exception)
     {
-        if (SchemaValidationConsole.TryWrite(Console, exception))
-        {
-            return ExitCodes.ERROR_WRONG_INPUT;
-        }
-
-        if (exception is ApiException<ErrorResponse> error
-            && !string.IsNullOrWhiteSpace(error.Result?.Message))
-        {
-            Console.WriteLine(error.Result.Message);
-            return exception.StatusCode is (int)HttpStatusCode.BadRequest or (int)HttpStatusCode.NotFound
-                ? ExitCodes.ERROR_WRONG_INPUT
-                : ExitCodes.ERROR_CRASH;
-        }
-
-        Console.WriteLine($"Error occurred: {exception.Message}");
-        return ExitCodes.ERROR_CRASH;
+        return SchemaValidationConsole.WriteWriteError(Console, exception);
     }
 
     private static bool ContainsPointerEscape(JArray patch)

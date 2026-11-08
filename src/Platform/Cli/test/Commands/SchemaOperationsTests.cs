@@ -109,12 +109,14 @@ public class SchemaOperationsTests
     }
 
     // The schema writes declare no 404 today, so the case of a 404 only pins the mapping of 424-69 (as in
-    // ConfigPatchCommand) for a write that declares it; an undeclared 404 is in the theory below.
+    // ConfigPatchCommand) for a write that declares it; an undeclared 404 is in the theory below. 424-215 (D2): a 403 is
+    // 44 and a 500 a failure of the service (3), not a crash.
     [Theory]
     [InlineData(400, ExitCodes.ERROR_WRONG_INPUT)]
     [InlineData(404, ExitCodes.ERROR_WRONG_INPUT)]
-    [InlineData(403, ExitCodes.ERROR_CRASH)]
-    [InlineData(500, ExitCodes.ERROR_CRASH)]
+    [InlineData(409, ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(403, ExitCodes.WARNING_UNAUTHORIZED_ACCESS)]
+    [InlineData(500, ExitCodes.ERROR_SERVICE_FAILURE)]
     public async Task Set_ErrorResponseWithAMessage_PrintsTheMessage(int statusCode, int expectedExitCode)
     {
         SetupSet(SchemaLayer.Type).ThrowsAsync(Error(statusCode, BadRequest, "The server refused it.", "SomeCode"));
@@ -125,12 +127,14 @@ public class SchemaOperationsTests
         Lines.ShouldBe(["! The server refused it.", "Error code: SomeCode"]);
     }
 
+    // 424-215: the message of the body when the client kept it as text, else the status; never the text of the exception,
+    // and a rejected request is 2, not a crash.
     [Theory]
-    [InlineData("undeclared 404")]
-    [InlineData("undeclared 413")]
-    [InlineData("no result")]
-    [InlineData("blank message")]
-    public async Task Set_ErrorWithoutAMessage_PrintsTheTextOfTheException(string kind)
+    [InlineData("undeclared 404", "! The request failed with 404 NotFound.")]
+    [InlineData("undeclared 413", "! Too large.")]
+    [InlineData("no result", "! The request failed with 400 BadRequest.")]
+    [InlineData("blank message", "! The request failed with 400 BadRequest.", "Error code: InvalidKey")]
+    public async Task Set_ErrorWithoutAMessage_PrintsTheStatus(string kind, params string[] expectedLines)
     {
         var headers = new Dictionary<string, IEnumerable<string>>();
         ApiException exception = kind switch
@@ -144,8 +148,9 @@ public class SchemaOperationsTests
 
         var exitCode = await Set(SchemaLayer.Type);
 
-        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
-        Lines.ShouldBe([$"Error occurred: {exception.Message}"]);
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        Lines.ShouldBe(expectedLines);
+        ShouldNotDumpTheException();
     }
 
     [Fact]
@@ -184,10 +189,10 @@ public class SchemaOperationsTests
     }
 
     [Fact]
-    public async Task Set_ConcurrentChange_PrintsTheTextOfTheException()
+    public async Task Set_ConcurrentChange_PrintsTheServerMessage()
     {
         // The server sends an ErrorResponse, but the SDK reads every 409 of a write as a SchemaValidationErrorResponse:
-        // a message and no entries, which neither TryWrite nor the ErrorResponse branch takes (out of scope of 424-69).
+        // a message and no entries, which TryWrite does not take; its message is printed (424-215).
         var exception = new ApiException<SchemaValidationErrorResponse>(
             "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.",
             409,
@@ -199,8 +204,24 @@ public class SchemaOperationsTests
 
         var exitCode = await Set(SchemaLayer.Type);
 
-        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
-        Lines.ShouldBe([$"Error occurred: {exception.Message}"]);
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        Lines.ShouldBe(["! The schema was changed by another writer."]);
+    }
+
+    // D2 of the CLI test cases (SCH-DEF-02, SCH-DEF-03): a Reader, or a machine without Schema.Write.
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type))]
+    [InlineData(nameof(SchemaLayer.Annotation))]
+    [InlineData(nameof(SchemaLayer.Descendant))]
+    public async Task Set_Forbidden_IsUnauthorizedWithTheServerMessage(string layerName)
+    {
+        var layer = Enum.Parse<SchemaLayer>(layerName);
+        SetupSet(layer).ThrowsAsync(AnnotationCommandFixture.MissingScope("Schema.Write"));
+
+        var exitCode = await Set(layer);
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        Lines.ShouldBe([$"! {AnnotationCommandFixture.MissingScopeMessage("Schema.Write")}", "Error code: AccessDenied"]);
     }
 
     [Fact]
@@ -269,7 +290,7 @@ public class SchemaOperationsTests
             "exe",
             null);
 
-        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         Lines.ShouldBe(["! The schema was changed by another writer."]);
     }
 
