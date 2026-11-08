@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.30.65254
+ * OpenAPI spec version: 0.10.31.6881
  */
 import * as zod from "zod";
 
@@ -657,7 +657,7 @@ export const SetAnnotationResponse = zod.object({
 });
 
 /**
- * Changes members of the annotation, whatever its status, merged on the server against its current state, so a concurrent change of another member is kept. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json): a member left out keeps its value, null clears it, Values merge name by name (null removes a name), arrays are replaced whole; member names match case-insensitively, the members a write ignores (keys, names, relation arrays, stamps) are ignored. Or a JSON Patch (RFC 6902, application/json-patch+json) over the editable document {IsDisabled, ValidFrom, ExpiresAt, TimeZone, Title, Description, DocumentationLink, Labels, Values, UnitType, UnitDefinition}, in which Labels and Values are always present (add /Labels/- appends a label, add /Values/plan sets a value) and a test operation is a precondition. With application/json, an object is a merge patch and an array a JSON Patch. Labels keep their first occurrence, a unit keeps UnitType and UnitDefinition, and the result is validated as a full write. A patch never creates or re-creates a key; If-Match writes only the version of an earlier read.
+ * Changes members of the annotation, whatever its status, merged on the server against its current state, so a concurrent change of another member is kept. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json): a member left out keeps its value, null clears it, Values merge name by name (null removes a name), arrays are replaced whole; member names match case-insensitively, the members a write ignores (keys, names, relation arrays, stamps) are ignored. Or a JSON Patch (RFC 6902, application/json-patch+json) over the editable document {IsDisabled, ValidFrom, ExpiresAt, TimeZone, Title, Description, DocumentationLink, Labels, Values, UnitType, UnitDefinition}, in which Labels and Values are always present (add /Labels/- appends a label, add /Values/plan sets a value) and a test operation is a precondition. With application/json, an object is a merge patch and an array a JSON Patch. Labels keep their first occurrence, a unit keeps UnitType and UnitDefinition, and the result is validated as a full write. A patch never creates or re-creates a key; If-Match writes only the version of an earlier read. A client whose model leaves null members out (the generated AnnotationMergePatch of the .NET SDK) can set members but not clear one: a null member is not sent, so it keeps its value. To clear, send the JSON with its nulls (PatchAnnotationVersionedAsync, patchAnnotationVersioned).
  */
 export const PatchAnnotationParams = zod.object({
   organization: zod.string().describe("Target organization name."),
