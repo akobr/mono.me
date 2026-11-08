@@ -132,6 +132,40 @@ public class JsonPathsParseTests
         JsonPaths.Parse("$['$schema']").ShouldBe([DocumentSegment.Property("$schema")]);
     }
 
+    [Theory]
+    [InlineData("$$")]
+    [InlineData("$1")]
+    [InlineData("$-a")]
+    [InlineData("$_a")]
+    public void AnyNameCharacterOrDollarAfterTheRoot_HasTheHintOfTheBracketForm(string path)
+    {
+        var exception = Should.Throw<JsonPathFormatException>(() => JsonPaths.ParsePrefix(path + "=x", out _));
+
+        exception.Position.ShouldBe(1);
+        exception.Message.ShouldContain("['$name']");
+    }
+
+    [Theory]
+    [InlineData("a.['b']")]
+    [InlineData("a.[0]")]
+    public void ABracketAfterADot_HasTheHintToDropTheDot(string path)
+    {
+        var exception = Should.Throw<JsonPathFormatException>(() => JsonPaths.Parse(path));
+
+        exception.Position.ShouldBe(2);
+        exception.Message.ShouldContain("not a.['name'] or a.[0]");
+    }
+
+    [Theory]
+    [InlineData("a[1٣]", 3)]
+    [InlineData("a[１]", 2)]
+    [InlineData("a['\\u12G4']", 7)]
+    [InlineData("a['\\u12z4']", 7)]
+    public void ADigitOutsideItsSet_IsAnError(string path, int position)
+    {
+        Should.Throw<JsonPathFormatException>(() => JsonPaths.Parse(path)).Position.ShouldBe(position);
+    }
+
     [Fact]
     public void Of_RefusesANegativeIndex()
     {

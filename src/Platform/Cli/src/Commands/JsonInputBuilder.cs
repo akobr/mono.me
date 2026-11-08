@@ -47,8 +47,10 @@ public static class JsonInputBuilder
                 throw new WrongInputException(message);
             }
 
+            // A string that looks like a date stays the string of the file, as the SDK reads it, rather than a date
+            // converted to the local time zone; an -x value over it is then a string, not a date.
             using var fileReader = fileSystem.File.OpenText(importFilePath);
-            await using var jsonReader = new JsonTextReader(fileReader);
+            await using var jsonReader = new JsonTextReader(fileReader) { DateParseHandling = DateParseHandling.None };
             var fileContent = await JObject.LoadAsync(
                 jsonReader,
                 new JsonLoadSettings
