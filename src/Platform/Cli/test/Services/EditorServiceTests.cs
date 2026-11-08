@@ -16,6 +16,7 @@ namespace _42.Platform.Cli.UnitTests.Services;
 // The loop of EditJsonAsync with a stand-in for the editor (ScriptedEditor).
 public class EditorServiceTests
 {
+    private const string RetryQuestion = "Would you like to re-open the editor to fix the issue";
     private const string SaveQuestion = "Do you want to save these changes";
 
     private readonly MockFileSystem _fileSystem = new();
@@ -60,6 +61,66 @@ public class EditorServiceTests
         result.Edited["since"]!.Value<string>().ShouldBe("2026-10-24T10:00:00+05:30");
         result.Edited["at"]!.Value<string>().ShouldBe("2026-12-01T00:00:00Z");
         _questions.ShouldBe([SaveQuestion]);
+    }
+
+    [Fact]
+    public async Task ADocumentTheCheckRejects_ReopensTheEditorOnTheSameText_BeforeTheQuestion()
+    {
+        var editor = Editor("""{ "bad": 1 }""", """{ "good": 1 }""");
+
+        var result = await editor.EditJsonAsync(
+            _console.Object,
+            ScriptedEditor.Vim,
+            new JObject { ["good"] = 0 },
+            "annotation-x",
+            false,
+            check: document => document.ContainsKey("bad") ? JsonEditCheck.Invalid("'bad' is not allowed.") : JsonEditCheck.Valid(document));
+
+        result.ExitCode.ShouldBe(ExitCodes.SUCCESS);
+        result.Edited!["good"]!.Value<int>().ShouldBe(1);
+        editor.Opened.Count.ShouldBe(2);
+        editor.Opened[1].ShouldBe("""{ "bad": 1 }""");
+        _console.Lines.ShouldContain(line => line.Contains("'bad' is not allowed.", StringComparison.Ordinal));
+        _questions.ShouldBe([RetryQuestion, SaveQuestion]);
+    }
+
+    [Fact]
+    public async Task ADocumentTheCheckRejects_IsAborted_WhenTheUserDoesNotFixIt()
+    {
+        var editor = Editor("""{ "bad": 1 }""");
+        _answers.Enqueue(false);
+
+        var result = await editor.EditJsonAsync(_console.Object, ScriptedEditor.Vim, new JObject(), "annotation-x", true, check: _ => JsonEditCheck.Invalid("Never valid."));
+
+        result.Edited.ShouldBeNull();
+        result.ExitCode.ShouldBe(ExitCodes.WARNING_ABORTED);
+        editor.Opened.Count.ShouldBe(1);
+        _console.Lines.ShouldContain("Edit aborted.");
+    }
+
+    // A change of the form only, which the check normalizes away, is no change: nothing is asked.
+    [Fact]
+    public async Task TheDocumentOfTheCheck_IsTheOneCompared_SoAChangeOfTheFormOnlyAsksNothing()
+    {
+        var editor = Editor("""{ "Labels": null }""");
+
+        var result = await editor.EditJsonAsync(_console.Object, ScriptedEditor.Vim, new JObject { ["Labels"] = new JArray() }, "annotation-x", false, check: Normalize);
+
+        result.Edited.ShouldBeNull();
+        result.ExitCode.ShouldBe(ExitCodes.WARNING_NO_WORK_NEEDED);
+        _questions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task TheDocumentOfTheCheck_IsTheOneReturned()
+    {
+        var editor = Editor("""{ "Labels": null, "Title": "New" }""");
+
+        var result = await editor.EditJsonAsync(_console.Object, ScriptedEditor.Vim, new JObject { ["Labels"] = new JArray() }, "annotation-x", false, check: Normalize);
+
+        result.ExitCode.ShouldBe(ExitCodes.SUCCESS);
+        result.Edited!["Labels"].ShouldBeOfType<JArray>();
+        result.Edited["Title"]!.Value<string>().ShouldBe("New");
     }
 
     [Theory]
@@ -129,6 +190,18 @@ public class EditorServiceTests
 
         result.Edited.ShouldBeNull();
         result.ExitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+    }
+
+    private static JsonEditCheck Normalize(JObject document)
+    {
+        var normalized = (JObject)document.DeepClone();
+
+        if (normalized["Labels"] is { Type: JTokenType.Null })
+        {
+            normalized["Labels"] = new JArray();
+        }
+
+        return JsonEditCheck.Valid(normalized);
     }
 
     private static JObject Dated()

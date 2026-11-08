@@ -129,13 +129,17 @@ public class EditorService : IEditorService
     /// Lets the user edit a JSON document in the preferred editor, validates it, shows the changes and asks for a confirmation.
     /// </summary>
     /// <param name="confirm">Whether to ask before accepting the edited document. The default is <c>true</c>.</param>
+    /// <param name="check">
+    /// Checks the parsed document: its problem re-opens the editor, and its document replaces the parsed one for the
+    /// comparison, the diff, the question and the result.
+    /// </param>
     /// <returns>
     /// The edited document, or null with an exit code:
     /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
     /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
     /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
     /// </returns>
-    public async Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew, bool confirm = true)
+    public async Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew, bool confirm = true, Func<JObject, JsonEditCheck>? check = null)
     {
         // 1. Ensure editor is configured
         if (!options.IsConfigured)
@@ -152,7 +156,7 @@ public class EditorService : IEditorService
 
         try
         {
-            // 3. Open editor loop (allows re-editing on invalid JSON)
+            // 3. Open editor loop (allows re-editing on invalid JSON, or on a document the check rejects)
             JObject edited;
 
             while (true)
@@ -166,7 +170,7 @@ public class EditorService : IEditorService
                 }
 
                 var editedJson = _fileSystem.File.ReadAllText(tempFilePath, Encoding.UTF8);
-                var (document, problem) = ReadDocument(editedJson);
+                var (document, problem) = ReadDocument(editedJson, check);
 
                 if (document is not null)
                 {
@@ -189,7 +193,7 @@ public class EditorService : IEditorService
                 }
             }
 
-            // 4. Compare the documents (not the formatting)
+            // 4. Compare the documents (not the formatting), as the check gave it
             if (JToken.DeepEquals(original, edited))
             {
                 console.WriteLine("No changes detected.");
@@ -281,17 +285,27 @@ public class EditorService : IEditorService
         return document;
     }
 
-    // The document when it is valid JSON; otherwise the problem to show.
-    private static (JObject? Document, string? Problem) ReadDocument(string json)
+    // The document when it is valid JSON and the check accepts it, as the check gave it; otherwise the problem to show.
+    private static (JObject? Document, string? Problem) ReadDocument(string json, Func<JObject, JsonEditCheck>? check)
     {
+        JObject document;
+
         try
         {
-            return (ParseDocument(json), null);
+            document = ParseDocument(json);
         }
         catch (JsonReaderException exception)
         {
             return (null, $"Invalid JSON: {exception.Message}");
         }
+
+        if (check is null)
+        {
+            return (document, null);
+        }
+
+        var result = check(document);
+        return (result.Document, result.Document is null ? result.Problem ?? "The document is not valid." : null);
     }
 
     /// <summary>
