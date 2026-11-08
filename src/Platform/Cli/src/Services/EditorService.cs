@@ -201,8 +201,7 @@ public class EditorService : IEditorService
             }
 
             // 5. Show diff
-            console.WriteHeader(isNew ? "New document" : "Changes");
-            console.WriteDiff(originalJson, edited.ToString(Formatting.Indented));
+            ShowChanges(console, isNew, originalJson, edited.ToString(Formatting.Indented));
 
             // 6. Confirm upload
             if (confirm)
@@ -282,7 +281,27 @@ public class EditorService : IEditorService
             // only comments may follow: the reader throws on anything else after the object
         }
 
+        // What Newtonsoft reads beyond JSON, and would write back changed or not at all.
+        var notJson = document
+            .DescendantsAndSelf()
+            .FirstOrDefault(token => token.Type is JTokenType.Undefined or JTokenType.Constructor
+                                     || (token.Type == JTokenType.Float && token.Value<double>() is var number && !double.IsFinite(number)));
+
+        if (notJson is not null)
+        {
+            throw new JsonReaderException($"The value at '{notJson.Path}' is not JSON (undefined, a constructor, NaN or Infinity).");
+        }
+
         return document;
+    }
+
+    /// <summary>
+    /// Shows the changes the user is asked to save: the original and the edited document, as the check gave it.
+    /// </summary>
+    protected virtual void ShowChanges(IExtendedConsole console, bool isNew, string originalJson, string editedJson)
+    {
+        console.WriteHeader(isNew ? "New document" : "Changes");
+        console.WriteDiff(originalJson, editedJson);
     }
 
     // The document when it is valid JSON and the check accepts it, as the check gave it; otherwise the problem to show.

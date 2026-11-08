@@ -123,6 +123,18 @@ public class EditorServiceTests
         result.Edited["Title"]!.Value<string>().ShouldBe("New");
     }
 
+    // The diff shows what the caller will save: the document of the check, not the text of the file.
+    [Fact]
+    public async Task TheDocumentOfTheCheck_IsTheOneShown()
+    {
+        var editor = Editor("""{ "Labels": null, "Title": "New" }""");
+
+        await editor.EditJsonAsync(_console.Object, ScriptedEditor.Vim, new JObject { ["Labels"] = new JArray() }, "annotation-x", false, check: Normalize);
+
+        var (_, shown) = editor.Diffs.ShouldHaveSingleItem();
+        JToken.DeepEquals(JObject.Parse(shown), new JObject { ["Labels"] = new JArray(), ["Title"] = "New" }).ShouldBeTrue();
+    }
+
     [Theory]
     [InlineData("{ \"a\": ")]
     [InlineData("{ \"a\": 1 } []")]
@@ -131,6 +143,10 @@ public class EditorServiceTests
     [InlineData("{ \"a\": { \"b\": 1, \"b\": 2 } }")]
     [InlineData("[]")]
     [InlineData("")]
+    [InlineData("{ \"a\": undefined }")]
+    [InlineData("{ \"a\": { \"b\": new Date(1) } }")]
+    [InlineData("{ \"a\": [NaN] }")]
+    [InlineData("{ \"a\": -Infinity }")]
     public async Task InvalidJson_ReopensTheEditor(string invalid)
     {
         var editor = Editor(invalid, """{ "a": 2 }""");
