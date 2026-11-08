@@ -102,20 +102,58 @@ public sealed class ManagementToolsHostTests : IDisposable
     }
 
     [Fact]
-    public async Task SetAnnotation_TitleOnly_SendsTheStoredValuesAsTheyAreStored()
+    public async Task SetAnnotation_TitleOnly_SendsAJsonPatchOfTheTitle_WithoutARead()
     {
-        // date-like strings, nested ones too, with offsets and milliseconds a parsed DateTime would not keep
-        const string values = """{"d1":"2026-11-01T10:00:00.000+02:00","d2":"2026-11-01T10:00:00.000Z","o":{"x":"2026-11-01T10:00:00+05:00","list":["2026-01-01T00:00:00.5Z"]}}""";
+        // the stored fields stay on the server: nothing is read, and only the title travels
         _host.Api.Respond = _ => RecordingApiHandler.Json(
-            $$"""{"AnnotationType":"Subject","ProjectName":"main","ViewName":"default","AnnotationKey":"sbt.northwind","Name":"northwind","Title":"Old","ValidFrom":"2026-11-01T00:00:00+01:00","Values":{{values}}}""");
+            """{"AnnotationType":"Subject","ProjectName":"main","ViewName":"default","AnnotationKey":"sbt.northwind","Name":"northwind","Title":"Northwind","Values":{"d1":"2026-11-01T10:00:00.000+02:00"}}""");
         await using var client = await _host.ConnectAsync();
 
         var result = await client.CallAsync("set_annotation", new { organization = "house", project = "main", key = "sbt.northwind", title = "Northwind" });
 
         result.IsError.ShouldNotBe(true, result.Text());
-        var write = _host.Api.Requests.Last();
-        write.Method.ShouldBe(HttpMethod.Post);
-        var body = (JObject)AsText(write.Body!);
+        var patch = _host.Api.Requests.ShouldHaveSingleItem();
+        patch.Method.ShouldBe(HttpMethod.Patch);
+        patch.Uri.ToString().ShouldBe($"{Base}/annotations/sbt.northwind");
+        patch.ContentType.ShouldBe("application/json-patch+json");
+        patch.Headers.ShouldNotContainKey("If-Match");
+        patch.Body.ShouldBe("""[{"op":"add","path":"/Title","value":"Northwind"}]""");
+        result.Text().ShouldContain("\"d1\":\"2026-11-01T10:00:00.000+02:00\"");
+    }
+
+    [Fact]
+    public async Task SetAnnotation_MissingKey_IsPostedWithIfNoneMatch_AndItsValuesAsGiven()
+    {
+        // date-like strings, nested ones too, with offsets and milliseconds a parsed DateTime would not keep
+        const string values = """{"d1":"2026-11-01T10:00:00.000+02:00","d2":"2026-11-01T10:00:00.000Z","o":{"x":"2026-11-01T10:00:00+05:00","list":["2026-01-01T00:00:00.5Z"]}}""";
+        _host.Api.Respond = request => request.Method == HttpMethod.Patch
+            ? RecordingApiHandler.Json("""{"Message":"The annotation does not exist.","ErrorCode":"AnnotationNotFound"}""", HttpStatusCode.NotFound)
+            : request.RequestUri!.AbsolutePath.EndsWith("/annotations/deleted/lookup", StringComparison.Ordinal)
+                ? RecordingApiHandler.Json("[]")
+                : RecordingApiHandler.Json("""{"AnnotationType":"Subject","ProjectName":"main","ViewName":"default","AnnotationKey":"sbt.northwind","Name":"northwind"}""");
+        await using var client = await _host.ConnectAsync();
+
+        var result = await client.CallAsync("set_annotation", new
+        {
+            organization = "house",
+            project = "main",
+            key = "sbt.northwind",
+            title = "Northwind",
+            validFrom = "2026-11-01T00:00:00+01:00",
+            values = ToolFixtures.Element(values),
+        });
+
+        result.IsError.ShouldNotBe(true, result.Text());
+        var requests = _host.Api.Requests.ToList();
+        requests.Select(request => request.Method).ShouldBe([HttpMethod.Patch, HttpMethod.Post, HttpMethod.Post]);
+        AsText(requests[0].Body!).Single(operation => operation.Value<string>("path") == "/Values")["value"]!.ToString(Formatting.None).ShouldBe(values);
+        requests[1].Uri.AbsolutePath.ShouldEndWith("/annotations/deleted/lookup");
+        var create = requests[2];
+        create.Uri.ToString().ShouldBe($"{Base}/annotations/sbt.northwind");
+        create.Headers["If-None-Match"].ShouldBe("*");
+        create.Headers.ShouldNotContainKey("If-Match");
+        var body = (JObject)AsText(create.Body!);
+        body.Value<string>("AnnotationType").ShouldBe("Subject");
         body.Value<string>("Title").ShouldBe("Northwind");
         body["Values"]!.ToString(Formatting.None).ShouldBe(values);
         DateTimeOffset.Parse(body.Value<string>("ValidFrom")!, CultureInfo.InvariantCulture).ShouldBe(new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.FromHours(1)));
