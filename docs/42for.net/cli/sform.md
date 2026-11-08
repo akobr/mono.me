@@ -16,6 +16,8 @@ sform account
 
 Every other command uses the stored session and refreshes it silently. `sform account logout` signs you out.
 
+`sform account set` picks the default project and view of the commands without `-p` and `-v`. They are kept with your other preferences in `sform.settings.json`, see [Settings](#settings).
+
 ## Sign in from a pipeline
 
 In a CI/CD pipeline or a GitHub Action nobody can type a code, so `sform` signs in as a machine instead. Create the machine once, then give the job the variables that `sform account machine create` prints. With any of them set, `sform` never asks anyone to sign in, and it stores no credential or token.
@@ -362,3 +364,36 @@ $env:DO_NOT_TRACK = "1"
 ```
 
 In a pipeline, set the variable in the `env` of the job like the sign-in variables above.
+
+## Settings
+
+`sform` keeps your preferences in `sform.settings.json`, in the same folder as the stored session and `telemetry.json`: `%LOCALAPPDATA%\.42for.net` on Windows and `~/.42for.net` elsewhere. Tool updates keep it.
+
+| Key | Values | When it is not set |
+|---|---|---|
+| `editor.type` | `vscode`, `neovim`, `vim` or `custom`: the editor of `story config edit`, `config patch`, `template edit` and the schema edit commands | `$VISUAL`, then `$EDITOR`, else `sform` asks on the first edit and saves the answer |
+| `editor.command` | The command line of a `custom` editor, e.g. `code --wait`; `sform` appends the file path | – |
+| `access.project` | `<organization>.<project>`: the default project of the commands without `-p` | `house.main` |
+| `access.view` | The default view of the commands without `-v` | `default` |
+
+`sform account settings` lists every key with the value the commands use and where it comes from: `settings`, a legacy file (see below), `$VISUAL` or `$EDITOR`, `STORYTELLER_PROJECT` or `STORYTELLER_VIEW`, a machine sign-in, which never uses the default project, or `default`. None of these commands needs a sign-in.
+
+``` powershell
+sform account settings                                           # the keys, their values and sources
+sform account settings --path                                    # only the file, e.g. code "$(sform account settings --path)"
+sform account settings --json                                    # the values as JSON
+sform account settings editor                                    # pick the editor from a list
+sform account settings editor vscode                             # or name it: vscode, neovim, vim
+sform account settings editor custom --command "code --wait"    # any command; it should wait until you close the file
+sform account settings set access.project contoso.payments
+sform account settings set access.view preview
+sform account settings unset editor.type                         # ask again on the next edit
+```
+
+`sform account set` sets the default project too, from the projects of your account, and `sform account register` and `sform account access-point create` set the project they create.
+
+A custom command, and `$VISUAL` or `$EDITOR`, is the executable, or a path in quotes, followed by its arguments, e.g. `"C:\Program Files\Notepad++\notepad++.exe" -multiInst -nosession`; no shell expands it. On Windows `sform` finds the executable on the `PATH` with the extensions of `PATHEXT`, so `code --wait` starts `code.cmd`. When the editor of `$VISUAL` or `$EDITOR` cannot be started, `sform` asks for one instead.
+
+Earlier versions kept the editor in `editor.config.json` and the default project in `access.default.json`, next to the `sform` assembly. `sform` still reads them while `sform.settings.json` has no section of its own for them, and moves both into it on the first change. `dotnet tool update` deletes the folder of the old version with the files in it, so after the update that brings `sform.settings.json` you choose the editor and run `sform account set` once more; from then on they survive updates.
+
+A change rewrites the whole file, so comments in it are not kept. When the file is damaged, `sform` says so on standard error and uses no editor and no default project from it until you fix it: `sform account settings --path` shows where it is.
