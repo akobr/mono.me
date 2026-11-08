@@ -17,9 +17,9 @@ namespace _42.Platform.Cli.AutomationTests;
 
 // What the CLI suite adds to the UI automation runtime: no sign-in flow of the runtime (Target:SignIn None: a pool user
 // signs in through sform's device code, whose AuthKit page asks for the credentials), the reporters Reporting:Systems may
-// select (Testiny), the checks of its own settings (Target, Cli, Machines, the pool), and the check of the target before
-// the first test without a page (CliTargetCheck: a pool user signs in through sform and reads the organization, project
-// and view; each configured machine signs in).
+// select (Testiny), the checks of its own settings (Target, Cli, KeyValues, Machines, the pool), and the check of the
+// target before the first test without a page (CliTargetCheck: a pool user signs in through sform and reads the
+// organization, project and view; each configured machine signs in).
 public sealed class CliAutomationSetup : IUiAutomationSetup
 {
     public string ReadmeHint => "docs/Platform/Cli.AutomationTests/automation-tests.md";
@@ -37,6 +37,9 @@ public sealed class CliAutomationSetup : IUiAutomationSetup
         // The Platform's shared keys first (organization, project, view, Target:RoleProjects), then the CLI's.
         var target = settings.Bind<CliTarget>(PlatformTargetSettings.Section);
         target.ValidateCli(errors);
+
+        // The customer key of the Byok cases, required when Target:Features lists Byok.
+        settings.Bind<KeyValueSettings>(KeyValueSettings.Section).Validate(target, errors);
 
         if (!string.IsNullOrWhiteSpace(target.SignIn) && !string.Equals(target.SignIn, TargetSettings.NoSignIn, StringComparison.OrdinalIgnoreCase))
         {

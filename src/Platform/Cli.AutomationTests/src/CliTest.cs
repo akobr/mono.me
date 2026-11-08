@@ -21,7 +21,11 @@ namespace _42.Platform.Cli.AutomationTests;
 //   - AsMachine("<name>") runs as a pre-provisioned machine (Machines:<name>), CreateMachineAsync creates one that the
 //     cleanup deletes (as the leased user or another, MachineCreation).
 //   - CreateDisposableProjectAsync creates a project of the test's own and acts in it (UseProject), AsGrantedUserAsync
-//     gives another pool user a role there (the "second user" of a P case).
+//     gives another pool user a role there (the "second user" of a P case); AsAnotherUserAsync, ArrangeAsAsync and
+//     AsRoleUserAsync lease another pool user (CliTest.SignIn.cs, CliTest.Roles.cs).
+//   - EventuallyAsync re-reads until a check passes, within a window: what the API serves from a cache of its instance
+//     (shared certificates, trusted issuers, machine and key/value policies) shows a change another instance made only
+//     when that cache expires.
 //   - Every run is attached as sform-<n>.txt (redacted); AddSecret registers a secret the test came by. The working
 //     directory and the homes are outside the artifacts (SformHomes).
 // TUnit creates an instance per attempt, so everything here belongs to one attempt. The roles and the skips are in
@@ -31,6 +35,9 @@ public abstract partial class CliTest : AutomationTest
 {
     // What the CLI prints for a 401, or a 403 without a message of the server (ApiRefusal.GeneralMessage of the CLI).
     public const string GeneralRefusal = "You are not authorized to execute the command or you don't have access to requested resources.";
+
+    // How long EventuallyAsync waits between two reads by default.
+    protected static readonly TimeSpan EventuallyInterval = TimeSpan.FromSeconds(5);
 
     private readonly List<Func<Task>> cleanups = [];
     private readonly List<SformHome> testHomes = [];
@@ -126,6 +133,37 @@ public abstract partial class CliTest : AutomationTest
     {
         ArgumentNullException.ThrowIfNull(arguments);
         return [.. arguments, "-p", ProjectKey, "-v", View];
+    }
+
+    // Runs sform with the arguments as the leased user until the result passes the check, at most for within (a run every
+    // 5 s), and returns the last result, which the test then checks as usual: a read the API serves from a cache of its
+    // instance shows a change another instance made only when that cache expires. A read that passes at once returns at
+    // once. Each run is attached.
+    protected Task<SformResult> EventuallyAsync(Func<SformResult, bool> passes, TimeSpan within, params string[] arguments)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        return EventuallyAsync(() => Sform(arguments), passes, within);
+    }
+
+    // The same for any read (another actor's run, a machine's, the rows of several pages): read until passes says so, at
+    // most for within, every interval (5 s by default); returns the last read.
+    protected async Task<T> EventuallyAsync<T>(Func<Task<T>> read, Func<T, bool> passes, TimeSpan within, TimeSpan? interval = null)
+    {
+        ArgumentNullException.ThrowIfNull(read);
+        ArgumentNullException.ThrowIfNull(passes);
+
+        var cancellation = TestContext.Current?.Execution.CancellationToken ?? CancellationToken.None;
+        var deadline = DateTimeOffset.UtcNow + within;
+        while (true)
+        {
+            var result = await read();
+            if (passes(result) || DateTimeOffset.UtcNow >= deadline)
+            {
+                return result;
+            }
+
+            await Task.Delay(interval ?? EventuallyInterval, cancellation);
+        }
     }
 
     // A new empty home of this test (removed at its end), e.g. for a second, separate sign-in.

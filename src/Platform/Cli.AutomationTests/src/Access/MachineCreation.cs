@@ -8,7 +8,7 @@ namespace _42.Platform.Cli.AutomationTests.Access;
 public sealed record MachineCreation
 {
     // The pool user who creates the machine and whose cleanup deletes it (AsAnotherUserAsync, AsGrantedUserAsync,
-    // ArrangeAsEditorAsync); null: the leased user. A [MachineOnly] test leases nobody, so it creates through another user.
+    // ArrangeAsAsync); null: the leased user. A [MachineOnly] test leases nobody, so it creates through another user.
     public SformActor? As { get; init; }
 
     // -p of the create and of the delete; null: the acting project (ProjectKey, or the project of UseProject).

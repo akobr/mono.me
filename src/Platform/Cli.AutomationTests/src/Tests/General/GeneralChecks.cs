@@ -1,21 +1,8 @@
-using System.Text.RegularExpressions;
-using _42.Platform.Cli.AutomationTests.Running;
-
 namespace _42.Platform.Cli.AutomationTests.Tests.General;
 
 // Checks of the Context and Errors cases that SformResult does not offer.
 internal static class GeneralChecks
 {
-    // The negative of SformResult.ShouldMatch: nothing of the stream matches (e.g. no frame of a stack trace).
-    public static SformResult ShouldNotMatch(this SformResult result, Regex pattern, SformStream stream = SformStream.StdOut)
-    {
-        ArgumentNullException.ThrowIfNull(result);
-        ArgumentNullException.ThrowIfNull(pattern);
-        return pattern.IsMatch(result.Text(stream))
-            ? throw result.Fail($"wrote what matches /{pattern}/ to its {(stream == SformStream.StdErr ? "standard error" : "standard output")}, which it must not")
-            : result;
-    }
-
     // The files of a folder and below, with their sizes and times of the last write; empty when it does not exist.
     public static IReadOnlyDictionary<string, (long Length, DateTime Written)> Snapshot(System.IO.Abstractions.IFileSystem fileSystem, string directory)
     {

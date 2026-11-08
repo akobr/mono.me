@@ -73,10 +73,10 @@ public sealed class SchemaContextTests : CliTest
             new("descendant", [rst1, "usg"], $"'usg' under '{rst1}'", "-v", "ctx_descendant_usg"),
         ];
 
-        var typesOfA = new Dictionary<string, IReadOnlyList<int>>(StringComparer.Ordinal);
+        var typesOfA = new Dictionary<string, IReadOnlyList<long>>(StringComparer.Ordinal);
         foreach (var code in new[] { "unt", "sbt" })
         {
-            typesOfA[code] = (await Sform("story", "schema", "type", "versions", code, "-p", a, "-v", aView)).ShouldSucceed().Versions();
+            typesOfA[code] = (await Sform("story", "schema", "type", "versions", code, "-p", a, "-v", aView)).ShouldSucceed().VersionRows(SchemaChecks.VersionsHeader);
         }
 
         foreach (var layer in subjects.GroupBy(subject => subject.Layer))

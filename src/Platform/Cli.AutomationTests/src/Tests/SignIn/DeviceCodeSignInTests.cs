@@ -4,7 +4,6 @@ using _42.Platform.Cli.AutomationTests.Editing;
 using _42.Platform.Cli.AutomationTests.Running;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
-using _42.Testing.UI.Automation.Runtime.Users;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.SignIn;
 
@@ -14,12 +13,6 @@ public sealed class DeviceCodeSignInTests : CliTest
 {
     // A sign-in that is not reused would start a device code and wait for it; a shorter timeout ends that sooner.
     private static readonly TimeSpan NoPromptTimeout = TimeSpan.FromSeconds(60);
-
-    // SGN-DEV-06 leases the pool user in two organizations (SignInOutput.FeatureUser), every other case any pool user.
-    protected override UserRequirement RequiredUser =>
-        TestContext.Current?.Metadata.TestDetails.MethodName == nameof(DeviceCode_SeveralOrganizations_RequiresOrganization)
-            ? SignInOutput.FeatureUser(CliFeatures.MultiOrganization)
-            : base.RequiredUser;
 
     // SGN-DEV-01: A pool user signs in with the device code and sees the account summary.
     // In an empty home, sform account [-o <AuthKit organization id>] writes the code as JSON, the first line on stderr;

@@ -18,9 +18,17 @@
     // { "<Role>": "<org>/<project>[/<view>]" }: a project where every pool user holds the role, for the tests of that
     // role ([UserRole]); a role without an entry leases a pool user who holds it in Target:Project.
     "RoleProjects": {},
-    // What the target offers beyond the basics ([RequiresFeature]): Byok, Hsm, Registration,
-    // MultiOrganization. A test of a feature that is not listed is skipped.
+    // What the target offers beyond the basics ([RequiresFeature]): Byok (with KeyValues below), Hsm, Registration,
+    // MultiOrganization (each with a pool user whose Roles list the feature's name). A test of a feature that is not
+    // listed is skipped.
     "Features": []
+  },
+  // The target's customer key of the Byok cases, required when Target:Features lists Byok: the versionless URI of a Key
+  // Vault key the platform's application may wrap and unwrap with (https://<vault>.vault.azure.net/keys/<name>), and the
+  // Entra tenant id (a GUID) of the vault.
+  "KeyValues": {
+    "ByokKeyUri": null,
+    "ByokTenantId": null
   },
   "Cli": {
     // 42.Platform.Cli.dll or an sform executable; null runs the build of src/Platform/Cli/src that building the tests
@@ -67,7 +75,12 @@
     "LeaseTimeoutSeconds": 120,
     // The CLI's own pre-provisioned AuthKit users (not the admin UI's ui-test-* pool, so both suites run at the same
     // time), with their roles in the target's organization and project; the passwords are in the user secrets
-    // (Users:Pool:<n>:Password) or UITESTS_Users__Pool__<n>__Password. Passwords pair with the users by position.
+    // (Users:Pool:<n>:Password) or UITESTS_Users__Pool__<n>__Password. Passwords pair with the users by position. A
+    // target with the feature Registration or MultiOrganization adds the user the feature stands for, its role and the
+    // feature's name in its Roles (e.g. [ "Reader", "Registration" ]): only that feature's tests lease it. The pool of
+    // the highest layer that sets an Email replaces this one entirely (no merge by index), so that layer restates these
+    // users and lists the feature users after them (the passwords keep their positions); in CI the 8 UITESTS_USER_<n>
+    // slots hold at most 8 users, so a feature user takes a role user's slot.
     "Pool": [
       { "Email": "cli-test-owner-1@42for.software", "DisplayName": "CLI Owner1", "Roles": [ "Owner" ] },
       { "Email": "cli-test-owner-2@42for.software", "DisplayName": "CLI Owner2", "Roles": [ "Owner" ] },

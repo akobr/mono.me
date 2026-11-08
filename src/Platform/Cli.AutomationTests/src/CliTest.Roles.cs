@@ -12,6 +12,12 @@ namespace _42.Platform.Cli.AutomationTests;
 // CreateDisposableProjectAsync) moves the acting project to another one for the rest of the test. The mode attributes
 // skip a test before its lease (GetSkipReason): [Terminal] and [DisposableProject] where no pseudo terminal is supported,
 // [RequiresFeature] unless Target:Features lists the feature, [RequiresMachine] unless Machines:<name> is configured.
+//
+// Feature users: the target marks the pool user a feature stands for (CliFeatures.OfUsers: Registration,
+// MultiOrganization) with the feature's name among its Roles. A [RequiresFeature] test of such a feature leases that user
+// (FeatureUser), whatever its [UserRole]; every other lease of the suite (RequiredUser, AsAnotherUserAsync, ArrangeAsAsync,
+// AsRoleUserAsync, AsGrantedUserAsync) excludes those users (WithoutFeatureUsers), so an unregistered user or one of two
+// organizations never acts in an ordinary test.
 public abstract partial class CliTest
 {
     private readonly HashSet<string> ownProjects = new(StringComparer.Ordinal);
@@ -61,11 +67,18 @@ public abstract partial class CliTest
     // Whether the test acts in a project of its own (CreateDisposableProjectAsync, UseProject with one it created).
     protected bool ActsInOwnProject => actingProject is { Own: true };
 
-    // The pool user of the acting role: any user in a project of Target:RoleProjects (every pool user holds the role
-    // there); otherwise PlatformRoles.RequirementOf the role.
-    protected override UserRequirement RequiredUser => RoleProject is not null
-        ? UserRequirement.Any
-        : PlatformRoles.RequirementOf(ActingRole);
+    // The pool user of the test: the feature user of a [RequiresFeature] of a user feature (UserFeature); otherwise the
+    // user of the acting role, never a feature user: any user in a project of Target:RoleProjects (every pool user holds
+    // the role there), else PlatformRoles.RequirementOf the role.
+    protected override UserRequirement RequiredUser => UserFeature is { } feature
+        ? FeatureUser(feature)
+        : WithoutFeatureUsers(RoleProject is not null ? UserRequirement.Any : PlatformRoles.RequirementOf(ActingRole));
+
+    // The user feature (CliFeatures.OfUsers) a [RequiresFeature] of the running test names; null for any other test.
+    protected string? UserFeature => Categories
+        .Where(category => category.StartsWith(CliCategories.RequiresPrefix, StringComparison.Ordinal))
+        .Select(category => category[CliCategories.RequiresPrefix.Length..])
+        .FirstOrDefault(feature => CliFeatures.OfUsers.Contains(feature, StringComparer.OrdinalIgnoreCase));
 
     // [MachineOnly] tests lease no pool user.
     protected override bool LeasesUser => !HasCategory(CliCategories.MachineOnly);
@@ -76,6 +89,50 @@ public abstract partial class CliTest
     protected bool HasCategory(string category)
     {
         return Categories.Contains(category, StringComparer.Ordinal);
+    }
+
+    // The pool user who stands for the feature (CliFeatures.Registration, MultiOrganization): the one whose Roles in
+    // Users:Pool list the feature's name. A target that lists the feature without such a user fails the lease with the
+    // requirement.
+    protected static UserRequirement FeatureUser(string feature)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(feature);
+        return UserRequirement.WithRole(feature);
+    }
+
+    // The requirement, and the user stands for no feature (CliFeatures.OfUsers) but one the requirement asks for itself
+    // (FeatureUser): what every lease of the suite goes through.
+    protected static UserRequirement WithoutFeatureUsers(UserRequirement requirement)
+    {
+        ArgumentNullException.ThrowIfNull(requirement);
+        return requirement.Except([.. CliFeatures.OfUsers.Where(feature => !requirement.Roles.Contains(feature, StringComparer.OrdinalIgnoreCase))]);
+    }
+
+    // The project Target:RoleProjects maps the role to, as -p and -v take it: "<organization>.<project>" and its view
+    // ("default" when the entry names none); null for Role.Any and a role without an entry.
+    protected (string ProjectKey, string View)? RoleProjectOf(Role role)
+    {
+        if (Target.RoleProjectOf(role) is not { } mapped)
+        {
+            return null;
+        }
+
+        var parts = mapped.Split('/', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        return ($"{parts[0]}.{parts[1]}", parts.Length > 2 ? parts[2] : "default");
+    }
+
+    // Another pool user who holds exactly the role, and the project and view where: "<contributor project>" or "<reader
+    // project>" of the catalogue for a step of another user. Any other pool user in the project Target:RoleProjects maps
+    // the role to (every pool user holds it there), else a pool user who holds the role in Target:Project
+    // (PlatformRoles.RequirementOf) with Target:Project and Target:View. Its runs take the project's -p and -v.
+    protected async Task<(SformActor Actor, string ProjectKey, string View)> AsRoleUserAsync(Role role)
+    {
+        if (RoleProjectOf(role) is { } mapped)
+        {
+            return (await AsAnotherUserAsync(UserRequirement.Any), mapped.ProjectKey, mapped.View);
+        }
+
+        return (await AsAnotherUserAsync(PlatformRoles.RequirementOf(role)), Target.ProjectKey, Target.View);
     }
 
     // From now on the test acts in the project: ProjectKey, Organization, Project, View and InProject(…) name it, and

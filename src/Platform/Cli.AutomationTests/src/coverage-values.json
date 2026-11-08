@@ -199,19 +199,19 @@
       "command": "storyteller schema type diff",
       "option": "--format",
       "values": [ "json", "unified" ],
-      "source": "SchemaTypeDiffCommand: passed to the API as the response format (SchemaOperations); the API knows json (the default) and unified."
+      "source": "SchemaTypeDiffCommand (SchemaOperations.DiffAsync): json (the default) prints the API's JSON diff; unified reads the same JSON diff and writes it as unified text (DiffResultConsoleExtensions.WriteUnifiedDiff)."
     },
     {
       "command": "storyteller schema annotation diff",
       "option": "--format",
       "values": [ "json", "unified" ],
-      "source": "SchemaAnnotationDiffCommand: passed to the API as the response format (SchemaOperations); the API knows json (the default) and unified."
+      "source": "SchemaAnnotationDiffCommand (SchemaOperations.DiffAsync): json (the default) prints the API's JSON diff; unified reads the same JSON diff and writes it as unified text (DiffResultConsoleExtensions.WriteUnifiedDiff)."
     },
     {
       "command": "storyteller schema descendant diff",
       "option": "--format",
       "values": [ "json", "unified" ],
-      "source": "SchemaDescendantDiffCommand: passed to the API as the response format (SchemaOperations); the API knows json (the default) and unified."
+      "source": "SchemaDescendantDiffCommand (SchemaOperations.DiffAsync): json (the default) prints the API's JSON diff; unified reads the same JSON diff and writes it as unified text (DiffResultConsoleExtensions.WriteUnifiedDiff)."
     }
   ]
 }

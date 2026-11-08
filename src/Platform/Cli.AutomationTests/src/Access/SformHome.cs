@@ -69,14 +69,14 @@ public sealed class SformHome
     // Removes the default project and the editor, so a test starts with neither unless it sets them.
     public void ResetDefaults()
     {
-        foreach (var name in new[] { AccessDefaultFileName, EditorConfigFileName })
-        {
-            var file = File(name);
-            if (fileSystem.File.Exists(file))
-            {
-                fileSystem.File.Delete(file);
-            }
-        }
+        ResetDefaultProject();
+        Delete(EditorConfigFileName);
+    }
+
+    // Removes the default project only (access.default.json), e.g. the one account points create sets; the editor stays.
+    public void ResetDefaultProject()
+    {
+        Delete(AccessDefaultFileName);
     }
 
     // The files in the home, relative to it, logs/ included unless excluded.
@@ -103,5 +103,14 @@ public sealed class SformHome
     public override string ToString()
     {
         return $"{Kind} home {Path}";
+    }
+
+    private void Delete(string name)
+    {
+        var file = File(name);
+        if (fileSystem.File.Exists(file))
+        {
+            fileSystem.File.Delete(file);
+        }
     }
 }

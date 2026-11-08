@@ -119,7 +119,7 @@ public sealed class KeyValueContextTests : CliTest
         (await Sform("story", "kv", "policy", "set", "--allow", "public", "--allow", "standard", "--allow", "hyok", "--projectKey", projectB)).ShouldSucceed();
 
         var hyokValue = CliData.Value();
-        var hyok = await KeyValuesSupportA.EventuallyAsync(() => Sform(Long("story", "kv", "set", h1, hyokValue, "--protection", "hyok")), result => result.Succeeded);
+        var hyok = await EventuallyAsync(() => Sform(Long("story", "kv", "set", h1, hyokValue, "--protection", "hyok")), result => result.Succeeded, KeyValuesSupportA.PolicyCacheWait);
         hyok.ShouldSucceed()
             .ShouldContain("Encrypted locally for 1 recipient(s); the platform cannot read the value.")
             .ShouldContain($"'{h1}' is at version 1 (Hyok).");
@@ -128,7 +128,7 @@ public sealed class KeyValueContextTests : CliTest
         (await Sform("story", "kv", "recipients", "add", "--name", "d", "--public-key", "d.pem", "--projectKey", projectB)).ShouldSucceed();
         foreach (var arguments in new[] { Long("story", "kv", "reencrypt", h1, "--private-key", "a.key.pem", "--kid", recipientA), Short("story", "kv", "reencrypt", h1, "--private-key", "a.key.pem", "--kid", recipientA) })
         {
-            (await KeyValuesSupportA.EventuallyAsync(() => Sform(arguments), result => result.Succeeded))
+            (await EventuallyAsync(() => Sform(arguments), result => result.Succeeded, KeyValuesSupportA.PolicyCacheWait))
                 .ShouldSucceed()
                 .ShouldContain("1 value(s) encrypted again for 2 recipient(s).");
         }

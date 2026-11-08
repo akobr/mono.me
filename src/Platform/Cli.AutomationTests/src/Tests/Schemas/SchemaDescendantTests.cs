@@ -76,8 +76,8 @@ public sealed class SchemaDescendantTests : CliTest
     // refused with exit 2 and names <unt> (<view>); set <rst> unt -i requires-req.json -f stores version 1, set … -i
     // requires-req2.json --force version 2, set … -i s3.json -f version 3; get <rst> unt --version 1 returns the first,
     // versions <rst> unt lists 3, 2 and 1, diff <rst> unt shows the JSON diff of 3 against 2, diff <rst> unt 3 1 --format
-    // unified a unified diff of 3 against 1, and diff <rst> unt 2 1 --format json the JSON diff of 2 against 1. The unified
-    // diff is checked last (sform cannot read the API's text/plain answer yet, see SCH-TYP-03).
+    // unified a unified diff of 3 against 1, and diff <rst> unt 2 1 --format json the JSON diff of 2 against 1 (the unified
+    // text as in SCH-TYP-03).
     [Test]
     [TestCase(301)]
     [UserRole(Role.Owner)]

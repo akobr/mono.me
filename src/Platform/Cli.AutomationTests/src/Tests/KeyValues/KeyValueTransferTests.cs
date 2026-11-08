@@ -178,7 +178,7 @@ public sealed class KeyValueTransferTests : CliTest
 
         // As a Contributor: the role's project of Target:RoleProjects, else a Contributor of the target project, who reads
         // this test's group there (the secret listed without its value).
-        var roleProject = KeyValuesSupportB.RoleProjectArguments(Target, Role.Contributor);
+        string[]? roleProject = RoleProjectOf(Role.Contributor) is { } mapped ? ["-p", mapped.ProjectKey, "-v", mapped.View] : null;
         var contributor = roleProject is null ? await AsAnotherUserAsync(PlatformRoles.RequirementOf(Role.Contributor)) : null;
         string[] scope = roleProject ?? ["-p", ProjectKey, "-v", View, "--prefix", $"{group}."];
         Task<SformResult> AsContributor(params string[] arguments) => contributor is null ? Sform(arguments) : contributor.Sform(arguments);

@@ -5,7 +5,6 @@ using _42.Platform.Cli.AutomationTests.Data;
 using _42.Platform.Cli.AutomationTests.Running;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
-using _42.Testing.UI.Automation.Runtime.Users;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.KeyValues;
 
@@ -56,7 +55,7 @@ public sealed class KeyValueBulkTests : CliTest
     [Covers("story kv", "--protection", "--values", "--protection=public", "--protection=standard", "--protection=hsm", "--protection=byok", "--protection=hyok")]
     public async Task Kv_List_LevelsAndValues()
     {
-        var holder = await ArrangeAsSecretsUserAsync();
+        var holder = await ArrangeAsAsync(SecretsUser);
         var view = CliData.ViewName();
         var root = CliData.KeyValueKey();
         var plainKey = $"{root}.plain";
@@ -289,7 +288,7 @@ public sealed class KeyValueBulkTests : CliTest
             (await Sform(InProject("story", "kv", "get", key, "--deleted"))).ShouldExitWith(CliExit.WrongInput);
         }
 
-        var (contributor, projectKey, view) = await AsContributorAsync();
+        var (contributor, projectKey, view) = await AsRoleUserAsync(Role.Contributor);
         (await contributor.Sform("story", "kv", "purge", CliData.KeyValueKey(), "-y", "-p", projectKey, "-v", view))
             .ShouldExitWith(CliExit.Unauthorized);
     }
@@ -400,32 +399,5 @@ public sealed class KeyValueBulkTests : CliTest
     {
         var pair = (await Sform(InProject("story", "kv", "get", key, "--deleted"))).ShouldSucceed().JsonNode();
         return pair["IsDeleted"]?.GetValue<bool>() ?? false;
-    }
-
-    // A ContributorWithSecrets (or higher) of the acting project who sets the secrets a Reader's case lists: another pool
-    // user. A project of Target:RoleProjects has nobody who may set a secret, so such a test acts in Target:Project, as
-    // ArrangeAsEditorAsync does.
-    private async Task<SformActor> ArrangeAsSecretsUserAsync()
-    {
-        if (RoleProject is { } project)
-        {
-            throw new InvalidOperationException(
-                $"The test arranges a secret as a ContributorWithSecrets in the project of its role, and Target:RoleProjects:{ActingRole} maps it to '{project}', where every pool user holds {ActingRole}; leave the role unmapped (a {ActingRole} of Target:Project acts) or provision the data there.");
-        }
-
-        return await AsAnotherUserAsync(SecretsUser);
-    }
-
-    // A Contributor and the project it acts in, "<contributor project>" of the catalogue: any other pool user in the project
-    // Target:RoleProjects maps Contributor to, else a pool user who is exactly a Contributor of Target:Project.
-    private async Task<(SformActor Actor, string ProjectKey, string View)> AsContributorAsync()
-    {
-        if (Target.RoleProjectOf(Role.Contributor) is { } mapped)
-        {
-            var parts = mapped.Split('/');
-            return (await AsAnotherUserAsync(UserRequirement.Any), $"{parts[0]}.{parts[1]}", parts.Length > 2 ? parts[2] : "default");
-        }
-
-        return (await AsAnotherUserAsync(PlatformRoles.RequirementOf(Role.Contributor)), Target.ProjectKey, Target.View);
     }
 }

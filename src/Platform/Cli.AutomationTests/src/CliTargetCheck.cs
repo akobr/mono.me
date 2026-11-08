@@ -2,10 +2,14 @@ using System.Text;
 using _42.Platform.Cli.AutomationTests.Access;
 using _42.Platform.Cli.AutomationTests.Running;
 using _42.Testing.UI.Automation.Runtime;
+using _42.Testing.UI.Automation.Runtime.Users;
 
 namespace _42.Platform.Cli.AutomationTests;
 
-// The check of the target before the first test, through sform itself (spec §3.4), as the check's pool user:
+// The check of the target before the first test, through sform itself (spec §3.4), as the check's pool user: the one the
+// library leased the check (any role: the first free user of Users:Pool), or, when that one stands for a user feature
+// (CliFeatures.OfUsers: an unregistered account, a user of two organizations), another pool user who stands for none
+// (UserOfCheckAsync), as only that feature's tests ever lease a feature user (CliTest.WithoutFeatureUsers):
 //   1. sform starts at all (sform --version);
 //   2. the user signs in through the device code into the user's home of the session (so the user's first test signs
 //      in no more) — the AuthKit device page, the pool password and -o Target:AuthKitOrganizationId are checked here;
@@ -26,6 +30,7 @@ public sealed class CliTargetCheck
     private readonly CliTarget target;
     private readonly SformRunner runner;
     private readonly string workingDirectory;
+    private TestUser user;
 
     public CliTargetCheck(TargetCheckContext context, CancellationToken cancellationToken)
     {
@@ -33,6 +38,7 @@ public sealed class CliTargetCheck
 
         this.context = context;
         this.cancellationToken = cancellationToken;
+        user = context.User;
         target = context.Settings.Bind<CliTarget>(PlatformTargetSettings.Section);
         var cli = context.Settings.Bind<CliSettings>(CliSettings.Section);
         var scope = context.Scope;
@@ -63,9 +69,18 @@ public sealed class CliTargetCheck
         }
     }
 
+    // The requirement of the user the check signs in instead of the one the library leased it: a pool user who stands for
+    // no user feature when the leased one stands for one (CliFeatures.OfUsers); null when the leased user will do.
+    internal static UserRequirement? ReplacementOf(TestUser leased)
+    {
+        ArgumentNullException.ThrowIfNull(leased);
+        return CliFeatures.OfUsers.Any(leased.HasRole) ? UserRequirement.Any.Except([.. CliFeatures.OfUsers]) : null;
+    }
+
     private async Task CheckAsync()
     {
         var scope = context.Scope;
+        user = await UserOfCheckAsync();
         var probe = SformHomes.NewForTest(context.Session, SformHomeKind.Fresh);
         try
         {
@@ -80,28 +95,28 @@ public sealed class CliTargetCheck
             SformHomes.Remove(probe, context.Session.FileSystem);
         }
 
-        var home = SformHomes.ForUser(context.Session, context.User);
+        var home = SformHomes.ForUser(context.Session, user);
         if (!home.IsSignedIn)
         {
             DeviceCodeSignInResult signIn;
             try
             {
-                signIn = await new DeviceCodeSignIn(runner, scope, target).SignInAsync(context.User, home, cancellationToken: cancellationToken);
+                signIn = await new DeviceCodeSignIn(runner, scope, target).SignInAsync(user, home, cancellationToken: cancellationToken);
             }
             catch (SformAssertionException exception)
             {
                 throw new TargetCheckException(
-                    $"{context.User} could not sign in through sform's device code against {target.BaseUrl}: {exception.Message} Check the pool user's password (Users:Pool:{context.User.Index}:Password), Target:AuthKitOrganizationId and that the AuthKit environment of the target allows the device code (docs/Platform/Cli.AutomationTests/automation-tests.md, \"Sign-in\").");
+                    $"{user} could not sign in through sform's device code against {target.BaseUrl}: {exception.Message} Check the pool user's password (Users:Pool:{user.Index}:Password), Target:AuthKitOrganizationId and that the AuthKit environment of the target allows the device code (docs/Platform/Cli.AutomationTests/automation-tests.md, \"Sign-in\").");
             }
 
             if (!signIn.IsSignedIn)
             {
-                throw new TargetCheckException($"{context.User} did not sign in through sform account: exit {signIn.Result.ExitCode}. {Excerpt(signIn.Result)}");
+                throw new TargetCheckException($"{user} did not sign in through sform account: exit {signIn.Result.ExitCode}. {Excerpt(signIn.Result)}");
             }
 
             if (signIn.Result.PlainStdOut.Contains("account register", StringComparison.Ordinal))
             {
-                throw new TargetCheckException($"{context.User} has no account on the target (sform account says to call sform account register); register the pool user first.");
+                throw new TargetCheckException($"{user} has no account on the target (sform account says to call sform account register); register the pool user first.");
             }
         }
 
@@ -142,6 +157,26 @@ public sealed class CliTargetCheck
         }
     }
 
+    // The leased user, or another pool user who stands for no user feature when the leased one stands for one
+    // (ReplacementOf); the other user goes back to the pool with the check's scope.
+    private async Task<TestUser> UserOfCheckAsync()
+    {
+        if (ReplacementOf(context.User) is not { } requirement)
+        {
+            return context.User;
+        }
+
+        try
+        {
+            return await context.Scope.LeaseAnotherUserAsync(requirement, cancellationToken);
+        }
+        catch (UserLeaseException exception)
+        {
+            throw new TargetCheckException(
+                $"The target check signs in a pool user who stands for no feature ({string.Join(", ", CliFeatures.OfUsers)}), as only the tests of a feature lease its user: {exception.Message} Add the role users to Users:Pool (docs/Platform/Cli.AutomationTests/automation-tests.md, \"Feature users\").");
+        }
+    }
+
     // The first lines of a run's output, redacted, for a message.
     private string Excerpt(SformResult result)
     {
@@ -155,7 +190,7 @@ public sealed class CliTargetCheck
         var story = await runner.RunAsync(["story", "-p", projectKey, "-v", view], new SformRunOptions { Home = home, Label = $"read {projectKey}/{view} ({settings})" });
         if (story.ExitCode != 0)
         {
-            failures.Append($"{context.User} cannot read the project {projectKey} ({settings}): sform story -p {projectKey} -v {view} ended with {SformResult.Describe(story.ExitCode)}. {Excerpt(story)} Create the organization and the project, and make the pool users members with their roles (docs/Platform/Cli.AutomationTests/automation-tests.md, \"Target\"). ");
+            failures.Append($"{user} cannot read the project {projectKey} ({settings}): sform story -p {projectKey} -v {view} ended with {SformResult.Describe(story.ExitCode)}. {Excerpt(story)} Create the organization and the project, and make the pool users members with their roles (docs/Platform/Cli.AutomationTests/automation-tests.md, \"Target\"). ");
         }
     }
 }

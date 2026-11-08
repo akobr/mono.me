@@ -81,8 +81,8 @@ public sealed class SchemaAnnotationTests : CliTest
     // SCH-ANN-03: get --version, versions and diff with both formats.
     // Three versions of the schema of <rst> (each adds a property: first, second, third); get <rst> --version 1 returns the
     // first; versions <rst> lists 3, 2 and 1; diff <rst> shows the JSON diff of 3 against 2, diff <rst> 3 1 --format
-    // unified a unified diff of 3 against 1, and diff <rst> 2 1 --format json the JSON diff of 2 against 1. The unified diff
-    // is checked last (sform cannot read the API's text/plain answer yet, see SCH-TYP-03).
+    // unified a unified diff of 3 against 1, and diff <rst> 2 1 --format json the JSON diff of 2 against 1 (the unified text
+    // as in SCH-TYP-03).
     [Test]
     [TestCase(282)]
     [UserRole(Role.Owner)]

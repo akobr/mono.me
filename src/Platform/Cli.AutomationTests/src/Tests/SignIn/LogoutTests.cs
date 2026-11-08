@@ -5,7 +5,6 @@ using _42.Platform.Cli.AutomationTests.Data;
 using _42.Platform.Cli.AutomationTests.Running;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
-using _42.Testing.UI.Automation.Runtime.Users;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.SignIn;
 
@@ -13,12 +12,6 @@ namespace _42.Platform.Cli.AutomationTests.Tests.SignIn;
 [Area(Area.SignIn)]
 public sealed class LogoutTests : CliTest
 {
-    // SGN-OUT-04 leases the unregistered pool user (SignInOutput.FeatureUser), every other case any pool user.
-    protected override UserRequirement RequiredUser =>
-        TestContext.Current?.Metadata.TestDetails.MethodName == nameof(Register_NewUser_CreatesAccountAndProject)
-            ? SignInOutput.FeatureUser(CliFeatures.Registration)
-            : base.RequiredUser;
-
     // SGN-OUT-01: account logout removes the session, and the next command is refused.
     // After a sign-in as in SGN-DEV-01 in an empty home, sform account logout says "You have been logged out from account:
     // <name>" (the name of the account header) and ends with 0, and the home's token store is empty; sform story -p

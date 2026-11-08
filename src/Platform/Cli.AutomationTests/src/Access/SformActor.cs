@@ -3,10 +3,11 @@ using _42.Testing.UI.Automation.Runtime.Users;
 
 namespace _42.Platform.Cli.AutomationTests.Access;
 
-// Another pool user of the test (CliTest.AsAnotherUserAsync, AsGrantedUserAsync, ArrangeAsEditorAsync), with the
-// user's own signed-in home of the session: e.g. an Editor who creates the data a Reader's case reads, the second user
-// of a grant (AccountIdAsync), or the creator of a machine (CliTest.CreateMachineAsync with MachineCreation.As). Its runs
-// are the test's (numbered, attached, redacted) and sign the user in through the device code the first time.
+// Another pool user of the test (CliTest.AsAnotherUserAsync, AsGrantedUserAsync, ArrangeAsAsync, ArrangeAsEditorAsync,
+// AsRoleUserAsync), with the user's own signed-in home of the session: e.g. an Editor who creates the data a Reader's
+// case reads, the second user of a grant (AccountIdAsync), or the creator of a machine (CliTest.CreateMachineAsync with
+// MachineCreation.As). Its runs are the test's (numbered, attached, redacted) and sign the user in through the device
+// code the first time.
 public sealed class SformActor
 {
     private readonly Func<SformActor, SformRunOptions, string[], Task<SformResult>> run;

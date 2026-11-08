@@ -101,7 +101,7 @@ HTTPS errors are ignored for a `localhost` target only.
 | Key | Default | Meaning |
 |---|---|---|
 | `LeaseTimeoutSeconds` | `120` | How long a lease waits for a free user before the test is **Blocked** (`No free user with role X …`) |
-| `Pool` | `[]` | The pre-provisioned users: `Email` (required, unique), `Password` (a secret; required when the sign-in flow needs one), `DisplayName`, `Roles` (a list, matched by a test's `UserRequirement`) |
+| `Pool` | `[]` | The pre-provisioned users: `Email` (required, unique), `Password` (a secret; required when the sign-in flow needs one), `DisplayName`, `Roles` (a list, matched by a test's `UserRequirement`: at least one of its roles, none of its `Except` roles) |
 
 A user is never held by two running tests; `TestUser.ToString()` and every report show only `Users:Pool:<n> (u-<hash of the e-mail>)`, never the e-mail or the password (both are `***` in a failure's message and stack trace too).
 
@@ -218,7 +218,7 @@ Derive the tests (or a project base class) from `UiTest`, an `AutomationTest` (s
 | `User` | The leased pool user |
 | `Settings`, `Session`, `Scope` | The run's settings, the `AutomationSession`, the test's `TestScope` (`Properties` go into the report, `NewContextAsync`, `OpenBrowserAsync`, `AttachTextAsync`, `AddSecret`, `Redact`, `ExtraUsers`, `Artifacts`) |
 | `Data` | `SeededData` of this attempt: `Slug(prefix, words)`, `Word()`, `Sentence(max)`, `Hex(n)`, Bogus' `Faker` and `Random`, seeded from the session seed, the test id and the attempt |
-| `RequiredUser` (virtual) | `UserRequirement.Any` by default; `UserRequirement.WithRole("Owner")`, `WithAnyRole(…)` |
+| `RequiredUser` (virtual) | `UserRequirement.Any` by default; `UserRequirement.WithRole("Owner")`, `WithAnyRole(…)`; `.Except("<role>", …)` refuses a user who has any of those roles too (e.g. a pool user who stands for a feature, whom only that feature's tests lease: `UserRequirement.Any.Except("Registration")`) |
 | `SignedIn` (virtual) | `true`: the context starts signed in; `false` for a test that signs in itself on its page (that page is traced, and a trace keeps what was typed: turn `Execution:Trace` off when it types a real password) |
 | `LeasesUser` (virtual) | `false` for a test that needs no user at all (a public page; not signed in either) |
 | `GetSkipReason(context, session)` (virtual) | `null` by default; a reason skips the test before its lease, browser context and page (see below) |
