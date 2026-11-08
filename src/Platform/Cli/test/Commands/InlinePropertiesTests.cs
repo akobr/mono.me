@@ -298,6 +298,27 @@ public class InlinePropertiesTests
         message.ShouldBe("The inline property 2 of 2 cannot set $.a.list[5]: $.a.list has 1 item, so its index can be at most 1.");
     }
 
+    // IConfiguration compares keys case-insensitively: one key keeps one spelling, the one already there.
+    [Fact]
+    public async Task ANameInAnotherCase_GoesIntoTheExistingProperty()
+    {
+        AddFile("""{"logging":{"logLevel":{"default":"Information"}},"Hosts":["a"]}""");
+
+        var document = await BuildAsync(FilePath, "Logging.LogLevel.Default=Warning", "Logging.LogLevel.Other=Debug", "hosts[1]=b");
+
+        Json(document).ShouldBe("""{"logging":{"logLevel":{"default":"Warning","Other":"Debug"}},"Hosts":["a","b"]}""");
+    }
+
+    [Fact]
+    public async Task TheExactSpelling_WinsOverAnotherCase()
+    {
+        AddFile("""{"a":1,"A":2}""");
+
+        var document = await BuildAsync(FilePath, "A=3");
+
+        Json(document).ShouldBe("""{"a":1,"A":3}""");
+    }
+
     [Fact]
     public async Task AReplacedProperty_KeepsItsPlace()
     {

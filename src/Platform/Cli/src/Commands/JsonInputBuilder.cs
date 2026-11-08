@@ -11,6 +11,7 @@ namespace _42.Platform.Cli.Commands;
 
 public static class JsonInputBuilder
 {
+    // Only copies the -i file into the empty document; the -x values are written by path (InlineProperties).
     private static readonly JsonMergeSettings JsonMergeOptions = new()
     {
         MergeArrayHandling = MergeArrayHandling.Union,
