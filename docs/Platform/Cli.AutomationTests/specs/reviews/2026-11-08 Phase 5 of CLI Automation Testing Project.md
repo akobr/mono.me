@@ -324,4 +324,4 @@ The branch was rebased onto `main` after seven pull requests merged. Their descr
 
 The catalogue has **251 cases** (22 new, all created in Testiny 2SC, no edit denied), each automated; sform has 105 commands, 35 aliases, 618 option forms, 87 arguments and 147 fixed values, 992 items, every one covered. In sform itself the rebase joined `CliPaths` with the settings store of #176 (see the review of phase 1), and the newest OpenAPI document of the TypeScript SDK (`open.api.v0.10.31.json`) describes `Pkcs12` as base64 like the C# one, so a new generation keeps the generated files as they are.
 
-Noted, not changed: the redirected-input stop of `story edit` (43) is a plain line on standard output, not the "! sform cannot ask for …" of the other prompts on standard error (ANN-EDT-04 expects what the code does).
+The redirected-input stop of `story edit` (43) was a plain line on standard output; it now writes "! sform cannot ask for the edit of the annotation: the input or the output is redirected." and the way without a terminal on standard error, like the other prompts (ANN-EDT-04, Testiny 467).
