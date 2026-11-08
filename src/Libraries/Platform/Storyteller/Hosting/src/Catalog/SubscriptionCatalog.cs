@@ -53,15 +53,7 @@ internal sealed class SubscriptionCatalog : ISubscriptionCatalog
                 nameof(key));
         }
 
-        try
-        {
-            var annotation = await _reader.ReadAsync(fullKey, includeDeleted: true, CancellationToken.None, cancellationToken).ConfigureAwait(false);
-            return annotation.DeletedAt is null ? (StorytellerExecution)annotation : null;
-        }
-        catch (StorytellerConfigurationException exception) when (CatalogReader.IsMissing(exception))
-        {
-            return null;
-        }
+        return (StorytellerExecution?)await _reader.FindAsync(fullKey, cancellationToken).ConfigureAwait(false);
     }
 
     // The arguments are checked at the call, not at the first MoveNextAsync. The interval follows the rule of the

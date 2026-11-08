@@ -76,6 +76,12 @@ internal sealed class ScriptedPages : IAnnotationPages
         return Pages(list, continuationToken);
     }
 
+    // The subscriptions' informer reads no descendants of other lists.
+    public Task<AnnotationPage> ReadDescendantsPageAsync(FullKey ancestor, AnnotationType descendants, bool includeInactive, string? continuationToken, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException("The script answers the executions and usages of a responsibility only.");
+    }
+
     public Task<StorytellerAnnotation> ReadAnnotationAsync(FullKey key, bool includeDeleted, CancellationToken cancellationToken)
     {
         lock (_lock)

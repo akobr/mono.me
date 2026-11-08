@@ -15,11 +15,11 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class StorytellerHostingServiceCollectionExtensions
 {
-    // IExecutionContext, ISubscriptionCatalog, IStorytellerDocuments when it is not registered yet, and the provider's
-    // refresher and logging (AddStorytellerConfiguration). The options are the provider's (STORYTELLER_* when unset),
-    // read and validated here, and throw StorytellerConfigurationException; the options of the provider alone are
-    // ignored, and Key is optional until who am I is used. Who am I, the catalog and the documents share one bound
-    // credential. Logs to the container's ILoggerFactory unless options.LoggerFactory is set. The first registration
+    // IExecutionContext, ISubscriptionCatalog, IStorytellerCatalog, IStorytellerDocuments when it is not registered yet,
+    // and the provider's refresher and logging (AddStorytellerConfiguration). The options are the provider's
+    // (STORYTELLER_* when unset), read and validated here, and throw StorytellerConfigurationException; the options of
+    // the provider alone are ignored, and Key is optional until who am I is used. Who am I, the catalogs and the
+    // documents share one bound credential. Logs to the container's ILoggerFactory unless options.LoggerFactory is set. The first registration
     // wins: a later call returns a builder over it without reading its options.
     public static IStorytellerHostingBuilder AddStoryteller(this IServiceCollection services, Action<StorytellerConfigurationOptions>? configure = null)
     {
@@ -57,6 +57,12 @@ public static class StorytellerHostingServiceCollectionExtensions
             serviceProvider.GetService<ILoggerFactory>()));
 
         services.TryAddSingleton<ISubscriptionCatalog>(serviceProvider => new SubscriptionCatalog(
+            settings,
+            serviceProvider.GetRequiredService<CatalogReader>(),
+            serviceProvider.GetService<ILoggerFactory>()));
+
+        // On its own: an application that registered its own ISubscriptionCatalog still gets this one.
+        services.TryAddSingleton<IStorytellerCatalog>(serviceProvider => new StorytellerCatalog(
             settings,
             serviceProvider.GetRequiredService<CatalogReader>(),
             serviceProvider.GetService<ILoggerFactory>()));

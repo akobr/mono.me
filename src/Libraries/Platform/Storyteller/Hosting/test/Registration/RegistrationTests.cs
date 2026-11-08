@@ -61,6 +61,44 @@ public sealed class RegistrationTests : IDisposable
     }
 
     [Fact]
+    public void TheStorytellerCatalog_IsOneSingleton()
+    {
+        var services = new ServiceCollection();
+
+        services.AddStoryteller(_fixture.Configure());
+        services.AddStoryteller(_fixture.Configure());
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+
+        services.Single(descriptor => descriptor.ServiceType == typeof(IStorytellerCatalog)).Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        provider.GetRequiredService<IStorytellerCatalog>().ShouldBeSameAs(provider.GetRequiredService<IStorytellerCatalog>());
+    }
+
+    [Fact]
+    public void AStorytellerCatalogRegisteredBefore_IsKept()
+    {
+        var services = new ServiceCollection();
+        var catalog = new NoCatalog();
+        services.AddSingleton<IStorytellerCatalog>(catalog);
+
+        services.AddStoryteller(_fixture.Configure());
+        using var provider = _fixture.Track(services.BuildServiceProvider());
+
+        provider.GetRequiredService<IStorytellerCatalog>().ShouldBeSameAs(catalog);
+    }
+
+    [Fact]
+    public async Task ASubscriptionCatalogRegisteredBefore_LeavesTheStorytellerCatalogToHosting()
+    {
+        var subscriptions = new NoSubscriptions();
+        _fixture.RouteAnnotation("rst.invoicing");
+
+        using var provider = _fixture.BuildServices(services: services => services.AddSingleton<ISubscriptionCatalog>(subscriptions));
+
+        provider.GetRequiredService<ISubscriptionCatalog>().ShouldBeSameAs(subscriptions);
+        (await provider.GetRequiredService<IStorytellerCatalog>().GetAsync("rst.invoicing")).ShouldBeOfType<StorytellerResponsibility>();
+    }
+
+    [Fact]
     public void ALaterRegistration_DoesNotReadItsOptions()
     {
         var services = new ServiceCollection();
@@ -359,5 +397,27 @@ public sealed class RegistrationTests : IDisposable
     public sealed class TenantOptions
     {
         public string? Name { get; set; }
+    }
+
+    // The test doubles of an application, registered before Hosting.
+    private sealed class NoCatalog : IStorytellerCatalog
+    {
+        public Task<StorytellerAnnotation?> GetAsync(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<TAnnotation?> GetAsync<TAnnotation>(string key, CancellationToken cancellationToken = default)
+            where TAnnotation : StorytellerAnnotation => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<TAnnotation>> ListAsync<TAnnotation>(StorytellerTarget<TAnnotation> target, CancellationToken cancellationToken = default)
+            where TAnnotation : StorytellerAnnotation => throw new NotSupportedException();
+
+        public IAsyncEnumerable<StorytellerAnnotationChange<TAnnotation>> WatchAsync<TAnnotation>(StorytellerTarget<TAnnotation> target, TimeSpan? pollInterval = null, CancellationToken cancellationToken = default)
+            where TAnnotation : StorytellerAnnotation => throw new NotSupportedException();
+    }
+
+    private sealed class NoSubscriptions : ISubscriptionCatalog
+    {
+        public Task<StorytellerExecution?> GetExecutionAsync(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public IAsyncEnumerable<StorytellerExecutionChange> WatchExecutionsAsync(string responsibility, string context, TimeSpan? pollInterval = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }
