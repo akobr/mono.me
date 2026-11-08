@@ -229,25 +229,21 @@ public abstract partial class CliTest : AutomationTest
         return editor;
     }
 
-    // Mode E with another program: the editor of the home (Home by default) becomes the custom command, in
-    // editor.config.json ({ "editor": { "EditorType": "Custom", "CustomCommand": "<program> [arguments]" } }); ResetDefaults
-    // removes it before the next test of the home. sform appends the quoted path of the file to edit and splits the command
+    // Mode E with another program: the editor of the home (Home by default) becomes the custom command, in the editor
+    // section of sform.settings.json ({ "editor": { "editorType": "Custom", "customCommand": "<program> [arguments]" } },
+    // as sform account settings editor custom --command writes it); ResetDefaults removes it before the next test of the home. sform appends the quoted path of the file to edit and splits the command
     // at its first space (EditorService.ParseCustomCommand), so the program's path must contain no space.
     protected async Task UseEditorAsync(string customCommand, SformHome? home = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(customCommand);
 
         var target = home ?? Home;
-        target.Ensure();
-        var json = new System.Text.Json.Nodes.JsonObject
+        target.WriteSettingsSection("editor", new System.Text.Json.Nodes.JsonObject
         {
-            ["editor"] = new System.Text.Json.Nodes.JsonObject
-            {
-                ["EditorType"] = "Custom",
-                ["CustomCommand"] = customCommand,
-            },
-        };
-        await FileSystem.File.WriteAllTextAsync(target.EditorConfigFile, json.ToJsonString(), new System.Text.UTF8Encoding(false));
+            ["editorType"] = "Custom",
+            ["customCommand"] = customCommand,
+        });
+        await Task.CompletedTask;
     }
 
     // Runs at the end of the attempt, in reverse order of registration, before the homes of the test are removed.

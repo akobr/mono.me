@@ -100,7 +100,7 @@ public sealed class LogoutTests : CliTest
     // stderr says "! sform cannot ask for the organization and the project of the new account: the input is redirected." and
     // "Run sform account register in a terminal." In a terminal, sform account register asks for the organization and the
     // project, answered with generated names: "Account <email> (<name>) has been created." and "Default project set to
-    // <org>.<project> with default view.", and access.default.json names them.
+    // <org>.<project> with default view.", and sform.settings.json names them.
     [Test]
     [TestCase(250)]
     [UserRole(Role.Any)]
@@ -132,10 +132,9 @@ public sealed class LogoutTests : CliTest
         await terminal.ExpectAsync($"Default project set to {organization}.{project} with default view.");
         (await terminal.WaitForExitAsync()).ShouldSucceed();
 
-        var access = JsonNode.Parse(Home.ReadText(SformHome.AccessDefaultFileName) ?? "null")?["access"];
-        await Assert.That(access?["OrganizationName"]?.GetValue<string>()).IsEqualTo(organization);
-        await Assert.That(access?["ProjectName"]?.GetValue<string>()).IsEqualTo(project);
-        await Assert.That(access?["ViewName"]?.GetValue<string>()).IsEqualTo("default");
+        await Assert.That(Home.AccessSetting("organizationName")).IsEqualTo(organization);
+        await Assert.That(Home.AccessSetting("projectName")).IsEqualTo(project);
+        await Assert.That(Home.AccessSetting("viewName")).IsEqualTo("default");
     }
 
     // The stored AuthKit session of the home: its text when the token store holds one, null when the store is empty (the

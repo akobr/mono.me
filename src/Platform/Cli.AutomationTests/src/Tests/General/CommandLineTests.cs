@@ -279,7 +279,7 @@ public sealed partial class CommandLineTests : CliTest
             .ShouldNotContain(SformProcessEnvironment.TokenStore);
 
         var files = Home.Files();
-        await Assert.That(files).Contains(SformHome.AccessDefaultFileName);
+        await Assert.That(files).Contains(SformHome.SettingsFileName);
         await Assert.That(files).Contains(SformHome.AuthKitSessionFileName);
         await Assert.That(files.Any(file => file.StartsWith(SformHome.LogsDirectoryName, StringComparison.OrdinalIgnoreCase))).IsTrue();
         await Assert.That(GeneralChecks.Changes(cliBefore, GeneralChecks.Snapshot(FileSystem, cliFolder))).IsEmpty();
