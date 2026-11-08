@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO.Abstractions.TestingHelpers;
 using System.Threading.Tasks;
+using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Services;
 
@@ -20,6 +21,9 @@ internal sealed class ScriptedEditor(MockFileSystem fileSystem, IEnumerable<stri
 
     public int ExitCode { get; init; }
 
+    // The documents of each diff the user was asked about: the original and the edited one, as the check gave it.
+    public List<(string Original, string Edited)> Diffs { get; } = [];
+
     public override Task<int> OpenFileInEditorAsync(string filePath, EditorOptions options)
     {
         Paths.Add(filePath);
@@ -31,5 +35,10 @@ internal sealed class ScriptedEditor(MockFileSystem fileSystem, IEnumerable<stri
         }
 
         return Task.FromResult(ExitCode);
+    }
+
+    protected override void ShowChanges(IExtendedConsole console, bool isNew, string originalJson, string editedJson)
+    {
+        Diffs.Add((originalJson, editedJson));
     }
 }
