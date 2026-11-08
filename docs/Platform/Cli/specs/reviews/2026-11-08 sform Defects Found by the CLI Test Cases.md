@@ -375,6 +375,13 @@ Without the fix it fails on the first write's `Content`. It ran with `STORYTELLE
 
 The phase 5 tests never read `Content` from a first write's printed model. They check its `Version` and read the content back, so they pass either way.
 
+### 19. Findings of the review of PR #178
+
+- **The environment that redirects the token is said.** `SFORM_<section>__<key>` wins over every file, also in a released `sform`, so whatever sets the environment decides where requests and the user's token go. `ConfigurationOverrideNotice` (called by `Program.Main` after the host is built) writes on standard error, once per run, "! The API address comes from the environment, SFORM_general__baseUrl=<value>; sform sends your sign-in there." and "! The sign-in settings come from the environment: <variables>." for `authentication.*`; other variables say nothing. The behaviour stays (the automation tests and CI need it) and `docs/42for.net/cli/sform.md` names it.
+- **A network failure names the service that failed.** `RequestTargetHandler`, registered for every client of `IHttpClientFactory` (`ConfigureHttpClientDefaults`), remembers the address of the last request sent. When a request fails without an answer and that address is not the API's (`Program.UnreachableTargetOf`), `sform` prints "! The service at <address> could not be reached: …" and that it called it for the sign-in, instead of pointing at `general.baseUrl`. A failure of the API, or of a client outside the factory, keeps the message of section 2.
+- **Small ones:** `machine renew --password-stdin` reads from `System.Console.In` when there is no inner console; `TokenStorage.HomeKey` hashes the folder in lower case on Windows and macOS, whose file systems ignore the case, so one `SFORM_HOME` written in two cases keeps one session; `%%` of a `BROWSER` command line is a literal `%` (`BrowserLauncher.Substitute`); `ExitCodes.ERROR_SERVICE_FAILURE` refers to `KeyValueConsoleExtensions.ExitCodeOf` instead of repeating the mapping.
+- **Tests:** `ConfigurationOverrideNoticeTests`, `ProgramTests.UnreachableTargetOf_IsTheServiceOtherThanTheApi`, `BrowserLauncherTests.Substitute_ReadsThePlaceholdersLeftToRight` and `ProtectedTokenStoreTests.HomeKey_IgnoresTheCaseOfThePath_WhereTheFileSystemDoes`.
+
 ### Not fixed, out of scope
 
 - `sform --version` prints the version of `42.CLI.Toolkit`, not of `sform` (`Assembly.GetExecutingAssembly()` in the toolkit).

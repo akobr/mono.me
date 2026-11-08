@@ -161,4 +161,16 @@ public class ProgramTests
         app.Conventions.UseDefaultConventions().UseConstructorInjection(services);
         app.Parse(args);
     }
+
+    // A request that failed without an answer names its service when it was not the API.
+    [Theory]
+    [InlineData("https://auth.example.com", "https://api.example.com/api", "https://auth.example.com")]
+    [InlineData("https://API.example.com", "https://api.example.com/api", null)]
+    [InlineData("http://localhost:7071", "http://localhost:7071/api", null)]
+    [InlineData(null, "https://api.example.com/api", null)]
+    [InlineData("https://auth.example.com", null, null)]
+    public void UnreachableTargetOf_IsTheServiceOtherThanTheApi(string? lastTarget, string? baseUrl, string? expected)
+    {
+        Program.UnreachableTargetOf(lastTarget, baseUrl).ShouldBe(expected);
+    }
 }

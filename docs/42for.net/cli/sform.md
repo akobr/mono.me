@@ -452,7 +452,7 @@ The session is encrypted for your user: with DPAPI on Windows, in the Keychain o
 | `SFORM_TOKEN_STORE` | `file`: the session as a plain file in `SFORM_HOME`; ignored without `SFORM_HOME` |
 | `SFORM_DEVICE_CODE_OUTPUT` | `json`: the device code prompt also as one JSON line on standard error |
 | `SFORM_BROWSER`, then `BROWSER` | The program `sform account --browser` opens the sign-in page with, see [Sign in](#sign-in) |
-| `SFORM_<section>__<key>` | A setting of `app.config.json` for this run, e.g. `SFORM_general__baseUrl` for the address of the API; it wins over the files |
+| `SFORM_<section>__<key>` | A setting of `app.config.json` for this run, e.g. `SFORM_general__baseUrl` for the address of the API; it wins over the files. Because it decides where your sign-in goes, every command says on standard error when the API address (`general.baseUrl`) or a sign-in setting (`authentication.*`) comes from the environment |
 | `COLUMNS` | The width of the output when `sform` has no console at all |
 | `DO_NOT_TRACK`, `SFORM_TELEMETRY_OPTOUT` | Turn telemetry off, see [Telemetry](#telemetry) |
 
