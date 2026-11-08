@@ -282,7 +282,7 @@ sform story config set exe.northwind.invoicing.production -i invoicing.json -x "
 - The values are written one by one, in the order of the command line, over the `-i` file, and the objects and arrays on the way are created: `-x db.host=x -x db.port=5432` sets `{ "db": { "host": "x", "port": 5432 } }`.
 - The value is the rest of the argument after the `=` that ends the path, so `-x "['a=b']=c=d"` sets the name `a=b` to `c=d`. `true` and `false` become booleans and numbers become numbers, as before.
 - An index names an existing item, which it replaces, or the next one, which it appends: `-x "hosts[0]=a" -x "hosts[1]=b"` builds `["a", "b"]`.
-- A path from an error, such as `$.Logging.LogLevel['Microsoft.AspNetCore']`, can be given with its `$`; in bash and zsh, leave the `$` out (see **Shells**). Inside the quotes, `\n`, `\r`, `\t` and `\uXXXX` are read as errors print them (a `#` is printed `\u0023`), so a backslash of a name is always written `\\`.
+- A path from an error, such as `$.Logging.LogLevel['Microsoft.AspNetCore']`, can be given as it is, `$` included; in bash and zsh, a path that starts with `$[` is given without its `$` (see **Shells**). Inside the quotes, `\n`, `\r`, `\t` and `\uXXXX` are read as errors print them (a `#` is printed `\u0023`), so a backslash of a name is always written `\\`.
 
 **Errors.** When a value cannot be set, `sform` sends nothing, writes one line to standard error and ends with exit code `2`. The line names the inline property, its character or its path, never a value. A value cannot be set when:
 
@@ -300,13 +300,13 @@ To change the items of a stored array, write the whole content with `-i <file> -
 
 **Shells.** Quote every `-x` argument:
 
-- **bash and zsh:** use double quotes. Inside them, write `\$` for a `$` of a name, as in `"retries['\$binding']=jlogic"`, and `\\\\` for the `\\` of a name, and leave out the leading `$` of a path from an error: `"$[…"` is arithmetic expansion there. zsh stops on an unquoted `hosts[0]=a`, which it reads as a pattern.
+- **bash and zsh:** use double quotes. Inside them, write `\$` for a `$` of a name, as in `"retries['\$binding']=jlogic"`, and `\\\\` for the `\\` of a name, and give a path from an error that starts with `$[` without its `$`, as `"['my.key'].x=1"`: `"$[…"` is arithmetic expansion there, while `"$.db.port=1"` passes as written. zsh stops on an unquoted `hosts[0]=a`, which it reads as a pattern.
 - **PowerShell:** a `$name` inside double quotes is a variable. Use single quotes, with the quotes of `['…']` doubled: `'retries[''$binding'']=jlogic'`.
 - **GitHub Actions:** write the command in a `run: |` block, where a `#` or a `: ` does not end it.
 
 An unquoted `a['b.c']=1` reaches `sform` as `a[b.c]=1`, and an expanded `$binding` leaves `['']`; the errors of both say so.
 
-**Changed.** The name of `-x` used to be a top-level property as written. Now a name that is not plain (a dot, a space, `:`, `$`, a leading digit or `-`, a letter outside ASCII, or the empty name) is written `['name']`: `-x "['a.b']=1"` sets the property `a.b`, as `-x a.b=1` did before.
+**Changed.** The name of `-x` used to be a top-level property as written. Now a name that is not plain (with a dot, a space, `:`, `$`, a leading digit or `-`, or a letter outside ASCII) is written `['name']`, and an empty name is refused: `-x "['a.b']=1"` sets the property `a.b`, as `-x a.b=1` did before.
 
 ## Telemetry
 
