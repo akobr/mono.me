@@ -37,7 +37,7 @@ public class ConfigSetCommand : BaseContextCommand
 
     public bool IsImportRequested => !string.IsNullOrWhiteSpace(ImportFilePath);
 
-    [Option("-x|--properties", CommandOptionType.MultipleValue, Description = "Specify inline properties to be set on the configuration.")]
+    [Option("-x|--properties", CommandOptionType.MultipleValue, Description = "Specify inline properties as path=value, for example -x \"db.port=5432\" -x \"hosts[0]=a\" -x \"Logging.LogLevel['Microsoft.AspNetCore']=Warning\"; quote each one.")]
     public string[]? InlineProperties { get; set; }
 
     public bool AreInlinePropertiesSpecified => InlineProperties?.Length > 0;

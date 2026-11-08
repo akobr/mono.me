@@ -54,7 +54,7 @@ public static class PlainOutputExtensions
     }
 
     // The text with the line-number gutter of WriteJson, without colours, for a reader in a terminal. Every # is shown as
-    // #, so a line cannot hold the ##[command] the runner of GitHub Actions finds anywhere in a line; the gutter
+    // \u0023, so a line cannot hold the ##[command] the runner of GitHub Actions finds anywhere in a line; the gutter
     // keeps :: from starting one. --content-only writes the text as it is.
     public static void WriteNumberedText(this IExtendedConsole @this, string text)
     {
