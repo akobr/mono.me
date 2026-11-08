@@ -406,17 +406,20 @@ public class ConfigExportCommandTests
     [Fact]
     public async Task File_ThatCannotBeWritten_IsWrongInput_AfterGitHubEnvWasAppended()
     {
-        _fileSystem.AddDirectory(P(@"C:\work\app.env"));
+        // A folder that does not exist: the write throws a DirectoryNotFoundException on Windows and on Unix. Not a
+        // folder at the path itself: on Unix the file replaces the path through File.Move, which the real file system
+        // refuses for a folder (OwnerOnlyFileTests) but the mock file system does by replacing the folder.
         SetupResolved(Envelope(Resolved));
         SetupEffective(Envelope(Effective));
 
-        var exitCode = await Execute(Key, "--github-env", "--prefix", "APP_", "-e", "app.env");
+        var exitCode = await Execute(Key, "--github-env", "--prefix", "APP_", "-e", "missing/app.env");
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _out.ToString().ShouldBe("::add-mask::s3cr3t-value\n::add-mask::5432\n");
         _fileSystem.File.ReadAllText(GitHubEnv).ShouldStartWith($"APP_DB__HOST<<{FirstDelimiter}\n");
         ErrorLines().Count.ShouldBe(1);
-        ErrorLines()[0].ShouldStartWith("The configuration could not be written to 'app.env': ");
+        ErrorLines()[0].ShouldStartWith("The configuration could not be written to 'missing/app.env': ");
+        _fileSystem.Directory.Exists(P(@"C:\work\missing")).ShouldBeFalse();
         ShouldNotRevealAValue();
         ShouldWriteOnlyThroughTheInnerConsole();
     }
