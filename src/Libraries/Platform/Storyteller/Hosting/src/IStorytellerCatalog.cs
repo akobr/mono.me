@@ -12,7 +12,8 @@ public interface IStorytellerCatalog
     Task<StorytellerAnnotation?> GetAsync(string key, CancellationToken cancellationToken = default);
 
     // The same, typed: a key of another type than TAnnotation's throws ArgumentException before any read.
-    // StorytellerAnnotation takes a key of any type.
+    // StorytellerAnnotation takes a key of any type; a type of the application that derives from it names no
+    // annotation type and throws ArgumentException.
     Task<TAnnotation?> GetAsync<TAnnotation>(string key, CancellationToken cancellationToken = default)
         where TAnnotation : StorytellerAnnotation;
 

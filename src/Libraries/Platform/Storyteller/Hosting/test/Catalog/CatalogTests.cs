@@ -64,6 +64,16 @@ public sealed class CatalogTests : IDisposable
     }
 
     [Fact]
+    public async Task GetAsyncOfATypeOfTheApplication_ThrowsBeforeAnyRead()
+    {
+        var exception = await Should.ThrowAsync<ArgumentException>(() => Catalog().GetAsync<ApplicationAnnotation>(Responsibility));
+
+        exception.ParamName.ShouldBe("TAnnotation");
+        exception.Message.ShouldStartWith("ApplicationAnnotation names no annotation type");
+        _fixture.Http.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task GetAsync_OfAMissingOrADeletedAnnotation_IsNull()
     {
         _catalog.Put(Daily, TestAnnotations.Deleted());
@@ -191,9 +201,15 @@ public sealed class CatalogTests : IDisposable
         _catalog.Put(Daily);
         _catalog.Put(Monthly);
         _catalog.Fail(Daily, HttpStatusCode.ServiceUnavailable);
+        _catalog.HoldRead(Monthly);
 
-        var exception = await Should.ThrowAsync<StorytellerConfigurationException>(() => Catalog().ListAsync(StorytellerTarget.UnitsOf(Responsibility)));
+        var list = Catalog().ListAsync(StorytellerTarget.UnitsOf(Responsibility));
+        await WaitUntilAsync(() => _catalog.Reads(Daily).Count == 1 && _catalog.HeldReads == 1);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
+        list.IsCompleted.ShouldBeFalse();
+        _catalog.ReleaseRead(Monthly);
+        var exception = await Should.ThrowAsync<StorytellerConfigurationException>(() => list);
         exception.Key.ShouldBe(FakeCatalog.Full(Daily));
         exception.IsTransient.ShouldBeTrue();
         _catalog.Reads(Monthly).ShouldHaveSingleItem();
@@ -211,9 +227,12 @@ public sealed class CatalogTests : IDisposable
         _catalog.Lists("rst.missing", "units").ShouldBeEmpty();
     }
 
+    // The API answers 403 AnnotationRestricted to the read of the ancestor and to its list alike; the list's words say
+    // what listing needs.
     [Fact]
     public async Task ListAsync_OfAMachineRestrictedBelowTheAncestor_SaysWhatItNeeds()
     {
+        _catalog.Fail(Responsibility, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
         _catalog.FailPage("units", null, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson, Responsibility);
 
         var exception = await Should.ThrowAsync<StorytellerConfigurationException>(() => Catalog().ListAsync(StorytellerTarget.UnitsOf(Responsibility)));
@@ -285,8 +304,28 @@ public sealed class CatalogTests : IDisposable
         _fixture.Dispose();
     }
 
+    private static async Task WaitUntilAsync(Func<bool> isOver)
+    {
+        var waiting = System.Diagnostics.Stopwatch.StartNew();
+
+        while (!isOver())
+        {
+            if (waiting.Elapsed > HostingFixture.Patience)
+            {
+                throw new TimeoutException("The reads did not arrive.");
+            }
+
+            await Task.Delay(5, TestContext.Current.CancellationToken);
+        }
+    }
+
     private IStorytellerCatalog Catalog()
     {
         return _fixture.BuildServices().GetRequiredService<IStorytellerCatalog>();
+    }
+
+    // A snapshot type an application derives for its own use.
+    private sealed class ApplicationAnnotation : StorytellerAnnotation
+    {
     }
 }

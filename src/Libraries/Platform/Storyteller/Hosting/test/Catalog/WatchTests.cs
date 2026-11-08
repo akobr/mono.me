@@ -182,6 +182,32 @@ public sealed class WatchTests : IDisposable
     }
 
     [Fact]
+    public async Task APoll_GivesRemovedThenChangedThenAdded_EachByKey()
+    {
+        _catalog.Put("unt.invoicing.b");
+        _catalog.Put("unt.invoicing.c");
+        _catalog.Put("unt.invoicing.d");
+        await using var probe = Watch(StorytellerTarget.UnitsOf(Responsibility));
+        (await probe.FirstPollAsync()).Count.ShouldBe(3);
+
+        _catalog.Update("unt.invoicing.b", TestAnnotations.Deleted());
+        _catalog.Update("unt.invoicing.d", json => json["Title"] = "Changed");
+        _catalog.Update("unt.invoicing.c", json => json["Title"] = "Changed");
+        _catalog.Put("unt.invoicing.e");
+        _catalog.Put("unt.invoicing.a");
+        var changes = await probe.NextPollAsync(Interval);
+
+        changes.Select(change => (change.Kind, change.Annotation.UnitName)).ShouldBe(
+        [
+            (StorytellerChangeKind.Removed, "b"),
+            (StorytellerChangeKind.Changed, "c"),
+            (StorytellerChangeKind.Changed, "d"),
+            (StorytellerChangeKind.Added, "a"),
+            (StorytellerChangeKind.Added, "e"),
+        ]);
+    }
+
+    [Fact]
     public async Task AHeldDescendantTheListMissed_StaysWithoutAnEvent()
     {
         _catalog.Put(Daily);
@@ -193,6 +219,37 @@ public sealed class WatchTests : IDisposable
 
         _catalog.Relist(Daily);
         (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
+    }
+
+    // A failure is no answer: only a read that answers ends a held annotation.
+    [Fact]
+    public async Task AHeldDescendantTheListMissed_WhoseReadFails_Stays_AndWarns()
+    {
+        _catalog.Put(Daily);
+        await using var probe = Watch(StorytellerTarget.UnitsOf(Responsibility));
+        await probe.FirstPollAsync();
+
+        _catalog.Unlist(Daily);
+        _catalog.Fail(Daily, HttpStatusCode.ServiceUnavailable);
+        (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
+        Warnings().ShouldHaveSingleItem().Message.ShouldStartWith($"Reading {FakeCatalog.Full(Daily)} failed (transient); it stays as it was, and the next poll reads it again.");
+
+        _catalog.Heal();
+        _catalog.Relist(Daily);
+        (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
+    }
+
+    // The API answers 403 AnnotationRestricted to the read of the ancestor and to its list alike.
+    [Fact]
+    public async Task AMachineRestrictedBelowTheAncestor_FailsThePoll_SayingWhatListingNeeds()
+    {
+        _catalog.Fail(Responsibility, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+        _catalog.FailPage("units", null, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson, Responsibility);
+
+        var exception = await Should.ThrowAsync<StorytellerConfigurationException>(() => WatchOnceAsync(StorytellerTarget.UnitsOf(Responsibility)));
+
+        exception.Message.ShouldStartWith($"The machine may not list the units of {FakeCatalog.Full(Responsibility)}: a machine restricted to an annotation reads that annotation and its descendants only, so listing them needs a machine restricted to {Responsibility} or to an annotation above it, or an unrestricted one");
+        exception.IsTransient.ShouldBeFalse();
     }
 
     [Fact]

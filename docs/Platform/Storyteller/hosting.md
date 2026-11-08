@@ -338,7 +338,7 @@ StorytellerUnit? daily = await catalog.GetAsync<StorytellerUnit>("unt.invoicing.
 | Member | Does |
 | --- | --- |
 | `GetAsync(key)` | One annotation, in any status, as the snapshot of its type; `null` when it does not exist or is deleted |
-| `GetAsync<T>(key)` | The same, typed. A key of another type than `T`'s throws `ArgumentException` before any read; `StorytellerAnnotation` takes any key |
+| `GetAsync<T>(key)` | The same, typed. A key of another type than `T`'s throws `ArgumentException` before any read. `StorytellerAnnotation` takes any key; a type of the application that derives from it names no type, and throws `ArgumentException` |
 | `ListAsync(target)` | The descendants of the target, by key, ordinally |
 | `WatchAsync(target, pollInterval)` | The informer of the target: `Added`, `Changed` and `Removed` |
 
