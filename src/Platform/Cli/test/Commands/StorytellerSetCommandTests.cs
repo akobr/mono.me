@@ -223,6 +223,9 @@ public class StorytellerSetCommandTests
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
         _calls.ShouldBe(["get", "create"]);
+        _fixture.Api.Verify(
+            api => api.FindDeletedAnnotationsAsync("org1", "proj1", "default", It.IsAny<AnnotationKeysRequest>()),
+            Times.Exactly(2));
     }
 
     [Fact]

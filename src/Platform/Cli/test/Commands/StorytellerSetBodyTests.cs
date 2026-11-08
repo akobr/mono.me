@@ -634,32 +634,68 @@ public class StorytellerSetBodyTests
         ((JObject)body["Values"]!).Count.ShouldBe(0);
     }
 
+    // The read does not tell a missing key from a deleted one: a second lookup does, before the create.
     [Fact]
     public async Task Replace_OfAMissingKey_OnlyCreates()
     {
         _http.Respond(HttpStatusCode.OK, "[]")
             .Respond(HttpStatusCode.NotFound, NotFound)
+            .Respond(HttpStatusCode.OK, "[]")
             .Respond(HttpStatusCode.OK, Answer(Key));
 
         var exitCode = await CreateCommand(Key, configure: command => command.IsReplaceRequested = true).OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _http.Requests[2].Headers!["If-None-Match"].ShouldBe("*");
-        _http.Requests[2].Headers!.ShouldNotContainKey("If-Match");
+        _http.Requests.Select(request => request.Method).ShouldBe([HttpMethod.Post, HttpMethod.Get, HttpMethod.Post, HttpMethod.Post]);
+        _http.Requests[3].Headers!["If-None-Match"].ShouldBe("*");
+        _http.Requests[3].Headers!.ShouldNotContainKey("If-Match");
     }
 
     [Fact]
-    public async Task Replace_OfAReadWithoutATag_WritesWithoutACondition()
+    public async Task Replace_OfAKeyDeletedAfterTheLookup_IsNotReCreated()
     {
         _http.Respond(HttpStatusCode.OK, "[]")
-            .Respond(HttpStatusCode.OK, StoredExecution)
-            .Respond(HttpStatusCode.OK, Answer(Key));
+            .Respond(HttpStatusCode.NotFound, NotFound)
+            .Respond(HttpStatusCode.OK, $"[{Answer(Key)}]");
 
         var exitCode = await CreateCommand(Key, configure: command => command.IsReplaceRequested = true).OnExecuteAsync();
 
+        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        _http.Requests.Count.ShouldBe(3);
+        _fixture.Console.Lines.ShouldContain(line => line.Contains("deleted meanwhile", StringComparison.Ordinal));
+    }
+
+    // Create new is the user's choice to re-create the deleted keys, so the read's 404 creates without asking again.
+    [Fact]
+    public async Task Replace_WithCreateNew_ReCreatesTheDeletedKey()
+    {
+        _http.Respond(HttpStatusCode.OK, $"[{Answer(Key)}]")
+            .Respond(HttpStatusCode.NotFound, NotFound)
+            .Respond(HttpStatusCode.OK, Answer(Key));
+
+        var exitCode = await CreateCommand(Key, configure: command =>
+        {
+            command.Recreate = true;
+            command.IsReplaceRequested = true;
+        }).OnExecuteAsync();
+
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _http.Requests[2].Headers!.ShouldNotContainKey("If-Match");
-        _http.Requests[2].Headers!.ShouldNotContainKey("If-None-Match");
+        _http.Requests.Select(request => request.Method).ShouldBe([HttpMethod.Post, HttpMethod.Get, HttpMethod.Post]);
+        _http.Requests[2].Headers!["If-None-Match"].ShouldBe("*");
+    }
+
+    // Without a tag the write could not be of the version read, so nothing is written.
+    [Fact]
+    public async Task Replace_OfAReadWithoutATag_WritesNothing()
+    {
+        _http.Respond(HttpStatusCode.OK, "[]")
+            .Respond(HttpStatusCode.OK, StoredExecution);
+
+        var exitCode = await CreateCommand(Key, configure: command => command.IsReplaceRequested = true).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_SERVICE_FAILURE);
+        _http.Requests.Count.ShouldBe(2);
+        _fixture.Console.Lines.ShouldContain(line => line.Contains("without an ETag", StringComparison.Ordinal));
     }
 
     [Fact]
