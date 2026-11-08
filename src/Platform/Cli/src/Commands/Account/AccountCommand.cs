@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
+using _42.Platform.Cli.Commands.Account.Settings;
 using _42.Platform.Cli.Commands.AccessPoints;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Commands.SharedCertificates;
@@ -26,6 +27,7 @@ namespace _42.Platform.Cli.Commands.Account;
     typeof(MachineListCommand),
     typeof(SharedCertListCommand),
     typeof(CaDownloadCommand),
+    typeof(AccountSettingsCommand),
     typeof(AccountLogoutCommand))]
 
 [Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage your account and access to 2S platform services.")]
