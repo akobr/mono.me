@@ -224,6 +224,76 @@ public class AccountSettingsCommandsTests
         _console.Lines.ShouldBeEmpty();
     }
 
+    // Null for what the commands do not use: no editor, and the default project of a machine sign-in.
+    [Fact]
+    public async Task Json_HasNullForAValueThatIsNotUsed()
+    {
+        _environment[StorytellerVariables.API_KEY] = "sk-test";
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"editor":{"editorType":"Vim","customCommand":"subl -w"},"access":{"projectName":"payments"}}"""));
+
+        (await List(json: true)).ShouldBe(ExitCodes.SUCCESS);
+
+        JObject.Parse(_out.ToString()).ShouldBeJson("""
+            {
+              "editor.type": "vim",
+              "editor.command": null,
+              "access.project": null,
+              "access.view": null
+            }
+            """);
+    }
+
+    [Fact]
+    public async Task Json_WithoutAnEditor_HasNullForIt()
+    {
+        (await List(json: true)).ShouldBe(ExitCodes.SUCCESS);
+
+        JObject.Parse(_out.ToString()).ShouldBeJson("""{"editor.type":null,"editor.command":null,"access.project":"house.main","access.view":"default"}""");
+    }
+
+    // set editor.type custom without a command: the next edit asks, so the list does not show custom as the editor.
+    [Fact]
+    public async Task TheList_OfACustomTypeWithoutACommand_ShowsThatTheEditAsks()
+    {
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"editor":{"editorType":"Custom"}}"""));
+
+        await List();
+
+        _console.Tables.ShouldHaveSingleItem().Rows[0].ShouldBe(["editor.type", "(ask on first use)", "default (custom needs editor.command)"]);
+    }
+
+    [Fact]
+    public async Task TheList_OfACommandWithoutAType_ShowsThatItIsNotUsed()
+    {
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"editor":{"customCommand":"subl -w"}}"""));
+
+        await List();
+
+        _console.Tables.ShouldHaveSingleItem().Rows[1].ShouldBe(["editor.command", "subl -w", "settings (used by a custom editor only)"]);
+    }
+
+    [Fact]
+    public async Task TheList_OfAnOrganizationWithoutAProject_ShowsItsMainProject()
+    {
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"access":{"organizationName":"contoso"}}"""));
+
+        await List();
+
+        _console.Tables.ShouldHaveSingleItem().Rows[2].ShouldBe(["access.project", "contoso.main", "settings"]);
+    }
+
+    // The commands without -p refuse such a STORYTELLER_PROJECT, so the stored project is not in use either.
+    [Fact]
+    public async Task TheList_OfAnInvalidProjectVariable_SaysSo()
+    {
+        _environment[TargetVariables.PROJECT] = "payments";
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"access":{"organizationName":"contoso","projectName":"payments"}}"""));
+
+        await List();
+
+        _console.Tables.ShouldHaveSingleItem().Rows[2].ShouldBe(["access.project", "payments", "STORYTELLER_PROJECT (invalid, not <organization>.<project>)"]);
+    }
+
     [Fact]
     public async Task TheList_OfADamagedFile_IsWrongInput()
     {
@@ -263,6 +333,7 @@ public class AccountSettingsCommandsTests
     [Theory]
     [InlineData("custom", null, "! A custom editor needs its command line: sform account settings editor custom --command \"code --wait\".")]
     [InlineData("custom", " ", "! A custom editor needs its command line: sform account settings editor custom --command \"code --wait\".")]
+    [InlineData("custom", "\"\"", "! A custom editor needs its command line: sform account settings editor custom --command \"code --wait\".")]
     [InlineData("vim", "vim -n", "! --command is for a custom editor only; vim needs none.")]
     [InlineData("notepad", null, "! 'notepad' is no editor sform knows; use vscode, neovim, vim, custom.")]
     public async Task Editor_RefusesAWrongChoice(string type, string? command, string line)
@@ -414,6 +485,7 @@ public class AccountSettingsCommandsTests
     [InlineData("access.project", ".payments", "! '.payments' is no value of access.project; it takes <organization>.<project>.")]
     [InlineData("access.project", "contoso.", "! 'contoso.' is no value of access.project; it takes <organization>.<project>.")]
     [InlineData("access.view", " ", "! ' ' is no value of access.view; it takes a view name.")]
+    [InlineData("editor.command", "\"\"", "! '\"\"' is no value of editor.command; it takes a command line, e.g. \"code --wait\".")]
     public async Task Set_RefusesAnUnknownKeyOrAnInvalidValue(string? key, string? value, string line)
     {
         var exitCode = await Set(key, value);

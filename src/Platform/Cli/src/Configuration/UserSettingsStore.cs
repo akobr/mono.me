@@ -14,7 +14,6 @@ public sealed class UserSettingsStore : IUserSettingsStore
 {
     // About five seconds for another sform run to finish its change.
     private const int LOCK_ATTEMPTS = 50;
-    private static readonly TimeSpan LockRetryDelay = TimeSpan.FromMilliseconds(100);
 
     private readonly IFileSystem _fileSystem;
     private readonly IReadOnlyDictionary<string, string> _legacyFilePaths;
@@ -33,6 +32,9 @@ public sealed class UserSettingsStore : IUserSettingsStore
 
     public string FilePath { get; }
 
+    // The pause between two attempts to take the lock; shorter in the tests.
+    internal TimeSpan LockRetryDelay { get; init; } = TimeSpan.FromMilliseconds(100);
+
     public JObject Load()
     {
         string content;
@@ -45,6 +47,11 @@ public sealed class UserSettingsStore : IUserSettingsStore
             }
 
             content = _fileSystem.File.ReadAllText(FilePath);
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // A link to dotfiles that are not there yet: no settings, and the first change creates the file it points to.
+            return new JObject();
         }
         catch (Exception exception) when (IsFileFailure(exception))
         {
@@ -160,7 +167,7 @@ public sealed class UserSettingsStore : IUserSettingsStore
     private static JToken Parse(string content)
     {
         using var reader = new JsonTextReader(new StringReader(content)) { DateParseHandling = DateParseHandling.None };
-        var token = JToken.ReadFrom(reader);
+        var token = JToken.ReadFrom(reader, new JsonLoadSettings { CommentHandling = CommentHandling.Ignore });
 
         while (reader.Read())
         {
@@ -263,27 +270,49 @@ public sealed class UserSettingsStore : IUserSettingsStore
             throw new UserSettingsException($"The settings file {FilePath} cannot be written: {exception.Message}", isDamaged: false, exception);
         }
 
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            for (var attempt = 1; ; attempt++)
+            try
             {
-                try
-                {
-                    return _fileSystem.FileStream.New(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
-                }
-                catch (IOException) when (attempt < LOCK_ATTEMPTS)
-                {
-                    Thread.Sleep(LockRetryDelay);
-                }
+                return _fileSystem.FileStream.New(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+            }
+            catch (Exception exception) when (attempt < LOCK_ATTEMPTS && IsHeldByAnother(exception, lockPath))
+            {
+                Thread.Sleep(LockRetryDelay);
+            }
+            catch (Exception exception) when (IsHeldByAnother(exception, lockPath))
+            {
+                throw new UserSettingsException($"The settings file {FilePath} is being changed by another sform run, try it again: {exception.Message}", isDamaged: false, exception);
+            }
+            catch (Exception exception) when (IsFileFailure(exception))
+            {
+                // A read-only or full disk: no retry helps.
+                throw new UserSettingsException($"The settings file {FilePath} cannot be written: {exception.Message}", isDamaged: false, exception);
             }
         }
-        catch (IOException exception)
+    }
+
+    // Another process holds the lock: a sharing or lock violation on Windows, EWOULDBLOCK of the flock on Linux (11) and
+    // macOS (35). On Windows a lock file that its last holder deleted is refused until a scanner lets go of it.
+    private bool IsHeldByAnother(Exception exception, string lockPath)
+    {
+        return exception switch
         {
-            throw new UserSettingsException($"The settings file {FilePath} is being changed by another sform run, try it again: {exception.Message}", isDamaged: false, exception);
+            IOException io => (io.HResult & 0xFFFF) is 32 or 33 or 11 or 35,
+            UnauthorizedAccessException => LockFileExists(lockPath),
+            _ => false,
+        };
+    }
+
+    private bool LockFileExists(string lockPath)
+    {
+        try
+        {
+            return _fileSystem.File.Exists(lockPath);
         }
         catch (Exception exception) when (IsFileFailure(exception))
         {
-            throw new UserSettingsException($"The settings file {FilePath} cannot be written: {exception.Message}", isDamaged: false, exception);
+            return false;
         }
     }
 

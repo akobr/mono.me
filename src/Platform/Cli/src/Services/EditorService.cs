@@ -152,6 +152,12 @@ public class EditorService : IEditorService
         var isTerminalEditor = options.EditorType == Configuration.EditorType.Neovim ||
                                options.EditorType == Configuration.EditorType.Vim;
 
+        // A command of quotes alone (""): reported like an editor that is not installed, not as a crash of Process.Start.
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            throw new Win32Exception(2, "The command line names no executable.");
+        }
+
         // Windows starts only an .exe by its bare name: code of a custom command or of $EDITOR is code.cmd on the PATH.
         if (options.EditorType == Configuration.EditorType.Custom && OperatingSystem.IsWindows())
         {
@@ -445,30 +451,13 @@ public class EditorService : IEditorService
     }
 
     /// <summary>
-    /// Splits a custom command into its executable and its arguments: at the first white space, or after the closing quote
-    /// of an executable in quotes, e.g. <c>"C:\Program Files\Notepad++\notepad++.exe" -multiInst</c>.
+    /// Splits a custom command into its executable and its arguments (see <see cref="CustomEditorCommand.Split"/>).
     /// </summary>
     /// <param name="customCommand">The custom command.</param>
     /// <returns>The executable without quotes and the trimmed arguments, empty when there are none.</returns>
     internal static (string Executable, string Arguments) SplitCustomCommand(string customCommand)
     {
-        var trimmed = customCommand.Trim();
-
-        if (trimmed.Length > 0 && trimmed[0] is '"' or '\'')
-        {
-            var closing = trimmed.IndexOf(trimmed[0], 1);
-
-            if (closing > 0)
-            {
-                return (trimmed[1..closing], trimmed[(closing + 1)..].Trim());
-            }
-        }
-
-        var separator = trimmed.IndexOfAny([' ', '\t']);
-
-        return separator < 0
-            ? (trimmed, string.Empty)
-            : (trimmed[..separator], trimmed[(separator + 1)..].Trim());
+        return CustomEditorCommand.Split(customCommand);
     }
 
     /// <summary>

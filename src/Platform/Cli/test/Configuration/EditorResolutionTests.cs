@@ -22,6 +22,7 @@ public class EditorResolutionTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
+    [InlineData("\"\"")]
     public void ABlankVisual_FallsBackToEditor(string? visual)
     {
         var environment = Environment(new() { ["VISUAL"] = visual, ["EDITOR"] = "nano -w" });

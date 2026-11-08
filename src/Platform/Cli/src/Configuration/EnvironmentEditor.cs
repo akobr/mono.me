@@ -31,9 +31,9 @@ public sealed class EnvironmentEditor
         {
             var value = getVariable(name);
 
-            if (!string.IsNullOrWhiteSpace(value))
+            if (CustomEditorCommand.IsValid(value))
             {
-                return new EnvironmentEditor(name, value.Trim());
+                return new EnvironmentEditor(name, value!.Trim());
             }
         }
 

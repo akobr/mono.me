@@ -53,7 +53,7 @@ public static class UserSettingDefinitions
             Description = "The command line of a custom editor; sform appends the file path. It should wait for the editor to close, e.g. code --wait.",
             ValueFormat = "a command line, e.g. \"code --wait\"",
             DefaultDisplay = "(not set)",
-            Parse = value => string.IsNullOrWhiteSpace(value) ? null : Changes(UserSettingsSchema.CUSTOM_COMMAND, value.Trim()),
+            Parse = value => CustomEditorCommand.IsValid(value) ? Changes(UserSettingsSchema.CUSTOM_COMMAND, value.Trim()) : null,
             Read = section => UserSettingsSchema.ParseText(UserSettingsSchema.GetValue(section, UserSettingsSchema.CUSTOM_COMMAND)),
         },
         new()
@@ -118,16 +118,13 @@ public static class UserSettingDefinitions
 
     private static string? ReadProjectKey(JObject section)
     {
+        var organization = UserSettingsSchema.ParseText(UserSettingsSchema.GetValue(section, UserSettingsSchema.ORGANIZATION_NAME));
         var project = UserSettingsSchema.ParseText(UserSettingsSchema.GetValue(section, UserSettingsSchema.PROJECT_NAME));
 
-        if (project is null)
-        {
-            return null;
-        }
-
-        // Without an organization the commands use the default one, as CommandContext does.
-        var organization = UserSettingsSchema.ParseText(UserSettingsSchema.GetValue(section, UserSettingsSchema.ORGANIZATION_NAME));
-        return $"{organization ?? Platform.Storyteller.Constants.DefaultTenantName}.{project}";
+        // A missing half is the default one, as CommandContext fills it in.
+        return organization is null && project is null
+            ? null
+            : $"{organization ?? Platform.Storyteller.Constants.DefaultTenantName}.{project ?? Platform.Storyteller.Constants.DefaultProjectName}";
     }
 
     private static Dictionary<string, JToken?> Changes(string property, string value)

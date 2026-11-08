@@ -79,6 +79,26 @@ public class UserSettingsStoreTests
         exception.Message.ShouldContain(reason);
     }
 
+    // Comments are no damage, before the object too; a write does not keep them.
+    [Fact]
+    public void Comments_AreRead()
+    {
+        _fileSystem.AddFile(SettingsPath, new MockFileData("// my sform settings\n{ /* the editor */ \"editor\": { \"editorType\": \"Vim\" } } // end"));
+
+        CreateStore().Read()[ConfigurationSections.EDITOR].Values.ShouldBeJson("""{"editorType":"Vim"}""");
+    }
+
+    // A link to dotfiles that are not checked out yet: no settings, not a failure of every run.
+    [Fact]
+    public void ALinkToAMissingFile_LoadsAsEmpty()
+    {
+        var file = ForwardingFile();
+        file.Setup(f => f.Exists(SettingsPath)).Returns(true);
+        file.Setup(f => f.ReadAllText(SettingsPath)).Throws(new FileNotFoundException("Could not find file."));
+
+        new UserSettingsStore(FileSystemWith(file), SettingsPath, LegacyPaths()).Load().HasValues.ShouldBeFalse();
+    }
+
     [Fact]
     public void ADamagedFile_IsNeverOverwritten()
     {
@@ -217,6 +237,19 @@ public class UserSettingsStoreTests
         _fileSystem.File.Exists(LegacyEditorPath).ShouldBeTrue();
     }
 
+    // A legacy file written by hand with more than its section stays; the settings file shadows its section.
+    [Fact]
+    public void ALegacyFileWithMoreThanItsSection_IsMovedButKept()
+    {
+        const string legacy = """{"access":{"OrganizationName":"contoso","ProjectName":"payments"},"general":{"baseUrl":"https://my-api"}}""";
+        _fileSystem.AddFile(LegacyAccessPath, new MockFileData(legacy));
+
+        CreateStore().Update(ConfigurationSections.EDITOR, Changes(UserSettingsSchema.EDITOR_TYPE, "Vim"));
+
+        Stored().ShouldBeJson("""{"access":{"organizationName":"contoso","projectName":"payments"},"editor":{"editorType":"Vim"}}""");
+        _fileSystem.File.ReadAllText(LegacyAccessPath).ShouldBe(legacy);
+    }
+
     [Fact]
     public void ADamagedLegacyFile_IsNeitherMovedNorDeleted()
     {
@@ -300,8 +333,74 @@ public class UserSettingsStoreTests
         fileSystem.Setup(system => system.File.Exists(SettingsPath)).Returns(true);
         fileSystem.Setup(system => system.File.ReadAllText(SettingsPath)).Throws(new IOException("The file is locked."));
 
-        Should.Throw<UserSettingsException>(() => new UserSettingsStore(fileSystem.Object, SettingsPath, LegacyPaths()).Load())
-            .Message.ShouldBe($"The settings file {SettingsPath} cannot be read: The file is locked.");
+        var exception = Should.Throw<UserSettingsException>(() => new UserSettingsStore(fileSystem.Object, SettingsPath, LegacyPaths()).Load());
+
+        exception.Message.ShouldBe($"The settings file {SettingsPath} cannot be read: The file is locked.");
+        exception.IsDamaged.ShouldBeFalse();
+        exception.ExitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+    }
+
+    // The write itself: a full disk, a read-only settings file. Nothing half written stays.
+    [Fact]
+    public void AFailedWrite_BecomesAUserSettingsException_AndLeavesNoTemporaryFile()
+    {
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"editor":{"editorType":"Vim"}}"""));
+        var file = ForwardingFile();
+        file.Setup(f => f.Move(It.IsAny<string>(), SettingsPath, true)).Throws(new IOException("There is not enough space on the disk."));
+
+        var exception = Should.Throw<UserSettingsException>(() => new UserSettingsStore(FileSystemWith(file), SettingsPath, LegacyPaths())
+            .Update(ConfigurationSections.EDITOR, Changes(UserSettingsSchema.EDITOR_TYPE, "Neovim")));
+
+        exception.Message.ShouldBe($"The settings file {SettingsPath} cannot be written: There is not enough space on the disk.");
+        exception.ExitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        Stored().ShouldBeJson("""{"editor":{"editorType":"Vim"}}""");
+        _fileSystem.Directory.GetFiles(SettingsDirectory).ShouldBe([SettingsPath]);
+    }
+
+    // Another sform run holds the lock for a moment: the change waits for it.
+    [Fact]
+    public void AHeldLock_IsWaitedFor()
+    {
+        var streams = new Mock<IFileStreamFactory>();
+        streams.SetupSequence(factory => factory.New(It.IsAny<string>(), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose))
+            .Throws(SharingViolation())
+            .Throws(SharingViolation())
+            .Returns(() => _fileSystem.FileStream.New(SettingsPath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose));
+
+        new UserSettingsStore(FileSystemWith(ForwardingFile(), streams.Object), SettingsPath, LegacyPaths()) { LockRetryDelay = TimeSpan.FromMilliseconds(1) }
+            .Update(ConfigurationSections.EDITOR, Changes(UserSettingsSchema.EDITOR_TYPE, "Vim"));
+
+        Stored().ShouldBeJson("""{"editor":{"editorType":"Vim"}}""");
+        streams.Verify(factory => factory.New(It.IsAny<string>(), It.IsAny<FileMode>(), It.IsAny<FileAccess>(), It.IsAny<FileShare>(), It.IsAny<int>(), It.IsAny<FileOptions>()), Times.Exactly(3));
+    }
+
+    [Fact]
+    public void ALockThatStaysHeld_AsksToTryAgain()
+    {
+        var streams = new Mock<IFileStreamFactory>();
+        streams.Setup(factory => factory.New(It.IsAny<string>(), It.IsAny<FileMode>(), It.IsAny<FileAccess>(), It.IsAny<FileShare>(), It.IsAny<int>(), It.IsAny<FileOptions>()))
+            .Throws(SharingViolation());
+
+        var exception = Should.Throw<UserSettingsException>(() => new UserSettingsStore(FileSystemWith(ForwardingFile(), streams.Object), SettingsPath, LegacyPaths()) { LockRetryDelay = TimeSpan.Zero }
+            .Update(ConfigurationSections.EDITOR, Changes(UserSettingsSchema.EDITOR_TYPE, "Vim")));
+
+        exception.Message.ShouldStartWith($"The settings file {SettingsPath} is being changed by another sform run, try it again: ");
+        streams.Verify(factory => factory.New(It.IsAny<string>(), It.IsAny<FileMode>(), It.IsAny<FileAccess>(), It.IsAny<FileShare>(), It.IsAny<int>(), It.IsAny<FileOptions>()), Times.Exactly(50));
+    }
+
+    // A read-only file system (EROFS, 30) is no other run: it fails at once instead of after five seconds.
+    [Fact]
+    public void ALockThatCannotBeCreated_FailsAtOnce()
+    {
+        var streams = new Mock<IFileStreamFactory>();
+        streams.Setup(factory => factory.New(It.IsAny<string>(), It.IsAny<FileMode>(), It.IsAny<FileAccess>(), It.IsAny<FileShare>(), It.IsAny<int>(), It.IsAny<FileOptions>()))
+            .Throws(new IOException("Read-only file system", 30));
+
+        var exception = Should.Throw<UserSettingsException>(() => new UserSettingsStore(FileSystemWith(ForwardingFile(), streams.Object), SettingsPath, LegacyPaths())
+            .Update(ConfigurationSections.EDITOR, Changes(UserSettingsSchema.EDITOR_TYPE, "Vim")));
+
+        exception.Message.ShouldBe($"The settings file {SettingsPath} cannot be written: Read-only file system");
+        streams.Verify(factory => factory.New(It.IsAny<string>(), It.IsAny<FileMode>(), It.IsAny<FileAccess>(), It.IsAny<FileShare>(), It.IsAny<int>(), It.IsAny<FileOptions>()), Times.Once);
     }
 
     [Fact]
@@ -338,6 +437,34 @@ public class UserSettingsStoreTests
     private JObject Stored()
     {
         return JObject.Parse(_fileSystem.File.ReadAllText(SettingsPath));
+    }
+
+    private static IOException SharingViolation()
+    {
+        return new IOException("The process cannot access the file because it is being used by another process.", unchecked((int)0x80070020));
+    }
+
+    // A File that does what the mock file system does, for a test to replace one of its calls.
+    private Mock<IFile> ForwardingFile()
+    {
+        var file = new Mock<IFile>();
+        file.Setup(f => f.Exists(It.IsAny<string?>())).Returns<string?>(path => _fileSystem.File.Exists(path));
+        file.Setup(f => f.ReadAllText(It.IsAny<string>())).Returns<string>(path => _fileSystem.File.ReadAllText(path));
+        file.Setup(f => f.WriteAllText(It.IsAny<string>(), It.IsAny<string?>())).Callback<string, string?>((path, text) => _fileSystem.File.WriteAllText(path, text));
+        file.Setup(f => f.Move(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>())).Callback<string, string, bool>((from, to, overwrite) => _fileSystem.File.Move(from, to, overwrite));
+        file.Setup(f => f.Delete(It.IsAny<string>())).Callback<string>(path => _fileSystem.File.Delete(path));
+        return file;
+    }
+
+    private IFileSystem FileSystemWith(Mock<IFile> file, IFileStreamFactory? streams = null)
+    {
+        var fileSystem = new Mock<IFileSystem>();
+        fileSystem.Setup(system => system.File).Returns(file.Object);
+        fileSystem.Setup(system => system.Path).Returns(_fileSystem.Path);
+        fileSystem.Setup(system => system.Directory).Returns(_fileSystem.Directory);
+        fileSystem.Setup(system => system.FileStream).Returns(streams ?? _fileSystem.FileStream);
+        fileSystem.Setup(system => system.FileInfo).Returns(_fileSystem.FileInfo);
+        return fileSystem.Object;
     }
 
     // The mock file system with a File whose Delete fails, as in a read-only install folder.

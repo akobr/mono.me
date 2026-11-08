@@ -201,14 +201,27 @@ public class EditorServiceSettingsTests
         EditorService.FindExecutable(_fileSystem, path, null, null, isWindows: true).ShouldBe(path);
     }
 
+    // Unix folders have no drive letter, so the test runs on Windows too.
     [Fact]
     public void OnUnix_TheFoldersOfThePath_AreSplitAtColons()
     {
-        Assert.SkipWhen(System.OperatingSystem.IsWindows(), "Unix paths have no drive letter to split the PATH at.");
-        _fileSystem.AddFile("/usr/bin/nano", new MockFileData(string.Empty));
+        var nano = _fileSystem.Path.Combine("/usr/bin", "nano");
+        _fileSystem.AddFile(nano, new MockFileData(string.Empty));
 
-        EditorService.FindExecutable(_fileSystem, "nano", "/usr/local/bin:/usr/bin", null, isWindows: false).ShouldBe("/usr/bin/nano");
+        EditorService.FindExecutable(_fileSystem, "nano", "/usr/local/bin:/usr/bin", null, isWindows: false).ShouldBe(nano);
+        EditorService.FindExecutable(_fileSystem, "nano", "/usr/local/bin;/usr/bin", null, isWindows: false).ShouldBeNull();
         EditorService.FindExecutable(_fileSystem, "nano.exe", "/usr/local/bin:/usr/bin", null, isWindows: false).ShouldBeNull();
+    }
+
+    // "" as the command: reported like an editor that is not installed, not as a crash of Process.Start.
+    [Theory]
+    [InlineData("\"\"")]
+    [InlineData("'' -w")]
+    public async Task ACommandWithoutAnExecutable_CannotStart(string command)
+    {
+        var service = new EditorService(_fileSystem, new UserSettingsStore(_fileSystem, SettingsPath, UserSettingsStoreTests.LegacyPaths()), EnvironmentEditor.None);
+
+        await Should.ThrowAsync<Win32Exception>(() => service.OpenFileInEditorAsync("F", new EditorOptions { EditorType = EditorType.Custom, CustomCommand = command }));
     }
 
     [Theory]
