@@ -493,8 +493,9 @@ public static class Definitions
         public const string Existing = "existing";
         public const string Name = "name";
 
-        // A request header; HeaderNames.IfNoneMatch is not a constant, so attributes cannot use it.
+        // Request headers; HeaderNames.IfNoneMatch and IfMatch are not constants, so attributes cannot use them.
         public const string IfNoneMatch = "If-None-Match";
+        public const string IfMatch = "If-Match";
     }
 
     public static class Tags
@@ -554,6 +555,7 @@ public static class Definitions
         public const string ResponseConfigurationNotFound = "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).";
         public const string ResponseConcurrentChange = "The annotations changed concurrently three times in a row (Conflict); try again.";
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
+        public const string ResponseAnnotationPreconditionFailed = "A condition of the write does not hold (ErrorCode AnnotationPreconditionFailed): If-Match names another version, or the annotation does not exist or is deleted; If-None-Match: * and the annotation exists. Read it again and retry.";
         public const string ResponseInternalServerError = "Unexpected error occurred on the service.";
 
         // The security schemes. Whether a machine's kind is accepted also depends on the project's machine authentication
@@ -579,6 +581,9 @@ public static class Definitions
         public const string IfNoneMatch = "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.";
         public const string CacheControlConfigurationRead = "private, no-cache: shared caches do not store the response, and a client revalidates its copy before each use.";
         public const string CacheControlResolvedRead = "no-store when the caller may read secrets, otherwise private, no-cache.";
+        public const string AnnotationEntityTag = "Strong entity tag of the annotation's version, for If-Match (a write of only that version) and If-None-Match. It changes with every change of the annotation, also when a child is created or deleted under it.";
+        public const string IfMatchAnnotation = "One or more entity tags of reads of the annotation, or *. The write happens only when the annotation exists (is not deleted) and is at one of these versions, or exists for *; otherwise 412. The comparison is strong. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).";
+        public const string IfNoneMatchAnnotation = "*, so the write only creates: a missing or deleted key; 412 when the annotation exists. A list of entity tags refuses those versions. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition).";
         public const string SecretsWithheld = "mtls-required when the project delivers secrets to machines only over mTLS and a machine that may read secrets called without its client certificate; the secrets then stay unbound, as their @ expressions. Absent otherwise.";
 
         // ?format= of the effective and resolved reads (configuration-formats.md, API).

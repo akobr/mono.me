@@ -12,6 +12,7 @@ using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1;
+using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Transferring;
 
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +24,7 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
-public class AnnotationsHttpTests
+public partial class AnnotationsHttpTests
 {
     private const string UsageBody = """
         {"AnnotationKey":"usg.northwind.invoicing","Name":"invoicing","AnnotationType":"Usage","ProjectName":"x","ViewName":"y",
@@ -1302,6 +1303,25 @@ public class AnnotationsHttpTests
 
         // What GetAnnotationsAsync lists.
         public IReadOnlyList<Annotation> Listed { get; init; } = [];
+
+        // The marker GetAnnotationWithMarkerAsync tells with Stored, and the one a conditional write answers.
+        public string? StoredMarker { get; init; }
+
+        public string? WrittenMarker { get; init; }
+
+        // The condition of the last conditional write.
+        public AnnotationWriteCondition? LastCondition { get; private set; }
+
+        public Task<MarkedRead<Annotation>> GetAnnotationWithMarkerAsync(FullKey fullKey)
+        {
+            return Task.FromResult(new MarkedRead<Annotation>(Stored, Stored is null ? null : StoredMarker));
+        }
+
+        public async Task<AnnotationWriteResult> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor, AnnotationWriteCondition condition)
+        {
+            LastCondition = condition;
+            return new AnnotationWriteResult(await SetAnnotationAsync(organization, annotation, actor), WrittenMarker);
+        }
 
         public Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor)
         {

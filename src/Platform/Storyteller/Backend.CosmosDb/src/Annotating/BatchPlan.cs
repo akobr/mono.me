@@ -37,10 +37,20 @@ internal sealed class BatchPlan : IDisposable
     // payloadBytes: the estimated size of the documents the operations send
     public void Add(int wave, string partitionKey, long payloadBytes, params Action<TransactionalBatch>[] operations)
     {
-        _units.Add(new Unit(wave, partitionKey, operations.ToList(), payloadBytes));
+        Add(wave, partitionKey, payloadBytes, operations.Select(operation => new BatchOperation(operation)));
     }
 
     public void Add(int wave, string partitionKey, long payloadBytes, IEnumerable<Action<TransactionalBatch>> operations)
+    {
+        Add(wave, partitionKey, payloadBytes, operations.Select(operation => new BatchOperation(operation)));
+    }
+
+    public void Add(int wave, string partitionKey, long payloadBytes, params BatchOperation[] operations)
+    {
+        Add(wave, partitionKey, payloadBytes, (IEnumerable<BatchOperation>)operations);
+    }
+
+    public void Add(int wave, string partitionKey, long payloadBytes, IEnumerable<BatchOperation> operations)
     {
         _units.Add(new Unit(wave, partitionKey, operations.ToList(), payloadBytes));
     }
@@ -58,11 +68,11 @@ internal sealed class BatchPlan : IDisposable
 
         foreach (var wave in _units.Where(unit => unit.Operations.Count > 0).GroupBy(unit => unit.Wave).OrderBy(group => group.Key))
         {
-            var batches = new List<(string PartitionKey, List<Action<TransactionalBatch>> Operations)>();
+            var batches = new List<(string PartitionKey, List<BatchOperation> Operations)>();
 
             foreach (var partition in wave.GroupBy(unit => unit.PartitionKey, StringComparer.Ordinal))
             {
-                var current = new List<Action<TransactionalBatch>>();
+                var current = new List<BatchOperation>();
                 var currentBytes = 0L;
 
                 // a unit is never split: a unit above a limit gets a batch of its own
@@ -101,7 +111,7 @@ internal sealed class BatchPlan : IDisposable
         _resources.Clear();
     }
 
-    private async Task ExecuteBatchAsync(string partitionKey, List<Action<TransactionalBatch>> operations, SemaphoreSlim throttler)
+    private async Task ExecuteBatchAsync(string partitionKey, List<BatchOperation> operations, SemaphoreSlim throttler)
     {
         await throttler.WaitAsync();
 
@@ -111,13 +121,19 @@ internal sealed class BatchPlan : IDisposable
 
             foreach (var operation in operations)
             {
-                operation(batch);
+                operation.Apply(batch);
             }
 
             using var response = await batch.ExecuteAsync();
 
             if (response.IsSuccessStatusCode)
             {
+                // the results come in the order of the operations
+                for (var index = 0; index < operations.Count && index < response.Count; index++)
+                {
+                    operations[index].Committed?.Invoke(response[index]);
+                }
+
                 return;
             }
 
@@ -140,5 +156,5 @@ internal sealed class BatchPlan : IDisposable
         }
     }
 
-    private sealed record Unit(int Wave, string PartitionKey, List<Action<TransactionalBatch>> Operations, long PayloadBytes);
+    private sealed record Unit(int Wave, string PartitionKey, List<BatchOperation> Operations, long PayloadBytes);
 }

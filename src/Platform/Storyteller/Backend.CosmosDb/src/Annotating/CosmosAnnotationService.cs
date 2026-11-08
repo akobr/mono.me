@@ -147,7 +147,12 @@ public partial class CosmosAnnotationService : IAnnotationService
         return annotations;
     }
 
-    public Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor)
+    public async Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor)
+    {
+        return (await SetAnnotationAsync(organization, annotation, actor, AnnotationWriteCondition.None)).Annotation;
+    }
+
+    public Task<AnnotationWriteResult> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor, AnnotationWriteCondition condition)
     {
         AnnotationRules.Validate(annotation);
         var fullKey = annotation.GetFullKey(organization);
@@ -156,15 +161,21 @@ public partial class CosmosAnnotationService : IAnnotationService
         {
             var store = Store(organization);
             var node = await store.LoadAsync(fullKey, withConfiguration: false, withAudit: false);
+            var exists = node.State == AnnotationItemState.Active;
 
-            if (node.State == AnnotationItemState.Active)
+            // The original condition, on every attempt, against the item this attempt replaces under its ETag: a write
+            // in between fails the batch, and the next attempt fails the condition instead of overwriting the write.
+            condition.Check(fullKey.Annotation, exists, node.ETag);
+
+            if (exists)
             {
                 await store.LoadDetailsAsync(node, withConfiguration: false, withAudit: true);
                 return await UpdateCoreAsync(store, node, annotation, actor);
             }
 
-            var created = await CreateCoreAsync(store, fullKey, annotation, actor);
-            return created[^1];
+            // the create replaces (or creates) the very item the condition was checked against
+            var created = await CreateCoreAsync(store, fullKey, annotation, actor, node);
+            return new AnnotationWriteResult(created.Annotations[^1], created.TargetMarker);
         });
     }
 
@@ -172,7 +183,7 @@ public partial class CosmosAnnotationService : IAnnotationService
     {
         AnnotationRules.Validate(annotation);
         var fullKey = annotation.GetFullKey(organization);
-        return await RetryAsync(() => CreateCoreAsync(Store(organization), fullKey, annotation, actor));
+        return (await RetryAsync(() => CreateCoreAsync(Store(organization), fullKey, annotation, actor))).Annotations;
     }
 
     public async Task UpdateAnnotationAsync(string organization, Annotation annotation, AuditActor actor)
@@ -210,7 +221,7 @@ public partial class CosmosAnnotationService : IAnnotationService
 
             try
             {
-                created = await RetryAsync(() => CreateCoreAsync(Store(organization), fullKey, annotation, actor));
+                created = (await RetryAsync(() => CreateCoreAsync(Store(organization), fullKey, annotation, actor))).Annotations;
             }
             catch (ConflictException)
             {
@@ -344,8 +355,10 @@ public partial class CosmosAnnotationService : IAnnotationService
     }
 
     // Creates the annotation and its ancestors that are not active. A missing key is created; a deleted one is
-    // re-created: its item is replaced, its configuration goes to the versions, and its audit continues.
-    private async Task<IReadOnlyList<Annotation>> CreateCoreAsync(AnnotationItemStore store, FullKey fullKey, Annotation input, AuditActor actor)
+    // re-created: its item is replaced, its configuration goes to the versions, and its audit continues. loadedTarget:
+    // the item of the key as the caller read it, so the write creates or replaces exactly that version (a change in
+    // between fails the batch). Returns the written annotations, the key last, and the marker of the key's item.
+    private async Task<CreateResult> CreateCoreAsync(AnnotationItemStore store, FullKey fullKey, Annotation input, AuditActor actor, AnnotationNode? loadedTarget = null)
     {
         var key = fullKey.Annotation;
         var target = AnnotationFactory.Normalize(input, key);
@@ -354,7 +367,9 @@ public partial class CosmosAnnotationService : IAnnotationService
         var keys = key.GetAllAncestorKeys().Append(key).ToList();
 
         // the annotation items decide what is written; an active ancestor needs nothing more than its item
-        var loaded = await Task.WhenAll(keys.Select(k => store.LoadAsync(FullKey.Create(k, fullKey), withConfiguration: false, withAudit: false)));
+        var loaded = await Task.WhenAll(keys.Select(k => loadedTarget is not null && IsSameKey(k, key)
+            ? Task.FromResult(loadedTarget)
+            : store.LoadAsync(FullKey.Create(k, fullKey), withConfiguration: false, withAudit: false)));
         var nodes = loaded.ToDictionary(node => node.KeyText, StringComparer.Ordinal);
 
         if (nodes[key.ToString()].State == AnnotationItemState.Active)
@@ -405,21 +420,25 @@ public partial class CosmosAnnotationService : IAnnotationService
         }
 
         using var plan = new BatchPlan(store.Container);
+        string? targetMarker = null;
 
         foreach (var write in writes)
         {
             var node = write.Node;
-            var operations = new List<Action<TransactionalBatch>>();
+            var operations = new List<BatchOperation>();
             var stream = plan.Keep(_serializer.WriteAnnotation(write.Entity));
             var payloadBytes = stream.Length;
+            var keepMarker = IsSameKey(node.Key.Annotation, key) ? KeepETag(etag => targetMarker = etag) : null;
 
             if (node.State == AnnotationItemState.Missing)
             {
-                operations.Add(batch => batch.CreateItemStream(stream));
+                operations.Add(new BatchOperation(batch => batch.CreateItemStream(stream), keepMarker));
             }
             else
             {
-                operations.Add(batch => batch.ReplaceItemStream(node.AnnotationId, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = node.ETag }));
+                operations.Add(new BatchOperation(
+                    batch => batch.ReplaceItemStream(node.AnnotationId, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = node.ETag }),
+                    keepMarker));
 
                 // a re-created annotation starts without configuration; the old content stays in the versions
                 if (node.Configuration is { } configuration)
@@ -427,27 +446,33 @@ public partial class CosmosAnnotationService : IAnnotationService
                     if (configuration.Content.HasValues)
                     {
                         var snapshot = ToHistorySnapshot(configuration);
-                        operations.Add(batch => batch.UpsertItem(snapshot));
+                        operations.Add(new BatchOperation(batch => batch.UpsertItem(snapshot)));
                         payloadBytes += EstimateBytes(snapshot);
                     }
 
-                    operations.Add(batch => batch.DeleteItem(node.ConfigurationId));
+                    operations.Add(new BatchOperation(batch => batch.DeleteItem(node.ConfigurationId)));
                 }
             }
 
             var audit = plan.Keep(_audit.Prepare(node, [write.Entry], timeToLiveSeconds: null, out _));
-            operations.Add(AnnotationAuditStore.Write(node, audit));
+            operations.Add(new BatchOperation(AnnotationAuditStore.Write(node, audit)));
             plan.Add(node.Key.Annotation.GetDepth(), node.PartitionKey, payloadBytes + audit.Length, operations);
         }
 
         AddRelationUpdates(plan, relations, updates);
         await plan.ExecuteAsync();
 
-        return writes.Select(write => write.Entity.ToModel()).ToList();
+        return new CreateResult(writes.Select(write => write.Entity.ToModel()).ToList(), targetMarker);
     }
 
-    // The node holds the annotation and its audit, read with their ETags.
-    private async Task<Annotation> UpdateCoreAsync(AnnotationItemStore store, AnnotationNode node, Annotation input, AuditActor actor)
+    private static Action<TransactionalBatchOperationResult> KeepETag(Action<string?> keep)
+    {
+        return result => keep(result.ETag);
+    }
+
+    // The node holds the annotation and its audit, read with their ETags. Returns the stored annotation with the marker
+    // of its item: the read one for a write that changes nothing, else the one the replacement committed.
+    private async Task<AnnotationWriteResult> UpdateCoreAsync(AnnotationItemStore store, AnnotationNode node, Annotation input, AuditActor actor)
     {
         var fullKey = node.Key;
 
@@ -462,7 +487,7 @@ public partial class CosmosAnnotationService : IAnnotationService
 
         if (changes.IsEmpty)
         {
-            return before;
+            return new AnnotationWriteResult(before, node.ETag);
         }
 
         var now = _timeProvider.GetUtcNow();
@@ -482,15 +507,18 @@ public partial class CosmosAnnotationService : IAnnotationService
         using var plan = new BatchPlan(store.Container);
         var stream = plan.Keep(_serializer.WriteAnnotation(entity));
         var audit = plan.Keep(_audit.Prepare(node, [entry], timeToLiveSeconds: null, out _));
+        string? marker = null;
         plan.Add(
             0,
             node.PartitionKey,
             stream.Length + audit.Length,
-            batch => batch.ReplaceItemStream(node.AnnotationId, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = node.ETag }),
-            AnnotationAuditStore.Write(node, audit));
+            BatchOperation.KeepingETag(
+                batch => batch.ReplaceItemStream(node.AnnotationId, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = node.ETag }),
+                etag => marker = etag),
+            new BatchOperation(AnnotationAuditStore.Write(node, audit)));
         await plan.ExecuteAsync();
 
-        return entity.ToModel();
+        return new AnnotationWriteResult(entity.ToModel(), marker);
     }
 
     // Every written annotation joins the arrays of its parents. A parent written in the same operation gets the name
@@ -768,4 +796,7 @@ public partial class CosmosAnnotationService : IAnnotationService
 
     // An annotation the operation writes, with its new entity and audit entry.
     private sealed record PendingWrite(AnnotationNode Node, AnnotationEntity Entity, AnnotationAuditEntry Entry, PendingKind Kind);
+
+    // The annotations a create wrote, the key last, and the marker of the key's item after the write.
+    private sealed record CreateResult(IReadOnlyList<Annotation> Annotations, string? TargetMarker);
 }
