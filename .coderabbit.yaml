@@ -1,7 +1,42 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: "en-US"
+early_access: true
 
 reviews:
+  suggested_labels: true
+  auto_apply_labels: true
+  labeling_instructions:
+    - label: api
+      instructions: When it contains changes about API. It changed payload or interface of an endpoint. New API endpoint is added.
+    - label: bug
+      instructions: The PR is fixing bug. Determined based on the original issue in Linear.
+    - label: feature
+      instructions: The PR is a new feature. Determined based on the original issue in Linear.
+    - label: backend
+      instructions: It contains changes about back-end, server code.
+    - label: frontend
+      instructions: When it contains changes about front-end code. The main clients, for example web interface,mobile
+        interface, or CLI.
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+  finishing_touches:
+    docstrings:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+    autofix:
+      enabled: false
+    simplify:
+      enabled: true
+    unit_tests:
+      enabled: true
+    fix_ci:
+      enabled: true
   path_filters:
     # Ignore all specification and review documents, wherever "specs" sits under "docs"
     - "!docs/**/specs/**"
+
+issue_enrichment:
+  auto_enrich:
+    enabled: true
