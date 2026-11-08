@@ -1,13 +1,14 @@
 using _42.Platform.Cli.AutomationTests.Access;
 using _42.Platform.Cli.AutomationTests.Running;
 using _42.Platform.Cli.AutomationTests.Running.Processes;
+using _42.Platform.Cli.AutomationTests.Running.Terminal;
 
 namespace _42.Platform.Cli.AutomationTests.SelfTests;
 
 // What the tests read from sform's output, without a process: the escape sequences removed, the JSON of WriteJson behind
 // its gutter, the device code of SFORM_DEVICE_CODE_OUTPUT=json and of the text prompt, the credentials sform prints once,
 // the command lines of a pseudo console and of util-linux script, a machine's id in its API key, ShouldNotMatch and the
-// rows of a versions table (VersionRows).
+// rows of a versions table (VersionRows), and the cursor of a pty that answers a position query (TerminalCursor).
 [Category(CliCategories.SelfTest)]
 public sealed class OutputSelfTests
 {
@@ -175,6 +176,41 @@ public sealed class OutputSelfTests
     // WriteJson renders at 80 columns whatever COLUMNS says: these are the lines Spectre.Console.Json 0.57.2 (the CLI's)
     // renders for this model, captured as WriteJson captures them. A value that does not fit moves to the next line, a
     // token longer than 80 is folded into lines of 80, a string with spaces wraps at a space and loses it.
+    // The position util-linux script's pty has after the output, as an xterm moves its cursor (TerminalCursor).
+    [Test]
+    public async Task TerminalCursor_FollowsTextWrapsAndMoves()
+    {
+        var cursor = new TerminalCursor(columns: 10, rows: 5);
+
+        cursor.Feed("\u001b]0;sform\u0007\u001b[1;31mab\u001b[0mc");
+        await Assert.That((cursor.Row, cursor.Column)).IsEqualTo((1, 4));
+
+        // Ten characters fill the row and wait in the last column; the eleventh wraps.
+        cursor.Feed("\r0123456789");
+        await Assert.That((cursor.Row, cursor.Column)).IsEqualTo((1, 10));
+        cursor.Feed("x");
+        await Assert.That((cursor.Row, cursor.Column)).IsEqualTo((2, 2));
+
+        cursor.Feed("\u001b[4;7H\u001b[2A\u001b[3D\tz\u001b7\r\n\n\n\n\n\u001b[?25l");
+        await Assert.That((cursor.Row, cursor.Column)).IsEqualTo((5, 1));
+        cursor.Feed("\u001b8");
+        await Assert.That((cursor.Row, cursor.Column)).IsEqualTo((2, 10));
+        cursor.Feed("\u001b[99;99f\u001b[G\u001b[2d");
+        await Assert.That((cursor.Row, cursor.Column)).IsEqualTo((2, 1));
+    }
+
+    // Each query (ESC [ 6 n) is answered with the position at it, also when the output splits it; a private one is not.
+    [Test]
+    public async Task TerminalCursor_AnswersEachPositionQuery()
+    {
+        var cursor = new TerminalCursor(columns: 80, rows: 24);
+
+        await Assert.That(cursor.Feed("? Name: \u001b[6nab\u001b[6n")).IsEqualTo("\u001b[1;9R\u001b[1;11R");
+        await Assert.That(cursor.Feed("\r\n\u001b[")).IsEmpty();
+        await Assert.That(cursor.Feed("6n")).IsEqualTo("\u001b[2;1R");
+        await Assert.That(cursor.Feed("\u001b[?6n\u001b[5n\u001b[6m")).IsEmpty();
+    }
+
     [Test]
     public async Task WrappedJson_FoldsAreJoined()
     {

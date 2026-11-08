@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using System.Runtime.Versioning;
+using _42.Platform.Cli.AutomationTests.Running.Terminal;
 
 namespace _42.Platform.Cli.AutomationTests.Running.Processes;
 
@@ -8,17 +9,24 @@ namespace _42.Platform.Cli.AutomationTests.Running.Processes;
 // writes to script's standard input is typed on the pty. -e returns sform's exit code, -f flushes every write, -q drops
 // script's own lines, /dev/null keeps no typescript. The command runs under /bin/sh with every argument single-quoted
 // (CommandLines.PosixShell) after stty sets the pty's size (script's standard input is no terminal to copy it from).
+// script is no terminal emulator, so the answer a terminal gives to the cursor position query (ESC [ 6 n, which .NET's
+// Console writes for every Sharprompt prompt) is typed here, with the position TerminalCursor follows on the output;
+// unanswered, .NET takes the keys of the test as part of the answer. The answers and the test's input are written one
+// at a time, so an answer never lands inside a key's sequence.
 // macOS ships BSD script, whose options differ; it is not supported (TerminalSupport says why).
 [SupportedOSPlatform("linux")]
 internal sealed class ScriptChild : ChildProcess
 {
     public const string ScriptPath = "/usr/bin/script";
 
-    private readonly RedirectedChild inner;
+    private readonly TerminalCursor cursor;
+    private readonly SemaphoreSlim typing = new(1, 1);
+    private readonly TaskCompletionSource<RedirectedChild> started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private RedirectedChild inner = null!;
 
-    private ScriptChild(RedirectedChild inner)
+    private ScriptChild(TerminalCursor cursor)
     {
-        this.inner = inner;
+        this.cursor = cursor;
     }
 
     public override int Id => inner.Id;
@@ -40,16 +48,34 @@ internal sealed class ScriptChild : ChildProcess
             ["LINES"] = request.Rows.ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
 
-        var inner = RedirectedChild.Start(
+        // The output starts before Start returns: an answer waits for the started child.
+        var child = new ScriptChild(new TerminalCursor(request.Columns, request.Rows));
+        child.inner = RedirectedChild.Start(
             request with { FileName = script, Arguments = ["-q", "-e", "-f", "-c", command, "/dev/null"], Environment = environment },
-            (_, text) => sink(SformStream.Terminal, text),
+            (stream, text) =>
+            {
+                sink(SformStream.Terminal, text);
+                if (stream == SformStream.StdOut)
+                {
+                    child.Answer(text);
+                }
+            },
             fileSystem);
-        return new ScriptChild(inner);
+        child.started.SetResult(child.inner);
+        return child;
     }
 
-    public override Task WriteAsync(string text, CancellationToken cancellationToken)
+    public override async Task WriteAsync(string text, CancellationToken cancellationToken)
     {
-        return inner.WriteAsync(text, cancellationToken);
+        await typing.WaitAsync(cancellationToken);
+        try
+        {
+            await inner.WriteAsync(text, cancellationToken);
+        }
+        finally
+        {
+            typing.Release();
+        }
     }
 
     // The keyboard stays until the end: script ends the session at the end of its input.
@@ -65,5 +91,36 @@ internal sealed class ScriptChild : ChildProcess
     public override void Dispose()
     {
         inner.Dispose();
+    }
+
+    // On the reader of script's standard output (one at a time, in the order of the output).
+    private void Answer(string output)
+    {
+        var reports = cursor.Feed(output);
+        if (reports.Length > 0)
+        {
+            _ = TypeAnswerAsync(reports);
+        }
+    }
+
+    private async Task TypeAnswerAsync(string reports)
+    {
+        try
+        {
+            var child = await started.Task;
+            await typing.WaitAsync();
+            try
+            {
+                await child.WriteAsync(reports, CancellationToken.None);
+            }
+            finally
+            {
+                typing.Release();
+            }
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or ObjectDisposedException)
+        {
+            // sform ended, or its input is gone: nobody waits for the answer
+        }
     }
 }
