@@ -157,13 +157,13 @@ public partial class MachineRestrictionHttpTests
     public async Task GetAnnotation_TheRestriction_ReachesTheService()
     {
         var (annotations, recorder) = Recording<IAnnotationService>();
-        recorder.Returns(nameof(IAnnotationService.GetAnnotationAsync), StoredAnnotation(Restriction));
+        recorder.Returns(nameof(IAnnotationService.GetAnnotationWithMarkerAsync), new MarkedRead<Annotation>(StoredAnnotation(Restriction), "\"1\""));
 
         var result = await CreateAnnotationsHttp(annotations).GetAnnotation(MachineRequest(), Org, Project, DefaultView, Restriction);
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<Annotation>().AnnotationKey.ShouldBe(Restriction);
         var call = recorder.Calls.ShouldHaveSingleItem();
-        call.Method.ShouldBe(nameof(IAnnotationService.GetAnnotationAsync));
+        call.Method.ShouldBe(nameof(IAnnotationService.GetAnnotationWithMarkerAsync));
         call.Arg<FullKey>(0).Annotation.ToString().ShouldBe(Restriction);
     }
 
@@ -570,7 +570,8 @@ public partial class MachineRestrictionHttpTests
         }
     }
 
-    // Records every call and answers with the result given for the method, or with null.
+    // Records every call and answers with the result given for the method, or with null; also with null for an
+    // overload of the name whose return type the result does not fit.
     public class RecordingProxy : DispatchProxy
     {
         private readonly Dictionary<string, object?> _results = [];
@@ -599,10 +600,11 @@ public partial class MachineRestrictionHttpTests
 
             if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>))
             {
+                var resultType = returnType.GetGenericArguments()[0];
                 return typeof(Task)
                     .GetMethod(nameof(Task.FromResult))!
-                    .MakeGenericMethod(returnType.GetGenericArguments()[0])
-                    .Invoke(null, [result]);
+                    .MakeGenericMethod(resultType)
+                    .Invoke(null, [resultType.IsInstanceOfType(result) ? result : null]);
             }
 
             return result;

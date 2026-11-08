@@ -32,7 +32,7 @@ public partial class MachineRestrictionHttpTests
     // empty 200. The descendant (a unit of execution) is left out where it has no descendants to ask for.
     private static readonly KeyedHandler[] KeyedHandlers =
     [
-        new(nameof(AnnotationsHttp.GetAnnotation), nameof(IAnnotationService.GetAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.GetAnnotation(http.Request(), Org, Project, DefaultView, key), MachineScope.AnnotationRead),
+        new(nameof(AnnotationsHttp.GetAnnotation), nameof(IAnnotationService.GetAnnotationWithMarkerAsync), FullKeyArg, (http, key) => http.Annotations.GetAnnotation(http.Request(), Org, Project, DefaultView, key), MachineScope.AnnotationRead),
         new(nameof(AnnotationsHttp.GetDescendants), nameof(IAnnotationService.GetAnnotationsAsync), DescendantsOfArg, (http, key) => http.Annotations.GetDescendants(http.Request(), Org, Project, DefaultView, key), MachineScope.AnnotationRead, WithDescendant: false),
         new(nameof(AnnotationsHttp.SetAnnotation), nameof(IAnnotationService.SetAnnotationAsync), AnnotationArg, (http, key) => http.Annotations.SetAnnotation(http.Request("PUT", AnnotationBody(key)), Org, Project, DefaultView, key), MachineScope.AnnotationWrite),
         new(nameof(AnnotationsHttp.DeleteAnnotation), nameof(IAnnotationService.DeleteAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.DeleteAnnotation(http.Request("DELETE"), Org, Project, DefaultView, key), MachineScope.AnnotationWrite, MachineScope.AnnotationManage),
@@ -531,6 +531,9 @@ public partial class MachineRestrictionHttpTests
         var (templates, templateCalls) = Recording<IConfigurationTemplateService>();
         var (bindings, bindingCalls) = Recording<IBindingCatalog>();
         annotationCalls.Returns(nameof(IAnnotationService.GetAnnotationsAsync), new AnnotationsResponse());
+
+        // the conditional SetAnnotationAsync, which the handler calls; the unconditional overload still answers null
+        annotationCalls.Returns(nameof(IAnnotationService.SetAnnotationAsync), new AnnotationWriteResult(AnnotationFactory.CreateDefault(AnnotationKey.Parse("sbt.recorded"), Project, DefaultView), Marker: null));
         configurationCalls.Returns(nameof(IConfigurationService.ClearConfigurationAsync), true);
         configurationCalls.Returns(nameof(IConfigurationService.GetConfigurationVersionsAsync), Array.Empty<ConfigurationVersion>());
 

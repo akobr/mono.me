@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
+using _42.Platform.Storyteller.Api.ConditionalWrites;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
@@ -15,6 +16,7 @@ using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
 
 namespace _42.Platform.Storyteller.Api.V1;
@@ -111,7 +113,7 @@ public partial class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
     [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), Description = "The requested annotation.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), CustomHeaderType = typeof(AnnotationResponseHeaders), Description = "The requested annotation, with the ETag of its version (none for a deleted one read with includeDeleted).")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The requested annotation doesn't exist or is deleted, or it is not active and includeInactive is not set (ErrorCode AnnotationInactive).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
@@ -135,7 +137,11 @@ public partial class AnnotationsHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var annotation = await _annotations.GetAnnotationAsync(fullKey);
+
+        // the marker of the item the body comes from; a deleted annotation is read apart and gets no ETag
+        var read = await _annotations.GetAnnotationWithMarkerAsync(fullKey);
+        var annotation = read?.Value;
+        var marker = annotation is null ? null : read!.Marker;
 
         if (annotation is null && includeDeleted)
         {
@@ -159,6 +165,7 @@ public partial class AnnotationsHttp
             });
         }
 
+        SetEntityTag(request, marker);
         return new OkObjectResult(annotation);
     }
 
@@ -293,16 +300,19 @@ public partial class AnnotationsHttp
     }
 
     [Function(nameof(SetAnnotation))]
-    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotation, Definitions.Tags.Annotations, Description = "Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.")]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotation, Definitions.Tags.Annotations, Description = "Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body replaces the editable content: what it does not hold is cleared (PatchAnnotation changes single members). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored. If-Match writes only the version of an earlier read and never re-creates; If-None-Match: * only creates.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
-    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Annotation), Description = "The annotation to create or update.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), Description = "The stored annotation.")]
+    [OpenApiParameter(Definitions.Parameters.IfMatch, In = ParameterLocation.Header, Required = false, Type = typeof(string), Description = Definitions.Descriptions.IfMatchAnnotation)]
+    [OpenApiParameter(Definitions.Parameters.IfNoneMatch, In = ParameterLocation.Header, Required = false, Type = typeof(string), Description = Definitions.Descriptions.IfNoneMatchAnnotation)]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Annotation), Required = true, Description = "The annotation to create or update.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), CustomHeaderType = typeof(AnnotationResponseHeaders), Description = "The stored annotation, with the ETag of its new version (POST; a PUT answers none, as its body is normalized).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConcurrentChange)]
+    [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseAnnotationPreconditionFailed)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenAnnotationWrite)]
@@ -316,6 +326,11 @@ public partial class AnnotationsHttp
         string key)
     {
         await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor, MachineScope.AnnotationWrite);
+
+        if (!WriteConditions.TryRead(request, out var condition, out var conditionError))
+        {
+            return conditionError!;
+        }
 
         // The body is read once, into the runtime type of its AnnotationType: the type-specific members
         // (SubjectKey, UnitType, ...) are required there, so a body without them is rejected instead of stored. Its
@@ -374,9 +389,17 @@ public partial class AnnotationsHttp
         try
         {
             // POST and PUT both store the annotation: a new key is created with its missing ancestors, an active one
-            // is updated, and a deleted one is re-created. The server-owned members of the body are ignored.
-            var stored = await _annotations.SetAnnotationAsync(organization, annotation, request.GetAuditActor());
-            return new OkObjectResult(stored);
+            // is updated, and a deleted one is re-created. The server-owned members of the body are ignored. The
+            // condition is checked against the annotation the write replaces.
+            var stored = await _annotations.SetAnnotationAsync(organization, annotation, request.GetAuditActor(), condition);
+
+            // RFC 9110 §9.3.4: no validator after a PUT whose body was stored transformed (normalized)
+            if (!string.Equals(request.Method, Definitions.Methods.Put, StringComparison.OrdinalIgnoreCase))
+            {
+                SetEntityTag(request, stored.Marker);
+            }
+
+            return new OkObjectResult(stored.Annotation);
         }
         catch (StorytellerException exception)
         {
@@ -983,6 +1006,15 @@ public partial class AnnotationsHttp
         catch (NotSupportedException exception)
         {
             throw new JsonException("A member of the annotation has a type the API cannot read.", exception);
+        }
+    }
+
+    // The ETag of the version a body comes from, when the service tells it.
+    private static void SetEntityTag(HttpRequestData request, string? marker)
+    {
+        if (AnnotationEntityTags.ToHeader(marker) is { } entityTag)
+        {
+            request.SetResponseHeader(HeaderNames.ETag, entityTag);
         }
     }
 

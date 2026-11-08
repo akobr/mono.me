@@ -53,6 +53,12 @@ public static class ErrorCodes
     public const string AnnotationDeleted = "AnnotationDeleted";
     public const string AnnotationNotDeleted = "AnnotationNotDeleted";
 
+    // A condition of an annotation write does not hold (If-Match, If-None-Match): it changed since it was read, it
+    // does not exist, or it already exists (412). InvalidPrecondition: such a header that is not * or a list of entity
+    // tags (400).
+    public const string AnnotationPreconditionFailed = "AnnotationPreconditionFailed";
+    public const string InvalidPrecondition = "InvalidPrecondition";
+
     public const string ValueRequired = "ValueRequired";
     public const string ValueTooLarge = "ValueTooLarge";
     public const string InvalidContentType = "InvalidContentType";

@@ -56,6 +56,20 @@ public interface IAnnotationService
     // Returns the stored annotation.
     Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor);
 
+    // SetAnnotationAsync under the caller's condition (If-Match, If-None-Match), checked against the annotation the
+    // write replaces; a condition that does not hold throws PreconditionFailedException. Returns the stored annotation
+    // with the marker of its item. The default writes only without a condition: a service that cannot check one never
+    // writes unconditionally.
+    async Task<AnnotationWriteResult> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor, AnnotationWriteCondition condition)
+    {
+        if (!condition.IsEmpty)
+        {
+            throw new NotSupportedException("This annotation service cannot check the condition of a write.");
+        }
+
+        return new AnnotationWriteResult(await SetAnnotationAsync(organization, annotation, actor), Marker: null);
+    }
+
     // Creates the annotation and its missing ancestors; a deleted key or ancestor is re-created.
     Task<IEnumerable<Annotation>> CreateAnnotationAsync(string organization, Annotation annotation, AuditActor actor);
 
