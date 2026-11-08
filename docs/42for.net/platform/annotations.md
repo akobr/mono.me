@@ -151,6 +151,7 @@ sform story delete sbt.northwind          # delete; prints the date it is purged
 sform story deleted                       # what was deleted, newest first
 sform story restore sbt.northwind         # bring it back with everything it took
 sform story history sbt.northwind         # who changed it, when, and what
+sform story edit sbt.northwind            # change it in your editor; the saved document replaces its content
 sform story delete sbt.northwind --permanent   # remove it now (Administrator or Owner)
 ```
 
@@ -158,7 +159,7 @@ A machine deletes and restores only with the scope `Annotation.Write` and the ma
 
 Every change is recorded with the account or machine that made it: creates, updates (with the old and new values), deletes, restores, and configuration versions.
 
-Writing a key that is deleted creates it again with an empty configuration. `sform story set` asks first and can restore the old record instead, so its configuration and history come back. It then merges what you give it into the restored record, as it does for any existing annotation; `--replace` writes only what you give it, and clears the rest.
+Writing a key that is deleted creates it again with an empty configuration. `sform story set` asks first and can restore the old record instead, so its configuration and history come back. It then merges what you give it into the restored record, as it does for any existing annotation; `--replace` writes only what you give it, and clears the rest. `sform story edit` asks the same: **Restore and edit** opens the deleted record in your editor, and restores it when you save, with what you changed.
 
 ## Export and import
 
