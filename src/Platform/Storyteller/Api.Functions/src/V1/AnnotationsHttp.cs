@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
@@ -9,6 +10,7 @@ using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.Configuring;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -23,6 +25,13 @@ namespace _42.Platform.Storyteller.Api.V1;
 
 public partial class AnnotationsHttp
 {
+    // The patch formats of PatchAnnotation (RFC 5789 §3.1), answered with a 415.
+    private const string AcceptPatchHeader = "Accept-Patch";
+    private const string AcceptPatch = Definitions.ContentTypes.MergePatch + ", " + Definitions.ContentTypes.JsonPatch;
+
+    // a member twice in a patch is ambiguous, so it is refused
+    private static readonly JsonDocumentOptions PatchDocumentOptions = new() { AllowDuplicateProperties = false };
+
     private static readonly JsonSerializerOptions AnnotationBodyOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -409,6 +418,115 @@ public partial class AnnotationsHttp
         {
             _logger.LogError(exception, "Failed to set annotation.");
             return new BadRequestObjectResult(exception.ToErrorResponse());
+        }
+    }
+
+    [Function(nameof(PatchAnnotation))]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.PatchAnnotation, Definitions.Tags.Annotations, Description = "Changes members of the annotation, whatever its status, merged on the server against its current state, so a concurrent change of another member is kept. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json): a member left out keeps its value, null clears it, Values merge name by name (null removes a name), arrays are replaced whole; member names match case-insensitively, the members a write ignores (keys, names, relation arrays, stamps) are ignored. Or a JSON Patch (RFC 6902, application/json-patch+json) over the editable document {IsDisabled, ValidFrom, ExpiresAt, TimeZone, Title, Description, DocumentationLink, Labels, Values, UnitType, UnitDefinition}, in which Labels and Values are always present (add /Labels/- appends a label, add /Values/plan sets a value) and a test operation is a precondition. With application/json, an object is a merge patch and an array a JSON Patch. Labels keep their first occurrence, a unit keeps UnitType and UnitDefinition, and the result is validated as a full write. A patch never creates or re-creates a key; If-Match writes only the version of an earlier read.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiParameter(Definitions.Parameters.IfMatch, In = ParameterLocation.Header, Required = false, Type = typeof(string), Description = Definitions.Descriptions.IfMatchAnnotation)]
+    [OpenApiRequestBody(Definitions.ContentTypes.MergePatch, typeof(AnnotationMergePatch), Required = true, Description = "A JSON Merge Patch of the annotation (application/merge-patch+json), or a JSON Patch of its editable document (application/json-patch+json).")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), CustomHeaderType = typeof(AnnotationResponseHeaders), Description = "The stored annotation, with the ETag of its version.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The body is not JSON or not a patch (ErrorCode PatchInvalid), a JSON Patch operation failed or the patched annotation is not valid (ErrorCode PatchInvalid or InvalidAnnotation), or a condition header is not valid (ErrorCode InvalidPrecondition).")]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The annotation does not exist (ErrorCode AnnotationNotFound) or is deleted (ErrorCode AnnotationDeleted); a patch never creates it.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConcurrentChange)]
+    [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseAnnotationPatchPreconditionFailed)]
+    [OpenApiResponseWithBody(HttpStatusCode.UnsupportedMediaType, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The body is neither application/merge-patch+json, application/json-patch+json nor application/json (ErrorCode InvalidContentType); Accept-Patch lists the patch formats.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenAnnotationWrite)]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> PatchAnnotation(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Patch, Route = Definitions.Routes.Annotations.V1.Annotation)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view,
+        string key)
+    {
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor, MachineScope.AnnotationWrite);
+
+        if (!AnnotationKey.TryParse(key, out var annotationKey))
+        {
+            return InvalidKey(key);
+        }
+
+        if (!WriteConditions.TryRead(request, out var condition, out var conditionError))
+        {
+            return conditionError!;
+        }
+
+        if (condition.IfNoneMatch is not null)
+        {
+            return new BadRequestObjectResult(new ErrorResponse("A patch never creates an annotation, so If-None-Match does not apply; create it with POST and If-None-Match: *.")
+            {
+                ErrorCode = ErrorCodes.InvalidPrecondition,
+            });
+        }
+
+        if (!TryGetPatchFormat(request, out var format))
+        {
+            request.SetResponseHeader(AcceptPatchHeader, AcceptPatch);
+            return new ObjectResult(new ErrorResponse($"A patch of an annotation is {Definitions.ContentTypes.MergePatch} or {Definitions.ContentTypes.JsonPatch}.")
+            {
+                ErrorCode = ErrorCodes.InvalidContentType,
+            })
+            {
+                StatusCode = (int)HttpStatusCode.UnsupportedMediaType,
+            };
+        }
+
+        using var body = new MemoryStream();
+
+        if (!await request.TryCopyBodyAsync(body, RequestBodyLimits.Annotation, request.FunctionContext.CancellationToken))
+        {
+            return RequestBodyExtensions.BodyTooLarge(RequestBodyLimits.Annotation);
+        }
+
+        AnnotationPatch patch;
+
+        try
+        {
+            patch = ReadPatch(JsonNode.Parse(body.WithoutByteOrderMark().Span, documentOptions: PatchDocumentOptions), format);
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or InvalidOperationException)
+        {
+            // not JSON, a member twice, or not a patch of its format; a JsonPatchException (an invalid JSON Patch) is an
+            // InvalidOperationException too
+            return new BadRequestObjectResult(new ErrorResponse($"The body is not a patch of an annotation: {exception.Message}")
+            {
+                ErrorCode = ErrorCodes.PatchInvalid,
+            });
+        }
+
+        try
+        {
+            var stored = await _annotations.PatchAnnotationAsync(FullKey.Create(annotationKey, organization, project, view), patch, request.GetAuditActor(), condition);
+            SetEntityTag(request, stored.Marker);
+            return new OkObjectResult(stored.Annotation);
+        }
+        catch (NotFoundException exception)
+        {
+            return new NotFoundObjectResult(new ErrorResponse(exception.Message)
+            {
+                ErrorCode = exception.ErrorCode,
+                Hint = exception.ErrorCode == ErrorCodes.AnnotationDeleted
+                    ? "A patch does not re-create a deleted annotation: restore it (RestoreAnnotations), or write it whole with POST."
+                    : "A patch does not create an annotation: write it whole with POST.",
+            });
+        }
+        catch (StorytellerException exception)
+        {
+            return ErrorResponseMapping.ToActionResult(exception);
+        }
+        catch (JsonPatchException exception)
+        {
+            // a failed test operation answers 412, any other failed operation 400
+            return ErrorResponseMapping.ToActionResult(exception);
         }
     }
 
@@ -1007,6 +1125,51 @@ public partial class AnnotationsHttp
         {
             throw new JsonException("A member of the annotation has a type the API cannot read.", exception);
         }
+    }
+
+    // The patch format of the body by its media type; application/json, or none, leaves it to the body (null). False
+    // for any other media type.
+    private static bool TryGetPatchFormat(HttpRequestData request, out AnnotationPatchFormat? format)
+    {
+        format = null;
+
+        if (!request.Headers.TryGetValues(HeaderNames.ContentType, out var values)
+            || string.Join(",", values) is not { Length: > 0 } contentType)
+        {
+            return true;
+        }
+
+        if (!MediaTypeHeaderValue.TryParse(contentType, out var mediaType))
+        {
+            return false;
+        }
+
+        if (mediaType.MediaType.Equals(Definitions.ContentTypes.MergePatch, StringComparison.OrdinalIgnoreCase))
+        {
+            format = AnnotationPatchFormat.MergePatch;
+            return true;
+        }
+
+        if (mediaType.MediaType.Equals(Definitions.ContentTypes.JsonPatch, StringComparison.OrdinalIgnoreCase))
+        {
+            format = AnnotationPatchFormat.JsonPatch;
+            return true;
+        }
+
+        return mediaType.MediaType.Equals(Definitions.ContentTypes.Json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // A merge patch is an object and a JSON Patch an array; without a format, the body tells it.
+    private static AnnotationPatch ReadPatch(JsonNode? body, AnnotationPatchFormat? format)
+    {
+        return (format, body) switch
+        {
+            (AnnotationPatchFormat.MergePatch or null, JsonObject document) => AnnotationPatch.Merge(document),
+            (AnnotationPatchFormat.JsonPatch or null, JsonArray operations) => AnnotationPatch.Json(operations),
+            (AnnotationPatchFormat.MergePatch, _) => throw new InvalidOperationException("A merge patch (RFC 7396) of an annotation is a JSON object."),
+            (AnnotationPatchFormat.JsonPatch, _) => throw new InvalidOperationException("A JSON Patch (RFC 6902) is a JSON array of operations."),
+            _ => throw new InvalidOperationException("A patch is a JSON object (a merge patch) or a JSON array (a JSON Patch)."),
+        };
     }
 
     // The ETag of the version a body comes from, when the service tells it.

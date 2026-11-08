@@ -369,6 +369,7 @@ public class OpenApiExportTests
                  {
                      (Definitions.RouteIds.Annotations.GetAnnotation, "GET", $"{annotations}/{{key}}"),
                      (Definitions.RouteIds.Annotations.SetAnnotation, "POST", $"{annotations}/{{key}}"),
+                     (Definitions.RouteIds.Annotations.PatchAnnotation, "PATCH", $"{annotations}/{{key}}"),
                      (Definitions.RouteIds.Annotations.DeleteAnnotation, "DELETE", $"{annotations}/{{key}}"),
                      (Definitions.RouteIds.Annotations.GetDescendants, "GET", $"{annotations}/{{key}}/{{descendants}}"),
                      (Definitions.RouteIds.Annotations.GetAnnotationHistory, "GET", $"{annotations}/{{key}}/history"),
@@ -898,6 +899,7 @@ public class OpenApiExportTests
             [Definitions.RouteIds.Annotations.FindDeletedAnnotations] = annotationRead,
             [Definitions.RouteIds.Annotations.GetAnnotationHistory] = annotationRead,
             [Definitions.RouteIds.Annotations.SetAnnotation] = (Definitions.Descriptions.ResponseForbiddenAnnotationWrite, [Scopes.Annotation.Write]),
+            [Definitions.RouteIds.Annotations.PatchAnnotation] = (Definitions.Descriptions.ResponseForbiddenAnnotationWrite, [Scopes.Annotation.Write]),
             [Definitions.RouteIds.Annotations.SetAnnotations] = annotationManage,
             [Definitions.RouteIds.Annotations.SetAnnotationsSimple] = annotationManage,
             [Definitions.RouteIds.Annotations.DeleteAnnotation] = annotationManage,

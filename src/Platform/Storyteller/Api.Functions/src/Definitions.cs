@@ -327,6 +327,7 @@ public static class Definitions
 
             public const string GetAnnotation = nameof(GetAnnotation);
             public const string SetAnnotation = nameof(SetAnnotation);
+            public const string PatchAnnotation = nameof(PatchAnnotation);
             public const string DeleteAnnotation = nameof(DeleteAnnotation);
             public const string GetDescendants = nameof(GetDescendants);
             public const string GetAnnotationHistory = nameof(GetAnnotationHistory);
@@ -556,6 +557,7 @@ public static class Definitions
         public const string ResponseConcurrentChange = "The annotations changed concurrently three times in a row (Conflict); try again.";
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
         public const string ResponseAnnotationPreconditionFailed = "A condition of the write does not hold (ErrorCode AnnotationPreconditionFailed): If-Match names another version, or the annotation does not exist or is deleted; If-None-Match: * and the annotation exists. Read it again and retry.";
+        public const string ResponseAnnotationPatchPreconditionFailed = "If-Match names another version of the annotation (ErrorCode AnnotationPreconditionFailed), or a JSON Patch test operation did not match (ErrorCode PatchTestFailed). Read it again and retry.";
         public const string ResponseInternalServerError = "Unexpected error occurred on the service.";
 
         // The security schemes. Whether a machine's kind is accepted also depends on the project's machine authentication
@@ -656,6 +658,8 @@ public static class Definitions
         public const string Yaml = "application/yaml";
         public const string Zip = "application/zip";
         public const string FormUrlEncoded = "application/x-www-form-urlencoded";
+        public const string MergePatch = "application/merge-patch+json";
+        public const string JsonPatch = "application/json-patch+json";
     }
 
     public static class SecuritySchemas

@@ -34,6 +34,7 @@ public partial class MachineRestrictionHttpTests
     [
         new(nameof(AnnotationsHttp.GetAnnotation), nameof(IAnnotationService.GetAnnotationWithMarkerAsync), FullKeyArg, (http, key) => http.Annotations.GetAnnotation(http.Request(), Org, Project, DefaultView, key), MachineScope.AnnotationRead),
         new(nameof(AnnotationsHttp.GetDescendants), nameof(IAnnotationService.GetAnnotationsAsync), DescendantsOfArg, (http, key) => http.Annotations.GetDescendants(http.Request(), Org, Project, DefaultView, key), MachineScope.AnnotationRead, WithDescendant: false),
+        new(nameof(AnnotationsHttp.PatchAnnotation), nameof(IAnnotationService.PatchAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.PatchAnnotation(http.Request("PATCH", "{\"Title\":\"patched\"}"), Org, Project, DefaultView, key), MachineScope.AnnotationWrite),
         new(nameof(AnnotationsHttp.SetAnnotation), nameof(IAnnotationService.SetAnnotationAsync), AnnotationArg, (http, key) => http.Annotations.SetAnnotation(http.Request("PUT", AnnotationBody(key)), Org, Project, DefaultView, key), MachineScope.AnnotationWrite),
         new(nameof(AnnotationsHttp.DeleteAnnotation), nameof(IAnnotationService.DeleteAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.DeleteAnnotation(http.Request("DELETE"), Org, Project, DefaultView, key), MachineScope.AnnotationWrite, MachineScope.AnnotationManage),
         new(nameof(AnnotationsHttp.GetDeletedAnnotation), nameof(IAnnotationService.GetDeletedAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.GetDeletedAnnotation(http.Request(), Org, Project, DefaultView, key), MachineScope.AnnotationRead),
@@ -534,6 +535,7 @@ public partial class MachineRestrictionHttpTests
 
         // the conditional SetAnnotationAsync, which the handler calls; the unconditional overload still answers null
         annotationCalls.Returns(nameof(IAnnotationService.SetAnnotationAsync), new AnnotationWriteResult(AnnotationFactory.CreateDefault(AnnotationKey.Parse("sbt.recorded"), Project, DefaultView), Marker: null));
+        annotationCalls.Returns(nameof(IAnnotationService.PatchAnnotationAsync), new AnnotationWriteResult(AnnotationFactory.CreateDefault(AnnotationKey.Parse("sbt.recorded"), Project, DefaultView), Marker: null));
         configurationCalls.Returns(nameof(IConfigurationService.ClearConfigurationAsync), true);
         configurationCalls.Returns(nameof(IConfigurationService.GetConfigurationVersionsAsync), Array.Empty<ConfigurationVersion>());
 

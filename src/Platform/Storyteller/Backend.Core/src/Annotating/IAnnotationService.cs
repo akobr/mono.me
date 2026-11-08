@@ -70,6 +70,15 @@ public interface IAnnotationService
         return new AnnotationWriteResult(await SetAnnotationAsync(organization, annotation, actor), Marker: null);
     }
 
+    // Applies the patch to the stored annotation (any status, not deleted) and writes the result, atomically: the patch
+    // is applied again to fresh state when the annotation changes in between. A missing key throws NotFoundException
+    // (AnnotationNotFound), a deleted one NotFoundException (AnnotationDeleted): a patch never creates or re-creates.
+    // Returns the stored annotation with the marker of its item.
+    Task<AnnotationWriteResult> PatchAnnotationAsync(FullKey fullKey, AnnotationPatch patch, AuditActor actor, AnnotationWriteCondition condition)
+    {
+        throw new NotSupportedException("This annotation service cannot patch an annotation.");
+    }
+
     // Creates the annotation and its missing ancestors; a deleted key or ancestor is re-created.
     Task<IEnumerable<Annotation>> CreateAnnotationAsync(string organization, Annotation annotation, AuditActor actor);
 

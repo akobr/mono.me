@@ -61,6 +61,7 @@ public class ForbiddenResponseDocumentFilterTests
     [InlineData(typeof(ConfigurationHttp), nameof(ConfigurationHttp.SetConfiguration))]
     [InlineData(typeof(ConfigurationHttp), nameof(ConfigurationHttp.PatchConfiguration))]
     [InlineData(typeof(AnnotationsHttp), nameof(AnnotationsHttp.SetAnnotation))]
+    [InlineData(typeof(AnnotationsHttp), nameof(AnnotationsHttp.PatchAnnotation))]
     [InlineData(typeof(TemplateHttp), nameof(TemplateHttp.SetTemplate))]
     [InlineData(typeof(TemplateHttp), nameof(TemplateHttp.PatchTemplate))]
     public void PatchCapableOperations_DocumentPreconditionFailed(Type type, string methodName)

@@ -179,6 +179,33 @@ public partial class CosmosAnnotationService : IAnnotationService
         });
     }
 
+    public Task<AnnotationWriteResult> PatchAnnotationAsync(FullKey fullKey, AnnotationPatch patch, AuditActor actor, AnnotationWriteCondition condition)
+    {
+        return RetryAsync(async () =>
+        {
+            var store = Store(fullKey.OrganizationName);
+            var node = await store.LoadAsync(fullKey, withConfiguration: false, withAudit: false);
+
+            // A patch never creates or re-creates a key; the conditions do not apply to a key it cannot patch
+            // (RFC 9110 §13.2.1), so these come first.
+            switch (node.State)
+            {
+                case AnnotationItemState.Missing:
+                    throw new NotFoundException($"The annotation '{fullKey.Annotation}' does not exist.", ErrorCodes.AnnotationNotFound);
+                case AnnotationItemState.Deleted:
+                    throw new NotFoundException($"The annotation '{fullKey.Annotation}' is deleted.", ErrorCodes.AnnotationDeleted);
+            }
+
+            // the original condition, and the patch, against the state of this attempt: a change in between fails the
+            // batch, and the next attempt applies the patch to the changed annotation
+            condition.Check(fullKey.Annotation, exists: true, node.ETag);
+            var patched = patch.Apply(node.Entity!.ToModel());
+
+            await store.LoadDetailsAsync(node, withConfiguration: false, withAudit: true);
+            return await UpdateCoreAsync(store, node, patched, actor);
+        });
+    }
+
     public async Task<IEnumerable<Annotation>> CreateAnnotationAsync(string organization, Annotation annotation, AuditActor actor)
     {
         AnnotationRules.Validate(annotation);

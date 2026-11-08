@@ -104,6 +104,7 @@ public partial class RouteTableTests
     [InlineData("POST v1/{}/{}/{}/annotations/deleted/restore")]
     [InlineData("GET v1/{}/{}/{}/annotations/{}/history")]
     [InlineData("DELETE v1/{}/{}/{}/annotations/{}")]
+    [InlineData("PATCH v1/{}/{}/{}/annotations/{}")]
     public void DeletedAnnotationRoutes_AreRegistered(string expected)
     {
         var routes = typeof(AccessHttp).Assembly
