@@ -29,7 +29,8 @@ public class KeyValueImportCommand : KeyValueCommandBase
         keys asks you to type the view name, unless -y is given. An item that is not
         valid, such as a new secret without its value, stops the import at the plan:
         nothing is written and the exit code is 2. The exit code is 45 when the write
-        of an item failed, and 44 when the API refuses the import.
+        of an item failed, and 44 when the sign-in or the rights are refused (401 or
+        403).
 
         A Contributor imports public pairs. Secret values, changes to or from a secret
         level, and a replace that deletes a secret need ContributorWithSecrets. A
