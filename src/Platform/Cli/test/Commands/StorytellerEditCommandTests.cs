@@ -27,6 +27,7 @@ namespace _42.Platform.Cli.UnitTests.Commands;
 public class StorytellerEditCommandTests
 {
     private const string Key = "exe.northwind.billing.prod";
+    private const string ETag = "\"a1.dmVyc2lvbg\"";
 
     // the key and its ancestors, roots first, as the lookup receives them
     private static readonly string[] LookedUp =
@@ -49,19 +50,32 @@ public class StorytellerEditCommandTests
     private string? _fileNamePrefix;
     private Func<JObject, JsonEditCheck>? _check;
     private Annotation? _written;
+    private string? _ifMatch;
+    private string? _ifNoneMatch;
 
     public StorytellerEditCommandTests()
     {
         _fixture.Api
-            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>()))
-            .Callback((string _, string _, string _, string _, Annotation body, string _, string _, CancellationToken _) =>
+            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string _, string _, string _, string _, Annotation body, string ifMatch, string ifNoneMatch, CancellationToken _) =>
             {
                 _calls.Add("set");
                 _written = body;
+                _ifMatch = ifMatch;
+                _ifNoneMatch = ifNoneMatch;
             })
             .ReturnsAsync(AnnotationCommandFixture.Active(Key));
 
-        // Each read takes the next answer; the last one repeats.
+        // Each read takes the next answer; the last one repeats. The first read is the versioned one, with the ETag
+        // the save is conditioned on.
+        _fixture.Api
+            .Setup(api => api.GetAnnotationVersionedAsync("org1", "proj1", "default", Key, true, It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                _calls.Add("get");
+                var answer = _reads.Count > 1 ? _reads.Dequeue() : _reads.Peek();
+                return Task.FromResult(new VersionedResponse<Annotation>(200, answer()!, new Dictionary<string, IEnumerable<string>> { ["ETag"] = [ETag] }));
+            });
         _fixture.Api
             .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, true, null, It.IsAny<CancellationToken>()))
             .Returns(() =>
@@ -87,7 +101,9 @@ public class StorytellerEditCommandTests
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe(["get", "edit", "get", "set"]);
+        _calls.ShouldBe(["get", "edit", "set"]);
+        _ifMatch.ShouldBe(ETag);
+        _ifNoneMatch.ShouldBeNull();
         _openedAsNew.ShouldBe(false);
         _fileNamePrefix.ShouldBe($"annotation-{Key}");
         _opened!["Title"]!.Value<string>().ShouldBe("Invoicing");
@@ -113,7 +129,9 @@ public class StorytellerEditCommandTests
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe(["get", "lookup", "edit", "get", "set"]);
+        _calls.ShouldBe(["get", "lookup", "edit", "set"]);
+        _ifMatch.ShouldBeNull();
+        _ifNoneMatch.ShouldBe("*");
         _openedAsNew.ShouldBe(true);
         _opened!["Title"]!.Type.ShouldBe(JTokenType.Null);
         _written!.Title.ShouldBe("Billing");
@@ -222,7 +240,7 @@ public class StorytellerEditCommandTests
         var exitCode = await Execute("EXE.northwind.billing.prod");
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe(["get", "edit", "get", "set"]);
+        _calls.ShouldBe(["get", "edit", "set"]);
         _fileNamePrefix.ShouldBe($"annotation-{Key}");
         _written!.AnnotationKey.ShouldBe(Key);
     }
@@ -253,7 +271,9 @@ public class StorytellerEditCommandTests
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe(["get", "lookup", "edit", "get", "set"]);
+        _calls.ShouldBe(["get", "lookup", "edit", "set"]);
+        _ifMatch.ShouldBeNull();
+        _ifNoneMatch.ShouldBe("*");
         _openedAsNew.ShouldBe(true);
         _opened!["Title"]!.Type.ShouldBe(JTokenType.Null);
     }
@@ -490,6 +510,7 @@ public class StorytellerEditCommandTests
             return changed;
         });
         EditorChanges(document => document["Description"] = "Mine");
+        WriteFails(Changed());
 
         var exitCode = await Execute();
 
@@ -507,6 +528,7 @@ public class StorytellerEditCommandTests
         Stored(StoredExecution());
         Missing();
         EditorChanges(document => document["Title"] = "Mine");
+        WriteFails(Changed());
 
         var exitCode = await Execute();
 
@@ -519,14 +541,14 @@ public class StorytellerEditCommandTests
     public async Task AKeyCreatedWhileTheEditorWasOpen_SavesNothing_AndKeepsTheEdit()
     {
         Missing();
-        _reads.Enqueue(() => StoredExecution());
         DeletedAmong();
         EditorChanges(document => document["Title"] = "Mine");
+        WriteFails(Changed());
 
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _calls.ShouldBe(["get", "lookup", "edit", "get"]);
+        _calls.ShouldBe(["get", "lookup", "edit"]);
         KeptEdit()["Title"]!.Value<string>().ShouldBe("Mine");
     }
 
@@ -542,10 +564,16 @@ public class StorytellerEditCommandTests
             return changed;
         });
         EditorChanges(document => document["Title"] = "Billing");
+        var writes = 0;
+        _fixture.Api
+            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ++writes == 1 ? Task.FromException<Annotation>(Changed()) : Task.FromResult<Annotation>(AnnotationCommandFixture.Active(Key)));
 
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
+        writes.ShouldBe(2);
+        _calls.ShouldBe(["get", "edit", "get"]);
     }
 
     [Theory]
@@ -599,7 +627,7 @@ public class StorytellerEditCommandTests
         Stored(StoredExecution());
         EditorChanges(document => document["Title"] = "Billing");
         _fixture.Api
-            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>()))
+            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("No such host is known."));
 
         await Should.ThrowAsync<HttpRequestException>(() => Execute());
@@ -646,7 +674,7 @@ public class StorytellerEditCommandTests
     public async Task ARefusedRead_OpensNoEditor()
     {
         _fixture.Api
-            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, true, null, It.IsAny<CancellationToken>()))
+            .Setup(api => api.GetAnnotationVersionedAsync("org1", "proj1", "default", Key, true, It.IsAny<CancellationToken>()))
             .ThrowsAsync(AnnotationCommandFixture.Error(403, "AnnotationRestricted", "The machine may not read it."));
 
         var exitCode = await Execute();
@@ -677,7 +705,7 @@ public class StorytellerEditCommandTests
     public async Task AnUnauthorizedRead_IsLeftToTheTopLevel()
     {
         _fixture.Api
-            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, true, null, It.IsAny<CancellationToken>()))
+            .Setup(api => api.GetAnnotationVersionedAsync("org1", "proj1", "default", Key, true, It.IsAny<CancellationToken>()))
             .ThrowsAsync(AnnotationCommandFixture.Error(401));
 
         (await Should.ThrowAsync<ApiException>(() => Execute())).StatusCode.ShouldBe(401);
@@ -751,10 +779,15 @@ public class StorytellerEditCommandTests
         _fixture.Console.Mock.Setup(console => console.Select(It.IsAny<SelectOptions<string>>())).Returns(choice);
     }
 
+    private static ApiException Changed()
+    {
+        return AnnotationCommandFixture.Error(412, "AnnotationPreconditionFailed", "The annotation changed since it was read.");
+    }
+
     private void WriteFails(Exception exception)
     {
         _fixture.Api
-            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>()))
+            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(exception);
     }
 
