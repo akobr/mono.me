@@ -18,6 +18,9 @@ namespace _42.Platform.Cli.Services;
 
 public class EditorService : IEditorService
 {
+    // As deep as the configurations client reads (ApiSdk.partial.cs): the API stores up to 128 levels.
+    private const int MaxDocumentDepth = 256;
+
     private readonly IFileSystem _fileSystem;
 
     /// <summary>
@@ -87,7 +90,7 @@ public class EditorService : IEditorService
     /// <param name="options">Editor selection and configuration to use when launching the editor.</param>
     /// <returns>`1` if the editor process could not be started; otherwise the editor process exit code.</returns>
     /// <exception cref="InvalidOperationException">Thrown when <see cref="Configuration.EditorType"/> in <paramref name="options"/> is not configured.</exception>
-    public async Task<int> OpenFileInEditorAsync(string filePath, EditorOptions options)
+    public virtual async Task<int> OpenFileInEditorAsync(string filePath, EditorOptions options)
     {
         var (command, arguments) = options.EditorType switch
         {
@@ -143,11 +146,7 @@ public class EditorService : IEditorService
 
         // 2. Write to a temp file
         var originalJson = original.ToString(Formatting.Indented);
-        var invalidChars = _fileSystem.Path.GetInvalidFileNameChars();
-        var safePrefix = string.Concat(fileNamePrefix.Select(c => invalidChars.Contains(c) ? '_' : c));
-        var tempFilePath = _fileSystem.Path.Combine(
-            _fileSystem.Path.GetTempPath(),
-            $"{safePrefix}-{_fileSystem.Path.GetRandomFileName()[..8]}.json");
+        var tempFilePath = CreateTempFilePath(_fileSystem, fileNamePrefix);
 
         await _fileSystem.File.WriteAllTextAsync(tempFilePath, originalJson, Encoding.UTF8);
 
@@ -167,27 +166,26 @@ public class EditorService : IEditorService
                 }
 
                 var editedJson = _fileSystem.File.ReadAllText(tempFilePath, Encoding.UTF8);
+                var (document, problem) = ReadDocument(editedJson);
 
-                try
+                if (document is not null)
                 {
-                    edited = JObject.Parse(editedJson);
+                    edited = document;
                     break;
                 }
-                catch (JsonReaderException jsonEx)
+
+                console.WriteImportant(problem!);
+
+                var shouldRetry = console.Confirm(new ConfirmOptions
                 {
-                    console.WriteImportant($"Invalid JSON: {jsonEx.Message}");
+                    Message = "Would you like to re-open the editor to fix the issue",
+                    DefaultValue = true,
+                });
 
-                    var shouldRetry = console.Confirm(new ConfirmOptions
-                    {
-                        Message = "Would you like to re-open the editor to fix the issue",
-                        DefaultValue = true,
-                    });
-
-                    if (!shouldRetry)
-                    {
-                        console.WriteLine("Edit aborted.");
-                        return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
-                    }
+                if (!shouldRetry)
+                {
+                    console.WriteLine("Edit aborted.");
+                    return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
                 }
             }
 
@@ -238,6 +236,61 @@ public class EditorService : IEditorService
             {
                 console.WriteImportant($"Could not delete temp file '{tempFilePath}': {ex.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// A new path in the temporary folder for a document, named after <paramref name="fileNamePrefix"/>. Only letters,
+    /// digits, '.', '-' and '_' are kept: an annotation name may hold '"' or '%', which would break the quoted path on the
+    /// editor's command line (cmd.exe expands %…% inside quotes).
+    /// </summary>
+    internal static string CreateTempFilePath(IFileSystem fileSystem, string fileNamePrefix)
+    {
+        var safePrefix = string.Concat(fileNamePrefix.Select(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_' ? c : '_'));
+        return fileSystem.Path.Combine(
+            fileSystem.Path.GetTempPath(),
+            $"{safePrefix}-{fileSystem.Path.GetRandomFileName()[..8]}.json");
+    }
+
+    /// <summary>
+    /// Parses an edited document as <see cref="JObject.Parse(string)"/> does (comments allowed, nothing after the object),
+    /// but as the SDK reads documents: date-like strings stay strings (<c>DateParseHandling.None</c>), which parsed would
+    /// never equal the original strings and would be written back in the offset of this machine, and up to the depth of
+    /// the configurations client. A property twice in one object is an error, not its last value.
+    /// </summary>
+    /// <exception cref="JsonReaderException">The text is not one JSON object.</exception>
+    internal static JObject ParseDocument(string json)
+    {
+        using var reader = new JsonTextReader(new StringReader(json))
+        {
+            DateParseHandling = DateParseHandling.None,
+            MaxDepth = MaxDocumentDepth,
+        };
+
+        var document = JObject.Load(reader, new JsonLoadSettings
+        {
+            CommentHandling = CommentHandling.Ignore,
+            DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error,
+        });
+
+        while (reader.Read())
+        {
+            // only comments may follow: the reader throws on anything else after the object
+        }
+
+        return document;
+    }
+
+    // The document when it is valid JSON; otherwise the problem to show.
+    private static (JObject? Document, string? Problem) ReadDocument(string json)
+    {
+        try
+        {
+            return (ParseDocument(json), null);
+        }
+        catch (JsonReaderException exception)
+        {
+            return (null, $"Invalid JSON: {exception.Message}");
         }
     }
 
