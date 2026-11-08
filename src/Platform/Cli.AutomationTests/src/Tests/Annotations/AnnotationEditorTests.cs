@@ -171,7 +171,7 @@ public sealed class AnnotationEditorTests : CliTest
     // ANN-EDT-04: On redirected input story edit ends with exit 43 before any request and names the commands that edit
     // without a terminal.
     // As an Editor with the fake editor configured, story edit <rst> of a missing key without a terminal ends with 43 and
-    // prints on stdout "sform story edit needs an interactive console, without redirected input or output. Without one:
+    // prints on stderr "! sform cannot ask for the edit of the annotation: the input or the output is redirected." and "Without a terminal:
     // sform story get <rst> -e <file>, edit the file, then sform story set <rst> -i <file> --replace."; the editor is not
     // started and story get <rst> finds nothing. With SFORM_general__baseUrl on a closed port of the loopback it ends with
     // 43 again (a request would end with 3).
@@ -182,13 +182,14 @@ public sealed class AnnotationEditorTests : CliTest
     public async Task Story_Edit_Redirected_NeedsTerminal()
     {
         var key = CliData.ResponsibilityKey();
-        var hint = $"sform story edit needs an interactive console, without redirected input or output. Without one: sform story get {key} -e <file>, edit the file, then sform story set {key} -i <file> --replace.";
+        var hint = $"Without a terminal: sform story get {key} -e <file>, edit the file, then sform story set {key} -i <file> --replace.";
         var editor = await UseEditorAsync();
 
         var redirected = editor.With(EditorChange.Merge(new JsonObject { ["Title"] = CliData.Value() }));
         (await Sform(redirected, InProject("story", "edit", key)))
             .ShouldExitWith(CliExit.InteractionNeeded)
-            .ShouldContain(hint, SformStream.StdOut);
+            .ShouldContain("! sform cannot ask for the edit of the annotation: the input or the output is redirected.", SformStream.StdErr)
+            .ShouldContain(hint, SformStream.StdErr);
         await Assert.That(editor.ReadLog(redirected).Count).IsEqualTo(0);
 
         (await Sform(InProject("story", "get", key)))
@@ -200,7 +201,8 @@ public sealed class AnnotationEditorTests : CliTest
             new SformRunOptions { BaseUrl = $"http://127.0.0.1:{ClosedPort()}/api", Label = "against a closed port" });
         (await Sform(offline, InProject("story", "edit", key)))
             .ShouldExitWith(CliExit.InteractionNeeded)
-            .ShouldContain(hint, SformStream.StdOut);
+            .ShouldContain("! sform cannot ask for the edit of the annotation: the input or the output is redirected.", SformStream.StdErr)
+            .ShouldContain(hint, SformStream.StdErr);
         await Assert.That(editor.ReadLog(offline).Count).IsEqualTo(0);
     }
 

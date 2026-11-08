@@ -76,7 +76,9 @@ public class StorytellerEditCommand : BaseContextCommand
         // The editor's questions (Sharprompt) need an interactive console: neither the input nor the output redirected.
         if (Console.Console is { IsInputRedirected: true } or { IsOutputRedirected: true })
         {
-            Console.WriteLine($"sform story edit needs an interactive console, without redirected input or output. Without one: sform story get {key} -e <file>, edit the file, then sform story set {key} -i <file> --replace.");
+            // On standard error, as every prompt that stops on redirected input (InteractiveInputExtensions).
+            Console.WriteErrorLine("! sform cannot ask for the edit of the annotation: the input or the output is redirected.");
+            Console.WriteErrorLine($"  Without a terminal: sform story get {key} -e <file>, edit the file, then sform story set {key} -i <file> --replace.");
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 

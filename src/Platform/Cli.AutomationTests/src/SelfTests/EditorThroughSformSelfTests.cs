@@ -141,7 +141,8 @@ public sealed class EditorThroughSformSelfTests
         var result = await sandbox.Runner.RunAsync(["story", "edit", AnnotationKey], options);
 
         result.ShouldExitWith(CliExit.InteractionNeeded)
-            .ShouldContain($"sform story edit needs an interactive console, without redirected input or output. Without one: sform story get {AnnotationKey} -e <file>, edit the file, then sform story set {AnnotationKey} -i <file> --replace.");
+            .ShouldContain("! sform cannot ask for the edit of the annotation: the input or the output is redirected.", SformStream.StdErr)
+            .ShouldContain($"Without a terminal: sform story get {AnnotationKey} -e <file>, edit the file, then sform story set {AnnotationKey} -i <file> --replace.", SformStream.StdErr);
         await Assert.That(api.Requests.IsEmpty).IsTrue().Because(api.Describe());
         await Assert.That(editor.ReadLog(options).Count).IsEqualTo(0);
     }

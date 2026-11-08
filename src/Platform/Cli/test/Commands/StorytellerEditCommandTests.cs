@@ -222,13 +222,19 @@ public class StorytellerEditCommandTests
     {
         _fixture.InnerConsole.SetupGet(console => console.IsInputRedirected).Returns(input);
         _fixture.InnerConsole.SetupGet(console => console.IsOutputRedirected).Returns(output);
+        var error = new StringWriter();
+        _fixture.InnerConsole.SetupGet(console => console.Error).Returns(error);
 
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.WARNING_INTERACTION_NEEDED);
         _calls.ShouldBeEmpty();
-        _fixture.Line("sform story edit needs an interactive console")
-            .ShouldContain($"sform story get {Key} -e <file>, edit the file, then sform story set {Key} -i <file> --replace");
+        _fixture.Console.Lines.ShouldBeEmpty();
+        error.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).ShouldBe(
+        [
+            "! sform cannot ask for the edit of the annotation: the input or the output is redirected.",
+            $"  Without a terminal: sform story get {Key} -e <file>, edit the file, then sform story set {Key} -i <file> --replace.",
+        ]);
     }
 
     [Fact]
