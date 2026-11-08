@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -55,6 +57,15 @@ public class KeyValueExportCommand : KeyValueCommandBase
     [Option("--include-secrets", CommandOptionType.NoValue, Description = "Include the values of secrets (secret rights needed); otherwise secrets are listed without a value.")]
     public bool IncludeSecrets { get; set; }
 
+    // The document with LF line ends and a final one. Only the CRLF of the json indentation (the line end of the
+    // platform) changes: every other CR or LF of a value is escaped, and ReplaceLineEndings would also turn the
+    // U+0085, U+2028, U+2029 and form feed a quoted env value holds as they are into line ends.
+    internal static string ToPayload(string text)
+    {
+        var payload = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+        return payload.Length == 0 || payload.EndsWith('\n') ? payload : payload + "\n";
+    }
+
     protected override async Task<int> ExecuteKeyValuesAsync()
     {
         var format = ResolveFormat();
@@ -71,14 +82,17 @@ public class KeyValueExportCommand : KeyValueCommandBase
 
         var text = KeyValueFormats.Serialize(document, format, out var skipped);
 
+        // On standard error, so a redirected standard output holds the document alone.
         if (skipped.Count > 0)
         {
-            Console.WriteLine($"{skipped.Count} secret(s) without a value were left out of the {format.ToString().ToLowerInvariant()} output: {string.Join(", ", skipped)}. Add --include-secrets, or use the json format.".ThemedLowlight(Console.Theme));
+            Console.WriteErrorLine($"{skipped.Count} secret(s) without a value were left out of the {format.ToString().ToLowerInvariant()} output: {string.Join(", ", skipped)}. Add --include-secrets, or use the json format.");
         }
 
         if (string.IsNullOrWhiteSpace(OutputPath))
         {
-            Console.WriteLine(text);
+            // As it is, in UTF-8 with LF line ends: no margin and no wrapping, so `kv export --format env > .env` works.
+            using var encoding = Console.UseUtf8Output();
+            Console.WriteRaw(ToPayload(text));
             return ExitCodes.SUCCESS;
         }
 

@@ -36,15 +36,7 @@ public sealed class ProgramProcessTests : IDisposable
     [Fact]
     public async Task AMachineSignIn_WritesItsHeaderAndSummary()
     {
-        var machine = Convert.ToBase64String(Encoding.UTF8.GetBytes("org1:proj1:m1")).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-        var result = await RunAsync(
-            ["account"],
-            new Dictionary<string, string>
-            {
-                ["STORYTELLER_ENDPOINT"] = $"http://127.0.0.1:{ClosedPort()}/api",
-                ["STORYTELLER_API_KEY"] = $"2s.{machine}.not-a-real-secret",
-            });
+        var result = await RunAsync(["account"], MachineVariables($"http://127.0.0.1:{ClosedPort()}/api"));
 
         result.ExitCode.ShouldBe(ExitCodes.SUCCESS, result.ToString());
         result.Lines.ShouldContain("# Machine sign-in");
@@ -67,12 +59,55 @@ public sealed class ProgramProcessTests : IDisposable
         result.Output.ShouldNotContain("Total mayhem");
     }
 
+    // GEN-CLI-01: the help of the key/value tree. KeyValueListCommand, the parent of every kv command, once took an
+    // optional TimeProvider that the container did not have, so every kv command line (--help too) exited with 1.
+    [Theory]
+    [InlineData("story", "kv", "--help")]
+    [InlineData("story", "key-values", "get", "--help")]
+    [InlineData("story", "kv", "policy", "set", "--help")]
+    public async Task TheHelpOfTheKeyValueCommands_IsWritten(params string[] args)
+    {
+        var result = await RunAsync(args);
+
+        result.ExitCode.ShouldBe(ExitCodes.SUCCESS, result.ToString());
+        result.Output.ShouldContain("Usage: sform storyteller kv");
+        result.Output.ShouldNotContain("Total mayhem");
+    }
+
+    // GEN-CLI-05 without an API: the kv commands reach the API, whose closed port is a service failure, not a crash.
+    [Theory]
+    [InlineData("story", "kv", "get", "x", "-p", "org1.proj1")]
+    [InlineData("story", "kv", "-p", "org1.proj1")]
+    public async Task AKeyValueCommand_OfAMachine_ReachesTheApi(params string[] args)
+    {
+        var baseUrl = $"http://127.0.0.1:{ClosedPort()}/api";
+
+        var result = await RunAsync(args, MachineVariables(baseUrl));
+
+        result.ExitCode.ShouldBe(ExitCodes.ERROR_SERVICE_FAILURE, result.ToString());
+        result.Output.ShouldContain("! The 2S platform could not be reached: ");
+        result.Output.ShouldContain($"The API is {baseUrl} ");
+        result.Output.ShouldNotContain("Total mayhem");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_home))
         {
             Directory.Delete(_home, recursive: true);
         }
+    }
+
+    // The API key of machine m1 of org1.proj1, which signs in without a call.
+    private static Dictionary<string, string> MachineVariables(string endpoint)
+    {
+        var machine = Convert.ToBase64String(Encoding.UTF8.GetBytes("org1:proj1:m1")).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+        return new Dictionary<string, string>
+        {
+            ["STORYTELLER_ENDPOINT"] = endpoint,
+            ["STORYTELLER_API_KEY"] = $"2s.{machine}.not-a-real-secret",
+        };
     }
 
     // A port nothing listens on: bound, then released.

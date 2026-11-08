@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
@@ -39,7 +40,7 @@ public class KeyValuePolicySetCommand : KeyValueCommandBase
     {
     }
 
-    [Option("--allow", CommandOptionType.MultipleValue, Description = "The allowed levels (repeatable): public, standard, hsm, byok, hyok. Public is always allowed.")]
+    [Option("--allow", CommandOptionType.MultipleValue, Description = "The allowed levels (repeatable): public, standard, hsm, byok, hyok; they replace the stored ones. Public is always allowed.")]
     public string[]? Allow { get; set; }
 
     [Option("--default", CommandOptionType.SingleValue, Description = "The default secret level clients offer.")]
@@ -64,7 +65,7 @@ public class KeyValuePolicySetCommand : KeyValueCommandBase
     {
         var update = new KeyValuePolicyUpdate
         {
-            AllowedProtections = Allow is { Length: > 0 } ? Allow.Select(text => KeyValueLevels.To<AllowedProtections2>(KeyValueLevels.Parse(Console, text))).Distinct().ToList() : null,
+            AllowedProtections = Allow is { Length: > 0 } ? ToAllowedProtections(Allow) : null,
             DefaultSecretProtection = Default is null ? null : KeyValueLevels.To<KeyValuePolicyUpdateDefaultSecretProtection>(KeyValueLevels.Parse(Console, Default)),
             RequireMtlsForSecretDelivery = ParseBool(RequireMtls),
             HsmRotationInterval = HsmRotationDays is null ? null : TimeSpan.FromDays(HsmRotationDays.Value).ToString("c"),
@@ -83,6 +84,17 @@ public class KeyValuePolicySetCommand : KeyValueCommandBase
         Console.WriteImportant($"The policy of {Context.OrganizationName}.{Context.ProjectName} is at version {policy.Version}.");
         Console.WriteJson(policy);
         return ExitCodes.SUCCESS;
+    }
+
+    // The given list replaces the stored one, and the API refuses a list without public ("Public pairs can not be
+    // disabled."), so public is always sent, first, as the help says.
+    private List<AllowedProtections2> ToAllowedProtections(string[] levels)
+    {
+        return levels
+            .Select(text => KeyValueLevels.To<AllowedProtections2>(KeyValueLevels.Parse(Console, text)))
+            .Prepend(AllowedProtections2.Public)
+            .Distinct()
+            .ToList();
     }
 
     private bool? ParseBool(string? text)

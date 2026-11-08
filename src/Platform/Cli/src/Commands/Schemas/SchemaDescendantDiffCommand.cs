@@ -29,7 +29,7 @@ public class SchemaDescendantDiffCommand : SchemaApiCommand
     [Argument(3, Description = "The version to compare from. If not specified, the previous version of 'to' is used.")]
     public string? FromVersion { get; set; }
 
-    [Option("--format", CommandOptionType.SingleValue, Description = "Response format passed to the API: 'json' (default) or 'unified'.")]
+    [Option("--format", CommandOptionType.SingleValue, Description = "'json' (default): the coloured diff with line numbers; 'unified': the plain unified diff, to be piped.")]
     public string? Format { get; set; }
 
     protected override Task<int> ExecuteAsync()

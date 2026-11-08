@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using System.Text;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Storyteller.Sdk;
 using Spectre.Console;
@@ -55,6 +57,50 @@ public static class DiffResultConsoleExtensions
 
             @this.WriteLine();
         }
+    }
+
+    /// <summary>
+    /// Writes a diff returned by the API as the plain unified text of the API's <c>?format=unified</c>: a hunk header
+    /// <c>@@ -a,b +c,d @@</c>, then each line with its prefix '+', '-' or ' '. The text goes to the standard output as it
+    /// is, in UTF-8 with LF line ends, to be piped; "No changes detected." goes to the standard error.
+    /// </summary>
+    public static void WriteUnifiedDiff(this IExtendedConsole @this, DiffResult diff)
+    {
+        var text = ToUnifiedDiff(diff);
+
+        if (text.Length == 0)
+        {
+            @this.WriteErrorLine("No changes detected.");
+            return;
+        }
+
+        using var encoding = @this.UseUtf8Output();
+        @this.WriteRaw(text);
+    }
+
+    // As DiffFormatter.ToUnifiedDiff of the API (Abstractions.Annotations), with LF line ends.
+    internal static string ToUnifiedDiff(DiffResult diff)
+    {
+        var text = new StringBuilder();
+
+        foreach (var hunk in diff.Hunks ?? [])
+        {
+            text.Append(CultureInfo.InvariantCulture, $"@@ -{hunk.OldStart},{hunk.OldCount} +{hunk.NewStart},{hunk.NewCount} @@").Append('\n');
+
+            foreach (var line in hunk.Lines ?? [])
+            {
+                var prefix = line.Type switch
+                {
+                    DiffLineType.Addition => '+',
+                    DiffLineType.Deletion => '-',
+                    _ => ' ',
+                };
+
+                text.Append(prefix).Append(line.Content).Append('\n');
+            }
+        }
+
+        return text.ToString();
     }
 
     private static void RenderLineWithSegments(DiffLine line, string prefix, string baseColor)

@@ -76,7 +76,8 @@ namespace _42.Platform.Cli
             services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
             services.AddSingleton<TransferPolling>();
 
-            // Needed by KeyValueListCommand: McMaster ignores parameter defaults and resolves every one.
+            // McMaster's constructor injection ignores the default value of an optional parameter: every parameter of a
+            // command's constructor has to be registered (CommandConstructionTests builds every command through this).
             services.AddSingleton(TimeProvider.System);
 
             ConfigureStorytellerSdk(services);

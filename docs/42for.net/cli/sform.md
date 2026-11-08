@@ -383,6 +383,26 @@ A missing value ends with `2`, as when it is missing on the command line; a conf
 
 Without any console at all, as when a program redirects standard input, output and error, `sform` writes its output as plain text: lines of at most `COLUMNS` characters (250 when it is not set), without trailing spaces.
 
+### Output for scripts
+
+These commands write their payload to standard output as it is, in UTF-8, without the margin and the line wrapping of the other output. A successful run writes nothing else there: its notes go to standard error, so a pipe or a redirect gets the payload alone, however long its lines are:
+
+| Command | Standard output of a successful run | Standard error |
+|---|---|---|
+| `sform story config <key> --content-only` | The content, see [Read a configuration](#read-a-configuration) | The messages of the command, also of a failed run |
+| `sform story kv export` without `-o` | The document in its format (`json`, `flat` or `env`), with LF line ends | The note on secrets without a value, which `flat` and `env` leave out |
+| `sform story kv get <key> --value-only` | The value, and a line end | Nothing |
+| `sform story schema type\|annotation\|descendant diff … --format unified` | The unified diff: `@@ -a,b +c,d @@` hunks of lines that start with `+`, `-` or a space, with LF line ends; nothing for a diff without changes | "No changes detected." |
+
+Only the payload of a successful run is alone on standard output. A run that is refused or fails writes its message to standard output, as every other command does, and ends with a non-zero exit code (see [Exit codes](#exit-codes)): an unknown key or format, a refusal of the API, a value that cannot be decrypted. `config --content-only` is the exception: it writes its own messages to standard error, and only parsing errors, sign-in failures, refusals of the API (`401`, `403`) and crashes to standard output. `kv get --value-only` of a pair without a value, such as a secret without `--reveal`, prints "The value is a secret; add --reveal." or "The pair has no value." and ends with `44`. So a script checks the exit code before it uses what it captured:
+
+``` bash
+set -e
+sform story kv export --format env > .env
+TOKEN="$(sform story kv get api.token --reveal --value-only)"
+sform story schema type diff exe 3 1 --format unified > exe.diff
+```
+
 ### The device code for programs
 
 A program that runs `sform account` and confirms the code itself, such as an automated test, sets `SFORM_DEVICE_CODE_OUTPUT=json`. The prompt is then also written to standard error as one JSON line, at once, before any other output of the prompt and before `sform` starts to wait:

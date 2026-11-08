@@ -14,6 +14,9 @@ namespace _42.Platform.Cli.Commands.Schemas;
 
 internal static class SchemaOperations
 {
+    // The --format of the diffs that sform writes itself: the API's text/plain answer does not reach it.
+    internal const string UnifiedFormat = "unified";
+
     public static async Task<int> GetAsync(
         IExtendedConsole console,
         ISchemasApiClient api,
@@ -223,7 +226,10 @@ internal static class SchemaOperations
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var responseFormat = string.IsNullOrWhiteSpace(format) ? null : format;
+        // The API answers ?format=unified as text/plain, which the typed client of the SDK reads as a failed call (an
+        // ApiException of a 200): sform asks for the JSON diff and writes the unified text itself, as the API would.
+        var isUnified = string.Equals(format?.Trim(), UnifiedFormat, StringComparison.OrdinalIgnoreCase);
+        var responseFormat = isUnified || string.IsNullOrWhiteSpace(format) ? null : format;
 
         try
         {
@@ -249,7 +255,14 @@ internal static class SchemaOperations
                 diff = await DiffVersionAsync(api, context, layer, annotationType, annotationKey, latestVersion, responseFormat);
             }
 
-            console.WriteDiffResult(diff);
+            if (isUnified)
+            {
+                console.WriteUnifiedDiff(diff);
+            }
+            else
+            {
+                console.WriteDiffResult(diff);
+            }
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
