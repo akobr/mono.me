@@ -11,7 +11,8 @@ namespace _42.Platform.Cli.AutomationTests.Tests.KeyValues;
 // encrypts locally for them (kv set --protection hyok), decrypts with a recipient's private key (kv get --private-key
 // --kid) and encrypts again for the current recipients (kv reencrypt). The recipients and the level hyok belong to the
 // project's policy, so every case runs in a disposable project; the test generates the recipients' RSA keys (3072 bits)
-// into its working directory.
+// into its working directory. A write at hyok right after a change of the policy goes through AfterPolicyChangeAsync:
+// the API checks it against its instance's cached policy.
 [Area(Area.KeyValues)]
 public sealed class KeyValueRecipientTests : CliTest
 {
@@ -116,7 +117,7 @@ public sealed class KeyValueRecipientTests : CliTest
         (await Sform(InProject("story", "kv", "set", plain, CliData.Value(), "--protection", "public"))).ShouldSucceed();
         (await Sform(new SformRunOptions { Secrets = [standardValue] }, InProject("story", "kv", "set", standard, standardValue, "--protection", "standard"))).ShouldSucceed();
 
-        (await Sform(new SformRunOptions { Secrets = [value] }, InProject("story", "kv", "set", key, value, "--protection", "hyok")))
+        (await AfterPolicyChangeAsync(new SformRunOptions { Secrets = [value] }, InProject("story", "kv", "set", key, value, "--protection", "hyok")))
             .ShouldSucceed()
             .ShouldContain("Encrypted locally for 1 recipient(s); the platform cannot read the value.")
             .ShouldContain($"'{key}' is at version 1 (Hyok).");
@@ -172,7 +173,7 @@ public sealed class KeyValueRecipientTests : CliTest
         (await Sform(InProject("story", "kv", "recipients", "disable", b.Id)))
             .ShouldSucceed()
             .ShouldContain($"Recipient '{b.Id}' is disabled.");
-        (await Sform(new SformRunOptions { Secrets = [firstValue] }, InProject("story", "kv", "set", first, firstValue, "--protection", "hyok")))
+        (await AfterPolicyChangeAsync(new SformRunOptions { Secrets = [firstValue] }, InProject("story", "kv", "set", first, firstValue, "--protection", "hyok")))
             .ShouldSucceed()
             .ShouldContain("Encrypted locally for 1 recipient(s); the platform cannot read the value.");
         (await Sform(InProject("story", "kv", "get", first, "--private-key", b.PrivateKeyFile, "--kid", b.Id)))
@@ -183,7 +184,7 @@ public sealed class KeyValueRecipientTests : CliTest
         (await Sform(InProject("story", "kv", "recipients", "enable", b.Id)))
             .ShouldSucceed()
             .ShouldContain($"Recipient '{b.Id}' is enabled.");
-        (await Sform(new SformRunOptions { Secrets = [secondValue] }, InProject("story", "kv", "set", second, secondValue, "--protection", "hyok")))
+        (await AfterPolicyChangeAsync(new SformRunOptions { Secrets = [secondValue] }, InProject("story", "kv", "set", second, secondValue, "--protection", "hyok")))
             .ShouldSucceed()
             .ShouldContain("Encrypted locally for 2 recipient(s); the platform cannot read the value.");
         await AssertDecryptsAsync(second, b, secondValue);
@@ -213,7 +214,7 @@ public sealed class KeyValueRecipientTests : CliTest
         var key = CliData.KeyValueKey();
         var value = CliData.SecretValue();
         AddSecret(value);
-        (await Sform(new SformRunOptions { Secrets = [value] }, InProject("story", "kv", "set", key, value, "--protection", "hyok")))
+        (await AfterPolicyChangeAsync(new SformRunOptions { Secrets = [value] }, InProject("story", "kv", "set", key, value, "--protection", "hyok")))
             .ShouldSucceed()
             .ShouldContain("Encrypted locally for 4 recipient(s); the platform cannot read the value.");
 
@@ -268,18 +269,19 @@ public sealed class KeyValueRecipientTests : CliTest
         foreach (var (key, value) in values)
         {
             AddSecret(value);
-            (await Sform(new SformRunOptions { Secrets = [value] }, InProject("story", "kv", "set", key, value, "--protection", "hyok")))
+            (await AfterPolicyChangeAsync(new SformRunOptions { Secrets = [value] }, InProject("story", "kv", "set", key, value, "--protection", "hyok")))
                 .ShouldSucceed()
                 .ShouldContain("Encrypted locally for 1 recipient(s); the platform cannot read the value.");
         }
 
         var d = await AddRecipientAsync("d");
 
-        (await Sform(InProject("story", "kv", "reencrypt", $"{group}.single", "--private-key", a.PrivateKeyFile, "--kid", a.Id)))
+        // each value is encrypted again for <a> and <d>: an instance that has not seen <d> yet refuses it (UnknownRecipient)
+        (await AfterPolicyChangeAsync(new SformRunOptions(), InProject("story", "kv", "reencrypt", $"{group}.single", "--private-key", a.PrivateKeyFile, "--kid", a.Id)))
             .ShouldSucceed()
             .ShouldContain("1 value(s) encrypted again for 2 recipient(s).")
             .ShouldNotContain("skipped");
-        (await Sform(InProject("story", "kv", "reencrypt", "--prefix", $"{group}.hyok.", "--private-key", a.PrivateKeyFile, "--kid", a.Id)))
+        (await AfterPolicyChangeAsync(new SformRunOptions(), InProject("story", "kv", "reencrypt", "--prefix", $"{group}.hyok.", "--private-key", a.PrivateKeyFile, "--kid", a.Id)))
             .ShouldSucceed()
             .ShouldContain("2 value(s) encrypted again for 2 recipient(s).")
             .ShouldNotContain("skipped");
@@ -300,6 +302,18 @@ public sealed class KeyValueRecipientTests : CliTest
         await WriteFileAsync(privateKeyFile, key.PrivatePem);
         var added = (await Sform(InProject("story", "kv", "recipients", "add", "--name", CliData.Slug("rcp"), "--public-key", $"{letter}.pem"))).ShouldSucceed();
         return new Recipient(KeyValuesSupportB.RecipientIdOf(added), privateKeyFile);
+    }
+
+    // A write at hyok (kv set --protection hyok, kv reencrypt) after a change of the policy (hyok allowed, a recipient
+    // added, disabled or enabled), run until it succeeds, at most for KeyValuesSupportA.PolicyCacheWait; the last run,
+    // which the test checks as usual. The API checks the level and the recipients of the value against its instance's
+    // copy of the policy, cached for a minute (a change refreshes only the instance that served it): an older copy
+    // refuses the level (409 ProtectionNotAllowed) or a recipient (400 UnknownRecipient), and nothing is written. sform
+    // encrypts for the recipients of the stored policy (GET recipients reads past the cache), so a write that passes has
+    // the current ones. A refused reencrypt --prefix may have encrypted some values again; the next run does all again.
+    private Task<SformResult> AfterPolicyChangeAsync(SformRunOptions options, params string[] arguments)
+    {
+        return EventuallyAsync(() => Sform(options, arguments), result => result.Succeeded, KeyValuesSupportA.PolicyCacheWait);
     }
 
     // kv policy set --allow public --allow standard --allow hyok: hyok allowed, which needs an enabled recipient.

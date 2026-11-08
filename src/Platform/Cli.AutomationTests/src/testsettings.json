@@ -18,9 +18,9 @@
     // { "<Role>": "<org>/<project>[/<view>]" }: a project where every pool user holds the role, for the tests of that
     // role ([UserRole]); a role without an entry leases a pool user who holds it in Target:Project.
     "RoleProjects": {},
-    // What the target offers beyond the basics ([RequiresFeature]): Byok (with KeyValues below), Hsm, Registration,
-    // MultiOrganization (each with a pool user whose Roles list the feature's name). A test of a feature that is not
-    // listed is skipped.
+    // What the target offers beyond the basics ([RequiresFeature]): Byok (with KeyValues below), ByokApplication (the
+    // platform's BYOK application on the API; Byok implies it), Hsm, Registration, MultiOrganization (each with a pool
+    // user whose Roles list the feature's name). A test of a feature that is not listed is skipped.
     "Features": []
   },
   // The target's customer key of the Byok cases, required when Target:Features lists Byok: the versionless URI of a Key

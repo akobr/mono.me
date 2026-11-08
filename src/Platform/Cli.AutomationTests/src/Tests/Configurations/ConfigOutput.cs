@@ -13,7 +13,8 @@ namespace _42.Platform.Cli.AutomationTests.Tests.Configurations;
 //     (WriteNumberedText, the gutter removed), LastJson the last model WriteJson printed (config patch prints the JSON
 //     Patch first, then the saved model);
 //   - ConfigurationVersions, TemplateVersions: the headers of config versions and template versions, whose rows
-//     SformResult.VersionRows reads (top to bottom, the newest first);
+//     SformResult.VersionRows reads (top to bottom, the newest first), and VersionAuthors the first word of their Author
+//     cells;
 //   - HasDiffLine: a deleted ('-') or added ('+') line of a diff (WriteDiffResult: "<old> <new> │ - <line>");
 //   - SavedVersion: N of "… has been saved (version N)." of config edit and template edit;
 //   - GitHubEnvNames, GitHubEnvValueOf: the heredoc entries of a GITHUB_ENV file (NAME<<ghadelimiter_…, the value, the
@@ -96,6 +97,28 @@ internal static partial class ConfigOutput
         return Regex.IsMatch(result.PlainStdOut, pattern, RegexOptions.Multiline | RegexOptions.CultureInvariant);
     }
 
+    // The first word of the Author cell of each row of a versions table (Version, Author, Created, Expires; the rows that
+    // SformResult.VersionRows reads), top to bottom: the cell may wrap, its first word stays on the row's line. A user's
+    // stamp is the provider's name of the account (or its id); one without a user prints "unknown", the platform's
+    // "system" and a machine's "machine:<id>" (AuditConsoleExtensions.FormatActor).
+    public static IReadOnlyList<string> VersionAuthors(SformResult result, string headerStart)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentException.ThrowIfNullOrWhiteSpace(headerStart);
+        var lines = result.Lines.ToList();
+        var header = lines.FindIndex(line => line.Contains(headerStart, StringComparison.Ordinal));
+        if (header < 0)
+        {
+            throw result.Fail($"printed no \"{headerStart} …\" header");
+        }
+
+        return lines.Skip(header + 1)
+            .Select(line => VersionAuthorPattern().Match(line))
+            .Where(match => match.Success)
+            .Select(match => match.Groups["author"].Value)
+            .ToList();
+    }
+
     // N of "… has been saved (version N)."; fails the run's assertion without it.
     public static long SavedVersion(SformResult result)
     {
@@ -134,6 +157,10 @@ internal static partial class ConfigOutput
     // A date of a versions table ("yyyy-MM-dd HH:mm"; the time may wrap to the next line of its cell).
     [GeneratedRegex(@"\d{4}-\d{2}-\d{2}", RegexOptions.CultureInvariant)]
     public static partial Regex DatePattern();
+
+    // A row of a versions table: its version, white space and the first word of the Author cell.
+    [GeneratedRegex(@"^\s*\d+\s+(?<author>\S+)", RegexOptions.CultureInvariant)]
+    private static partial Regex VersionAuthorPattern();
 
     [GeneratedRegex(@"has been saved \(version (?<version>\d+)\)\.", RegexOptions.CultureInvariant)]
     private static partial Regex SavedPattern();

@@ -158,7 +158,11 @@ public sealed class KeyValueContextTests : CliTest
     // and kv usage. Each acts on B: its policy changes and its key rotates, the recipients, the audit events and the usage
     // are B's; the view changes nothing for the policy (both reads are the same version) and the recipients, while kv audit
     // lists only the events of <view>. A's policy (the mTLS rule, the Standard key's version, the recipients) stays as it
-    // was.
+    // was. byok-setup and byok-verify need the platform's BYOK application (the feature ByokApplication, which Byok
+    // implies): without it the API answers both with 501 ProtectionNotConfigured before it looks at the project, so the
+    // steps then check exit 2 and "Error code: ProtectionNotConfigured" (the options reached the API). A's Standard key is
+    // compared only when A had one at the start: the first Standard secret of a project records its key in the policy,
+    // and other tests write Standard secrets into A meanwhile.
     [Test]
     [TestCase(462)]
     [UserRole(Role.Owner)]
@@ -204,14 +208,25 @@ public sealed class KeyValueContextTests : CliTest
             .ShouldContain($"The policy of {projectB} is at version ");
         await Assert.That(mtlsOn.JsonNode()["RequireMtlsForSecretDelivery"]?.GetValue<bool>()).IsTrue();
 
+        var byokApplication = Target.HasFeature(CliFeatures.ByokApplication);
         foreach (var arguments in new[] { Long("story", "kv", "policy", "byok-setup"), Short("story", "kv", "policy", "byok-setup") })
         {
-            (await Sform(arguments)).ShouldSucceed().ShouldContain("Bring your own key");
+            var setup = await Sform(arguments);
+            if (byokApplication)
+            {
+                setup.ShouldSucceed().ShouldContain("Bring your own key");
+            }
+            else
+            {
+                setup.ShouldExitWith(CliExit.WrongInput).ShouldContain("Error code: ProtectionNotConfigured");
+            }
         }
 
         foreach (var arguments in new[] { Long("story", "kv", "policy", "byok-verify"), Short("story", "kv", "policy", "byok-verify") })
         {
-            (await Sform(arguments)).ShouldExitWith(CliExit.WrongInput).ShouldContain("Error code: ByokNotConfigured");
+            (await Sform(arguments))
+                .ShouldExitWith(CliExit.WrongInput)
+                .ShouldContain(byokApplication ? "Error code: ByokNotConfigured" : "Error code: ProtectionNotConfigured");
         }
 
         foreach (var arguments in new[] { Long("story", "kv", "policy", "rotate", "--protection", "standard"), Short("story", "kv", "policy", "rotate", "--protection", "standard") })
@@ -260,7 +275,11 @@ public sealed class KeyValueContextTests : CliTest
 
         var policyOfAAfter = await PolicyOfAsync(Target.ProjectKey);
         await Assert.That(policyOfAAfter["RequireMtlsForSecretDelivery"]?.ToJsonString()).IsEqualTo(policyOfA["RequireMtlsForSecretDelivery"]?.ToJsonString());
-        await Assert.That(policyOfAAfter["Standard"]?["CurrentKeyVersion"]?.ToJsonString()).IsEqualTo(policyOfA["Standard"]?["CurrentKeyVersion"]?.ToJsonString());
+        if (policyOfA["Standard"]?["CurrentKeyVersion"] is { } standardKeyOfA)
+        {
+            await Assert.That(policyOfAAfter["Standard"]?["CurrentKeyVersion"]?.ToJsonString()).IsEqualTo(standardKeyOfA.ToJsonString());
+        }
+
         await Assert.That(Sorted(RecipientIds(policyOfAAfter))).IsEquivalentTo(Sorted(RecipientIds(policyOfA)));
     }
 

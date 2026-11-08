@@ -132,12 +132,13 @@ public sealed class KeyValuePolicyTests : CliTest
     // In a disposable project, kv policy byok-setup prints "Bring your own key" with the consent URL of the platform's
     // application, the role to grant its service principal, the commands to set and verify the key and the application
     // id; kv policy byok-verify, with no customer key in the policy, ends with 2, the server's message and "Error code:
-    // ByokNotConfigured". The target has the platform's BYOK application (as the catalogue assumes), not necessarily a
-    // customer key (the Byok feature).
+    // ByokNotConfigured". Both need the platform's BYOK application on the API (the feature ByokApplication, which Byok
+    // implies), not a customer key: without the application the API answers both with 501 ProtectionNotConfigured.
     [Test]
     [TestCase(445)]
     [UserRole(Role.Owner)]
     [DisposableProject]
+    [RequiresFeature(CliFeatures.ByokApplication)]
     [Covers("story kv policy byok-setup")]
     [Covers("story kv policy byok-verify")]
     public async Task KvPolicy_ByokSetup_PrintsSteps()
@@ -294,6 +295,13 @@ public sealed class KeyValuePolicyTests : CliTest
         return stored is not null && string.Equals(stored.TrimEnd('/'), given.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
     }
 
+    // A write at a level the policy has just allowed, run until it succeeds, at most for KeyValuesSupportA.PolicyCacheWait;
+    // the last run, which the test checks as usual.
+    private Task<SformResult> AtNewLevelAsync(SformRunOptions options, params string[] arguments)
+    {
+        return EventuallyAsync(() => Sform(options, arguments), result => result.Succeeded, KeyValuesSupportA.PolicyCacheWait);
+    }
+
     // The steps KV-POL-07 and KV-POL-08 share once the level is allowed and the default: a secret set at the level, a
     // standard secret moved to it, a secret imported at it (with a public pair beside it), [hsm: the key rotated,] each
     // readable; the list and the export of the level hold only the three; the audit's reprotect lists the move only.
@@ -314,17 +322,20 @@ public sealed class KeyValuePolicyTests : CliTest
 
         (await Sform(new SformRunOptions { Secrets = secrets }, InProject("story", "kv", "set", moved, movedValue, "--protection", "standard"))).ShouldSucceed();
 
-        (await Sform(new SformRunOptions { Secrets = secrets }, InProject("story", "kv", "set", set, setValue, "--protection", level)))
+        // the set, the protect and the import at the level just allowed check the API's cached policy (a minute on each
+        // instance, KeyValuesSupportA.PolicyCacheWait): each goes again until the level is allowed there; a refused one
+        // writes nothing (409 ProtectionNotAllowed)
+        (await AtNewLevelAsync(new SformRunOptions { Secrets = secrets }, InProject("story", "kv", "set", set, setValue, "--protection", level)))
             .ShouldSucceed()
             .ShouldContain($"'{set}' is at version 1 ({levelName}).");
 
-        (await Sform(InProject("story", "kv", "protect", moved, "--protection", level)))
+        (await AtNewLevelAsync(new SformRunOptions(), InProject("story", "kv", "protect", moved, "--protection", level)))
             .ShouldSucceed()
             .ShouldContain("1 of 1 keys protected.");
 
         var envFile = $"{level[0]}.env";
         await WriteFileAsync(envFile, $"{KeyValuesSupportB.EnvName(imported)}={importedValue}\n{KeyValuesSupportB.EnvName(plain)}={CliData.Value()}\n");
-        (await Sform(new SformRunOptions { Secrets = secrets }, InProject("story", "kv", "import", envFile, "--format", "env", "--secret", $"{group}.{level[0].ToString().ToUpperInvariant()}_*", "--protection", level, "-y")))
+        (await AtNewLevelAsync(new SformRunOptions { Secrets = secrets }, InProject("story", "kv", "import", envFile, "--format", "env", "--secret", $"{group}.{level[0].ToString().ToUpperInvariant()}_*", "--protection", level, "-y")))
             .ShouldSucceed()
             .ShouldContain("Imported: 2 create.");
 

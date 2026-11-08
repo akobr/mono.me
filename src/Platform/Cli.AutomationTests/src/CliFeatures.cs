@@ -6,6 +6,12 @@ public static class CliFeatures
     // A customer key in an Azure Key Vault (BYOK): KeyValues:ByokKeyUri and KeyValues:ByokTenantId (KeyValueSettings).
     public const string Byok = "Byok";
 
+    // The platform's BYOK application on the API (KeyValues:Protection:Byok of the deployment, or the Key Vault emulator
+    // of the Aspire host), without a customer key: what kv policy byok-setup prints and what byok-verify verifies a
+    // customer key with; without it the API answers both with 501 ProtectionNotConfigured. Byok implies it
+    // (CliTarget.HasFeature).
+    public const string ByokApplication = "ByokApplication";
+
     // HSM-backed keys.
     public const string Hsm = "Hsm";
 
@@ -15,7 +21,7 @@ public static class CliFeatures
     // A pool user in two WorkOS organizations.
     public const string MultiOrganization = "MultiOrganization";
 
-    public static IReadOnlyList<string> All { get; } = [Byok, Hsm, Registration, MultiOrganization];
+    public static IReadOnlyList<string> All { get; } = [Byok, ByokApplication, Hsm, Registration, MultiOrganization];
 
     // The features a pool user stands for: the target marks that user with the feature's name among its Roles in
     // Users:Pool (e.g. { "Email": "…", "Roles": [ "Reader", "Registration" ] }). A [RequiresFeature] test of such a feature

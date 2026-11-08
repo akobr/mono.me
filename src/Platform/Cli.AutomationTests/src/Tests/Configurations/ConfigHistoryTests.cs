@@ -17,8 +17,9 @@ public sealed class ConfigHistoryTests : CliTest
 
     // CFG-HIS-01: config versions lists the versions newest first.
     // An Editor writes three versions of <rst> (a=1, a=2, a=3); as a Reader, config versions <rst> prints "Versions of the
-    // configuration for '<rst>'" and a table whose rows are the three versions, the newest first, with their times (the
-    // author's name is the provider's and not checked).
+    // configuration for '<rst>'" and a table whose rows are the three versions, the newest first, with their times and
+    // their author: the same account in each row (its name is the provider's, so it is not compared with a value), never
+    // "unknown", "system" or a machine.
     [Test]
     [TestCase(428)]
     [UserRole(Role.Reader)]
@@ -34,6 +35,13 @@ public sealed class ConfigHistoryTests : CliTest
             .ShouldContain($"Versions of the configuration for '{key}'")
             .ShouldMatch(ConfigOutput.DatePattern());
         await Assert.That(Join(listed.VersionRows(ConfigOutput.ConfigurationVersions))).IsEqualTo(Join(written.Reverse()));
+
+        var authors = ConfigOutput.VersionAuthors(listed, ConfigOutput.ConfigurationVersions);
+        await Assert.That(authors.Count).IsEqualTo(written.Length).Because(listed.PlainStdOut);
+        await Assert.That(authors.Distinct(StringComparer.Ordinal).Count()).IsEqualTo(1).Because(listed.PlainStdOut);
+        await Assert.That(authors[0] is "unknown" or "system" || authors[0].StartsWith("machine:", StringComparison.Ordinal))
+            .IsFalse()
+            .Because(listed.PlainStdOut);
     }
 
     // CFG-HIS-02: config diff compares the latest with its previous version, or two given versions.

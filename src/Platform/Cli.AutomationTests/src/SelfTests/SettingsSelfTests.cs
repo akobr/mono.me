@@ -3,9 +3,9 @@ using _42.Testing.UI.Automation.Runtime.Users;
 namespace _42.Platform.Cli.AutomationTests.SelfTests;
 
 // The suite's own rules about its settings and its pool, without a target: the KeyValues section of the BYOK cases
-// (required with the feature Byok, its shape checked when set) and the feature users (a test of a user feature leases the
-// user the feature stands for, every other lease excludes those users, and the target check signs in another user when the
-// library leased it one of them).
+// (required with the feature Byok, its shape checked when set), Byok standing for ByokApplication too, and the feature
+// users (a test of a user feature leases the user the feature stands for, every other lease excludes those users, and the
+// target check signs in another user when the library leased it one of them).
 [Category(CliCategories.SelfTest)]
 public sealed class SettingsSelfTests
 {
@@ -25,6 +25,19 @@ public sealed class SettingsSelfTests
         await Assert.That(Errors(new KeyValueSettings { ByokKeyUri = KeyUri }, withByok)).IsEquivalentTo(new[] { KeyValueSettings.MissingCustomerKey });
         await Assert.That(Errors(new KeyValueSettings { ByokKeyUri = KeyUri, ByokTenantId = TenantId }, withByok)).IsEmpty();
         await Assert.That(Errors(new KeyValueSettings(), new CliTarget())).IsEmpty();
+    }
+
+    // Byok, a customer key, needs the platform's BYOK application, so it stands for ByokApplication too; not the reverse.
+    [Test]
+    public async Task Features_ByokImpliesTheByokApplication()
+    {
+        var withByok = new CliTarget { Features = [CliFeatures.Byok] };
+        var withApplication = new CliTarget { Features = [" byokapplication "] };
+
+        await Assert.That(withByok.HasFeature(CliFeatures.ByokApplication)).IsTrue();
+        await Assert.That(withApplication.HasFeature(CliFeatures.ByokApplication)).IsTrue();
+        await Assert.That(withApplication.HasFeature(CliFeatures.Byok)).IsFalse();
+        await Assert.That(new CliTarget().HasFeature(CliFeatures.ByokApplication)).IsFalse();
     }
 
     [Test]
