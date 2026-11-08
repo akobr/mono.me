@@ -1,6 +1,6 @@
 # Storyteller configuration action
 
-A composite GitHub Action that reads the resolved configuration of an annotation from the 2S Platform and exports it into the environment of the job, into a file, or both. It installs [`sform`](https://42for.net/cli/sform) and runs `sform story config <key> --resolved` once, with `--github-env` or `--mask`, so the names, the masks, the heredocs and the refusals are those of `sform` and its tests ([Export to GitHub Actions](https://42for.net/cli/sform#export-to-github-actions)). The public page is [GitHub Action](https://42for.net/cli/github-action).
+A composite GitHub Action that reads the resolved configuration of an annotation from the 2S Platform and exports it into the environment of the job, into a file, or both. It installs [`sform`](https://42for.net/cli/sform) and runs `sform story config export <key>` once, which always reads the resolved configuration and always masks, so the names, the masks, the heredocs and the refusals are those of `sform` and its tests ([Export to GitHub Actions](https://42for.net/cli/sform#export-to-github-actions)). The public page is [GitHub Action](https://42for.net/cli/github-action).
 
 - **Specs:** [Flat Output Formats for Configurations](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Flat%20Output%20Formats%20for%20Configurations.md), sections 8 and 9; [Publishing the GitHub Action and Secrets in CI](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Publishing%20the%20GitHub%20Action%20and%20Secrets%20in%20CI.md).
 - **Source:** [`src/Platform/GitHubAction`](https://github.com/akobr/mono.me/tree/main/src/Platform/GitHubAction) of the monorepo `akobr/mono.me`. Releases are copied into a repository of their own, see [Releasing](#releasing).
@@ -25,7 +25,7 @@ A composite GitHub Action that reads the resolved configuration of an annotation
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
-The action is released into a repository of its own, listed on GitHub Marketplace, with a tag `vX.Y.Z` per release and a major tag `vX` that moves with them (see [Releasing](#releasing)). Once the first release is out, use it from there as `<owner>/<name>@v1`; the owner and the name of that repository are not decided yet. Until then, and for changes that are not released, pin a commit of the monorepo, `akobr/mono.me/src/Platform/GitHubAction@<commit>`, as the examples here do. A workflow of the monorepo uses `./src/Platform/GitHubAction` after `actions/checkout`. No `sform` on NuGet has these options yet, so every example installs the one the workflow packed in an earlier step `sform` (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
+The action is released into a repository of its own, listed on GitHub Marketplace, with a tag `vX.Y.Z` per release and a major tag `vX` that moves with them (see [Releasing](#releasing)). Once the first release is out, use it from there as `<owner>/<name>@v1`; the owner and the name of that repository are not decided yet. Until then, and for changes that are not released, pin a commit of the monorepo, `akobr/mono.me/src/Platform/GitHubAction@<commit>`, as the examples here do. A workflow of the monorepo uses `./src/Platform/GitHubAction` after `actions/checkout`. No `sform` on NuGet has `story config export` yet, so every example installs the one the workflow packed in an earlier step `sform` (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
 
 ## Inputs
 
@@ -37,10 +37,11 @@ The action is released into a repository of its own, listed on GitHub Marketplac
 | `endpoint` | | The address of the API, `/api` included, passed as `STORYTELLER_ENDPOINT` |
 | `client-id` | | Passed as `STORYTELLER_CLIENT_ID`; a GUID in a job with `permissions: id-token: write` signs in with the job's OIDC token |
 | `export-env` | `false` | Export the resolved configuration into `GITHUB_ENV` (`--github-env`) |
-| `env-prefix` | | `--env-prefix`, for example `APP_`; with `export-env`, and for `output-file` in the `env` format |
+| `env-prefix` | | `--prefix`, for example `APP_`; with `export-env`, and for `output-file` in the `env` format |
 | `allow-unprefixed` | `false` | `--allow-unprefixed`: let `export-env` write the names of the configuration without a prefix |
+| `allow-unresolved` | `false` | `--allow-unresolved`: export binding expressions that were not resolved as they are, instead of failing |
 | `mask` | `bound` | `--mask`: `bound` masks the values that bindings produced, `all` every string and number |
-| `output-file` | | Also write the resolved configuration to this file (`--export <file> --format <format> --content-only`); best under `$RUNNER_TEMP`. A relative path is relative to the workspace |
+| `output-file` | | Also write the resolved configuration to this file (`--export <file> --format <format>`, the content alone); best under `$RUNNER_TEMP`. A relative path is relative to the workspace |
 | `format` | `env` | The format of `output-file`: `env`, `flat`, `properties`, `yaml` or `json` (the content alone) |
 | `cli-version` | required | The exact version of `42.Platform.Cli` to install |
 | `cli-source` | | An additional NuGet source of the tool, a URL or an absolute path, for example the folder the workflow packed `sform` into |
@@ -49,12 +50,12 @@ The action is released into a repository of its own, listed on GitHub Marketplac
 
 ## Steps
 
-1. **Check the inputs.** `key` and `cli-version` are required, `cli-version` is an exact version (no range, no path), `export-env` and `allow-unprefixed` are `true` or `false`, and `export-env`, `output-file` or both are set. Otherwise the step fails with a message that names the input, before anything is installed. An `env-prefix` that neither `export-env` nor an `env` file uses is a warning.
+1. **Check the inputs.** `key` and `cli-version` are required, `cli-version` is an exact version (no range, no path), `export-env`, `allow-unprefixed` and `allow-unresolved` are `true` or `false`, and `export-env`, `output-file` or both are set. Otherwise the step fails with a message that names the input, before anything is installed. An `env-prefix` that neither `export-env` nor an `env` file uses is a warning.
 2. **Look for .NET 10.** When `dotnet --list-sdks` lists an SDK `10.`, the runner keeps its .NET, and `sform` gets its root as `DOTNET_ROOT` when the job has none. Otherwise `actions/setup-dotnet@v6` installs `10.0.x`. The check is on the SDK, not the runtime: an older SDK cannot install a `net10.0` tool and a runtime alone installs nothing, while an SDK 10 brings the runtime `sform` runs on.
 3. **Install sform.** `dotnet tool install 42.Platform.Cli --version <cli-version> --tool-path "$RUNNER_TEMP/storyteller-action/sform-<cli-version>"`, with `--add-source <cli-source>` when it is set and never `--prerelease`. It runs in `$RUNNER_TEMP`, so the `nuget.config` and `global.json` of the repository are not read. A later use of the action in the job with the same version finds the tool in that folder.
-4. **Read the configuration.** One run of `sform story config <key> --resolved --mask <mask>`, with `--github-env` when `export-env` is true, `--export <output-file> --format <format> --content-only` when `output-file` is set, and `--env-prefix` and `--allow-unprefixed`. One resolved and one effective read give the variables, the masks and the file. `sform` writes the `::add-mask::` commands first, then `GITHUB_ENV`, then the file, and a summary to standard error: the names of the variables and the number of masked values, never a value.
+4. **Read the configuration.** One run of `sform story config export <key> --mask=<mask>`, with `--github-env` when `export-env` is true, `--export=<output-file> --format=<format>` when `output-file` is set, `--prefix=<env-prefix>` with `export-env` or with an `output-file` in `env`, `--allow-unprefixed` with `export-env`, and `--allow-unresolved` when `allow-unresolved` is true. The export implies `--resolved` and writes the file as the content alone. One resolved and one effective read give the variables, the masks and the file. `sform` writes the `::add-mask::` commands first, then `GITHUB_ENV`, then the file, and a summary to standard error: the names of the variables and the number of masked values, never a value.
 
-Inputs never reach a script through `${{ inputs.* }}`: every step gets them in `env:` under private names (`SA_KEY`, `SA_PROJECT`, …), quotes them, and builds the arguments of `sform` as a bash array. The step fails with the exit code of `sform`, `2` for a configuration or options it refuses (see [Read a configuration](https://42for.net/cli/sform#read-a-configuration)).
+Inputs never reach a script through `${{ inputs.* }}`: every step gets them in `env:` under private names (`SA_KEY`, `SA_PROJECT`, …), quotes them, and builds the arguments of `sform` as a bash array. Every value of an input goes in the `--option=value` form, because `sform` reads an argument that starts with `@` as a response file. The step fails with the exit code of `sform`, `2` for a configuration or options it refuses (see [Export to GitHub Actions](https://42for.net/cli/sform#export-to-github-actions)).
 
 ## Credentials
 
@@ -108,7 +109,7 @@ The machine needs `Secrets.Read` (`sform account machine create -r --scope secre
 
 The policy is per project: turned off, it lets every machine of the project with `Secrets.Read` receive secret values, and every machine with `Secrets.Write` write secrets, without mTLS, with an API key, client credentials or a federated token, not only the machine of the workflow.
 
-Without `Secrets.Read` or such a sign-in, the API withholds the secrets (`X-2S-Secrets-Withheld`) or returns the expressions of the secret bindings, and the action fails with exit code `2` and writes nothing. A machine without `Secrets.Read` can read a configuration without secret bindings.
+Without `Secrets.Read` or such a sign-in, the API withholds the secrets (`X-2S-Secrets-Withheld`) or returns the expressions of the secret bindings, and the action fails with exit code `2` and writes nothing. `allow-unresolved: true` exports such expressions as they are; withheld secrets always fail. A machine without `Secrets.Read` can read a configuration without secret bindings.
 
 ### Set up a certificate machine
 
@@ -139,7 +140,7 @@ The names come from the configuration, so whoever edits the configuration could 
 
 ## Until sform is published
 
-`42.Platform.Cli` on nuget.org is older than these options. Until a release has them, the workflow packs `sform` from the monorepo and installs it through `cli-source`:
+`42.Platform.Cli` on nuget.org is older than `story config export`. Until a release has it, the workflow packs `sform` from the monorepo and installs it through `cli-source`. The action of a commit runs `story config export`, so pack `sform` from the same commit or a newer one: an older `sform` has no such command and fails with exit code `-1` (`255` in bash).
 
 ```yaml
 steps:
@@ -180,7 +181,7 @@ A workflow of the monorepo checks out the monorepo itself (`fetch-depth: 0`), pa
 
 ## Checks
 
-No workflow tests the action (section 9 of the first spec): nothing in GitHub builds or tests .NET yet, and there is no Storyteller instance for a smoke test. The one workflow of the action releases it, see [Releasing](#releasing). The logic that matters for security (names, masks, heredocs, refusals) is in `sform`, with its unit tests ([`src/Platform/Cli/test`](https://github.com/akobr/mono.me/tree/main/src/Platform/Cli/test): `ConfigGetCommandTests`, `ConfigurationMasksTests`, `GitHubEnvironmentFileTests`). [The review of phase 5](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/reviews/2026-10-27%20Phase%205%20of%20Flat%20Output%20Formats%20for%20Configurations.md) records the local checks: `action.yml` parses, and its scripts ran in bash against a packed `sform` and a stub API, with stub `RUNNER_TEMP`, `GITHUB_ENV` and `GITHUB_OUTPUT`; `actionlint` was not available.
+No workflow tests the action (section 9 of the first spec): nothing in GitHub builds or tests .NET yet, and there is no Storyteller instance for a smoke test. The one workflow of the action releases it, see [Releasing](#releasing). The logic that matters for security (names, masks, heredocs, refusals) is in `sform`, with its unit tests ([`src/Platform/Cli/test`](https://github.com/akobr/mono.me/tree/main/src/Platform/Cli/test): `ConfigExportCommandTests`, `ConfigurationMasksTests`, `GitHubEnvironmentFileTests`). [The review of phase 5](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/reviews/2026-10-27%20Phase%205%20of%20Flat%20Output%20Formats%20for%20Configurations.md) records the local checks: `action.yml` parses, and its scripts ran in bash against a packed `sform` and a stub API, with stub `RUNNER_TEMP`, `GITHUB_ENV` and `GITHUB_OUTPUT`; `actionlint` was not available.
 
 ## Releasing
 

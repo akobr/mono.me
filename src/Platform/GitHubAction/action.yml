@@ -7,8 +7,8 @@ branding:
   icon: sliders
   color: purple
 
-# A thin wrapper of `sform story config <key> --resolved --github-env | --mask`: the names, the masks, the heredocs and
-# the refusals are sform's, with its tests. Credentials are not inputs; sform reads them from the job (STORYTELLER_*).
+# A thin wrapper of `sform story config export <key>`: the names, the masks, the heredocs and the refusals are sform's,
+# with its tests. Credentials are not inputs; sform reads them from the job (STORYTELLER_*).
 inputs:
   key:
     description: The annotation key of the configuration, for example exe.northwind.invoicing.production.
@@ -41,6 +41,10 @@ inputs:
     description: true to let export-env write the names of the configuration without a prefix.
     required: false
     default: 'false'
+  allow-unresolved:
+    description: true to export binding expressions that were not resolved as they are, instead of failing.
+    required: false
+    default: 'false'
   mask:
     description: bound masks the values bindings produced, all masks every string and number.
     required: false
@@ -71,6 +75,7 @@ runs:
         SA_KEY: ${{ inputs.key }}
         SA_EXPORT_ENV: ${{ inputs.export-env }}
         SA_ALLOW_UNPREFIXED: ${{ inputs.allow-unprefixed }}
+        SA_ALLOW_UNRESOLVED: ${{ inputs.allow-unresolved }}
         SA_ENV_PREFIX: ${{ inputs.env-prefix }}
         SA_OUTPUT_FILE: ${{ inputs.output-file }}
         SA_FORMAT: ${{ inputs.format }}
@@ -97,12 +102,14 @@ runs:
 
         is_bool "$SA_EXPORT_ENV" || fail "The input export-env must be true or false."
         is_bool "$SA_ALLOW_UNPREFIXED" || fail "The input allow-unprefixed must be true or false."
+        is_bool "$SA_ALLOW_UNRESOLVED" || fail "The input allow-unresolved must be true or false."
 
         if ! is_true "$SA_EXPORT_ENV" && [ -z "$SA_OUTPUT_FILE" ]; then
           fail "Set export-env to true, output-file, or both: the action exports the resolved configuration into the job environment or a file."
         fi
 
-        # An empty format is env, as in the read step, which passes the prefix for it.
+        # The rule of --prefix: it names the variables of export-env and those of an output-file in env. An empty format
+        # is env, as in the read step, which passes the prefix only then.
         if [ -n "$SA_ENV_PREFIX" ] && ! is_true "$SA_EXPORT_ENV"; then
           case "${SA_FORMAT:-env}" in
             [Ee][Nn][Vv]) ;;
@@ -169,6 +176,7 @@ runs:
         SA_EXPORT_ENV: ${{ inputs.export-env }}
         SA_ENV_PREFIX: ${{ inputs.env-prefix }}
         SA_ALLOW_UNPREFIXED: ${{ inputs.allow-unprefixed }}
+        SA_ALLOW_UNRESOLVED: ${{ inputs.allow-unresolved }}
         SA_MASK: ${{ inputs.mask }}
         SA_OUTPUT_FILE: ${{ inputs.output-file }}
         SA_FORMAT: ${{ inputs.format }}
@@ -186,7 +194,9 @@ runs:
         # A tool in a folder of its own finds .NET through DOTNET_ROOT, which setup-dotnet sets and a runner image may not.
         if [ -z "${DOTNET_ROOT:-}" ] && [ -n "$SA_DOTNET_ROOT" ]; then export DOTNET_ROOT="$SA_DOTNET_ROOT"; fi
 
-        args=(story config "$SA_KEY" --resolved --mask "${SA_MASK:-bound}")
+        # The --option=value form for every value of an input: McMaster expands a separate argument that starts with '@'
+        # as a response file. The export always reads the resolved configuration, and its file holds the content alone.
+        args=(story config export "$SA_KEY" "--mask=${SA_MASK:-bound}")
         format=${SA_FORMAT:-env}
 
         if is_true "$SA_EXPORT_ENV"; then
@@ -197,18 +207,21 @@ runs:
           fi
         fi
 
-        # sform refuses --env-prefix without --github-env or --format env.
+        # sform refuses --prefix without --github-env or an --export file in env.
         if [ -n "$SA_ENV_PREFIX" ]; then
           if is_true "$SA_EXPORT_ENV"; then
-            args+=("--env-prefix=$SA_ENV_PREFIX")
+            args+=("--prefix=$SA_ENV_PREFIX")
           elif [ -n "$SA_OUTPUT_FILE" ]; then
-            case "$format" in [Ee][Nn][Vv]) args+=("--env-prefix=$SA_ENV_PREFIX") ;; esac
+            case "$format" in [Ee][Nn][Vv]) args+=("--prefix=$SA_ENV_PREFIX") ;; esac
           fi
         fi
 
-        # The --option=value form: McMaster expands a separate argument that starts with '@' as a response file.
+        if is_true "$SA_ALLOW_UNRESOLVED"; then
+          args+=(--allow-unresolved)
+        fi
+
         if [ -n "$SA_OUTPUT_FILE" ]; then
-          args+=("--export=$SA_OUTPUT_FILE" "--format=$format" --content-only)
+          args+=("--export=$SA_OUTPUT_FILE" "--format=$format")
         fi
 
         "$RUNNER_TEMP/storyteller-action/sform-$SA_CLI_VERSION/sform" "${args[@]}"
