@@ -5,8 +5,9 @@ using System.Text.Json.Serialization;
 namespace _42.Platform.Cli.AutomationTests.Coverage;
 
 // coverage-values.json: the options whose values come from a fixed set (spec §4.1), each value an item to cover as
-// "--option=value". The CLI validates most of them in code (a string option), so the file is the source of the set and
-// says where it lives ("source"); when the code parses the value into an enum, "enum" names it, and the coverage test
+// "--option=value", and the positional arguments of such a set ("argument": "arg0" instead of "option"), each value an
+// item to cover as "arg0=value". The CLI validates most of them in code (a string option or argument), so the file is the
+// source of the set and says where it lives ("source"); when the code parses the value into an enum, "enum" names it, and the coverage test
 // checks the set against the enum's members: "values" are the members but those in "except" (the CLI itself refuses
 // them, exit 2 before any call) and in "refused" (the CLI sends them and the platform refuses them), plus those in "extra"
 // (values it takes besides the enum). A member the CLI accepts and acts on is a value, however odd, so a case has to show
@@ -44,8 +45,23 @@ public sealed class CoverageValues
         return Options.FirstOrDefault(entry =>
             entry.Command is not null
             && entry.Option is not null
+            && entry.Argument is null
             && string.Equals(Canonical(entry.Command), command.IsRoot ? string.Empty : command.Path, StringComparison.Ordinal)
             && option.Forms.Contains(entry.Option, StringComparer.Ordinal));
+    }
+
+    // The entry of a command's positional argument (by the command's canonical path and its token, "arg0").
+    public Entry? For(CliCommand command, CliArgument argument)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(argument);
+
+        return Options.FirstOrDefault(entry =>
+            entry.Command is not null
+            && entry.Argument is not null
+            && entry.Option is null
+            && string.Equals(Canonical(entry.Command), command.IsRoot ? string.Empty : command.Path, StringComparison.Ordinal)
+            && string.Equals(entry.Argument, argument.Token, StringComparison.Ordinal));
     }
 
     // A command path as For compares it: its words without a leading "sform", single-spaced.
@@ -84,6 +100,10 @@ public sealed class CoverageValues
         // A form of the option, the long one by convention ("--protection").
         public string? Option { get; init; }
 
+        // Instead of an option, a positional argument whose values come from a fixed set, by its token ("arg0"); each
+        // value is an item covered as "arg0=value".
+        public string? Argument { get; init; }
+
         // The values as the catalogue writes them ("public", "Reader"); compared without case.
         public IReadOnlyList<string> Values { get; init; } = [];
 
@@ -105,7 +125,7 @@ public sealed class CoverageValues
 
         public override string ToString()
         {
-            return $"{Command} {Option}";
+            return $"{Command} {Option ?? Argument}";
         }
     }
 }

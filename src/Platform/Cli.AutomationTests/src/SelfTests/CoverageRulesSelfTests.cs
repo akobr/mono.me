@@ -173,6 +173,56 @@ public sealed class CoverageRulesSelfTests
         await Assert.That(Model().CheckValues()).IsEmpty();
     }
 
+    // A positional argument with a fixed set ("argument": "arg0"): each value is an item "arg0=value", in any case, listed in
+    // the catalogue as written there; an entry names exactly one option or argument the command has, once, and an enum it
+    // names is checked like an option's.
+    [Test]
+    public async Task ArgumentValues_ResolveCheckAndCompare()
+    {
+        var model = new CoverageModel(Tree(), new CoverageValues
+        {
+            Options =
+            [
+                ArgumentValues("storyteller kv get", "arg0", ["public", "standard"], enumType: null),
+                ArgumentValues("storyteller kv protect", "arg0", ["public", "standard", "hsm", "byok"], refused: ["Hyok"]),
+                Values("storyteller kv set", "--mode", ["merge", "replace"], enumType: null),
+            ],
+        });
+
+        await Assert.That(model.CheckValues()).IsEmpty();
+        await Assert.That(model.Items.Select(item => item.Key)).Contains("storyteller kv get|Value|arg0=public");
+        await Assert.That(model.Items.Select(item => item.Key)).Contains("storyteller kv protect|Value|arg0=byok");
+
+        var value = model.Resolve(Usage("story kv get", "arg0", "arg0=STANDARD"));
+        await Assert.That(value.IsValid).IsTrue();
+        await Assert.That(Keys(value)).Contains("storyteller kv get|Value|arg0=standard");
+        await Assert.That(model.Resolve(Usage("story kv get", "arg0=hsm")).Problems.Single()).Contains("'hsm' is not a value of arg0 of 'storyteller kv get'");
+        await Assert.That(model.Resolve(Usage("story kv set", "arg0=x")).Problems.Single()).Contains("arg0 of 'storyteller kv set' has no fixed set of values");
+        await Assert.That(model.Resolve(Usage("story kv get", "arg1=x")).Problems.Single()).Contains("takes 1 argument(s)");
+
+        await Assert.That(CatalogueCovers.IsItem("arg0=public")).IsTrue();
+        await Assert.That(CatalogueCovers.Compare(Row("get", "arg0", "arg0=standard"), Resolve(model, Usage("story kv get", "arg0", "arg0=Standard")))).IsEmpty();
+        var missing = CatalogueCovers.Compare(Row("get", "arg0", "arg0=public"), Resolve(model, Usage("story kv get", "arg0")));
+        await Assert.That(missing.Single()).Contains("the row lists `arg0=public`, no [Covers] does.");
+
+        var wrong = new CoverageValues
+        {
+            Options =
+            [
+                ArgumentValues("storyteller kv get", "arg1", ["a"], enumType: null),
+                ArgumentValues("storyteller kv protect", "arg0", ["public", "standard"]),
+                ArgumentValues("storyteller kv set", "arg0", ["a"], enumType: null) with { Option = "--secret" },
+                ArgumentValues("storyteller kv set", "arg1", ["a"], enumType: null),
+                ArgumentValues("storyteller kv set", "arg1", ["b"], enumType: null),
+            ],
+        };
+        var problems = string.Join('\n', new CoverageModel(Tree(), wrong).CheckValues());
+        await Assert.That(problems).Contains("storyteller kv get arg1: 'storyteller kv get' has no argument arg1 (its arguments: arg0 (Key)).");
+        await Assert.That(problems).Contains("storyteller kv protect arg0: the values differ from the members of Selftest.Level: missing Hsm, Byok, Hyok.");
+        await Assert.That(problems).Contains("name either an \"option\" or an \"argument\"");
+        await Assert.That(problems).Contains("storyteller kv set arg1: the argument is listed twice.");
+    }
+
     // A misspelled field fails the load with the file's name and the field, "$comment" is welcome at both levels.
     [Test]
     public async Task Load_UnknownField_Fails_CommentsAllowed()
@@ -341,6 +391,11 @@ public sealed class CoverageRulesSelfTests
     private static CoverageValues.Entry Values(string command, string option, string[] values, string[]? except = null, string[]? refused = null, string? enumType = Level)
     {
         return new CoverageValues.Entry { Command = command, Option = option, Values = values, Enum = enumType, Except = except ?? [], Refused = refused ?? [], Source = "selftest" };
+    }
+
+    private static CoverageValues.Entry ArgumentValues(string command, string argument, string[] values, string[]? refused = null, string? enumType = Level)
+    {
+        return new CoverageValues.Entry { Command = command, Argument = argument, Values = values, Enum = enumType, Refused = refused ?? [], Source = "selftest" };
     }
 
     private static CoverageExceptions.Entry Exception(string command, string? item, string? feature)

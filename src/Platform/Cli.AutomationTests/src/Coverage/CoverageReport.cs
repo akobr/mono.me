@@ -93,7 +93,7 @@ public sealed class CoverageReport
     {
         var builder = new StringBuilder();
         builder.AppendLine($"{Uncovered.Count} of {Model.Items.Count} items of sform's command tree are covered by no [Covers] of the tests ({Usages} [Covers] read): {Summary(Uncovered)}.");
-        builder.AppendLine("Each line lists what a test still has to cover, as [Covers(\"<command path>\", \"<item>\", …)]: the command when its path ends with the command's name, an alias typed in the path, options by each form, values as --option=value, arguments as argN. The context -p counts with any case of its command. See docs/Platform/Cli.AutomationTests/automation-tests.md#command-coverage.");
+        builder.AppendLine("Each line lists what a test still has to cover, as [Covers(\"<command path>\", \"<item>\", …)]: the command when its path ends with the command's name, an alias typed in the path, options by each form, values as --option=value (of an argument as argN=value), arguments as argN. The context -p counts with any case of its command. See docs/Platform/Cli.AutomationTests/automation-tests.md#command-coverage.");
         builder.AppendLine();
         builder.Append(Grouped(Uncovered));
         return builder.ToString();
