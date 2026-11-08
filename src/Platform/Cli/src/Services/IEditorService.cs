@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
@@ -31,6 +32,11 @@ public interface IEditorService
     /// <param name="fileNamePrefix">A prefix of the temporary file name.</param>
     /// <param name="isNew">Whether the document doesn't exist on the server yet.</param>
     /// <param name="confirm">Whether to ask before accepting the edited document. The default is <c>true</c>.</param>
+    /// <param name="check">
+    /// Checks the parsed document before the comparison and the question. A problem re-opens the editor, as invalid JSON
+    /// does; the document of a valid check (for example normalized) replaces the parsed one for the comparison with
+    /// <paramref name="original"/>, the diff, the question and the result. The default takes the parsed document.
+    /// </param>
     /// <returns>The edited document, or the exit code when there is nothing to save.</returns>
-    Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew, bool confirm = true);
+    Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew, bool confirm = true, Func<JObject, JsonEditCheck>? check = null);
 }
