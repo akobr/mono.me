@@ -89,12 +89,13 @@ npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 npm run prepare:local  # npm ci and npm run build, each only when its inputs changed (--force: always)
 ```
 
-To generate from a specific document: `SPEC=../open.api.v0.10.28.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.28.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.28.26699` → `0.10.28`).
+To generate from a specific document: `SPEC=../open.api.v0.10.30.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.10.30.json'; npm run generate`). The package version follows `info.version` of the document (`0.10.30.65254` → `0.10.30`).
 
 Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer) corrects the document:
 
 - The `application/json-patch+json` bodies of `PatchConfiguration` and `PatchTemplate` are documented as `object`; the transformer replaces them with a required array of `JsonPatchOperation` (`op`, `path`, `from`, `value`).
 - `Values` of annotations and configurations is `IReadOnlyDictionary<string, object>` in C#, documented as a map of objects; the transformer widens it to a map of any JSON value, so the Zod schemas accept numbers and strings.
+- `PatchAnnotation` loses its `application/json-patch+json` body. With two media types Orval would send no `Content-Type`, fetch would send `text/plain`, and the API answers that with `415`. The generated `patchAnnotation` and `usePatchAnnotation` send a merge patch, and [`patchAnnotationVersioned`](#conditional-writes-of-annotations) sends either format. This one is a choice of the SDK too, and it stays.
 - `GrantUserAccess` and `RevokeUserAccess` are marked deprecated (the members endpoints replace them in browser clients).
 - `GetConfiguration` and `GetResolvedConfiguration` lose the `format` query parameter and the `text/plain` and `application/yaml` bodies of their `200`. With them, Orval would add a `params` argument before `options` and return `Configuration | string`; without them, the generated functions, composables, Zod schemas and mocks keep the `Configuration` envelope, and the formats are read with the [formatted helpers](#formatted-reads). This one is a choice of the SDK, not a gap of the document, and it stays.
 
@@ -306,20 +307,20 @@ The read of an annotation answers with a strong `ETag` (`"a1.…"`), and so does
 import { getAnnotationVersioned, hasErrorCode, patchAnnotationVersioned, setAnnotationVersioned } from '@42for.net/2splatform.sdk'
 
 // One request, merged on the server: no read and no tag. null clears a member, or removes a value.
-await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { Title: 'Customers', Values: { old: null } })
+await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { Title: 'Customers', Values: { old: null } })
 
 // A JSON Patch appends a label or sets one value; a test operation is a precondition (412 PatchTestFailed).
-await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', [
+await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', [
   { op: 'test', path: '/Title', value: 'Customers' },
   { op: 'add', path: '/Labels/-', value: 'billing' },
   { op: 'add', path: '/Values/plan', value: 'pro' },
 ])
 
 // A whole body under the tag of the read.
-const { value, etag } = await getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { includeInactive: true })
+const { value, etag } = await getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { includeInactive: true })
 
 try {
-  await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { ...value, Title: 'Customers' }, { ifMatch: etag })
+  await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { ...value, Title: 'Customers' }, { ifMatch: etag })
 } catch (error) {
   if (hasErrorCode(error, 'AnnotationPreconditionFailed')) {
     // changed or deleted since the read: read it again
@@ -327,7 +328,7 @@ try {
 }
 
 // Create only: a 412 when the key exists.
-await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { ifNoneMatch: '*' })
+await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { ifNoneMatch: '*' })
 ```
 
 - `ifMatch` writes only the version of that tag, and never re-creates a deleted key. `ifNoneMatch: '*'` only creates (a missing or deleted key). A condition that does not hold is a `412` with the `errorCode` `AnnotationPreconditionFailed` (`isPreconditionFailed(error)`). Without a readable tag, `etag` is `undefined` and `ifMatch: etag` sends no condition, so check `etag` before you rely on it.

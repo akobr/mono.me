@@ -68,13 +68,13 @@ function configure(overrides: Partial<StorytellerConfig> & Pick<StorytellerConfi
 
 const sentHeaders = (call: Call | undefined) => new Headers(call?.init.headers)
 
-const url = 'https://api.example.com/api/v1/acme/billing/default/annotations/sbj.customer'
+const url = 'https://api.example.com/api/v1/acme/billing/default/annotations/sbt.customer'
 const tag = '"a1.AAAAAAAAAAAAAAAAAAAAAA"'
 const newTag = '"a1.BBBBBBBBBBBBBBBBBBBBBB"'
 const annotation: Annotation = {
   ProjectName: 'billing',
   ViewName: 'default',
-  AnnotationKey: 'sbj.customer',
+  AnnotationKey: 'sbt.customer',
   Name: 'customer',
   AnnotationType: 'Subject',
   Title: 'Customer',
@@ -100,7 +100,7 @@ describe('versioned annotation reads', () => {
     const { fetch, calls } = fakeFetch(json(annotation, 200, { etag: tag }))
     configure({ fetch })
 
-    const result = await getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer')
+    const result = await getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer')
 
     expect(result).toEqual({ value: annotation, etag: tag })
     expect(calls[0]?.url).toBe(url)
@@ -116,18 +116,18 @@ describe('versioned annotation reads', () => {
     const { fetch, calls } = fakeFetch(json(annotation), json(annotation), json(annotation))
     configure({ fetch })
 
-    await getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { includeInactive: true })
-    await getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { includeInactive: false })
+    await getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { includeInactive: true })
+    await getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { includeInactive: false })
     // an encoded key, and no query while undefined
-    await getAnnotationVersioned('a b', 'billing', 'default', 'sbj.a+b?c#d', { includeInactive: undefined })
+    await getAnnotationVersioned('a b', 'billing', 'default', 'sbt.a+b?c#d', { includeInactive: undefined })
 
     expect(calls.map((call) => call.url)).toEqual([
       `${url}?includeInactive=true`,
       `${url}?includeInactive=false`,
-      'https://api.example.com/api/v1/a%20b/billing/default/annotations/sbj.a%2Bb%3Fc%23d',
+      'https://api.example.com/api/v1/a%20b/billing/default/annotations/sbt.a%2Bb%3Fc%23d',
     ])
-    expect(sdk.getGetAnnotationUrl('acme', 'billing', 'default', 'sbj.customer', { includeInactive: true })).toBe(
-      '/v1/acme/billing/default/annotations/sbj.customer?includeInactive=true',
+    expect(sdk.getGetAnnotationUrl('acme', 'billing', 'default', 'sbt.customer', { includeInactive: true })).toBe(
+      '/v1/acme/billing/default/annotations/sbt.customer?includeInactive=true',
     )
     for (const call of calls) {
       expect(call.init).not.toHaveProperty('includeInactive')
@@ -138,8 +138,8 @@ describe('versioned annotation reads', () => {
     const { fetch } = fakeFetch(json(annotation), json(annotation, 200, { etag: '' }))
     configure({ fetch })
 
-    const missing = await getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer')
-    const empty = await getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer')
+    const missing = await getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer')
+    const empty = await getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer')
 
     expect(missing).toEqual({ value: annotation })
     expect(missing.etag).toBeUndefined()
@@ -151,7 +151,7 @@ describe('versioned annotation reads', () => {
     configure({ fetch })
     const controller = new AbortController()
 
-    await getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { signal: controller.signal, cache: 'no-store' })
+    await getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { signal: controller.signal, cache: 'no-store' })
 
     expect(calls[0]?.init.signal).toBe(controller.signal)
     expect(calls[0]?.init.cache).toBe('no-store')
@@ -164,7 +164,7 @@ describe('versioned annotation writes', () => {
     const { fetch, calls } = fakeFetch(json(stored, 200, { etag: newTag }))
     configure({ fetch })
 
-    const result = await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { ...annotation, Title: 'Customers' }, { ifMatch: tag })
+    const result = await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { ...annotation, Title: 'Customers' }, { ifMatch: tag })
 
     expect(result).toEqual({ value: stored, etag: newTag })
     expect(calls[0]?.url).toBe(url)
@@ -182,8 +182,8 @@ describe('versioned annotation writes', () => {
     const { fetch, calls } = fakeFetch(json(annotation, 200, { etag: tag }), json(annotation, 200, { etag: tag }))
     configure({ fetch })
 
-    await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { ifNoneMatch: '*' })
-    await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation)
+    await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { ifNoneMatch: '*' })
+    await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation)
 
     expect(sentHeaders(calls[0]).get('If-None-Match')).toBe('*')
     expect(sentHeaders(calls[0]).has('If-Match')).toBe(false)
@@ -208,13 +208,13 @@ describe('versioned annotation writes', () => {
     ]
 
     for (const headers of variants) {
-      await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { headers, ifMatch: tag, ifNoneMatch: '*' })
+      await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { headers, ifMatch: tag, ifNoneMatch: '*' })
     }
     // without the options, the headers set by the caller go out as they are
-    await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { headers: variants[0], ifMatch: undefined })
+    await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { headers: variants[0], ifMatch: undefined })
     // an empty tag sends nothing, and removes a header set by the caller
-    await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { headers: variants[0], ifMatch: '', ifNoneMatch: '' })
-    await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { ifMatch: '', ifNoneMatch: '' })
+    await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { headers: variants[0], ifMatch: '', ifNoneMatch: '' })
+    await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { ifMatch: '', ifNoneMatch: '' })
 
     for (const call of calls.slice(0, variants.length)) {
       const sent = sentHeaders(call)
@@ -236,8 +236,8 @@ describe('versioned annotation writes', () => {
     const { fetch, calls } = fakeFetch(json(annotation), json(annotation))
     configure({ fetch })
 
-    await setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { headers: { 'content-type': 'text/plain' } })
-    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { Title: 'Customers' }, { headers: { 'Content-Type': 'application/json' } })
+    await setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { headers: { 'content-type': 'text/plain' } })
+    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { Title: 'Customers' }, { headers: { 'Content-Type': 'application/json' } })
 
     expect(sentHeaders(calls[0]).get('Content-Type')).toBe('application/json')
     expect(sentHeaders(calls[1]).get('Content-Type')).toBe('application/merge-patch+json')
@@ -254,7 +254,7 @@ describe('versioned annotation patches', () => {
       'acme',
       'billing',
       'default',
-      'sbj.customer',
+      'sbt.customer',
       // null clears or removes; an undefined member is left out, so it keeps its value
       { Description: null, Title: undefined, Values: { plan: 'enterprise', old: null } },
       { ifMatch: tag },
@@ -277,7 +277,7 @@ describe('versioned annotation patches', () => {
     // the API matches member names case-insensitively
     const patch: AnnotationPatchBody = { title: 'Customers', labels: null }
 
-    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', patch)
+    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', patch)
 
     expect(calls[0]?.init.body).toBe('{"title":"Customers","labels":null}')
     expect(sentHeaders(calls[0]).get('Content-Type')).toBe('application/merge-patch+json')
@@ -294,7 +294,7 @@ describe('versioned annotation patches', () => {
       { op: 'remove', path: '/Description' },
     ]
 
-    const result = await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', operations)
+    const result = await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', operations)
 
     expect(result.etag).toBe(newTag)
     expect(calls[0]?.init.method).toBe('PATCH')
@@ -308,9 +308,9 @@ describe('versioned annotation patches', () => {
     configure({ fetch })
     const headers = { 'if-match': '"a1.old"' }
 
-    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', [], { headers, ifMatch: tag })
-    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', [], { headers })
-    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', [], { headers, ifMatch: '' })
+    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', [], { headers, ifMatch: tag })
+    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', [], { headers })
+    await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', [], { headers, ifMatch: '' })
 
     expect(calls.map((call) => sentHeaders(call).get('If-Match'))).toEqual([tag, '"a1.old"', null])
   })
@@ -320,7 +320,7 @@ describe('versioned annotation patches', () => {
     configure({ fetch })
 
     for (const patch of [null, 'Title', 5]) {
-      const error = await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', patch as unknown as AnnotationPatchBody).catch(
+      const error = await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', patch as unknown as AnnotationPatchBody).catch(
         (caught: unknown) => caught,
       )
       expect(error).toBeInstanceOf(TypeError)
@@ -332,18 +332,18 @@ describe('versioned annotation patches', () => {
 describe('versioned annotation errors', () => {
   it('maps a missing and a deleted key of a patch to 404 with its errorCode', async () => {
     const { fetch } = fakeFetch(
-      json({ Message: "The annotation 'sbj.customer' does not exist.", Hint: 'POST it to create it.', ErrorCode: 'AnnotationNotFound' }, 404),
-      json({ Message: "The annotation 'sbj.customer' is deleted.", Hint: 'Restore it first.', ErrorCode: 'AnnotationDeleted' }, 404),
+      json({ Message: "The annotation 'sbt.customer' does not exist.", Hint: 'POST it to create it.', ErrorCode: 'AnnotationNotFound' }, 404),
+      json({ Message: "The annotation 'sbt.customer' is deleted.", Hint: 'Restore it first.', ErrorCode: 'AnnotationDeleted' }, 404),
     )
     configure({ fetch })
 
-    const missing = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { Title: 'x' }))
-    const deleted = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { Title: 'x' }))
+    const missing = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { Title: 'x' }))
+    const deleted = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { Title: 'x' }))
 
     expect(missing).toBeInstanceOf(StorytellerError)
     expect(isNotFound(missing)).toBe(true)
     expect(hasErrorCode(missing, 'AnnotationNotFound')).toBe(true)
-    expect(missing).toMatchObject({ message: "The annotation 'sbj.customer' does not exist.", hint: 'POST it to create it.' })
+    expect(missing).toMatchObject({ message: "The annotation 'sbt.customer' does not exist.", hint: 'POST it to create it.' })
     expect(hasErrorCode(deleted, 'AnnotationDeleted')).toBe(true)
   })
 
@@ -355,9 +355,9 @@ describe('versioned annotation errors', () => {
     )
     configure({ fetch })
 
-    const changed = await failureOf(setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { ifMatch: tag }))
-    const exists = await failureOf(setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation, { ifNoneMatch: '*' }))
-    const testFailed = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', [{ op: 'test', path: '/Title', value: 'x' }]))
+    const changed = await failureOf(setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { ifMatch: tag }))
+    const exists = await failureOf(setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation, { ifNoneMatch: '*' }))
+    const testFailed = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', [{ op: 'test', path: '/Title', value: 'x' }]))
 
     for (const error of [changed, exists]) {
       expect(isPreconditionFailed(error)).toBe(true)
@@ -377,10 +377,10 @@ describe('versioned annotation errors', () => {
     )
     configure({ fetch })
 
-    const inactive = await failureOf(getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer'))
-    const conflict = await failureOf(setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation))
-    const invalid = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { Labels: [1] }))
-    const failed = await failureOf(getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer'))
+    const inactive = await failureOf(getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer'))
+    const conflict = await failureOf(setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation))
+    const invalid = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { Labels: [1] }))
+    const failed = await failureOf(getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer'))
 
     expect(hasErrorCode(inactive, 'AnnotationInactive')).toBe(true)
     expect(isConflict(conflict)).toBe(true)
@@ -396,9 +396,9 @@ describe('versioned annotation errors', () => {
     )
     configure({ fetch })
 
-    const empty = await failureOf(getAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer'))
-    const textual = await failureOf(setAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', annotation))
-    const array = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { Title: 'x' }))
+    const empty = await failureOf(getAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer'))
+    const textual = await failureOf(setAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', annotation))
+    const array = await failureOf(patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { Title: 'x' }))
 
     for (const error of [empty, textual, array]) {
       expect(error).toBeInstanceOf(StorytellerError)
@@ -412,7 +412,7 @@ describe('versioned annotation errors', () => {
     const { fetch, calls } = fakeFetch(new Response(null, { status: 401 }), json(annotation, 200, { etag: newTag }))
     configure({ fetch, getAccessToken: () => tokens.shift(), onUnauthorized })
 
-    const result = await patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { Title: null }, { ifMatch: tag })
+    const result = await patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { Title: null }, { ifMatch: tag })
 
     expect(result.etag).toBe(newTag)
     expect(calls.map((call) => sentHeaders(call).get('Authorization'))).toEqual(['Bearer expired', 'Bearer fresh'])
@@ -427,7 +427,7 @@ describe('versioned annotation errors', () => {
     const hanging = hangingFetch()
     configure({ fetch: hanging.fetch })
 
-    const unanswered = patchAnnotationVersioned('acme', 'billing', 'default', 'sbj.customer', { Title: 'x' }, { ifMatch: tag, timeoutMs: 1000 }).catch(
+    const unanswered = patchAnnotationVersioned('acme', 'billing', 'default', 'sbt.customer', { Title: 'x' }, { ifMatch: tag, timeoutMs: 1000 }).catch(
       (caught: unknown) => caught,
     )
     await vi.advanceTimersByTimeAsync(1000)
