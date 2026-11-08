@@ -253,6 +253,61 @@ The certificate expires after the certificate lifetime of the project, or after 
 - run: docker compose --env-file "$RUNNER_TEMP/billing.env" up --detach
 ```
 
+## Write a configuration
+
+`sform story config set <key>` merges a document into the stored content of the configuration of an annotation; with `--replace` the document replaces the content. The document comes from a JSON file (`-i`) and from inline properties (`-x path=value`), in this order. `sform story template set <type>` takes the same `-i`, `-x` and `--replace` for the template of a type.
+
+::: warning
+The paths of `-x` are newer than the `sform` on NuGet, which stores `-x db.port=5432` as a top-level property named `db.port`, and `-x "hosts[0]=a"` as one named `hosts[0]`, without an error. Until a release has them, install a `sform` packed from the repository, as [Until sform is published](/cli/github-action#until-sform-is-published) shows.
+:::
+
+``` text
+sform story config set <key> [-i|--import <file>] [-x|--properties <path=value> ...] [--replace] [-f|--force]
+```
+
+``` bash
+sform story config set exe.northwind.invoicing.production -x "db.host=sql.example.com" -x "db.port=5432"
+sform story config set exe.northwind.invoicing.production -x "Logging.LogLevel['Microsoft.AspNetCore']=Warning"
+sform story config set exe.northwind.invoicing.production -i invoicing.json -x "hosts[0]=a" -x "hosts[1]=b" --replace
+```
+
+**The path.** The name before `=` is a path, written as the errors of `sform` and of the API write paths:
+
+| Step | Written | Example |
+|---|---|---|
+| A name of ASCII letters, digits, `_` and `-` that starts with a letter or `_` | `.name`; the first step without the dot | `db.port` |
+| Any other name | `['name']`; inside, `\'` is a quote and `\\` a backslash | `Logging.LogLevel['Microsoft.AspNetCore']`, `['$schema']` |
+| An item of an array | `[index]` | `hosts[0]`, `list[1].name` |
+
+- The values are written one by one, in the order of the command line, over the `-i` file, and the objects and arrays on the way are created: `-x db.host=x -x db.port=5432` sets `{ "db": { "host": "x", "port": 5432 } }`.
+- The value is the rest of the argument after the `=` that ends the path, so `-x "['a=b']=c=d"` sets the name `a=b` to `c=d`. `true` and `false` become booleans and numbers become numbers, as before.
+- An index names an existing item, which it replaces, or the next one, which it appends: `-x "hosts[0]=a" -x "hosts[1]=b"` builds `["a", "b"]`.
+- A path from an error, such as `$.Logging.LogLevel['Microsoft.AspNetCore']`, can be given with its `$`; in bash and zsh, leave the `$` out (see **Shells**). Inside the quotes, `\n`, `\r`, `\t` and `\uXXXX` are read as errors print them (a `#` is printed `\u0023`), so a backslash of a name is always written `\\`.
+
+**Errors.** When a value cannot be set, `sform` sends nothing, writes one line to standard error and ends with exit code `2`. The line names the inline property, its character or its path, never a value. A value cannot be set when:
+
+- the path is not valid, or no `=` follows it;
+- the path goes through a value that is not an object or an array, `-x a=1 -x a.b=2`, also when `a` comes from the `-i` file; or it uses an object as an array, or the other way round;
+- an index is past the end of the array: `-x "hosts[1]=b"` without `hosts[0]`;
+- the path starts with an index, or holds an empty name, `['']`.
+
+**What the API does with the document.** Without `--replace`, the API merges the document into the stored content: objects merge, arrays are joined (an item that is already there is not added again), and `null` never erases. The checks above see the document that `sform` builds, not the stored content. So:
+
+- `-x "hosts[0]=x"` adds `x` to a stored `hosts` array rather than replacing its first item, and `-x "list[0].name=n"` adds the item `{ "name": "n" }`;
+- a value of another kind replaces the stored one: `-x db.port=5432` over a stored text `db` stores `{ "db": { "port": 5432 } }`.
+
+To change the items of a stored array, write the whole content with `-i <file> --replace`, or use `sform story config edit` or `sform story config patch`.
+
+**Shells.** Quote every `-x` argument:
+
+- **bash and zsh:** use double quotes. Inside them, write `\$` for a `$` of a name, as in `"retries['\$binding']=jlogic"`, and `\\\\` for the `\\` of a name, and leave out the leading `$` of a path from an error: `"$[…"` is arithmetic expansion there. zsh stops on an unquoted `hosts[0]=a`, which it reads as a pattern.
+- **PowerShell:** a `$name` inside double quotes is a variable. Use single quotes, with the quotes of `['…']` doubled: `'retries[''$binding'']=jlogic'`.
+- **GitHub Actions:** write the command in a `run: |` block, where a `#` or a `: ` does not end it.
+
+An unquoted `a['b.c']=1` reaches `sform` as `a[b.c]=1`, and an expanded `$binding` leaves `['']`; the errors of both say so.
+
+**Changed.** The name of `-x` used to be a top-level property as written. Now a name that is not plain (a dot, a space, `:`, `$`, a leading digit or `-`, a letter outside ASCII, or the empty name) is written `['name']`: `-x "['a.b']=1"` sets the property `a.b`, as `-x a.b=1` did before.
+
 ## Telemetry
 
 `sform` sends anonymous usage data to PostHog in the EU cloud: which commands run, how they end and how long they take. It sends one event per run, after the command has finished. The output and the exit code stay the same, the run waits for the event about two seconds at most, and an event that cannot be sent is dropped.

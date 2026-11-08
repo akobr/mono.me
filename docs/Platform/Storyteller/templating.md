@@ -283,7 +283,7 @@ The `sform` CLI manages templates under `sform storyteller` (alias `story`), nex
 
 ```text
 sform story template <type> [--version <n>] [-e|--export <file>]
-sform story template set|create <type> [-i|--import <file>] [-x|--properties k=v ...] [--replace]
+sform story template set|create <type> [-i|--import <file>] [-x|--properties path=value ...] [--replace]
 sform story template edit <type>
 sform story template delete|remove <type>
 sform story template versions <type>
@@ -293,7 +293,7 @@ sform story template diff <type> [to] [from]
 | Command | Behaviour |
 | --- | --- |
 | `template <type>` | Prints the current template, or the version given by `--version`, and optionally exports it to a file. |
-| `set` | Builds a document from `--import` and `--properties` and merges it into the template (`SetTemplate`). With `--replace`, the template content is replaced by the document instead: the CLI sends a JSON Patch computed from the current content, so properties that are not in the document are removed and arrays are replaced, not unioned. |
+| `set` | Builds a document from `--import` and `--properties` and merges it into the template (`SetTemplate`). The name of a property is a path in the syntax of [JSON paths](configuration-formats.md#rules-shared-by-every-format), written over the file in order: `-x "db.port=5432"`, `-x "hosts[0]=a"`, `-x "Logging.LogLevel['Microsoft.AspNetCore']=Warning"` (see [Write a configuration](https://42for.net/cli/sform#write-a-configuration)). With `--replace`, the template content is replaced by the document instead: the CLI sends a JSON Patch computed from the current content, so properties that are not in the document are removed and arrays are replaced, not unioned. |
 | `edit` | Opens the current template (or `{}`) in the configured editor, shows the changes, and after a confirmation replaces the template with the edited document, the same way as `set --replace`. |
 | `delete` | Deletes the template; its history is kept. |
 | `versions` | Lists the versions, newest first: version, author, creation time, and expiration time (`—` for the current version). |
@@ -306,6 +306,7 @@ Examples, for the `default` view of the current project:
 ```text
 sform story template exe
 sform story template set exe -x owner=platform -x retries=3
+sform story template set exe -x "db.port=5432" -x "Logging.LogLevel['Microsoft.AspNetCore']=Warning"
 sform story template set exe -i exe-template.json --replace
 sform story template edit exe
 sform story template versions exe
