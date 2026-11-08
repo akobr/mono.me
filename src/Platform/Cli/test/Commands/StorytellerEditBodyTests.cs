@@ -402,7 +402,7 @@ public class StorytellerEditBodyTests
     private sealed class UnwritableBodyClient(HttpClient httpClient)
         : AnnotationsApiClient(httpClient, new SdkConfiguration { BaseUrl = "http://localhost:7071/api" })
     {
-        public override Task<_42.Platform.Storyteller.Sdk.Annotation> SetAnnotationAsync(string organization, string project, string view, string key, _42.Platform.Storyteller.Sdk.Annotation body = null!, CancellationToken cancellationToken = default)
+        public override Task<_42.Platform.Storyteller.Sdk.Annotation> SetAnnotationAsync(string organization, string project, string view, string key, _42.Platform.Storyteller.Sdk.Annotation body, string if_Match = null!, string if_None_Match = null!, CancellationToken cancellationToken = default)
         {
             throw new JsonSerializationException("Cannot write a null value for property 'AnnotationKey'. Property requires a value. Path ''.");
         }
