@@ -180,12 +180,13 @@ public sealed class AnnotationEditTests : CliTest
 
     // ANN-SET-06: Setting a deleted annotation fails without an option, --restore-deleted restores it, --recreate creates
     // it new.
-    // As an Editor, <rst> gets a configuration (config set -x cli_probe=<value>) and is deleted. story set <rst> on the
-    // redirected input lists the deleted annotation and ends with 2; its standard error has "! sform cannot ask for what
-    // happens to the deleted annotations: the input is redirected." and names --restore-deleted and --recreate. story set
-    // <rst> --restore-deleted -l r says "Restored <rst>." and stores the label; the configuration is back and the history
+    // As an Editor, <rst> gets the label before and a configuration (config set -x cli_probe=<value>), and is deleted.
+    // story set <rst> on the redirected input lists the deleted annotation and ends with 2; its standard error has "! sform
+    // cannot ask for what happens to the deleted annotations: the input is redirected." and names --restore-deleted and
+    // --recreate. story set <rst> --restore-deleted -l r says "Restored <rst>." and merges the label into the restored
+    // annotation (one PATCH after the restore): the labels are before and r; the configuration is back and the history
     // keeps the entries from before the delete. After another delete, story set <rst> --recreate creates it new: no
-    // "Restored", and the configuration no longer has cli_probe.
+    // "Restored", no label before, and the configuration no longer has cli_probe.
     [Test]
     [TestCase(290)]
     [UserRole(Role.Editor)]
@@ -194,7 +195,7 @@ public sealed class AnnotationEditTests : CliTest
     {
         var key = CliData.ResponsibilityKey();
         var probe = CliData.Value();
-        await Sform(InProject("story", "set", key)).ShouldSucceed();
+        await Sform(InProject("story", "set", key, "-l", "before")).ShouldSucceed();
         await Sform(InProject("story", "config", "set", key, "-x", $"cli_probe={probe}")).ShouldSucceed();
         await Sform(InProject("story", "delete", key)).ShouldSucceed();
 
@@ -209,7 +210,7 @@ public sealed class AnnotationEditTests : CliTest
         var restored = (await Sform(InProject("story", "set", key, "--restore-deleted", "-l", "r")))
             .ShouldSucceed()
             .ShouldContain($"Restored {key}.");
-        await Assert.That(Strings(restored.JsonNode()["Labels"])).IsEquivalentTo(new[] { "r" });
+        await Assert.That(string.Join(", ", Strings(restored.JsonNode()["Labels"]))).IsEqualTo("before, r");
         var content = (await Sform(InProject("story", "config", key, "--content-only"))).ShouldSucceed().JsonNode();
         await Assert.That(content["cli_probe"]?.GetValue<string>()).IsEqualTo(probe);
         var history = (await Sform(InProject("story", "history", key, "--json"))).ShouldSucceed().JsonNode();
@@ -219,10 +220,11 @@ public sealed class AnnotationEditTests : CliTest
         await Assert.That(actions).Contains("Restored");
 
         await Sform(InProject("story", "delete", key)).ShouldSucceed();
-        (await Sform(InProject("story", "set", key, "--recreate")))
+        var created = (await Sform(InProject("story", "set", key, "--recreate")))
             .ShouldSucceed()
             .ShouldContain("This annotation is deleted:")
             .ShouldNotContain("Restored ");
+        await Assert.That(Strings(created.JsonNode()["Labels"])).DoesNotContain("before");
         var recreated = (await Sform(InProject("story", "config", key, "--content-only"))).ShouldSucceed().JsonNode();
         await Assert.That(recreated["cli_probe"]).IsNull();
     }
@@ -293,6 +295,55 @@ public sealed class AnnotationEditTests : CliTest
         (await creator.Sform(InProject("story", "get", refused)))
             .ShouldExitWith(CliExit.WrongInput)
             .ShouldContain($"The annotation '{refused}' has not been found.");
+    }
+
+    // ANN-SET-10: story set merges into an existing annotation, and --replace replaces its whole content.
+    // As an Editor, story set <rst> -i full.json creates <rst> with a title, a description, the label x and the values a=1
+    // and b=2. story set <rst> -l y -c a=3 merges with one PATCH: the title and the description stay, the labels are x and
+    // y, a is 3 and b stays 2. story set <rst> --replace -c a=4 -l z writes the options alone (with If-Match of the version
+    // it read): no title, no description, the label z only and the value a=4 only. story set <rst2> --replace -c a=1
+    // creates the missing <rst2>. The history of <rst> is Created, Updated, Updated.
+    [Test]
+    [TestCase(472)]
+    [UserRole(Role.Editor)]
+    [Covers("story set", "--replace")]
+    public async Task Story_SetReplace_ClearsWhatTheInputLacks()
+    {
+        var key = CliData.ResponsibilityKey();
+        var missing = CliData.ResponsibilityKey();
+        var title = CliData.Value();
+        var description = CliData.Value();
+        await WriteFileAsync("full.json", new JsonObject
+        {
+            ["Title"] = title,
+            ["Description"] = description,
+            ["Labels"] = new JsonArray("x"),
+            ["Values"] = new JsonObject { ["a"] = 1, ["b"] = 2 },
+        }.ToJsonString());
+        (await Sform(InProject("story", "set", key, "-i", "full.json"))).ShouldSucceed();
+
+        var merged = (await Sform(InProject("story", "set", key, "-l", "y", "-c", "a=3"))).ShouldSucceed().JsonNode();
+        await Assert.That(merged["Title"]?.GetValue<string>()).IsEqualTo(title);
+        await Assert.That(merged["Description"]?.GetValue<string>()).IsEqualTo(description);
+        await Assert.That(string.Join(", ", Strings(merged["Labels"]))).IsEqualTo("x, y");
+        await Assert.That(merged["Values"]?["a"]?.GetValue<double>()).IsEqualTo(3d);
+        await Assert.That(merged["Values"]?["b"]?.GetValue<double>()).IsEqualTo(2d);
+
+        (await Sform(InProject("story", "set", key, "--replace", "-c", "a=4", "-l", "z"))).ShouldSucceed();
+        var replaced = (await Sform(InProject("story", "get", key))).ShouldSucceed().JsonNode();
+        await Assert.That(replaced["Title"]).IsNull();
+        await Assert.That(replaced["Description"]).IsNull();
+        await Assert.That(Strings(replaced["Labels"])).IsEquivalentTo(new[] { "z" });
+        await Assert.That((replaced["Values"] as JsonObject)?.Select(pair => pair.Key).ToList() ?? []).IsEquivalentTo(new[] { "a" });
+        await Assert.That(replaced["Values"]?["a"]?.GetValue<double>()).IsEqualTo(4d);
+
+        var created = (await Sform(InProject("story", "set", missing, "--replace", "-c", "a=1"))).ShouldSucceed().JsonNode();
+        await Assert.That(created["AnnotationKey"]!.GetValue<string>()).IsEqualTo(missing);
+        await Assert.That(created["Values"]?["a"]?.GetValue<double>()).IsEqualTo(1d);
+        (await Sform(InProject("story", "get", missing))).ShouldSucceed();
+
+        var history = (await Sform(InProject("story", "history", key, "--json"))).ShouldSucceed().JsonNode();
+        await Assert.That(Actions(history)).IsEquivalentTo(new[] { "Created", "Updated", "Updated" });
     }
 
     // The strings of a JSON array (Labels); empty for a missing one.

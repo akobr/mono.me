@@ -1,10 +1,13 @@
+using System.Text.Json.Nodes;
+using _42.Platform.Cli.AutomationTests.Editing;
 using _42.Platform.Cli.AutomationTests.Running;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Annotations;
 
-// Context: every annotation command takes the project from --projectKey and the view from -v or --view.
+// Context: every annotation command takes the project from --projectKey and the view from -v or --view (story edit, which
+// needs a terminal and the editor, in a case of its own).
 [Area(Area.Annotations)]
 public sealed class AnnotationContextTests : CliTest
 {
@@ -112,5 +115,56 @@ public sealed class AnnotationContextTests : CliTest
         }
 
         (await Sform("story", "-p", projectB, "-v", "default")).ShouldSucceed().ShouldContain("No annotation exists yet.");
+    }
+
+    // ANN-CTX-02: story edit takes its project from --projectKey and its view from -v or --view.
+    // As an Editor without a default project, <rst1> is set in <view> of the project (a view other than the role's) with
+    // a=<value>, and <rst2> is missing. In a terminal, story edit <rst1> --projectKey <project> --view <view> opens the fake
+    // editor on the document of <view> (a=<value>); the title it sets is saved after Yes. story edit <rst2> --projectKey
+    // <project> -v <view> says "does not exist yet, creating new." and saves the title it sets. story get -p <project> -v
+    // <view> reads both with their titles, and the role's view has neither.
+    [Test]
+    [TestCase(473)]
+    [UserRole(Role.Editor)]
+    [Terminal]
+    [Covers("story edit", "--projectKey", "-v", "--view")]
+    public async Task StoryEdit_ContextOptions_TargetProjectAndView()
+    {
+        var view = CliData.ViewName();
+        var first = CliData.ResponsibilityKey();
+        var second = CliData.ResponsibilityKey();
+        var value = CliData.Value();
+        var titles = new Dictionary<string, string>(StringComparer.Ordinal) { [first] = CliData.Value(), [second] = CliData.Value() };
+        (await Sform("story", "set", first, "-p", ProjectKey, "-v", view, "-c", $"a={value}")).ShouldSucceed();
+        var editor = await UseEditorAsync();
+
+        var withView = editor.With(EditorChange.Merge(new JsonObject { ["Title"] = titles[first] }));
+        await using (var terminal = await StartSformInTerminal(withView, "story", "edit", first, "--projectKey", ProjectKey, "--view", view))
+        {
+            await AnnotationEditorTests.AnswerSaveAsync(terminal, save: true);
+            await terminal.ExpectAsync($"Annotation '{first}' has been saved.");
+            (await terminal.WaitForExitAsync()).ShouldSucceed();
+        }
+
+        await Assert.That(editor.ReadLog(withView).Single().OriginalJson()!["Values"]?["a"]?.GetValue<string>()).IsEqualTo(value);
+
+        var withV = editor.With(EditorChange.Merge(new JsonObject { ["Title"] = titles[second] }));
+        await using (var terminal = await StartSformInTerminal(withV, "story", "edit", second, "--projectKey", ProjectKey, "-v", view))
+        {
+            await terminal.ExpectAsync($"Annotation '{second}' does not exist yet, creating new.");
+            await AnnotationEditorTests.AnswerSaveAsync(terminal, save: true);
+            await terminal.ExpectAsync($"Annotation '{second}' has been saved.");
+            (await terminal.WaitForExitAsync()).ShouldSucceed();
+        }
+
+        foreach (var (key, title) in titles)
+        {
+            var annotation = (await Sform("story", "get", key, "-p", ProjectKey, "-v", view)).ShouldSucceed().JsonNode();
+            await Assert.That(annotation["Title"]?.GetValue<string>()).IsEqualTo(title);
+            await Assert.That(annotation["ViewName"]?.GetValue<string>()).IsEqualTo(view);
+            (await Sform(InProject("story", "get", key)))
+                .ShouldExitWith(CliExit.WrongInput)
+                .ShouldContain($"The annotation '{key}' has not been found.");
+        }
     }
 }
