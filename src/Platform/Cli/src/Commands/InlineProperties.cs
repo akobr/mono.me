@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using _42.Platform.Cli.Output.Exceptions;
@@ -48,7 +49,7 @@ public static class InlineProperties
             if (segment.Name is { Length: 0 })
             {
                 throw new WrongInputException(
-                    $"{subject} cannot set {JsonPaths.Of(segments)}: a name is empty, which a configuration cannot hold. A shell may have expanded a $name inside double quotes; write \\$ there, or use single quotes.");
+                    $"{subject} cannot set {JsonPaths.Of(segments)}: a name is empty, which a configuration cannot hold. A shell may have expanded a $name of the argument: in bash and zsh write \\$ inside the double quotes, in PowerShell use single quotes and double the quotes of ['…'].");
             }
         }
 
@@ -79,14 +80,7 @@ public static class InlineProperties
                 // An existing container is entered as it is: setting it again would put a copy in its place.
                 if (!ReferenceEquals(next, item))
                 {
-                    if (segment.Index < count)
-                    {
-                        array[segment.Index] = next;
-                    }
-                    else
-                    {
-                        array.Add(next);
-                    }
+                    Put(array, segment.Index, next);
                 }
 
                 container = next;
@@ -99,11 +93,41 @@ public static class InlineProperties
 
                 if (!ReferenceEquals(next, child))
                 {
-                    obj[segment.Name!] = next;
+                    Put(obj, segment.Name!, next);
                 }
 
                 container = next;
             }
+        }
+    }
+
+    // Replaces the item at index, or appends at the end. Not through the indexer, which keeps an item it deems equal:
+    // Newtonsoft compares a date with only the wall-clock time of a date with an offset, so another instant was dropped.
+    private static void Put(JArray array, int index, JToken token)
+    {
+        if (index < array.Count)
+        {
+            array.RemoveAt(index);
+            array.Insert(index, token);
+        }
+        else
+        {
+            array.Add(token);
+        }
+    }
+
+    // Replaces the property of the name in place, or adds it at the end; not through the indexer, as for an item.
+    private static void Put(JObject obj, string name, JToken token)
+    {
+        var property = obj.Property(name, StringComparison.Ordinal);
+
+        if (property is null)
+        {
+            obj.Add(name, token);
+        }
+        else
+        {
+            property.Replace(new JProperty(name, token));
         }
     }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions.TestingHelpers;
@@ -257,7 +258,110 @@ public class InlinePropertiesTests
         var message = await FailAsync(null, "retries['']=jlogic");
 
         message.ShouldBe(
-            "The inline property 1 of 1 cannot set $.retries['']: a name is empty, which a configuration cannot hold. A shell may have expanded a $name inside double quotes; write \\$ there, or use single quotes.");
+            "The inline property 1 of 1 cannot set $.retries['']: a name is empty, which a configuration cannot hold. A shell may have expanded a $name of the argument: in bash and zsh write \\$ inside the double quotes, in PowerShell use single quotes and double the quotes of ['…'].");
+    }
+
+    [Theory]
+    [InlineData("['']['x']=1", "$[''].x")]
+    [InlineData("a[''].b=1", "$.a[''].b")]
+    [InlineData("a[0][''][1]=1", "$.a[0][''][1]")]
+    public async Task AnEmptyName_BeforeTheLastStep_IsAWrongInput(string inlineProperty, string path)
+    {
+        var message = await FailAsync(null, inlineProperty);
+
+        message.ShouldStartWith($"The inline property 1 of 1 cannot set {path}: a name is empty");
+    }
+
+    [Fact]
+    public async Task AnIndex_ReplacesAnItemAfterTheFirst()
+    {
+        var document = await BuildAsync(null, "hosts[0]=a", "hosts[1]=b", "hosts[2]=c", "hosts[1]=x");
+
+        Json(document).ShouldBe("""{"hosts":["a","x","c"]}""");
+    }
+
+    [Fact]
+    public async Task AnIndex_EntersAnItemAfterTheFirst()
+    {
+        AddFile("""{"list":[{"name":"x"},{"name":"y","keep":1},{"name":"z"}]}""");
+
+        var document = await BuildAsync(FilePath, "list[1].name=n", "list[1].more.deep=true");
+
+        Json(document).ShouldBe("""{"list":[{"name":"x"},{"name":"n","keep":1,"more":{"deep":true}},{"name":"z"}]}""");
+    }
+
+    [Fact]
+    public async Task AnIndexPastTheEnd_NamesTheArrayDeepInThePath()
+    {
+        var message = await FailAsync(null, "a.list[0]=x", "a.list[5]=y");
+
+        message.ShouldBe("The inline property 2 of 2 cannot set $.a.list[5]: $.a.list has 1 item, so its index can be at most 1.");
+    }
+
+    [Fact]
+    public async Task AReplacedProperty_KeepsItsPlace()
+    {
+        AddFile("""{"a":1,"b":{"c":2},"d":3}""");
+
+        var document = await BuildAsync(FilePath, "b=x", "a=y");
+
+        Json(document).ShouldBe("""{"a":"y","b":"x","d":3}""");
+    }
+
+    [Theory]
+    [InlineData("a=1.5", "a number")]
+    [InlineData("a=00:05:00", "a time span")]
+    [InlineData("a=text", "a string")]
+    public async Task ACrossedValue_IsNamedByItsKind(string first, string kind)
+    {
+        var message = await FailAsync(null, first, "a.b=1");
+
+        message.ShouldBe($"The inline property 2 of 2 cannot set $.a.b: $.a is {kind}, not an object.");
+    }
+
+    // The file is read as the SDK reads it: a string that looks like a date stays its text.
+    [Fact]
+    public async Task ADateStringOfTheFile_StaysItsText()
+    {
+        AddFile("""{"when":"2024-01-01T00:00:00+05:00","list":["2024-01-01"]}""");
+
+        var document = await BuildAsync(FilePath, "other=1");
+
+        Json(document).ShouldBe("""{"when":"2024-01-01T00:00:00+05:00","list":["2024-01-01"],"other":1}""");
+    }
+
+    [Fact]
+    public async Task ADateStringOfTheFile_IsAStringInAMessage()
+    {
+        AddFile("""{"when":"2024-01-01"}""");
+
+        var message = await FailAsync(FilePath, "when.x=1");
+
+        message.ShouldBe("The inline property 1 of 1 cannot set $.when.x: $.when is a string, not an object.");
+    }
+
+    // Newtonsoft's indexer keeps a date it deems equal: the same wall-clock time with another offset, or the same instant.
+    [Theory]
+    [InlineData("""{"a":{"d":"2024-01-01T00:00:00Z"}}""", "a.d")]
+    [InlineData("""{"a":["2024-01-01T00:00:00Z"]}""", "a[0]")]
+    public async Task ADate_ReplacesTheValueOfTheFile(string file, string path)
+    {
+        AddFile(file);
+
+        var document = await BuildAsync(FilePath, $"{path}=2024-01-01T00:00:00+05:00");
+
+        var value = document.SelectToken(path)!;
+        value.Type.ShouldBe(JTokenType.Date);
+        value.Value<DateTimeOffset>().Offset.ShouldBe(TimeSpan.FromHours(5));
+    }
+
+    [Fact]
+    public async Task ADate_ReplacesADateOfTheSameInstant()
+    {
+        var document = await BuildAsync(null, "a=2024-01-01T00:00:00Z", "a=2024-01-01T05:00:00+05:00", "l[0]=2024-01-01T00:00:00Z", "l[0]=2024-01-01T05:00:00+05:00");
+
+        document["a"]!.Value<DateTimeOffset>().Offset.ShouldBe(TimeSpan.FromHours(5));
+        document["l"]![0]!.Value<DateTimeOffset>().Offset.ShouldBe(TimeSpan.FromHours(5));
     }
 
     [Fact]
