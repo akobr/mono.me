@@ -25,7 +25,7 @@ A composite GitHub Action that reads the resolved configuration of an annotation
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
-The action is released into a repository of its own, listed on GitHub Marketplace, with a tag `vX.Y.Z` per release and a major tag `vX` that moves with them (see [Releasing](#releasing)). Once the first release is out, use it from there as `<owner>/<name>@v1`; the owner and the name of that repository are not decided yet. Until then, and for changes that are not released, pin a commit of the monorepo, `akobr/mono.me/src/Platform/GitHubAction@<commit>`, as the examples here do. A workflow of the monorepo uses `./src/Platform/GitHubAction` after `actions/checkout`. No `sform` on NuGet has `story config export` yet, so every example installs the one the workflow packed in an earlier step `sform` (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
+The action is released into a repository of its own, listed on GitHub Marketplace, with a tag `vX.Y.Z` per release and a major tag `vX` that moves with them (see [Releasing](#releasing)). Once the first release is out, use it from there as `<owner>/<name>@v1`; the owner and the name of that repository are not decided yet. Until then, and for changes that are not released, pin a commit of the monorepo, `akobr/mono.me/src/Platform/GitHubAction@<commit>`, as the examples here do. A workflow of the monorepo uses `./src/Platform/GitHubAction` after `actions/checkout`. No `sform` on NuGet has `story config export` yet, so every example installs the `sform` that the workflow packed in an earlier step (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
 
 ## Inputs
 

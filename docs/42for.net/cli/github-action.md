@@ -22,7 +22,7 @@ The Storyteller configuration action brings the resolved configuration of an ann
 - run: dotnet run --project src/Billing   # AddEnvironmentVariables("APP_")
 ```
 
-The action lives in the [mono.me repository](https://github.com/akobr/mono.me/tree/main/src/Platform/GitHubAction) and has no release tags yet: pin a commit. It runs on Linux, macOS and Windows runners. No `sform` on NuGet has `story config export` yet, so every example installs the one the workflow packed in an earlier step `sform` (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
+The action lives in the [mono.me repository](https://github.com/akobr/mono.me/tree/main/src/Platform/GitHubAction) and has no release tags yet: pin a commit. It runs on Linux, macOS and Windows runners. No `sform` on NuGet has `story config export` yet, so every example installs the `sform` that the workflow packed in an earlier step (`cli-version` and `cli-source`), see [Until sform is published](#until-sform-is-published).
 
 ## Inputs
 
