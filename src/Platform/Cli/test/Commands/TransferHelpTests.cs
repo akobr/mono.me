@@ -22,6 +22,8 @@ public class TransferHelpTests
     [Theory]
     [InlineData("export", "Export the view (for administrators).")]
     [InlineData("import", "Import into the view (for administrators).")]
+    [InlineData("kv export", "Export the key/value pairs of the view.")]
+    [InlineData("kv import", "Import key/value pairs into the view.")]
     public void ParentList_GivesTheCommandOneLine(string path, string description)
     {
         var command = Command(path);
@@ -38,6 +40,8 @@ public class TransferHelpTests
     [Theory]
     [InlineData("export")]
     [InlineData("import")]
+    [InlineData("kv export")]
+    [InlineData("kv import")]
     public void Help_StartsWithTheDescription_AndEndsWithTheDetail_AfterTheOptions(string path)
     {
         var command = Command(path);
@@ -55,6 +59,8 @@ public class TransferHelpTests
     [Theory]
     [InlineData("export")]
     [InlineData("import")]
+    [InlineData("kv export")]
+    [InlineData("kv import")]
     public void Detail_FitsAnEightyColumnTerminal(string path)
     {
         var detail = Lines(Command(path).ExtendedHelpText);
@@ -66,6 +72,8 @@ public class TransferHelpTests
     [Theory]
     [InlineData("export", "", "-f|--format -i|--include -o|--output -x|--extract --timeout -p|--projectKey -v|--view -?|-h|--help")]
     [InlineData("import", "zip-or-folder", "-i|--include -e|--existing --dry-run --force --timeout -p|--projectKey -v|--view -?|-h|--help")]
+    [InlineData("kv export", "", "-o|--output --format --prefix --protection --include-secrets -p|--projectKey -v|--view -?|-h|--help")]
+    [InlineData("kv import", "File", "--format --secret --protection --mode --prefix --dry-run -y|--yes -p|--projectKey -v|--view -?|-h|--help")]
     public void ArgumentsAndOptions_StayAsTheyWere(string path, string arguments, string options)
     {
         var command = Command(path);
@@ -85,6 +93,32 @@ public class TransferHelpTests
         ];
 
         return string.Join('|', names.Where(name => name is not null));
+    }
+
+    // The detail of the key/value commands, from the Files paragraph and the table "Who may do what" of key-values.md.
+    [Theory]
+    [InlineData(
+        "kv export",
+        "The formats are json, the 2s.key-values.v1 document with the levels; flat, one JSON object of key: \"value\"; and env, .env lines (KEY=VALUE, with db.password as DB__PASSWORD).",
+        "Without --format, a *.json file gets json, any other file env, and the standard output json.",
+        "Secrets have a value only with --include-secrets and the secret rights. Without it, json lists them without a value, and flat and env leave them out with a note.",
+        "A Reader exports the pairs; the values of secrets need ContributorWithSecrets.",
+        "A machine needs Configuration.Read and Configuration.Transfer, and for the values of secrets Secrets.Read and its mTLS certificate, unless the project's policy turns the mTLS rule off.")]
+    [InlineData(
+        "kv import",
+        "The file is json, the 2s.key-values.v1 document with the levels; flat, one JSON object of key: \"value\"; or env, .env lines (KEY=VALUE, with DB__PASSWORD as db.password).",
+        "Without --format, the format is guessed from the file name and the content.",
+        "flat and env carry no levels: keys matching a --secret glob become secrets of the --protection level, or of the project's default secret level, and the other keys are public.",
+        "The plan, a dry run on the server, is shown first and then confirmed: -y skips the confirmation, and --dry-run stops after the plan. A replace that deletes keys asks you to type the view name. The exit code is 45 when an item failed.",
+        "A Contributor imports public pairs. Secret values, changes to or from a secret level, and a replace that deletes a secret need ContributorWithSecrets. A machine needs Configuration.Write and Configuration.Transfer, and for secrets Secrets.Write and its mTLS certificate, unless the project's policy turns the mTLS rule off.")]
+    public void KeyValueDetail_GivesTheFormatsTheSecretsAndTheRights(string path, params string[] sentences)
+    {
+        var command = Command(path);
+        var detail = Unwrap(command.ExtendedHelpText);
+
+        // Not for administrators only: Readers export and Contributors import.
+        command.Description.ShouldNotContain("administrators");
+        detail.ShouldBe(string.Join(' ', sentences));
     }
 
     // The text as one line: the words of every line, separated by single spaces.
