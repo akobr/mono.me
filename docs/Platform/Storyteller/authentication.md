@@ -260,7 +260,7 @@ Known limits of the AuthKit flows today:
 The `authentication` section of `app.config.json` decides, in this order:
 
 1. `provider` set to `EntraId` or `AuthKit`: used as configured, together with `clientId` (and `tenantId` for Entra ID).
-2. Otherwise, a cached answer of `GET v1/auth/configuration` for the current `general.baseUrl`, kept in `auth.discovery.json` next to `access.default.json`.
+2. Otherwise, a cached answer of `GET v1/auth/configuration` for the current `general.baseUrl`, kept in `auth.discovery.json` next to the `sform` assembly.
 3. Otherwise, the discovery endpoint itself, called without a token. The answer is cached.
 4. If the server has no discovery endpoint (older deployments), Entra ID with the configured `tenantId` and `clientId`, and the scope `api://{clientId}/User.Impersonation`.
 
@@ -405,7 +405,7 @@ Other platforms (Azure, AWS, Google Cloud, Vercel) have no built-in source: writ
 3. the organization and project of `STORYTELLER_KEY`;
 4. the project of the API key or the certificate.
 
-`access.default.json` is never used for a machine, because it outlives the job on a self-hosted runner. A command without a project stops. So does a command whose target differs from the project of the API key or the certificate, whether `-p`, `STORYTELLER_PROJECT` or `STORYTELLER_KEY` names it: "The machine credentials in STORYTELLER_API_KEY belong to acme.billing, not acme.web." Client credentials, a token file and a `Federated` machine name no project, so they need `-p`, `STORYTELLER_PROJECT` or `STORYTELLER_KEY`. For a `Federated` machine the project also picks the token endpoint, so `-p` wins over the variables there too. The view comes from `-v`, then `STORYTELLER_VIEW`, then the view of `STORYTELLER_KEY` while the target is the project of the key, then `default`. `STORYTELLER_PROJECT` and `STORYTELLER_VIEW` also apply to a user sign-in, ahead of `access.default.json`.
+The default project and view of the settings (`sform.settings.json`, see `sform account settings`) are never used for a machine, because they outlive the job on a self-hosted runner. A command without a project stops. So does a command whose target differs from the project of the API key or the certificate, whether `-p`, `STORYTELLER_PROJECT` or `STORYTELLER_KEY` names it: "The machine credentials in STORYTELLER_API_KEY belong to acme.billing, not acme.web." Client credentials, a token file and a `Federated` machine name no project, so they need `-p`, `STORYTELLER_PROJECT` or `STORYTELLER_KEY`. For a `Federated` machine the project also picks the token endpoint, so `-p` wins over the variables there too. The view comes from `-v`, then `STORYTELLER_VIEW`, then the view of `STORYTELLER_KEY` while the target is the project of the key, then `default`. `STORYTELLER_PROJECT` and `STORYTELLER_VIEW` also apply to a user sign-in, ahead of the default project and view of the settings.
 
 `STORYTELLER_KEY` is the variable of the configuration provider, so a job whose application reads its configuration with the provider sets it once for both. A user sign-in never reads it. `STORYTELLER_PROJECT` wins over a key of another project, and the view of that key then does not apply. For a machine the key must be a full key, as the provider parses it (`FullKey`); any other value stops a command whose project the key would pick (no `-p` and no `STORYTELLER_PROJECT`) with exit code `2`: "STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}."
 
