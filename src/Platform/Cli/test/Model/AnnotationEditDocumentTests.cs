@@ -101,6 +101,28 @@ public class AnnotationEditDocumentTests
     }
 
     [Fact]
+    public void Create_OfStoredDuplicateLabels_IsTheNormalizedDocument()
+    {
+        var stored = Stored();
+        stored.Labels = ["eu", "prod", "eu"];
+
+        var document = AnnotationEditDocument.Create(Execution, stored);
+
+        document["Labels"]!.Values<string>().ShouldBe(["eu", "prod"]);
+        JToken.DeepEquals(AnnotationEditDocument.Normalize(Execution, document), document).ShouldBeTrue();
+    }
+
+    // A document parsed with dates, not the editor's file: a DateTime has no explicit offset, a DateTimeOffset has one.
+    [Fact]
+    public void Validate_OfDateTokens_TakesOnlyThoseWithAnOffset()
+    {
+        AnnotationEditDocument.Validate(Execution, new JObject { ["ValidFrom"] = new JValue(new DateTime(2026, 12, 1)) })
+            .ShouldStartWith("'ValidFrom' must be a date and time with an offset");
+        AnnotationEditDocument.Validate(Execution, new JObject { ["ValidFrom"] = new JValue(new DateTimeOffset(2026, 12, 1, 0, 0, 0, TimeSpan.FromHours(1))) })
+            .ShouldBeNull();
+    }
+
+    [Fact]
     public void Create_ThenNormalize_IsTheSameDocument()
     {
         var document = AnnotationEditDocument.Create(Execution, Stored());
