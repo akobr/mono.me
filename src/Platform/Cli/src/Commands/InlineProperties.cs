@@ -18,6 +18,9 @@ public static class InlineProperties
     // Writes the value of every path=value into document; throws WrongInputException naming the path.
     public static void Apply(JObject document, IReadOnlyList<string> inlineProperties)
     {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(inlineProperties);
+
         for (var index = 0; index < inlineProperties.Count; index++)
         {
             var subject = string.Create(
@@ -88,7 +91,7 @@ public static class InlineProperties
             else
             {
                 var obj = (JObject)container;
-                var child = obj[segment.Name!];
+                var child = Find(obj, segment.Name!)?.Value;
                 var next = isLast ? value : Enter(child, segments, index, subject);
 
                 if (!ReferenceEquals(next, child))
@@ -116,10 +119,11 @@ public static class InlineProperties
         }
     }
 
-    // Replaces the property of the name in place, or adds it at the end; not through the indexer, as for an item.
+    // Replaces the property of the name in place, keeping the spelling it has, or adds it at the end; not through the
+    // indexer, as for an item.
     private static void Put(JObject obj, string name, JToken token)
     {
-        var property = obj.Property(name, StringComparison.Ordinal);
+        var property = Find(obj, name);
 
         if (property is null)
         {
@@ -127,8 +131,15 @@ public static class InlineProperties
         }
         else
         {
-            property.Replace(new JProperty(name, token));
+            property.Replace(new JProperty(property.Name, token));
         }
+    }
+
+    // The property of the name: the exact spelling first, else one that differs only in case, as IConfiguration compares
+    // keys case-insensitively; -x Logging.x over a file's "logging" must not add a second spelling of one key.
+    private static JProperty? Find(JObject obj, string name)
+    {
+        return obj.Property(name, StringComparison.Ordinal) ?? obj.Property(name, StringComparison.OrdinalIgnoreCase);
     }
 
     // The path, then '=', then the value: a bracketed name may hold '=', so the path is read before the '=' is looked for.

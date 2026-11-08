@@ -306,7 +306,7 @@ To change the items of a stored array, write the whole content with `-i <file> -
 
 An unquoted `a['b.c']=1` reaches `sform` as `a[b.c]=1`, and an expanded `$binding` leaves `['']`; the errors of both say so.
 
-**Changed.** The name of `-x` used to be a top-level property as written. Now a name that is not plain (with a dot, a space, `:`, `$`, a leading digit or `-`, or a letter outside ASCII) is written `['name']`, and an empty name is refused: `-x "['a.b']=1"` sets the property `a.b`, as `-x a.b=1` did before.
+**Changed.** The name of `-x` used to be a top-level property as written. Now a name that is not plain (with a dot, a space, `:`, `$`, a leading digit or `-`, or a letter outside ASCII) is written `['name']`, and an empty name is refused: `-x "['a.b']=1"` sets the property `a.b`, as `-x a.b=1` did before. The `IConfiguration` spelling `-x "Logging:LogLevel:Default=Warning"` now fails; write `Logging.LogLevel.Default`. A name matches a property of the file in any case, as `IConfiguration` keys do, and keeps the spelling of the file. A date-like value of `-x` becomes a date, while one of the `-i` file stays its text.
 
 ## Telemetry
 
