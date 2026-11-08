@@ -147,4 +147,16 @@ public class BrowserLauncherTests
         var paths = CliPaths.Create(new MockFileSystem(), null, MockUnixSupport.Path(@"C:\tools\sform"), () => MockUnixSupport.Path(@"C:\Users\ada"));
         return SformEnvironment.FromEnvironment(name => _environment.GetValueOrDefault(name), paths);
     }
+
+    // %s of a BROWSER command line is the address, %% a literal percent sign.
+    [Theory]
+    [InlineData("%s", "https://a/b")]
+    [InlineData("--url=%s", "--url=https://a/b")]
+    [InlineData("100%%", "100%")]
+    [InlineData("%%s", "%s")]
+    [InlineData("50% off", "50% off")]
+    public void Substitute_ReadsThePlaceholdersLeftToRight(string part, string expected)
+    {
+        BrowserLauncher.Substitute(part, "https://a/b").ShouldBe(expected);
+    }
 }

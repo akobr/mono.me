@@ -20,8 +20,15 @@ public sealed record TokenStorage(string Directory, bool IsUnprotected, bool IsH
     public string MsalCacheFileName => IsUnprotected ? MSAL_CACHE_FILE + PLAINTEXT_SUFFIX : MSAL_CACHE_FILE;
 
     // Null without SFORM_HOME (the entry keeps its fixed name, so an existing session stays); with SFORM_HOME the first
-    // 16 hex digits of the SHA-256 of the directory, so each SFORM_HOME has an entry, and a session, of its own.
+    // 16 hex digits of the SHA-256 of the directory, so each SFORM_HOME has an entry, and a session, of its own. On Windows
+    // and macOS, whose file systems ignore the case by default, the directory is hashed in lower case, so C:\Work\Home and
+    // c:\work\home keep one session.
     public string? HomeKey => IsHome
-        ? Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Directory)))[..16]
+        ? Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(KeyOf(Directory))))[..16]
         : null;
+
+    private static string KeyOf(string directory)
+    {
+        return OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? directory.ToLowerInvariant() : directory;
+    }
 }

@@ -165,4 +165,21 @@ public sealed class ProtectedTokenStoreTests : IDisposable
             Directory.Delete(_directory, recursive: true);
         }
     }
+
+    // On Windows and macOS one folder written in another case is the same SFORM_HOME, so it keeps one session.
+    [Fact]
+    public void HomeKey_IgnoresTheCaseOfThePath_WhereTheFileSystemDoes()
+    {
+        var upper = new TokenStorage(@"C:\Work\Home", IsUnprotected: false, IsHome: true).HomeKey;
+        var lower = new TokenStorage(@"c:\work\home", IsUnprotected: false, IsHome: true).HomeKey;
+
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+        {
+            lower.ShouldBe(upper);
+        }
+        else
+        {
+            lower.ShouldNotBe(upper);
+        }
+    }
 }

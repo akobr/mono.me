@@ -51,6 +51,8 @@ public static partial class SecretScanner
             }
         }
 
+        // Values of fewer than 4 characters are not masked: they would mask every such run of text in the output. The
+        // secrets sform prints (keys, generated passwords) are far longer; a short secret has to be registered by hand.
         return found.Where(value => value.Trim().Length >= 4).ToArray();
     }
 

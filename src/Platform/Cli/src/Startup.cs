@@ -63,6 +63,7 @@ namespace _42.Platform.Cli
 
             services.AddSingleton<IExtendedConsole, SformConsole>();
             services.AddHttpClient();
+            services.ConfigureHttpClientDefaults(builder => builder.AddHttpMessageHandler(() => new RequestTargetHandler()));
             ConfigureMachineSignIn(services);
             services.AddSingleton(GitHubActionsSettings.FromEnvironment(System.Environment.GetEnvironmentVariable));
             ConfigureStatePaths(services, Paths, SformEnvironment);

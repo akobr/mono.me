@@ -12,6 +12,7 @@ using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
+using _42.Platform.Cli.Services;
 using _42.Platform.Cli.Telemetry;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -72,10 +73,29 @@ public class Program
             return ExitCodes.ERROR_CRASH;
         }
 
+        // Where requests and the token go is said whenever the environment, not the files, decides it.
+        ConfigurationOverrideNotice.Write(System.Environment.GetEnvironmentVariables(), System.Console.Error);
+
         System.Console.CancelKeyPress += OnCancelKeyPress;
         var exitCode = await RunAsync(args);
         await _telemetry.SendAsync(CurrentRun, exitCode);
         return exitCode;
+    }
+
+    // The scheme, host and port of the request that failed when it was not one to the API; null for the API, or when
+    // unknown.
+    internal static string? UnreachableTargetOf(string? lastTarget, string? baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(lastTarget)
+            || !Uri.TryCreate(lastTarget, UriKind.Absolute, out var target)
+            || !Uri.TryCreate(baseUrl, UriKind.Absolute, out var api))
+        {
+            return null;
+        }
+
+        return Uri.Compare(target, api, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) == 0
+            ? null
+            : target.GetLeftPart(UriPartial.Authority);
     }
 
     // An invalid SFORM_HOME (relative, or a file) ends the run before anything is read or written: falling back to the
@@ -296,6 +316,17 @@ public class Program
     {
         CurrentRun.Exception = exception;
         await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(exception, "The service could not be reached")));
+
+        // A request to another service than the API (the sign-in service or its discovery) names that service.
+        if (UnreachableTargetOf(RequestTargetHandler.LastTarget, _baseUrl) is { } target)
+        {
+            Console.Write("! ", Color.Magenta);
+            Console.WriteLine($"The service at {target} could not be reached: {reason}");
+            Console.WriteLine(
+                $"  sform called it for the sign-in, not the API{(string.IsNullOrWhiteSpace(_baseUrl) ? string.Empty : $" ({_baseUrl})")}; check the network and the sign-in settings of the deployment.",
+                Color.DarkGray);
+            return ExitCodes.ERROR_SERVICE_FAILURE;
+        }
 
         Console.Write("! ", Color.Magenta);
         Console.WriteLine($"The 2S platform could not be reached: {reason}");

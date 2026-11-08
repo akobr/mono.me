@@ -155,7 +155,7 @@ public class MachineRenewCommand : BaseContextCommand
     {
         if (PasswordFromStdin)
         {
-            return Console.Console.In.ReadLine() ?? string.Empty;
+            return (Console.Console?.In ?? System.Console.In).ReadLine() ?? string.Empty;
         }
 
         Console.EnsureInteractiveValue(
