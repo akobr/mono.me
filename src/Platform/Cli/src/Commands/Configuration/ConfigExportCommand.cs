@@ -254,7 +254,7 @@ public class ConfigExportCommand : BaseContextCommand
         }
         catch (ApiException exception) when (exception.StatusCode == (int)HttpStatusCode.NotFound)
         {
-            Console.WriteErrorLine($"The configuration for '{options.Key}' has not been found.");
+            Console.WriteErrorLine($"The effective configuration for '{options.Key}' has not been found, so the values that bindings produced cannot be told apart. Nothing was exported.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
         catch (ApiException exception) when (exception.StatusCode is not ((int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden))

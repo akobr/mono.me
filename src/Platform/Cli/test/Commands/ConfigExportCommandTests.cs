@@ -643,7 +643,7 @@ public class ConfigExportCommandTests
         var exitCode = await Execute(Key, "--github-env", "--prefix", "APP_");
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _error.ToString().ShouldBe($"The configuration for '{Key}' has not been found.\n");
+        _error.ToString().ShouldBe($"The effective configuration for '{Key}' has not been found, so the values that bindings produced cannot be told apart. Nothing was exported.\n");
         _out.ToString().ShouldBeEmpty();
         _fileSystem.File.ReadAllText(GitHubEnv).ShouldBeEmpty();
     }
