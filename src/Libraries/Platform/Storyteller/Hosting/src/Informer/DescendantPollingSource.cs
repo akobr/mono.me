@@ -82,48 +82,6 @@ internal sealed class DescendantPollingSource
         }
     }
 
-    // Why a confirmation read ends a held annotation; null while it is still a descendant of the target. A failure other
-    // than a 404 has no answer and is handled before.
-    private static StorytellerRemovalReason? ReasonOf(PointRead read, bool includeInactive, DateTimeOffset now)
-    {
-        if (read.Annotation is not { } annotation)
-        {
-            return StorytellerRemovalReason.Missing;
-        }
-
-        if (annotation.DeletedAt is not null)
-        {
-            return StorytellerRemovalReason.Deleted;
-        }
-
-        if (includeInactive)
-        {
-            return null;
-        }
-
-        return annotation.GetStatus(now) switch
-        {
-            AnnotationStatus.Disabled => StorytellerRemovalReason.Disabled,
-            AnnotationStatus.Scheduled => StorytellerRemovalReason.Scheduled,
-            AnnotationStatus.Expired => StorytellerRemovalReason.Expired,
-            _ => null,
-        };
-    }
-
-    private static async Task<T> LimitAsync<T>(SemaphoreSlim limiter, Func<Task<T>> read, CancellationToken cancellationToken)
-    {
-        await limiter.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-        try
-        {
-            return await read().ConfigureAwait(false);
-        }
-        finally
-        {
-            limiter.Release();
-        }
-    }
-
     private async Task<DescendantBatch> PollAsync(PollState poll, CancellationToken cancellationToken)
     {
         var scope = poll.Scope;
@@ -137,7 +95,7 @@ internal sealed class DescendantPollingSource
             }
 
             items = await ListPaging.ReadAllAsync(
-                    token => LimitAsync(
+                    token => PollReads.LimitAsync(
                         poll.Limiter,
                         () => _pages.ReadDescendantsPageAsync(scope.Ancestor, scope.Type, scope.IncludeInactive, token, cancellationToken),
                         cancellationToken),
@@ -169,7 +127,7 @@ internal sealed class DescendantPollingSource
     {
         try
         {
-            await LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(poll.Scope.Ancestor, includeDeleted: false, cancellationToken), cancellationToken).ConfigureAwait(false);
+            await PollReads.LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(poll.Scope.Ancestor, includeDeleted: false, cancellationToken), cancellationToken).ConfigureAwait(false);
         }
         catch (StorytellerConfigurationException exception) when (CatalogReader.IsMissing(exception))
         {
@@ -309,7 +267,7 @@ internal sealed class DescendantPollingSource
             return null;
         }
 
-        if (ReasonOf(read, poll.Scope.IncludeInactive, _timeProvider.GetUtcNow()) is { } reason)
+        if (PollReads.ReasonOf(read.Annotation, poll.Scope.IncludeInactive, _timeProvider.GetUtcNow()) is { } reason)
         {
             return new StorytellerRemoval(held.Key.Annotation.ToString(), reason);
         }
@@ -323,7 +281,7 @@ internal sealed class DescendantPollingSource
     {
         try
         {
-            var annotation = await LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(key, includeDeleted, cancellationToken), cancellationToken).ConfigureAwait(false);
+            var annotation = await PollReads.LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(key, includeDeleted, cancellationToken), cancellationToken).ConfigureAwait(false);
             return new PointRead(key, annotation, null);
         }
         catch (StorytellerConfigurationException exception) when (!cancellationToken.IsCancellationRequested)

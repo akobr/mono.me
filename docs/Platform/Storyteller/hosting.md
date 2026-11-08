@@ -395,6 +395,10 @@ A poll:
 
 The interval, the jitter, the zero interval, the checks at the call, failed polls and point reads, and cancellation are those of [`WatchExecutionsAsync`](#the-informer). Each enumeration runs its own loop and holds its own annotations.
 
+- **A target that cannot work ends the watch.** A definitive failure before any poll has completed, such as an ancestor that does not exist (`404`), a `401`, or a `403` of a machine that may not list the target, is thrown from the enumeration: polling again would not fix it, and a watch that never ends would look like an empty target. A transient failure is logged and polled again.
+- **After a poll has completed**, every failure is logged and polled again, definitive ones included, as a policy may change back; what is held stays.
+- **An ancestor deleted later.** The list of a deleted ancestor answers what is not deleted under it, and a deletion cascades, so its held descendants leave as `Removed` with `Deleted`.
+
 ### Freshness
 
 `Modified` moves on a create, an update that changes something, and a restore. The server keeps the relation names of a parent (`UnitNames`, `ContextNames`, `ResponsibilityNames`) without moving its `Modified`, and the items of a list do not carry them. So:
@@ -681,7 +685,7 @@ See [Annotation restriction of machines](authentication.md#annotation-restrictio
 
 **Cost of `IStorytellerCatalog`:**
 
-- `ListAsync`: one read of the ancestor, one request per page of its descendants of the type, and one point read per descendant that passes the filters;
+- `ListAsync`: one read of the ancestor, one request per page of its descendants of the type, and one point read per descendant that passes the filters, 4 at a time. The filters run in the process, so the pages list every descendant of the type, and `ListAsync(StorytellerTarget.ExecutionsOf("rst.…"))` of a responsibility with thousands of executions makes thousands of reads. Target the narrowest ancestor that holds what you need (`usg.{S}.{R}` rather than `rst.{R}` with a subject filter), and prefer `WatchAsync`, which reads again only what changed;
 - a poll of `WatchAsync`: one request per page, one read of the ancestor until a poll has completed, and point reads for changes only: one per added, changed or removed annotation.
 
 **Limits:**

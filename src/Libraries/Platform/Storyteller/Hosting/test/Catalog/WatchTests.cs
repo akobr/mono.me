@@ -336,6 +336,64 @@ public sealed class WatchTests : IDisposable
         _catalog.Lists("rst.missing", "units").ShouldBeEmpty();
     }
 
+    // Polling again would not fix it, and a watch that never ends would read as an empty target.
+    [Fact]
+    public async Task ADefinitiveFailureBeforeAnyPollCompleted_EndsTheWatch()
+    {
+        await using var probe = Watch(StorytellerTarget.UnitsOf("rst.missing"));
+
+        var exception = await Should.ThrowAsync<StorytellerConfigurationException>(() => probe.Completion.WaitAsync(HostingFixture.Patience));
+
+        exception.StatusCode.ShouldBe(404);
+        exception.IsTransient.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ATransientFailureBeforeAnyPollCompleted_IsPolledAgain()
+    {
+        _catalog.Put(Daily);
+        _catalog.FailPage("units", null, HttpStatusCode.ServiceUnavailable, parent: Responsibility);
+        await using var probe = Watch(StorytellerTarget.UnitsOf(Responsibility));
+        (await probe.FirstPollAsync()).ShouldBeEmpty();
+
+        _catalog.Heal();
+
+        (await probe.NextPollAsync(Interval)).ShouldHaveSingleItem().Kind.ShouldBe(StorytellerChangeKind.Added);
+    }
+
+    // A policy may change back: after a poll completed, a definitive failure is polled again too.
+    [Fact]
+    public async Task ADefinitiveFailureAfterAPollCompleted_IsPolledAgain()
+    {
+        _catalog.Put(Daily);
+        await using var probe = Watch(StorytellerTarget.UnitsOf(Responsibility));
+        await probe.FirstPollAsync();
+
+        _catalog.FailPage("units", null, HttpStatusCode.Forbidden, TestAnnotations.ErrorJson, Responsibility);
+        (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
+        Warnings().ShouldHaveSingleItem().Message.ShouldContain("failed (definitive); the 1 annotations held stay as they are.");
+
+        _catalog.Heal();
+        (await probe.NextPollAsync(Interval)).ShouldBeEmpty();
+        probe.Completion.IsCompleted.ShouldBeFalse();
+    }
+
+    // Listing the descendants of a deleted ancestor answers what is not deleted under it, and a deletion cascades.
+    [Fact]
+    public async Task AnAncestorDeletedAfterTheFirstPoll_RemovesItsDescendants()
+    {
+        _catalog.Put(Daily);
+        await using var probe = Watch(StorytellerTarget.UnitsOf(Responsibility));
+        await probe.FirstPollAsync();
+
+        _catalog.Update(Responsibility, TestAnnotations.Deleted());
+        _catalog.Update(Daily, TestAnnotations.Deleted());
+        var change = (await probe.NextPollAsync(Interval)).ShouldHaveSingleItem();
+
+        change.Kind.ShouldBe(StorytellerChangeKind.Removed);
+        change.Removal.ShouldBe(new StorytellerRemoval(Daily, StorytellerRemovalReason.Deleted));
+    }
+
     [Fact]
     public async Task EachEnumeration_HoldsItsOwn()
     {
