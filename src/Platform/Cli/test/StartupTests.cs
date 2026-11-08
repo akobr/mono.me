@@ -70,6 +70,21 @@ public class StartupTests
         }
     }
 
+    // The path that crashed: McMaster creates the models of the parents while it parses, also for --help.
+    [Theory]
+    [InlineData("story", "kv", "--help")]
+    [InlineData("story", "kv", "export", "--help")]
+    [InlineData("story", "kv", "import", "--help")]
+    [InlineData("story", "export", "--help")]
+    public void Help_ActivatesTheCommandsOnItsPath(params string[] args)
+    {
+        using var provider = StartupServices().BuildServiceProvider();
+        using var app = new CommandLineApplication<PlatformCommand>();
+        app.Conventions.UseDefaultConventions().UseConstructorInjection(provider);
+
+        app.Execute(args).ShouldBe(0);
+    }
+
     [Fact]
     public void TimeProvider_IsTheSystemClock()
     {
