@@ -47,6 +47,29 @@ public class StartupTests
         unresolved.ShouldBeEmpty();
     }
 
+    // Registered is not enough: every service a command takes has to build, with what it needs below it.
+    [Fact]
+    public void EveryServiceOfACommand_Builds()
+    {
+        using var provider = StartupServices().BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
+        var isService = provider.GetRequiredService<IServiceProviderIsService>();
+
+        var parameters = Commands(typeof(PlatformCommand))
+            .SelectMany(command => command.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
+            .SelectMany(constructor => constructor.GetParameters())
+            .Select(parameter => parameter.ParameterType)
+            .Where(type => !Provided.Contains(type) && isService.IsService(type))
+            .Distinct()
+            .ToList();
+
+        parameters.ShouldContain(typeof(TimeProvider));
+
+        foreach (var type in parameters)
+        {
+            Should.NotThrow(() => provider.GetRequiredService(type), type.FullName);
+        }
+    }
+
     [Fact]
     public void TimeProvider_IsTheSystemClock()
     {
@@ -60,7 +83,9 @@ public class StartupTests
         var environment = new Mock<IHostEnvironment>();
         environment.SetupGet(host => host.EnvironmentName).Returns(Environments.Production);
 
+        // What the host registers before Startup: McMaster's hosting adds the console.
         var services = new ServiceCollection();
+        services.AddSingleton<IConsole>(PhysicalConsole.Singleton);
         new Startup(environment.Object).ConfigureServices(services, new ConfigurationBuilder().Build());
         return services;
     }

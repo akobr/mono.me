@@ -30,10 +30,11 @@ public class KeyValueListCommand : KeyValueCommandBase
 {
     private readonly TimeProvider _timeProvider;
 
-    public KeyValueListCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, TimeProvider? timeProvider = null)
+    // Required: McMaster ignores default values and resolves every parameter (Startup registers TimeProvider.System).
+    public KeyValueListCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, TimeProvider timeProvider)
         : base(console, context, keyValues)
     {
-        _timeProvider = timeProvider ?? TimeProvider.System;
+        _timeProvider = timeProvider;
     }
 
     [Option("--prefix", CommandOptionType.SingleValue, Description = "Only keys starting with this prefix.")]

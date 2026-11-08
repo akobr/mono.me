@@ -46,7 +46,7 @@ public class TransferHelpTests
     {
         var command = Command(path);
         var lines = Render(command);
-        var detail = Lines(command.ExtendedHelpText);
+        var detail = HelpTexts.Lines(command.ExtendedHelpText);
 
         lines[0].ShouldBe(command.Description);
         lines[1].ShouldBeEmpty();
@@ -63,7 +63,7 @@ public class TransferHelpTests
     [InlineData("kv import")]
     public void Detail_FitsAnEightyColumnTerminal(string path)
     {
-        var detail = Lines(Command(path).ExtendedHelpText);
+        var detail = HelpTexts.Lines(Command(path).ExtendedHelpText);
 
         detail.ShouldAllBe(line => line.Length <= DetailWidth);
         detail.ShouldAllBe(line => line == line.TrimEnd());
@@ -78,8 +78,8 @@ public class TransferHelpTests
     {
         var command = Command(path);
 
-        command.Arguments.Select(argument => argument.Name).ShouldBe(Words(arguments));
-        command.GetOptions().Select(Template).ShouldBe(Words(options), ignoreOrder: true);
+        command.Arguments.Select(argument => argument.Name).ShouldBe(HelpTexts.Words(arguments));
+        command.GetOptions().Select(Template).ShouldBe(HelpTexts.Words(options), ignoreOrder: true);
     }
 
     // The detail of the key/value commands, from the Files paragraph and the table "Who may do what" of key-values.md.
@@ -96,23 +96,17 @@ public class TransferHelpTests
         "The file is json, the 2s.key-values.v1 document with the levels; flat, one JSON object of key: \"value\"; or env, .env lines (KEY=VALUE, with DB__PASSWORD as db.password).",
         "Without --format, the format is guessed from the file name and the content.",
         "flat and env carry no levels: keys matching a --secret glob become secrets of the --protection level, or of the project's default secret level, and the other keys are public.",
-        "The plan, a dry run on the server, is shown first and then confirmed: -y skips the confirmation, and --dry-run stops after the plan. A replace that deletes keys asks you to type the view name. An item that is not valid, such as a new secret without its value, stops the import at the plan: nothing is written and the exit code is 2. The exit code is 45 when the write of an item failed.",
+        "The plan, a dry run on the server, is shown first and then confirmed: -y skips the confirmation, and --dry-run stops after the plan. A replace that deletes keys asks you to type the view name, unless -y is given. An item that is not valid, such as a new secret without its value, stops the import at the plan: nothing is written and the exit code is 2. The exit code is 45 when the write of an item failed, and 44 when the API refuses the import.",
         "A Contributor imports public pairs. Secret values, changes to or from a secret level, and a replace that deletes a secret need ContributorWithSecrets. A machine needs Configuration.Write and Configuration.Transfer, and for secrets Secrets.Write and its mTLS certificate, unless the project's policy turns the mTLS rule off.")]
     public void KeyValueDetail_GivesTheFormatsTheSecretsAndTheRights(string path, params string[] sentences)
     {
         var command = Command(path);
-        var detail = Unwrap(command.ExtendedHelpText);
+        var detail = HelpTexts.Unwrap(command.ExtendedHelpText);
 
         // Not for administrators only: Readers export and Contributors import.
         command.Description.ShouldNotBeNull();
         command.Description.ShouldNotContain("administrators");
         detail.ShouldBe(string.Join(' ', sentences));
-    }
-
-    // The text as one line: the words of every line, separated by single spaces.
-    internal static string Unwrap(string? text)
-    {
-        return string.Join(' ', Words(text));
     }
 
     // As the help writes it: -?|-h|--help.
@@ -128,11 +122,6 @@ public class TransferHelpTests
         return string.Join('|', names.Where(name => name is not null));
     }
 
-    private static string[] Words(string? text)
-    {
-        return (text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-    }
-
     // The command of sform story at the path, for example "kv export".
     private static CommandLineApplication Command(string path)
     {
@@ -141,7 +130,7 @@ public class TransferHelpTests
 
         CommandLineApplication command = story;
 
-        foreach (var name in Words(path))
+        foreach (var name in HelpTexts.Words(path))
         {
             command = command.Commands.Single(subcommand => subcommand.Name == name);
         }
@@ -153,20 +142,7 @@ public class TransferHelpTests
     {
         using var writer = new StringWriter();
         new FixedWidthHelp().Generate(command, writer);
-        return Lines(writer.ToString());
-    }
-
-    // Lines without their ends, and without the empty one after a last line end.
-    private static List<string> Lines(string? text)
-    {
-        var lines = (text ?? string.Empty).ReplaceLineEndings("\n").Split('\n').ToList();
-
-        if (lines.Count > 1 && lines[^1].Length == 0)
-        {
-            lines.RemoveAt(lines.Count - 1);
-        }
-
-        return lines;
+        return HelpTexts.Lines(writer.ToString());
     }
 
     private sealed class FixedWidthHelp : DefaultHelpTextGenerator
