@@ -32,7 +32,7 @@ public class TemplateSetCommand : BaseContextCommand
     [Option("-i|--import", CommandOptionType.SingleValue, Description = "Specify a file from where the template will be imported.")]
     public string? ImportFilePath { get; set; }
 
-    [Option("-x|--properties", CommandOptionType.MultipleValue, Description = "Specify inline properties to be set on the template.")]
+    [Option("-x|--properties", CommandOptionType.MultipleValue, Description = "Specify inline properties as path=value, for example -x \"db.port=5432\" -x \"hosts[0]=a\" -x \"Logging.LogLevel['Microsoft.AspNetCore']=Warning\"; quote each one.")]
     public string[]? InlineProperties { get; set; }
 
     [Option("--replace", CommandOptionType.NoValue, Description = "Replace the content of the template instead of merging into it (removes properties which are not specified).")]

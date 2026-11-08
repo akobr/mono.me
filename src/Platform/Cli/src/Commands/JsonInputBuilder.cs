@@ -2,6 +2,7 @@ using System;
 using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -20,12 +21,15 @@ public static class JsonInputBuilder
     /// <summary>
     /// Builds a JSON document from an imported file and inline properties (in this order).
     /// </summary>
-    /// <param name="console">The console for error messages.</param>
+    /// <param name="console">The console for error messages, written as plain lines on its standard error.</param>
     /// <param name="fileSystem">The file system to read the imported file from.</param>
     /// <param name="importFilePath">An optional path of a JSON file.</param>
-    /// <param name="inlineProperties">Optional inline properties in the format <c>name=value</c>.</param>
+    /// <param name="inlineProperties">
+    /// Optional inline properties in the format <c>path=value</c>, written into the document at their paths in order
+    /// (see <see cref="InlineProperties"/>).
+    /// </param>
     /// <returns>The built document.</returns>
-    /// <exception cref="WrongInputException">Thrown when the file doesn't exist or an inline property has a wrong format.</exception>
+    /// <exception cref="WrongInputException">Thrown when the file doesn't exist or an inline property has a wrong format or cannot be set.</exception>
     public static async Task<JObject> BuildAsync(
         IExtendedConsole console,
         IFileSystem fileSystem,
@@ -39,7 +43,7 @@ public static class JsonInputBuilder
             if (!fileSystem.File.Exists(importFilePath))
             {
                 var message = $"The file '{fileSystem.Path.GetFullPath(importFilePath)}' does not exist.";
-                console.WriteImportant(message);
+                console.WriteErrorLine(message);
                 throw new WrongInputException(message);
             }
 
@@ -59,23 +63,15 @@ public static class JsonInputBuilder
 
         if (inlineProperties?.Length > 0)
         {
-            JObject inlineContent = new();
-
-            foreach (var inlineProperty in inlineProperties)
+            try
             {
-                var parts = inlineProperty.Split('=', 2);
-
-                if (parts.Length != 2)
-                {
-                    var message = $"The inline property '{inlineProperty}' is not in the correct format.";
-                    console.WriteImportant(message);
-                    throw new WrongInputException(message);
-                }
-
-                inlineContent[parts[0]] = new JValue(PropertyValueParser.ParseValue(parts[1]));
+                InlineProperties.Apply(content, inlineProperties);
             }
-
-            content.Merge(inlineContent, JsonMergeOptions);
+            catch (WrongInputException exception)
+            {
+                console.WriteErrorLine(exception.Message);
+                throw;
+            }
         }
 
         return content;
