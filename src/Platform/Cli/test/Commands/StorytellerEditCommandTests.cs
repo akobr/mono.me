@@ -54,7 +54,7 @@ public class StorytellerEditCommandTests
     {
         _fixture.Api
             .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>()))
-            .Callback((string _, string _, string _, string _, Annotation body, CancellationToken _) =>
+            .Callback((string _, string _, string _, string _, Annotation body, string _, string _, CancellationToken _) =>
             {
                 _calls.Add("set");
                 _written = body;
