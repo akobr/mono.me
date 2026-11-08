@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using _42.Platform.Cli.AutomationTests.Running;
+using _42.Platform.Cli.AutomationTests.Running.Terminal;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
@@ -51,15 +52,84 @@ public sealed class AccountSetTests : CliTest
             .ShouldContain($"Default project set to {ProjectKey} with default view.");
     }
 
+    // ACC-SET-02: account set in a terminal offers the user's projects and stores the choice.
+    // With the default set to the target project (account set -p <org>.<project>), sform account set in a terminal names the
+    // current default and asks "Which project would you like to set as default" with the user's projects, the target project
+    // among them and preselected: Enter alone picks it, sform says "Default project set to <org>.<project> with view
+    // default." and access.default.json names it.
+    [Test]
+    [TestCase(269)]
+    [UserRole(Role.Any)]
+    [Terminal]
+    [Covers("account set")]
+    public async Task AccountSet_Interactive_SelectsProject()
+    {
+        (await Sform("account", "set", "-p", ProjectKey)).ShouldSucceed();
+
+        await using var terminal = await StartSformInTerminal("account", "set");
+        await terminal.ExpectAsync($"Currently the default project is set to {ProjectKey} and view is default.");
+        await terminal.ExpectAsync("Which project would you like to set as default");
+        await terminal.ExpectAsync(ProjectKey);
+        await terminal.SendKeyAsync(TerminalKey.Enter);
+        await terminal.ExpectAsync($"Default project set to {ProjectKey} with view default.");
+        (await terminal.WaitForExitAsync()).ShouldSucceed();
+
+        await AssertDefaultAsync("default");
+    }
+
+    // ACC-SET-03: account set without -p on redirected input fails with exit 2.
+    // sform account set with the input redirected ends with 2 within the timeout, before any call (the list it would offer
+    // needs a terminal); stderr says "! sform cannot ask for the default project: the input is redirected." and "Pass it with
+    // -p|--projectKey <organizationName>.<projectName>.", and no default project is written.
+    [Test]
+    [TestCase(270)]
+    [UserRole(Role.Any)]
+    [Covers("account set")]
+    public async Task AccountSet_RedirectedWithoutProject_Fails()
+    {
+        (await Sform(new SformRunOptions { Timeout = TimeSpan.FromSeconds(30) }, "account", "set"))
+            .ShouldExitWith(CliExit.WrongInput)
+            .ShouldContain("! sform cannot ask for the default project: the input is redirected.", SformStream.StdErr)
+            .ShouldContain("Pass it with -p|--projectKey <organizationName>.<projectName>.", SformStream.StdErr)
+            .ShouldNotContain("Default project set to");
+        await Assert.That(Home.HasDefaultProject).IsFalse();
+    }
+
+    // ACC-SET-04: account set -p checks only the format: a key without a dot fails with exit 2, an unknown project is stored.
+    // With the default set to the target project, sform account set -p only-org ends with 2 before any call ("The project
+    // key 'only-org' is not in the format <organizationName>.<projectName>.") and leaves access.default.json as it was;
+    // sform account set -p <org>.<generated> is not checked against the account: it stores the generated project as the
+    // default and ends with 0.
+    [Test]
+    [TestCase(271)]
+    [UserRole(Role.Any)]
+    [Covers("account set", "-p")]
+    public async Task AccountSet_ProjectKey_ChecksFormatOnly()
+    {
+        (await Sform("account", "set", "-p", ProjectKey)).ShouldSucceed();
+        var before = Home.ReadText(Access.SformHome.AccessDefaultFileName);
+
+        (await Sform("account", "set", "-p", "only-org"))
+            .ShouldExitWith(CliExit.WrongInput)
+            .ShouldContain("The project key 'only-org' is not in the format <organizationName>.<projectName>.");
+        await Assert.That(Home.ReadText(Access.SformHome.AccessDefaultFileName)).IsEqualTo(before);
+
+        var generated = CliData.ProjectName();
+        (await Sform("account", "set", "-p", $"{Organization}.{generated}"))
+            .ShouldSucceed()
+            .ShouldContain($"Default project set to {Organization}.{generated} with view default.");
+        await AssertDefaultAsync("default", generated);
+    }
+
     // access.default.json of the home: { "access": { "OrganizationName", "ProjectName", "ViewName" } }.
-    private async Task AssertDefaultAsync(string view)
+    private async Task AssertDefaultAsync(string view, string? project = null)
     {
         var text = Home.ReadText(Access.SformHome.AccessDefaultFileName);
         await Assert.That(text).IsNotNull();
 
         var access = JsonNode.Parse(text!)!["access"]!;
         await Assert.That(access["OrganizationName"]!.GetValue<string>()).IsEqualTo(Organization);
-        await Assert.That(access["ProjectName"]!.GetValue<string>()).IsEqualTo(Project);
+        await Assert.That(access["ProjectName"]!.GetValue<string>()).IsEqualTo(project ?? Project);
         await Assert.That(access["ViewName"]!.GetValue<string>()).IsEqualTo(view);
     }
 }
