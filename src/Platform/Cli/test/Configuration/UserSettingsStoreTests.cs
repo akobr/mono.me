@@ -132,6 +132,24 @@ public class UserSettingsStoreTests
         JObject.Parse(_fileSystem.File.ReadAllText(target)).ShouldBeJson("""{"editor":{"editorType":"Vim"}}""");
     }
 
+    // A loop of links is never written over: the change fails and both links stay.
+    [Fact]
+    public void ALoopOfLinks_FailsWithoutReplacingALink()
+    {
+        var other = P(@"C:\Users\ada\dotfiles\sform.settings.json");
+        _fileSystem.AddFile(other, new MockFileData(string.Empty));
+        _fileSystem.Directory.CreateDirectory(SettingsDirectory);
+        _fileSystem.File.CreateSymbolicLink(SettingsPath, other);
+        _fileSystem.File.Delete(other);
+        _fileSystem.File.CreateSymbolicLink(other, SettingsPath);
+
+        var exception = Should.Throw<UserSettingsException>(() => CreateStore().Update(ConfigurationSections.EDITOR, Changes(UserSettingsSchema.EDITOR_TYPE, "Vim")));
+
+        exception.Message.ShouldContain("cannot be written");
+        _fileSystem.FileInfo.New(SettingsPath).LinkTarget.ShouldBe(other);
+        _fileSystem.FileInfo.New(other).LinkTarget.ShouldBe(SettingsPath);
+    }
+
     [Fact]
     public void ADamagedFile_IsNeverOverwritten()
     {
