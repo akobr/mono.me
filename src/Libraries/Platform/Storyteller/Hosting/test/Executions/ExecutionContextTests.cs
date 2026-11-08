@@ -453,6 +453,87 @@ public sealed class ExecutionContextTests : IDisposable
         context.GetSubscriptionStatus(_fixture.Time.GetUtcNow()).ShouldBe(StorytellerSubscriptionStatus.Deleted);
     }
 
+    [Fact]
+    public async Task AResponsibilityKey_IsATypedSnapshot_WithItsUnitNames()
+    {
+        _fixture.Environment["STORYTELLER_KEY"] = Full(Responsibility);
+        _fixture.RouteAnnotation(Responsibility, json => json["UnitNames"] = new JArray("daily", "monthly"));
+
+        var context = await WhoAmI().GetAsync();
+
+        var responsibility = context.Annotation.ShouldBeOfType<StorytellerResponsibility>();
+        responsibility.UnitNames.ShouldBe(["daily", "monthly"]);
+        context.Responsibility.ShouldBeSameAs(responsibility);
+        context.Find<StorytellerResponsibility>().ShouldBeSameAs(responsibility);
+        context.Find<StorytellerExecution>().ShouldBeNull();
+        context.Find<StorytellerUnit>().ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task AUnitOfExecutionKey_HasTypedAncestors_WithTheirRelations()
+    {
+        RouteUnitOfExecution();
+        _fixture.RouteAnnotation(Responsibility, json => json["UnitNames"] = new JArray("daily"));
+        _fixture.RouteAnnotation(Subject, json =>
+        {
+            json["ContextNames"] = new JArray("prod");
+            json["ResponsibilityNames"] = new JArray("invoicing");
+        });
+        _fixture.RouteAnnotation(Usage, json => json["ContextNames"] = new JArray("prod"));
+        _fixture.RouteAnnotation(Context, json => json["ResponsibilityNames"] = new JArray("invoicing"));
+        _fixture.RouteAnnotation("unt.invoicing.daily", json => json["UnitType"] = "job");
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, json => json["UnitNames"] = new JArray("daily"));
+
+        var context = await WhoAmI().GetAsync();
+
+        var unitOfExecution = context.Annotation.ShouldBeOfType<StorytellerUnitOfExecution>();
+        unitOfExecution.UnitName.ShouldBe("daily");
+        context.Find<StorytellerUnitOfExecution>().ShouldBeSameAs(unitOfExecution);
+        context.Find<StorytellerResponsibility>().ShouldNotBeNull().UnitNames.ShouldBe(["daily"]);
+        context.Find<StorytellerSubject>().ShouldNotBeNull().ContextNames.ShouldBe(["prod"]);
+        context.Find<StorytellerSubject>()!.ResponsibilityNames.ShouldBe(["invoicing"]);
+        context.Find<StorytellerUsage>().ShouldNotBeNull().ContextNames.ShouldBe(["prod"]);
+        context.Find<StorytellerContext>().ShouldNotBeNull().ResponsibilityNames.ShouldBe(["invoicing"]);
+        context.Find<StorytellerUnit>().ShouldNotBeNull().UnitType.ShouldBe("job");
+        context.Find<StorytellerExecution>().ShouldBeSameAs(context.Execution);
+        context.Usage.ShouldBeOfType<StorytellerUsage>();
+        context.Subject.ShouldBeOfType<StorytellerSubject>();
+        context.Context.ShouldBeOfType<StorytellerContext>();
+        context.Ancestors[AnnotationType.Unit].ShouldBeOfType<StorytellerUnit>().UnitName.ShouldBe("daily");
+    }
+
+    [Fact]
+    public async Task ABackgroundReadThatFindsAResponsibilityGone_KeepsItsTypeAndRelations()
+    {
+        _fixture.Environment["STORYTELLER_KEY"] = Full(Responsibility);
+        _fixture.RouteAnnotation(Responsibility, json => json["UnitNames"] = new JArray("daily"));
+        var whoAmI = WhoAmI();
+        await whoAmI.GetAsync();
+        _fixture.Time.Advance(RefreshInterval);
+        _fixture.RouteStatus(Responsibility, HttpStatusCode.NotFound);
+
+        await whoAmI.GetAsync();
+        await Background(whoAmI);
+        var gone = await whoAmI.GetAsync();
+
+        var responsibility = gone.Annotation.ShouldBeOfType<StorytellerResponsibility>();
+        responsibility.DeletedAt.ShouldBe(_fixture.Time.GetUtcNow());
+        responsibility.UnitNames.ShouldBe(["daily"]);
+        gone.GetSubscriptionStatus(_fixture.Time.GetUtcNow()).ShouldBe(StorytellerSubscriptionStatus.Deleted);
+    }
+
+    // A test double may hold base snapshots: the members give them, Find<T>() does not.
+    [Fact]
+    public void Find_OfABaseSnapshot_IsNull_AndOfTheBaseType_Throws()
+    {
+        var usage = new StorytellerAnnotation { Key = Full(Usage), AnnotationKey = Usage, Type = AnnotationType.Usage, Name = "invoicing" };
+        var context = new StorytellerExecutionContext { Key = usage.Key, Annotation = usage, ReadAt = _fixture.Time.GetUtcNow() };
+
+        context.Usage.ShouldBeSameAs(usage);
+        context.Find<StorytellerUsage>().ShouldBeNull();
+        Should.Throw<ArgumentException>(() => context.Find<StorytellerAnnotation>()).Message.ShouldContain("StorytellerAnnotation names no annotation type");
+    }
+
     public void Dispose()
     {
         _fixture.Dispose();
