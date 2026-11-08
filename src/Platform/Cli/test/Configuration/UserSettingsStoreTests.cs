@@ -99,6 +99,39 @@ public class UserSettingsStoreTests
         new UserSettingsStore(FileSystemWith(file), SettingsPath, LegacyPaths()).Load().HasValues.ShouldBeFalse();
     }
 
+    // Dotfiles: the settings file is a link, and stays one; the file it points to is replaced.
+    [Fact]
+    public void ALinkToAnExistingFile_StaysALink()
+    {
+        var target = P(@"C:\Users\ada\dotfiles\sform.settings.json");
+        _fileSystem.AddFile(target, new MockFileData("""{"editor":{"editorType":"Vim"}}"""));
+        _fileSystem.Directory.CreateDirectory(SettingsDirectory);
+        _fileSystem.File.CreateSymbolicLink(SettingsPath, target);
+
+        CreateStore().Update(ConfigurationSections.EDITOR, Changes(UserSettingsSchema.EDITOR_TYPE, "Neovim"));
+
+        _fileSystem.FileInfo.New(SettingsPath).LinkTarget.ShouldBe(target);
+        JObject.Parse(_fileSystem.File.ReadAllText(target)).ShouldBeJson("""{"editor":{"editorType":"Neovim"}}""");
+    }
+
+    // The link made before the dotfiles exist: the first change creates the file it points to, and its folder.
+    [Fact]
+    public void ALinkToAMissingFile_IsCreatedThroughTheLink()
+    {
+        var target = P(@"C:\Users\ada\dotfiles\sform\sform.settings.json");
+        _fileSystem.Directory.CreateDirectory(SettingsDirectory);
+
+        // The mock file system links only to a file that exists, so the target goes after the link is made.
+        _fileSystem.AddFile(target, new MockFileData(string.Empty));
+        _fileSystem.File.CreateSymbolicLink(SettingsPath, target);
+        _fileSystem.Directory.Delete(P(@"C:\Users\ada\dotfiles\sform"), recursive: true);
+
+        CreateStore().Update(ConfigurationSections.EDITOR, Changes(UserSettingsSchema.EDITOR_TYPE, "Vim"));
+
+        _fileSystem.FileInfo.New(SettingsPath).LinkTarget.ShouldBe(target);
+        JObject.Parse(_fileSystem.File.ReadAllText(target)).ShouldBeJson("""{"editor":{"editorType":"Vim"}}""");
+    }
+
     [Fact]
     public void ADamagedFile_IsNeverOverwritten()
     {
