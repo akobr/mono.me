@@ -379,6 +379,48 @@ public class ConfigExportCommandTests
         ErrorLines()[^1].ShouldBe("Wrote the configuration to app.env.");
     }
 
+    // GITHUB_ENV comes before the file: when it cannot be written, the file is not written either.
+    [Fact]
+    public async Task GitHubEnv_ThatCannotBeWritten_IsWrongInput_AndTheFileIsNotWritten()
+    {
+        // A folder that does not exist: the append throws a DirectoryNotFoundException.
+        var unwritable = P(@"C:\runner\missing\set_env");
+        _gitHubActions = GitHubActionsSettings.FromEnvironment(
+            name => name == GitHubActionsSettings.ENV ? unwritable : null,
+            () => _delimiters.Dequeue());
+        SetupResolved(Envelope(Resolved));
+        SetupEffective(Envelope(Effective));
+
+        var exitCode = await Execute(Key, "--github-env", "--prefix", "APP_", "-e", "app.env");
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _out.ToString().ShouldBe("::add-mask::s3cr3t-value\n::add-mask::5432\n");
+        ErrorLines().Count.ShouldBe(1);
+        ErrorLines()[0].ShouldStartWith("GITHUB_ENV could not be written: ");
+        _fileSystem.File.Exists(P(@"C:\work\app.env")).ShouldBeFalse();
+        ShouldNotRevealAValue();
+        ShouldWriteOnlyThroughTheInnerConsole();
+    }
+
+    // The file comes after GITHUB_ENV: when it cannot be written, GITHUB_ENV holds the variables already.
+    [Fact]
+    public async Task File_ThatCannotBeWritten_IsWrongInput_AfterGitHubEnvWasAppended()
+    {
+        _fileSystem.AddDirectory(P(@"C:\work\app.env"));
+        SetupResolved(Envelope(Resolved));
+        SetupEffective(Envelope(Effective));
+
+        var exitCode = await Execute(Key, "--github-env", "--prefix", "APP_", "-e", "app.env");
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _out.ToString().ShouldBe("::add-mask::s3cr3t-value\n::add-mask::5432\n");
+        _fileSystem.File.ReadAllText(GitHubEnv).ShouldStartWith($"APP_DB__HOST<<{FirstDelimiter}\n");
+        ErrorLines().Count.ShouldBe(1);
+        ErrorLines()[0].ShouldStartWith("The configuration could not be written to 'app.env': ");
+        ShouldNotRevealAValue();
+        ShouldWriteOnlyThroughTheInnerConsole();
+    }
+
     [Fact]
     public async Task GitHubEnv_WithExportInJson_WritesTheContentAlone()
     {
