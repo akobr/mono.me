@@ -516,9 +516,37 @@ public partial class CosmosAnnotationService : IAnnotationService
         }
 
         AddRelationUpdates(plan, relations, updates);
-        await plan.ExecuteAsync();
+
+        try
+        {
+            await plan.ExecuteAsync();
+        }
+        catch (AnnotationConcurrencyException) when (targetMarker is not null)
+        {
+            // The keys committed and a later wave lost to a concurrent change, the relation arrays of a parent: the
+            // create is done, so the arrays are completed under fresh ETags instead of retrying the whole create, which
+            // would find the key existing and report it so (a bulk create skips it, an import calls it unchanged).
+            await CompleteParentRelationsWithRetriesAsync(store, fullKey);
+        }
 
         return new CreateResult(writes.Select(write => write.Entity.ToModel()).ToList(), targetMarker);
+    }
+
+    // CompleteParentRelationsAsync until it does not lose to a concurrent change; the last loss is rethrown.
+    private async Task CompleteParentRelationsWithRetriesAsync(AnnotationItemStore store, FullKey fullKey)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await CompleteParentRelationsAsync(store, fullKey);
+                return;
+            }
+            catch (AnnotationConcurrencyException) when (attempt < MaxAttempts)
+            {
+                // a parent changed again: read it again
+            }
+        }
     }
 
     // The active parents of the key and its ancestors list them in their relation arrays: what a create writes in its

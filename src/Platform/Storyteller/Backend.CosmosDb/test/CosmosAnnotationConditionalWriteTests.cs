@@ -238,6 +238,57 @@ public class CosmosAnnotationConditionalWriteTests(Startup startup)
         parent.UnitNames.Should().Contain("invoice", "the retry completes the relation array the failed wave did not write");
     }
 
+    // Every create completes the relation arrays its last wave lost: the bulk create reports the key, the single create
+    // does not answer 409 for its own key, and the import calls it created.
+    [Theory]
+    [InlineData("bulk")]
+    [InlineData("single")]
+    [InlineData("import")]
+    public async Task Create_AParentChangedBeforeItsRelationArrays_CompletesThem(string path)
+    {
+        var project = $"cw-parent-{path}";
+        await Annotations.SetAnnotationAsync(TestConstants.Organization, Model(project, "rst.billing"), Actor);
+        var (service, storage) = CreateService();
+        var competed = false;
+
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (!competed && batch.Contains(BatchOperationKind.Replace, $"{View}.rst.billing"))
+            {
+                competed = true;
+                await Annotations.SetAnnotationAsync(TestConstants.Organization, Model(project, "rst.billing") with { Title = "theirs" }, Actor);
+            }
+
+            return null;
+        };
+
+        var unit = Model(project, "unt.billing.invoice") with { Title = "ours" };
+
+        switch (path)
+        {
+            case "bulk":
+                (await service.CreateAnnotationsAsync(TestConstants.Organization, [unit], Actor)).Select(created => created.AnnotationKey).Should().Equal("unt.billing.invoice");
+                break;
+            case "single":
+                (await service.CreateAnnotationAsync(TestConstants.Organization, unit, Actor)).Last().AnnotationKey.Should().Be("unt.billing.invoice");
+                break;
+            default:
+                var result = await service.ImportAnnotationAsync(
+                    FullKeyOf(project, "unt.billing.invoice"),
+                    Newtonsoft.Json.Linq.JObject.Parse("""{ "Title": "ours" }"""),
+                    new Transferring.ViewImportOptions { Actor = Actor, Existing = ViewImportExisting.Overwrite },
+                    new Transferring.ViewImportOverlay());
+                result.Outcome.Should().Be(ViewImportOutcome.Created);
+                break;
+        }
+
+        competed.Should().BeTrue();
+        (await Annotations.GetAnnotationAsync(FullKeyOf(project, "unt.billing.invoice")))!.Title.Should().Be("ours");
+        var parent = (Responsibility)(await Annotations.GetAnnotationAsync(FullKeyOf(project, "rst.billing")))!;
+        parent.Title.Should().Be("theirs");
+        parent.UnitNames.Should().Contain("invoice");
+    }
+
     // Without a condition, a create that loses to a concurrent create becomes an update on the retry.
     [Fact]
     public async Task Unconditional_ACreateLosingToAConcurrentCreate_UpdatesIt()
