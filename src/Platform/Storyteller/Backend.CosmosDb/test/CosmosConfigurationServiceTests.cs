@@ -420,6 +420,38 @@ public class CosmosConfigurationServiceTests(Startup startup)
         after.Content["own"]!.Value<string>().Should().Be("context");
     }
 
+    // The answer of the first write, which creates the item, is the stored document, as the answer of every later
+    // write: the API returns it to the caller (sform config set prints it). It used to come from the calculated content,
+    // which a new item does not have, so the first write answered without a Content.
+    [Fact]
+    public async Task FirstWrite_ReturnsTheStoredContent()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("fw-content");
+        await annotations.CreateAnnotationsFromStringAsync(
+            TestConstants.Organization,
+            FirstWriteProject,
+            Constants.DefaultViewName,
+            [annotationKey.ToString()],
+            AnnotationServiceTestExtensions.TestActor);
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, FirstWriteProject, Constants.DefaultViewName);
+        (await HasConfigurationItemAsync(key)).Should().BeFalse("the write has to create the item");
+
+        var first = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "first", "nested": { "count": 1 } }"""), AuditActor.System);
+        var second = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "second" }"""), AuditActor.System);
+
+        first.Version.Should().Be(1);
+        first.AnnotationKey.Should().Be(annotationKey.ToString());
+        JToken.DeepEquals(first.Content, JObject.Parse("""{ "name": "first", "nested": { "count": 1 } }""")).Should().BeTrue(first.Content?.ToString());
+        second.Version.Should().Be(2);
+        JToken.DeepEquals(second.Content, JObject.Parse("""{ "name": "second", "nested": { "count": 1 } }""")).Should().BeTrue(second.Content?.ToString());
+        var stored = await configs.GetRawConfigurationAsync(key);
+        JToken.DeepEquals(stored!.Content, second.Content).Should().BeTrue(stored.Content?.ToString());
+    }
+
     [Fact]
     public async Task VersioningOfConfiguration()
     {

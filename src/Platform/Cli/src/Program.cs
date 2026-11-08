@@ -273,6 +273,23 @@ public class Program
         }
     }
 
+    // Also the host of CommandConstructionTests, which builds the model of every command through its container.
+    internal static IHostBuilder CreateHostBuilder(string[] args, CliPaths? paths)
+    {
+        var builder = new HostBuilder();
+
+        // Startup reads them from the properties of the builder.
+        if (paths is not null)
+        {
+            builder.Properties[typeof(CliPaths)] = paths;
+        }
+
+        return builder
+            .UseEnvironment(ResolveEnvironmentName(System.Environment.GetEnvironmentVariable))
+            .UseCommandLineApplication<PlatformCommand>(args, ConfigureConsoleApplication)
+            .UseStartup<Startup>();
+    }
+
     // A service failure, not a crash: the reason, and the address sform called. Neither the arguments nor the URL of the
     // request are logged; an argument may be a value of a key/value pair.
     private static async Task<int> ReportUnreachableServiceAsync(Exception exception, string reason)
@@ -329,18 +346,7 @@ public class Program
 
     private static IHostBuilder CreateHostBuilder(string[] args)
     {
-        var builder = new HostBuilder();
-
-        // Startup reads them from the properties of the builder.
-        if (_paths is not null)
-        {
-            builder.Properties[typeof(CliPaths)] = _paths;
-        }
-
-        return builder
-            .UseEnvironment(ResolveEnvironmentName(System.Environment.GetEnvironmentVariable))
-            .UseCommandLineApplication<PlatformCommand>(args, ConfigureConsoleApplication)
-            .UseStartup<Startup>();
+        return CreateHostBuilder(args, _paths);
     }
 
     private static void ConfigureConsoleApplication(CommandLineApplication<PlatformCommand> application)

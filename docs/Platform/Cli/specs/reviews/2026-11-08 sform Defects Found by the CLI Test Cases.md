@@ -271,6 +271,110 @@ Not changed: on Windows, `sform` writes redirected output in the console's code 
 
 The coverage test of phase 4 found that `kv import` took every level for the keys a `--secret` glob matches: `public` stored those secrets as plain values, and `hyok` was sent and refused by the API, as an import of flat or env text has no values encrypted on the client. Like `kv protect`, `KeyValueImportCommand.ResolveSecretLevelAsync` now refuses both with exit 2 and "The keys --secret matches are imported as secrets: --protection takes standard, hsm or byok." (unit test `Import_SecretsAsPublicOrHyok_IsWrongInput`). `coverage-values.json` lists them under `except`, and `docs/Platform/Storyteller/key-values.md` names the levels.
 
+### Defects found by phase 5
+
+Phase 5 automated the 229 cases against the real `sform` and found five more defects, fixed in §14 to §18. What it found and left is listed under [Not fixed, out of scope](#not-fixed-out-of-scope). After these fixes `Cli.UnitTests` has 1324 tests (28 new), all green, and `CosmosConfigurationServiceTests` of `Backend.CosmosDb.UnitTests` 36 (1 new), all green against a Testcontainers emulator.
+
+### 14. Every `story kv` command crashed (a blocker)
+
+Every `sform story kv …` command line, every `--help` of the tree included, ended with exit `1` and "Total mayhem". The log showed "The constructor of type '…KeyValueListCommand' contains the parameter of type 'System.TimeProvider' is not registered". `KeyValueListCommand`, the parent of every kv command, took `TimeProvider? timeProvider = null`. McMaster's constructor injection ignores the default value of an optional parameter, and `Startup.ConfigureServices` did not register `TimeProvider`. Parsing builds the models of the whole path, so the crash hit every command below the list. The unit tests constructed the commands themselves and never saw it. This blocked GEN-CLI-01, GEN-CLI-03, GEN-CLI-05, the whole Key-Values section (the Elementary KV-PAR-01 and KV-SEC-01 among them), and the setup of CFG-GHA-01 and CFG-GET-02.
+
+**The fix.**
+
+- `Startup.ConfigureServices` registers `TimeProvider.System`.
+- `KeyValueListCommand` takes a required `TimeProvider`, so no command keeps an optional parameter.
+- Every constructor of the 99 command classes was checked for other parameter types the container lacks: there were none. The other types are the console, the context, the seven API clients, `IFileSystem`, the options, the editor, the browser launcher, `CliPaths`, `SformEnvironment`, `GitHubActionsSettings`, the sign-in services, `TransferPolling`, `ISdkConfiguration`, `IServiceProvider` and McMaster's `CommandLineApplication`.
+- `Program.CreateHostBuilder(string[], CliPaths?)` is now internal, so the tests build the host that `Main` builds.
+
+**Tests.**
+
+- `CommandConstructionTests` (new) builds sform's real host through `Program.CreateHostBuilder` and `Startup`. It applies McMaster's conventions with the host's container, as the command line host does, walks the whole command tree and builds the model of every command. It fails with the path and the reason of each command that cannot be built. It also checks that the tree holds every class with `[Command]` of the assembly, and that the container has the system clock. `Startup.ConfigureApplication` sets `JsonConvert.DefaultSettings` for the process, so the class runs in a collection without parallelization (`GlobalJsonSettingsCollection`) and restores the settings afterwards. Without the fix, the test names `sform storyteller kv` and the missing `TimeProvider`.
+- `ProgramProcessTests` (out of process, the built sform with every stream redirected):
+  - `story kv --help`, `story key-values get --help` and `story kv policy set --help` exit `0` and print `Usage: sform storyteller kv`;
+  - `story kv get x -p org1.proj1` and `story kv -p org1.proj1`, as an API-key machine whose `STORYTELLER_ENDPOINT` is a closed port, exit `3` with "The 2S platform could not be reached". Before the fix, all five exited `1`.
+
+Files: `Startup.cs`, `Program.cs`, `Commands/KeyValues/KeyValueListCommand.cs`; `test/CommandConstructionTests.cs`, `test/ProgramProcessTests.cs`.
+
+### 15. `schema … diff --format unified` crashed
+
+`sform story schema type|annotation|descendant diff … --format unified` ended with exit `1` and "! The request failed with 200 OK.". `SchemaOperations.DiffAsync` passed `unified` on to the API, which answers that format as `text/plain` (`DiffResultHttpExtensions.ToDiffResponse`). The typed methods of the NSwag client (`Get*SchemaVersionDiff(Custom)Async`) read a `200` only as `DiffResult` JSON, so they threw an `ApiException` with status `200`, which `ExitCodeOf` maps to `1`.
+
+**The fix**, in the CLI alone. The generated SDK stays as it is: a text method would need a hand-written twin of six methods.
+
+- For `unified` (in any case, with spaces around it), `DiffAsync` asks the API for the JSON diff.
+- The new `DiffResultConsoleExtensions.WriteUnifiedDiff` writes it as the text of the API's `DiffFormatter.ToUnifiedDiff`: a `@@ -a,b +c,d @@` header per hunk, then each line with its prefix `+`, `-` or a space.
+- The text goes to the standard output through `WriteRaw`, in UTF-8 with LF line ends, so it can be piped.
+- A diff without changes writes nothing there, as the API's empty text, and "No changes detected." to the standard error.
+- Any other `--format` value, `json` included, still goes to the API as before.
+- The help of `--format` says what each value prints.
+
+The config, template and kv diffs send no format, so the API answers them with JSON and they never had the problem.
+
+**Tests.** `SchemaDiffCommandTests` (new, 9 tests):
+
+- the unified text of each layer: type with both versions in three spellings of `unified`, annotation of the latest version, descendant of one version. Each checks the exact output, that the API was asked with no format, and that nothing went to the error output or through the themed lines;
+- a diff without changes;
+- `--format json` passed to the API;
+- `ToUnifiedDiff` with several hunks and with an empty line.
+
+The phase 5 tests SCH-TYP-03, SCH-ANN-03 and SCH-DSC-03 expect exactly this: exit `0`, a hunk header and the changed property.
+
+Files: `Commands/Schemas/SchemaOperations.cs`, `SchemaTypeDiffCommand.cs`, `SchemaAnnotationDiffCommand.cs`, `SchemaDescendantDiffCommand.cs`, `Output/DiffResultConsoleExtensions.cs`; `test/Commands/SchemaDiffCommandTests.cs`.
+
+### 16. `kv export` and `kv get --value-only` wrote indented, wrapped lines
+
+`kv export` without `-o` (`KeyValueExportCommand`) and `kv get --value-only` (`KeyValueGetCommand`) wrote their payload through `Console.WriteLine`. That renders through Alba with a margin of two spaces and wraps lines longer than the width (`COLUMNS`, or 250 when redirected). So `sform story kv export --format env > .env` got indented lines, and a long value, such as a hyok JWE in a json export, was split. The note on secrets without a value was mixed into the document.
+
+**The fix.**
+
+- Both commands write the payload through `WriteRaw`, in UTF-8 (`UseUtf8Output`, as `config --content-only` does).
+- `kv export` writes the document with LF line ends and a final one (`KeyValueExportCommand.ToPayload`). It changes only the CRLF that the indentation of the json formats writes on Windows. Every other CR or LF of a value is escaped, and `ReplaceLineEndings` would also have turned the U+0085, U+2028, U+2029 or form feed that a quoted env value keeps as it is into a line end, so the standard output would differ from the `-o` file and an import would read another value.
+- `--value-only` writes the value as it is, and a line end.
+- The note "N secret(s) without a value were left out of the … output" goes to the standard error (`WriteErrorLine`).
+- The `-o` file is written as before.
+- The messages of a refused or failed run stay on the standard output, as in every command but `config --content-only`: a `--value-only` without a value (its exit code is listed under [Not fixed](#not-fixed-out-of-scope)), a value that cannot be decrypted, an unknown format and the API's refusals. KV-TRN-04 (`Cli.AutomationTests/src/Tests/KeyValues/KeyValueTransferTests.cs:200`–`:202`) reads the refusal of `kv export --include-secrets` from the standard output. "Output for scripts" in `sform.md` says that only the payload of a successful run is alone there, and that a script checks the exit code.
+
+**Tests.**
+
+- `KeyValueImportExportCommandTests`: the env export prints exactly `DB__HOST=sql\n`, with the note alone on the error output and no themed line; the json export starts with `{\n`, ends with `}\n` and has no CR.
+- `Export_ToTheStandardOutput_IsWrittenAsItIs` (new): a 600-character value stays on its line.
+- `ToPayload_HasLfLineEndsAndAFinalOne` (new, 5 cases; one keeps U+2028, U+2029, U+0085 and a form feed of a quoted env value).
+- `Export_Env_ToTheStandardOutput_KeepsTheUnicodeSeparatorsOfAValue` (new): the env export of such a value prints it as it is, and `ParseEnv` reads it back unchanged.
+- `KeyValueSetAndGetCommandTests`: `--value-only` of a public value and of a decrypted hyok value print exactly the value and `\n`.
+- `RecordingConsole` now records the standard output of its inner console (`OutputText`).
+
+The phase 5 tests trim lines and parse leniently, so they pass with or without this fix.
+
+### 17. `kv policy set --allow` without `public`
+
+The help of `--allow` said "Public is always allowed", but `KeyValuePolicySetCommand` sent only the given levels. The list replaces the stored one, so `kv policy set --allow byok` sent `[Byok]`, and the API refused it with exit `2` and "Public pairs can not be disabled.".
+
+**The fix.** The command always sends `Public`, first and once (`ToAllowedProtections`: `Prepend(Public).Distinct()`), as the help promises. The help now also says that the levels replace the stored ones. A level still in use has to stay listed: with standard keys, `--allow byok` now gets the API's `409 ProtectionInUse`, also exit `2`. A list that names `public` itself sends the same as before. The tests pass the full list.
+
+**Tests.** `KeyValueProjectCommandTests`:
+
+- `PolicySet_Allow_AlwaysSendsPublic` (4 cases): `byok`, `standard hyok`, `hsm PUBLIC hsm` and `public`;
+- `PolicySet_WithoutAllow_KeepsTheAllowedLevels`: no `--allow` sends no list;
+- the existing `PolicySet_SendsOnlyTheGivenMembers` with `public standard HSM` is unchanged.
+
+**The catalogue.** KV-POL-07 in `test-cases.md`, and the first step of Testiny 448 (KV-POL-07) and 449 (KV-POL-08), said that `--allow byok` (`hsm`) alone ends with "Public pairs can not be disabled.". They now say that sform adds public, so it ends with exit `2` and `ProtectionInUse`, as standard is still in use. No test runs that command alone.
+
+### 18. The first write of a configuration answered without a `Content`
+
+In the API (`Backend.CosmosDb`), the create branch of `CosmosConfigurationService.WriteConfigurationAsync` returned `configuration.ToConfiguration()`. That takes `Content` from `CalculatedContent`, which a new item does not have. So the API's answer to the first write had no `Content`, and the first `sform story config set|create <key> -x …` (and a `config edit` that creates the configuration) printed a model without it. Every later write returns `ToConfigurationFromContent()`, the stored content.
+
+**The fix.** The create branch returns `configuration.ToConfigurationFromContent()`, the stored content, as every later write does. An import goes through the same method but answers a `ViewImportResult`, so its answer does not change.
+
+**Test.** `CosmosConfigurationServiceTests.FirstWrite_ReturnsTheStoredContent` (new):
+
+- in the project without templates, it checks that no item exists before the write;
+- the first write answers version `1` with exactly the written document;
+- the second write answers version `2` with the merged document, which a read returns too.
+
+Without the fix it fails on the first write's `Content`. It ran with `STORYTELLER_TESTS_USE_CONTAINER=true`, class by class: 36 of 36.
+
+The phase 5 tests never read `Content` from a first write's printed model. They check its `Version` and read the content back, so they pass either way.
+
 ### Not fixed, out of scope
 
 - `sform --version` prints the version of `42.CLI.Toolkit`, not of `sform` (`Assembly.GetExecutingAssembly()` in the toolkit).
@@ -279,3 +383,20 @@ The coverage test of phase 4 found that `kv import` took every level for the key
 - The committed OpenAPI document keeps version `0.10.15` and one description that is out of date (the `404` of the patch). The next full export and SDK regeneration will pick both up.
 - `story export` and `story import` print a refused start or download (`WriteRefusal`) without the error code. Their exit codes already follow the rule (`44` for `403`, `2` otherwise), and `sform.md` says so.
 - The `Failed` status of an export or import job stays `1` (§9).
+
+Found by phase 5, left as they are. Each item says what the tests expect now:
+
+- **History grammar.** `story history` with one hidden entry prints "1 older entries are not shown." (`src/Platform/Cli/src/Output/AuditConsoleExtensions.cs:46`, `WriteHistory`), not "1 older entry is not shown.". ANN-DEL-09 (`Cli.AutomationTests/src/Tests/Annotations/AnnotationDeleteTests.cs:326`) expects the current text for `--top 2` of three entries.
+- **The responsibility tree hides a single context.** In `story -t -b rst` (`responsibility`), a subject with exactly one context is shown without it. `StorytellerListCommand.RenderResponsibilityTreeAsync` clears the children of every node with one child (`src/Platform/Cli/src/Commands/Storyteller/StorytellerListCommand.cs:464`), so the tree is not (responsibility, subject, context) as the catalogue says. ANN-LST-06 (`AnnotationListTests.cs:177`) gives the subject two contexts and expects the current behaviour.
+- **Mixed exit codes for input errors of the machine commands.** In `MachineCreateCommand`, these end with `-1` (`ERROR_INPUT_PARSING`): an unknown credential kind (`src/Platform/Cli/src/Commands/MachineAccess/MachineCreateCommand.cs:118`), the federation-rule option errors (`:172`, `:178`) and `-s` with another kind (`:195`). These end with `2`: an unknown `--scope` or `-m` value and a runtime scope given to `-m` (`:127`, `:133`, `:141`). `MachineAuthSetCommand.cs:57`, `:69` and `:78` use `-1`. The tests expect the codes as the catalogue documents them: MCH-CRD-02, MCH-CRD-04 and MCH-POL-03 expect `-1`, MCH-LIF-07 and MCH-LIF-09 expect `2`.
+- **`machine create --scope SecretsRead` alone gives a machine that cannot read.** `SecretsRead` counts as a runtime scope, so the union of `MachineCreateCommand` (`:144`–`:160`) adds no `-r` scopes, and the server's `MachineScopes.WithImpliedReads` adds no Configuration scope. The machine gets `44` on every `kv get`, `--reveal` included. `sform.md` already says that `--scope secrets-read` alone gives only `Secrets.Read`. KV-SEC-06 (`KeyValueSecretTests.cs:183`, `:185`) creates its machines with `-r --scope SecretsRead`. A later change could add `MachineScopes.ReadOnly` when only Secrets scopes are given, or warn.
+- **`kv get <secret> --value-only` without `--reveal` exits `44`.** It prints "The value is a secret; add --reveal." and ends with `WARNING_UNAUTHORIZED_ACCESS` (`src/Platform/Cli/src/Commands/KeyValues/KeyValueGetCommand.cs:68`–`:69`). Nothing was refused (the API answered `200` without the value), so `2` (`--reveal` missing) would fit better. No test depends on it.
+- **The arrow of `config patch`.** `PatchVersionReport` (`src/Platform/Cli/src/Json/PatchVersionReport.cs:23`) prints "Configuration for '<key>' patched: version N → M." through `WriteImportant`, without `UseUtf8Output`. On Windows with redirected output, the `→` goes through the OEM code page and may come out as `?` or a best fit. CFG-SET-08 (`ConfigWriteTests.cs:230`, `:240`) matches only "… patched: version N ", never the arrow.
+- **Per-instance caches of the API.** Several stores keep a copy per API instance and evict it only on the instance that changed it, so a multi-instance deployment serves stale reads until the copy expires:
+  - shared certificates by thumbprint and the project's list, 5 minutes (`src/Platform/Storyteller/Backend.CosmosDb/src/Accessing/CosmosSharedCertificateStore.cs:23`, `:25`): a revoked shared certificate with a valid API key keeps authenticating on another instance for up to 5 minutes;
+  - client certificates, 5 minutes (`CosmosClientCertificateStore.cs:21`);
+  - federated issuers, 60 seconds (`CosmosFederatedIssuerStore.cs:22`);
+  - the machine authentication policy, 60 seconds (`CosmosMachineAuthenticationPolicyStore.cs:15`);
+  - the key/value policy, 60 seconds (`src/Platform/Storyteller/Backend.CosmosDb/src/KeyValues/Policy/CosmosKeyValuePolicyStore.cs:20`): key/value writes and reveals check the cached copy.
+
+  The tests re-read with a bounded retry. CRT-SHC-04 reads nothing before it revokes, so no instance has the certificate cached. The lists after a change are re-read within the cache window. KV-SEC-06 and KV-CTX-01 repeat a run until the change applies (`CliTest.EventuallyAsync` with `KeyValuesSupportA.PolicyCacheWait`). A fix would cache `IsRevoked` for a few seconds only, or invalidate across instances.

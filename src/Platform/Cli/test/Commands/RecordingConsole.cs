@@ -20,6 +20,7 @@ internal sealed class RecordingConsole
     private readonly List<RecordedTable> _tables = [];
     private readonly StringBuilder _pending = new();
     private readonly StringWriter _error = new();
+    private readonly StringWriter _output = new();
 
     public RecordingConsole()
     {
@@ -73,16 +74,19 @@ internal sealed class RecordingConsole
     // What went to standard error of the inner console, after UseInnerConsole.
     public string ErrorText => _error.ToString();
 
+    // What went to standard output of the inner console as it is (WriteRaw), after UseInnerConsole.
+    public string OutputText => _output.ToString();
+
     public IReadOnlyList<string> ErrorLines => ErrorText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
-    // An inner console (Console.Console) whose standard error is recorded; with redirectedInput, the standard input is
-    // redirected and reads the given text, as for a pipe or a job without a terminal.
+    // An inner console (Console.Console) whose standard output and error are recorded; with redirectedInput, the
+    // standard input is redirected and reads the given text, as for a pipe or a job without a terminal.
     public RecordingConsole UseInnerConsole(bool redirectedInput, string input = "")
     {
         var inner = new Mock<IConsole>();
         inner.SetupGet(console => console.IsInputRedirected).Returns(redirectedInput);
         inner.SetupGet(console => console.Error).Returns(_error);
-        inner.SetupGet(console => console.Out).Returns(TextWriter.Null);
+        inner.SetupGet(console => console.Out).Returns(_output);
         inner.SetupGet(console => console.In).Returns(new StringReader(input));
         Mock.SetupGet(console => console.Console).Returns(inner.Object);
         return this;

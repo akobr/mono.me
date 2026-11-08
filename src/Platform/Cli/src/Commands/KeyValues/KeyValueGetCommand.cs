@@ -69,7 +69,9 @@ public class KeyValueGetCommand : KeyValueCommandBase
                 return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
             }
 
-            Console.WriteLine(pair.Value);
+            // As it is, in UTF-8, with a line end after it: no margin and no wrapping, for scripts.
+            using var encoding = Console.UseUtf8Output();
+            Console.WriteRaw(pair.Value + "\n");
             return ExitCodes.SUCCESS;
         }
 

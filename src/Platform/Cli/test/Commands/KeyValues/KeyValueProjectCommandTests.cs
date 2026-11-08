@@ -42,6 +42,39 @@ public class KeyValueProjectCommandTests
         _console.Lines.ShouldContain(line => line.Contains("is at version 2"));
     }
 
+    // "Public is always allowed": the given levels replace the stored ones, and the API refuses a list without public
+    // ("Public pairs can not be disabled."), so public is always sent, first, once.
+    [Theory]
+    [InlineData(new[] { "byok" }, new[] { AllowedProtections2.Public, AllowedProtections2.Byok })]
+    [InlineData(new[] { "standard", "hyok" }, new[] { AllowedProtections2.Public, AllowedProtections2.Standard, AllowedProtections2.Hyok })]
+    [InlineData(new[] { "hsm", "PUBLIC", "hsm" }, new[] { AllowedProtections2.Public, AllowedProtections2.Hsm })]
+    [InlineData(new[] { "public" }, new[] { AllowedProtections2.Public })]
+    public async Task PolicySet_Allow_AlwaysSendsPublic(string[] allow, AllowedProtections2[] expected)
+    {
+        KeyValuePolicyUpdate? sent = null;
+        _api.Setup(api => api.SetKeyValuePolicyAsync("org1", "proj1", It.IsAny<KeyValuePolicyUpdate>()))
+            .Callback<string, string, KeyValuePolicyUpdate, CancellationToken>((_, _, update, _) => sent = update)
+            .ReturnsAsync(new KeyValuePolicy { Version = 3 });
+
+        var exitCode = await new KeyValuePolicySetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Allow = allow }.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        sent!.AllowedProtections.ShouldBe(expected);
+    }
+
+    [Fact]
+    public async Task PolicySet_WithoutAllow_KeepsTheAllowedLevels()
+    {
+        KeyValuePolicyUpdate? sent = null;
+        _api.Setup(api => api.SetKeyValuePolicyAsync("org1", "proj1", It.IsAny<KeyValuePolicyUpdate>()))
+            .Callback<string, string, KeyValuePolicyUpdate, CancellationToken>((_, _, update, _) => sent = update)
+            .ReturnsAsync(new KeyValuePolicy { Version = 3 });
+
+        await new KeyValuePolicySetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Default = "standard" }.OnExecuteAsync();
+
+        sent!.AllowedProtections.ShouldBeNull();
+    }
+
     [Fact]
     public async Task PolicySet_ByokSettings_AndRotateOnlyStandardOrHsm()
     {

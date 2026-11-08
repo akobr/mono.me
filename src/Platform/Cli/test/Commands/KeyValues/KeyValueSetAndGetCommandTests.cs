@@ -113,11 +113,14 @@ public class KeyValueSetAndGetCommandTests
         _api.Setup(api => api.GetKeyValueAsync("org1", "proj1", "default", "db.host", null, null)).ReturnsAsync(KeyValueTestContext.Pair("db.host", KeyValueProtection.Public, "sql"));
         _api.Setup(api => api.GetKeyValueAsync("org1", "proj1", "default", "db.password", null, null)).ReturnsAsync(KeyValueTestContext.Pair("db.password", KeyValueProtection.Standard, null));
 
+        _console.UseInnerConsole(redirectedInput: false);
+
         var shown = await new KeyValueGetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Key = "db.host", ValueOnly = true }.OnExecuteAsync();
         var hidden = await new KeyValueGetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Key = "db.password", ValueOnly = true }.OnExecuteAsync();
 
+        // The value as it is, without the margin of the console, and a line end.
         shown.ShouldBe(ExitCodes.SUCCESS);
-        _console.Lines.ShouldContain("sql");
+        _console.OutputText.ShouldBe("sql\n");
         hidden.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
         _console.Lines.ShouldContain(line => line.Contains("add --reveal"));
     }
@@ -130,11 +133,13 @@ public class KeyValueSetAndGetCommandTests
         var document = ClientSecretEncryptor.Encrypt("plain", [new ClientEncryptionRecipientKey("api", RsaPublicJwk.FromRsa(api.Rsa)), new ClientEncryptionRecipientKey("worker", RsaPublicJwk.FromRsa(worker.Rsa))], "org1/proj1/default/db.password");
         _api.Setup(a => a.GetKeyValueAsync("org1", "proj1", "default", "db.password", true, null)).ReturnsAsync(() => KeyValueTestContext.Pair("db.password", KeyValueProtection.Hyok, document));
 
+        _console.UseInnerConsole(redirectedInput: false);
+
         var decrypted = await new KeyValueGetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Key = "db.password", ValueOnly = true, PrivateKeyPath = worker.PrivateKeyPem, RecipientId = "worker" }.OnExecuteAsync();
         var ambiguous = await new KeyValueGetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Key = "db.password", ValueOnly = true, PrivateKeyPath = worker.PrivateKeyPem }.OnExecuteAsync();
 
         decrypted.ShouldBe(ExitCodes.SUCCESS);
-        _console.Lines.ShouldContain("plain");
+        _console.OutputText.ShouldBe("plain\n");
         ambiguous.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _console.Lines.ShouldContain(line => line.Contains("--kid"));
     }

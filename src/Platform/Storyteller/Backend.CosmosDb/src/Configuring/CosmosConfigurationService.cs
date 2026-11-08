@@ -443,7 +443,9 @@ public partial class CosmosConfigurationService : IConfigurationService
                 // that read it as missing is either cleared here or fails to cache on the changed ETag
                 await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, configuration.Version);
                 await CompleteInvalidationAsync(key, repository, configuration.PendingInvalidationId);
-                return configuration.ToConfiguration();
+
+                // the stored content, as every later write answers: a new item has no calculated content yet
+                return configuration.ToConfigurationFromContent();
             }
 
             JObject newContent;
