@@ -11,9 +11,24 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.IMPORT, Description = "Import a zip or a folder into the view (Administrator): annotations, schemas, templates and configurations, each recognized by its file name. Only current documents are imported, never versions, and nothing is deleted. A machine needs the write scopes of the included kinds, with Annotation.Manage for annotations, Schema.Write for schemas and Template.Write for templates, and Configuration.Transfer instead of a role.")]
+[Command(CommandNames.IMPORT, Description = "Import into the view (for administrators).", ExtendedHelpText = HelpDetail)]
 public class StorytellerImportCommand : BaseContextCommand
 {
+    // After the options of 'sform story import --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The zip or folder holds annotations, schemas, templates and configurations,
+        each recognized by its file name. Only current documents are imported, never
+        versions, and nothing is deleted.
+
+        A user needs the Administrator role on the project. A machine needs no role
+        but Configuration.Transfer and the write scopes of every included kind:
+        Annotation.Write and Annotation.Manage for annotations, Configuration.Write
+        and Schema.Write for schemas, Configuration.Write and Template.Write for
+        templates, and Configuration.Write for configurations.
+        """;
+
     private readonly ITransfersApiClient _transfersApi;
     private readonly IFileSystem _fileSystem;
     private readonly TransferPolling _polling;
