@@ -9,6 +9,7 @@ using _42.Platform.Cli.Configuration;
 using _42.Platform.Storyteller.Sdk;
 using Microsoft.Extensions.Options;
 using Moq;
+using Newtonsoft.Json.Linq;
 using Sharprompt;
 using Shouldly;
 using Xunit;
@@ -18,6 +19,7 @@ namespace _42.Platform.Cli.UnitTests.Commands;
 public class StorytellerSetCommandTests
 {
     private const string Key = "exe.northwind.billing.prod";
+    private const string ETag = "\"a1.djE\"";
 
     // the key and its ancestors, roots first, as the lookup receives them
     private static readonly string[] LookedUp =
@@ -34,32 +36,92 @@ public class StorytellerSetCommandTests
 
     public StorytellerSetCommandTests()
     {
+        // The merge: one patch, without a read.
+        Patches();
+
+        // The create of a missing key, only while it is missing.
         _fixture.Api
-            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>()))
-            .Callback(() => _calls.Add("set"))
+            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>(), null, "*"))
+            .Callback(() => _calls.Add("create"))
             .ReturnsAsync(AnnotationCommandFixture.Active(Key));
 
-        // The read of what the write merges into.
+        // The read and the write of --replace, over the version read.
         _fixture.Api
-            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, true, It.IsAny<bool?>(), It.IsAny<CancellationToken>()))
+            .Setup(api => api.GetAnnotationVersionedAsync("org1", "proj1", "default", Key, true))
             .Callback(() => _calls.Add("get"))
+            .ReturnsAsync(Versioned(ETag));
+        _fixture.Api
+            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>(), ETag, null))
+            .Callback(() => _calls.Add("replace"))
             .ReturnsAsync(AnnotationCommandFixture.Active(Key));
     }
 
     [Fact]
-    public async Task NothingDeleted_WritesWithoutAsking()
+    public async Task NothingDeleted_PatchesWithoutAskingOrReading()
     {
         DeletedAmong();
 
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe(["get", "set"]);
+        _calls.ShouldBe(["patch"]);
         _fixture.Console.Mock.Verify(console => console.Select(It.IsAny<SelectOptions<string>>()), Times.Never);
     }
 
     [Fact]
-    public async Task DeletedKey_WithRestoreDeleted_RestoresItAloneThenUpdates()
+    public async Task MissingKey_IsCreatedAfterThePatch()
+    {
+        DeletedAmong();
+        Patches(AnnotationCommandFixture.Error(404, "AnnotationNotFound", "The annotation does not exist."));
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _calls.ShouldBe(["patch", "create"]);
+    }
+
+    [Fact]
+    public async Task KeyCreatedMeanwhile_IsPatchedInTheNextRound()
+    {
+        DeletedAmong();
+        Patches(AnnotationCommandFixture.Error(404, "AnnotationNotFound", "The annotation does not exist."), null);
+        CreateFails(412, "AnnotationPreconditionFailed", "The annotation exists already.");
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _calls.ShouldBe(["patch", "create", "patch"]);
+    }
+
+    [Fact]
+    public async Task ThreeRoundsLost_StopWithoutAnotherRequest()
+    {
+        DeletedAmong();
+        Patches(Enumerable.Repeat<Exception?>(AnnotationCommandFixture.Error(404, "AnnotationNotFound", "The annotation does not exist."), StorytellerSetCommand.MaxWriteRounds).ToArray());
+        CreateFails(412, "AnnotationPreconditionFailed", "The annotation exists already.");
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        _calls.ShouldBe(["patch", "create", "patch", "create", "patch", "create"]);
+        _fixture.Console.Lines.ShouldContain($"The annotation {Key} changed concurrently; try again.");
+    }
+
+    [Fact]
+    public async Task KeyDeletedAfterTheLookup_IsNotReCreated()
+    {
+        DeletedAmong();
+        Patches(AnnotationCommandFixture.Error(404, "AnnotationDeleted", "The annotation is deleted."));
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        _calls.ShouldBe(["patch"]);
+        _fixture.Line($"The annotation {Key} was deleted meanwhile").ShouldContain("run the command again");
+    }
+
+    [Fact]
+    public async Task DeletedKey_WithRestoreDeleted_RestoresItAloneThenPatches()
     {
         DeletedAmong(Key);
         Restores();
@@ -67,25 +129,37 @@ public class StorytellerSetCommandTests
         var exitCode = await Execute(restoreDeleted: true);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe([$"restore:{Key}:False", "get", "set"]);
+        _calls.ShouldBe([$"restore:{Key}:False", "patch"]);
         _fixture.Line("- exe.northwind.billing.prod").ShouldContain("by Ales Kobr");
     }
 
     [Fact]
-    public async Task DeletedAncestor_WithRecreate_WritesWithoutRestoring()
+    public async Task DeletedAncestor_WithRecreate_CreatesWithoutRestoringOrPatching()
     {
         DeletedAmong("sbt.northwind");
 
         var exitCode = await Execute(recreate: true);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _calls.ShouldBe(["get", "set"]);
+        _calls.ShouldBe(["create"]);
         _fixture.Line("This annotation is deleted").ShouldNotBeNull();
     }
 
+    [Fact]
+    public async Task DeletedKey_WithRecreate_RestoredMeanwhile_IsPatched()
+    {
+        DeletedAmong(Key);
+        CreateFails(412, "AnnotationPreconditionFailed", "The annotation exists already.");
+
+        var exitCode = await Execute(recreate: true);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _calls.ShouldBe(["create", "patch"]);
+    }
+
     [Theory]
-    [InlineData(StorytellerSetCommand.RestoreAndUpdateChoice, "restore:sbt.northwind:False,get,set")]
-    [InlineData(StorytellerSetCommand.CreateNewChoice, "get,set")]
+    [InlineData(StorytellerSetCommand.RestoreAndUpdateChoice, "restore:sbt.northwind:False,patch")]
+    [InlineData(StorytellerSetCommand.CreateNewChoice, "create")]
     public async Task DeletedAncestor_AsksAndFollowsTheAnswer(string answer, string expectedCalls)
     {
         DeletedAmong("sbt.northwind");
@@ -123,6 +197,59 @@ public class StorytellerSetCommandTests
         _fixture.Line("Choose").ShouldContain("--restore-deleted");
         _fixture.Line("Choose").ShouldContain("--recreate");
         _fixture.Console.Mock.Verify(console => console.Select(It.IsAny<SelectOptions<string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Replace_ReadsTheVersion_AndWritesOnlyIt()
+    {
+        DeletedAmong();
+
+        var exitCode = await Execute(replace: true);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _calls.ShouldBe(["get", "replace"]);
+    }
+
+    [Fact]
+    public async Task Replace_OfAMissingKey_OnlyCreates()
+    {
+        DeletedAmong();
+        _fixture.Api
+            .Setup(api => api.GetAnnotationVersionedAsync("org1", "proj1", "default", Key, true))
+            .Callback(() => _calls.Add("get"))
+            .ThrowsAsync(AnnotationCommandFixture.Error(404, "AnnotationNotFound", "The annotation does not exist."));
+
+        var exitCode = await Execute(replace: true);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _calls.ShouldBe(["get", "create"]);
+    }
+
+    [Fact]
+    public async Task DeletedKey_WithRestoreDeletedAndReplace_RestoresThenReplacesTheRestoredVersion()
+    {
+        DeletedAmong(Key);
+        Restores();
+
+        var exitCode = await Execute(restoreDeleted: true, replace: true);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _calls.ShouldBe([$"restore:{Key}:False", "get", "replace"]);
+    }
+
+    [Fact]
+    public async Task Replace_OfAChangedVersion_PrintsTheServerMessage()
+    {
+        DeletedAmong();
+        _fixture.Api
+            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>(), ETag, null))
+            .ThrowsAsync(AnnotationCommandFixture.Error(412, "AnnotationPreconditionFailed", "The annotation changed since it was read."));
+
+        var exitCode = await Execute(replace: true);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _fixture.Console.Lines.ShouldContain("! The annotation changed since it was read.");
+        _fixture.Console.Lines.ShouldContain("Error code: AnnotationPreconditionFailed");
     }
 
     [Fact]
@@ -169,14 +296,62 @@ public class StorytellerSetCommandTests
     public async Task InvalidAnnotation_PrintsTheServerMessage()
     {
         DeletedAmong();
-        _fixture.Api
-            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>()))
-            .ThrowsAsync(AnnotationCommandFixture.Error(400, "InvalidAnnotation", "Title has 201 characters, at most 200 are allowed."));
+        Patches(AnnotationCommandFixture.Error(400, "InvalidAnnotation", "Title has 201 characters, at most 200 are allowed."));
 
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _fixture.Console.Lines.ShouldContain("Title has 201 characters, at most 200 are allowed.");
+    }
+
+    [Fact]
+    public async Task ConflictOfTheServer_PrintsItsMessage()
+    {
+        DeletedAmong();
+        Patches(AnnotationCommandFixture.Error(409, "Conflict", "The annotations changed concurrently three times in a row."));
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        _fixture.Console.Lines.ShouldContain("The annotations changed concurrently three times in a row.");
+    }
+
+    private static VersionedResponse<Annotation> Versioned(string? etag = null)
+    {
+        var headers = new Dictionary<string, IEnumerable<string>>();
+
+        if (etag is not null)
+        {
+            headers["ETag"] = [etag];
+        }
+
+        return new VersionedResponse<Annotation>(200, AnnotationCommandFixture.Active(Key), headers);
+    }
+
+    // The answers of the patches in their order, an exception for a failed one and null for a written one; the last
+    // answers every further patch. Without answers, every patch writes.
+    private void Patches(params Exception?[] answers)
+    {
+        var count = 0;
+
+        _fixture.Api
+            .Setup(api => api.PatchAnnotationVersionedAsync("org1", "proj1", "default", Key, It.IsAny<JToken>(), null))
+            .Callback(() => _calls.Add("patch"))
+            .Returns(() =>
+            {
+                var answer = answers.Length == 0 ? null : answers[Math.Min(count++, answers.Length - 1)];
+                return answer is null
+                    ? Task.FromResult(Versioned(ETag))
+                    : Task.FromException<VersionedResponse<Annotation>>(answer);
+            });
+    }
+
+    private void CreateFails(int statusCode, string errorCode, string message)
+    {
+        _fixture.Api
+            .Setup(api => api.SetAnnotationAsync("org1", "proj1", "default", Key, It.IsAny<Annotation>(), null, "*"))
+            .Callback(() => _calls.Add("create"))
+            .ThrowsAsync(AnnotationCommandFixture.Error(statusCode, errorCode, message));
     }
 
     private void DeletedAmong(params string[] deletedKeys)
@@ -204,7 +379,7 @@ public class StorytellerSetCommandTests
             });
     }
 
-    private Task<int> Execute(bool restoreDeleted = false, bool recreate = false)
+    private Task<int> Execute(bool restoreDeleted = false, bool recreate = false, bool replace = false)
     {
         var command = new StorytellerSetCommand(
             _fixture.Console.Object,
@@ -216,6 +391,7 @@ public class StorytellerSetCommandTests
             AnnotationKey = Key,
             RestoreDeleted = restoreDeleted,
             Recreate = recreate,
+            IsReplaceRequested = replace,
         };
 
         return command.OnExecuteAsync();

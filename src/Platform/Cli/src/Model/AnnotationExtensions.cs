@@ -11,44 +11,86 @@ namespace _42.Platform.Cli.Model;
 
 public static class AnnotationExtensions
 {
-    // The body of a write. Without a stored annotation it holds the input alone, and the write replaces the content of an
-    // existing key. With one, the input is merged into it: a member the input has wins, the labels are joined, and each
-    // value of the input is written over the one of the same name. The relation arrays stay out: the server owns them.
-    public static SdkAnnotation ToSdkAnnotation(this CoreAnnotation @this, SdkAnnotation? stored = null)
+    // The body of a create or a replace: the input alone, so a write to an existing key replaces its content. The
+    // relation arrays stay out: the server owns them.
+    public static SdkAnnotation ToSdkAnnotation(this CoreAnnotation @this)
     {
-        var annotation = CreateForKey(AnnotationKey.Parse(@this.AnnotationKey), @this, stored);
+        var annotation = CreateForKey(AnnotationKey.Parse(@this.AnnotationKey), @this);
 
         annotation.AnnotationKey = @this.AnnotationKey;
         annotation.Name = @this.Name;
-        annotation.Title = @this.Title ?? stored?.Title;
-        annotation.ValidFrom = @this.ValidFrom ?? stored?.ValidFrom;
-        annotation.ExpiresAt = @this.ExpiresAt ?? stored?.ExpiresAt;
-        annotation.IsDisabled = @this.IsDisabled ?? stored?.IsDisabled;
-        annotation.TimeZone = @this.TimeZone ?? stored?.TimeZone;
+        annotation.Title = @this.Title;
+        annotation.ValidFrom = @this.ValidFrom;
+        annotation.ExpiresAt = @this.ExpiresAt;
+        annotation.IsDisabled = @this.IsDisabled;
+        annotation.TimeZone = @this.TimeZone;
 
         annotation.ViewName = @this.ViewName;
         annotation.ProjectName = @this.ProjectName;
 
-        annotation.Description = @this.Description ?? stored?.Description;
-        annotation.DocumentationLink = @this.DocumentationLink ?? stored?.DocumentationLink;
+        annotation.Description = @this.Description;
+        annotation.DocumentationLink = @this.DocumentationLink;
 
-        var values = stored?.Values?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? new Dictionary<string, object>();
-
-        foreach (var (name, value) in @this.Values ?? new Dictionary<string, object>())
-        {
-            values[name] = value;
-        }
-
-        annotation.Values = values;
-        annotation.Labels = (stored?.Labels ?? []).Concat(@this.Labels ?? []).Distinct(StringComparer.Ordinal).ToList();
+        annotation.Values = @this.Values?.ToDictionary(pair => pair.Key, pair => pair.Value) ?? new Dictionary<string, object>();
+        annotation.Labels = GetLabels(@this).ToList();
 
         return annotation;
     }
 
+    // The merge into an existing key, as a JSON Patch of its editable document that the server applies to the current
+    // state: each member the input has (not null) is set, each value of the input replaces the stored value of the same
+    // name whole, and each label is appended (the server keeps a label once, so the stored ones stay first). A unit's
+    // type and definition are set when the input has them. What the input does not hold is kept.
+    public static Sdk.AnnotationJsonPatch ToJsonPatch(this CoreAnnotation @this)
+    {
+        var patch = new Sdk.AnnotationJsonPatch();
+
+        SetWhenGiven(patch, nameof(CoreAnnotation.IsDisabled), @this.IsDisabled);
+        SetWhenGiven(patch, nameof(CoreAnnotation.ValidFrom), @this.ValidFrom);
+        SetWhenGiven(patch, nameof(CoreAnnotation.ExpiresAt), @this.ExpiresAt);
+        SetWhenGiven(patch, nameof(CoreAnnotation.TimeZone), @this.TimeZone);
+        SetWhenGiven(patch, nameof(CoreAnnotation.Title), @this.Title);
+        SetWhenGiven(patch, nameof(CoreAnnotation.Description), @this.Description);
+        SetWhenGiven(patch, nameof(CoreAnnotation.DocumentationLink), @this.DocumentationLink);
+
+        if (@this is CoreUnit unit)
+        {
+            // null when the file does not name them, whatever the model declares
+            SetWhenGiven(patch, nameof(CoreUnit.UnitType), unit.UnitType);
+            SetWhenGiven(patch, nameof(CoreUnit.UnitDefinition), unit.UnitDefinition);
+        }
+
+        foreach (var (name, value) in @this.Values ?? new Dictionary<string, object>())
+        {
+            patch.SetValue(name, value);
+        }
+
+        foreach (var label in GetLabels(@this))
+        {
+            patch.AddLabel(label);
+        }
+
+        return patch;
+    }
+
+    private static void SetWhenGiven(Sdk.AnnotationJsonPatch patch, string member, object? value)
+    {
+        if (value is not null)
+        {
+            patch.Set(member, value);
+        }
+    }
+
+    // Each label once, in the order of the input; a null in a file is no label.
+    private static IEnumerable<string> GetLabels(CoreAnnotation annotation)
+    {
+        return (annotation.Labels ?? []).OfType<string>().Distinct(StringComparer.Ordinal);
+    }
+
     // The model of the key's type, with its type-specific members. The API reads a body into that type, where they are
     // required, and answers 400 without them. Everything but a unit's type and definition comes from the key, as the
-    // API's AnnotationFactory makes it; those come from the input, else from the stored unit, else the defaults of a create.
-    private static SdkAnnotation CreateForKey(AnnotationKey key, CoreAnnotation source, SdkAnnotation? stored)
+    // API's AnnotationFactory makes it; those come from the input, else the defaults of a create.
+    private static SdkAnnotation CreateForKey(AnnotationKey key, CoreAnnotation source)
     {
         return key.Type switch
         {
@@ -58,8 +100,8 @@ public static class AnnotationExtensions
             {
                 ResponsibilityKey = key.GetResponsibilityKey(),
                 ResponsibilityName = key.GetResponsibilityName(),
-                UnitType = (source as CoreUnit)?.UnitType ?? (stored as Sdk.Unit)?.UnitType ?? CoreUnit.DefaultUnitType,
-                UnitDefinition = (source as CoreUnit)?.UnitDefinition ?? (stored as Sdk.Unit)?.UnitDefinition ?? CoreUnit.DefaultUnitDefinition,
+                UnitType = (source as CoreUnit)?.UnitType ?? CoreUnit.DefaultUnitType,
+                UnitDefinition = (source as CoreUnit)?.UnitDefinition ?? CoreUnit.DefaultUnitDefinition,
             },
             AnnotationType.Usage => new Sdk.Usage
             {
