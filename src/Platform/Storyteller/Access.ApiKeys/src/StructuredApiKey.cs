@@ -43,10 +43,11 @@ public record StructuredApiKey(string Organization, string Project, string Machi
 
         var metadata = decoded.Split(MetadataSeparator, 3);
 
+        // a blank segment names no organization, project or machine: the key is malformed (a 401), never a lookup
         if (metadata.Length != 3
-            || string.IsNullOrEmpty(metadata[0])
-            || string.IsNullOrEmpty(metadata[1])
-            || string.IsNullOrEmpty(metadata[2]))
+            || string.IsNullOrWhiteSpace(metadata[0])
+            || string.IsNullOrWhiteSpace(metadata[1])
+            || string.IsNullOrWhiteSpace(metadata[2]))
         {
             return null;
         }
