@@ -54,7 +54,7 @@ Each flag removes one condition, so a deleted annotation that is also disabled n
 
 ## Items
 
-All items of an annotation live in the annotation's partition of the organization container `org.{organization}` ([inheritance.md](inheritance.md) describes the partitions).
+All items of an annotation live in the annotation's partition of its organization in the shared container `organizations` ([inheritance.md](inheritance.md) describes the partitions).
 
 | Item | Id | While the annotation is deleted |
 | --- | --- | --- |
@@ -147,7 +147,9 @@ Audit entries are excluded from the index (`/Entries/*`), so a write is charged 
 
 ## Containers
 
-Organization containers have TTL on without a default expiry (`DefaultTimeToLive = -1`) and the indexing policy excludes `/Entries/*`. Only items with a `ttl` expire: the versions of configurations, templates and schemas (365 days after their write) and the items of deleted annotations. DbCreator applies the settings to existing organization containers on every start; the `core` container is not changed.
+The data of every organization is in one container, `organizations` in the database `42.Platform.2S`, next to `core`. Its partition key is hierarchical: `/Organization`, then `/PartitionKey`, the partition an item has always had (`{project}.rst.{name}`, `{project}.sbt.{name}`, `{project}.kv.{view}`, ...). Every item carries `Organization`; a logical partition is (organization, partition), so the same ids and partitions in two organizations never meet. Queries over a whole organization filter on `c.Organization = @organization` and run with the organization as the key prefix; `OrganizationContainer` (`Backend.CosmosDb`) builds every key and query option of one organization. Creating an organization creates no container: an organization is its access point in `core`. The layout and its reasons are in the spec [Shared Organization Container](specs/2026-11-09%20Shared%20Organization%20Container.md).
+
+The container has TTL on without a default expiry (`DefaultTimeToLive = -1`) and the indexing policy excludes `/Entries/*` and the audit stamps. Only items with a `ttl` expire: the versions of configurations, templates and schemas (365 days after their write) and the items of deleted annotations. DbCreator creates the container and applies the settings on every start; the `core` container is not changed. DbCreator refuses a database that still has the containers of the earlier layout (`org.{organization}`, one per organization) and says how to seed it again.
 
 ## API
 

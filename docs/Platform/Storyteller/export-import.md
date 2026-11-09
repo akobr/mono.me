@@ -438,7 +438,7 @@ A written document can carry warnings (`ViewImportItem.Warnings`, each a `Code` 
 
 ## Jobs
 
-A job is an item in the organization container, in the partition `{project}.transfer`, with the id `{view}.exp.{id}` or `{view}.imp.{id}`. So it is only found through the view it was started in. It holds the public model (`ViewExport` or `ViewImport`), a copy of its status for the count of active jobs, and a `ttl`. The queue message only names the job.
+A job is an item in the container `organizations`, in the organization's partition `{project}.transfer`, with the id `{view}.exp.{id}` or `{view}.imp.{id}`. So it is only found through the view it was started in. It holds the public model (`ViewExport` or `ViewImport`), a copy of its status for the count of active jobs, and a `ttl`. The queue message only names the job.
 
 ```mermaid
 stateDiagram-v2
