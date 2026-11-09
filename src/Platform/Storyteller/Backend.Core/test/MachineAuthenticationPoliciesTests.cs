@@ -282,4 +282,74 @@ public class MachineAuthenticationPoliciesTests
         ((int)MachineCredentialKind.Federated).ShouldBe(4);
         Enum.GetNames<MachineCredentialKind>().ShouldBe(["ApiKey", "Certificate", "CertificateAndApiKey", "ClientCredentials", "Federated"]);
     }
+
+    [Fact]
+    public void Resolve_LeavesOutTheKindsTheDeploymentTurnsOff()
+    {
+        var stored = new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate, MachineCredentialKind.CertificateAndApiKey],
+            CredentialKind = MachineCredentialKind.Certificate,
+        };
+
+        var policy = MachineAuthenticationPolicies.Resolve(stored, CertificatesTurnedOff());
+
+        policy.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.ApiKey]);
+        policy.CredentialKind.ShouldBe(MachineCredentialKind.ApiKey);
+        policy.AllowsSharedCertificates().ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Resolve_APolicyWithOnlyTurnedOffKinds_EnablesTheDeploymentDefault()
+    {
+        var stored = new MachineAuthenticationPolicy { EnabledCredentialKinds = [MachineCredentialKind.Certificate] };
+
+        var policy = MachineAuthenticationPolicies.Resolve(stored, CertificatesTurnedOff());
+
+        policy.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.ApiKey]);
+        policy.CredentialKind.ShouldBe(MachineCredentialKind.ApiKey);
+    }
+
+    [Fact]
+    public void Validate_ATurnedOffKind_IsRefused()
+    {
+        var policy = new MachineAuthenticationPolicy { EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey] };
+
+        MachineAuthenticationPolicies.Validate(policy, CertificatesTurnedOff())
+            .ShouldBe("The machine credential kind CertificateAndApiKey is turned off in this deployment.");
+        MachineAuthenticationPolicies.Validate(policy, _options).ShouldBeNull();
+    }
+
+    [Fact]
+    public void ValidateOptions_TheDefaultKindTurnedOff_IsRefused()
+    {
+        var options = CertificatesTurnedOff();
+        options.DefaultCredentialKind = MachineCredentialKind.Certificate;
+
+        MachineAuthenticationPolicies.ValidateOptions(options)
+            .ShouldBe("MachineAuth:DefaultCredentialKind Certificate is turned off by MachineAuth:DisabledCredentialKinds.");
+        MachineAuthenticationPolicies.ValidateOptions(CertificatesTurnedOff()).ShouldBeNull();
+        MachineAuthenticationPolicies.ValidateOptions(_options).ShouldBeNull();
+    }
+
+    [Fact]
+    public void ValidateOptions_AnUnknownTurnedOffKind_IsRefused()
+    {
+        var options = new MachineAuthenticationOptions { DisabledCredentialKinds = [(MachineCredentialKind)99] };
+
+        MachineAuthenticationPolicies.ValidateOptions(options)
+            .ShouldBe("MachineAuth:DisabledCredentialKinds names 99, which is not a machine credential kind.");
+    }
+
+    private MachineAuthenticationOptions CertificatesTurnedOff()
+    {
+        return new MachineAuthenticationOptions
+        {
+            DefaultCredentialKind = _options.DefaultCredentialKind,
+            CertificateLifetimeDays = _options.CertificateLifetimeDays,
+            MinCertificateLifetimeDays = _options.MinCertificateLifetimeDays,
+            MaxCertificateLifetimeDays = _options.MaxCertificateLifetimeDays,
+            DisabledCredentialKinds = [MachineCredentialKind.Certificate, MachineCredentialKind.CertificateAndApiKey],
+        };
+    }
 }

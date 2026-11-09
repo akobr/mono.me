@@ -9,6 +9,11 @@ public class MachineAuthenticationOptions
 
     public MachineCredentialKind DefaultCredentialKind { get; set; } = MachineCredentialKind.ApiKey;
 
+    // The kinds this deployment turns off, whatever the projects enable: e.g. Certificate and CertificateAndApiKey
+    // on a host whose front end passes no client certificates. A project's policy can't enable them, the effective
+    // policy leaves them out, so their machines can't be created or sign in, and shared certificates can't be issued.
+    public MachineCredentialKind[] DisabledCredentialKinds { get; set; } = [];
+
     public string CertificateHeaderName { get; set; } = DefaultCertificateHeaderName;
 
     public bool IsCertificateHeaderFromClientAllowed { get; set; }
