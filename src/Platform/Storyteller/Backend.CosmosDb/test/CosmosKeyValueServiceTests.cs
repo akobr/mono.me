@@ -411,8 +411,13 @@ public class CosmosKeyValueServiceTests(Startup startup)
     }
 
     [Fact]
+    [Trait(CosmosTestEmulator.TraitName, CosmosTestEmulator.ClassicTrait)]
     public async Task Listing_Pages()
     {
+        // The vNext emulator (vnext-EN20261019) answers the query of a Linux client, whose SDK gets the query plan from the
+        // gateway, with every item of the partition in one page: x-ms-max-item-count 1000, 1050 items, no continuation.
+        Assert.SkipUnless(Context.Emulator.IsLikeTheService, CosmosTestEmulator.SkipReasonOnVNext);
+
         var project = NewProject("paging");
         var document = new KeyValueDocument
         {
