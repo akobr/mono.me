@@ -48,7 +48,7 @@ public class InitDbCommand : IAsyncCommand
         {
             Console.Write("! ", Color.Magenta);
             Console.WriteLine(
-                $"The database '{CosmosConstants.DatabaseName}' has the layout before the shared container '{CosmosConstants.OrganizationsContainerName}'. Nothing was written.");
+                $"The database '{CosmosConstants.DatabaseName}' does not have the layout of the shared container '{CosmosConstants.OrganizationsContainerName}'. Nothing was written.");
 
             foreach (var problem in exception.Problems)
             {
