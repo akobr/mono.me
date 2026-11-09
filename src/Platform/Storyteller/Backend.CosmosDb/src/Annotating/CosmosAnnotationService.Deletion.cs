@@ -42,8 +42,10 @@ public partial class CosmosAnnotationService
         string? deletionId = null,
         string? continuationToken = null)
     {
-        // every partition of the project; only annotation items carry both AnnotationType and Deletion
-        var text = "SELECT * FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND c.ProjectName = @project "
+        // every partition of the project; only annotation items carry both AnnotationType and Deletion. An
+        // organization-wide query: the store adds @organization and the organization's key prefix.
+        var text = $"SELECT * FROM c WHERE c.Organization = {OrganizationContainer.OrganizationParameter} "
+                   + "AND STARTSWITH(c.PartitionKey, @projectPrefix) AND c.ProjectName = @project "
                    + "AND c.ViewName = @view AND IS_DEFINED(c.AnnotationType) AND IS_DEFINED(c.Deletion)";
 
         if (rootsOnly)
@@ -231,7 +233,7 @@ public partial class CosmosAnnotationService
         var deletingKeys = deleting.Select(node => node.KeyText).ToHashSet(StringComparer.Ordinal);
         var descendantCount = deleting.Count - 1;
 
-        using var plan = new BatchPlan(store.Container);
+        using var plan = new BatchPlan(store.Repository);
 
         foreach (var node in deleting)
         {
@@ -250,7 +252,7 @@ public partial class CosmosAnnotationService
                 // the last content survives an expiry in the versions, like after a permanent delete
                 if (configuration.Content.HasValues)
                 {
-                    var snapshot = ToHistorySnapshot(configuration);
+                    var snapshot = ToHistorySnapshot(configuration, store.Repository.Organization);
                     operations.Add(batch => batch.UpsertItem(snapshot));
                     payloadBytes += EstimateBytes(snapshot);
                 }
@@ -362,7 +364,7 @@ public partial class CosmosAnnotationService
                 case AnnotationItemState.Missing:
                     var model = AnnotationFactory.CreateDefault(ancestorKey, targetModel.ProjectName, targetModel.ViewName, targetModel);
                     var entry = AnnotationAuditStore.NewEntry(AnnotationAuditAction.Created, actor, now) with { Cause = ancestorCause };
-                    writes.Add(new PendingWrite(ancestor, ToStoredEntity(model) with { Created = stamp, Modified = stamp }, entry, PendingKind.Create));
+                    writes.Add(new PendingWrite(ancestor, ToStoredEntity(model, store.Repository.Organization) with { Created = stamp, Modified = stamp }, entry, PendingKind.Create));
                     break;
             }
         }
@@ -451,7 +453,7 @@ public partial class CosmosAnnotationService
             }
         }
 
-        using var plan = new BatchPlan(store.Container);
+        using var plan = new BatchPlan(store.Repository);
 
         foreach (var write in writes)
         {
@@ -561,7 +563,7 @@ public partial class CosmosAnnotationService
             .Append(root)
             .ToList();
 
-        using var plan = new BatchPlan(store.Container);
+        using var plan = new BatchPlan(store.Repository);
 
         foreach (var node in purging)
         {
@@ -572,7 +574,7 @@ public partial class CosmosAnnotationService
             {
                 if (configuration.Content.HasValues)
                 {
-                    var snapshot = ToHistorySnapshot(configuration);
+                    var snapshot = ToHistorySnapshot(configuration, store.Repository.Organization);
                     operations.Add(batch => batch.UpsertItem(snapshot));
                     payloadBytes += EstimateBytes(snapshot);
                 }

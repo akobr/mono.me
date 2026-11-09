@@ -49,14 +49,13 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
         }
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
 
         var query = new QueryDefinition("SELECT * FROM c WHERE STARTSWITH(c.id, @prefix)")
             .WithParameter("@prefix", IdPrefix);
 
         using var iterator = repository.Container.GetItemQueryIterator<SharedCertificateEntity>(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = partitionKey });
+            requestOptions: repository.QueryOptions($"{project}.access"));
 
         var results = new List<SharedCertificate>();
 
@@ -86,7 +85,7 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var entity = await repository.Container.TryReadItemAsync(
             $"{IdPrefix}{thumbprint.ToUpperInvariant()}",
-            new PartitionKey($"{project}.access"),
+            repository.Key($"{project}.access"),
             stream => stream.DeserializeSystemTextJson<SharedCertificateEntity>(_serializerOptions));
 
         var certificate = entity is null ? null : ToModel(entity);
@@ -98,11 +97,12 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = $"{project}.access";
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
 
         var entity = new SharedCertificateEntity
         {
             PartitionKey = partitionKeyValue,
+            Organization = repository.Organization,
             Id = $"{IdPrefix}{certificate.Thumbprint}",
             Label = certificate.Label,
             Thumbprint = certificate.Thumbprint,
@@ -118,8 +118,7 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
     public async Task<bool> RevokeAsync(string organization, string project, string thumbprint)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKeyValue = $"{project}.access";
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key($"{project}.access");
         var id = $"{IdPrefix}{thumbprint}";
 
         var entity = await repository.Container.TryReadItemAsync(
@@ -142,7 +141,6 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
     public async Task<bool> LabelExistsAsync(string organization, string project, string label)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
 
         var query = new QueryDefinition("SELECT VALUE COUNT(1) FROM c WHERE STARTSWITH(c.id, @prefix) AND c.Label = @label")
             .WithParameter("@prefix", IdPrefix)
@@ -150,7 +148,7 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
 
         using var iterator = repository.Container.GetItemQueryIterator<int>(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = partitionKey });
+            requestOptions: repository.QueryOptions($"{project}.access"));
 
         if (iterator.HasMoreResults)
         {

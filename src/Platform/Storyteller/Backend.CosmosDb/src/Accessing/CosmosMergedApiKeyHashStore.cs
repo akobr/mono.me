@@ -35,7 +35,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = $"{project}.access";
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
 
         // Unlike ReplaceAsync, this creates the machine when it is missing: it runs on create, before the machine exists.
         // A stored machine gets only its two fields patched; a missing one answers 404 and gets the partial entity below.
@@ -59,6 +59,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         var partial = new MachineAccessEntity
         {
             PartitionKey = partitionKeyValue,
+            Organization = repository.Organization,
             Id = machineAccessId,
             ObjectId = machineAccessId,
             AccessKey = "***",
@@ -77,7 +78,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         string newHashedSecret)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
+        var partitionKey = repository.Key($"{project}.access");
 
         // A concurrent write to another field (a certificate renewal) only moves the ETag, so a few retries suffice.
         const int maxAttempts = 3;
@@ -130,7 +131,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
     public async Task<ApiKeyHashEntry?> GetAsync(string organization, string project, string machineAccessId)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
+        var partitionKey = repository.Key($"{project}.access");
 
         var machineAccess = await repository.Container.TryReadItemAsync(
             machineAccessId,
@@ -148,7 +149,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
     public async Task<bool> DeleteAsync(string organization, string project, string machineAccessId)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
+        var partitionKey = repository.Key($"{project}.access");
 
         var machineAccess = await repository.Container.TryReadItemAsync(
             machineAccessId,

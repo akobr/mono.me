@@ -13,8 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
-
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 // The audit document of annotations: entries with previous and new values, the stamps, and the size limit.
@@ -188,7 +186,7 @@ public class CosmosAnnotationAuditTests(Startup startup)
         history.Entries.Count.Should().BeLessThan(41);
         history.Entries[0].Fields!.Single(f => f.Field == "Title").Value!.ToString().Should().StartWith("Title 39 ");
 
-        using var response = await Container.ReadItemStreamAsync("default.adt.sbt.tr-s", new PartitionKey($"{Project}.sbt.tr-s"));
+        using var response = await Container.ReadItemStreamAsync("default.adt.sbt.tr-s", Key("sbt.tr-s").GetCosmosPartitionKey());
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var stored = response.Content.Length;
         using var document = await JsonDocument.ParseAsync(response.Content);

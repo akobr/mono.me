@@ -12,8 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
-
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 // Soft delete, restore, re-create and permanent delete of annotations, with their configurations and TTLs.
@@ -187,7 +185,7 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
         await Annotations.DeleteAnnotationAsync(Key("sbt.ms-s"));
 
         var partitionKey = $"{Project}.sbt.ms-s";
-        using (await Container.DeleteItemStreamAsync("default.cfv.sbt.ms-s.1", new PartitionKey(partitionKey)))
+        using (await Container.DeleteItemStreamAsync("default.cfv.sbt.ms-s.1", OrganizationKeys.Key(TestConstants.Organization, partitionKey)))
         {
             // the snapshot expired or was removed
         }
@@ -305,7 +303,7 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
         await Annotations.DeleteAnnotationAsync(Key("sbt.rx-s"));
 
         // the subject expired before its usage (as if its ttl had run out first)
-        using (await Container.DeleteItemStreamAsync("default.sbt.rx-s", new PartitionKey($"{Project}.sbt.rx-s")))
+        using (await Container.DeleteItemStreamAsync("default.sbt.rx-s", OrganizationKeys.Key(TestConstants.Organization, $"{Project}.sbt.rx-s")))
         {
         }
 
@@ -582,7 +580,7 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
 
     private async Task<JsonElement?> ReadRawAsync(string id, string partitionKey)
     {
-        using var response = await Container.ReadItemStreamAsync(id, new PartitionKey(partitionKey));
+        using var response = await Container.ReadItemStreamAsync(id, OrganizationKeys.Key(TestConstants.Organization, partitionKey));
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {

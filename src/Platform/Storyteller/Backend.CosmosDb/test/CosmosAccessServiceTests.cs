@@ -812,11 +812,10 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         return new CosmosAccessService(
             new ContainerRepositoryProvider(new FixedClientProvider(client)),
-            Context.Services.GetRequiredService<IContainerFactory>(),
             Context.Services.GetRequiredService<IOptions<JsonSerializerOptions>>());
     }
 
-    // A new organization creates its own container, so the tests use few of them.
+    // A new organization is only its access point in core (its data shares the container organizations).
     private static string NewOrganizationName() => $"o-{Guid.NewGuid():N}"[..14];
 
     private static string ProjectOf(string pointKey) => pointKey[(Organization.Length + 1)..];

@@ -370,7 +370,7 @@ public class CosmosAnnotationConditionalWriteTests(Startup startup)
     private async Task<string> ItemETagAsync(string project, string key = Key)
     {
         var fullKey = FullKeyOf(project, key);
-        using var response = await GetContainer().ReadItemStreamAsync($"{View}.{key}", new PartitionKey(fullKey.GetPartitionKey()));
+        using var response = await GetContainer().ReadItemStreamAsync($"{View}.{key}", fullKey.GetCosmosPartitionKey());
         response.IsSuccessStatusCode.Should().BeTrue();
         return response.Headers.ETag;
     }
@@ -380,7 +380,7 @@ public class CosmosAnnotationConditionalWriteTests(Startup startup)
     {
         using var response = await GetContainer().PatchItemStreamAsync(
             id,
-            new PartitionKey(FullKeyOf(project).GetPartitionKey()),
+            FullKeyOf(project).GetCosmosPartitionKey(),
             [PatchOperation.Increment("/TouchedByTest", 1)]);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);

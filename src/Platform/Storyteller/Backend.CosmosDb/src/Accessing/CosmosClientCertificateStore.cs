@@ -60,10 +60,10 @@ public class CosmosClientCertificateStore : IClientCertificateStore
             .WithParameter("@prefix", MachineCertificateEntity.IdPrefix)
             .WithParameter("@machine", machineAccessId);
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        using var iterator = container.GetItemQueryIterator<MachineCertificateEntity>(
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var iterator = repository.Container.GetItemQueryIterator<MachineCertificateEntity>(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetPartitionKey(project)), MaxItemCount = 1 });
+            requestOptions: repository.QueryOptions(GetPartitionKey(project), maxItemCount: 1));
 
         MachineCertificateEntity? newest = null;
 
@@ -86,10 +86,10 @@ public class CosmosClientCertificateStore : IClientCertificateStore
             return cached.Record;
         }
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        var entity = await container.TryReadItemAsync(
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var entity = await repository.Container.TryReadItemAsync(
             MachineCertificateEntity.GetId(thumbprint),
-            new PartitionKey(GetPartitionKey(project)),
+            repository.Key(GetPartitionKey(project)),
             stream => stream.DeserializeNewtonsoft<MachineCertificateEntity>(_serializerOptions));
 
         var record = await ToRecordAsync(organization, project, entity);
@@ -100,18 +100,19 @@ public class CosmosClientCertificateStore : IClientCertificateStore
     public async Task StoreAsync(string organization, string project, CertificateRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetPartitionKey(project);
-        var entity = MachineCertificateEntity.FromRecord(partitionKeyValue, record, _timeProvider.GetUtcNow());
+        var entity = MachineCertificateEntity.FromRecord(repository.Organization, partitionKeyValue, record, _timeProvider.GetUtcNow());
 
-        await container.UpsertItemAsync(entity, new PartitionKey(partitionKeyValue));
+        await repository.Container.UpsertItemAsync(entity, repository.Key(partitionKeyValue));
         Evict(organization, project, record.MachineAccessId, record.Thumbprint);
     }
 
     public async Task RevokeAsync(string organization, string project, string machineAccessId)
     {
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        var partitionKey = new PartitionKey(GetPartitionKey(project));
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var container = repository.Container;
+        var partitionKey = repository.Key(GetPartitionKey(project));
         var query = new QueryDefinition("SELECT * FROM c WHERE STARTSWITH(c.id, @prefix) AND c.MachineAccessId = @machine")
             .WithParameter("@prefix", MachineCertificateEntity.IdPrefix)
             .WithParameter("@machine", machineAccessId);
@@ -144,10 +145,10 @@ public class CosmosClientCertificateStore : IClientCertificateStore
             return record;
         }
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        var machine = await container.TryReadItemAsync(
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var machine = await repository.Container.TryReadItemAsync(
             record.MachineAccessId,
-            new PartitionKey(GetPartitionKey(project)),
+            repository.Key(GetPartitionKey(project)),
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_entityOptions));
 
         return record with { CredentialKind = machine?.CredentialKind };

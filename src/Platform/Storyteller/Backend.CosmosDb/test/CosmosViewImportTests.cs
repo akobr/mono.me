@@ -15,8 +15,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
-
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 // The imports of annotation, schema, template and configuration files: outcomes, warnings, Existing, Force, dry runs,
@@ -986,6 +984,7 @@ public class CosmosViewImportTests(Startup startup)
             new ConfigurationSchemaEntity
             {
                 PartitionKey = $"{project}.schema",
+                Organization = Organization,
                 Id = $"{View}.{EntityIdPrefixTypes.ConfigurationSchema}.t.{typeCode}",
                 AnnotationKey = typeCode,
                 Name = typeCode,
@@ -995,7 +994,7 @@ public class CosmosViewImportTests(Startup startup)
                 Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
                 Version = 1,
             },
-            new PartitionKey($"{project}.schema"));
+            OrganizationKeys.Key(Organization, $"{project}.schema"));
     }
 
     private Task CreateAsync(string project, params string[] keys)
@@ -1012,7 +1011,7 @@ public class CosmosViewImportTests(Startup startup)
 
     private async Task<bool> HasCachedCalculationAsync(FullKey key)
     {
-        var item = await Container.ReadItemAsync<JObject>($"{key.ViewName}.cnf.{key.Annotation}", new PartitionKey(key.GetPartitionKey()));
+        var item = await Container.ReadItemAsync<JObject>($"{key.ViewName}.cnf.{key.Annotation}", key.GetCosmosPartitionKey());
         return item.Resource["CalculatedContent"]?.Type == JTokenType.Object;
     }
 }

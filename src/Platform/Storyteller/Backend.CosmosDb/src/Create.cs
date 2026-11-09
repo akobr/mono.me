@@ -8,9 +8,11 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller;
 
+// The seeded items of an organization; each carries the organization of its partition in the container organizations.
 public static class Create
 {
     public static ResponsibilityEntity Responsibility(
+        string organization,
         string responsibilityName,
         IEnumerable<string>? unitNames = null,
         string viewName = Constants.DefaultViewName,
@@ -22,6 +24,7 @@ public static class Create
         {
             Id = string.Empty,
             PartitionKey = PartitionKeys.GetResponsibility(projectName, responsibilityName),
+            Organization = organization,
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Responsibility,
@@ -34,6 +37,7 @@ public static class Create
     }
 
     public static SubjectEntity Subject(
+        string organization,
         string subjectName,
         IEnumerable<string>? responsibilityNames = null,
         IEnumerable<string>? contextNames = null,
@@ -46,6 +50,7 @@ public static class Create
         {
             Id = string.Empty,
             PartitionKey = PartitionKeys.GetSubject(projectName, subjectName),
+            Organization = organization,
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Subject,
@@ -59,6 +64,7 @@ public static class Create
     }
 
     public static ContextEntity Context(
+        string organization,
         string subjectName,
         string contextName,
         IEnumerable<string>? responsibilityNames = null,
@@ -71,6 +77,7 @@ public static class Create
         {
             Id = string.Empty,
             PartitionKey = PartitionKeys.GetSubject(projectName, subjectName),
+            Organization = organization,
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Context,
@@ -85,6 +92,7 @@ public static class Create
     }
 
     public static UsageEntity Usage(
+        string organization,
         string subjectName,
         string responsibilityName,
         IEnumerable<string>? contextNames = null,
@@ -97,6 +105,7 @@ public static class Create
         {
             Id = string.Empty,
             PartitionKey = PartitionKeys.GetResponsibility(projectName, responsibilityName),
+            Organization = organization,
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Usage,
@@ -113,6 +122,7 @@ public static class Create
     }
 
     public static ExecutionEntity Execution(
+        string organization,
         string subjectName,
         string responsibilityName,
         string contextName,
@@ -126,6 +136,7 @@ public static class Create
         {
             Id = string.Empty,
             PartitionKey = PartitionKeys.GetResponsibility(projectName, responsibilityName),
+            Organization = organization,
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Execution,
@@ -145,6 +156,7 @@ public static class Create
     }
 
     public static UnitOfExecutionEntity UnitOfExecution(
+        string organization,
         string subjectName,
         string responsibilityName,
         string unitName,
@@ -158,6 +170,7 @@ public static class Create
         {
             Id = string.Empty,
             PartitionKey = PartitionKeys.GetResponsibility(projectName, responsibilityName),
+            Organization = organization,
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.UnitOfExecution,
@@ -178,12 +191,13 @@ public static class Create
         };
     }
 
-    public static ConfigurationEntity Configuration(AnnotationKey annotationKey, JObject content, AuditActor? author = null, string viewName = Constants.DefaultViewName, string projectName = Constants.DefaultProjectName)
+    public static ConfigurationEntity Configuration(string organization, AnnotationKey annotationKey, JObject content, AuditActor? author = null, string viewName = Constants.DefaultViewName, string projectName = Constants.DefaultProjectName)
     {
         return new ConfigurationEntity
         {
             Id = $"{viewName}.cnf.{annotationKey}",
             PartitionKey = PartitionKeys.GetKey(annotationKey, projectName),
+            Organization = organization,
             AnnotationKey = annotationKey,
             Name = annotationKey.Name,
             Content = content,

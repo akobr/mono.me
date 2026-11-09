@@ -7,8 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
 
-using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
-
 namespace _42.Platform.Storyteller.Annotating;
 
 // Writes grouped into transactional batches. A unit is the operations of one annotation and its items, always in
@@ -23,13 +21,14 @@ internal sealed class BatchPlan : IDisposable
     private const long MaxPayloadBytesPerBatch = 1_500_000;
     private const int MaxParallelBatches = 8;
 
-    private readonly Container _container;
+    // the organization of every unit: a unit keeps the partition key value, the batch gets the full key of both levels
+    private readonly OrganizationContainer _repository;
     private readonly List<Unit> _units = [];
     private readonly List<IDisposable> _resources = [];
 
-    public BatchPlan(Container container)
+    public BatchPlan(OrganizationContainer repository)
     {
-        _container = container;
+        _repository = repository;
     }
 
     public bool IsEmpty => _units.All(unit => unit.Operations.Count == 0);
@@ -117,7 +116,7 @@ internal sealed class BatchPlan : IDisposable
 
         try
         {
-            var batch = _container.CreateTransactionalBatch(new PartitionKey(partitionKey));
+            var batch = _repository.Container.CreateTransactionalBatch(_repository.Key(partitionKey));
 
             foreach (var operation in operations)
             {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json.Linq;
@@ -10,44 +11,50 @@ namespace _42.Platform.Storyteller;
 
 public class Data
 {
-    public static async Task CreateCoreAnnotations(Container container)
+    // The core annotations of the organization of the container, in the shared container organizations.
+    public static async Task CreateCoreAnnotations(OrganizationContainer container)
     {
+        var organization = container.Organization;
+
         // responsibilities
-        await container.UpsertItemAsync(Create.Responsibility("storyteller"));
-        await container.UpsertItemAsync(Create.Responsibility("supervisor"));
-        await container.UpsertItemAsync(Create.Responsibility("scheduler"));
+        await UpsertAsync(container, Create.Responsibility(organization, "storyteller"));
+        await UpsertAsync(container, Create.Responsibility(organization, "supervisor"));
+        await UpsertAsync(container, Create.Responsibility(organization, "scheduler"));
 
         // subjects
-        await container.UpsertItemAsync(Create.Subject(
+        await UpsertAsync(container, Create.Subject(
+            organization,
             "42",
             ["storyteller", "supervisor", "scheduler"],
             ["system"]));
 
         // contexts
-        await container.UpsertItemAsync(Create.Context(
+        await UpsertAsync(container, Create.Context(
+            organization,
             "42",
             "system",
             ["storyteller", "supervisor", "scheduler"]));
 
         // usages
-        await container.UpsertItemAsync(Create.Usage("42", "storyteller", ["system"]));
-        await container.UpsertItemAsync(Create.Usage("42", "supervisor", ["system"]));
-        await container.UpsertItemAsync(Create.Usage("42", "scheduler", ["system"]));
+        await UpsertAsync(container, Create.Usage(organization, "42", "storyteller", ["system"]));
+        await UpsertAsync(container, Create.Usage(organization, "42", "supervisor", ["system"]));
+        await UpsertAsync(container, Create.Usage(organization, "42", "scheduler", ["system"]));
 
         // executions
-        await container.UpsertItemAsync(Create.Execution("42", "storyteller", "system"));
-        await container.UpsertItemAsync(Create.Execution("42", "supervisor", "system"));
-        await container.UpsertItemAsync(Create.Execution("42", "scheduler", "system"));
+        await UpsertAsync(container, Create.Execution(organization, "42", "storyteller", "system"));
+        await UpsertAsync(container, Create.Execution(organization, "42", "supervisor", "system"));
+        await UpsertAsync(container, Create.Execution(organization, "42", "scheduler", "system"));
 
         // configurations
-        await container.UpsertItemAsync(Create.Configuration(
+        await UpsertAsync(container, Create.Configuration(
+            organization,
             AnnotationKey.CreateContext("42", "system"),
             JObject.Parse("""{ "IsSystem": true, "Number": 42, "Text": "system" }""")));
     }
 
     // Grants the account the given roles and adds it to each access point with the same role, keeping what is already
     // stored: other memberships of the account, other members and settings of the access points. Missing access points
-    // are created; a new organization needs its container (org.{name}) created by the caller.
+    // are created; an organization needs nothing more, its data lives in the shared container organizations.
     public static async Task SeedAccountAccessAsync(
         Container container,
         string accountId,
@@ -84,6 +91,13 @@ public class Data
                         : accessPoint with { AccessMap = accessMap };
                 });
         }
+    }
+
+    // The item in its partition of the organization: both levels of the key of the container organizations.
+    private static Task<ItemResponse<T>> UpsertAsync<T>(OrganizationContainer container, T entity)
+        where T : Entity
+    {
+        return container.Container.UpsertItemAsync(entity, container.Key(entity.PartitionKey));
     }
 
     // Read, change and write back with optimistic concurrency: a replace only with the ETag that was read, a create only

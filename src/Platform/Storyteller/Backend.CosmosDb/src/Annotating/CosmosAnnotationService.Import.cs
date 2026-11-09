@@ -23,7 +23,7 @@ public partial class CosmosAnnotationService
         CancellationToken cancellationToken = default)
     {
         var states = await AnnotationItemStore.ReadStatesAsync(
-            Store(organization).Container,
+            Store(organization).Repository.Container,
             keys.Select(key => FullKey.Create(key, organization, project, view)),
             cancellationToken);
 
@@ -74,7 +74,7 @@ public partial class CosmosAnnotationService
 
         // the keys the create writes, ancestors first; an ancestor that an earlier file of this import made active is
         // not among them, also in a dry run, where it is not stored
-        var states = await AnnotationItemStore.ReadStatesAsync(store.Container, ancestors.Select(ancestor => FullKey.Create(ancestor, fullKey)));
+        var states = await AnnotationItemStore.ReadStatesAsync(store.Repository.Container, ancestors.Select(ancestor => FullKey.Create(ancestor, fullKey)));
         var written = ancestors
             .Where(ancestor => states[ancestor.ToString()] != AnnotationItemState.Active
                                && !overlay.ActiveAnnotations.Contains(ancestor.ToString()))

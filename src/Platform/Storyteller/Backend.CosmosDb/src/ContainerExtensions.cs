@@ -5,7 +5,6 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Cosmos.Scripts;
 using Container = Microsoft.Azure.Cosmos.Container;
 using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
@@ -69,56 +68,5 @@ public static class ContainerExtensions
 
         var item = serialization(response.Content);
         return (item, response.Headers.ETag);
-    }
-
-    public static async Task UpsertStoredProcedureAsync(this Container @this, StoredProcedureProperties props)
-    {
-        try
-        {
-            await @this.Scripts.CreateStoredProcedureAsync(props);
-        }
-        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
-        {
-            await @this.Scripts.ReplaceStoredProcedureAsync(props);
-        }
-        catch (CosmosException ex)
-        {
-            throw;
-        }
-    }
-
-    public static async Task RemoveArrayValueAsync(this Container @this, string id, string propertyName, string valueToRemove, PartitionKey partitionKey)
-    {
-        var @params = new dynamic[] { id, propertyName, valueToRemove };
-        await @this.Scripts.ExecuteStoredProcedureAsync<string>(
-            CosmosStoredProcedureNames.RemoveValueFromArray,
-            partitionKey,
-            @params);
-    }
-
-    public static async Task DeleteUsageAndExecutionsAsync(this Container @this, string usageId, string executionIdPrefix, string unitOfExecutionIdPrefix, PartitionKey partitionKey)
-    {
-        var @params = new dynamic[] { usageId, executionIdPrefix, unitOfExecutionIdPrefix };
-        var finished = false;
-
-        while (!finished)
-        {
-            var response = await @this.Scripts.ExecuteStoredProcedureAsync<DeleteResponse>(
-                CosmosStoredProcedureNames.DeleteUsageAndExecutions,
-                partitionKey,
-                @params);
-
-            finished = response.Resource.Finished;
-
-            // Optional: Add a small delay if needed, though usually not necessary for SP continuations
-            // if (!finished) await Task.Delay(10);
-        }
-    }
-
-    private class DeleteResponse
-    {
-        public bool Finished { get; set; }
-
-        public int Count { get; set; }
     }
 }

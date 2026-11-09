@@ -300,7 +300,6 @@ public class FederationPersistenceTests(CosmosFixture fixture)
 
         return new CosmosAccessService(
             fixture.Services.GetRequiredService<IContainerRepositoryProvider>(),
-            fixture.Services.GetRequiredService<IContainerFactory>(),
             fixture.Services.GetRequiredService<IOptions<JsonSerializerOptions>>(),
             router.Object);
     }

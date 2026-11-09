@@ -9,7 +9,6 @@ using _42.Platform.Storyteller.Transferring;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
 namespace _42.Platform.Storyteller.Configuring;
 
@@ -34,10 +33,10 @@ public partial class CosmosConfigurationSchemaService
                 + "AND IS_OBJECT(c.Content) AND ARRAY_LENGTH(ObjectToArray(c.Content)) > 0")
             .WithParameter("@prefix", prefix);
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        using var iterator = container.GetItemQueryIterator<string>(
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var iterator = repository.Container.GetItemQueryIterator<string>(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetSchemaPartitionKey(project)) });
+            requestOptions: repository.QueryOptions(GetSchemaPartitionKey(project)));
 
         var keys = new HashSet<SchemaKey>();
 
@@ -95,7 +94,7 @@ public partial class CosmosConfigurationSchemaService
             return new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
         }
 
-        var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
+        var partitionKey = repository.Key(GetSchemaPartitionKey(project));
         var existing = await ReadCurrentEntityAsync(repository, partitionKey, identity);
 
         // an empty schema is no document, as in an export

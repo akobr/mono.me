@@ -284,15 +284,17 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
     // Keys of the project, active or deleted, per view, that still carry the level.
     public async Task<IReadOnlyDictionary<string, int>> CountInUseAsync(string organization, string project, KeyValueProtection protection, CancellationToken cancellationToken = default)
     {
-        var query = new QueryDefinition(
+        // every key/value partition of the project: an organization-wide query, isolated by its predicate on c.Organization
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var query = repository.WithOrganization(new QueryDefinition(
                 "SELECT c.ViewName AS View, COUNT(1) AS Count FROM c "
-                + "WHERE STARTSWITH(c.PartitionKey, @prefix) AND STARTSWITH(c.id, @idPrefix) AND c.Content.Protection = @level GROUP BY c.ViewName")
+                + "WHERE c.Organization = @organization AND STARTSWITH(c.PartitionKey, @prefix) AND STARTSWITH(c.id, @idPrefix) "
+                + "AND c.Content.Protection = @level GROUP BY c.ViewName")
             .WithParameter("@prefix", $"{project}.{PartitionKeys.KeyValuesPartitionInfix}.")
             .WithParameter("@idPrefix", $"{EntityIdPrefixTypes.KeyValue}.")
-            .WithParameter("@level", protection.ToString());
+            .WithParameter("@level", protection.ToString()));
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        using var iterator = container.GetItemQueryIterator<ViewCountRow>(query);
+        using var iterator = repository.Container.GetItemQueryIterator<ViewCountRow>(query, requestOptions: repository.QueryOptions());
         var counts = new Dictionary<string, int>(StringComparer.Ordinal);
 
         while (iterator.HasMoreResults)

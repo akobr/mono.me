@@ -210,7 +210,7 @@ public class CosmosConfigurationInvalidationOrderTests(Startup startup)
     // written in transactional batches, a burst of single writes times out on a small emulator.
     private async Task<List<string>> InsertCachedExecutionsAsync(FullKey responsibility, int count, string name = "raw")
     {
-        var partitionKey = new PartitionKey(responsibility.GetPartitionKey());
+        var partitionKey = responsibility.GetCosmosPartitionKey();
         var ids = Enumerable.Range(0, count)
             .Select(index => $"{View}.cnf.exe.{name}{index}.{responsibility.Annotation.Name}.c")
             .ToList();
@@ -225,6 +225,7 @@ public class CosmosConfigurationInvalidationOrderTests(Startup startup)
                 {
                     ["id"] = id,
                     ["PartitionKey"] = responsibility.GetPartitionKey(),
+                    ["Organization"] = responsibility.OrganizationName,
                     ["AnnotationKey"] = id[$"{View}.cnf.".Length..],
                     ["Name"] = "c",
                     ["ProjectName"] = responsibility.ProjectName,
@@ -255,13 +256,13 @@ public class CosmosConfigurationInvalidationOrderTests(Startup startup)
 
     private async Task<JObject> ReadItemAsync(FullKey key, string id)
     {
-        var response = await GetContainer().ReadItemAsync<JObject>(id, new PartitionKey(key.GetPartitionKey()));
+        var response = await GetContainer().ReadItemAsync<JObject>(id, key.GetCosmosPartitionKey());
         return response.Resource;
     }
 
     private async Task<bool> HasItemAsync(FullKey key, string id)
     {
-        using var response = await GetContainer().ReadItemStreamAsync(id, new PartitionKey(key.GetPartitionKey()));
+        using var response = await GetContainer().ReadItemStreamAsync(id, key.GetCosmosPartitionKey());
         return response.IsSuccessStatusCode;
     }
 

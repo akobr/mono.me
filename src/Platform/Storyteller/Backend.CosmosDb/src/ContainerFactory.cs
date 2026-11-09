@@ -3,17 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using _42.Platform.Storyteller.Entities;
 using _42.Utils.Async;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Cosmos.Scripts;
 using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller;
 
 public class ContainerFactory : IContainerFactory
 {
-    // Organization containers: TTL on without a default expiry (only items with a ttl expire: versions, and the
+    // The container organizations: TTL on without a default expiry (only items with a ttl expire: versions, and the
     // items of soft-deleted annotations), and the audit entries left out of the index.
     public const string AuditEntriesPath = "/Entries/*";
 
@@ -29,6 +27,14 @@ public class ContainerFactory : IContainerFactory
         "/Actor/*",
     ];
 
+    // The hierarchical partition key of the container organizations: the organization, then the partition each item has
+    // always had ({project}.rst.{name}, {project}.kv.{view}, ...).
+    public static readonly IReadOnlyList<string> OrganizationsPartitionKeyPaths =
+    [
+        OrganizationKeys.OrganizationPath,
+        OrganizationKeys.PartitionKeyPath,
+    ];
+
     private readonly ICosmosClientProvider _cosmosClientProvider;
     private readonly CosmosDbOptions _options;
     private readonly AsyncLazy<Database> _database;
@@ -40,125 +46,31 @@ public class ContainerFactory : IContainerFactory
         _database = new AsyncLazy<Database>(BuildDatabase);
     }
 
+    // The container organizations gets its hierarchical key and its settings; any other container (core) the single
+    // path /PartitionKey.
     public async Task<Container> CreateContainerIfNotExistsAsync(string containerName)
     {
-        var database = await _database;
-        var properties = new ContainerProperties(containerName, $"/{nameof(Entity.PartitionKey)}");
-        var isOrganization = containerName.StartsWith(CosmosConstants.OrganizationContainerNamePrefix, StringComparison.Ordinal);
-
-        if (isOrganization)
+        if (string.Equals(containerName, CosmosConstants.OrganizationsContainerName, StringComparison.Ordinal))
         {
-            ApplySettings(properties);
+            return await EnsureOrganizationsContainerAsync();
         }
+
+        var database = await _database;
+        var properties = new ContainerProperties(containerName, OrganizationKeys.PartitionKeyPath);
+        var containerResult = await database.CreateContainerIfNotExistsAsync(properties);
+        return containerResult.Container;
+    }
+
+    public async Task<Container> EnsureOrganizationsContainerAsync()
+    {
+        var database = await _database;
+        var properties = new ContainerProperties(CosmosConstants.OrganizationsContainerName, OrganizationsPartitionKeyPaths.ToList());
+        ApplySettings(properties);
 
         var containerResult = await database.CreateContainerIfNotExistsAsync(properties);
 
-        if (isOrganization)
-        {
-            await EnsureContainerSettingsAsync(containerResult.Container);
-        }
-
-        await containerResult.Container.UpsertStoredProcedureAsync(new StoredProcedureProperties
-        {
-            Id = CosmosStoredProcedureNames.RemoveValueFromArray,
-            Body = """
-                   function removeValueFromArray(itemId, propertyName, valueToRemove) {
-                       var context = getContext();
-                       var collection = context.getCollection();
-
-                       var query = {
-                           query: "SELECT * FROM c WHERE c.id = @id",
-                           parameters: [{ name: "@id", value: itemId }]
-                       };
-
-                       var isAccepted = collection.queryDocuments(collection.getSelfLink(), query, function (err, items, responseOptions) {
-                           if (err) throw new Error("Error: " + err.message);
-
-                           if (items.length != 1) throw new Error("Item not found");
-
-                           var item = items[0];
-                           var array = item[propertyName];
-
-                           if (!Array.isArray(array)) throw new Error("Property is not an array");
-
-                           var index = array.indexOf(valueToRemove);
-
-                           if (index > -1) {
-                               array.splice(index, 1);
-
-                               var isUpdated = collection.replaceDocument(item._self, item, function (err, updatedItem) {
-                                   if (err) throw new Error("Error: " + err.message);
-                                   context.getResponse().setBody(updatedItem);
-                               });
-
-                               if (!isUpdated) throw new Error("Item update failed");
-                           } else {
-                               throw new Error("Value not found in array");
-                           }
-                       });
-
-                       if (!isAccepted) throw new Error("Query not accepted by server");
-                   }
-                   """
-        });
-
-        await containerResult.Container.UpsertStoredProcedureAsync(new StoredProcedureProperties
-        {
-            Id = CosmosStoredProcedureNames.DeleteUsageAndExecutions,
-            Body = """
-                   function deleteUsageAndExecutions(usageId, executionIdPrefix, unitOfExecutionIdPrefix) {
-                       var context = getContext();
-                       var collection = context.getCollection();
-                       var response = context.getResponse();
-
-                       var query = {
-                           query: "SELECT c._self FROM c WHERE c.id = @usageId OR STARTSWITH(c.id, @exePrefix) OR STARTSWITH(c.id, @uxePrefix)",
-                           parameters: [
-                               { name: "@usageId", value: usageId },
-                               { name: "@exePrefix", value: executionIdPrefix },
-                               { name: "@uxePrefix", value: unitOfExecutionIdPrefix }
-                           ]
-                       };
-
-                       var isAccepted = collection.queryDocuments(collection.getSelfLink(), query, function (err, items, responseOptions) {
-                           if (err) throw new Error("Error querying items: " + err.message);
-
-                           if (items.length === 0) {
-                               response.setBody({ finished: true, count: 0 });
-                               return;
-                           }
-
-                           var count = 0;
-                           function deleteNext() {
-                               if (count >= items.length) {
-                                   response.setBody({ finished: true, count: count });
-                                   return;
-                               }
-
-                               var item = items[count];
-                               var isAcceptedDelete = collection.deleteDocument(item._self, function (err) {
-                                   if (err) throw new Error("Failed to delete item: " + err.message);
-                                   count++;
-                                   deleteNext();
-                               });
-
-                               if (!isAcceptedDelete) {
-                                   // If deleteDocument returns false, we have reached the limit.
-                                   response.setBody({ finished: false, count: count });
-                               }
-                           }
-
-                           deleteNext();
-                       });
-
-                       if (!isAccepted) {
-                           // Query wasn't even accepted, might be too many results or RU limit
-                           response.setBody({ finished: false, count: 0 });
-                       }
-                   }
-                   """
-        });
-
+        // an existing container keeps its definition: one created before the settings existed gets them now
+        await EnsureContainerSettingsAsync(containerResult.Container);
         return containerResult.Container;
     }
 
@@ -174,29 +86,45 @@ public class ContainerFactory : IContainerFactory
         }
     }
 
-    public async Task<IReadOnlyList<string>> EnsureOrganizationContainersAsync()
+    // Reads only: the database is not created when it is missing.
+    public async Task<IReadOnlyList<string>> FindLayoutProblemsAsync()
     {
-        var database = await _database;
-        var updated = new List<string>();
-        using var iterator = database.GetContainerQueryIterator<ContainerProperties>();
+        var problems = new List<string>();
+        var database = _cosmosClientProvider.Client.GetDatabase(CosmosConstants.DatabaseName);
+        var containers = new List<ContainerProperties>();
 
-        while (iterator.HasMoreResults)
+        try
         {
-            foreach (var properties in await iterator.ReadNextAsync())
-            {
-                if (!properties.Id.StartsWith(CosmosConstants.OrganizationContainerNamePrefix, StringComparison.Ordinal))
-                {
-                    continue;
-                }
+            using var iterator = database.GetContainerQueryIterator<ContainerProperties>();
 
-                await EnsureContainerSettingsAsync(database.GetContainer(properties.Id));
-                updated.Add(properties.Id);
+            while (iterator.HasMoreResults)
+            {
+                containers.AddRange(await iterator.ReadNextAsync());
+            }
+        }
+        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            return problems;
+        }
+
+        foreach (var properties in containers.OrderBy(properties => properties.Id, StringComparer.Ordinal))
+        {
+            if (properties.Id.StartsWith(CosmosConstants.LegacyOrganizationContainerNamePrefix, StringComparison.Ordinal))
+            {
+                problems.Add($"The container '{properties.Id}' holds one organization in the layout before the shared container '{CosmosConstants.OrganizationsContainerName}'.");
+            }
+            else if (string.Equals(properties.Id, CosmosConstants.OrganizationsContainerName, StringComparison.Ordinal)
+                     && !HasOrganizationsPartitionKey(properties))
+            {
+                var paths = properties.PartitionKeyPaths is { Count: > 0 } keyPaths ? keyPaths : [properties.PartitionKeyPath];
+                problems.Add($"The container '{properties.Id}' is partitioned by {string.Join(", ", paths)}, not by {string.Join(", ", OrganizationsPartitionKeyPaths)}.");
             }
         }
 
-        return updated;
+        return problems;
     }
 
+    // Names of the containers of the platform database.
     public async Task<IReadOnlyList<string>> GetContainerNamesAsync()
     {
         var database = await _database;
@@ -209,6 +137,12 @@ public class ContainerFactory : IContainerFactory
         }
 
         return names;
+    }
+
+    private static bool HasOrganizationsPartitionKey(ContainerProperties properties)
+    {
+        return properties.PartitionKeyPaths is { } paths
+               && paths.SequenceEqual(OrganizationsPartitionKeyPaths, StringComparer.Ordinal);
     }
 
     // Returns whether anything changed.
@@ -253,7 +187,7 @@ public class ContainerFactory : IContainerFactory
                 : null;
 
         var databaseResponse = await _cosmosClientProvider.Client.CreateDatabaseIfNotExistsAsync(
-            "42.Platform.2S",
+            CosmosConstants.DatabaseName,
             throughput);
         return databaseResponse.Database;
     }

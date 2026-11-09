@@ -16,9 +16,10 @@ public static class FullKeyExtensions
             : $"{@this.ProjectName}.{AnnotationTypeCodes.Responsibility}.{annotationKey.ResponsibilityName}";
     }
 
+    // The full hierarchical key of the item in the container organizations: the organization, then the partition.
     public static PartitionKey GetCosmosPartitionKey(this FullKey @this)
     {
-        return new PartitionKey(@this.GetPartitionKey());
+        return OrganizationKeys.Key(@this.OrganizationName, @this.GetPartitionKey());
     }
 
     public static string GetCosmosItemId(this FullKey @this)

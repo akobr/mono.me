@@ -668,18 +668,33 @@ public class CosmosKeyValueServiceTests(Startup startup)
         var client = Context.Services.GetRequiredService<ICosmosClientProvider>().Client;
         var database = client.GetDatabase(CosmosConstants.DatabaseName);
         var factory = Context.Services.GetRequiredService<IContainerFactory>();
+        var auditExclusions = ContainerFactory.AuditStampPaths.Prepend(ContainerFactory.AuditEntriesPath).ToList();
 
-        var created = (await database.GetContainer($"org.{Org}").ReadContainerAsync()).Resource;
-        created.DefaultTimeToLive.Should().Be(-1, "containers of the platform get TTL on creation");
+        var organizations = (await database.GetContainer(CosmosConstants.OrganizationsContainerName).ReadContainerAsync()).Resource;
+        organizations.PartitionKeyPaths.Should().Equal(ContainerFactory.OrganizationsPartitionKeyPaths);
+        organizations.DefaultTimeToLive.Should().Be(-1, "the container organizations gets TTL on creation");
+        organizations.IndexingPolicy.ExcludedPaths.Select(path => path.Path).Should().Contain(auditExclusions);
 
-        var legacyName = $"legacy-{Guid.NewGuid():N}";
-        await database.CreateContainerAsync(new ContainerProperties(legacyName, "/PartitionKey"));
-        (await database.GetContainer(legacyName).ReadContainerAsync()).Resource.DefaultTimeToLive.Should().BeNull();
+        // A container with the key of organizations but without its settings, as one created before them, gets them on
+        // the next start. A unique name of its own (never "org.", which DbCreator refuses), deleted afterwards.
+        var bareName = $"bare-{Guid.NewGuid():N}";
+        await database.CreateContainerAsync(new ContainerProperties(bareName, ContainerFactory.OrganizationsPartitionKeyPaths.ToList()));
+        var bare = database.GetContainer(bareName);
 
-        await factory.EnsureContainerSettingsAsync(database.GetContainer(legacyName));
-        (await database.GetContainer(legacyName).ReadContainerAsync()).Resource.DefaultTimeToLive.Should().Be(-1);
+        try
+        {
+            (await bare.ReadContainerAsync()).Resource.DefaultTimeToLive.Should().BeNull();
 
-        await database.GetContainer(legacyName).DeleteContainerAsync();
+            await factory.EnsureContainerSettingsAsync(bare);
+
+            var settled = (await bare.ReadContainerAsync()).Resource;
+            settled.DefaultTimeToLive.Should().Be(-1);
+            settled.IndexingPolicy.ExcludedPaths.Select(path => path.Path).Should().Contain(auditExclusions);
+        }
+        finally
+        {
+            await bare.DeleteContainerAsync();
+        }
 
         var project = NewProject("ttl");
         await KeyValues.SetAsync(Org, project, View, "active", Public("v"), Admin);
@@ -708,7 +723,7 @@ public class CosmosKeyValueServiceTests(Startup startup)
     private async Task<string> ReadRawItemAsync(string project, string id)
     {
         var container = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(Org).Container;
-        using var response = await container.ReadItemStreamAsync(id, PartitionKeys.GetCosmosKeyValues(project, View));
+        using var response = await container.ReadItemStreamAsync(id, PartitionKeys.GetCosmosKeyValues(Org, project, View));
         using var reader = new System.IO.StreamReader(response.Content, Encoding.UTF8);
         return await reader.ReadToEndAsync();
     }

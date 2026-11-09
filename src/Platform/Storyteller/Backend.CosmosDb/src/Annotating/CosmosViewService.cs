@@ -28,15 +28,15 @@ public class CosmosViewService : IViewService
 
     public async Task<IReadOnlyList<View>> GetViewsAsync(string organization, string project, bool discover)
     {
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        var views = (await GetRegisteredAsync(container, project))
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var views = (await GetRegisteredAsync(repository, project))
             .ToDictionary(view => view.Name, StringComparer.Ordinal);
 
         views.TryAdd(Constants.DefaultViewName, new View { Name = Constants.DefaultViewName, IsDefault = true });
 
         if (discover)
         {
-            foreach (var name in await DiscoverAsync(container, project))
+            foreach (var name in await DiscoverAsync(repository, project))
             {
                 views.TryAdd(name, new View { Name = name });
             }
@@ -61,6 +61,7 @@ public class CosmosViewService : IViewService
         var entity = new ViewEntity
         {
             PartitionKey = ViewEntity.GetPartitionKey(project),
+            Organization = organization,
             Name = name!,
             Description = NormalizeDescription(model.Description),
             Created = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
@@ -68,8 +69,8 @@ public class CosmosViewService : IViewService
 
         try
         {
-            var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-            await container.CreateItemAsync(entity, new PartitionKey(entity.PartitionKey));
+            var repository = _repositoryProvider.GetOrganizationContainer(organization);
+            await repository.Container.CreateItemAsync(entity, repository.Key(entity.PartitionKey));
         }
         catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.Conflict)
         {
@@ -90,16 +91,17 @@ public class CosmosViewService : IViewService
             NameRules.EnsureViewName(name);
         }
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = ViewEntity.GetPartitionKey(project);
-        var existing = await container.TryReadItemAsync(
+        var existing = await repository.Container.TryReadItemAsync(
             $"{ViewEntity.IdPrefix}{name}",
-            new PartitionKey(partitionKey),
+            repository.Key(partitionKey),
             stream => stream.DeserializeSystemTextJson<ViewEntity>(_serializerOptions));
 
         var entity = (existing ?? new ViewEntity
         {
             PartitionKey = partitionKey,
+            Organization = organization,
             Name = name,
             Created = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
         }) with
@@ -107,7 +109,7 @@ public class CosmosViewService : IViewService
             Description = NormalizeDescription(model.Description),
         };
 
-        await container.UpsertItemAsync(entity, new PartitionKey(partitionKey));
+        await repository.Container.UpsertItemAsync(entity, repository.Key(partitionKey));
         return entity.ToView();
     }
 
@@ -116,13 +118,13 @@ public class CosmosViewService : IViewService
         return string.IsNullOrWhiteSpace(description) ? null : description.Trim();
     }
 
-    private async Task<List<View>> GetRegisteredAsync(Container container, string project)
+    private async Task<List<View>> GetRegisteredAsync(OrganizationContainer repository, string project)
     {
         var query = new QueryDefinition("SELECT * FROM c WHERE STARTSWITH(c.id, @prefix)")
             .WithParameter("@prefix", ViewEntity.IdPrefix);
-        using var iterator = container.GetItemQueryStreamIterator(
+        using var iterator = repository.Container.GetItemQueryStreamIterator(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(ViewEntity.GetPartitionKey(project)) });
+            requestOptions: repository.QueryOptions(ViewEntity.GetPartitionKey(project)));
         var views = new List<View>();
 
         while (iterator.HasMoreResults)
@@ -137,12 +139,15 @@ public class CosmosViewService : IViewService
     }
 
     // Every view that holds any document of the project: annotations, configurations, templates, schemas and their history.
-    // A cross-partition query over the organization container; meant for administrators, not for every page load.
-    private static async Task<List<string>> DiscoverAsync(Container container, string project)
+    // An organization-wide query over every partition of the organization (its key prefix, isolated by the predicate
+    // on Organization); meant for administrators, not for every page load.
+    private static async Task<List<string>> DiscoverAsync(OrganizationContainer repository, string project)
     {
-        var query = new QueryDefinition("SELECT DISTINCT VALUE c.ViewName FROM c WHERE STARTSWITH(c.PartitionKey, @prefix) AND IS_DEFINED(c.ViewName)")
-            .WithParameter("@prefix", $"{project}.");
-        using var iterator = container.GetItemQueryIterator<string>(query);
+        var query = repository.WithOrganization(new QueryDefinition(
+                $"SELECT DISTINCT VALUE c.ViewName FROM c WHERE c.Organization = {OrganizationContainer.OrganizationParameter} "
+                + "AND STARTSWITH(c.PartitionKey, @prefix) AND IS_DEFINED(c.ViewName)")
+            .WithParameter("@prefix", $"{project}."));
+        using var iterator = repository.Container.GetItemQueryIterator<string>(query, requestOptions: repository.QueryOptions());
         var names = new List<string>();
 
         while (iterator.HasMoreResults)

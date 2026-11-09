@@ -1366,7 +1366,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
     {
         using var response = await GetContainer().ReadItemStreamAsync(
             $"{key.ViewName}.cnf.{key.Annotation}",
-            new PartitionKey(key.GetPartitionKey()));
+            key.GetCosmosPartitionKey());
 
         return response.IsSuccessStatusCode;
     }
@@ -1375,7 +1375,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
     {
         var item = await GetContainer().ReadItemAsync<JObject>(
             $"{key.ViewName}.cnf.{key.Annotation}",
-            new PartitionKey(key.GetPartitionKey()));
+            key.GetCosmosPartitionKey());
 
         return item.Resource["CalculatedContent"]?.Type == JTokenType.Object;
     }

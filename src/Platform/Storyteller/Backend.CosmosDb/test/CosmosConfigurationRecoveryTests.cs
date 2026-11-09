@@ -662,7 +662,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         // a document written before versions were counted
         var row = await ReadRowAsync(responsibility);
         row["Version"] = 0;
-        await GetContainer().ReplaceItemAsync(row, RowId(responsibility), new PartitionKey(responsibility.GetPartitionKey()));
+        await GetContainer().ReplaceItemAsync(row, RowId(responsibility), responsibility.GetCosmosPartitionKey());
 
         var written = await Configurations.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "a": 2 }"""), AuditActor.System);
 
@@ -674,7 +674,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         await Configurations.ClearConfigurationAsync(responsibility);
         var cacheRow = (JObject)row.DeepClone();
         cacheRow["Content"] = new JObject();
-        await GetContainer().UpsertItemAsync(cacheRow, new PartitionKey(responsibility.GetPartitionKey()));
+        await GetContainer().UpsertItemAsync(cacheRow, responsibility.GetCosmosPartitionKey());
         (await Configurations.GetConfigurationVersionContentAsync(responsibility, 0))!.Content["a"]!.Value<int>().Should().Be(1);
     }
 
@@ -746,13 +746,13 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
 
     private async Task<JObject> ReadItemAsync(FullKey key, string id)
     {
-        var response = await GetContainer().ReadItemAsync<JObject>(id, new PartitionKey(key.GetPartitionKey()));
+        var response = await GetContainer().ReadItemAsync<JObject>(id, key.GetCosmosPartitionKey());
         return response.Resource;
     }
 
     private async Task<bool> HasItemAsync(FullKey key, string id)
     {
-        using var response = await GetContainer().ReadItemStreamAsync(id, new PartitionKey(key.GetPartitionKey()));
+        using var response = await GetContainer().ReadItemStreamAsync(id, key.GetCosmosPartitionKey());
         return response.IsSuccessStatusCode;
     }
 
@@ -769,6 +769,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
         {
             ["id"] = id,
             ["PartitionKey"] = row["PartitionKey"],
+            ["Organization"] = key.OrganizationName,
             ["AnnotationKey"] = row["AnnotationKey"],
             ["Name"] = row["Name"],
             ["ProjectName"] = row["ProjectName"],
@@ -778,7 +779,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
             ["Modified"] = row["Modified"],
         };
 
-        await GetContainer().UpsertItemAsync(history, new PartitionKey(key.GetPartitionKey()));
+        await GetContainer().UpsertItemAsync(history, key.GetCosmosPartitionKey());
         return id;
     }
 
@@ -787,7 +788,7 @@ public class CosmosConfigurationRecoveryTests(Startup startup)
     {
         using var response = await GetContainer().PatchItemStreamAsync(
             RowId(key),
-            new PartitionKey(key.GetPartitionKey()),
+            key.GetCosmosPartitionKey(),
             [PatchOperation.Increment("/AffectedCounter", 1)]);
 
         response.IsSuccessStatusCode.Should().BeTrue();

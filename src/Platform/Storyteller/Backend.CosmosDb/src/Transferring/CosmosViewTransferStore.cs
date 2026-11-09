@@ -33,11 +33,11 @@ public class CosmosViewTransferStore : IViewTransferStore
 
     public async Task<ViewTransferRecord> CreateAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
     {
-        var container = GetContainer(record.Organization);
+        var repository = GetRepository(record.Organization);
         var entity = ToEntity(record);
-        var response = await container.CreateItemAsync(
+        var response = await repository.Container.CreateItemAsync(
             entity,
-            new PartitionKey(entity.PartitionKey),
+            repository.Key(entity.PartitionKey),
             new ItemRequestOptions { EnableContentResponseOnWrite = false },
             cancellationToken);
 
@@ -52,9 +52,9 @@ public class CosmosViewTransferStore : IViewTransferStore
         string id,
         CancellationToken cancellationToken = default)
     {
-        var (entity, etag) = await GetContainer(organization).TryReadItemWithETagAsync(
+        var (entity, etag) = await GetRepository(organization).Container.TryReadItemWithETagAsync(
             GetId(view, kind, id),
-            PartitionKeys.GetCosmosTransfer(project),
+            PartitionKeys.GetCosmosTransfer(organization, project),
             stream => stream.DeserializeNewtonsoft<ViewTransferEntity>(_serializerSettings),
             cancellationToken: cancellationToken);
 
@@ -66,14 +66,15 @@ public class CosmosViewTransferStore : IViewTransferStore
 
     public async Task<ViewTransferRecord?> TryReplaceAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
     {
+        var repository = GetRepository(record.Organization);
         var entity = ToEntity(record);
 
         try
         {
-            var response = await GetContainer(record.Organization).ReplaceItemAsync(
+            var response = await repository.Container.ReplaceItemAsync(
                 entity,
                 entity.Id,
-                new PartitionKey(entity.PartitionKey),
+                repository.Key(entity.PartitionKey),
                 new ItemRequestOptions { IfMatchEtag = record.ETag, EnableContentResponseOnWrite = false },
                 cancellationToken);
 
@@ -101,9 +102,9 @@ public class CosmosViewTransferStore : IViewTransferStore
             .WithParameter("@queuedSince", queuedSince.ToUnixTimeSeconds())
             .WithParameter("@runningSince", runningSince.ToUnixTimeSeconds());
 
-        using var iterator = GetContainer(organization).GetItemQueryIterator<int>(
+        using var iterator = GetRepository(organization).Container.GetItemQueryIterator<int>(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = PartitionKeys.GetCosmosTransfer(project) });
+            requestOptions: new QueryRequestOptions { PartitionKey = PartitionKeys.GetCosmosTransfer(organization, project) });
 
         var count = 0;
 
@@ -118,9 +119,9 @@ public class CosmosViewTransferStore : IViewTransferStore
         return count;
     }
 
-    private Container GetContainer(string organization)
+    private OrganizationContainer GetRepository(string organization)
     {
-        return _repositoryProvider.GetOrganizationContainer(organization).Container;
+        return _repositoryProvider.GetOrganizationContainer(organization);
     }
 
     private ViewTransferEntity ToEntity(ViewTransferRecord record)
@@ -129,6 +130,7 @@ public class CosmosViewTransferStore : IViewTransferStore
         {
             Id = GetId(record.View, record.Kind, record.Id),
             PartitionKey = PartitionKeys.GetTransfer(record.Project),
+            Organization = record.Organization,
             ProjectName = record.Project,
             ViewName = record.View,
             TransferId = record.Id,

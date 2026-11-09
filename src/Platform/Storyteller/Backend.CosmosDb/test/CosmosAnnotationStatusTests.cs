@@ -49,7 +49,7 @@ public class CosmosAnnotationStatusTests(Startup startup)
         await CreateAsync("sbt.ln-null");
         await Container.PatchItemAsync<object>(
             $"{Constants.DefaultViewName}.sbt.ln-null",
-            PartitionKeys.GetCosmosSubject(Project, "ln-null"),
+            PartitionKeys.GetCosmosSubject(TestConstants.Organization, Project, "ln-null"),
             [PatchOperation.Set<object>("/IsDisabled", null)]);
 
         var active = await ListAsync("sbt.ln-");

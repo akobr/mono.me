@@ -64,7 +64,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         using var iterator = repository.Container.GetItemQueryIterator<DocumentListingRow>(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetSchemaPartitionKey(project)) });
+            requestOptions: repository.QueryOptions(GetSchemaPartitionKey(project)));
 
         var summaries = new List<ConfigurationSchemaSummary>();
 
@@ -184,14 +184,14 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     {
         var parsedKey = AnnotationKey.Parse(annotationKey);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
+        var partitionKey = repository.Key(GetSchemaPartitionKey(project));
         return await ResolveCombinedAsync(repository, partitionKey, view, parsedKey, schemaOverride: null);
     }
 
     public async Task ValidateContentAsync(string organization, string project, string view, string annotationKey, JObject content, ViewImportOverlay? overlay = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
+        var partitionKey = repository.Key(GetSchemaPartitionKey(project));
         var overlayLayers = overlay is null ? null : new OverlaySchemaLayers(overlay.Schemas, AuditStamp.Of(AuditActor.System, _timeProvider.GetUtcNow()), IsValidSchemaAsync);
         var combined = await ResolveCombinedAsync(repository, partitionKey, view, AnnotationKey.Parse(annotationKey), schemaOverride: null, overlayLayers: overlayLayers);
 
@@ -348,11 +348,11 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
             .WithParameter("@currentPrefix", currentPrefix)
             .WithParameter("@historyPrefix", historyPrefix);
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var histories = new DocumentHistories<(ViewDocumentKind Kind, string? Type, string? Key)>();
-        using var iterator = container.GetItemQueryStreamIterator(
+        using var iterator = repository.Container.GetItemQueryStreamIterator(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetSchemaPartitionKey(project)) });
+            requestOptions: repository.QueryOptions(GetSchemaPartitionKey(project)));
 
         while (iterator.HasMoreResults)
         {
@@ -389,7 +389,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         // annotation and descendant-type schemas follow their annotation, as configurations do: a deleted or missing
         // annotation leaves them out
         var states = await AnnotationItemStore.ReadStatesAsync(
-            container,
+            repository.Container,
             documents
                 .Select(document => document.Identity.Key)
                 .OfType<string>()
@@ -433,7 +433,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     private async Task<ConfigurationSchema?> ReadCurrentAsync(string organization, string project, SchemaIdentity identity)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
+        var partitionKey = repository.Key(GetSchemaPartitionKey(project));
         var entity = await ReadCurrentEntityAsync(repository, partitionKey, identity);
         return entity?.ToConfigurationSchema(identity.ModelType, identity.ModelKey);
     }
@@ -459,7 +459,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetSchemaPartitionKey(project);
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -502,6 +502,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
             var updated = new ConfigurationSchemaEntity
             {
                 PartitionKey = partitionKeyValue,
+                Organization = organization,
                 Id = identity.CurrentId,
                 AnnotationKey = identity.AnnotationKey,
                 Name = identity.Name,
@@ -570,7 +571,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetSchemaPartitionKey(project);
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -601,7 +602,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     private async Task<IReadOnlyCollection<ConfigurationVersion>> ListVersionsAsync(string organization, string project, SchemaIdentity identity)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
+        var partitionKey = repository.Key(GetSchemaPartitionKey(project));
         var feed = repository.Container.GetItemLinqQueryable<ConfigurationSchemaHistoryEntity>(
                 requestOptions: new QueryRequestOptions { PartitionKey = partitionKey })
             .Where(history => history.Id.StartsWith(identity.HistoryPrefix))
@@ -629,7 +630,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     private async Task<ConfigurationSchema?> ReadVersionAsync(string organization, string project, SchemaIdentity identity, uint version)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
+        var partitionKey = repository.Key(GetSchemaPartitionKey(project));
         var history = await repository.Container.TryReadItemAsync(
             identity.HistoryId(version),
             partitionKey,
@@ -671,7 +672,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     // re-create of an annotation empties its stored one, the archive's documents of keys without a stored one are
     // checked too, and the other layers are taken from the archive where it brings them.
     private async Task<IReadOnlyList<SchemaValidationError>> CollectComplianceErrorsAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         PartitionKey partitionKey,
         string project,
         string view,
@@ -685,7 +686,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         var imported = overlay is null ? [] : await ReadImportedConfigurationsAsync(overlay, identity);
         var errors = new List<SchemaValidationError>();
         var layerCache = new Dictionary<string, ConfigurationSchemaEntity?>();
-        var feed = QueryAffectedConfigurations(repository.Container, project, view, identity);
+        var feed = QueryAffectedConfigurations(repository, project, view, identity);
 
         while (feed.HasMoreResults)
         {
@@ -750,7 +751,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     }
 
     private async Task<CombinedConfigurationSchema?> ResolveCombinedAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         PartitionKey partitionKey,
         string view,
         AnnotationKey key,
@@ -790,7 +791,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
 
     // One layer: the schema being saved, else the one an import brings, else the stored one.
     private async Task<ConfigurationSchema?> ResolveLayerAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         PartitionKey partitionKey,
         SchemaIdentity identity,
         SchemaOverride? schemaOverride,
@@ -812,7 +813,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     }
 
     private Task<(ConfigurationSchemaEntity? Item, string? ETag)> ReadCurrentWithETagAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         PartitionKey partitionKey,
         SchemaIdentity identity)
     {
@@ -823,7 +824,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     }
 
     private async Task<ConfigurationSchemaEntity?> ReadLayerAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         PartitionKey partitionKey,
         SchemaIdentity identity,
         Dictionary<string, ConfigurationSchemaEntity?>? layerCache)
@@ -844,7 +845,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     }
 
     private async Task<ConfigurationSchemaEntity?> ReadCurrentEntityAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         PartitionKey partitionKey,
         SchemaIdentity identity)
     {
@@ -855,7 +856,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
     }
 
     private Task<(ConfigurationSchemaStateEntity? Item, string? ETag)> ReadStateAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         PartitionKey partitionKey,
         SchemaIdentity identity)
     {
@@ -865,9 +866,13 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
             stream => stream.DeserializeNewtonsoft<ConfigurationSchemaStateEntity>(_serializerOptions));
     }
 
-    private static FeedIterator<ConfigurationEntity> QueryAffectedConfigurations(Container container, string project, string view, SchemaIdentity identity)
+    private static FeedIterator<ConfigurationEntity> QueryAffectedConfigurations(OrganizationContainer repository, string project, string view, SchemaIdentity identity)
     {
-        var query = container.GetItemLinqQueryable<ConfigurationEntity>(allowSynchronousQueryExecution: false);
+        // organization-wide: the predicate on the organization is the isolation, the key prefix only routes
+        var organization = repository.Organization;
+        var query = repository.Container
+            .GetItemLinqQueryable<ConfigurationEntity>(allowSynchronousQueryExecution: false, requestOptions: repository.QueryOptions())
+            .Where(config => config.Organization == organization);
 
         if (identity.Kind == SchemaKind.Annotation)
         {
@@ -897,6 +902,7 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         var newState = new ConfigurationSchemaStateEntity
         {
             PartitionKey = schema.PartitionKey,
+            Organization = schema.Organization,
             Id = identity.StateId,
             AnnotationKey = schema.AnnotationKey,
             Name = schema.Name,

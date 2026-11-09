@@ -85,9 +85,11 @@ public partial class CosmosConfigurationService : IConfigurationService
         string? continuationToken = null)
     {
         var idPrefix = $"{view}.{EntityIdPrefixTypes.Configuration}.";
+
+        // organization-wide: the predicate on the organization is the isolation, the key prefix only routes
         var text = "SELECT c.AnnotationKey, c.Version, c.Modified, c.CalculatedContentHash, "
             + "(IS_OBJECT(c.Content) AND ARRAY_LENGTH(ObjectToArray(c.Content)) > 0) AS HasContent "
-            + "FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND STARTSWITH(c.id, @idPrefix) "
+            + "FROM c WHERE c.Organization = @organization AND STARTSWITH(c.PartitionKey, @projectPrefix) AND STARTSWITH(c.id, @idPrefix) "
             + "AND NOT IS_DEFINED(c.AnnotationDeletionId)";
 
         if (!string.IsNullOrWhiteSpace(annotationType))
@@ -100,17 +102,17 @@ public partial class CosmosConfigurationService : IConfigurationService
             text += " AND STARTSWITH(c.id, @keyPrefix)";
         }
 
-        var query = new QueryDefinition(text)
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var query = repository.WithOrganization(new QueryDefinition(text)
             .WithParameter("@projectPrefix", $"{project}.")
             .WithParameter("@idPrefix", idPrefix)
             .WithParameter("@typePrefix", $"{idPrefix}{annotationType?.Trim().ToLowerInvariant()}.")
-            .WithParameter("@keyPrefix", $"{idPrefix}{keyPrefix?.Trim()}");
+            .WithParameter("@keyPrefix", $"{idPrefix}{keyPrefix?.Trim()}"));
 
-        var repository = _repositoryProvider.GetOrganizationContainer(organization);
         using var iterator = repository.Container.GetItemQueryIterator<ConfigurationListingRow>(
             query,
             string.IsNullOrWhiteSpace(continuationToken) ? null : continuationToken,
-            new QueryRequestOptions { MaxItemCount = CosmosConstants.MaxItemCountPerPage });
+            repository.QueryOptions(maxItemCount: CosmosConstants.MaxItemCountPerPage));
 
         if (!iterator.HasMoreResults)
         {
@@ -277,8 +279,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         }
 
         var annotationKey = key.Annotation.ToString();
-        var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = key.GetCosmosPartitionKey();
 
         // TODO: [P3] optimize the query to ignore Content
         var feed = repository.Container.GetItemLinqQueryable<ConfigurationHistoryEntity>(
@@ -328,8 +329,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         }
 
         var annotationKey = key.Annotation.ToString();
-        var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = key.GetCosmosPartitionKey();
         var configId = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKey}";
         var configEntity = await repository.Container.TryReadItemAsync(
             configId,
@@ -395,7 +395,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         var annotationKey = key.Annotation.ToString();
         var id = GetConfigurationId(key);
         var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = key.GetCosmosPartitionKey();
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -418,6 +418,7 @@ public partial class CosmosConfigurationService : IConfigurationService
                 var configuration = new ConfigurationEntity
                 {
                     PartitionKey = partitionKeyValue,
+                    Organization = key.OrganizationName,
                     Id = id,
                     AnnotationKey = annotationKey,
                     IsServerSubstitutionDisabled = false,
@@ -593,18 +594,21 @@ public partial class CosmosConfigurationService : IConfigurationService
         string view,
         CancellationToken cancellationToken = default)
     {
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        var deletedKeys = await ReadDeletedAnnotationKeysAsync(container, project, view, cancellationToken);
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var deletedKeys = await ReadDeletedAnnotationKeysAsync(repository, project, view, cancellationToken);
         var currentPrefix = $"{view}.{EntityIdPrefixTypes.Configuration}.";
-        var query = new QueryDefinition(
+
+        // organization-wide: the predicate on the organization is the isolation, the key prefix only routes
+        var query = repository.WithOrganization(new QueryDefinition(
                 "SELECT c.id, c.AnnotationKey, c.Version, c.Content, c.Modified, c.AnnotationDeletionId FROM c "
-                + "WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND (STARTSWITH(c.id, @currentPrefix) OR STARTSWITH(c.id, @historyPrefix))")
+                + "WHERE c.Organization = @organization AND STARTSWITH(c.PartitionKey, @projectPrefix) "
+                + "AND (STARTSWITH(c.id, @currentPrefix) OR STARTSWITH(c.id, @historyPrefix))")
             .WithParameter("@projectPrefix", $"{project}.")
             .WithParameter("@currentPrefix", currentPrefix)
-            .WithParameter("@historyPrefix", $"{view}.{EntityIdPrefixTypes.ConfigurationVersion}.");
+            .WithParameter("@historyPrefix", $"{view}.{EntityIdPrefixTypes.ConfigurationVersion}."));
 
         var histories = new DocumentHistories<string>(StringComparer.Ordinal);
-        using var iterator = container.GetItemQueryStreamIterator(query);
+        using var iterator = repository.Container.GetItemQueryStreamIterator(query, requestOptions: repository.QueryOptions());
 
         while (iterator.HasMoreResults)
         {
@@ -816,7 +820,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // Merges the view template of the node's type. It is read on every calculation, after the node's item, so a cache
     // written under the ETag of that read never holds a template older than the read.
-    private async Task TryAutogeneratePropertiesAsync(JObject config, FullKey key, IContainerRepository repository)
+    private async Task TryAutogeneratePropertiesAsync(JObject config, FullKey key, OrganizationContainer repository)
     {
         var (template, _) = await ReadTemplateAsync(key, key.Annotation.TypeCode.ToLowerInvariant(), repository);
 
@@ -828,17 +832,17 @@ public partial class CosmosConfigurationService : IConfigurationService
         config.MergeInto(template.Content);
     }
 
-    private Task<(GenerateTemplateEntity? Item, string? ETag)> ReadTemplateAsync(FullKey key, string typeCode, IContainerRepository repository)
+    private Task<(GenerateTemplateEntity? Item, string? ETag)> ReadTemplateAsync(FullKey key, string typeCode, OrganizationContainer repository)
     {
         return repository.Container.TryReadItemWithETagAsync(
             CosmosConfigurationTemplateService.GetTemplateId(key.ViewName, typeCode),
-            PartitionKeys.GetCosmosTemplate(key.ProjectName),
+            PartitionKeys.GetCosmosTemplate(repository.Organization, key.ProjectName),
             stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
     }
 
     private async Task CollectHierarchyNodesAsync(
         InheritanceGraphNode node,
-        IContainerRepository repository,
+        OrganizationContainer repository,
         JObject result,
         HashSet<string> visited)
     {
@@ -871,11 +875,11 @@ public partial class CosmosConfigurationService : IConfigurationService
     // the item had before every read of the calculation: the item is read first, then the ancestors and the template.
     // An invalidation that patches the item meanwhile makes the cache write fail, and a missing item is created first,
     // so that it is either reached by an invalidation or created after it.
-    private async Task<JObject?> CalculateAndCacheConfigurationAsync(InheritanceGraphNode node, IContainerRepository repository)
+    private async Task<JObject?> CalculateAndCacheConfigurationAsync(InheritanceGraphNode node, OrganizationContainer repository)
     {
         var key = node.Key;
         var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = key.GetCosmosPartitionKey();
         var configEntryId = GetConfigurationId(key);
         var (configEntry, configEntryETag) = await ReadConfigurationAsync(repository, configEntryId, partitionKey);
 
@@ -904,6 +908,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         {
             Id = configEntryId,
             PartitionKey = partitionKeyValue,
+            Organization = key.OrganizationName,
             AnnotationKey = key.Annotation.ToString(),
             IsServerSubstitutionDisabled = false,
             Name = key.Annotation.Name,
@@ -940,7 +945,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // The effective document of the node: the documents of its ancestors, the template of its type, and its own
     // content, merged in this order.
-    private async Task<JObject> CalculateConfigurationAsync(InheritanceGraphNode node, IContainerRepository repository, ConfigurationEntity? configEntry)
+    private async Task<JObject> CalculateConfigurationAsync(InheritanceGraphNode node, OrganizationContainer repository, ConfigurationEntity? configEntry)
     {
         var config = new JObject();
 
@@ -968,7 +973,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // An invalidation (or any other write) since the ETag was taken means the calculation can be stale; then it is
     // not cached, and the next read calculates again.
-    private async Task TryCacheConfigurationAsync(IContainerRepository repository, ConfigurationEntity configEntry, string etag, JObject config)
+    private async Task TryCacheConfigurationAsync(OrganizationContainer repository, ConfigurationEntity configEntry, string etag, JObject config)
     {
         var hash = config.CalculateMurmurHash32Bits(_jsonSettingsProvider.GetSettings(JsonSettingNames.Unique));
 
@@ -981,7 +986,7 @@ public partial class CosmosConfigurationService : IConfigurationService
                     CalculatedContentHash = $"{hash:x8}",
                 },
                 configEntry.Id,
-                new PartitionKey(configEntry.PartitionKey),
+                repository.Key(configEntry.PartitionKey),
                 new ItemRequestOptions { IfMatchEtag = etag, EnableContentResponseOnWrite = false });
         }
         catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
@@ -990,7 +995,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         }
     }
 
-    private Task InvalidateConfigurationsAsync(FullKey key, IContainerRepository repository)
+    private Task InvalidateConfigurationsAsync(FullKey key, OrganizationContainer repository)
     {
         var targets = GetDescendantTargets(key);
         return targets.Count == 0
@@ -1112,7 +1117,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // Deletes the row: a written version is archived first, a cache row (version 0) is deleted directly. Returns the
     // deleted row, and the archive with its pending invalidation.
-    private async Task<(ConfigurationEntity? Deleted, PendingClear? Archived)> ForceDeleteConfigurationAsync(FullKey key, IContainerRepository repository)
+    private async Task<(ConfigurationEntity? Deleted, PendingClear? Archived)> ForceDeleteConfigurationAsync(FullKey key, OrganizationContainer repository)
     {
         var annotationKey = key.Annotation.ToString();
         var id = GetConfigurationId(key);
@@ -1165,7 +1170,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         throw ConcurrentChange(annotationKey);
     }
 
-    private Task<(ConfigurationEntity? Item, string? ETag)> ReadConfigurationAsync(IContainerRepository repository, string id, PartitionKey partitionKey)
+    private Task<(ConfigurationEntity? Item, string? ETag)> ReadConfigurationAsync(OrganizationContainer repository, string id, PartitionKey partitionKey)
     {
         return repository.Container.TryReadItemWithETagAsync(
             id,
@@ -1174,7 +1179,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     // Decides how the stored version is archived, see ArchivePlan.
-    private async Task<ArchivePlan> PlanArchiveAsync(FullKey key, IContainerRepository repository, ConfigurationEntity existing)
+    private async Task<ArchivePlan> PlanArchiveAsync(FullKey key, OrganizationContainer repository, ConfigurationEntity existing)
     {
         if (!IsWrittenVersion(existing))
         {
@@ -1205,7 +1210,7 @@ public partial class CosmosConfigurationService : IConfigurationService
             : new ArchivePlan(highest + 1, IsStored: false, highest + 2);
     }
 
-    private Task<ConfigurationHistoryEntity?> ReadHistoryAsync(FullKey key, IContainerRepository repository, ulong version)
+    private Task<ConfigurationHistoryEntity?> ReadHistoryAsync(FullKey key, OrganizationContainer repository, ulong version)
     {
         return repository.Container.TryReadItemAsync(
             GetHistoryId(key, version),
@@ -1235,7 +1240,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     // writer changed or deleted the row meanwhile.
     private async Task<ConfigurationEntity?> TryWriteNextVersionAsync(
         FullKey key,
-        IContainerRepository repository,
+        OrganizationContainer repository,
         ConfigurationEntity existing,
         string etag,
         JObject newContent,
@@ -1243,7 +1248,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     {
         var annotationKey = key.Annotation.ToString();
         var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = key.GetCosmosPartitionKey();
         var archive = await PlanArchiveAsync(key, repository, existing);
         var history = archive.Version is { } archivedVersion && !archive.IsStored
             ? ToHistory(key, existing, archivedVersion, pendingInvalidationId: null)
@@ -1292,14 +1297,14 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // Archives the stored version with the token of a pending invalidation and deletes the row in one batch, guarded
     // by the ETag of the read. Returns the archive, or null when another writer changed or deleted the row meanwhile.
-    private async Task<PendingClear?> TryArchiveAndDeleteAsync(FullKey key, IContainerRepository repository, ConfigurationEntity existing, string etag)
+    private async Task<PendingClear?> TryArchiveAndDeleteAsync(FullKey key, OrganizationContainer repository, ConfigurationEntity existing, string etag)
     {
         var annotationKey = key.Annotation.ToString();
         var partitionKeyValue = key.GetPartitionKey();
         var archive = await PlanArchiveAsync(key, repository, existing);
         var version = archive.Version ?? throw new InvalidOperationException("Only a written version is archived.");
         var archived = new PendingClear(GetHistoryId(key, version), NewInvalidationId(key), version);
-        var batch = repository.Container.CreateTransactionalBatch(new PartitionKey(partitionKeyValue));
+        var batch = repository.Container.CreateTransactionalBatch(key.GetCosmosPartitionKey());
 
         if (!archive.IsStored)
         {
@@ -1373,7 +1378,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     // Finishes what an earlier request left pending on the configuration, before a write looks at its input: the
     // invalidation of the row's last write, and of the clears that archived the versions of a missing or empty row.
     // True when it did something, which can have changed the row since it was read.
-    private async Task<bool> CompletePendingWorkAsync(FullKey key, IContainerRepository repository, ConfigurationEntity? existing)
+    private async Task<bool> CompletePendingWorkAsync(FullKey key, OrganizationContainer repository, ConfigurationEntity? existing)
     {
         var clears = existing is null || !existing.Content.HasValues
             ? await ReadPendingClearsAsync(key, repository)
@@ -1390,7 +1395,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // Reads the row for a write, after finishing what an earlier request left pending on it; finishing removes a token
     // from the row, so the row is read again for the ETag that guards the write.
-    private async Task<(ConfigurationEntity? Item, string? ETag)> ReadForWriteAsync(FullKey key, IContainerRepository repository, string id, PartitionKey partitionKey)
+    private async Task<(ConfigurationEntity? Item, string? ETag)> ReadForWriteAsync(FullKey key, OrganizationContainer repository, string id, PartitionKey partitionKey)
     {
         var (existingConfiguration, etag) = await ReadConfigurationAsync(repository, id, partitionKey);
         await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
@@ -1406,7 +1411,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     // Invalidates the descendants of a write and removes its token from the row; a write without a token has none.
-    private Task CompleteInvalidationAsync(FullKey key, IContainerRepository repository, string? token)
+    private Task CompleteInvalidationAsync(FullKey key, OrganizationContainer repository, string? token)
     {
         return token is null
             ? Task.CompletedTask
@@ -1415,7 +1420,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // Invalidates the descendants of the clears that archived the versions of the configuration and removes their
     // tokens: of the given one and of every one still pending. Without any, only an unconditional call invalidates.
-    private async Task CompletePendingClearsAsync(FullKey key, IContainerRepository repository, PendingClear? archived, bool always = false)
+    private async Task CompletePendingClearsAsync(FullKey key, OrganizationContainer repository, PendingClear? archived, bool always = false)
     {
         var clears = await ReadPendingClearsAsync(key, repository);
 
@@ -1434,7 +1439,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // The tokens are known before the invalidation starts, so a write or clear that commits during it keeps its own.
     // A failed invalidation keeps every token, a later request finishes it.
-    private async Task InvalidateAndCompleteAsync(FullKey key, IContainerRepository repository, string? rowToken, IReadOnlyCollection<PendingClear> clears)
+    private async Task InvalidateAndCompleteAsync(FullKey key, OrganizationContainer repository, string? rowToken, IReadOnlyCollection<PendingClear> clears)
     {
         try
         {
@@ -1476,7 +1481,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     // A newer write or clear sets its own token, so the filter never removes one whose invalidation is still owed.
-    private async Task RemovePendingInvalidationAsync(IContainerRepository repository, string id, PartitionKey partitionKey, string filterPredicate)
+    private async Task RemovePendingInvalidationAsync(OrganizationContainer repository, string id, PartitionKey partitionKey, string filterPredicate)
     {
         using var response = await repository.Container.PatchItemStreamAsync(
             id,
@@ -1496,7 +1501,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     // The archives of the configuration whose clear has not finished its invalidation.
-    private static async Task<List<PendingClear>> ReadPendingClearsAsync(FullKey key, IContainerRepository repository)
+    private static async Task<List<PendingClear>> ReadPendingClearsAsync(FullKey key, OrganizationContainer repository)
     {
         if (key.Annotation.Type == AnnotationType.UnitOfExecution)
         {
@@ -1534,6 +1539,7 @@ public partial class CosmosConfigurationService : IConfigurationService
         return new ConfigurationHistoryEntity
         {
             PartitionKey = key.GetPartitionKey(),
+            Organization = key.OrganizationName,
             Id = GetHistoryId(key, version),
             AnnotationKey = key.Annotation.ToString(),
             Version = version,
@@ -1575,7 +1581,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     // The highest version in the history of the configuration, 0 without one.
-    private static async Task<ulong> GetHighestArchivedVersionAsync(FullKey key, IContainerRepository repository)
+    private static async Task<ulong> GetHighestArchivedVersionAsync(FullKey key, OrganizationContainer repository)
     {
         var maxVersionResponse = await repository.Container.GetItemLinqQueryable<ConfigurationHistoryEntity>(
                 requestOptions: new QueryRequestOptions { PartitionKey = key.GetCosmosPartitionKey() })
@@ -1587,17 +1593,18 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     // Keys of the soft-deleted annotations of a view, whose configuration versions are hidden.
-    private static async Task<HashSet<string>> ReadDeletedAnnotationKeysAsync(Container container, string project, string view, CancellationToken cancellationToken)
+    private static async Task<HashSet<string>> ReadDeletedAnnotationKeysAsync(OrganizationContainer repository, string project, string view, CancellationToken cancellationToken)
     {
-        var query = new QueryDefinition(
-                "SELECT VALUE c.AnnotationKey FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND c.ProjectName = @project "
-                + "AND c.ViewName = @view AND IS_DEFINED(c.AnnotationType) AND IS_DEFINED(c.Deletion)")
+        // organization-wide: the predicate on the organization is the isolation, the key prefix only routes
+        var query = repository.WithOrganization(new QueryDefinition(
+                "SELECT VALUE c.AnnotationKey FROM c WHERE c.Organization = @organization AND STARTSWITH(c.PartitionKey, @projectPrefix) "
+                + "AND c.ProjectName = @project AND c.ViewName = @view AND IS_DEFINED(c.AnnotationType) AND IS_DEFINED(c.Deletion)")
             .WithParameter("@projectPrefix", $"{project}.")
             .WithParameter("@project", project)
-            .WithParameter("@view", view);
+            .WithParameter("@view", view));
 
         var keys = new HashSet<string>(StringComparer.Ordinal);
-        using var iterator = container.GetItemQueryIterator<string>(query);
+        using var iterator = repository.Container.GetItemQueryIterator<string>(query, requestOptions: repository.QueryOptions());
 
         while (iterator.HasMoreResults)
         {
@@ -1622,7 +1629,7 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     // A soft-deleted annotation's configuration cannot change until a restore.
-    private static async Task EnsureAnnotationNotDeletedAsync(FullKey key, IContainerRepository repository, ConfigurationEntity? existingConfiguration)
+    private static async Task EnsureAnnotationNotDeletedAsync(FullKey key, OrganizationContainer repository, ConfigurationEntity? existingConfiguration)
     {
         var isDeleted = existingConfiguration is not null
             ? existingConfiguration.AnnotationDeletionId is not null
@@ -1638,7 +1645,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // Configuration changes appear in the annotation's history as version references. Best effort: the configuration
     // is already written, so a failed append is logged and the request still succeeds.
-    private async Task AuditConfigurationAsync(FullKey key, IContainerRepository repository, AuditActor? actor, AnnotationAuditAction action, ulong version)
+    private async Task AuditConfigurationAsync(FullKey key, OrganizationContainer repository, AuditActor? actor, AnnotationAuditAction action, ulong version)
     {
         if (actor is null || _auditStore is null)
         {

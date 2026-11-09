@@ -15,6 +15,10 @@ public record class MachineCertificateEntity
 
     public required string PartitionKey { get; init; }
 
+    // The organization of the item: the first level of the hierarchical partition key of the container
+    // organizations (/Organization, /PartitionKey). Cosmos DB refuses a write whose key does not match it.
+    public required string Organization { get; init; }
+
     [JsonProperty("id")]
     [JsonPropertyName("id")]
     public required string Id { get; init; }
@@ -66,9 +70,10 @@ public record class MachineCertificateEntity
         LastRenewalAt,
         CredentialKind);
 
-    public static MachineCertificateEntity FromRecord(string partitionKey, CertificateRecord record, DateTimeOffset now) => new()
+    public static MachineCertificateEntity FromRecord(string organization, string partitionKey, CertificateRecord record, DateTimeOffset now) => new()
     {
         PartitionKey = partitionKey,
+        Organization = organization,
         Id = GetId(record.Thumbprint),
         TimeToLiveInSeconds = (int)Math.Max(60, (record.NotAfter.AddDays(30) - now).TotalSeconds),
         MachineAccessId = record.MachineAccessId,

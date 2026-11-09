@@ -41,6 +41,7 @@ internal static class KeyValueMappings
     public static KeyValueVersionEntity ToVersion(this KeyValueEntity e, int timeToLiveInSeconds) => new()
     {
         PartitionKey = e.PartitionKey,
+        Organization = e.Organization,
         Id = $"{EntityIdPrefixTypes.KeyValueVersion}.{KeyValueRules.Normalize(e.Key)}.{e.Version}",
         TimeToLiveInSeconds = timeToLiveInSeconds,
         ProjectName = e.ProjectName,

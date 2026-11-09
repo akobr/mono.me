@@ -14,26 +14,27 @@ using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
 namespace _42.Platform.Storyteller.Annotating;
 
-// Loads the items of annotations from one organization container.
+// Loads the items of annotations of one organization from the container organizations.
 internal sealed class AnnotationItemStore
 {
-    private readonly Container _container;
+    private readonly OrganizationContainer _repository;
     private readonly AnnotationItemSerializer _serializer;
 
-    public AnnotationItemStore(Container container, AnnotationItemSerializer serializer)
+    public AnnotationItemStore(OrganizationContainer repository, AnnotationItemSerializer serializer)
     {
-        _container = container;
+        _repository = repository;
         _serializer = serializer;
     }
 
-    public Container Container => _container;
+    // The organization of the store, the keys of its items and its batches (BatchPlan).
+    public OrganizationContainer Repository => _repository;
 
-    // Whether the annotation item exists and is active, without deserializing it.
+    // Whether the annotation item exists and is active, without deserializing it. The key carries its organization.
     public static async Task<AnnotationItemState> ReadStateAsync(Container container, FullKey key)
     {
         using var response = await container.ReadItemStreamAsync(
             AnnotationItemIds.Annotation(key.ViewName, key.Annotation.ToString()),
-            new PartitionKey(key.GetPartitionKey()));
+            key.GetCosmosPartitionKey());
 
         if (response.StatusCode == HttpStatusCode.NotFound || response.Content is null)
         {
@@ -49,7 +50,8 @@ internal sealed class AnnotationItemStore
             : AnnotationItemState.Active;
     }
 
-    // The states of the annotation items of the keys, by key, in one request and without deserializing them.
+    // The states of the annotation items of the keys, by key, in one request and without deserializing them. Each key
+    // carries its organization.
     public static async Task<IReadOnlyDictionary<string, AnnotationItemState>> ReadStatesAsync(
         Container container,
         IEnumerable<FullKey> keys,
@@ -67,7 +69,7 @@ internal sealed class AnnotationItemStore
             if (keysById.TryAdd(id, keyText))
             {
                 states[keyText] = AnnotationItemState.Missing;
-                items.Add((id, new PartitionKey(key.GetPartitionKey())));
+                items.Add((id, key.GetCosmosPartitionKey()));
             }
         }
 
@@ -99,7 +101,7 @@ internal sealed class AnnotationItemStore
     public async Task<AnnotationNode> LoadAsync(FullKey key, bool withConfiguration = true, bool withAudit = true)
     {
         var node = new AnnotationNode(key);
-        var partitionKey = new PartitionKey(node.PartitionKey);
+        var partitionKey = _repository.Key(node.PartitionKey);
 
         var annotationTask = ReadDocumentAsync(node.AnnotationId, partitionKey);
         var configurationTask = withConfiguration ? ReadDocumentAsync(node.ConfigurationId, partitionKey) : Task.FromResult<(JsonDocument?, string?)>((null, null));
@@ -137,7 +139,7 @@ internal sealed class AnnotationItemStore
     // Completes a node loaded without its configuration or audit, once it is clear that the write needs them.
     public async Task LoadDetailsAsync(AnnotationNode node, bool withConfiguration, bool withAudit)
     {
-        var partitionKey = new PartitionKey(node.PartitionKey);
+        var partitionKey = _repository.Key(node.PartitionKey);
         var configurationTask = withConfiguration ? ReadDocumentAsync(node.ConfigurationId, partitionKey) : Task.FromResult<(JsonDocument?, string?)>((null, null));
         var auditTask = withAudit ? ReadDocumentAsync(node.AuditId, partitionKey) : Task.FromResult<(JsonDocument?, string?)>((null, null));
 
@@ -220,7 +222,7 @@ internal sealed class AnnotationItemStore
     // Whether an item exists, by a point read of its stream.
     public async Task<bool> ExistsAsync(string id, string partitionKey)
     {
-        using var response = await _container.ReadItemStreamAsync(id, new PartitionKey(partitionKey));
+        using var response = await _repository.Container.ReadItemStreamAsync(id, _repository.Key(partitionKey));
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -246,8 +248,8 @@ internal sealed class AnnotationItemStore
         }
 
         var byId = requested.ToDictionary(node => node.AnnotationId, StringComparer.Ordinal);
-        using var response = await _container.ReadManyItemsStreamAsync(
-            requested.Select(node => (node.AnnotationId, new PartitionKey(node.PartitionKey))).ToList());
+        using var response = await _repository.Container.ReadManyItemsStreamAsync(
+            requested.Select(node => (node.AnnotationId, _repository.Key(node.PartitionKey))).ToList());
 
         EnsureSuccess(response);
 
@@ -275,13 +277,15 @@ internal sealed class AnnotationItemStore
         return found;
     }
 
-    // One page of annotation items of a query, with the continuation of the next page.
+    // One page of annotation items of an organization-wide query, with the continuation of the next page. The text of
+    // the query has "c.Organization = @organization" (the isolation); the store adds the parameter and routes the
+    // query by the organization's key prefix.
     public async Task<(IReadOnlyList<AnnotationEntity> Entities, string? ContinuationToken)> QueryPageAsync(QueryDefinition query, string? continuationToken)
     {
-        using var iterator = _container.GetItemQueryStreamIterator(
-            query,
+        using var iterator = _repository.Container.GetItemQueryStreamIterator(
+            _repository.WithOrganization(query),
             string.IsNullOrWhiteSpace(continuationToken) ? null : continuationToken,
-            new QueryRequestOptions { MaxItemCount = CosmosConstants.MaxItemCountPerPage });
+            _repository.QueryOptions(maxItemCount: CosmosConstants.MaxItemCountPerPage));
 
         if (!iterator.HasMoreResults)
         {
@@ -338,7 +342,7 @@ internal sealed class AnnotationItemStore
 
     private async Task<(JsonDocument? Document, string? ETag)> ReadDocumentAsync(string id, PartitionKey partitionKey)
     {
-        using var response = await _container.ReadItemStreamAsync(id, partitionKey);
+        using var response = await _repository.Container.ReadItemStreamAsync(id, partitionKey);
 
         if (response.StatusCode == HttpStatusCode.NotFound || response.Content is null)
         {
@@ -365,9 +369,10 @@ internal sealed class AnnotationItemStore
         text.Append(string.Join(" OR ", prefixes.Select((_, index) => $"STARTSWITH(c.id, @p{index})")));
         text.Append(')');
 
+        // across the partitions of the project: an organization-wide query, isolated by its organization
         if (scope.PartitionKey is null)
         {
-            text.Append(" AND STARTSWITH(c.PartitionKey, @partitionPrefix)");
+            text.Append($" AND c.Organization = {OrganizationContainer.OrganizationParameter} AND STARTSWITH(c.PartitionKey, @partitionPrefix)");
         }
 
         var query = new QueryDefinition(text.ToString());
@@ -379,16 +384,13 @@ internal sealed class AnnotationItemStore
 
         if (scope.PartitionKey is null)
         {
-            query = query.WithParameter("@partitionPrefix", scope.PartitionPrefix);
+            query = _repository.WithOrganization(query).WithParameter("@partitionPrefix", scope.PartitionPrefix);
         }
 
-        using var iterator = _container.GetItemQueryStreamIterator(
+        // one partition, or the organization's key prefix when the scope spans partitions
+        using var iterator = _repository.Container.GetItemQueryStreamIterator(
             query,
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = scope.PartitionKey is null ? null : new PartitionKey(scope.PartitionKey),
-                MaxItemCount = CosmosConstants.MaxItemCountPerPage,
-            });
+            requestOptions: _repository.QueryOptions(scope.PartitionKey, CosmosConstants.MaxItemCountPerPage));
 
         while (iterator.HasMoreResults)
         {

@@ -84,7 +84,7 @@ public class KeyValueEndToEndTests(Startup startup)
         (await keyValues.GetVersionAsync(Org, project, View, "db.password", 1, reveal: true, admin))!.Value.Should().Be("hunter2");
 
         var container = services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(Org).Container;
-        using var response = await container.ReadItemStreamAsync("kv.db.password", PartitionKeys.GetCosmosKeyValues(project, View));
+        using var response = await container.ReadItemStreamAsync("kv.db.password", PartitionKeys.GetCosmosKeyValues(Org, project, View));
         using var reader = new StreamReader(response.Content, Encoding.UTF8);
         var raw = await reader.ReadToEndAsync();
 
@@ -128,7 +128,7 @@ public class KeyValueEndToEndTests(Startup startup)
         policy.Version.Should().Be(1);
 
         var container = repositories.GetOrganizationContainer(Org).Container;
-        using var response = await container.ReadItemStreamAsync("kv.db.password", PartitionKeys.GetCosmosKeyValues(project, View));
+        using var response = await container.ReadItemStreamAsync("kv.db.password", PartitionKeys.GetCosmosKeyValues(Org, project, View));
         using var reader = new StreamReader(response.Content, Encoding.UTF8);
         var raw = await reader.ReadToEndAsync();
         raw.Should().Contain($"/keys/{keyName}/{policy.Standard.CurrentKeyVersion}\"", "the envelope was wrapped with the recorded version");
