@@ -39,7 +39,7 @@ The configuration value `Cosmos:Mode` picks the emulator:
 | Mode | Emulator | Use it when |
 |---|---|---|
 | `container` (default) | The Linux vNext emulator in a persistent container with the named data volume `platform-cosmos-vnext-data` and its Data Explorer (a link on the `cosmos` resource); x64 and Arm, starts in seconds | Everyday work; nothing to install besides Docker |
-| `local` | Windows Cosmos DB Emulator installed on the machine, reached through `ConnectionStrings:cosmos` | Request charges and indexing as in Azure (the vNext emulator charges a flat 1 RU and applies no range indexes) |
+| `local` | Windows Cosmos DB Emulator installed on the machine, reached through `ConnectionStrings:cosmos` | Request charges and indexing as in Azure (the vNext emulator charges a flat 1 RU, applies no range indexes and answers an ordered listing, such as the key-values of a view, in one page) |
 
 The platform keeps every organization in one container, `organizations`, keyed by `/Organization` and then `/PartitionKey` (see [annotation-lifecycle.md](../Storyteller/annotation-lifecycle.md#containers)). The container mode moved from the classic Linux emulator (volume `platform-cosmos-data`) to the vNext emulator with that change (424-230), and its new volume starts empty: run `db-creator` once after the first start. The old volume is no longer used; remove it with `docker volume rm platform-cosmos-data` when you don't need its data. Data of the earlier layout is not migrated: DbCreator refuses a database with `org.*` containers, so delete the database `42.Platform.2S` (or use an empty volume) and run `db-creator` again.
 

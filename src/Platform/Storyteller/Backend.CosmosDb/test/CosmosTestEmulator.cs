@@ -16,7 +16,8 @@ public enum CosmosEmulatorKind
     Local,
 
     // The Linux vNext emulator in a container: the default with STORYTELLER_TESTS_USE_CONTAINER=true. No request
-    // charges (a flat 1 RU), no range or composite indexes, and replacing container settings does nothing.
+    // charges (a flat 1 RU), no range or composite indexes, no paging of a query with ORDER BY (one page, whatever its
+    // MaxItemCount), and replacing container settings does nothing.
     VNext,
 
     // The classic Linux emulator in a container (STORYTELLER_TESTS_EMULATOR=classic): the engine of the service, with
@@ -30,7 +31,8 @@ public sealed class CosmosTestEmulator
 {
     public const string WellKnownKey = "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
 
-    // The trait of the tests that only the engine of the service answers right: request charges, indexes, container settings.
+    // The trait of the tests that only the engine of the service answers right: request charges, indexes, container settings,
+    // the paging of ordered queries.
     public const string TraitName = "Emulator";
     public const string ClassicTrait = "Classic";
 
@@ -54,7 +56,7 @@ public sealed class CosmosTestEmulator
     // Request charges, indexing policies and container settings behave as in Azure.
     public bool IsLikeTheService => Kind != CosmosEmulatorKind.VNext;
 
-    public static string SkipReasonOnVNext => "The vNext emulator has no request charges, no range indexes, and does not apply container settings; run with STORYTELLER_TESTS_EMULATOR=classic or the local emulator.";
+    public static string SkipReasonOnVNext => "The vNext emulator has no request charges, no range indexes, does not page a query with ORDER BY, and does not apply container settings; run with STORYTELLER_TESTS_EMULATOR=classic or the local emulator.";
 
     // reuseLabel keeps one reused emulator per test module: the cleanup deletes the platform database, and Testcontainers'
     // reuse is not safe when two modules start the same container at once (two containers, one hash).

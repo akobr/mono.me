@@ -411,8 +411,12 @@ public class CosmosKeyValueServiceTests(Startup startup)
     }
 
     [Fact]
+    [Trait(CosmosTestEmulator.TraitName, CosmosTestEmulator.ClassicTrait)]
     public async Task Listing_Pages()
     {
+        // the vNext emulator ignores the page size of a query with ORDER BY and answers every item in one page
+        Assert.SkipUnless(Context.Emulator.IsLikeTheService, CosmosTestEmulator.SkipReasonOnVNext);
+
         var project = NewProject("paging");
         var document = new KeyValueDocument
         {

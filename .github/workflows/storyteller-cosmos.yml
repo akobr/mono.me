@@ -2,7 +2,8 @@ name: Storyteller Cosmos DB
 
 # The Cosmos DB suites of the Storyteller backend (Backend.CosmosDb/test and Access.Certificates/testint) on
 # Testcontainers emulators. The vNext job is the everyday run: the light Linux emulator, without the tests that only the
-# engine of the service answers right (the trait Emulator=Classic: request charges, stored sizes, expiry timing). The
+# engine of the service answers right (the trait Emulator=Classic: request charges, stored sizes, expiry timing, the
+# paging of a query with ORDER BY, which vNext answers in one page). The
 # classic job runs the whole suites on the classic Linux emulator, which charges request units and enforces the indexing
 # policy like Azure, so an ORDER BY on an excluded path or a costlier query fails here. Spec:
 # docs/Platform/Storyteller/specs/2026-11-09 Shared Organization Container.md, sections 8 and 10. On a pull request the
