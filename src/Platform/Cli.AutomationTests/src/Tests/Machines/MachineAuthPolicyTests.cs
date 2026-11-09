@@ -45,6 +45,7 @@ public sealed class MachineAuthPolicyTests : MachineAccessTest
     [UserRole(Role.Owner)]
     [DisposableProject]
     [Covers("account machine machine-auth", "-k", "--credential-kind", "-d", "--default-kind", "-l", "--lifetime-days", "--credential-kind=ApiKey", "--credential-kind=Certificate", "--credential-kind=CertificateAndApiKey", "--credential-kind=ClientCredentials", "--credential-kind=Federated", "--default-kind=ApiKey", "--default-kind=Certificate", "--default-kind=CertificateAndApiKey", "--default-kind=ClientCredentials", "--default-kind=Federated")]
+    [CertificateKinds]
     public async Task MachineAuth_Set_ChangesPolicy()
     {
         await CreateDisposableProjectAsync();

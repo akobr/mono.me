@@ -27,6 +27,7 @@ public sealed partial class MachineCertificateTests : PlatformTest
     [TestCase(182)]
     [UserRole(Role.Owner)]
     [DisposableProject]
+    [CertificateKinds]
     public async Task Certificates_CertificateMachine_DownloadsPfx()
     {
         var project = await CreateDisposableProjectAsync();
@@ -76,6 +77,7 @@ public sealed partial class MachineCertificateTests : PlatformTest
     [TestCase(183)]
     [UserRole(Role.Owner)]
     [DisposableProject]
+    [CertificateKinds]
     public async Task Certificates_SharedCertificateMachine_ResetsApiKeyOnly()
     {
         var project = await CreateDisposableProjectAsync();
@@ -125,6 +127,7 @@ public sealed partial class MachineCertificateTests : PlatformTest
     [TestCase(184)]
     [UserRole(Role.Owner)]
     [DisposableProject]
+    [CertificateKinds]
     public async Task Certificates_IssueSharedCertificate_DownloadsAndRevokes()
     {
         var project = await CreateDisposableProjectAsync();

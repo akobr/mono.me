@@ -23,6 +23,7 @@ public sealed partial class SettingsMachineAuthenticationTests : PlatformTest
     [TestCase(157)]
     [UserRole(Role.Owner)]
     [DisposableProject]
+    [CertificateKinds]
     public async Task MachinePolicy_ChangeKindsAndLifetime_IsKept()
     {
         var project = await CreateDisposableProjectAsync();

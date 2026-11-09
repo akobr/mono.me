@@ -169,6 +169,7 @@ public sealed class KeyValueSecretTests : CliTest
     [UserRole(Role.Owner)]
     [DisposableProject]
     [Covers("story kv get", "--reveal")]
+    [CertificateKinds]
     public async Task Kv_MachineSecrets_ScopeAndMtls()
     {
         await CreateDisposableProjectAsync();

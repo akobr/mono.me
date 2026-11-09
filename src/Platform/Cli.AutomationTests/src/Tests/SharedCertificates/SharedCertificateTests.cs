@@ -21,6 +21,7 @@ public sealed class SharedCertificateTests : MachineAccessTest
     [UserRole(Role.Admin)]
     [Covers("account shared-cert")]
     [Covers("account certificate")]
+    [CertificateKinds]
     public async Task SharedCert_List_ShowsCertificates()
     {
         var certificate = await IssueSharedCertificateAsync(CliData.LabelName(), "l.pfx");
@@ -47,6 +48,7 @@ public sealed class SharedCertificateTests : MachineAccessTest
     [UserRole(Role.Owner)]
     [DisposableProject]
     [Covers("account shared-cert issue", "arg0", "-l", "--lifetime-days", "-o", "--output")]
+    [CertificateKinds]
     public async Task SharedCert_Issue_WritesPfx()
     {
         await CreateDisposableProjectAsync();
@@ -80,6 +82,7 @@ public sealed class SharedCertificateTests : MachineAccessTest
     [UserRole(Role.Owner)]
     [DisposableProject]
     [Covers("account shared-cert create")]
+    [CertificateKinds]
     public async Task SharedCert_CreateAlias_Issues()
     {
         await CreateDisposableProjectAsync();
@@ -110,6 +113,7 @@ public sealed class SharedCertificateTests : MachineAccessTest
     [DisposableProject]
     [Covers("account shared-cert revoke", "arg0")]
     [Covers("account shared-cert delete", "arg0")]
+    [CertificateKinds]
     public async Task SharedCert_Revoke_StopsSignIn()
     {
         await CreateDisposableProjectAsync();
@@ -167,6 +171,7 @@ public sealed class SharedCertificateTests : MachineAccessTest
     [Covers("account shared-cert issue", "--projectKey", "-v", "--view")]
     [Covers("account shared-cert", "--projectKey", "-v", "--view")]
     [Covers("account shared-cert revoke", "--projectKey", "-v", "--view")]
+    [CertificateKinds]
     public async Task SharedCertCommands_ContextOptions_TargetProject()
     {
         var projectA = Target.ProjectKey;
