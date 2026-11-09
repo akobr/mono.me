@@ -29,7 +29,7 @@ public class MachineResetTests(CosmosFixture fixture)
 
     private static readonly MachineScope[] Granted = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead];
 
-    private static readonly PartitionKey PartitionKey = new($"{Project}.access");
+    private static readonly PartitionKey PartitionKey = OrganizationKeys.Key(Organization, $"{Project}.access");
 
     private IApiKeyValidator Validator => fixture.Services.GetRequiredService<IApiKeyValidator>();
 
@@ -673,7 +673,8 @@ public class MachineResetTests(CosmosFixture fixture)
                 return response;
             });
 
-        var repository = Mock.Of<IContainerRepository>(r => r.Container == container.Object);
+        // a real scope over the wrapper (the class is sealed): the keys are the organization's, the calls reach the wrapper
+        var repository = new OrganizationContainer(Organization, container.Object);
         return Mock.Of<IContainerRepositoryProvider>(p => p.GetOrganizationContainer(Organization) == repository);
     }
 
@@ -691,7 +692,6 @@ public class MachineResetTests(CosmosFixture fixture)
     {
         return new CosmosAccessService(
             repositoryProvider ?? fixture.Services.GetRequiredService<IContainerRepositoryProvider>(),
-            fixture.Services.GetRequiredService<IContainerFactory>(),
             fixture.Services.GetRequiredService<IOptions<JsonSerializerOptions>>(),
             router);
     }

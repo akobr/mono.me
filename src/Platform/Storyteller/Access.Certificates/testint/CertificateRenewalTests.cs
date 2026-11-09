@@ -3,7 +3,6 @@ using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
-using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -118,11 +117,12 @@ public class CertificateRenewalTests(CosmosFixture fixture)
         var repositoryProvider = fixture.Services.GetRequiredService<IContainerRepositoryProvider>();
         var repository = repositoryProvider.GetOrganizationContainer(Organization);
         var partitionKeyValue = $"{Project}.access";
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
 
         var entity = new MachineAccessEntity
         {
             PartitionKey = partitionKeyValue,
+            Organization = Organization,
             Id = machineId,
             ObjectId = machineId,
             AccessKey = "***",
@@ -161,11 +161,12 @@ public class CertificateRenewalTests(CosmosFixture fixture)
         var repositoryProvider = fixture.Services.GetRequiredService<IContainerRepositoryProvider>();
         var repository = repositoryProvider.GetOrganizationContainer(Organization);
         var partitionKeyValue = $"{Project}.access";
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
 
         var entity = new MachineAccessEntity
         {
             PartitionKey = partitionKeyValue,
+            Organization = Organization,
             Id = machineId,
             ObjectId = machineId,
             AccessKey = "***",

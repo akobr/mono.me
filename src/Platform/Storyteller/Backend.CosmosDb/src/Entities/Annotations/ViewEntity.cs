@@ -11,6 +11,10 @@ public record class ViewEntity
 
     public required string PartitionKey { get; init; }
 
+    // The organization of the item: the first level of the hierarchical partition key of the container
+    // organizations (/Organization, /PartitionKey). Cosmos DB refuses a write whose key does not match it.
+    public required string Organization { get; init; }
+
     [JsonProperty("id")]
     [JsonPropertyName("id")]
     public string Id => $"{IdPrefix}{Name}";

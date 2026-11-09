@@ -146,6 +146,6 @@ public class AuditStampTests(Startup startup)
 
     private async Task<JObject> ReadRawAsync(string id, string partitionKey)
     {
-        return (await Container.ReadItemAsync<JObject>(id, new PartitionKey(partitionKey))).Resource;
+        return (await Container.ReadItemAsync<JObject>(id, OrganizationKeys.Key(Organization, partitionKey))).Resource;
     }
 }

@@ -4,5 +4,6 @@ public interface IContainerRepositoryProvider
 {
     IContainerRepository GetCore();
 
-    IContainerRepository GetOrganizationContainer(string organizationName);
+    // The data of one organization in the shared container "organizations".
+    OrganizationContainer GetOrganizationContainer(string organizationName);
 }

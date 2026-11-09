@@ -14,7 +14,7 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 public class ContainerRepositoryProviderTests
 {
     [Fact]
-    public async Task ParallelCalls_GetOneRepositoryPerContainer()
+    public async Task ParallelCalls_ShareOneContainerForEveryOrganization()
     {
         var client = new Mock<CosmosClient>();
         client
@@ -28,10 +28,12 @@ public class ContainerRepositoryProviderTests
             () => (Name: names[index % names.Length], Repository: provider.GetOrganizationContainer(names[index % names.Length])),
             TestContext.Current.CancellationToken)));
 
+        repositories.Select(pair => pair.Repository.Container).Distinct().Should().ContainSingle()
+            .Which.Id.Should().Be(CosmosConstants.OrganizationsContainerName);
+
         foreach (var group in repositories.GroupBy(pair => pair.Name))
         {
-            group.Select(pair => pair.Repository).Distinct().Should().ContainSingle();
-            group.First().Repository.Container.Id.Should().Be($"{CosmosConstants.OrganizationContainerNamePrefix}{group.Key}");
+            group.Should().OnlyContain(pair => pair.Repository.Organization == group.Key);
         }
 
         provider.GetCore().Container.Id.Should().Be(CosmosConstants.CoreContainerName);

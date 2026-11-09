@@ -70,7 +70,7 @@ internal static class ConfigurationCacheInvalidator
     /// <summary>
     /// Invalidates cached calculations of all configurations in the view which merge the view template of the given type.
     /// </summary>
-    public static Task InvalidateForTemplateAsync(IContainerRepository repository, string projectName, string viewName, string typeCode)
+    public static Task InvalidateForTemplateAsync(OrganizationContainer repository, string projectName, string viewName, string typeCode)
     {
         var targets = GetTemplateAffectedTypeCodes(typeCode)
             .Select(code => new InvalidationTarget(code, BuildTemplatePredicate(projectName, viewName, [code])))
@@ -85,7 +85,7 @@ internal static class ConfigurationCacheInvalidator
     /// reads only ancestors that are patched already, and an item created after its level was queried was created
     /// after them. A failure stops before the next level.
     /// </summary>
-    public static async Task InvalidateAsync(IContainerRepository repository, IReadOnlyCollection<InvalidationTarget> targets)
+    public static async Task InvalidateAsync(OrganizationContainer repository, IReadOnlyCollection<InvalidationTarget> targets)
     {
         foreach (var level in targets.GroupBy(target => GetLevel(target.TypeCode)).OrderBy(level => level.Key))
         {
@@ -109,14 +109,18 @@ internal static class ConfigurationCacheInvalidator
             : int.MaxValue;
     }
 
-    private static async Task CollectAsync(IContainerRepository repository, InvalidationTarget target, Dictionary<string, List<string>> groups)
+    private static async Task CollectAsync(OrganizationContainer repository, InvalidationTarget target, Dictionary<string, List<string>> groups)
     {
+        // a target across partitions is routed by the organization's key prefix; the predicate on the organization
+        // keeps the items of other organizations out, the prefix alone does not guarantee it
+        var organization = repository.Organization;
         var feed = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
                 requestOptions: new QueryRequestOptions
                 {
-                    PartitionKey = target.PartitionKey,
+                    PartitionKey = target.PartitionKey ?? repository.Prefix,
                     MaxItemCount = CosmosConstants.MaxItemCountPerPage,
                 })
+            .Where(config => config.Organization == organization)
             .Where(target.Predicate)
             .Where(config => !config.AnnotationDeletionId.IsDefined())
             .Select(config => new EntityIndices { PartitionKey = config.PartitionKey, Id = config.Id })
@@ -131,15 +135,15 @@ internal static class ConfigurationCacheInvalidator
         }
     }
 
-    private static Task PatchAsync(IContainerRepository repository, Dictionary<string, List<string>> groups)
+    private static Task PatchAsync(OrganizationContainer repository, Dictionary<string, List<string>> groups)
     {
         return PatchAsync(
             repository,
-            groups.Select(group => (new PartitionKey(group.Key), (IReadOnlyList<string>)group.Value)));
+            groups.Select(group => (repository.Key(group.Key), (IReadOnlyList<string>)group.Value)));
     }
 
     private static async Task PatchAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         IEnumerable<(PartitionKey PartitionKey, IReadOnlyList<string> Ids)> groups)
     {
         using var throttler = new SemaphoreSlim(MaxParallelBatches);

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.KeyValues.Audit;
 using _42.Platform.Storyteller.KeyValues.Usage;
@@ -21,7 +22,7 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
     private readonly IKeyValueUsageRecorder _recorder;
     private readonly IKeyValueUsageStore _store;
     private readonly IKeyValueAuditLog _audit;
-    private readonly IContainerFactory _containerFactory;
+    private readonly CosmosOrganizationCatalog _organizations;
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly KeyValueOptions _options;
     private readonly TimeProvider _timeProvider;
@@ -31,7 +32,7 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
         IKeyValueUsageRecorder recorder,
         IKeyValueUsageStore store,
         IKeyValueAuditLog audit,
-        IContainerFactory containerFactory,
+        CosmosOrganizationCatalog organizations,
         IContainerRepositoryProvider repositoryProvider,
         IOptions<KeyValueOptions> options,
         TimeProvider? timeProvider = null,
@@ -40,7 +41,7 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
         _recorder = recorder;
         _store = store;
         _audit = audit;
-        _containerFactory = containerFactory;
+        _organizations = organizations;
         _repositoryProvider = repositoryProvider;
         _options = options.Value;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -79,16 +80,9 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
 
     public async Task TakeSnapshotAsync(DateOnly day, CancellationToken cancellationToken = default)
     {
-        var prefix = CosmosConstants.OrganizationContainerNamePrefix;
-
-        foreach (var containerName in await _containerFactory.GetContainerNamesAsync())
+        // the organizations are their access points in core: their data shares one container, which names none of them
+        foreach (var organization in await _organizations.ListAsync(cancellationToken))
         {
-            if (!containerName.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var organization = containerName[prefix.Length..];
             var gaugesPerProject = new Dictionary<string, Dictionary<string, long>>(StringComparer.Ordinal);
 
             await foreach (var row in QueryKeysAsync(organization, cancellationToken))
@@ -213,8 +207,8 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
     {
         var query = new QueryDefinition(
                 "SELECT c.ProjectName AS Project, c.Content.Protection AS Protection, COUNT(1) AS Count, SUM(c.Content.Length) AS Bytes FROM c "
-                + "WHERE CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) AND NOT IS_DEFINED(c.Deleted.At) "
-                + "GROUP BY c.ProjectName, c.Content.Protection")
+                + "WHERE c.Organization = @organization AND CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) "
+                + "AND NOT IS_DEFINED(c.Deleted.At) GROUP BY c.ProjectName, c.Content.Protection")
             .WithParameter("@infix", $".{PartitionKeys.KeyValuesPartitionInfix}.")
             .WithParameter("@prefix", $"{EntityIdPrefixTypes.KeyValue}.");
 
@@ -225,8 +219,9 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
     {
         var query = new QueryDefinition(
                 "SELECT c.ProjectName AS Project, COUNT(1) AS Count, SUM(c.Content.Length) AS Bytes FROM c "
-                + "WHERE CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) AND NOT IS_DEFINED(c.Deleted.At) "
-                + "AND (c.Content.ContentType = @reference OR c.Content.ContentType = @appConfiguration) GROUP BY c.ProjectName")
+                + "WHERE c.Organization = @organization AND CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) "
+                + "AND NOT IS_DEFINED(c.Deleted.At) AND (c.Content.ContentType = @reference OR c.Content.ContentType = @appConfiguration) "
+                + "GROUP BY c.ProjectName")
             .WithParameter("@infix", $".{PartitionKeys.KeyValuesPartitionInfix}.")
             .WithParameter("@prefix", $"{EntityIdPrefixTypes.KeyValue}.")
             .WithParameter("@reference", KeyValueContentTypes.SecretReference)
@@ -239,17 +234,20 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
     {
         var query = new QueryDefinition(
                 "SELECT c.ProjectName AS Project, COUNT(1) AS Count, SUM(c.Content.Length) AS Bytes FROM c "
-                + "WHERE CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) GROUP BY c.ProjectName")
+                + "WHERE c.Organization = @organization AND CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) "
+                + "GROUP BY c.ProjectName")
             .WithParameter("@infix", $".{PartitionKeys.KeyValuesPartitionInfix}.")
             .WithParameter("@prefix", $"{EntityIdPrefixTypes.KeyValueVersion}.");
 
         return QueryAsync<ProjectCountRow>(organization, query, cancellationToken);
     }
 
+    // An organization-wide query over every key/value partition: its text has "c.Organization = @organization", the
+    // isolation, and the organization's key prefix routes it.
     private async IAsyncEnumerable<T> QueryAsync<T>(string organization, QueryDefinition query, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        using var iterator = container.GetItemQueryIterator<T>(query);
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var iterator = repository.Container.GetItemQueryIterator<T>(repository.WithOrganization(query), requestOptions: repository.QueryOptions());
 
         while (iterator.HasMoreResults)
         {

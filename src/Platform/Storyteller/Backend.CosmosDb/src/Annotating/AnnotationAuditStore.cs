@@ -8,8 +8,6 @@ using _42.Platform.Storyteller.Entities.Annotations;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
 
-using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
-
 namespace _42.Platform.Storyteller.Annotating;
 
 // The audit document of an annotation: one item per key, appended in the same batch as the annotation write and
@@ -59,6 +57,7 @@ public sealed class AnnotationAuditStore
         audit = new AnnotationAuditEntity
         {
             PartitionKey = node.PartitionKey,
+            Organization = node.Key.OrganizationName,
             Id = node.AuditId,
             ProjectName = node.Key.ProjectName,
             ViewName = node.Key.ViewName,
@@ -85,17 +84,19 @@ public sealed class AnnotationAuditStore
             : batch => batch.ReplaceItemStream(id, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
     }
 
-    // Appends one entry outside of an annotation write (configuration events), retrying concurrent appends.
+    // Appends one entry outside of an annotation write (configuration events), retrying concurrent appends. The
+    // container is the shared container organizations; the key carries the organization.
     internal async Task AppendAsync(Container container, FullKey key, AnnotationAuditEntry entry)
     {
-        var store = new AnnotationItemStore(container, _serializer);
+        var repository = new OrganizationContainer(key.OrganizationName, container);
+        var store = new AnnotationItemStore(repository, _serializer);
 
         for (var attempt = 1; ; attempt++)
         {
             var node = await store.LoadAsync(key, withConfiguration: false);
             using var stream = Prepare(node, [entry], node.Audit?.TimeToLiveInSeconds, out _);
 
-            var partitionKey = new PartitionKey(node.PartitionKey);
+            var partitionKey = repository.Key(node.PartitionKey);
             using var response = node.Audit is null
                 ? await container.CreateItemStreamAsync(stream, partitionKey)
                 : await container.ReplaceItemStreamAsync(stream, node.AuditId, partitionKey, new ItemRequestOptions { IfMatchEtag = node.AuditETag });

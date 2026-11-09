@@ -7,7 +7,6 @@ using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.KeyValues;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
-using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
 namespace _42.Platform.Storyteller.Configuring;
 
@@ -83,12 +82,13 @@ internal sealed class BindingDependencyValidator
         string organization,
         IReadOnlyList<(string Id, string PartitionKey)> items)
     {
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
 
         try
         {
-            using var response = await container.ReadManyItemsStreamAsync(
-                items.Select(item => (item.Id, new PartitionKey(item.PartitionKey))).ToList());
+            // the manifests keep the partition values, the reads need the full keys of the organization
+            using var response = await repository.Container.ReadManyItemsStreamAsync(
+                items.Select(item => (item.Id, repository.Key(item.PartitionKey))).ToList());
 
             if (!response.IsSuccessStatusCode || response.Content is null)
             {

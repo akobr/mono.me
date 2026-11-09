@@ -165,6 +165,7 @@ public class CosmosKeyValueService : IKeyValueService
                 var created = new KeyValueEntity
                 {
                     PartitionKey = place.PartitionKeyValue,
+                    Organization = place.Organization,
                     Id = GetId(normalizedKey),
                     ProjectName = project,
                     ViewName = view,
@@ -686,7 +687,7 @@ public class CosmosKeyValueService : IKeyValueService
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = PartitionKeys.GetKeyValues(project, view);
-        return new Place(organization, project, view, repository.Container, partitionKeyValue, new PartitionKey(partitionKeyValue));
+        return new Place(organization, project, view, repository.Container, partitionKeyValue, repository.Key(partitionKeyValue));
     }
 
     private QueryDefinition BuildListingQuery(KeyValueListRequest request)
@@ -1462,6 +1463,7 @@ public class CosmosKeyValueService : IKeyValueService
                     ? new KeyValueEntity
                     {
                         PartitionKey = place.PartitionKeyValue,
+                        Organization = place.Organization,
                         Id = GetId(item.NormalizedKey),
                         ProjectName = place.Project,
                         ViewName = place.View,
@@ -1620,6 +1622,7 @@ public class CosmosKeyValueService : IKeyValueService
         });
     }
 
+    // Container is the shared container "organizations"; PartitionKey is the full (organization, partition) key of the view.
     private sealed record Place(string Organization, string Project, string View, Container Container, string PartitionKeyValue, PartitionKey PartitionKey)
     {
         public KeyValueIdentity Identity(string normalizedKey, ulong version)

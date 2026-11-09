@@ -8,7 +8,6 @@ using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 using FluentAssertions;
-using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -171,6 +170,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             new ConfigurationSchemaEntity
             {
                 PartitionKey = $"{project}.schema",
+                Organization = TestConstants.Organization,
                 Id = $"{View}.{EntityIdPrefixTypes.ConfigurationSchema}.d.{typeCode}.{annotationKey}",
                 AnnotationKey = annotationKey,
                 Name = $"dt.{typeCode}.{annotationKey}",
@@ -180,7 +180,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
                 Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
                 Version = 1,
             },
-            new PartitionKey($"{project}.schema"));
+            OrganizationKeys.Key(TestConstants.Organization, $"{project}.schema"));
 
         var stored = await schemas.GetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, annotationKey, typeCode);
         stored.Should().NotBeNull();
@@ -554,6 +554,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             new ConfigurationSchemaEntity
             {
                 PartitionKey = $"{project}.schema",
+                Organization = TestConstants.Organization,
                 Id = $"{EntityIdPrefixTypes.ConfigurationSchema}.{typeCode}",
                 AnnotationKey = typeCode,
                 Name = typeCode,
@@ -563,7 +564,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
                 Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
                 Version = 9,
             },
-            new PartitionKey($"{project}.schema"));
+            OrganizationKeys.Key(TestConstants.Organization, $"{project}.schema"));
 
         (await schemas.GetSchemaAsync(TestConstants.Organization, project, View, typeCode)).Should().BeNull();
         (await schemas.GetCombinedSchemaAsync(TestConstants.Organization, project, View, "rst.legacy-target")).Should().BeNull();
@@ -759,6 +760,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             new ConfigurationSchemaEntity
             {
                 PartitionKey = $"{project}.schema",
+                Organization = TestConstants.Organization,
                 Id = $"{View}.{EntityIdPrefixTypes.ConfigurationSchema}.t.{typeCode}",
                 AnnotationKey = typeCode,
                 Name = typeCode,
@@ -768,7 +770,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
                 Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
                 Version = 1,
             },
-            new PartitionKey($"{project}.schema"));
+            OrganizationKeys.Key(TestConstants.Organization, $"{project}.schema"));
     }
 
     private async Task<FullKey> CreateResponsibilityAsync(IAnnotationService annotations, string project, string name, string view)

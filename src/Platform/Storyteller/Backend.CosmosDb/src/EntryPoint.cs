@@ -96,6 +96,9 @@ public static class EntryPoint
         services.AddSingleton<IContainerFactory, ContainerFactory>();
         services.AddSingleton<IContainerRepositoryProvider, ContainerRepositoryProvider>();
 
+        // The organizations that exist: their access points in core, since their data shares one container.
+        services.AddSingleton<CosmosOrganizationCatalog>();
+
         services.AddSingleton<IApiKeyHashStore, CosmosMergedApiKeyHashStore>();
         services.AddSingleton<ICertificateAuthorityStore, CosmosCertificateAuthorityStore>();
         services.AddSingleton<IMachineAuthenticationPolicyStore, CosmosMachineAuthenticationPolicyStore>();

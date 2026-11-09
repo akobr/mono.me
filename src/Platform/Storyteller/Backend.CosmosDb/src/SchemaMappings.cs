@@ -42,6 +42,7 @@ internal static class SchemaMappings
     public static ConfigurationSchemaHistoryEntity ToHistory(this ConfigurationSchemaEntity entity, string historyId) => new()
     {
         PartitionKey = entity.PartitionKey,
+        Organization = entity.Organization,
         Id = historyId,
         AnnotationKey = entity.AnnotationKey,
         Name = entity.Name,

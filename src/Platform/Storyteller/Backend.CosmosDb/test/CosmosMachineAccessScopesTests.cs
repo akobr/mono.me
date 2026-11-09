@@ -43,7 +43,7 @@ public class CosmosMachineAccessScopesTests(Startup startup)
         (await access.GetMachineAccessesAsync(Org, project)).Single(machine => machine.Id == created.Id).Scopes.Should().Equal(Granted);
         (await hashStore.GetAsync(Org, project, created.Id))!.Scopes.Should().Equal(Granted);
 
-        var stored = (await Container.ReadItemAsync<JObject>(created.Id, new PartitionKey($"{project}.access"))).Resource;
+        var stored = (await Container.ReadItemAsync<JObject>(created.Id, OrganizationKeys.Key(Org, $"{project}.access"))).Resource;
         stored["Scopes"]!.Values<string>().Should().Equal("AnnotationRead", "AnnotationWrite", "SecretsRead", "SchemaWrite");
         stored.ContainsKey("Scope").Should().BeFalse();
         stored.ContainsKey("ManagementScopes").Should().BeFalse();
@@ -71,7 +71,7 @@ public class CosmosMachineAccessScopesTests(Startup startup)
     {
         var project = $"scopes-{Guid.NewGuid():N}"[..20];
         var id = Guid.NewGuid().ToString("D");
-        var partitionKey = new PartitionKey($"{project}.access");
+        var partitionKey = OrganizationKeys.Key(Org, $"{project}.access");
 
         // a machine as stored before the flat scopes: a preset and management scopes, no Scopes
         await Container.UpsertItemAsync(
@@ -79,6 +79,7 @@ public class CosmosMachineAccessScopesTests(Startup startup)
             {
                 ["id"] = id,
                 ["PartitionKey"] = $"{project}.access",
+                ["Organization"] = Org,
                 ["ObjectId"] = id,
                 ["AccessKey"] = "2s.***",
                 ["Scope"] = "DefaultReadWrite",
@@ -103,7 +104,6 @@ public class CosmosMachineAccessScopesTests(Startup startup)
 
     private CosmosAccessService CreateAccessService(IMachineAccessService? machineAccessService = null) => new(
         Context.Services.GetRequiredService<IContainerRepositoryProvider>(),
-        Context.Services.GetRequiredService<IContainerFactory>(),
         Context.Services.GetRequiredService<IOptions<JsonSerializerOptions>>(),
         machineAccessService);
 

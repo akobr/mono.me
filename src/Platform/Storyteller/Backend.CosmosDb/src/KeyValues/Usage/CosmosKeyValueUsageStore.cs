@@ -78,10 +78,10 @@ public class CosmosKeyValueUsageStore : IKeyValueUsageStore
             .WithParameter("@from", FormatDay(from))
             .WithParameter("@to", FormatDay(to));
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        using var iterator = container.GetItemQueryIterator<KeyValueUsageEntity>(
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var iterator = repository.Container.GetItemQueryIterator<KeyValueUsageEntity>(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetPartitionKey(project)) });
+            requestOptions: repository.QueryOptions(GetPartitionKey(project)));
         var days = new List<KeyValueUsageDay>();
 
         while (iterator.HasMoreResults)
@@ -109,9 +109,10 @@ public class CosmosKeyValueUsageStore : IKeyValueUsageStore
     // Read, change, write with the ETag; the day document of a project is not contended enough for anything else.
     private async Task UpdateAsync(string organization, string project, DateOnly day, Func<KeyValueUsageEntity, KeyValueUsageEntity> change, CancellationToken cancellationToken)
     {
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var container = repository.Container;
         var partitionKeyValue = GetPartitionKey(project);
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
         var id = $"{KeyValueUsageEntity.IdPrefix}{FormatDay(day)}";
 
         for (var attempt = 0; attempt < MaxRetries; attempt++)
@@ -125,6 +126,7 @@ public class CosmosKeyValueUsageStore : IKeyValueUsageStore
             var entity = change(existing ?? new KeyValueUsageEntity
             {
                 PartitionKey = partitionKeyValue,
+                Organization = repository.Organization,
                 Id = id,
                 TimeToLiveInSeconds = (int)Math.Max(60, _options.Usage.Retention.TotalSeconds),
                 ProjectName = project,

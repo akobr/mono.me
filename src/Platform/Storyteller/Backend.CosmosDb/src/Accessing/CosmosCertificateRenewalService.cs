@@ -40,8 +40,7 @@ public class CosmosCertificateRenewalService : ICertificateRenewalService
         string presentingThumbprint)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKeyValue = $"{project}.access";
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key($"{project}.access");
 
         var entity = await repository.Container.TryReadItemAsync(
             machineAccessId,
@@ -60,8 +59,9 @@ public class CosmosCertificateRenewalService : ICertificateRenewalService
         return await RenewCoreAsync(repository, partitionKey, entity, organization, project, machineAccessId, presentingThumbprint);
     }
 
+    // The partition key is the full key (organization, "{project}.access") of the machine in the repository.
     private async Task<CertificateRenewalResult> RenewCoreAsync(
-        IContainerRepository repository,
+        OrganizationContainer repository,
         PartitionKey partitionKey,
         MachineAccessEntity entity,
         string organization,

@@ -212,19 +212,20 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
             ? pending with { TargetKeyVersion = info.CurrentKeyVersion }
             : new RewrapStatus { Protection = protection, TargetKeyVersion = info.CurrentKeyVersion, StartedAt = now, Remaining = -1 };
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        var query = new QueryDefinition(
+        // every key/value partition of the project: an organization-wide query, isolated by its predicate on c.Organization
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var query = repository.WithOrganization(new QueryDefinition(
                 "SELECT c.id, c.PartitionKey, c._etag, c.ttl, c._ts, c.Content FROM c "
-                + "WHERE STARTSWITH(c.PartitionKey, @prefix) AND c.Content.Protection = @level AND IS_DEFINED(c.Content.Encrypted) "
-                + "AND NOT ENDSWITH(c.Content.Encrypted.KeyId, @versionSuffix)")
+                + "WHERE c.Organization = @organization AND STARTSWITH(c.PartitionKey, @prefix) AND c.Content.Protection = @level "
+                + "AND IS_DEFINED(c.Content.Encrypted) AND NOT ENDSWITH(c.Content.Encrypted.KeyId, @versionSuffix)")
             .WithParameter("@prefix", $"{project}.{PartitionKeys.KeyValuesPartitionInfix}.")
             .WithParameter("@level", protection.ToString())
-            .WithParameter("@versionSuffix", $"/{info.CurrentKeyVersion}");
+            .WithParameter("@versionSuffix", $"/{info.CurrentKeyVersion}"));
 
         long processed = 0;
         string? lastError = null;
         using var throttler = new SemaphoreSlim(Math.Max(1, _options.Protection.MaxConcurrentKeyOperations));
-        using var iterator = container.GetItemQueryIterator<RewrapRow>(query, requestOptions: new QueryRequestOptions { MaxItemCount = 100 });
+        using var iterator = repository.Container.GetItemQueryIterator<RewrapRow>(query, requestOptions: repository.QueryOptions(maxItemCount: 100));
 
         while (iterator.HasMoreResults)
         {
@@ -236,7 +237,7 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
 
                 try
                 {
-                    if (await RewrapOneAsync(container, provider, scope, policy, row, cancellationToken))
+                    if (await RewrapOneAsync(repository, provider, scope, policy, row, cancellationToken))
                     {
                         Interlocked.Increment(ref processed);
                     }
@@ -283,7 +284,7 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
         return (int)Math.Max(1, (expires - now).TotalSeconds);
     }
 
-    private async Task<bool> RewrapOneAsync(Container container, IKeyEncryptionProvider provider, KeyValueScope scope, KeyValuePolicy policy, RewrapRow row, CancellationToken cancellationToken)
+    private async Task<bool> RewrapOneAsync(OrganizationContainer repository, IKeyEncryptionProvider provider, KeyValueScope scope, KeyValuePolicy policy, RewrapRow row, CancellationToken cancellationToken)
     {
         var encrypted = row.Content.Encrypted!;
         var dataKey = await provider.UnwrapAsync(scope, policy, encrypted, cancellationToken);
@@ -309,9 +310,9 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
 
             try
             {
-                await container.PatchItemAsync<object>(
+                await repository.Container.PatchItemAsync<object>(
                     row.Id,
-                    new PartitionKey(row.PartitionKey),
+                    repository.Key(row.PartitionKey),
                     operations,
                     new PatchItemRequestOptions { IfMatchEtag = row.ETag },
                     cancellationToken);

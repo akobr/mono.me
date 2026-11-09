@@ -460,7 +460,7 @@ public class CosmosConfigurationCompositionTests(Startup startup)
     {
         var item = await GetContainer().ReadItemAsync<JObject>(
             $"{key.ViewName}.cnf.{key.Annotation}",
-            new PartitionKey(key.GetPartitionKey()));
+            key.GetCosmosPartitionKey());
 
         return item.Resource;
     }
@@ -469,7 +469,7 @@ public class CosmosConfigurationCompositionTests(Startup startup)
     {
         using var response = await GetContainer().ReadItemStreamAsync(
             $"{key.ViewName}.cnf.{key.Annotation}",
-            new PartitionKey(key.GetPartitionKey()));
+            key.GetCosmosPartitionKey());
 
         return response.IsSuccessStatusCode;
     }
@@ -489,7 +489,7 @@ public class CosmosConfigurationCompositionTests(Startup startup)
         {
             using var response = await GetContainer().ReadItemStreamAsync(
                 $"{key.ViewName}.cnf.{key.Annotation}",
-                new PartitionKey(key.GetPartitionKey()));
+                key.GetCosmosPartitionKey());
 
             tags[key.Annotation.ToString()] = response.IsSuccessStatusCode ? response.Headers.ETag : null;
         }

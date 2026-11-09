@@ -6,7 +6,7 @@ public class ContainerRepositoryProvider : IContainerRepositoryProvider
 {
     private readonly ICosmosClientProvider _clientProvider;
 
-    // Parallel requests of a cold worker ask for the same containers at once.
+    // Parallel requests of a cold worker ask for the same containers at once. Two entries at most: core and organizations.
     private readonly ConcurrentDictionary<string, IContainerRepository> _cache = new();
 
     public ContainerRepositoryProvider(ICosmosClientProvider clientProvider)
@@ -19,9 +19,10 @@ public class ContainerRepositoryProvider : IContainerRepositoryProvider
         return GetContainer(CosmosConstants.CoreContainerName);
     }
 
-    public IContainerRepository GetOrganizationContainer(string organizationName)
+    // A small scope per call over the one shared container, so nothing here grows with the number of organizations.
+    public OrganizationContainer GetOrganizationContainer(string organizationName)
     {
-        return GetContainer($"{CosmosConstants.OrganizationContainerNamePrefix}{organizationName}");
+        return new OrganizationContainer(organizationName, GetContainer(CosmosConstants.OrganizationsContainerName).Container);
     }
 
     private IContainerRepository GetContainer(string containerName)

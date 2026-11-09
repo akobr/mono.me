@@ -48,9 +48,9 @@ public class CosmosKeyValueAuditLog : IKeyValueAuditLog
     public async Task WriteAsync(string organization, string project, KeyValueAuditEvent entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        var entity = ToEntity(project, entry);
-        await container.CreateItemAsync(entity, new PartitionKey(entity.PartitionKey), cancellationToken: cancellationToken);
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var entity = ToEntity(repository.Organization, project, entry);
+        await repository.Container.CreateItemAsync(entity, repository.Key(entity.PartitionKey), cancellationToken: cancellationToken);
     }
 
     public void RecordBindingRead(string organization, string project, string view, string key, KeyValueProtection protection, KeyValueCaller caller)
@@ -134,11 +134,11 @@ public class CosmosKeyValueAuditLog : IKeyValueAuditLog
             .WithParameter("@from", query.From is null ? null : KeyValueAuditEntity.FormatTime(query.From.Value))
             .WithParameter("@to", query.To is null ? null : KeyValueAuditEntity.FormatTime(query.To.Value));
 
-        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
-        using var iterator = container.GetItemQueryIterator<KeyValueAuditEntity>(
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var iterator = repository.Container.GetItemQueryIterator<KeyValueAuditEntity>(
             definition,
             string.IsNullOrWhiteSpace(query.ContinuationToken) ? null : query.ContinuationToken,
-            new QueryRequestOptions { PartitionKey = new PartitionKey(GetPartitionKey(project)), MaxItemCount = PageSize });
+            repository.QueryOptions(GetPartitionKey(project), PageSize));
 
         if (!iterator.HasMoreResults)
         {
@@ -182,9 +182,10 @@ public class CosmosKeyValueAuditLog : IKeyValueAuditLog
         Detail = entity.Detail,
     };
 
-    private KeyValueAuditEntity ToEntity(string project, KeyValueAuditEvent entry) => new()
+    private KeyValueAuditEntity ToEntity(string organization, string project, KeyValueAuditEvent entry) => new()
     {
         PartitionKey = GetPartitionKey(project),
+        Organization = organization,
         Id = string.IsNullOrWhiteSpace(entry.Id) ? NewId(entry.Time) : entry.Id,
         TimeToLiveInSeconds = (int)Math.Max(60, _options.AuditRetention.TotalSeconds),
         ProjectName = project,

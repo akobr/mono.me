@@ -123,9 +123,11 @@ public partial class CosmosAnnotationService : IAnnotationService
         // exported annotation compares equal when it is imported back. The LINQ queries of GetAnnotationsAsync read
         // them with the SDK's Newtonsoft serializer, which turns numbers into doubles and date strings into local
         // dates. Every partition of the project; only annotation items carry AnnotationType. A disabled, scheduled or
-        // expired annotation is exported as well: only a deleted one is not in the view.
+        // expired annotation is exported as well: only a deleted one is not in the view. An organization-wide query: the
+        // store adds @organization and the organization's key prefix.
         var query = new QueryDefinition(
-                "SELECT * FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND c.ProjectName = @project "
+                $"SELECT * FROM c WHERE c.Organization = {OrganizationContainer.OrganizationParameter} "
+                + "AND STARTSWITH(c.PartitionKey, @projectPrefix) AND c.ProjectName = @project "
                 + "AND c.ViewName = @view AND IS_DEFINED(c.AnnotationType) AND NOT IS_DEFINED(c.Deletion)")
             .WithParameter("@projectPrefix", $"{project}.")
             .WithParameter("@project", project)
@@ -349,16 +351,18 @@ public partial class CosmosAnnotationService : IAnnotationService
         }
     }
 
-    private static AnnotationEntity ToStoredEntity(Annotation model)
+    private static AnnotationEntity ToStoredEntity(Annotation model, string organization)
     {
-        return model.ToEntity() with { PartitionKey = PartitionKeys.GetKey(model) };
+        return model.ToEntity(organization) with { PartitionKey = PartitionKeys.GetKey(model) };
     }
 
-    private static ConfigurationHistoryEntity ToHistorySnapshot(ConfigurationEntity configuration)
+    // organization: of the store the snapshot is written to, in the partition of the configuration
+    private static ConfigurationHistoryEntity ToHistorySnapshot(ConfigurationEntity configuration, string organization)
     {
         return new ConfigurationHistoryEntity
         {
             PartitionKey = configuration.PartitionKey,
+            Organization = organization,
             Id = AnnotationItemIds.ConfigurationVersion(configuration.ViewName, configuration.AnnotationKey, configuration.Version),
             AnnotationKey = configuration.AnnotationKey,
             Version = configuration.Version,
@@ -388,7 +392,7 @@ public partial class CosmosAnnotationService : IAnnotationService
 
     private AnnotationItemStore Store(string organization)
     {
-        return new AnnotationItemStore(_repositoryProvider.GetOrganizationContainer(organization).Container, _serializer);
+        return new AnnotationItemStore(_repositoryProvider.GetOrganizationContainer(organization), _serializer);
     }
 
     private async Task<Dictionary<string, AnnotationNode>> LoadNodesAsync(AnnotationItemStore store, IEnumerable<FullKey> keys)
@@ -456,7 +460,7 @@ public partial class CosmosAnnotationService : IAnnotationService
                 DeletionId = node.Entity?.Deletion?.DeletionId,
             };
 
-            writes.Add(new PendingWrite(node, ToStoredEntity(model) with { Created = stamp, Modified = stamp }, entry, PendingKind.Create));
+            writes.Add(new PendingWrite(node, ToStoredEntity(model, store.Repository.Organization) with { Created = stamp, Modified = stamp }, entry, PendingKind.Create));
         }
 
         var relations = new Dictionary<string, AnnotationNode>(StringComparer.Ordinal);
@@ -469,7 +473,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             await CollectDeletedChildrenAsync(store, write.Node, writes, nodes, relations, updates, now);
         }
 
-        using var plan = new BatchPlan(store.Container);
+        using var plan = new BatchPlan(store.Repository);
         string? targetMarker = null;
 
         foreach (var write in writes)
@@ -501,7 +505,7 @@ public partial class CosmosAnnotationService : IAnnotationService
                 {
                     if (configuration.Content.HasValues)
                     {
-                        var snapshot = ToHistorySnapshot(configuration);
+                        var snapshot = ToHistorySnapshot(configuration, store.Repository.Organization);
                         operations.Add(new BatchOperation(batch => batch.UpsertItem(snapshot)));
                         payloadBytes += EstimateBytes(snapshot);
                     }
@@ -589,7 +593,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             return;
         }
 
-        using var plan = new BatchPlan(store.Container);
+        using var plan = new BatchPlan(store.Repository);
         AddRelationUpdates(plan, nodes, updates);
         await plan.ExecuteAsync();
     }
@@ -616,7 +620,7 @@ public partial class CosmosAnnotationService : IAnnotationService
 
         var now = _timeProvider.GetUtcNow();
         var stored = node.Entity!;
-        var entity = AnnotationRelations.CopyFrom(ToStoredEntity(after), stored) with
+        var entity = AnnotationRelations.CopyFrom(ToStoredEntity(after, store.Repository.Organization), stored) with
         {
             Created = stored.Created,
             Modified = Stamp(actor, now),
@@ -628,7 +632,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             Values = changes.Values.Count > 0 ? changes.Values : null,
         };
 
-        using var plan = new BatchPlan(store.Container);
+        using var plan = new BatchPlan(store.Repository);
         var stream = plan.Keep(_serializer.WriteAnnotation(entity));
         var audit = plan.Keep(_audit.Prepare(node, [entry], timeToLiveSeconds: null, out _));
         string? marker = null;
@@ -809,6 +813,8 @@ public partial class CosmosAnnotationService : IAnnotationService
         // descendants of a key: the scope gives the partition and the key prefix of this type; the prefix can cover
         // more (the units of execution of every unit of a responsibility), so the page is filtered by the graph
         var descendantsOf = model.Request.DescendantsOf;
+        var organization = model.Request.Organization;
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
         string? keyPrefix = null;
         string? partitionPrefix = null;
 
@@ -826,20 +832,22 @@ public partial class CosmosAnnotationService : IAnnotationService
             }
 
             keyPrefix = scope.Prefix;
-            partitionKey = scope.Scope.PartitionKey is null ? null : new PartitionKey(scope.Scope.PartitionKey);
+            partitionKey = scope.Scope.PartitionKey is null ? null : repository.Key(scope.Scope.PartitionKey);
             partitionPrefix = scope.Scope.PartitionKey is null ? scope.Scope.PartitionPrefix : null;
         }
 
-        var repository = _repositoryProvider.GetOrganizationContainer(model.Request.Organization);
+        // one partition, or without one an organization-wide query: routed by the organization's key prefix and
+        // isolated by the predicate on Organization
         var queryable = repository.Container.GetItemLinqQueryable<TEntity>(
             continuationToken: cosmosToken,
             requestOptions: new QueryRequestOptions
             {
-                PartitionKey = partitionKey,
+                PartitionKey = partitionKey ?? repository.Prefix,
                 MaxItemCount = PageSize,
             });
 
         var matches = queryable
+            .Where(r => r.Organization == organization)
             .Where(r => r.AnnotationType == annotationType)
             .Where(r => r.ProjectName == model.Request.Project)
             .Where(r => r.ViewName == model.Request.View);

@@ -95,18 +95,19 @@ public class CosmosClientCertificateStoreTests(Startup startup)
         await store.StoreAsync(Org, project, NewRecord(older, olderThumbprint));
         (await CreateStore().GetByMachineAccessIdAsync(Org, project, older))!.CredentialKind.Should().BeNull("the machine has no document");
 
-        var container = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(Org).Container;
-        await container.UpsertItemAsync(
+        var repository = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(Org);
+        await repository.Container.UpsertItemAsync(
             new Entities.Access.MachineAccessEntity
             {
                 PartitionKey = CosmosClientCertificateStore.GetPartitionKey(project),
+                Organization = Org,
                 Id = older,
                 ObjectId = older,
                 AccessKey = "***",
                 Scopes = [.. Granted],
                 CredentialKind = MachineCredentialKind.CertificateAndApiKey,
             },
-            new Microsoft.Azure.Cosmos.PartitionKey(CosmosClientCertificateStore.GetPartitionKey(project)));
+            repository.Key(CosmosClientCertificateStore.GetPartitionKey(project)));
 
         (await CreateStore().GetByMachineAccessIdAsync(Org, project, older))!.CredentialKind.Should().Be(MachineCredentialKind.CertificateAndApiKey);
         (await CreateStore().GetByThumbprintAsync(Org, project, olderThumbprint))!.CredentialKind.Should().Be(MachineCredentialKind.CertificateAndApiKey);
@@ -118,8 +119,9 @@ public class CosmosClientCertificateStoreTests(Startup startup)
         var project = $"certs-{Guid.NewGuid():N}"[..20];
         var machine = Guid.NewGuid().ToString("D");
         var thumbprint = Guid.NewGuid().ToString("N").ToUpperInvariant();
-        var container = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(Org).Container;
-        var partitionKey = new Microsoft.Azure.Cosmos.PartitionKey(CosmosClientCertificateStore.GetPartitionKey(project));
+        var repository = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(Org);
+        var container = repository.Container;
+        var partitionKey = repository.Key(CosmosClientCertificateStore.GetPartitionKey(project));
         var id = Entities.Access.MachineCertificateEntity.GetId(thumbprint);
 
         await CreateStore().StoreAsync(Org, project, NewRecord(machine, thumbprint) with { CredentialKind = MachineCredentialKind.Certificate });

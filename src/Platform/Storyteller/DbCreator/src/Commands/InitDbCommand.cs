@@ -40,7 +40,26 @@ public class InitDbCommand : IAsyncCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        await _coreOrgBuilder.BuildAsync();
+        try
+        {
+            await _coreOrgBuilder.BuildAsync();
+        }
+        catch (DatabaseLayoutException exception)
+        {
+            Console.Write("! ", Color.Magenta);
+            Console.WriteLine(
+                $"The database '{CosmosConstants.DatabaseName}' has the layout before the shared container '{CosmosConstants.OrganizationsContainerName}'. Nothing was written.");
+
+            foreach (var problem in exception.Problems)
+            {
+                Console.WriteLine($"  {problem}");
+            }
+
+            Console.WriteLine(
+                $"  Its data is not migrated: delete the database '{CosmosConstants.DatabaseName}' (or start the emulator with a new data volume), then run DbCreator again to seed it.");
+            return ExitCodes.ERROR_DATABASE_LAYOUT;
+        }
+
         await _review.RenderReview();
         return ExitCodes.SUCCESS;
     }

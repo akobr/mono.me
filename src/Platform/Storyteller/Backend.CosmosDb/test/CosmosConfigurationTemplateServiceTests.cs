@@ -433,6 +433,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
             {
                 Id = $"{Constants.DefaultViewName}.gen.exe",
                 PartitionKey = partitionKey,
+                Organization = TestConstants.Organization,
                 ProjectName = project,
                 ViewName = Constants.DefaultViewName,
                 AnnotationKey = "exe",
@@ -440,7 +441,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
                 Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
                 Content = JObject.Parse("""{ "legacy": true }"""),
             },
-            new PartitionKey(partitionKey));
+            OrganizationKeys.Key(TestConstants.Organization, partitionKey));
 
         var configuration = await Configs.GetRawConfigurationAsync(execution);
 
@@ -487,7 +488,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         // simulate a committed deletion whose invalidation failed afterwards
         await GetContainer().DeleteItemAsync<JObject>(
             $"{View}.gen.{type}",
-            PartitionKeys.GetCosmosTemplate(project));
+            PartitionKeys.GetCosmosTemplate(TestConstants.Organization, project));
         await ReplaceRawItemAsync(project, $"{View}.gns.{type}", item => item["IsInvalidationPending"] = true);
 
         var deleted = await Templates.DeleteTemplateAsync(org, project, View, type);
@@ -512,7 +513,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         // simulate the expiration (ttl) of the whole history
         foreach (var version in new[] { 1, 2 })
         {
-            await GetContainer().DeleteItemAsync<JObject>($"{View}.gnv.{type}.{version}", PartitionKeys.GetCosmosTemplate(project));
+            await GetContainer().DeleteItemAsync<JObject>($"{View}.gnv.{type}.{version}", PartitionKeys.GetCosmosTemplate(TestConstants.Organization, project));
         }
 
         var recreated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "c": 3 }"""), AuditActor.System);
@@ -532,7 +533,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
 
     private async Task<JObject> ReadRawItemAsync(string project, string id)
     {
-        var response = await GetContainer().ReadItemAsync<JObject>(id, PartitionKeys.GetCosmosTemplate(project));
+        var response = await GetContainer().ReadItemAsync<JObject>(id, PartitionKeys.GetCosmosTemplate(TestConstants.Organization, project));
         return response.Resource;
     }
 
@@ -540,14 +541,14 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
     {
         var item = await ReadRawItemAsync(project, id);
         change(item);
-        await GetContainer().ReplaceItemAsync(item, id, PartitionKeys.GetCosmosTemplate(project));
+        await GetContainer().ReplaceItemAsync(item, id, PartitionKeys.GetCosmosTemplate(TestConstants.Organization, project));
     }
 
     private async Task<bool> HasCachedCalculationAsync(FullKey key)
     {
         var item = await GetContainer().ReadItemAsync<JObject>(
             $"{key.ViewName}.cnf.{key.Annotation}",
-            new PartitionKey(key.GetPartitionKey()));
+            key.GetCosmosPartitionKey());
 
         return item.Resource["CalculatedContent"]?.Type == JTokenType.Object;
     }

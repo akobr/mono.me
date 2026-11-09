@@ -173,11 +173,11 @@ public partial class CosmosConfigurationService
     }
 
     // The reads and the parts of one composition.
-    private sealed class CompositionWalk(IContainerRepository repository)
+    private sealed class CompositionWalk(OrganizationContainer repository)
     {
         private readonly HashSet<string> _sourceIds = [];
 
-        public IContainerRepository Repository { get; } = repository;
+        public OrganizationContainer Repository { get; } = repository;
 
         // Configuration items by annotation key, null for no item.
         public Dictionary<string, ConfigurationEntity?> Configurations { get; } = [];

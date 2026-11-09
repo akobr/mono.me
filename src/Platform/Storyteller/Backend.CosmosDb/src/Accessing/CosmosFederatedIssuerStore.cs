@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller;
 
-// Trusted issuers of a project: one document per issuer in the organization container, partition {project}.federation
+// Trusted issuers of a project: one document per issuer in the organization's data, partition {project}.federation
 // (outside the machine list of {project}.access), id = name. The list is cached for a minute per instance and dropped
 // on a local write, like the machine authentication policy; another instance sees a change within that minute.
 public class CosmosFederatedIssuerStore : IFederatedIssuerStore
@@ -53,7 +53,7 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
 
         if (entities is null)
         {
-            // No organization container, so no project to cache issuers for.
+            // No container organizations, so no project to cache issuers for.
             return [];
         }
 
@@ -87,7 +87,7 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetPartition(project);
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
         var existing = await ReadAsync(organization, project, issuer.Name, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         FederatedIssuerEntity entity;
@@ -97,12 +97,12 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
             if (existing is null)
             {
                 // Counted from the store, not the cached list, so concurrent instances cannot pass the limit together by much.
-                if (await CountAsync(repository.Container, partitionKey, cancellationToken) >= FederationValidation.MaxIssuersPerProject)
+                if (await CountAsync(repository, partitionKeyValue, cancellationToken) >= FederationValidation.MaxIssuersPerProject)
                 {
                     throw new InvalidInputException(FederationValidation.TooManyIssuersMessage, ErrorCodes.InvalidFederation);
                 }
 
-                entity = ToEntity(issuer, partitionKeyValue, now, now);
+                entity = ToEntity(issuer, repository.Organization, partitionKeyValue, now, now);
                 await repository.Container.CreateItemAsync(entity, partitionKey, cancellationToken: cancellationToken);
             }
             else
@@ -113,7 +113,7 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
                     throw new InvalidInputException(FederationValidation.IssuerImmutableMessage, ErrorCodes.InvalidFederation);
                 }
 
-                entity = ToEntity(issuer, partitionKeyValue, existing.CreatedAt, now);
+                entity = ToEntity(issuer, repository.Organization, partitionKeyValue, existing.CreatedAt, now);
                 await repository.Container.ReplaceItemAsync(
                     entity,
                     entity.Id,
@@ -142,7 +142,7 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         using var response = await repository.Container.DeleteItemStreamAsync(
             name,
-            new PartitionKey(GetPartition(project)),
+            repository.Key(GetPartition(project)),
             cancellationToken: cancellationToken);
         Invalidate(organization, project);
 
@@ -160,11 +160,11 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         return $"fedissuers:{organization}.{project}";
     }
 
-    private static async Task<int> CountAsync(Container container, PartitionKey partitionKey, CancellationToken cancellationToken)
+    private static async Task<int> CountAsync(OrganizationContainer repository, string partitionKey, CancellationToken cancellationToken)
     {
-        using var iterator = container.GetItemQueryIterator<int>(
+        using var iterator = repository.Container.GetItemQueryIterator<int>(
             new QueryDefinition("SELECT VALUE COUNT(1) FROM c"),
-            requestOptions: new QueryRequestOptions { PartitionKey = partitionKey });
+            requestOptions: repository.QueryOptions(partitionKey));
         var count = 0;
 
         while (iterator.HasMoreResults)
@@ -193,11 +193,12 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         };
     }
 
-    private static FederatedIssuerEntity ToEntity(FederatedIssuer issuer, string partitionKey, DateTimeOffset createdAt, DateTimeOffset updatedAt)
+    private static FederatedIssuerEntity ToEntity(FederatedIssuer issuer, string organization, string partitionKey, DateTimeOffset createdAt, DateTimeOffset updatedAt)
     {
         return new FederatedIssuerEntity
         {
             PartitionKey = partitionKey,
+            Organization = organization,
             Id = issuer.Name,
             Issuer = issuer.Issuer,
             KeySource = issuer.KeySource,
@@ -224,12 +225,12 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         return await repository.Container.TryReadItemAsync(
             name,
-            new PartitionKey(GetPartition(project)),
+            repository.Key(GetPartition(project)),
             stream => stream.DeserializeSystemTextJson<FederatedIssuerEntity>(_serializerOptions),
             cancellationToken: cancellationToken);
     }
 
-    // Null when the organization container doesn't exist.
+    // Null when the container organizations doesn't exist; a missing organization is only an empty partition.
     private async Task<List<FederatedIssuerEntity>?> QueryAsync(string organization, string project, CancellationToken cancellationToken)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -237,7 +238,7 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
 
         using var iterator = repository.Container.GetItemQueryStreamIterator(
             new QueryDefinition("SELECT * FROM c"),
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetPartition(project)) });
+            requestOptions: repository.QueryOptions(GetPartition(project)));
 
         while (iterator.HasMoreResults)
         {

@@ -232,7 +232,7 @@ public class BindingDependencyTests(Startup startup)
 
     private async Task<string> ETagAsync(string id, string partitionKey)
     {
-        using var response = await Container.ReadItemStreamAsync(id, new PartitionKey(partitionKey));
+        using var response = await Container.ReadItemStreamAsync(id, OrganizationKeys.Key(Org, partitionKey));
         response.IsSuccessStatusCode.Should().BeTrue($"the item {id} exists");
         return response.Headers.ETag;
     }

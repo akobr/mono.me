@@ -190,7 +190,7 @@ public class ConfigurationResolutionTests
         if (container is not null)
         {
             repositories.Setup(provider => provider.GetOrganizationContainer(Key.OrganizationName))
-                .Returns(Mock.Of<IContainerRepository>(repository => repository.Container == container));
+                .Returns(new OrganizationContainer(Key.OrganizationName, container));
         }
 
         // the resolve step never touches the repositories

@@ -18,18 +18,16 @@ public class CosmosAccessService : IAccessService
     private const string MAIN_PARTITION_KEY = "access";
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
-    private readonly IContainerFactory _containerFactory;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly IMachineAccessService? _machineAccessService;
 
-    public CosmosAccessService(IContainerRepositoryProvider repositoryProvider,
-        IContainerFactory containerFactory,
+    public CosmosAccessService(
+        IContainerRepositoryProvider repositoryProvider,
         IOptions<JsonSerializerOptions> serializerOptions,
         IMachineAccessService? machineAccessService = null)
     {
         _repositoryProvider = repositoryProvider;
         _machineAccessService = machineAccessService;
-        _containerFactory = containerFactory;
         _serializerOptions = serializerOptions.Value;
     }
 
@@ -182,10 +180,10 @@ public class CosmosAccessService : IAccessService
             throw new AccessDeniedException($"The account '{model.OwnerId}' doesn't have owner rights to the organization '{model.Organization}'.");
         }
 
+        // An organization is its access point in core: its data lives in the shared container organizations, so
+        // creating one creates no container.
         if (organizationAccessPoint is null)
         {
-            await _containerFactory.CreateContainerIfNotExistsAsync($"org.{model.Organization}");
-
             var organizationAccessPointEntity = new AccessPointEntity
             {
                 Key = model.Organization,
@@ -490,10 +488,7 @@ public class CosmosAccessService : IAccessService
 
         using var iterator = repository.Container.GetItemQueryIterator<MachineAccessEntity>(
             query,
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey($"{project}.access"),
-            });
+            requestOptions: repository.QueryOptions($"{project}.access"));
 
         var resultList = new List<MachineAccessEntity>();
 
@@ -510,7 +505,7 @@ public class CosmosAccessService : IAccessService
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var machineAccess = await repository.Container.TryReadItemAsync(
             id,
-            new PartitionKey($"{project}.access"),
+            repository.Key($"{project}.access"),
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null
             ? machineAccess.ToMachineAccess()
@@ -521,7 +516,7 @@ public class CosmosAccessService : IAccessService
     {
         var repository = _repositoryProvider.GetOrganizationContainer(model.Organization);
         var partitionKeyValue = $"{model.Project}.access";
-        var partitionKey = new PartitionKey(partitionKeyValue);
+        var partitionKey = repository.Key(partitionKeyValue);
 
         var machineAccess = await MachineAccessService.CreateMachineAccessAsync(model);
 
@@ -541,6 +536,7 @@ public class CosmosAccessService : IAccessService
         var entity = new MachineAccessEntity
         {
             PartitionKey = partitionKeyValue,
+            Organization = repository.Organization,
             Id = machineAccess.Id,
             ObjectId = machineAccess.ObjectId,
             AccessKey = maskedKey,
@@ -580,7 +576,7 @@ public class CosmosAccessService : IAccessService
     public async Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
+        var partitionKey = repository.Key($"{project}.access");
         var machineAccess = await repository.Container.TryReadItemAsync(
             appId,
             partitionKey,
@@ -649,7 +645,7 @@ public class CosmosAccessService : IAccessService
     public async Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
+        var partitionKey = repository.Key($"{project}.access");
         var machineAccess = await repository.Container.TryReadItemAsync(
             appId,
             partitionKey,
@@ -680,18 +676,11 @@ public class CosmosAccessService : IAccessService
 
     public async Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId)
     {
+        // A missing organization has no machine, so the point read with the full key answers it too.
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        using var response = await repository.Container.ReadContainerStreamAsync();
-
-        if (response.StatusCode is HttpStatusCode.NotFound
-            || response.Content is null)
-        {
-            return false;
-        }
-
         var machineAccess = await repository.Container.TryReadItemAsync(
             appId,
-            new PartitionKey($"{project}.access"),
+            repository.Key($"{project}.access"),
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null;
     }
@@ -699,7 +688,7 @@ public class CosmosAccessService : IAccessService
     public async Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, IReadOnlyList<FederationRule> rules)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
+        var partitionKey = repository.Key($"{project}.access");
 
         // A concurrent write to the machine (a reset, a certificate renewal) only moves the ETag, so one retry suffices.
         for (var attempt = 1; ; attempt++)
@@ -758,10 +747,7 @@ public class CosmosAccessService : IAccessService
         {
             using var iterator = repository.Container.GetItemQueryIterator<string>(
                 query,
-                requestOptions: new QueryRequestOptions
-                {
-                    PartitionKey = new PartitionKey($"{project}.access"),
-                });
+                requestOptions: repository.QueryOptions($"{project}.access"));
 
             while (iterator.HasMoreResults && ids.Count < max)
             {
@@ -770,7 +756,7 @@ public class CosmosAccessService : IAccessService
         }
         catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
         {
-            // No organization container: no machines.
+            // No container organizations (a missing organization is only an empty partition): no machines.
             return [];
         }
 

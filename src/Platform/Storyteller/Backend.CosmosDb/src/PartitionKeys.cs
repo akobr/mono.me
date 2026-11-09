@@ -61,33 +61,34 @@ public static class PartitionKeys
         };
     }
 
-    public static PartitionKey GetCosmosKey(IAnnotation annotation)
+    // The full hierarchical keys of the container organizations (/Organization, /PartitionKey).
+    public static PartitionKey GetCosmosKey(string organization, IAnnotation annotation)
     {
-        return new PartitionKey(GetKey(annotation));
+        return OrganizationKeys.Key(organization, GetKey(annotation));
     }
 
-    public static PartitionKey GetCosmosResponsibility(string projectName, string responsibilityName)
+    public static PartitionKey GetCosmosResponsibility(string organization, string projectName, string responsibilityName)
     {
-        return new PartitionKey(GetResponsibility(projectName, responsibilityName));
+        return OrganizationKeys.Key(organization, GetResponsibility(projectName, responsibilityName));
     }
 
-    public static PartitionKey GetCosmosSubject(string projectName, string subjectName)
+    public static PartitionKey GetCosmosSubject(string organization, string projectName, string subjectName)
     {
-        return new PartitionKey(GetSubject(projectName, subjectName));
+        return OrganizationKeys.Key(organization, GetSubject(projectName, subjectName));
     }
 
-    public static PartitionKey GetCosmosTemplate(string projectName)
+    public static PartitionKey GetCosmosTemplate(string organization, string projectName)
     {
-        return new PartitionKey(GetTemplate(projectName));
+        return OrganizationKeys.Key(organization, GetTemplate(projectName));
     }
 
-    public static PartitionKey GetCosmosKeyValues(string projectName, string viewName)
+    public static PartitionKey GetCosmosKeyValues(string organization, string projectName, string viewName)
     {
-        return new PartitionKey(GetKeyValues(projectName, viewName));
+        return OrganizationKeys.Key(organization, GetKeyValues(projectName, viewName));
     }
 
-    public static PartitionKey GetCosmosTransfer(string projectName)
+    public static PartitionKey GetCosmosTransfer(string organization, string projectName)
     {
-        return new PartitionKey(GetTransfer(projectName));
+        return OrganizationKeys.Key(organization, GetTransfer(projectName));
     }
 }

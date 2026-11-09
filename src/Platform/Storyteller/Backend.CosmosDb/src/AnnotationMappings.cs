@@ -29,17 +29,18 @@ internal static class AnnotationMappings
         where TAnnotation : Annotation
         => (TAnnotation)((AnnotationEntity)entity).ToModel();
 
-    public static AnnotationEntity ToEntity(this Annotation annotation)
+    // organization: the organization the entity is stored in (the first level of its partition key)
+    public static AnnotationEntity ToEntity(this Annotation annotation, string organization)
     {
         return annotation switch
         {
-            Responsibility m => m.ToResponsibilityEntity(),
-            Subject m => m.ToSubjectEntity(),
-            Usage m => m.ToUsageEntity(),
-            Context m => m.ToContextEntity(),
-            Execution m => m.ToExecutionEntity(),
-            Unit m => m.ToUnitEntity(),
-            UnitOfExecution m => m.ToUnitOfExecutionEntity(),
+            Responsibility m => m.ToResponsibilityEntity(organization),
+            Subject m => m.ToSubjectEntity(organization),
+            Usage m => m.ToUsageEntity(organization),
+            Context m => m.ToContextEntity(organization),
+            Execution m => m.ToExecutionEntity(organization),
+            Unit m => m.ToUnitEntity(organization),
+            UnitOfExecution m => m.ToUnitOfExecutionEntity(organization),
             _ => throw new NotSupportedException($"Unsupported annotation type: {annotation.GetType().Name}"),
         };
     }
@@ -78,10 +79,11 @@ internal static class AnnotationMappings
         UnitNames = new HashSet<string>(e.UnitNames),
     };
 
-    private static ResponsibilityEntity ToResponsibilityEntity(this Responsibility m) => new()
+    private static ResponsibilityEntity ToResponsibilityEntity(this Responsibility m, string organization) => new()
     {
         Id = string.Empty,
         PartitionKey = string.Empty,
+        Organization = organization,
         ProjectName = m.ProjectName,
         ViewName = m.ViewName,
         AnnotationKey = m.AnnotationKey,
@@ -119,10 +121,11 @@ internal static class AnnotationMappings
         ResponsibilityNames = new HashSet<string>(e.ResponsibilityNames),
     };
 
-    private static SubjectEntity ToSubjectEntity(this Subject m) => new()
+    private static SubjectEntity ToSubjectEntity(this Subject m, string organization) => new()
     {
         Id = string.Empty,
         PartitionKey = string.Empty,
+        Organization = organization,
         ProjectName = m.ProjectName,
         ViewName = m.ViewName,
         AnnotationKey = m.AnnotationKey,
@@ -164,10 +167,11 @@ internal static class AnnotationMappings
         ContextNames = new HashSet<string>(e.ContextNames),
     };
 
-    private static UsageEntity ToUsageEntity(this Usage m) => new()
+    private static UsageEntity ToUsageEntity(this Usage m, string organization) => new()
     {
         Id = string.Empty,
         PartitionKey = string.Empty,
+        Organization = organization,
         ProjectName = m.ProjectName,
         ViewName = m.ViewName,
         AnnotationKey = m.AnnotationKey,
@@ -210,10 +214,11 @@ internal static class AnnotationMappings
         ResponsibilityNames = new HashSet<string>(e.ResponsibilityNames),
     };
 
-    private static ContextEntity ToContextEntity(this Context m) => new()
+    private static ContextEntity ToContextEntity(this Context m, string organization) => new()
     {
         Id = string.Empty,
         PartitionKey = string.Empty,
+        Organization = organization,
         ProjectName = m.ProjectName,
         ViewName = m.ViewName,
         AnnotationKey = m.AnnotationKey,
@@ -259,10 +264,11 @@ internal static class AnnotationMappings
         UnitNames = new HashSet<string>(e.UnitNames),
     };
 
-    private static ExecutionEntity ToExecutionEntity(this Execution m) => new()
+    private static ExecutionEntity ToExecutionEntity(this Execution m, string organization) => new()
     {
         Id = string.Empty,
         PartitionKey = string.Empty,
+        Organization = organization,
         ProjectName = m.ProjectName,
         ViewName = m.ViewName,
         AnnotationKey = m.AnnotationKey,
@@ -309,10 +315,11 @@ internal static class AnnotationMappings
         UnitDefinition = e.UnitDefinition,
     };
 
-    private static UnitEntity ToUnitEntity(this Unit m) => new()
+    private static UnitEntity ToUnitEntity(this Unit m, string organization) => new()
     {
         Id = string.Empty,
         PartitionKey = string.Empty,
+        Organization = organization,
         ProjectName = m.ProjectName,
         ViewName = m.ViewName,
         AnnotationKey = m.AnnotationKey,
@@ -361,10 +368,11 @@ internal static class AnnotationMappings
         ContextName = e.ContextName,
     };
 
-    private static UnitOfExecutionEntity ToUnitOfExecutionEntity(this UnitOfExecution m) => new()
+    private static UnitOfExecutionEntity ToUnitOfExecutionEntity(this UnitOfExecution m, string organization) => new()
     {
         Id = string.Empty,
         PartitionKey = string.Empty,
+        Organization = organization,
         ProjectName = m.ProjectName,
         ViewName = m.ViewName,
         AnnotationKey = m.AnnotationKey,

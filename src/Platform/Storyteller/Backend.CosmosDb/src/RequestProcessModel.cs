@@ -17,7 +17,7 @@ public class RequestProcessModel
         InputContinuationToken = token;
 
         HasPartitionKey = !string.IsNullOrWhiteSpace(request.PartitionKey);
-        PartitionKey = HasPartitionKey ? new PartitionKey(request.PartitionKey) : null;
+        PartitionKey = HasPartitionKey ? OrganizationKeys.Key(request.Organization, request.PartitionKey!) : null;
     }
 
     public AnnotationsRequest Request { get; }
@@ -27,6 +27,7 @@ public class RequestProcessModel
 
     public bool HasPartitionKey { get; }
 
+    // The full key of the partition the request names, in its organization (container organizations).
     public PartitionKey? PartitionKey { get; }
 
     public ISet<AnnotationType> TypesMap { get; }
