@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
@@ -9,13 +11,18 @@ namespace _42.Platform.Storyteller
     {
         private readonly Lazy<CosmosClient> _client;
         private readonly CosmosDbOptions _options;
+        private readonly IReadOnlyList<RequestHandler> _handlers;
         private SocketsHttpHandler? _emulatorHandler;
 
+        // The request handlers registered in the services join the client's pipeline (the Cosmos DB tests check every
+        // organization-wide query with one).
         public CosmosClientProvider(
-            IOptions<CosmosDbOptions> options)
+            IOptions<CosmosDbOptions> options,
+            IEnumerable<RequestHandler>? handlers = null)
         {
             _client = new Lazy<CosmosClient>(BuildClient);
             _options = options.Value;
+            _handlers = handlers?.ToList() ?? [];
         }
 
         public CosmosClient Client => _client.Value;
@@ -59,6 +66,11 @@ namespace _42.Platform.Storyteller
                 options.HttpClientFactory = () => new HttpClient(handler, disposeHandler: false);
                 options.ConnectionMode = ConnectionMode.Gateway;
                 options.LimitToEndpoint = true;
+            }
+
+            foreach (var handler in _handlers)
+            {
+                options.CustomHandlers.Add(handler);
             }
 
             CosmosClient client = new(

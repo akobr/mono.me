@@ -104,6 +104,9 @@ public class Startup : IAsyncLifetime, ITestContext
             .AddConsole()
             .AddFilter("_42.Platform.Storyteller.KeyValues", LogLevel.Debug));
         services.AddCosmosDbAnnotations(configuration);
+
+        // every organization-wide query of the suite must filter on c.Organization (OrganizationQueryGuard)
+        services.AddSingleton<RequestHandler, OrganizationQueryGuard>();
         services.AddSingleton<CoreDbStructureBuilder>();
 
         services.AddSingleton<ConfigBindingFunction>();
