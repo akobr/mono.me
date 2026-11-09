@@ -424,6 +424,7 @@ public class TransferIsolationTests(Startup startup)
         var query = new QueryDefinition("SELECT VALUE c.Organization FROM c WHERE c.id = @id").WithParameter("@id", id);
         var organizations = new List<string>();
 
+        using var crossOrganization = OrganizationQueryGuard.AllowCrossOrganization();
         using var iterator = container.GetItemQueryIterator<string>(query);
 
         while (iterator.HasMoreResults)
