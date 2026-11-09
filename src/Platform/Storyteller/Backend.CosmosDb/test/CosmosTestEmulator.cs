@@ -54,7 +54,7 @@ public sealed class CosmosTestEmulator
     // Request charges, indexing policies and container settings behave as in Azure.
     public bool IsLikeTheService => Kind != CosmosEmulatorKind.VNext;
 
-    public static string SkipReasonOnVNext => "The vNext emulator has no request charges, no range indexes, and does not apply container settings; run with STORYTELLER_TESTS_EMULATOR=classic or the local emulator.";
+    public static string SkipReasonOnVNext => "The vNext emulator has no request charges, no range indexes, does not apply container settings, and does not keep the page size of every query; run with STORYTELLER_TESTS_EMULATOR=classic or the local emulator.";
 
     // reuseLabel keeps one reused emulator per test module: the cleanup deletes the platform database, and Testcontainers'
     // reuse is not safe when two modules start the same container at once (two containers, one hash).

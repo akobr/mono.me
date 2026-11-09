@@ -64,6 +64,19 @@ The findings of the review of pull request #182, which delivers the spec [Shared
 - **The finding.** Move the check of the bare container (`EnsureContainerSettingsAsync`) into a classic-only test.
 - **Not valid:** the test passes on the vNext emulator. The container settings are stored and read back there, as on the classic emulator. Moving it would only drop it from the vNext runs. Left as it is.
 
+### 8. The first pull request run
+
+- The vNext job of the first run on the pull request failed in one test, `CosmosKeyValueServiceTests.Listing_Pages`: the first page had 1,050 items instead of 1,000.
+- **Not related to the inline comment of section 7:** `Containers_HaveItemLevelTimeToLiveEnabled` passed in the same job (777 of 778 passed).
+- The cause is the emulator together with the client's OS:
+  - On Linux, the SDK gets the query plan from the gateway.
+  - For that single-partition query (full key, `x-ms-max-item-count: 1000`), the vNext emulator returns all 1,050 items with no continuation.
+  - From Windows, the same emulator container returns 1,000 items and a continuation.
+  - The failure reproduced every time from the .NET SDK container `mcr.microsoft.com/dotnet/sdk:10.0` against the local emulator, and the captured request and response showed the cause.
+  - The service and the classic emulator keep the page size.
+- `Listing_Pages` now carries the trait `Emulator=Classic` and skips itself on vNext. The skip reason of `CosmosTestEmulator` names the page size. On the classic emulator it passes (the 5 classic tests, 5 of 5).
+- The rest of the vNext suite passed on Linux in that job, so no other test depends on the page size.
+
 ### Validation
 
 - The affected projects build: `DbCreator`, `Api.Functions`, `Api.Web` and both Cosmos DB test projects.
@@ -71,6 +84,6 @@ The findings of the review of pull request #182, which delivers the spec [Shared
   - `Backend.CosmosDb/test` without the classic trait, with the guard: 778 of 778;
   - `Access.Certificates/testint`: 73 of 73.
 - On the pinned classic emulator:
-  - the `Emulator=Classic` tests: 4 of 4;
+  - the `Emulator=Classic` tests: 4 of 4, and 5 of 5 with `Listing_Pages`;
   - the guard tests and the isolation tests of annotations, configurations and transfers: 35 of 35.
 - The pull request trigger of the workflow runs once this branch is pushed.
