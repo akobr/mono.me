@@ -178,6 +178,30 @@ public class PolicyAwareCredentialKindTests
         _lifetimes.ShouldBe([90]);
     }
 
+    [Theory]
+    [InlineData(MachineCredentialKind.Certificate)]
+    [InlineData(MachineCredentialKind.CertificateAndApiKey)]
+    public async Task Create_AKindTheDeploymentTurnsOff_IsNotSupported(MachineCredentialKind kind)
+    {
+        var service = CreateService([MachineCredentialKind.Certificate, MachineCredentialKind.CertificateAndApiKey]);
+
+        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(
+            () => service.CreateMachineAccessAsync(Model(kind)));
+
+        exception.Message.ShouldBe($"The credential kind {kind} is not enabled in the project org1.proj1.");
+        _authority.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Create_WithoutAKind_WhenTheDefaultIsTurnedOff_UsesTheNextEnabledKind()
+    {
+        var access = await CreateService([MachineCredentialKind.Certificate, MachineCredentialKind.CertificateAndApiKey])
+            .CreateMachineAccessAsync(Model());
+
+        access.CredentialKind.ShouldBe(MachineCredentialKind.ApiKey);
+        _authority.VerifyNoOtherCalls();
+    }
+
     private static MachineAccessCreate Model(MachineCredentialKind? kind = null, int? lifetimeDays = null, bool? useSharedCertificate = null)
     {
         return new MachineAccessCreate
@@ -196,9 +220,11 @@ public class PolicyAwareCredentialKindTests
         _policyStore.Setup(store => store.GetAsync("org1", "proj1")).ReturnsAsync(policy);
     }
 
-    private PolicyAwareMachineAccessService CreateService()
+    private PolicyAwareMachineAccessService CreateService(MachineCredentialKind[]? turnedOff = null)
     {
-        var options = Options.Create(TestCertificateHelper.DefaultOptions);
+        var settings = TestCertificateHelper.DefaultOptions;
+        settings.DisabledCredentialKinds = turnedOff ?? [];
+        var options = Options.Create(settings);
 
         return new PolicyAwareMachineAccessService(
             new ApiKeyMachineAccessService(_hashStore.Object),

@@ -4,12 +4,13 @@ namespace _42.Platform.Storyteller.Accessing;
 // A policy stored before that (only CredentialKind) enables just its one kind.
 public static class MachineAuthenticationPolicies
 {
-    // The policy a project applies, with every property filled: the enabled kinds (distinct, in enum order),
-    // an enabled default kind and the default certificate lifetime within the deployment's bounds.
+    // The policy a project applies, with every property filled: the enabled kinds (distinct, in enum order, without
+    // the kinds the deployment turns off), an enabled default kind and the default certificate lifetime within the
+    // deployment's bounds.
     public static MachineAuthenticationPolicy Resolve(MachineAuthenticationPolicy? stored, MachineAuthenticationOptions options)
     {
         var requested = GetRequestedKinds(stored);
-        var enabled = Order(requested.Where(Enum.IsDefined));
+        var enabled = Order(requested.Where(kind => Enum.IsDefined(kind) && !options.IsTurnedOff(kind)));
 
         if (enabled.Count < 1)
         {
@@ -63,6 +64,13 @@ public static class MachineAuthenticationPolicies
             return $"The machine credential kind {unknown[0]:D} doesn't exist.";
         }
 
+        var turnedOff = kinds.Where(options.IsTurnedOff).ToList();
+
+        if (turnedOff.Count > 0)
+        {
+            return $"The machine credential kind {turnedOff[0]} is turned off in this deployment.";
+        }
+
         if (requested.CredentialKind is { } defaultKind && !kinds.Contains(defaultKind))
         {
             return $"The default credential kind {defaultKind} is not one of the enabled kinds.";
@@ -88,6 +96,30 @@ public static class MachineAuthenticationPolicies
             EnabledCredentialKinds = Order(kinds),
             CredentialKind = requested.CredentialKind ?? kinds[0],
         };
+    }
+
+    // Null when the deployment's settings are consistent, else why not: the kinds it turns off must exist, and the
+    // default kind, which a project without a policy enables, must not be one of them.
+    public static string? ValidateOptions(MachineAuthenticationOptions options)
+    {
+        var unknown = options.DisabledCredentialKinds.Where(kind => !Enum.IsDefined(kind)).ToList();
+
+        if (unknown.Count > 0)
+        {
+            return $"MachineAuth:DisabledCredentialKinds names {unknown[0]:D}, which is not a machine credential kind.";
+        }
+
+        if (options.IsTurnedOff(options.DefaultCredentialKind))
+        {
+            return $"MachineAuth:DefaultCredentialKind {options.DefaultCredentialKind} is turned off by MachineAuth:DisabledCredentialKinds.";
+        }
+
+        return null;
+    }
+
+    public static bool IsTurnedOff(this MachineAuthenticationOptions options, MachineCredentialKind kind)
+    {
+        return options.DisabledCredentialKinds.Contains(kind);
     }
 
     public static bool IsEnabled(this MachineAuthenticationPolicy policy, MachineCredentialKind kind)

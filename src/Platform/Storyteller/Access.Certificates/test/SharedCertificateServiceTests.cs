@@ -116,6 +116,28 @@ public class SharedCertificateServiceTests
     }
 
     [Fact]
+    public async Task IssueAsync_CertificateAndApiKeyTurnedOffByTheDeployment_IsNotSupported()
+    {
+        var storeMock = new Mock<ISharedCertificateStore>();
+        var authorityMock = new Mock<IClientCertificateAuthority>();
+        var options = TestCertificateHelper.DefaultOptions;
+        options.DisabledCredentialKinds = [MachineCredentialKind.Certificate, MachineCredentialKind.CertificateAndApiKey];
+
+        var service = new SharedCertificateService(
+            authorityMock.Object,
+            storeMock.Object,
+            PolicyStore(MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey),
+            Options.Create(options),
+            NullLogger<SharedCertificateService>.Instance);
+
+        await Should.ThrowAsync<MachineAccessNotSupportedException>(
+            () => service.IssueAsync("org1", "proj1", "my-service", 365));
+
+        authorityMock.VerifyNoOtherCalls();
+        storeMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public async Task RevokeAsync_AProjectWithoutCertificateAndApiKey_StillRevokes()
     {
         var storeMock = new Mock<ISharedCertificateStore>();

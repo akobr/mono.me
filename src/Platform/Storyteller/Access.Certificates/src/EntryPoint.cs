@@ -2,6 +2,7 @@ using _42.Platform.Storyteller.Accessing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller;
 
@@ -26,8 +27,10 @@ public static class CertificateEntryPoint
             }
         }
 
-        services.Configure<MachineAuthenticationOptions>(
-            configuration.GetSection(MachineAuthenticationOptions.SectionName));
+        services.AddOptions<MachineAuthenticationOptions>()
+            .Bind(configuration.GetSection(MachineAuthenticationOptions.SectionName))
+            .ValidateOnStart();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<MachineAuthenticationOptions>, MachineAuthenticationOptionsValidator>());
 
         services.AddSingleton<CertificateMachineAccessService>();
         services.AddSingleton<LocalCertificateAuthority>();

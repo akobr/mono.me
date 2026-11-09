@@ -914,6 +914,13 @@ The policy (`MachineAuthenticationPolicy`) is stored on the project's access poi
 | `CredentialKind` | The default kind: preselected for a new machine, and used when a create request names none. One of the enabled kinds. |
 | `CertificateLifetimeDays` | The default certificate lifetime of new machines, in days. When it is not set, `MachineAuth:CertificateLifetimeDays` (365) applies. |
 
+**Kinds a deployment turns off.** `MachineAuth:DisabledCredentialKinds` lists kinds that no project of the deployment may use, whatever its policy says; it is empty by default. A deployment whose front end passes no client certificates (such as one without mTLS yet) sets `["Certificate", "CertificateAndApiKey"]`, so nobody creates machines that could never sign in:
+
+* The effective policy (`GET` below, and every check of a machine call) leaves the turned-off kinds out. A stored policy that enabled them keeps them stored, and they work again once the setting no longer lists them. When nothing else is left, the project enables `MachineAuth:DefaultCredentialKind`.
+* A policy `PUT` that enables a turned-off kind answers `400` with "The machine credential kind Certificate is turned off in this deployment.".
+* Creating a machine of a turned-off kind answers `400 MachineAccessNotSupported`, and so does issuing a shared certificate while `CertificateAndApiKey` is turned off. Machines of a turned-off kind that already exist are refused at sign-in.
+* The startup fails when `MachineAuth:DefaultCredentialKind` is one of the turned-off kinds, or when the list names a kind that doesn't exist.
+
 Without a stored policy a project enables only `MachineAuth:DefaultCredentialKind` (`ApiKey`). A policy stored before projects could enable several kinds has only `CredentialKind`; it enables that one kind. `Federated` machines also need a deployment that registers [federation](#configuration) and the project's [trusted issuers](#trusted-issuers). The issuers are kept apart from the policy, so a policy `PUT` never touches them.
 
 `GET v1/access/points/{organization}.{project}/machine-authentication` returns the policy with every property filled, so a client does not have to know the deployment defaults. It needs `Contributor`, because Contributors create machines. `PUT` on the same route sets it, needs `Administrator`, and returns the filled policy too. The body may leave out `CredentialKind` (the first listed kind becomes the default) and `CertificateLifetimeDays` (the project then follows the deployment default). A body with only `CredentialKind` enables that one kind, as older clients send it. `PUT` returns `400` when:
