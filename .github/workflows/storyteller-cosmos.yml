@@ -5,8 +5,21 @@ name: Storyteller Cosmos DB
 # engine of the service answers right (the trait Emulator=Classic: request charges, stored sizes, expiry timing). The
 # classic job runs the whole suites on the classic Linux emulator, which charges request units and enforces the indexing
 # policy like Azure, so an ORDER BY on an excluded path or a costlier query fails here. Spec:
-# docs/Platform/Storyteller/specs/2026-11-09 Shared Organization Container.md, sections 8 and 10.
+# docs/Platform/Storyteller/specs/2026-11-09 Shared Organization Container.md, sections 8 and 10. On a pull request the
+# classic job runs only the Emulator=Classic tests; by hand or called, the whole suites.
 on:
+  pull_request:
+    paths:
+      - src/Platform/Storyteller/**
+      - src/Platform/version.json
+      - src/.stylecop/**
+      - Directory.Build.props
+      - Directory.Packages.props
+      - global.json
+      - nuget.config
+      - stylecop.json
+      - version.json
+      - .github/workflows/storyteller-cosmos.yml
   workflow_dispatch:
   workflow_call:
 
@@ -78,10 +91,15 @@ jobs:
         with:
           global-json-file: global.json
 
+      # A pull request runs the tests only this emulator answers right; the whole suites run by hand or when called.
       - name: Backend.CosmosDb
-        run: dotnet test --project "$BACKEND_TESTS" --report-trx --results-directory TestResults/backend
+        env:
+          TRAIT_FILTER: ${{ github.event_name == 'pull_request' && '--filter-trait Emulator=Classic' || '' }}
+        run: dotnet test --project "$BACKEND_TESTS" $TRAIT_FILTER --report-trx --results-directory TestResults/backend
 
+      # Its suite has no Emulator=Classic tests (a module without tests fails the run).
       - name: Access.Certificates integration
+        if: github.event_name != 'pull_request'
         run: dotnet test --project "$CERTIFICATE_TESTS" --report-trx --results-directory TestResults/certificates
 
       - name: Test results

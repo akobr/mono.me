@@ -34,8 +34,10 @@ public sealed class CosmosTestEmulator
     public const string TraitName = "Emulator";
     public const string ClassicTrait = "Classic";
 
-    private const string VNextImage = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest";
-    private const string ClassicImage = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest";
+    // Pinned to the releases the suites ran green on (vnext-latest and latest of 2026-11-09), so a new emulator release
+    // never changes a run by itself: move both tags on purpose and run the suites on them.
+    private const string VNextImage = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20261019";
+    private const string ClassicImage = "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:2.14.28";
     private const int GatewayPort = 8081;
     private const int HealthPort = 8080;
 
