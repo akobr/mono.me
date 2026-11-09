@@ -18,7 +18,7 @@ The API runs in `Development` (`DOTNET_ENVIRONMENT` in `local.settings.json`), s
 
 - .NET SDK 10 (`global.json`), Node 22.18 or newer, Docker Desktop.
 - Azure Functions Core Tools 4, the current 64-bit build (`func --version`).
-- The Windows Cosmos DB emulator, recommended: the Linux container emulator does not support stored procedures, which the Platform requires. Run the host with the `https-local-cosmos` profile to use it. It needs an elevated (administrator) start; `Backend.CosmosDb` tests use it at `https://localhost:8081`, and some of them (`KeyValueEndToEndTests`) also need Docker for Lowkey Vault.
+- Docker runs the Cosmos DB emulator of the Aspire host (the Linux vNext emulator) and of the tests (`STORYTELLER_TESTS_USE_CONTAINER=true`). The Windows Cosmos DB emulator is optional: run the host with the `https-local-cosmos` profile to use it, for request charges and indexing as in Azure. It needs an elevated (administrator) start; the `Backend.CosmosDb` tests use it at `https://localhost:8081` when `STORYTELLER_TESTS_USE_CONTAINER` is not set, and delete its database `42.Platform.2S`. Some of them (`KeyValueEndToEndTests`) also need Docker for Lowkey Vault.
 - HTTPS dev certificate: `dotnet dev-certs https --trust`.
 
 ## 2. Trust the dev certificate in Node

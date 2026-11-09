@@ -366,7 +366,7 @@ A caller that wants to know what a resolve read passes a `BindingDependencies` t
 
 The manifest is **volatile** when the resolved body can change while the recorded markers do not: JSON-e (`now`, `$fromNow`), a Key Vault read, a component that is not `IRecordingBinding`, a service that gives no marker (the default `LookupWithMarkerAsync` and `GetAnnotationWithMarkerAsync`), two markers of one input in one resolve, and a collector that no `BindingScope` carried. `BindingDependencies` fails closed: it is volatile until a scope carries it.
 
-`IConfigurationService.AreDependenciesUnchangedAsync` revalidates a manifest: one ReadMany of the items over the organization container, reading only their `_etag`. It never looks a value up, decrypts, meters or audits. An input of another kind counts as changed. The API keeps the manifests of its resolved reads and answers 304 from them ([conditional reads](inheritance.md#conditional-reads)).
+`IConfigurationService.AreDependenciesUnchangedAsync` revalidates a manifest: one ReadMany of the items (with the full keys of their organization in the container `organizations`), reading only their `_etag`. It never looks a value up, decrypts, meters or audits. An input of another kind counts as changed. The API keeps the manifests of its resolved reads and answers 304 from them ([conditional reads](inheritance.md#conditional-reads)).
 
 ## Extending the System
 

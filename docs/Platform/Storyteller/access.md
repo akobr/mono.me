@@ -6,7 +6,7 @@ An organization role does not grant access to the organization's projects. Each 
 
 ## Names
 
-New organizations, projects, and views follow one rule: 2 to 63 characters from `a-z`, `0-9`, and `-`, starting with a letter or a digit (`^[a-z0-9][a-z0-9-]{1,62}\z`). Names become route segments, container names (`org.{organization}`), and parts of keys, where `.` separates the segments, so upper case and dots are not allowed. Some words are reserved because the API or the admin UI uses them in addresses:
+New organizations, projects, and views follow one rule: 2 to 63 characters from `a-z`, `0-9`, and `-`, starting with a letter or a digit (`^[a-z0-9][a-z0-9-]{1,62}\z`). Names become route segments, the first level of the partition key of the shared container `organizations`, and parts of keys, where `.` separates the segments, so upper case and dots are not allowed. Some words are reserved because the API or the admin UI uses them in addresses:
 
 | Kind | Reserved |
 | --- | --- |
@@ -29,7 +29,7 @@ Every machine of the project lists the views, also one restricted to an annotati
 
 A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md) of its registration, null for a view that is not registered), `IsDefault`, and `IsRegistered`. `default` is always listed, also when it is not registered. Registrations live in the organization container, partition `{project}.meta`, id `view.{name}`.
 
-`?discover=true` also lists every view that holds documents of the project (annotations, configurations, templates, schemas, and their history) with `IsRegistered = false`. It is a cross-partition `SELECT DISTINCT VALUE c.ViewName` over the organization container, so it is meant for an administrator's occasional check, not for every page load.
+`?discover=true` also lists every view that holds documents of the project (annotations, configurations, templates, schemas, and their history) with `IsRegistered = false`. It is a cross-partition `SELECT DISTINCT VALUE c.ViewName` over the organization's partitions of the shared container `organizations` (filtered by `c.Organization`, with the organization as the key prefix), so it is meant for an administrator's occasional check, not for every page load.
 
 ## Projects
 

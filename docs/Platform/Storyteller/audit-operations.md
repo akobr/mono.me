@@ -9,6 +9,8 @@ This document compares how the annotation CRUD operations wrote to Cosmos DB bef
 
 The design behind the change is in [the spec](specs/2026-10-11%20Soft-delete%20and%20audit%20of%20annotations.md), and the resulting behavior in [annotation-lifecycle.md](annotation-lifecycle.md).
 
+The two stored procedures of the "before" side (`RemoveValueFromArray`, `DeleteUsageAndExecutions`) stayed registered on every container, unused, until the [shared organization container](specs/2026-11-09%20Shared%20Organization%20Container.md) removed them. The "after" side runs no server-side code.
+
 ## Summary
 
 | Operation | Before | After | RU before | RU after |

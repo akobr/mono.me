@@ -31,7 +31,7 @@ Templates are created, changed, and deleted through `IConfigurationTemplateServi
 
 The base `Entity` fields are `id`, `PartitionKey`, `ProjectName`, `ViewName`, `AnnotationKey`, `Name`, and `_ts`. Calculation addresses the item by `id` and partition key. It reads `Content` and leaves the other fields unused.
 
-Items live in the organization container (`org.{organization}` in database `42.Platform.2S`). Property names are Pascal case; the item id is `id`.
+Items live in the shared container `organizations` (database `42.Platform.2S`), in the partitions of their organization. Property names are Pascal case; the item id is `id`.
 
 ### Identity
 
@@ -135,7 +135,7 @@ Versioning follows configuration versioning:
 - A new template starts at version `1`. Each change that alters the content increments `Version`.
 - Before a change, the current item is copied into a `GenerateTemplateHistoryEntity` with id `{viewName}.gnv.{typeCode}.{version}`, in the same `{project}.template` partition. Every view has its own version sequence. The copy and the change are written in one transactional batch.
 - A delete also writes the history item of the deleted version. A template created again later continues the numbering after `LastVersion` of the state record, even when the history has already expired. Templates written before the state record existed fall back to the highest history version.
-- History items expire after 365 days (`ttl`). The current version never expires. The expiry is enforced since the containers got item-level TTL with the [key/value pairs](key-values.md#lifecycle) (`DefaultTimeToLive = -1`, set by `ContainerFactory` on new organization containers and by `2sInitDb` on existing ones); before that, the `ttl` was stored but ignored.
+- History items expire after 365 days (`ttl`). The current version never expires. The expiry is enforced since the containers got item-level TTL with the [key/value pairs](key-values.md#lifecycle) (`DefaultTimeToLive = -1`, set by `ContainerFactory` on the container `organizations`, see the [container settings](annotation-lifecycle.md#containers)); before that, the `ttl` was stored but ignored.
 - `ConfigurationVersion` describes a version: `Version`, `Modified` (who wrote the version and when, see [audit stamps](audit-stamps.md)), `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
 
 ## Merge

@@ -167,7 +167,8 @@ dotnet build src/Platform
 
 # Run all tests: the solution (in Microsoft.Testing.Platform mode dotnet test takes no traversal until .NET 11). The UI
 # automation tests skip without a target (the committed default). With STORYTELLER_TESTS_USE_CONTAINER=true each Cosmos DB
-# suite starts its own emulator container (about 1.5 GB each): give Docker 4+ CPUs and 10+ GB, or run one module at a time.
+# suite starts its own emulator container (vNext by default, about 0.6 GB each; STORYTELLER_TESTS_EMULATOR=classic about 1.5 GB
+# each: give Docker 4+ CPUs and 10+ GB, or run one module at a time).
 dotnet test --solution 42.mono.slnx
 dotnet test --solution 42.mono.slnx --max-parallel-test-modules 1   # one module at a time: slower, for a small Docker VM
 
@@ -316,7 +317,8 @@ When a spec is large and delivered in phases, create one review file per phase. 
   - IDE: Visual Studio "Use testing platform server mode", Rider "Enable Testing Platform support", VS Code C# Dev Kit "Use Testing Platform Protocol";
   - `xUnit1051` (pass `TestContext.Current.CancellationToken`) is a suggestion in `test/` and `testint/` (`.editorconfig`);
   - `mrepo build -t` in `src/Platform` or `src/Libraries` runs the tests of that area through its traversal, one module at a time (`dotnet build Directory.Build.proj -t:Test -p:SkipNonexistentTargets=true -p:TestInParallel=false`: the `test` script of the two items in `mrepo.json`); the items below them inherit the script, which runs `dotnet test --project test` in a project folder;
-  - the Cosmos DB suites delete every database of the emulator they use: by default the local Windows emulator on `https://localhost:8081`, so set `STORYTELLER_TESTS_USE_CONTAINER=true` (a Testcontainers emulator) before a run that includes them unless its data may go.
+  - the Cosmos DB suites (`Backend.CosmosDb/test`, `Access.Certificates/testint`) delete the database `42.Platform.2S` of the emulator they use: by default the local Windows emulator on `https://localhost:8081`, so set `STORYTELLER_TESTS_USE_CONTAINER=true` (a Testcontainers emulator) before a run that includes them unless its data may go. With it, `STORYTELLER_TESTS_EMULATOR` picks the emulator: `vnext` (the default: light, quick, the whole suite in one run) or `classic` (the classic Linux emulator, x64 only: real request charges and indexes). The tests that only an emulator like the service answers right carry the trait `Emulator=Classic` and skip themselves on vNext (`--filter-trait "Emulator=Classic"` selects them, `--filter-not-trait` leaves them out);
+  - the Cosmos DB layout: one database `42.Platform.2S` with two containers, `core` and `organizations` (every organization's data, hierarchical key `/Organization`, `/PartitionKey`; `OrganizationContainer` builds the keys, and every query over an organization filters on `c.Organization`); docs in `docs/Platform/Storyteller/annotation-lifecycle.md#containers`.
 - Test containers: `Testcontainers.CosmosDb`, `Testcontainers.Azurite`, `Testcontainers.PostgreSql`
 - Fake data: `Bogus`, `NBuilder`
 - Mocking: `Moq`
@@ -355,6 +357,7 @@ StyleCop is enabled by default (opt-out with `<EnableStyleCop>false</EnableStyle
 - `.github/workflows/storyteller-sdk-release.yml` — hand-run release of the Storyteller NuGet and npm packages, gated by the conformance workflow; a dry run unless `publish` is set
 - `.github/workflows/ui-admin-automation.yml` — the admin UI automation tests (TUnit + Playwright) in `mcr.microsoft.com/playwright/dotnet:v1.63.0-noble` (as user 1001; only its `Run` step gets the secrets), by hand (`workflow_dispatch`) or called (`workflow_call`); inputs `profile`, `filter` (default the Elementary set), `target_url`, `report_testiny` and `use_mock_ui` (builds and serves the admin UI's mock e2e build in the job, no secrets); a deployed target's traces are always removed from the artifact; a deployed target's settings and secrets come from the `ui-admin-automation` environment; no push or pull request trigger yet
 - `.github/workflows/cli-automation.yml` — the CLI automation tests on `ubuntu-latest` (the SDK of `global.json`, Playwright's Chromium only for the device page), by hand (`workflow_dispatch`) or called (`workflow_call`); inputs `profile`, `filter` (default the Elementary set), `target_url` and `report_testiny`; the target's settings and secrets (the CLI pool's passwords, the `apikey` machine, Testiny) come from the `cli-automation` environment, given to the `Run` step only; no push or pull request trigger yet
+- `.github/workflows/storyteller-cosmos.yml` — the Cosmos DB suites of the Storyteller backend (`Backend.CosmosDb/test`, `Access.Certificates/testint`) on Testcontainers emulators, by hand (`workflow_dispatch`) or called (`workflow_call`): a vNext job without the `Emulator=Classic` trait, and a classic job with the whole suites (request charges and indexing as in Azure)
 - `.github/workflows/cli-checks.yml` — on every pull request and push to `main` that touches the CLI or its tests: the CLI unit tests and the self tests and coverage checks of `Cli.AutomationTests` (no target, no secrets)
 - NuGet local feed: `.artifacts/` directory (configured in `nuget.config`)
 - Issues tracked in ClickUp (`https://app.clickup.com/t/{id}`)
