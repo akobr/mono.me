@@ -14,20 +14,22 @@ var storage = builder
         emulator.WithLifetime(ContainerLifetime.Persistent);
     });
 
-// Local Cosmos DB emulator, picked by Cosmos:Mode. "container" (default) runs the classic Linux emulator in a container,
-// which supports the stored procedures the backend registers (the vNext emulator does not); "local" uses the Windows
-// emulator installed on the machine (ConnectionStrings:cosmos). The launch profiles *-local-cosmos set the local mode.
+// Local Cosmos DB emulator, picked by Cosmos:Mode. "container" (default) runs the Linux vNext emulator in a container
+// (light, quick to start, x64 and Arm, with the Data Explorer); "local" uses the Windows emulator installed on the machine
+// (ConnectionStrings:cosmos), the engine of the service with real request charges and indexes. The launch profiles
+// *-local-cosmos set the local mode.
 var cosmosMode = builder.Configuration["Cosmos:Mode"] ?? "container";
 IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvariant() switch
 {
     "container" => builder
         .AddAzureCosmosDB("cosmos")
-        .RunAsClassicEmulator(emulator =>
+        .RunAsEmulator(emulator =>
         {
-            // Data Explorer is only available with the vNext emulator. The named data volume keeps the data when the
-            // container is recreated (e.g. after an Aspire upgrade).
             emulator.WithLifetime(ContainerLifetime.Persistent);
-            emulator.WithDataVolume("platform-cosmos-data");
+            // its own volume: the classic emulator's volume platform-cosmos-data holds the layout before the shared
+            // container organizations, which DbCreator refuses, and a format the vNext emulator does not read
+            emulator.WithDataVolume("platform-cosmos-vnext-data");
+            emulator.WithDataExplorer();
         }),
     "local" => builder.AddConnectionString("cosmos"),
     _ => throw new InvalidOperationException($"Unknown Cosmos:Mode '{cosmosMode}', use 'container' or 'local'."),

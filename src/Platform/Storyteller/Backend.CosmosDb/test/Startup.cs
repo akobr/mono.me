@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
@@ -9,7 +8,6 @@ using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using _42.Platform.Storyteller.KeyValues;
 using _42.Platform.Storyteller.KeyValues.Protection;
-using DotNet.Testcontainers.Builders;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
@@ -17,46 +15,23 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Polly;
-using Testcontainers.CosmosDb;
 using Xunit;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 public class Startup : IAsyncLifetime, ITestContext
 {
-    // STORYTELLER_TESTS_USE_CONTAINER=true runs against a Testcontainers emulator instead of the local one, whose
-    // databases the cleanup deletes
-    private static readonly bool UseContainer =
-        string.Equals(
-            Environment.GetEnvironmentVariable("STORYTELLER_TESTS_USE_CONTAINER"),
-            "true",
-            StringComparison.OrdinalIgnoreCase);
-
     public IConfiguration Configuration { get; private set; }
 
     public IServiceProvider Services { get; private set; }
 
-    public CosmosDbContainer DbContainer { get; private set; }
+    // The local emulator, or a reused container of the vNext (default) or classic emulator: see CosmosTestEmulator.
+    public CosmosTestEmulator Emulator { get; } = CosmosTestEmulator.FromEnvironment("backend-cosmosdb-unittests");
 
     public async ValueTask InitializeAsync()
     {
-        // Built only when used: building it needs a running Docker, the local emulator does not.
-        DbContainer = UseContainer
-            ? new CosmosDbBuilder("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
-                .WithReuse(true)
-                // Its own label, so its own reused emulator: the cleanup deletes every database, and Testcontainers' reuse
-                // is not safe when two test modules start the same container at once (two containers, one hash).
-                .WithLabel("net.42for.tests.cosmos", "backend-cosmosdb-unittests")
-                // 10 partitions, the emulator's default, named so nobody lowers it: with 5, or 8 on a reused emulator, the containers the tests create run out of partitions (503, substatus 1007).
-                .WithEnvironment("AZURE_COSMOS_EMULATOR_PARTITION_COUNT", "10")
-                // The port opens before the partitions start: wait for the emulator's "Started" line, or the first
-                // requests fail with "The SSL connection could not be established".
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(@"(?m)^Started\s*$"))
-                .Build()
-            : null!;
-
         var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5));
-        var containerTask = UseContainer ? DbContainer.StartAsync(cancellation.Token) : Task.CompletedTask;
+        var containerTask = Emulator.StartAsync(cancellation.Token);
         var services = new ServiceCollection();
         var configurationBuilder = new ConfigurationBuilder();
 
@@ -93,27 +68,24 @@ public class Startup : IAsyncLifetime, ITestContext
         });
     }
 
+    // Only the platform database: the run starts from an empty one, and other databases of the emulator stay.
     private async Task DeleteDatabasesAsync()
     {
         var clientProvider = Services.GetRequiredService<ICosmosClientProvider>();
-        var client = clientProvider.Client;
-        var iterator = client.GetDatabaseQueryIterator<DatabaseProperties>();
 
-        while (iterator.HasMoreResults)
+        try
         {
-            foreach (var database in await iterator.ReadNextAsync())
-            {
-                await client.GetDatabase(database.Id).DeleteAsync();
-            }
+            await clientProvider.Client.GetDatabase(CosmosConstants.DatabaseName).DeleteAsync();
+        }
+        catch (CosmosException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // nothing to delete
         }
     }
 
     private void Configure(IConfigurationBuilder builder)
     {
-        // the emulator image serves HTTPS, the connection string of Testcontainers names HTTP
-        var connectionString = UseContainer
-            ? DbContainer.GetConnectionString().Replace("http://", "https://", StringComparison.Ordinal)
-            : "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
+        var connectionString = Emulator.GetConnectionString();
 
         builder.Add(new MemoryConfigurationSource
         {

@@ -1,0 +1,93 @@
+name: Storyteller Cosmos DB
+
+# The Cosmos DB suites of the Storyteller backend (Backend.CosmosDb/test and Access.Certificates/testint) on
+# Testcontainers emulators. The vNext job is the everyday run: the light Linux emulator, without the tests that only the
+# engine of the service answers right (the trait Emulator=Classic: request charges, stored sizes, expiry timing). The
+# classic job runs the whole suites on the classic Linux emulator, which charges request units and enforces the indexing
+# policy like Azure, so an ORDER BY on an excluded path or a costlier query fails here. Spec:
+# docs/Platform/Storyteller/specs/2026-11-09 Shared Organization Container.md, sections 8 and 10.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: storyteller-cosmos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  STORYTELLER_TESTS_USE_CONTAINER: 'true'
+  BACKEND_TESTS: src/Platform/Storyteller/Backend.CosmosDb/test/Backend.CosmosDb.UnitTests.csproj
+  CERTIFICATE_TESTS: src/Platform/Storyteller/Access.Certificates/testint/Access.Certificates.IntegrationTests.csproj
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  vnext:
+    name: vNext emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      STORYTELLER_TESTS_EMULATOR: vnext
+    steps:
+      # The whole history: the versioning of the build fails on a shallow clone.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # One module at a time: each starts its own emulator container.
+      - name: Backend.CosmosDb
+        run: dotnet test --project "$BACKEND_TESTS" --filter-not-trait "Emulator=Classic" --report-trx --results-directory TestResults/backend
+
+      - name: Access.Certificates integration
+        run: dotnet test --project "$CERTIFICATE_TESTS" --filter-not-trait "Emulator=Classic" --report-trx --results-directory TestResults/certificates
+
+      - name: Test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyteller-cosmos-vnext
+          path: TestResults
+          if-no-files-found: ignore
+
+  classic:
+    name: Classic emulator
+    # The classic emulator image is x64 only.
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      STORYTELLER_TESTS_EMULATOR: classic
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Backend.CosmosDb
+        run: dotnet test --project "$BACKEND_TESTS" --report-trx --results-directory TestResults/backend
+
+      - name: Access.Certificates integration
+        run: dotnet test --project "$CERTIFICATE_TESTS" --report-trx --results-directory TestResults/certificates
+
+      - name: Test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyteller-cosmos-classic
+          path: TestResults
+          if-no-files-found: ignore

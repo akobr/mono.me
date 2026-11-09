@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Extensions.Configuration;
-using Testcontainers.CosmosDb;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
@@ -10,5 +9,6 @@ public interface ITestContext
 
     IServiceProvider Services { get; }
 
-    CosmosDbContainer DbContainer { get; }
+    // The emulator of the run, for the tests that only an emulator like the service answers right.
+    CosmosTestEmulator Emulator { get; }
 }
