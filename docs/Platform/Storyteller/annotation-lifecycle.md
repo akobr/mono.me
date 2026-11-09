@@ -151,6 +151,12 @@ The data of every organization is in one container, `organizations` in the datab
 
 The container has TTL on without a default expiry (`DefaultTimeToLive = -1`) and the indexing policy excludes `/Entries/*` and the audit stamps. Only items with a `ttl` expire: the versions of configurations, templates and schemas (365 days after their write) and the items of deleted annotations. DbCreator creates the container and applies the settings on every start; the `core` container is not changed. DbCreator refuses a database that still has the containers of the earlier layout (`org.{organization}`, one per organization) and says how to seed it again.
 
+The prefix key alone does not isolate organizations: the predicate on `c.Organization` does. The Cosmos DB tests run every query through `OrganizationQueryGuard`, a request handler of the suite's client that refuses a query on `organizations` without one full key unless it filters on the organization (`c.Organization = @organization`, or LINQ's `root["Organization"] = "..."`).
+
+The storage does not check that an organization exists. With a container per organization, a missing container answered `404`; in the shared container, reads of an unknown organization find nothing and writes succeed. Such data belongs to no organization of the catalog (`CosmosOrganizationCatalog` lists the access points in `core`), so the key/value usage snapshot does not count it. The access checks are the gate: a user acts only in the organizations of their account's access map, granted through an organization's access point, and a machine is a point read in its own organization. Code that writes for an organization outside these checks must make sure the organization exists first.
+
+All organizations share the throughput of the database. A busy organization can make the others wait (`429`), and Cosmos DB has no throughput per logical partition or key prefix. An organization that needs throughput of its own moves to a container or an account of its own.
+
 ## API
 
 All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Functions/src/V1/AnnotationsHttp.cs` and `AnnotationsHttp.Deleted.cs`). Writes record the caller as the actor (`GetAuditActor()`): an account with its id and name from the token, a machine with its id, or `System` for a request without an identity in `DEV_AUTH` builds.
