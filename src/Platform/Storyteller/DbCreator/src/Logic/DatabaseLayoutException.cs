@@ -9,7 +9,7 @@ namespace _42.Platform.Storyteller.DbCreator.Logic;
 public sealed class DatabaseLayoutException : Exception
 {
     public DatabaseLayoutException(IReadOnlyList<string> problems)
-        : base($"The database '{CosmosConstants.DatabaseName}' has the layout before the shared container '{CosmosConstants.OrganizationsContainerName}': {string.Join(" ", problems)}")
+        : base($"The database '{CosmosConstants.DatabaseName}' does not have the layout of the shared container '{CosmosConstants.OrganizationsContainerName}': {string.Join(" ", problems)}")
     {
         Problems = problems;
     }
