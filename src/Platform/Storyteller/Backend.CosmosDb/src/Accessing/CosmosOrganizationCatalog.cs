@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
 
 namespace _42.Platform.Storyteller.Accessing;
@@ -10,9 +11,6 @@ namespace _42.Platform.Storyteller.Accessing;
 // core is the record of which organizations exist, by their access points in the partition "access".
 public sealed class CosmosOrganizationCatalog
 {
-    private const string AccessPartition = "access";
-    private const string AccessPointIdPrefix = "apt.";
-
     private readonly IContainerRepositoryProvider _repositoryProvider;
 
     public CosmosOrganizationCatalog(IContainerRepositoryProvider repositoryProvider)
@@ -25,13 +23,13 @@ public sealed class CosmosOrganizationCatalog
     {
         var repository = _repositoryProvider.GetCore();
         var query = new QueryDefinition("SELECT VALUE c.Key FROM c WHERE STARTSWITH(c.id, @prefix) AND NOT CONTAINS(c.Key, @separator)")
-            .WithParameter("@prefix", AccessPointIdPrefix)
+            .WithParameter("@prefix", AccessPointEntity.IdPrefix)
             .WithParameter("@separator", ".");
         var organizations = new List<string>();
 
         using var iterator = repository.Container.GetItemQueryIterator<string>(
             query,
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(AccessPartition), MaxItemCount = CosmosConstants.MaxItemCountPerPage });
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(AccessPointEntity.Partition), MaxItemCount = CosmosConstants.MaxItemCountPerPage });
 
         while (iterator.HasMoreResults)
         {

@@ -6,11 +6,15 @@ namespace _42.Platform.Storyteller.Entities.Access;
 
 public record class AccessPointEntity
 {
-    public string PartitionKey => "access";
+    // The partition of core with the access points, and the prefix of their ids ("apt.{organization}[.{project}]").
+    public const string Partition = "access";
+    public const string IdPrefix = "apt.";
+
+    public string PartitionKey => Partition;
 
     [JsonProperty("id")]
     [JsonPropertyName("id")]
-    public string Id => $"apt.{Key}";
+    public string Id => $"{IdPrefix}{Key}";
 
     public required string Key { get; init; }
 
