@@ -16,6 +16,8 @@ namespace _42.Platform.Cli.Output;
 
 public static class ExtendedConsoleExtensions
 {
+    private const int CaptureWidth = 1_000_000;
+
     public static void WriteJson(this IExtendedConsole @this, object data)
     {
         var sb = new StringBuilder();
@@ -33,6 +35,10 @@ public static class ExtendedConsoleExtensions
             ColorSystem = ColorSystemSupport.TrueColor,
             Ansi = AnsiSupport.Yes,
         });
+
+        // Without a width the capture console renders 80 columns and folds a longer token inside its string, which
+        // breaks the JSON for a reader of the output (a machine's key, a long value); the terminal wraps the lines anyway.
+        captureConsole.Profile.Width = CaptureWidth;
         captureConsole.Write(new JsonText(json));
 
         var lines = captureWriter.ToString()
@@ -55,7 +61,7 @@ public static class ExtendedConsoleExtensions
     /// <param name="data">The object to serialize to JSON.</param>
     /// <param name="filePath">The path of the file to create or overwrite.</param>
     /// <remarks>
-    /// If the path points to an existing directory, no file is written and the method returns. If the file already exists, the console is prompted to confirm overwriting (default true). The method writes an empty line before and after the JSON output.
+    /// If the path points to an existing directory, no file is written and the method returns. If the file already exists, the console is prompted to confirm overwriting (default true); on redirected input the file is rewritten without a prompt. The method writes an empty line before and after the JSON output.
     /// </remarks>
     public static void WriteJsonToFile(this IExtendedConsole @this, object data, string filePath, IFileSystem fileSystem)
     {
@@ -69,7 +75,12 @@ public static class ExtendedConsoleExtensions
                 return;
             }
 
-            if (fileSystem.File.Exists(filePath))
+            if (fileSystem.File.Exists(filePath) && !@this.IsInteractive())
+            {
+                // Without a terminal the default answer of the prompt applies: the named file is rewritten.
+                Console.WriteLine($"The file '{fileSystem.Path.GetFileName(filePath)}' already exists and is rewritten.");
+            }
+            else if (fileSystem.File.Exists(filePath))
             {
                 var shouldOverride = @this.Confirm(new ConfirmOptions
                 {

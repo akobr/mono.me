@@ -1,0 +1,69 @@
+name: CLI checks
+
+# The checks of sform that need no deployment, on every pull request and push to main that touches the CLI or its tests:
+# the unit tests of the CLI, and the self tests and coverage checks of the CLI automation tests (every command, alias,
+# option, argument and fixed value of sform is covered by a case, and every case of the catalogue has its test). The case
+# tests themselves need a target and run in cli-automation.yml. No secret is used.
+on:
+  pull_request:
+    paths:
+      - 'src/Platform/Cli/**'
+      - 'src/Platform/Cli.AutomationTests/**'
+      - 'src/Platform/Automation.Shared/**'
+      - 'src/Libraries/Testing/UI.Automation.*/**'
+      - 'src/Libraries/CLI/Toolkit/**'
+      - 'src/Platform/Storyteller/Sdk.NSwag/**'
+      - 'docs/Platform/Cli.AutomationTests/test-cases.md'
+      - 'Directory.Packages.props'
+      - '.github/workflows/cli-checks.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/Platform/Cli/**'
+      - 'src/Platform/Cli.AutomationTests/**'
+      - 'src/Platform/Automation.Shared/**'
+      - 'src/Libraries/Testing/UI.Automation.*/**'
+      - 'src/Libraries/CLI/Toolkit/**'
+      - 'src/Platform/Storyteller/Sdk.NSwag/**'
+      - 'docs/Platform/Cli.AutomationTests/test-cases.md'
+      - 'Directory.Packages.props'
+      - '.github/workflows/cli-checks.yml'
+
+concurrency:
+  group: cli-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    name: CLI unit tests, self tests and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # The whole history: the versioning of the build fails on a shallow clone.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: CLI unit tests
+        run: dotnet test --project src/Platform/Cli/test
+
+      # Without Target:BaseUrl the case tests skip; the self tests of the device page skip without Chromium, and those of
+      # the pseudo terminal use util-linux script of the runner's image.
+      - name: CLI automation self tests and coverage checks
+        run: dotnet test --project src/Platform/Cli.AutomationTests/src --treenode-filter "/**[(Category=SelfTest)|(Category=Coverage)]"

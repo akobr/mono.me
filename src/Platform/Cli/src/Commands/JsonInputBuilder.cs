@@ -30,7 +30,7 @@ public static class JsonInputBuilder
     /// (see <see cref="InlineProperties"/>).
     /// </param>
     /// <returns>The built document.</returns>
-    /// <exception cref="WrongInputException">Thrown when the file doesn't exist or an inline property has a wrong format or cannot be set.</exception>
+    /// <exception cref="WrongInputException">Thrown when the file doesn't exist or holds no JSON object, or an inline property has a wrong format or cannot be set.</exception>
     public static async Task<JObject> BuildAsync(
         IExtendedConsole console,
         IFileSystem fileSystem,
@@ -50,16 +50,28 @@ public static class JsonInputBuilder
 
             // A string that looks like a date stays the string of the file, as the SDK reads it, rather than a date
             // converted to the local time zone; an -x value over it is then a string, not a date.
-            using var fileReader = fileSystem.File.OpenText(importFilePath);
-            await using var jsonReader = new JsonTextReader(fileReader) { DateParseHandling = DateParseHandling.None };
-            var fileContent = await JObject.LoadAsync(
-                jsonReader,
-                new JsonLoadSettings
-                {
-                    CommentHandling = CommentHandling.Ignore,
-                    DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Ignore,
-                    LineInfoHandling = LineInfoHandling.Ignore,
-                });
+            JObject fileContent;
+
+            try
+            {
+                using var fileReader = fileSystem.File.OpenText(importFilePath);
+                await using var jsonReader = new JsonTextReader(fileReader) { DateParseHandling = DateParseHandling.None };
+                fileContent = await JObject.LoadAsync(
+                    jsonReader,
+                    new JsonLoadSettings
+                    {
+                        CommentHandling = CommentHandling.Ignore,
+                        DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Ignore,
+                        LineInfoHandling = LineInfoHandling.Ignore,
+                    });
+            }
+            catch (JsonReaderException exception)
+            {
+                // a file that is not JSON, or a JSON array or value: the input is wrong, not the tool
+                var message = $"The file '{fileSystem.Path.GetFullPath(importFilePath)}' is not a JSON object: {exception.Message}";
+                console.WriteImportant(message);
+                throw new WrongInputException(message);
+            }
 
             content.Merge(fileContent, JsonMergeOptions);
         }

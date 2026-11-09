@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Text.RegularExpressions;
 using _42.Platform.Cli.Commands;
+using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Telemetry;
 using McMaster.Extensions.CommandLineUtils;
 using Moq;
@@ -110,6 +112,19 @@ public class CommandPathTests
             if (serviceType == typeof(IServiceProvider))
             {
                 return this;
+            }
+
+            // The settings of the process are plain classes, not mocked.
+            var paths = CliPaths.Create(new MockFileSystem(), null, MockUnixSupport.Path(@"C:\tools\sform"), () => MockUnixSupport.Path(@"C:\Users\ada"));
+
+            if (serviceType == typeof(CliPaths))
+            {
+                return paths;
+            }
+
+            if (serviceType == typeof(SformEnvironment))
+            {
+                return SformEnvironment.FromEnvironment(_ => null, paths);
             }
 
             return serviceType.IsInterface || serviceType.IsAbstract

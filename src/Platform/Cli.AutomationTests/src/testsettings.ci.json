@@ -1,0 +1,14 @@
+{
+  // A CI job (.github/workflows/cli-automation.yml): the target, the organization id and the secrets come from the job's
+  // environment (UITESTS_Target__BaseUrl, UITESTS_Target__AuthKitOrganizationId, UITESTS_Users__Pool__<n>__Password,
+  // UITESTS_Machines__apikey__ApiKey); one test at a time per pool user at most, one retry for a flaky device page.
+  "Execution": {
+    "MaxParallelTests": 4,
+    "Retries": 1,
+    "Trace": "Off",
+    "Screenshot": "OnFailure"
+  },
+  "Users": {
+    "LeaseTimeoutSeconds": 300
+  }
+}

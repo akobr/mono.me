@@ -19,6 +19,14 @@ internal static class OwnerOnlyFile
     {
         var target = fileSystem.Path.GetFullPath(path);
         var directory = fileSystem.Path.GetDirectoryName(target) ?? throw new IOException($"'{path}' is not a path of a file.");
+
+        // A folder at the path is refused before anything is written; File.Move would refuse it too, but not every
+        // file system (the mock one of the tests) does.
+        if (fileSystem.Directory.Exists(target))
+        {
+            throw new IOException($"'{path}' is a directory.");
+        }
+
         var temporary = fileSystem.Path.Combine(directory, $".{fileSystem.Path.GetFileName(target)}.{Guid.NewGuid():N}.tmp");
         var options = new FileStreamOptions
         {

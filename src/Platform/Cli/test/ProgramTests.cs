@@ -1,7 +1,12 @@
+using System;
+using System.IO;
 using System.IO.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
+using System.Net.Http;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.Configuration;
 using _42.Platform.Cli.GitHubActions;
+using _42.Platform.Cli.Output.Exceptions;
 using _42.Platform.Cli.UnitTests.Commands;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -71,6 +76,76 @@ public class ProgramTests
             args);
     }
 
+    // A command outside BaseContextCommand that stopped at a prompt on redirected input: it wrote why, Main ends with its code.
+    [Theory]
+    [InlineData(ExitCodes.WARNING_INTERACTION_NEEDED)]
+    [InlineData(ExitCodes.ERROR_WRONG_INPUT)]
+    public async Task RunAsync_OfAnOutputException_EndsWithItsExitCode(int code)
+    {
+        var exitCode = await Program.RunAsync(() => throw new InteractionNeededException(code, "sform cannot ask for the default project."), []);
+
+        exitCode.ShouldBe(code);
+    }
+
+    [Theory]
+    [InlineData("state")]
+    [InlineData("./state")]
+    public void ResolvePaths_OfARelativeHome_SaysWhyAndGivesNoPaths(string home)
+    {
+        var error = new StringWriter();
+
+        Program.ResolvePaths(name => name == "SFORM_HOME" ? home : null, new MockFileSystem(), error).ShouldBeNull();
+
+        error.ToString().ShouldBe($"! SFORM_HOME must be an absolute path, and '{home}' is relative.{Environment.NewLine}");
+    }
+
+    [Fact]
+    public void ResolvePaths_OfAnAbsoluteHome_GivesItsPaths()
+    {
+        var home = MockUnixSupport.Path(@"C:\state\ada");
+        var error = new StringWriter();
+
+        var paths = Program.ResolvePaths(name => name == "SFORM_HOME" ? home : null, new MockFileSystem(), error);
+
+        paths.ShouldNotBeNull().StateDirectory.ShouldBe(home);
+        paths.UserDirectory.ShouldBe(home);
+        error.ToString().ShouldBeEmpty();
+    }
+
+    // GEN-CLI-04: an API that does not answer is a service failure, not a crash.
+    [Fact]
+    public async Task RunAsync_OfAnUnreachableService_IsAServiceFailure()
+    {
+        var exitCode = await Program.RunAsync(
+            () => throw new HttpRequestException("No connection could be made because the target machine actively refused it. (127.0.0.1:9)"),
+            []);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_SERVICE_FAILURE);
+    }
+
+    [Fact]
+    public async Task RunAsync_OfATimedOutRequest_IsAServiceFailure()
+    {
+        var exitCode = await Program.RunAsync(
+            () => throw new TaskCanceledException("The request was canceled.", new TimeoutException("The operation was canceled.")),
+            []);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_SERVICE_FAILURE);
+    }
+
+    // A release build is Production whatever DOTNET_ENVIRONMENT says; a build from source follows it, else Development.
+    [Theory]
+    [InlineData(true, null, "Development")]
+    [InlineData(true, "  ", "Development")]
+    [InlineData(true, "Production", "Production")]
+    [InlineData(true, " Staging ", "Staging")]
+    [InlineData(false, null, "Production")]
+    [InlineData(false, "Development", "Production")]
+    public void ResolveEnvironmentName_FollowsDotnetEnvironmentInASourceBuildOnly(bool isSourceBuild, string? variable, string expected)
+    {
+        Program.ResolveEnvironmentName(name => name == "DOTNET_ENVIRONMENT" ? variable : null, isSourceBuild).ShouldBe(expected);
+    }
+
     // The command line of sform story config and its subcommands, as the host builds it.
     private static void Parse(params string[] args)
     {
@@ -85,5 +160,17 @@ public class ProgramTests
         var app = new CommandLineApplication<ConfigGetCommand>(NullConsole.Singleton);
         app.Conventions.UseDefaultConventions().UseConstructorInjection(services);
         app.Parse(args);
+    }
+
+    // A request that failed without an answer names its service when it was not the API.
+    [Theory]
+    [InlineData("https://auth.example.com", "https://api.example.com/api", "https://auth.example.com")]
+    [InlineData("https://API.example.com", "https://api.example.com/api", null)]
+    [InlineData("http://localhost:7071", "http://localhost:7071/api", null)]
+    [InlineData(null, "https://api.example.com/api", null)]
+    [InlineData("https://auth.example.com", null, null)]
+    public void UnreachableTargetOf_IsTheServiceOtherThanTheApi(string? lastTarget, string? baseUrl, string? expected)
+    {
+        Program.UnreachableTargetOf(lastTarget, baseUrl).ShouldBe(expected);
     }
 }

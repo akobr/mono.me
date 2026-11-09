@@ -30,7 +30,7 @@ public class KeyValueListCommand : KeyValueCommandBase
 {
     private readonly TimeProvider _timeProvider;
 
-    // Required: McMaster ignores default values and resolves every parameter (Startup registers TimeProvider.System).
+    // No optional parameter: McMaster's constructor injection ignores its default and fails on a type the container lacks.
     public KeyValueListCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, TimeProvider timeProvider)
         : base(console, context, keyValues)
     {

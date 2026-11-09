@@ -34,7 +34,7 @@ public class AccessPointListCommand : BaseCommand
         {
             account = await _accessApi.GetAccountAsync();
         }
-        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound or (int)HttpStatusCode.Unauthorized)
+        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",

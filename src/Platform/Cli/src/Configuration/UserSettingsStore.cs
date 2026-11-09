@@ -18,8 +18,10 @@ public sealed class UserSettingsStore : IUserSettingsStore
     private readonly IFileSystem _fileSystem;
     private readonly IReadOnlyDictionary<string, string> _legacyFilePaths;
 
-    public UserSettingsStore(IFileSystem fileSystem)
-        : this(fileSystem, UserSettingsLocation.GetFilePath(fileSystem), UserSettingsLocation.GetLegacyFilePaths(fileSystem))
+    // The paths of CliPaths: sform.settings.json in the user directory, the legacy files in the state directory (both
+    // SFORM_HOME when it is set).
+    public UserSettingsStore(IFileSystem fileSystem, CliPaths paths)
+        : this(fileSystem, paths.UserSettingsFile, paths.LegacySettingsFiles)
     {
     }
 

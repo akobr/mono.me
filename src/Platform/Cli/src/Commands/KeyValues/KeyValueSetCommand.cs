@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
 using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller.Sdk.ClientSideEncryption;
@@ -164,6 +165,7 @@ public class KeyValueSetCommand : KeyValueCommandBase
 
         if (KeyValueLevels.IsSecret(level))
         {
+            Console.EnsureInteractiveValue($"the value of '{Key}'", "Pass it with --stdin, with -i|--import <file>, or as an argument.");
             return Console.Password(new PasswordOptions { Message = $"Value of '{Key}'" });
         }
 

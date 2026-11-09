@@ -41,6 +41,8 @@ public class KeyValuePurgeCommand : KeyValueBulkCommandBase
 
         if (!Yes)
         {
+            Console.EnsureInteractive("the confirmation of the purge", "Pass -y|--yes to purge without asking.");
+
             if (HasPrefix)
             {
                 var typed = Console.Input<string>($"Type the view name '{Context.ViewName}' to purge {DescribeTarget()}");

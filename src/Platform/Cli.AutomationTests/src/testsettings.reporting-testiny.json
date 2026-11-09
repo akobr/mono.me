@@ -1,0 +1,28 @@
+{
+  // Reports the run to Testiny project 2SC (id 2) as a classic test run whose test cases are the [TestCase] ids of the
+  // tests; combine it with a target profile, e.g. UITESTS_PROFILE=dev,reporting-testiny. The API key is not committed:
+  // the user secrets (Reporting:Testiny:ApiKey) or UITESTS_Reporting__Testiny__ApiKey.
+  // docs/Platform/Cli.AutomationTests/automation-tests.md, "Testiny".
+  "Reporting": {
+    "Enabled": true,
+    "Systems": [ "Testiny" ],
+    "Testiny": {
+      "BaseUrl": "https://app.testiny.io/api/v1/",
+      "ApiKey": "",
+      "ProjectId": 2,
+      "TestPlanId": null,
+      "Mode": "TestRun",
+      "PlanCasesAsNotRun": true,
+      "CloseRunOnComplete": true,
+      "Attachments": "Failures",
+      "MaxAttachmentBytes": 26214400,
+      "Comments": "Failures",
+      "ResultForSkipped": "SKIPPED",
+      "ResultForBlocked": "BLOCKED",
+      "RequestTimeoutSeconds": 30,
+      "MinUploadBytesPerSecond": 262144,
+      // Not verified against the Testiny app: set the form "Copy link to test run" shows ({AppUrl}, {ProjectId}, {RunId}).
+      "RunUrlTemplate": "{AppUrl}/{ProjectId}/testruns/{RunId}"
+    }
+  }
+}

@@ -105,14 +105,13 @@ public class StorytellerSetCommand : BaseContextCommand
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
-            using var fileReader = _fileSystem.File.OpenText(ImportFilePath);
-
-            // A date-like string stays as written: parsed, it would be written back in the offset of this machine.
-            await using var jsonReader = new JsonTextReader(fileReader) { DateParseHandling = DateParseHandling.None };
             object? serializedAnnotation;
 
             try
             {
+                using var fileReader = _fileSystem.File.OpenText(ImportFilePath);
+                // A date-like string stays as written: parsed, it would be written back in the offset of this machine.
+                await using var jsonReader = new JsonTextReader(fileReader) { DateParseHandling = DateParseHandling.None };
                 var fileContent = await JObject.LoadAsync(
                     jsonReader,
                     new JsonLoadSettings
@@ -127,6 +126,7 @@ public class StorytellerSetCommand : BaseContextCommand
             }
             catch (JsonException exception)
             {
+                // a file that is not JSON, a JSON array, or a property of the wrong type: the input is wrong, not the tool
                 Console.WriteErrorLine($"The import file '{_fileSystem.Path.GetFileName(ImportFilePath)}' does not contain a valid annotation: {exception.Message}");
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
@@ -210,26 +210,13 @@ public class StorytellerSetCommand : BaseContextCommand
             Console.WriteErrorLine($"The annotation {annotationKey} could not be sent: {e.Message}");
             return ExitCodes.ERROR_CRASH;
         }
-        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.BadRequest or (int)HttpStatusCode.Conflict)
-        {
-            // for example InvalidAnnotation: the server names the field and its limit
-            Console.WriteLine(e.GetErrorMessage());
-            return e.StatusCode == (int)HttpStatusCode.BadRequest ? ExitCodes.ERROR_WRONG_INPUT : ExitCodes.ERROR_CRASH;
-        }
-        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
-        {
-            // for example the restore of --restore-deleted by a machine without the management scope Annotation.Manage
-            return Console.WriteApiError(e);
-        }
-        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound or (int)HttpStatusCode.PreconditionFailed)
-        {
-            // for example a replace of a version that changed since its read (AnnotationPreconditionFailed)
-            return Console.WriteApiError(e);
-        }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
-            Console.WriteLine($"Error occurred: {e.Message}");
-            return ExitCodes.ERROR_CRASH;
+            // the server's message and code: for example InvalidAnnotation (400), where the server names the field and its
+            // limit, a 409 (a concurrent change, a deleted annotation) or a 412 (a replace of a version that changed since
+            // its read, AnnotationPreconditionFailed), all 2; the restore of --restore-deleted by a machine without the
+            // management scope Annotation.Manage (403, 44); a failure of the service 3
+            return Console.WriteApiError(e);
         }
     }
 
@@ -403,13 +390,12 @@ public class StorytellerSetCommand : BaseContextCommand
         {
             choice = CreateNewChoice;
         }
-        else if (Console.Console?.IsInputRedirected == true)
-        {
-            Console.WriteLine("Choose what happens to them: --restore-deleted restores and updates them, --recreate creates them new.");
-            return (ExitCodes.ERROR_WRONG_INPUT, false);
-        }
         else
         {
+            Console.EnsureInteractiveValue(
+                "what happens to the deleted annotations",
+                "Choose with an option: --restore-deleted restores and updates them, --recreate creates them new.");
+
             choice = Console.Select(new SelectOptions<string>
             {
                 Message = "What do you want to do",

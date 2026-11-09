@@ -1,0 +1,244 @@
+{
+  "$comment": "The options of sform whose values come from a fixed set (spec §4.1): each value is an item CommandCoverageTests wants covered as [Covers(\"<command>\", \"<option>=<value>\")]. command: the canonical path without sform (no alias); option: its long form, or argument: arg0, arg1, … for a positional argument with a fixed set, whose values are covered as \"arg0=<value>\"; values: as the catalogue writes them (compared without case), every value the CLI accepts and acts on; source: where the CLI's code keeps the set, and who refuses the members left out; enum: the enum the code parses the value into (the test checks the values against its members, but those in except (the CLI refuses them) and refused (the CLI sends them, the platform refuses them), plus those in extra). Unknown fields fail the test. See docs/Platform/Cli.AutomationTests/automation-tests.md#coverage-valuesjson.",
+  "options": [
+    {
+      "command": "account points grant",
+      "option": "--role",
+      "values": [ "Reader", "Contributor", "ContributorWithSecrets", "Administrator", "Owner" ],
+      "enum": "_42.Platform.Storyteller.Sdk.PermissionRole",
+      "refused": [ "None" ],
+      "source": "AccessPointGrantCommand: Enum.TryParse<PermissionRole>(ignoreCase), and an unknown or missing role grants Contributor; None is sent, and the API refuses it (AccessHttp: \"The role None can't be granted or revoked.\")."
+    },
+    {
+      "command": "account points revoke",
+      "option": "--role",
+      "values": [ "Reader", "Contributor", "ContributorWithSecrets", "Administrator", "Owner" ],
+      "enum": "_42.Platform.Storyteller.Sdk.PermissionRole",
+      "refused": [ "None" ],
+      "source": "AccessPointRevokeCommand: Enum.TryParse<PermissionRole>(ignoreCase), and an unknown or missing role revokes Reader; None is sent, and the API refuses it (AccessHttp: \"The role None can't be granted or revoked.\")."
+    },
+    {
+      "command": "account settings editor",
+      "argument": "arg0",
+      "values": [ "vscode", "neovim", "vim", "custom" ],
+      "enum": "_42.Platform.Cli.Configuration.EditorType",
+      "source": "AccountSettingsEditorCommand: UserSettingDefinitions.ParseEditorName (Configuration/UserSettingDefinitions.cs, EditorNames: a name per member of EditorType, in any case); another type ends with exit 2 (\"'<type>' is no editor sform knows; use vscode, neovim, vim, custom.\"). Without a type the command asks in a terminal (EditorService.PromptEditorPreference)."
+    },
+    {
+      "command": "account settings set",
+      "argument": "arg0",
+      "values": [ "editor.type", "editor.command", "access.project", "access.view" ],
+      "source": "AccountSettingsSetCommand.FindDefinition: UserSettingDefinitions.Find (Configuration/UserSettingDefinitions.cs, UserSettingDefinitions.All, the key in any case); another key, or none, ends with exit 2 (\"'<key>' is no setting sform knows; the settings are editor.type, editor.command, access.project, access.view.\")."
+    },
+    {
+      "command": "account settings unset",
+      "argument": "arg0",
+      "values": [ "editor.type", "editor.command", "access.project", "access.view" ],
+      "source": "AccountSettingsUnsetCommand: AccountSettingsSetCommand.FindDefinition, as for set (UserSettingDefinitions.All); another key, or none, ends with exit 2."
+    },
+    {
+      "command": "account machine create",
+      "option": "--scope",
+      "values": [ "AnnotationRead", "AnnotationWrite", "ConfigurationRead", "ConfigurationWrite", "SecretsRead", "SecretsWrite", "ConfigurationTransfer", "SchemaWrite", "TemplateWrite", "AnnotationManage", "KeyValueManage" ],
+      "enum": "_42.Platform.Storyteller.Sdk.MachineScope",
+      "source": "MachineScopes.TryParse (Commands/MachineAccess/MachineScopes.cs): the enum name, the scope string (Secrets.Read) or kebab case (secrets-read) in any case, repeated or comma-separated; MachineScopes.Names."
+    },
+    {
+      "command": "account machine create",
+      "option": "--manage",
+      "values": [ "ConfigurationTransfer", "SchemaWrite", "TemplateWrite", "AnnotationManage", "KeyValueManage" ],
+      "enum": "_42.Platform.Storyteller.Sdk.MachineScope",
+      "except": [ "AnnotationRead", "AnnotationWrite", "ConfigurationRead", "ConfigurationWrite", "SecretsRead", "SecretsWrite" ],
+      "source": "MachineCreateCommand: MachineScopes.TryParse, then only the management scopes (MachineScopes.ManagementNames); the CLI refuses a runtime scope with exit 2 (\"… is not a management scope; give it with --scope.\")."
+    },
+    {
+      "command": "account machine create",
+      "option": "--credential-kind",
+      "values": [ "ApiKey", "Certificate", "CertificateAndApiKey", "ClientCredentials", "Federated" ],
+      "enum": "_42.Platform.Storyteller.Sdk.MachineAccessCreateCredentialKind",
+      "source": "MachineCreateCommand: CredentialKinds.TryParse<MachineAccessCreateCredentialKind> (the name in any case or kebab case); CredentialKinds.Names."
+    },
+    {
+      "command": "account machine machine-auth",
+      "option": "--credential-kind",
+      "values": [ "ApiKey", "Certificate", "CertificateAndApiKey", "ClientCredentials", "Federated" ],
+      "enum": "_42.Platform.Storyteller.Sdk.MachineCredentialKind",
+      "source": "MachineAuthSetCommand: CredentialKinds.TryParse<MachineCredentialKind>, repeated or comma-separated."
+    },
+    {
+      "command": "account machine machine-auth",
+      "option": "--default-kind",
+      "values": [ "ApiKey", "Certificate", "CertificateAndApiKey", "ClientCredentials", "Federated" ],
+      "enum": "_42.Platform.Storyteller.Sdk.MachineCredentialKind",
+      "source": "MachineAuthSetCommand: CredentialKinds.TryParse<MachineCredentialKind>, and one of the kinds of --credential-kind."
+    },
+    {
+      "command": "storyteller",
+      "option": "--tree-root",
+      "values": [ "rst", "responsibility", "sbt" ],
+      "source": "StorytellerListCommand.RenderTreeAsync: 'responsibility' or rst (AnnotationTypeCodes.Responsibility) renders the tree of responsibilities, anything else (sbt) the tree of subjects."
+    },
+    {
+      "command": "storyteller export",
+      "option": "--format",
+      "values": [ "folder", "git" ],
+      "enum": "_42.Platform.Storyteller.Sdk.ViewExportCreateFormat",
+      "source": "ViewTransferArguments.TryParseFormat: folder or git in any case."
+    },
+    {
+      "command": "storyteller export",
+      "option": "--include",
+      "values": [ "annotations", "schemas", "templates", "configurations" ],
+      "enum": "_42.Platform.Storyteller.Sdk.ViewArchiveContent",
+      "source": "ViewTransferArguments.TryParseInclude: the names of ViewArchiveContent in any case, repeated or comma-separated."
+    },
+    {
+      "command": "storyteller import",
+      "option": "--include",
+      "values": [ "annotations", "schemas", "templates", "configurations" ],
+      "enum": "_42.Platform.Storyteller.Sdk.ViewArchiveContent",
+      "source": "ViewTransferArguments.TryParseInclude: the names of ViewArchiveContent in any case, repeated or comma-separated."
+    },
+    {
+      "command": "storyteller import",
+      "option": "--existing",
+      "values": [ "overwrite", "skip" ],
+      "enum": "_42.Platform.Storyteller.Sdk.ViewImportExisting",
+      "source": "ViewTransferArguments.TryParseExisting: the names of ViewImportExisting in any case."
+    },
+    {
+      "command": "storyteller config",
+      "option": "--format",
+      "values": [ "json", "flat", "properties", "env", "yaml" ],
+      "enum": "_42.Platform.Storyteller.ConfigurationFormats.ConfigurationFormat",
+      "extra": [ "json" ],
+      "source": "ConfigGetCommand: json (the model, the default), else ConfigurationFormatNames.TryParse into ConfigurationFormat."
+    },
+    {
+      "command": "storyteller config export",
+      "option": "--format",
+      "values": [ "env", "flat", "properties", "yaml", "json" ],
+      "enum": "_42.Platform.Storyteller.ConfigurationFormats.ConfigurationFormat",
+      "extra": [ "json" ],
+      "source": "ConfigExportCommand.Validate: env (the default) when --format is missing, else ConfigurationReads.TryParseFormat: json (any case) is the content JSON alone, the other names ConfigurationFormatNames.TryParse into ConfigurationFormat."
+    },
+    {
+      "command": "storyteller config export",
+      "option": "--mask",
+      "values": [ "bound", "all" ],
+      "enum": "_42.Platform.Cli.Commands.Configuration.MaskMode",
+      "source": "ConfigExportCommand.Validate: Ascii.EqualsIgnoreCase(Mask, \"bound\" | \"all\") into MaskMode; bound when --mask is missing."
+    },
+    {
+      "command": "storyteller kv",
+      "option": "--protection",
+      "values": [ "public", "standard", "hsm", "byok", "hyok" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+      "source": "KeyValueListCommand: KeyValueLevels.Parse for each (KeyValueLevels.Names, the names of KeyValueProtection in any case)."
+    },
+    {
+      "command": "storyteller kv set",
+      "option": "--protection",
+      "values": [ "public", "standard", "hsm", "byok", "hyok" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+      "source": "KeyValueSetCommand.ResolveLevelAsync: KeyValueLevels.Parse; hyok encrypts on the client."
+    },
+    {
+      "command": "storyteller kv protect",
+      "option": "--protection",
+      "values": [ "standard", "hsm", "byok" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+      "except": [ "Public", "Hyok" ],
+      "source": "KeyValueProtectCommand (KeyValueBulkCommands.cs): KeyValueLevels.Parse, then the CLI refuses public and hyok with exit 2 (only the server-side levels can be reached)."
+    },
+    {
+      "command": "storyteller kv export",
+      "option": "--format",
+      "values": [ "json", "flat", "env" ],
+      "enum": "_42.Platform.Cli.Commands.KeyValues.KeyValueFileFormat",
+      "source": "KeyValueExportCommand.ResolveFormat: KeyValueFormats.TryParseFormat (document, flat-json, dotenv and .env are other names of the same three)."
+    },
+    {
+      "command": "storyteller kv export",
+      "option": "--protection",
+      "values": [ "public", "standard", "hsm", "byok", "hyok" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+      "source": "KeyValueExportCommand: KeyValueLevels.Parse for each."
+    },
+    {
+      "command": "storyteller kv import",
+      "option": "--format",
+      "values": [ "json", "flat", "env" ],
+      "enum": "_42.Platform.Cli.Commands.KeyValues.KeyValueFileFormat",
+      "source": "KeyValueImportCommand.ResolveFormat: KeyValueFormats.TryParseFormat (document, flat-json, dotenv and .env are other names of the same three)."
+    },
+    {
+      "command": "storyteller kv import",
+      "option": "--protection",
+      "values": [ "standard", "hsm", "byok" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+      "except": [ "Public", "Hyok" ],
+      "source": "KeyValueImportCommand.ResolveSecretLevelAsync: the level of the keys --secret matches; public and hyok end with exit 2 (the keys are secrets, and hyok needs values encrypted on the client)."
+    },
+    {
+      "command": "storyteller kv import",
+      "option": "--mode",
+      "values": [ "merge", "replace" ],
+      "source": "KeyValueImportCommand.ParseMode: merge (the default) or replace in any case."
+    },
+    {
+      "command": "storyteller kv policy set",
+      "option": "--allow",
+      "values": [ "public", "standard", "hsm", "byok", "hyok" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+      "source": "KeyValuePolicySetCommand (KeyValuePolicyCommand.cs): KeyValueLevels.Parse for each, into AllowedProtections2."
+    },
+    {
+      "command": "storyteller kv policy set",
+      "option": "--default",
+      "values": [ "standard", "hsm", "byok", "hyok" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+      "refused": [ "Public" ],
+      "source": "KeyValuePolicySetCommand: KeyValueLevels.Parse into KeyValuePolicyUpdateDefaultSecretProtection; public is sent, and the API refuses it as the default secret level (CosmosKeyValuePolicyService: \"The default secret level must be an allowed secret level\")."
+    },
+    {
+      "command": "storyteller kv policy set",
+      "option": "--require-mtls",
+      "values": [ "true", "false" ],
+      "source": "KeyValuePolicySetCommand.ParseBool: bool.TryParse."
+    },
+    {
+      "command": "storyteller kv policy rotate",
+      "option": "--protection",
+      "values": [ "standard", "hsm" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueProtection",
+      "except": [ "Public", "Byok", "Hyok" ],
+      "source": "KeyValueRotateCommand (KeyValuePolicyCommand.cs): KeyValueLevels.Parse, then the CLI refuses all but Standard and Hsm with exit 2 (the customer rotates a byok key in their own vault)."
+    },
+    {
+      "command": "storyteller kv audit",
+      "option": "--operation",
+      "values": [ "Reveal", "Export", "BindingRead", "Create", "Update", "Delete", "Restore", "PermanentDelete", "Purge", "Reprotect", "Import", "PolicyChange", "Rotate", "Rewrap", "ByokVerify", "ByokUnavailable", "RecipientAdded", "RecipientChanged", "RecipientRemoved" ],
+      "enum": "_42.Platform.Storyteller.Sdk.KeyValueAuditEventOperation",
+      "source": "KeyValueAuditCommand.ParseOperation: Enum.TryParse<KeyValueAuditEventOperation>(ignoreCase) and Enum.IsDefined."
+    },
+    {
+      "command": "storyteller schema type diff",
+      "option": "--format",
+      "values": [ "json", "unified" ],
+      "source": "SchemaTypeDiffCommand (SchemaOperations.DiffAsync): json (the default) prints the API's JSON diff; unified reads the same JSON diff and writes it as unified text (DiffResultConsoleExtensions.WriteUnifiedDiff)."
+    },
+    {
+      "command": "storyteller schema annotation diff",
+      "option": "--format",
+      "values": [ "json", "unified" ],
+      "source": "SchemaAnnotationDiffCommand (SchemaOperations.DiffAsync): json (the default) prints the API's JSON diff; unified reads the same JSON diff and writes it as unified text (DiffResultConsoleExtensions.WriteUnifiedDiff)."
+    },
+    {
+      "command": "storyteller schema descendant diff",
+      "option": "--format",
+      "values": [ "json", "unified" ],
+      "source": "SchemaDescendantDiffCommand (SchemaOperations.DiffAsync): json (the default) prints the API's JSON diff; unified reads the same JSON diff and writes it as unified text (DiffResultConsoleExtensions.WriteUnifiedDiff)."
+    }
+  ]
+}

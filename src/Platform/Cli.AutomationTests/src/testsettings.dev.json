@@ -1,0 +1,11 @@
+{
+  // The local Storyteller API: the Azure Functions host of the Aspire host (dotnet run --project src/Platform/Aspire.Host/src)
+  // or func start, on port 7071, with the committed CLI pool of AuthKit staging (passwords in the user secrets). It must be
+  // running: otherwise the target check fails every test.
+  "Target": {
+    "BaseUrl": "http://localhost:7071/api",
+    // The Aspire host runs the API with the Key Vault emulator, which stands in for the platform's BYOK application
+    // (kv policy byok-setup, byok-verify).
+    "Features": [ "ByokApplication" ]
+  }
+}

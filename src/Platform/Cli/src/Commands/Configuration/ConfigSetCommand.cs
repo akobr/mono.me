@@ -42,16 +42,8 @@ public class ConfigSetCommand : BaseContextCommand
 
     public bool AreInlinePropertiesSpecified => InlineProperties?.Length > 0;
 
-    [Option("-c|--custom-properties", CommandOptionType.MultipleValue, Description = "Specify custom properties to be set on the configuration.")]
-    public string[]? CustomProperties { get; set; }
-
-    public bool AreCustomPropertiesSpecified => CustomProperties?.Length > 0;
-
-    [Option("-l|--labels", CommandOptionType.MultipleValue, Description = "Specify labels to be set on the configuration.")]
-    public string[]? Labels { get; set; }
-
-    public bool AreLabelsSpecified => Labels?.Length > 0;
-
+    // No -c|--custom-properties or -l|--labels: the write of a configuration takes its content alone, and the API stores
+    // no custom properties or labels of a configuration (they belong to the annotation, see story set).
     [Option("--replace", CommandOptionType.NoValue, Description = "Replace the stored content of the configuration instead of merging into it (removes properties which are not specified).")]
     public bool IsReplaceRequested { get; set; }
 
@@ -61,8 +53,6 @@ public class ConfigSetCommand : BaseContextCommand
     protected override async Task<int> ExecuteAsync()
     {
         var config = await JsonInputBuilder.BuildAsync(Console, _fileSystem, ImportFilePath, InlineProperties);
-
-        // TODO: [P1] add support for custom properties and labels
         _42.Platform.Storyteller.Sdk.Configuration? data;
 
         try
@@ -112,13 +102,9 @@ public class ConfigSetCommand : BaseContextCommand
         }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
-            if (SchemaValidationConsole.TryWrite(Console, e))
-            {
-                return ExitCodes.ERROR_WRONG_INPUT;
-            }
-
-            Console.WriteLine($"Error occurred: {e.Message}");
-            return ExitCodes.ERROR_CRASH;
+            // a schema violation lists the configurations; a 403 (a Reader, a machine without Configuration.Write) is 44
+            // with the server's message, a 412 or another rejection 2, a failure of the service 3
+            return SchemaValidationConsole.WriteWriteError(Console, e);
         }
 
         Console.WriteJson(data);

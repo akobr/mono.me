@@ -1,10 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using _42.CLI.Toolkit.Output;
 using Alba.CsConsoleFormat;
+using McMaster.Extensions.CommandLineUtils;
 using Moq;
 
 namespace _42.Platform.Cli.UnitTests.Commands;
@@ -17,6 +19,8 @@ internal sealed class RecordingConsole
     private readonly List<string> _lines = [];
     private readonly List<RecordedTable> _tables = [];
     private readonly StringBuilder _pending = new();
+    private readonly StringWriter _error = new();
+    private readonly StringWriter _output = new();
 
     public RecordingConsole()
     {
@@ -66,6 +70,27 @@ internal sealed class RecordingConsole
     public IReadOnlyList<string> Lines => _lines;
 
     public IReadOnlyList<RecordedTable> Tables => _tables;
+
+    // What went to standard error of the inner console, after UseInnerConsole.
+    public string ErrorText => _error.ToString();
+
+    // What went to standard output of the inner console as it is (WriteRaw), after UseInnerConsole.
+    public string OutputText => _output.ToString();
+
+    public IReadOnlyList<string> ErrorLines => ErrorText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+    // An inner console (Console.Console) whose standard output and error are recorded; with redirectedInput, the
+    // standard input is redirected and reads the given text, as for a pipe or a job without a terminal.
+    public RecordingConsole UseInnerConsole(bool redirectedInput, string input = "")
+    {
+        var inner = new Mock<IConsole>();
+        inner.SetupGet(console => console.IsInputRedirected).Returns(redirectedInput);
+        inner.SetupGet(console => console.Error).Returns(_error);
+        inner.SetupGet(console => console.Out).Returns(_output);
+        inner.SetupGet(console => console.In).Returns(new StringReader(input));
+        Mock.SetupGet(console => console.Console).Returns(inner.Object);
+        return this;
+    }
 
     // The plain text of an element: also of the cells of a table.
     internal static string ToText(object? element)

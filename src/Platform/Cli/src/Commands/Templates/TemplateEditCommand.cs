@@ -34,6 +34,9 @@ public class TemplateEditCommand : BaseContextCommand
     [Argument(0, Description = "An annotation type code (rst, unt, sbt, usg, cnt, exe, uxe) to edit the template for.")]
     public string AnnotationType { get; set; } = string.Empty;
 
+    [Option("-y|--yes", CommandOptionType.NoValue, Description = "Save the edited template without asking for confirmation.")]
+    public bool Yes { get; set; }
+
     /// <summary>
     /// Opens the template in the configured editor and replaces the template with the edited document when the user confirms.
     /// </summary>
@@ -43,11 +46,20 @@ public class TemplateEditCommand : BaseContextCommand
     /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
     /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
     /// - <c>ExitCodes.WARNING_UNAUTHORIZED_ACCESS</c> when the API refused the change with 403, with the server's message;
-    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code or the API rejected the change otherwise.
+    /// - <c>ExitCodes.ERROR_WRONG_INPUT</c> when the API rejected the change (400, 404, 409, 412), with the server's message;
+    /// - <c>ExitCodes.ERROR_SERVICE_FAILURE</c> when the service failed (5xx);
+    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
     /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
         var annotationType = Console.ValidateAnnotationType(AnnotationType);
+
+        // The changes are confirmed before they are saved: without a terminal, fail before any call or editor.
+        if (!Yes)
+        {
+            Console.EnsureInteractive("the confirmation of the changes", "Pass -y|--yes to save them without asking.");
+        }
+
         var currentContent = await _templatesApi.GetTemplateContentAsync(
             Context.OrganizationName,
             Context.ProjectName,
@@ -64,7 +76,8 @@ public class TemplateEditCommand : BaseContextCommand
             _editorOptions,
             currentContent ?? new JObject(),
             $"template-{Context.ViewName}-{annotationType}",
-            currentContent is null);
+            currentContent is null,
+            confirm: !Yes);
 
         if (result.Edited is null)
         {
@@ -91,15 +104,10 @@ public class TemplateEditCommand : BaseContextCommand
             Console.WriteImportant($"Template for '{annotationType}' has been saved (version {saved.Version}).");
             return ExitCodes.SUCCESS;
         }
-        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
-        {
-            // for example a machine without the management scope Template.Write: the server names it
-            return Console.WriteApiError(e);
-        }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
-            Console.WriteLine($"Error occurred: {e.Message}");
-            return ExitCodes.ERROR_CRASH;
+            // for example a machine without the management scope Template.Write (403): the server names it
+            return SchemaValidationConsole.WriteWriteError(Console, e);
         }
     }
 }

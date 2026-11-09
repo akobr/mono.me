@@ -1,0 +1,107 @@
+{
+  // The committed defaults; docs/Platform/Cli.AutomationTests/automation-tests.md ("Configure") lists every layer above
+  // them. No secrets here: passwords and machine keys go to the user secrets (or UITESTS_* variables in CI). Without
+  // Target:BaseUrl every CLI test is skipped (the self tests still run), so the solution's dotnet test passes without a
+  // running API; the dev profile (UITESTS_PROFILE=dev) targets the local API (Aspire or func start, port 7071).
+  "Target": {
+    // The API's base URL, /api included, e.g. https://<host>/api; sform gets it as SFORM_general__baseUrl.
+    "BaseUrl": "",
+    "Organization": "cli-tests",
+    "Project": "automation",
+    "View": "default",
+    // None: the runtime signs nobody in; a pool user signs in through sform's device code, whose AuthKit page asks for
+    // the e-mail and the password (typed in an untraced browser context).
+    "SignIn": "None",
+    // The WorkOS organization id (org_…) the pool users sign in to, passed as sform account -o (which takes the WorkOS
+    // id, not the 2S organization name); null signs in without -o, which works for a pool user in one organization.
+    "AuthKitOrganizationId": null,
+    // { "<Role>": "<org>/<project>[/<view>]" }: a project where every pool user holds the role, for the tests of that
+    // role ([UserRole]); a role without an entry leases a pool user who holds it in Target:Project.
+    "RoleProjects": {},
+    // What the target offers beyond the basics ([RequiresFeature]): Byok (with KeyValues below), ByokApplication (the
+    // platform's BYOK application on the API; Byok implies it), Hsm, Registration, MultiOrganization (each with a pool
+    // user whose Roles list the feature's name). A test of a feature that is not listed is skipped.
+    "Features": []
+  },
+  // The target's customer key of the Byok cases, required when Target:Features lists Byok: the versionless URI of a Key
+  // Vault key the platform's application may wrap and unwrap with (https://<vault>.vault.azure.net/keys/<name>), and the
+  // Entra tenant id (a GUID) of the vault.
+  "KeyValues": {
+    "ByokKeyUri": null,
+    "ByokTenantId": null
+  },
+  "Cli": {
+    // 42.Platform.Cli.dll or an sform executable; null runs the build of src/Platform/Cli/src that building the tests
+    // makes (its path is recorded in the test assembly).
+    "Path": null,
+    // How long one run of sform may take before its process tree is killed (the device code sign-in waits within it).
+    "TimeoutMs": 120000,
+    // A test's working directory (<temp>/sform-automation/<run id>/work/…, outside the artifacts) is removed when the
+    // test passes and kept when it does not; true keeps every one (the files sform wrote: .pfx, exports, GITHUB_ENV).
+    "KeepWorkingDirectories": false
+  },
+  // The pre-provisioned machines of the target by name: { "<name>": { "ApiKey": "…" (user secrets), "Project":
+  // "<org>.<project>", "View": null, "Scopes": [ "AnnotationRead", … ], "Endpoint": null (Target:BaseUrl), "Id": null } };
+  // also ClientId/ClientSecret, ClientCredentialsUrl/ClientCredentialsScope, Certificate/CertificatePassword, Key.
+  // "apikey" is the API key machine of Target:Project that the machine sign-in cases use ([RequiresMachine]).
+  "Machines": {},
+  "Browser": {
+    // Only for the AuthKit device page of the sign-in: the local, headless Chromium.
+    "Provider": "Local",
+    "Engine": "chromium",
+    "Channel": null,
+    "Headless": true,
+    "SlowMoMs": 0,
+    "Device": null,
+    "Viewport": { "Width": 1280, "Height": 900 },
+    "Locale": "en-US",
+    "TimeZone": "UTC",
+    "ColorScheme": "light"
+  },
+  "Execution": {
+    "MaxParallelTests": 4,
+    "Seed": null,
+    "ActionTimeoutMs": 15000,
+    "NavigationTimeoutMs": 30000,
+    "ExpectTimeoutMs": 10000,
+    "Retries": 0,
+    // Off: the pool passwords are typed on the device page; a trace would keep them.
+    "Trace": "Off",
+    "Screenshot": "OnFailure",
+    "Video": "Off",
+    "ArtifactsPath": "TestResults/artifacts"
+  },
+  "Users": {
+    "LeaseTimeoutSeconds": 120,
+    // The CLI's own pre-provisioned AuthKit users (not the admin UI's ui-test-* pool, so both suites run at the same
+    // time), with their roles in the target's organization and project; the passwords are in the user secrets
+    // (Users:Pool:<n>:Password) or UITESTS_Users__Pool__<n>__Password. Passwords pair with the users by position. A
+    // target with the feature Registration or MultiOrganization adds the user the feature stands for, its role and the
+    // feature's name in its Roles (e.g. [ "Reader", "Registration" ]): only that feature's tests lease it. The pool of
+    // the highest layer that sets an Email replaces this one entirely (no merge by index), so that layer restates these
+    // users and lists the feature users after them (the passwords keep their positions); in CI the 8 UITESTS_USER_<n>
+    // slots hold at most 8 users, so a feature user takes a role user's slot.
+    "Pool": [
+      { "Email": "cli-test-owner-1@42for.software", "DisplayName": "CLI Owner1", "Roles": [ "Owner" ] },
+      { "Email": "cli-test-owner-2@42for.software", "DisplayName": "CLI Owner2", "Roles": [ "Owner" ] },
+      { "Email": "cli-test-admin-1@42for.software", "DisplayName": "CLI Admin1", "Roles": [ "Administrator" ] },
+      { "Email": "cli-test-admin-2@42for.software", "DisplayName": "CLI Admin2", "Roles": [ "Administrator" ] },
+      { "Email": "cli-test-contributor-1@42for.software", "DisplayName": "CLI Contributor1", "Roles": [ "Contributor" ] },
+      { "Email": "cli-test-contributor-2@42for.software", "DisplayName": "CLI Contributor2", "Roles": [ "Contributor" ] },
+      { "Email": "cli-test-reader-1@42for.software", "DisplayName": "CLI Reader1", "Roles": [ "Reader" ] },
+      { "Email": "cli-test-reader-2@42for.software", "DisplayName": "CLI Reader2", "Roles": [ "Reader" ] }
+    ]
+  },
+  "Reporting": {
+    "Enabled": false,
+    "Systems": [],
+    "RunName": "CLI automation {Date:yyyy-MM-dd} {Time:HH:mm} {Profile}",
+    "RunDescription": null,
+    "UnmappedTests": "Ignore",
+    "BatchSize": 20,
+    "FlushIntervalSeconds": 5,
+    "MaxAttempts": 5,
+    "CompleteTimeoutSeconds": 120,
+    "ReplayFile": null
+  }
+}

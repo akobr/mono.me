@@ -698,7 +698,8 @@ public class ConfigExportCommandTests
 
         var exitCode = await Execute(Key, "--github-env", "--prefix", "APP_");
 
-        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        // A failure of the service (5xx) is 3, as everywhere in sform.
+        exitCode.ShouldBe(ExitCodes.ERROR_SERVICE_FAILURE);
         _error.ToString().ShouldBe("Unexpected error occurred on the service. Retry later.\nError code: Unexpected\n");
         _out.ToString().ShouldBeEmpty();
         _fileSystem.File.ReadAllText(GitHubEnv).ShouldBeEmpty();

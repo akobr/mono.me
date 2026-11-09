@@ -14,6 +14,9 @@ namespace _42.Platform.Cli.Commands.Schemas;
 
 internal static class SchemaOperations
 {
+    // The --format of the diffs that sform writes itself: the API's text/plain answer does not reach it.
+    internal const string UnifiedFormat = "unified";
+
     public static async Task<int> GetAsync(
         IExtendedConsole console,
         ISchemasApiClient api,
@@ -81,8 +84,15 @@ internal static class SchemaOperations
         SchemaLayer layer,
         string? annotationType,
         string? annotationKey,
-        bool force)
+        bool force,
+        bool confirm = true)
     {
+        // The changes are confirmed before they are saved: without a terminal, fail before any call or editor.
+        if (confirm)
+        {
+            console.EnsureInteractive("the confirmation of the changes", "Pass -y|--yes to save them without asking.");
+        }
+
         var subject = Describe(layer, annotationType, annotationKey);
         ConfigurationSchema current;
 
@@ -105,7 +115,8 @@ internal static class SchemaOperations
             editorOptions,
             ToJObject(current.Content),
             EditorFilePrefix(layer, context.ViewName, annotationType, annotationKey),
-            false);
+            false,
+            confirm);
 
         if (result.Edited is null)
         {
@@ -215,7 +226,10 @@ internal static class SchemaOperations
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var responseFormat = string.IsNullOrWhiteSpace(format) ? null : format;
+        // The API answers ?format=unified as text/plain, which the typed client of the SDK reads as a failed call (an
+        // ApiException of a 200): sform asks for the JSON diff and writes the unified text itself, as the API would.
+        var isUnified = string.Equals(format?.Trim(), UnifiedFormat, StringComparison.OrdinalIgnoreCase);
+        var responseFormat = isUnified || string.IsNullOrWhiteSpace(format) ? null : format;
 
         try
         {
@@ -241,7 +255,14 @@ internal static class SchemaOperations
                 diff = await DiffVersionAsync(api, context, layer, annotationType, annotationKey, latestVersion, responseFormat);
             }
 
-            console.WriteDiffResult(diff);
+            if (isUnified)
+            {
+                console.WriteUnifiedDiff(diff);
+            }
+            else
+            {
+                console.WriteDiffResult(diff);
+            }
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
@@ -311,32 +332,12 @@ internal static class SchemaOperations
         console.WriteLine("Existing configurations were not required to comply.");
     }
 
+    // The failing configurations of a compliance check, else the server's message and code (the message of the
+    // exception is only the OpenAPI description of the status) with the exit code of the status: a refusal (403) is 44,
+    // a rejected request (400, 404, 409, …) 2, and a failure of the service 3.
     private static int WriteApiError(IExtendedConsole console, ApiException exception)
     {
-        if (SchemaValidationConsole.TryWrite(console, exception))
-        {
-            return ExitCodes.ERROR_WRONG_INPUT;
-        }
-
-        // A status the operation declares: the message of the exception is only its OpenAPI description, the server's
-        // message and code are in the ErrorResponse.
-        if (exception is ApiException<ErrorResponse> error
-            && !string.IsNullOrWhiteSpace(error.Result?.Message))
-        {
-            console.WriteImportant(error.Result.Message);
-
-            if (!string.IsNullOrWhiteSpace(error.Result.ErrorCode))
-            {
-                console.WriteLine($"Error code: {error.Result.ErrorCode}".ThemedLowlight(console.Theme));
-            }
-
-            return exception.StatusCode is (int)HttpStatusCode.BadRequest or (int)HttpStatusCode.NotFound
-                ? ExitCodes.ERROR_WRONG_INPUT
-                : ExitCodes.ERROR_CRASH;
-        }
-
-        console.WriteLine($"Error occurred: {exception.Message}");
-        return ExitCodes.ERROR_CRASH;
+        return SchemaValidationConsole.WriteWriteError(console, exception);
     }
 
     private static Task<ConfigurationSchema> GetCurrentAsync(

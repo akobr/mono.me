@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
+using _42.Platform.Automation.Shared.Access;
 using _42.Platform.UI.Admin.AutomationTests.Pages;
 using _42.Testing.UI.Automation.Runtime.Access;
 using _42.Testing.UI.Automation.Runtime.Settings;
@@ -51,9 +52,10 @@ public abstract partial class PlatformTest
     }
 
     // On a deployed target, once the app handed a sign-in over to AuthKit (Continue with AuthKit, or a protected page
-    // opened signed out): waits until the browser left the app's host, signs in on the hosted page as the leased user,
-    // with WorkOS' labels like AuthKitSignIn (Email, Continue or Continue with email, Password, Sign in), and returns once the browser is back
-    // on the app past /callback. The steps on the hosted page are not traced: the chunk recorded so far is dropped, and
+    // opened signed out): waits until the browser left the app's host, signs in on the hosted page as the leased user
+    // with the steps of AuthKitSignIn (AuthKitHostedPage: Email, Continue or Continue with email, Password, Sign in, typed
+    // as BrowserStack masks a typed value in its session logs), and returns once the browser is back on the app past
+    // /callback. The steps on the hosted page are not traced: the chunk recorded so far is dropped, and
     // a new one starts once the steps ended. A browser that is not back on the app by then (a step failed: a wrong
     // password, an MFA or Radar prompt, a renamed button) first has the value of every input and text area of its
     // frames emptied, or goes to about:blank when that fails, so the snapshots of the new chunk (the failure screenshot
@@ -79,10 +81,7 @@ public abstract partial class PlatformTest
 
         try
         {
-            await TypeOnHostedPageAsync(Page.GetByRole(AriaRole.Textbox, new() { Name = "Email" }), User.Email);
-            await Page.GetByRole(AriaRole.Button, new() { NameRegex = Access.AuthKitSignIn.AuthKitContinue }).ClickAsync();
-            await TypeOnHostedPageAsync(Page.GetByLabel("Password", new() { Exact = true }), password);
-            await Page.GetByRole(AriaRole.Button, new() { Name = "Sign in", Exact = true }).ClickAsync();
+            await AuthKitHostedPage.EnterCredentialsAsync(Page, User.Email, password);
             await Page.WaitForURLAsync(url => IsOnHost(url, app));
         }
         catch (Exception exception) when (exception is PlaywrightException or TimeoutException)
@@ -106,13 +105,6 @@ public abstract partial class PlatformTest
     {
         var app = AppUri();
         await Page.WaitForURLAsync(url => !IsOnHost(url, app));
-    }
-
-    // Typed, not filled, as AuthKitSignIn does: BrowserStack masks a typed value in its session logs.
-    private static async Task TypeOnHostedPageAsync(ILocator field, string value)
-    {
-        await field.ClearAsync();
-        await field.PressSequentiallyAsync(value);
     }
 
     // The text with the password and the e-mail as ***, each as is, JSON-escaped and URL-encoded (a URL in the message
@@ -140,8 +132,7 @@ public abstract partial class PlatformTest
 
     private static bool IsOnHost(string url, Uri app)
     {
-        return Uri.TryCreate(url, UriKind.Absolute, out var current)
-            && string.Equals(current.GetLeftPart(UriPartial.Authority), app.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
+        return AuthKitHostedPage.IsOnHost(url, app);
     }
 
     // Untraced, after a failed step on the hosted page: empties the value of every input and text area of the page's

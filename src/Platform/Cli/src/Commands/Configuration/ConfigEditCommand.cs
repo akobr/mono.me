@@ -41,6 +41,9 @@ public class ConfigEditCommand : BaseContextCommand
     [Option("-f|--force", CommandOptionType.NoValue, Description = "Store the configuration even when it violates the schema.")]
     public bool Force { get; set; }
 
+    [Option("-y|--yes", CommandOptionType.NoValue, Description = "Save the edited configuration without asking for confirmation.")]
+    public bool Yes { get; set; }
+
     /// <summary>
     /// Opens the stored content of the configuration (without inherited values and templates) in the configured editor,
     /// and replaces the stored content with the edited document when the user confirms.
@@ -50,10 +53,19 @@ public class ConfigEditCommand : BaseContextCommand
     /// - <c>ExitCodes.SUCCESS</c> when the edited configuration was saved;
     /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
     /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
-    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code or the API rejected the change.
+    /// - <c>ExitCodes.ERROR_WRONG_INPUT</c> when the change violates the schema or the API rejected it (400, 404, 409, 412);
+    /// - <c>ExitCodes.WARNING_UNAUTHORIZED_ACCESS</c> when the API refused the write (403), with the server's message;
+    /// - <c>ExitCodes.ERROR_SERVICE_FAILURE</c> when the service failed (5xx);
+    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
     /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
+        // The changes are confirmed before they are saved: without a terminal, fail before any call or editor.
+        if (!Yes)
+        {
+            Console.EnsureInteractive("the confirmation of the changes", "Pass -y|--yes to save them without asking.");
+        }
+
         var storedContent = await _configurationApi.GetStoredConfigurationContentAsync(
             Context.OrganizationName,
             Context.ProjectName,
@@ -70,7 +82,8 @@ public class ConfigEditCommand : BaseContextCommand
             _editorOptions,
             storedContent ?? new JObject(),
             $"config-{AnnotationKey}",
-            storedContent is null);
+            storedContent is null,
+            confirm: !Yes);
 
         if (result.Edited is null)
         {
@@ -100,13 +113,7 @@ public class ConfigEditCommand : BaseContextCommand
         }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
-            if (SchemaValidationConsole.TryWrite(Console, e))
-            {
-                return ExitCodes.ERROR_WRONG_INPUT;
-            }
-
-            Console.WriteLine($"Error occurred: {e.Message}");
-            return ExitCodes.ERROR_CRASH;
+            return SchemaValidationConsole.WriteWriteError(Console, e);
         }
     }
 }

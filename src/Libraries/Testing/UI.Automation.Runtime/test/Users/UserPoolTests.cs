@@ -36,6 +36,43 @@ public sealed class UserPoolTests
     }
 
     [Fact]
+    public async Task LeaseAsync_SkipsTheUsersOfAnExcludedRole()
+    {
+        var pool = Pool(("unregistered@example.test", ["Reader", "Registration"]), ("reader@example.test", ["Reader"]));
+
+        var reader = await pool.LeaseAsync(UserRequirement.WithRole("Reader").Except("Registration"));
+        var feature = await pool.LeaseAsync(UserRequirement.WithRole("Registration"));
+
+        reader.Email.ShouldBe("reader@example.test");
+        feature.Email.ShouldBe("unregistered@example.test");
+    }
+
+    [Fact]
+    public async Task LeaseAsync_FailsAtOnce_WhenEveryUserOfTheRoleIsExcluded()
+    {
+        var pool = Pool(("unregistered@example.test", ["Reader", "Registration"]), ("owner@example.test", ["Owner"]));
+
+        var exception = await Should.ThrowAsync<UserLeaseException>(() => pool.LeaseAsync(UserRequirement.WithRole("Reader").Except("Registration")));
+
+        exception.Message.ShouldBe("No user of Users:Pool has role Reader and none of Registration; the pool has 2.");
+    }
+
+    [Fact]
+    public async Task Return_HandsAnExcludedUserOnlyToAWaiterItSatisfies()
+    {
+        var pool = Pool(("multi@example.test", ["Owner", "MultiOrganization"]), ("owner@example.test", ["Owner"]));
+        var multi = await pool.LeaseAsync(UserRequirement.WithRole("MultiOrganization"));
+        var owner = await pool.LeaseAsync(UserRequirement.WithRole("Owner"));
+
+        var waitsForAnOrdinaryOwner = pool.LeaseAsync(UserRequirement.WithRole("Owner").Except("MultiOrganization"));
+        pool.Return(multi);
+        waitsForAnOrdinaryOwner.IsCompleted.ShouldBeFalse();
+
+        pool.Return(owner);
+        (await waitsForAnOrdinaryOwner).ShouldBeSameAs(owner);
+    }
+
+    [Fact]
     public async Task LeaseAsync_FailsAtOnce_ForARoleNobodyHas()
     {
         var pool = Pool(("owner@example.test", ["Owner"]), ("reader@example.test", ["Reader"]));

@@ -155,6 +155,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     public Task<SignedInUser> LoginWithDeviceCodeAsync(
         Func<DeviceCodePrompt, Task> onPrompt,
         Func<IReadOnlyList<OrganizationChoice>, Task<string>>? selectOrganization = null,
+        string? organizationId = null,
         CancellationToken cancellationToken = default)
     {
         throw new AuthenticationException(

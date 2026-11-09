@@ -1,0 +1,83 @@
+{
+  "$comment": "Items of sform's command tree that only tests a target may lack the feature for ([RequiresFeature]) or that never run ([Skip]) cover (spec §4.2). Their tests exist and skip with the reason where Target:Features lacks the feature. CommandCoverageTests checks that every item covered only by such tests is listed here and that no entry is covered by a test that runs against every target. command: the path without sform; item: an option form, --option=value, argN or an alias (missing: the command itself); feature: of CliFeatures; reason: why. See docs/Platform/Cli.AutomationTests/automation-tests.md#coverage-exceptionsjson.",
+  "exceptions": [
+    {
+      "command": "storyteller kv policy set",
+      "item": "--byok-key",
+      "feature": "Byok",
+      "reason": "KV-POL-05: sets the customer key of an Azure Key Vault the platform may use, which only a target with BYOK has."
+    },
+    {
+      "command": "storyteller kv policy set",
+      "item": "--byok-tenant",
+      "feature": "Byok",
+      "reason": "KV-POL-05: the tenant of the customer key, with --byok-key."
+    },
+    {
+      "command": "storyteller kv policy set",
+      "item": "--allow=byok",
+      "feature": "Byok",
+      "reason": "KV-POL-07: the byok level needs the customer key of KV-POL-05."
+    },
+    {
+      "command": "storyteller kv policy set",
+      "item": "--default=byok",
+      "feature": "Byok",
+      "reason": "KV-POL-07: the byok level needs the customer key of KV-POL-05."
+    },
+    {
+      "command": "storyteller kv set",
+      "item": "--protection=byok",
+      "feature": "Byok",
+      "reason": "KV-POL-07: a value at the byok level needs the customer key of KV-POL-05."
+    },
+    {
+      "command": "storyteller kv protect",
+      "item": "--protection=byok",
+      "feature": "Byok",
+      "reason": "KV-POL-07: moving a key to the byok level needs the customer key of KV-POL-05."
+    },
+    {
+      "command": "storyteller kv import",
+      "item": "--protection=byok",
+      "feature": "Byok",
+      "reason": "KV-POL-07: importing secrets at the byok level needs the customer key of KV-POL-05."
+    },
+    {
+      "command": "storyteller kv policy set",
+      "item": "--allow=hsm",
+      "feature": "Hsm",
+      "reason": "KV-POL-08: the hsm level needs HSM-backed keys (a Key Vault Premium or a Managed HSM), which only a target with HSM has."
+    },
+    {
+      "command": "storyteller kv policy set",
+      "item": "--default=hsm",
+      "feature": "Hsm",
+      "reason": "KV-POL-08: the hsm level needs HSM-backed keys."
+    },
+    {
+      "command": "storyteller kv set",
+      "item": "--protection=hsm",
+      "feature": "Hsm",
+      "reason": "KV-POL-08: a value at the hsm level needs HSM-backed keys."
+    },
+    {
+      "command": "storyteller kv protect",
+      "item": "--protection=hsm",
+      "feature": "Hsm",
+      "reason": "KV-POL-08: moving a key to the hsm level needs HSM-backed keys."
+    },
+    {
+      "command": "storyteller kv import",
+      "item": "--protection=hsm",
+      "feature": "Hsm",
+      "reason": "KV-POL-08: importing secrets at the hsm level needs HSM-backed keys."
+    },
+    {
+      "command": "storyteller kv policy rotate",
+      "item": "--protection=hsm",
+      "feature": "Hsm",
+      "reason": "KV-POL-08: rotating the hsm key needs HSM-backed keys."
+    }
+  ]
+}

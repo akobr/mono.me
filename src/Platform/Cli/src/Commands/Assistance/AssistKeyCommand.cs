@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
@@ -20,6 +21,9 @@ public class AssistKeyCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
+        // Every part of the key is asked for; there are no options for them.
+        Console.EnsureInteractive("the parts of the annotation key", "Run sform assist key in a terminal.");
+
         Console.WriteLine("Annotation key use simple format of:");
         Console.WriteLine("    <type>.<name>".ThemedHighlight(Console.Theme));
         Console.WriteLine("Type is three characters length code and hierarchy is done by dots notation same like object path in C#.".ThemedLowlight(Console.Theme));

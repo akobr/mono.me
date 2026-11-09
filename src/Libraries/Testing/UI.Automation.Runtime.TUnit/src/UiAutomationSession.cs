@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using _42.Testing.UI.Automation.Runtime.Browsers;
 using _42.Testing.UI.Automation.Runtime.Settings;
 using Microsoft.Extensions.Logging;
 using TUnit.Core;
@@ -13,8 +14,9 @@ namespace _42.Testing.UI.Automation.Runtime.TUnit;
 // limiter) runs before Before(TestSession); the hook also hands Execution:MaxParallelTests to TUnit, whose command line
 // and TUNIT_MAX_PARALLEL_TESTS still win, raises TUnit's hook timeout (5 minutes) to the settings' StartBudget when that
 // is longer, and has the terminal log show the settings' secrets as ***. Before the first test the AutomationSession
-// starts with every selected test as planned (the start ends with the setup's target check, when it has one); after the
-// last it stops and the run summary goes to the terminal. A failure to load or to start (a failed target check
+// starts with every selected test as planned (the start ends with the setup's target check, when it has one), and with
+// its browser provider started only when one of them is a UiTest (ChooseBrowserProviderStart); after the last it stops
+// and the run summary goes to the terminal. A failure to load or to start (a failed target check
 // included) is logged once and kept, and fails each UI test at once with its message (UiAutomationUnavailableException,
 // never retried), instead of failing TUnit's discovery or every test of the assembly.
 public static class UiAutomationSession
@@ -27,6 +29,10 @@ public static class UiAutomationSession
     private static Exception? failure;
     private static AutomationSession? current;
     private static bool closed;
+
+    // Whether the run starts its browser with the session (a selected test is a UiTest); the end receiver's reports of
+    // plain tests name the browser only then.
+    private static bool browserRun;
 
     // The settings of the run; throws before discovery and when they did not load.
     public static UiAutomationSettings Settings => settings ?? throw new InvalidOperationException(failure is null
@@ -136,6 +142,8 @@ public static class UiAutomationSession
 
         var options = CreateOptions();
         options.PlannedTests = context.AllTests.Select(TestIdentityFactory.Create).ToArray();
+        options.BrowserProviderStart = ChooseBrowserProviderStart(context.AllTests.Select(test => test.Metadata.TestDetails.ClassType));
+        browserRun = options.BrowserProviderStart == BrowserProviderStart.WithSession;
         options.TestEngine = EngineVersion;
 
         AutomationSession session;
@@ -236,16 +244,16 @@ public static class UiAutomationSession
         return Current ?? throw new InvalidOperationException("The UI automation session has not started (Before(TestSession) did not run).");
     }
 
-    // One report per test and attempt: the first caller (a UI test's After(Test), which claims every attempt it ends,
-    // then the end receiver) wins.
+    // One report per test and attempt: the first caller (an AutomationTest's After(Test), which claims every attempt it
+    // ends, then the end receiver) wins.
     internal static bool TryClaim(TestIdentity test, int attempt)
     {
         return Claimed.TryAdd((test.Id, attempt), 0);
     }
 
-    // The end receiver's report of a test that did not report itself: a test that does not derive from UiTest, or one
-    // that an attribute skipped (it runs no hooks). Results before the session started wait for it; a retried attempt
-    // and a run without a session (skip mode, a failed start) report nothing.
+    // The end receiver's report of a test that did not report itself: a test that does not derive from AutomationTest, or
+    // one that an attribute skipped (it runs no hooks). Results before the session started wait for it; a retried
+    // attempt and a run without a session (skip mode, a failed start) report nothing.
     internal static async ValueTask ReportFromEngineAsync(TestContext context)
     {
         if (settings is not { IsConfigured: true, IsReplay: false } || failure is not null || await RetryPolicy.WillRetryAsync(context))
@@ -270,7 +278,7 @@ public static class UiAutomationSession
 
         var startedAt = result?.Start ?? context.Execution.TestStart ?? DateTimeOffset.UtcNow;
         var duration = result?.Duration ?? (result is { Start: { } start, End: { } end } ? end - start : TimeSpan.Zero);
-        var pending = new PendingReport(test, outcome, startedAt, duration, attempt, exception, CapturedOutput(context));
+        var pending = new PendingReport(test, outcome, startedAt, duration, attempt, exception, CapturedOutput(context), ReportsBrowser(context.Metadata.TestDetails.ClassType));
 
         AutomationSession? session;
         lock (Gate)
@@ -289,6 +297,31 @@ public static class UiAutomationSession
         }
 
         Send(session, pending);
+    }
+
+    // With the session when a planned test opens its page before it runs (a UiTest), so browsers that do not launch fail
+    // the session before any test; otherwise (only AutomationTests without a browser, plain tests) at the first browser a
+    // test or the target check asks for, so such a run never starts Playwright unless one does.
+    internal static BrowserProviderStart ChooseBrowserProviderStart(IEnumerable<Type> testClasses)
+    {
+        ArgumentNullException.ThrowIfNull(testClasses);
+        return testClasses.Any(type => typeof(UiTest).IsAssignableFrom(type)) ? BrowserProviderStart.WithSession : BrowserProviderStart.OnFirstLease;
+    }
+
+    // Whether the end receiver's report of a test of testClass names the browser (provider, engine and device): true for
+    // a UiTest, which opens its page before the test; false for any other AutomationTest, because the receiver reports
+    // only one whose scope never began, which opened no browser; null for a plain test, whose report names the browser
+    // when the run starts it with the session (a run with a UiTest), as before AutomationTest existed.
+    internal static bool? ReportsBrowser(Type testClass)
+    {
+        ArgumentNullException.ThrowIfNull(testClass);
+
+        if (typeof(UiTest).IsAssignableFrom(testClass))
+        {
+            return true;
+        }
+
+        return typeof(AutomationTest).IsAssignableFrom(testClass) ? false : null;
     }
 
     // The skip reason as the exception of a skipped report, whose message is all the report keeps.
@@ -343,7 +376,15 @@ public static class UiAutomationSession
     {
         try
         {
-            session.Report(session.CreateReport(pending.Test, pending.Outcome, pending.StartedAt, pending.Duration, pending.Attempt, pending.Exception, pending.Output));
+            session.Report(session.CreateReport(
+                pending.Test,
+                pending.Outcome,
+                pending.StartedAt,
+                pending.Duration,
+                pending.Attempt,
+                pending.Exception,
+                pending.Output,
+                browser: pending.Browser ?? browserRun));
         }
         catch (Exception exception)
         {
@@ -387,6 +428,7 @@ public static class UiAutomationSession
         }
 
         Claimed.Clear();
+        browserRun = false;
         settings = null;
         setup = null;
         failure = null;
@@ -400,5 +442,6 @@ public static class UiAutomationSession
         TimeSpan Duration,
         int Attempt,
         Exception? Exception,
-        string? Output);
+        string? Output,
+        bool? Browser);
 }

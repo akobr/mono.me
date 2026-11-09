@@ -97,6 +97,9 @@ public class StorytellerDeleteCommand : BaseContextCommand
 
         if (!Yes)
         {
+            // After the lookup, so an unknown key ends with its own code also without a terminal.
+            Console.EnsureInteractive("the confirmation of the permanent delete", "Pass -y|--yes to delete without asking.");
+
             var descendants = active is not null
                 ? await DescribeActiveDescendantsAsync(annotationKey)
                 : DescribeDeletedDescendants(deleted!.Deletion);
@@ -122,8 +125,11 @@ public class StorytellerDeleteCommand : BaseContextCommand
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
         {
+            // a refusal like any other (44): the server's message and code (a Contributor, or a machine, which never
+            // deletes permanently), then which role it takes
+            var exitCode = Console.WriteApiError(e);
             Console.WriteLine("Only an Administrator or Owner can delete permanently.");
-            return ExitCodes.ERROR_WRONG_INPUT;
+            return exitCode;
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {

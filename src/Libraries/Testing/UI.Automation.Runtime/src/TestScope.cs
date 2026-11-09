@@ -19,12 +19,21 @@ namespace _42.Testing.UI.Automation.Runtime;
 // user signed out), writes console.log, closes the contexts, releases the browser, returns the users and hands the
 // report to the dispatcher. It never throws; a cleanup step that fails is logged.
 //
+// A scope without a browser (TestScopeOptions.Browser false) leases the user and has its data and artifacts, but
+// acquires no browser in BeginAsync: Browser, Context and Page throw, no screenshot, trace or video is taken, and its
+// artifacts are what the test attaches (AttachTextAsync, Artifacts). OpenBrowserAsync acquires a browser on demand, in
+// any scope, and returns a new context of it (signed in as a user when asked); the scope closes it and releases the
+// browser at its end. Its console goes to console.log; it is not traced.
+//
+// What the scope writes (AttachTextAsync, console.log) and its report go through Redact: the session's (the settings'
+// secrets, the pool e-mails) and the secrets the test registered with AddSecret, e.g. a credential a command printed.
+//
 // The cached sign-in is never redone on the test's page: that page is traced, and a trace keeps the parameters of
 // every action, the typed password included. A test that signs in itself (TestScopeOptions.SignedIn false) has that
 // exposure in its trace.zip; turn its trace off (Execution:Trace Off) when it types a real password.
 //
-// console.log goes through the session's Redact, and every URL in it loses its query and fragment (as ?*** or #***):
-// the URLs of a sign-in carry its code, state or tokens.
+// Every URL in console.log also loses its query and fragment (as ?*** or #***): the URLs of a sign-in carry its code,
+// state or tokens.
 public sealed partial class TestScope : IAsyncDisposable
 {
     private readonly TestScopeOptions options;
@@ -33,17 +42,25 @@ public sealed partial class TestScope : IAsyncDisposable
     private readonly List<TestUser> extraUsers = [];
     private readonly List<IBrowserContext> extraContexts = [];
     private readonly List<(IBrowserContext Context, TestUser User)> signedInContexts = [];
+    private readonly List<string> secrets = [];
     private readonly object gate = new();
+
+    // Held while OpenBrowserAsync acquires the browser on demand and while ReleaseAsync releases it.
+    private readonly SemaphoreSlim browserGate = new(1, 1);
     private TestUser? user;
-    private BrowserLease? lease;
+    private volatile BrowserLease? lease;
     private IBrowserContext? context;
     private IPage? page;
     private string? videoDirectory;
     private bool tracing;
     private int begun;
+    private int started;
     private int contextsClosed;
     private int released;
     private Task<TestResultReport>? ending;
+
+    // The secrets of AddSecret; null until the first one.
+    private volatile SecretRedactor? secretRedactor;
 
     private TestScope(AutomationSession session, TestIdentity test, TestScopeOptions options)
     {
@@ -80,13 +97,18 @@ public sealed partial class TestScope : IAsyncDisposable
     // What BeginAsync threw; EndAsync reports it when the engine passes no exception of its own.
     public Exception? BeginException { get; private set; }
 
-    public bool IsStarted => page is not null;
+    // Whether BeginAsync finished: the user is leased and, with a browser, the context and the page are open.
+    public bool IsStarted => Volatile.Read(ref started) != 0;
 
-    public BrowserLease Browser => lease ?? throw NotStarted();
+    // Whether BeginAsync opens a browser context and a page (TestScopeOptions.Browser).
+    public bool UsesBrowser => options.Browser;
 
-    public IBrowserContext Context => context ?? throw NotStarted();
+    // The browser of the test: BeginAsync's, or OpenBrowserAsync's in a scope without a browser.
+    public BrowserLease Browser => lease ?? throw (options.Browser ? NotStarted() : NoBrowser("browser", "OpenBrowserAsync was not called"));
 
-    public IPage Page => page ?? throw NotStarted();
+    public IBrowserContext Context => context ?? throw (options.Browser ? NotStarted() : NoBrowser("context", "OpenBrowserAsync opens one"));
+
+    public IPage Page => page ?? throw (options.Browser ? NotStarted() : NoBrowser("page", "OpenBrowserAsync opens a context, whose NewPageAsync opens one"));
 
     public bool HasUser => user is not null;
 
@@ -113,7 +135,7 @@ public sealed partial class TestScope : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(test);
 
         options ??= new TestScopeOptions();
-        if (options.SignedIn && !options.LeaseUser)
+        if (options.Browser && options.SignedIn && !options.LeaseUser)
         {
             throw new ArgumentException("TestScopeOptions.SignedIn needs LeaseUser.", nameof(options));
         }
@@ -140,45 +162,50 @@ public sealed partial class TestScope : IAsyncDisposable
                 user = await Session.Users.LeaseAsync(options.User, cancellationToken);
             }
 
-            step = BeginStep.Browser;
-            lease = await Session.BrowserProvider.AcquireAsync(Test, cancellationToken);
-
-            step = BeginStep.SignIn;
-            string? storageState = null;
-            if (options.SignedIn && Session.StorageStates is { } cache)
+            if (options.Browser)
             {
-                storageState = await cache.GetAsync(user!, lease.Browser, Session.ContextOptions.Create(), Artifacts, cancellationToken);
-            }
+                step = BeginStep.Browser;
+                lease = await Session.BrowserProvider.AcquireAsync(Test, cancellationToken);
 
-            step = BeginStep.Page;
-
-            var execution = Session.Settings.Execution;
-            if (execution.Video != ArtifactPolicy.Off)
-            {
-                videoDirectory = Artifacts.GetPath(".video");
-            }
-
-            context = await NewContextCoreAsync(storageState, videoDirectory, label: null);
-            if (storageState is not null)
-            {
-                lock (gate)
+                step = BeginStep.SignIn;
+                string? storageState = null;
+                if (options.SignedIn && Session.StorageStates is { } cache)
                 {
-                    signedInContexts.Add((context, user!));
+                    storageState = await cache.GetAsync(user!, lease.Browser, Session.ContextOptions.Create(), Artifacts, cancellationToken);
                 }
-            }
 
-            if (execution.Trace != ArtifactPolicy.Off)
-            {
-                await context.Tracing.StartAsync(new TracingStartOptions
+                step = BeginStep.Page;
+
+                var execution = Session.Settings.Execution;
+                if (execution.Video != ArtifactPolicy.Off)
                 {
-                    Title = Test.DisplayName,
-                    Screenshots = true,
-                    Snapshots = true,
-                });
-                tracing = true;
+                    videoDirectory = Artifacts.GetPath(".video");
+                }
+
+                context = await NewContextCoreAsync(storageState, videoDirectory, label: null);
+                if (storageState is not null)
+                {
+                    lock (gate)
+                    {
+                        signedInContexts.Add((context, user!));
+                    }
+                }
+
+                if (execution.Trace != ArtifactPolicy.Off)
+                {
+                    await context.Tracing.StartAsync(new TracingStartOptions
+                    {
+                        Title = Test.DisplayName,
+                        Screenshots = true,
+                        Snapshots = true,
+                    });
+                    tracing = true;
+                }
+
+                page = await context.NewPageAsync();
             }
 
-            page = await context.NewPageAsync();
+            Volatile.Write(ref started, 1);
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested && options.TestCancellation is { IsCancellationRequested: false })
         {
@@ -204,10 +231,72 @@ public sealed partial class TestScope : IAsyncDisposable
         return other;
     }
 
+    // A browser context for a test that needs one now, e.g. one without a browser that approves a device code on a web
+    // page: acquires the scope's browser on demand (once; a scope with a browser keeps the one of BeginAsync) and returns
+    // a new context of it, signed in as asUser when given (and a sign-in flow is set; the user's cached sign-in, as for
+    // a test's page). Call it after BeginAsync, as often as needed; the scope closes every context, hands their sign-ins
+    // back to the cache and releases the browser at its end. Its console goes to console.log; it is not traced. A
+    // browser that is not available throws (e.g. BrowserUnavailableException).
+    public async Task<IBrowserContext> OpenBrowserAsync(TestUser? asUser = null, CancellationToken cancellationToken = default)
+    {
+        if (!IsStarted)
+        {
+            throw NotStarted();
+        }
+
+        if (lease is null)
+        {
+            await AcquireBrowserAsync(cancellationToken);
+        }
+
+        return await NewContextAsync(asUser, cancellationToken);
+    }
+
+    // Writes a text file of the test (e.g. the output of a command it ran) to its artifacts, through Redact: the
+    // settings' secrets, the pool users' e-mails and the secrets of AddSecret become ***. The report lists it, and the
+    // engine adapter attaches it to the test's result. A file the test wrote itself is listed with Artifacts.Add as it
+    // is (mask its text with Redact first when it may hold a secret).
+    public Task<TestArtifact> AttachTextAsync(string fileName, string content, ArtifactKind kind = ArtifactKind.Output, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+        ArgumentNullException.ThrowIfNull(content);
+
+        return Artifacts.WriteTextAsync(fileName, Redact(content), kind, cancellationToken);
+    }
+
+    // A secret the test came by at run time, which the settings do not know: the API key or client secret of a machine
+    // it created, a token a command printed. From then on AttachTextAsync and Redact show it as ***, in every form the
+    // session's Redact knows (as is, trimmed, URL-encoded, JSON-escaped); console.log and the failure and output of the
+    // scope's report hide it also when it was registered after it appeared. A file written before is not rewritten, so
+    // register a secret before attaching a text that holds it. A value shorter than 4 characters is ignored, as for the
+    // settings' secrets (masking it would mask ordinary text everywhere).
+    public void AddSecret(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        lock (gate)
+        {
+            secrets.Add(value);
+            secretRedactor = new SecretRedactor(secrets);
+        }
+    }
+
+    // The text as the scope's artifacts and report show it: the session's Redact (the settings' secrets and the pool
+    // users' e-mails), then the secrets of AddSecret.
+    public string Redact(string? text)
+    {
+        return WithoutScopeSecrets(Session.Redact(text));
+    }
+
     // Another context of the test's browser, signed in as asUser when given (and a sign-in flow is set); closed at the end.
-    // Its console goes to the same console.log; it is not traced.
+    // Its console goes to the same console.log; it is not traced. In a scope without a browser, after OpenBrowserAsync.
     public async Task<IBrowserContext> NewContextAsync(TestUser? asUser = null, CancellationToken cancellationToken = default)
     {
+        if (Volatile.Read(ref contextsClosed) != 0)
+        {
+            throw Ended();
+        }
+
         var browserLease = Browser;
         string? storageState = null;
         if (asUser is not null && Session.StorageStates is { } cache)
@@ -222,13 +311,28 @@ public sealed partial class TestScope : IAsyncDisposable
         }
 
         var created = await NewContextCoreAsync(storageState, null, asUser?.Fingerprint ?? $"context-{number}");
+
+        // The scope may have ended while the context opened (e.g. the engine's timeout ended the test inside
+        // OpenBrowserAsync). CloseContextsAsync sets its flag and takes its list under the same lock, so the context is
+        // either on that list or closed here.
+        bool ended;
         lock (gate)
         {
-            extraContexts.Add(created);
-            if (storageState is not null)
+            ended = contextsClosed != 0;
+            if (!ended)
             {
-                signedInContexts.Add((created, asUser!));
+                extraContexts.Add(created);
+                if (storageState is not null)
+                {
+                    signedInContexts.Add((created, asUser!));
+                }
             }
+        }
+
+        if (ended)
+        {
+            await TryAsync("closing a context opened after the end", () => created.CloseAsync());
+            throw Ended();
         }
 
         return created;
@@ -280,6 +384,16 @@ public sealed partial class TestScope : IAsyncDisposable
         return new InvalidOperationException("The test scope has not begun (BeginAsync) or its start failed.");
     }
 
+    private static InvalidOperationException NoBrowser(string what, string hint)
+    {
+        return new InvalidOperationException($"The test scope has no {what}: it runs without a browser (TestScopeOptions.Browser is false); {hint}.");
+    }
+
+    private static InvalidOperationException Ended()
+    {
+        return new InvalidOperationException("The test scope has ended (EndAsync); it opens no more browser contexts.");
+    }
+
     [GeneratedRegex(@"(?<url>\bhttps?://[^\s?#""'<>]+)(?<rest>[?#][^\s""'<>]*?)(?=[:,.;)]?(?:[\s""'<>]|$))", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
     private static partial Regex UrlQueryPattern();
 
@@ -293,6 +407,25 @@ public sealed partial class TestScope : IAsyncDisposable
             BeginStep.SignIn => new TimeoutException($"The sign-in of {user} did not finish before {budget}.", exception),
             _ => new TimeoutException($"The context and page of the test did not open before {budget}.", exception),
         };
+    }
+
+    // OpenBrowserAsync's browser, once; under the browser gate, so a release at the end either sees it or prevents it.
+    private async Task AcquireBrowserAsync(CancellationToken cancellationToken)
+    {
+        await browserGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (Volatile.Read(ref released) != 0)
+            {
+                throw Ended();
+            }
+
+            lease ??= await Session.BrowserProvider.AcquireAsync(Test, cancellationToken);
+        }
+        finally
+        {
+            browserGate.Release();
+        }
     }
 
     private async Task<IBrowserContext> NewContextCoreAsync(string? storageState, string? recordVideoDirectory, string? label)
@@ -311,7 +444,30 @@ public sealed partial class TestScope : IAsyncDisposable
 
     private void Log(string line)
     {
-        consoleLines.Enqueue($"{Session.TimeProvider.GetUtcNow().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture)} {Session.Redact(WithoutUrlQueries(line))}");
+        consoleLines.Enqueue($"{Session.TimeProvider.GetUtcNow().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture)} {Redact(WithoutUrlQueries(line))}");
+    }
+
+    // The text without the secrets of AddSecret.
+    private string WithoutScopeSecrets(string text)
+    {
+        return secretRedactor is { } scoped ? scoped.Redact(text) : text;
+    }
+
+    // The report's failure and output without the secrets of AddSecret (CreateReport applied the session's Redact).
+    private TestResultReport WithoutScopeSecrets(TestResultReport report)
+    {
+        if (secretRedactor is not { } scoped)
+        {
+            return report;
+        }
+
+        return report with
+        {
+            Failure = report.Failure is { } failure
+                ? failure with { Message = scoped.Redact(failure.Message), StackTrace = failure.StackTrace is null ? null : scoped.Redact(failure.StackTrace) }
+                : null,
+            Output = report.Output is null ? null : scoped.Redact(report.Output),
+        };
     }
 
     private async Task<TestResultReport> EndCoreAsync(TestOutcome outcome, Exception? exception, string? output, bool reportResult)
@@ -355,7 +511,8 @@ public sealed partial class TestScope : IAsyncDisposable
 
         if (!consoleLines.IsEmpty)
         {
-            await TryAsync("console.log", () => Artifacts.WriteTextAsync("console.log", string.Join('\n', consoleLines) + "\n", ArtifactKind.ConsoleLog, CancellationToken.None));
+            // The secrets of AddSecret once more: a line may be older than its secret.
+            await TryAsync("console.log", () => Artifacts.WriteTextAsync("console.log", WithoutScopeSecrets(string.Join('\n', consoleLines) + "\n"), ArtifactKind.ConsoleLog, CancellationToken.None));
         }
 
         var values = new Dictionary<string, string>(lease?.Properties ?? new Dictionary<string, string>(), StringComparer.Ordinal);
@@ -374,7 +531,7 @@ public sealed partial class TestScope : IAsyncDisposable
             values[key] = value;
         }
 
-        var report = Session.CreateReport(Test, outcome, StartedAt, duration, Attempt, exception, output, Artifacts.Artifacts, values);
+        var report = WithoutScopeSecrets(Session.CreateReport(Test, outcome, StartedAt, duration, Attempt, exception, output, Artifacts.Artifacts, values, browser: options.Browser || lease is not null));
         await ReleaseAsync(report);
         if (reportResult)
         {
@@ -461,14 +618,17 @@ public sealed partial class TestScope : IAsyncDisposable
 
     private async Task CloseContextsAsync()
     {
-        if (Interlocked.Exchange(ref contextsClosed, 1) != 0)
-        {
-            return;
-        }
-
+        // The flag and the list under one lock: a NewContextAsync that finishes now either finds its context on this list
+        // or the flag set, and closes the context itself.
         IBrowserContext[] contexts;
         lock (gate)
         {
+            if (contextsClosed != 0)
+            {
+                return;
+            }
+
+            contextsClosed = 1;
             contexts = [.. extraContexts];
         }
 
@@ -490,7 +650,19 @@ public sealed partial class TestScope : IAsyncDisposable
             return;
         }
 
-        if (lease is { } current)
+        // After an acquisition of OpenBrowserAsync that is still running, which then finds the scope released.
+        await browserGate.WaitAsync();
+        BrowserLease? current;
+        try
+        {
+            current = lease;
+        }
+        finally
+        {
+            browserGate.Release();
+        }
+
+        if (current is not null)
         {
             await TryAsync("releasing the browser", () => Session.BrowserProvider.ReleaseAsync(current, report, CancellationToken.None).AsTask());
         }

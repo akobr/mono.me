@@ -87,27 +87,34 @@ public class CertificatesHttp
 
         var result = await _renewalService.RenewAsync(organization, project, id, presentingThumbprint);
 
+        // The body is the CertificateRenewalResult the OpenAPI document declares (Outcome, Pkcs12 in base64, Password,
+        // Thumbprint, LastRenewalAt, Message), which the SDKs read; nulls are left out. A refusal is an ErrorResponse
+        // with its code, so a client can tell a renewal before the window from a certificate that is not the current one.
         return result.Outcome switch
         {
-            CertificateRenewalOutcome.Success => new OkObjectResult(new
+            CertificateRenewalOutcome.Success => new OkObjectResult(new CertificateRenewalResult
             {
-                result.Thumbprint,
-                Certificate = result.Pkcs12 is not null ? Convert.ToBase64String(result.Pkcs12) : null,
-                CertificatePassword = result.Password,
-                result.LastRenewalAt,
+                Outcome = CertificateRenewalOutcome.Success,
+                Pkcs12 = result.Pkcs12,
+                Password = result.Password,
+                Thumbprint = result.Thumbprint,
+                LastRenewalAt = result.LastRenewalAt,
             }),
-            CertificateRenewalOutcome.AlreadyRenewed => new OkObjectResult(new
+            CertificateRenewalOutcome.AlreadyRenewed => new OkObjectResult(new CertificateRenewalResult
             {
-                result.Message,
-                result.LastRenewalAt,
+                Outcome = CertificateRenewalOutcome.AlreadyRenewed,
+                Message = result.Message,
+                LastRenewalAt = result.LastRenewalAt,
             }),
             CertificateRenewalOutcome.NotInRenewalWindow => new BadRequestObjectResult(new ErrorResponse
             {
                 Message = result.Message ?? "Not in renewal window.",
+                ErrorCode = ErrorCodes.NotInRenewalWindow,
             }),
             CertificateRenewalOutcome.NotFound => new NotFoundObjectResult(new ErrorResponse
             {
                 Message = result.Message ?? "Machine access not found.",
+                ErrorCode = ErrorCodes.NotFound,
             }),
             _ => new StatusCodeResult((int)HttpStatusCode.InternalServerError),
         };

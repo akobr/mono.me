@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Cli.AutomationTests</AssemblyName>
+    <RootNamespace>_42.Platform.Cli.AutomationTests</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- TUnit on Microsoft.Testing.Platform supplies the entry point. 'dotnet test' runs it with the solution or on its own,
+         and so does 'dotnet run' (see docs/Platform/Cli.AutomationTests/automation-tests.md). -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+
+    <UserSecretsId>be44b33c-c6f8-469a-aa25-4963a533f962</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="TUnit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Libraries\Testing\UI.Automation.Reporting.Testiny\src\UI.Automation.Reporting.Testiny.csproj" />
+    <ProjectReference Include="..\..\..\Libraries\Testing\UI.Automation.Runtime.TUnit\src\UI.Automation.Runtime.TUnit.csproj" />
+    <ProjectReference Include="..\..\Automation.Shared\src\Automation.Shared.csproj" />
+
+    <!-- The system under test: building the tests builds sform. Its assembly is not referenced (the tests start it out of
+         process); OutputItemType hands its build output (the 42.Platform.Cli.dll of the same configuration) to the
+         RecordSformPath target below. -->
+    <ProjectReference Include="..\..\Cli\src\Cli.csproj" ReferenceOutputAssembly="false" Private="false" OutputItemType="SformBuildOutput" />
+
+    <!-- The fake editor of mode E (spec §4.3), built with the tests the same way: sform starts its apphost as the custom
+         command of the editor section of sform.settings.json. RecordSformPath records the path of its 42.Platform.Cli.AutomationTests.Editor.dll
+         as EditorPath (FakeEditor turns it into the apphost next to it). -->
+    <ProjectReference Include="..\editor\Cli.AutomationTests.Editor.csproj" ReferenceOutputAssembly="false" Private="false" OutputItemType="EditorBuildOutput" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- System.Reflection.MetadataLoadContext reads the command tree of 42.Platform.Cli.dll for CommandCoverageTests
+         without running any of its code. -->
+    <PackageReference Include="System.Reflection.MetadataLoadContext" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Role, [UserRole], PlatformRoles and PlatformTargetSettings of the shared Platform library, so a test writes
+         [UserRole(Role.Reader)] without a using. -->
+    <Using Include="_42.Platform.Automation.Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="testsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- What CommandCoverageTests reads besides the [Covers] of the tests: the options with a fixed set of values, and the
+         items only feature-gated tests cover (docs/Platform/Cli.AutomationTests/automation-tests.md#command-coverage). -->
+    <None Update="coverage-values.json;coverage-exceptions.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The path of the built sform, recorded by MSBuild instead of guessed from bin/<Configuration>: the referenced project's
+       target output becomes [assembly: AssemblyMetadata("SformPath", "<full path of 42.Platform.Cli.dll>")], which
+       SformLocator reads when Cli:Path is not set (and CommandCoverageTests always). The fake editor's dll the same way,
+       as EditorPath. -->
+  <Target Name="RecordSformPath" AfterTargets="ResolveProjectReferences" BeforeTargets="GetAssemblyAttributes;CoreGenerateAssemblyInfo">
+    <ItemGroup>
+      <_SformBuildPath Include="@(SformBuildOutput->'%(FullPath)')" Condition="'%(Extension)' == '.dll'" />
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition="'@(_SformBuildPath)' != ''">
+        <_Parameter1>SformPath</_Parameter1>
+        <_Parameter2>@(_SformBuildPath)</_Parameter2>
+      </AssemblyAttribute>
+      <_EditorBuildPath Include="@(EditorBuildOutput->'%(FullPath)')" Condition="'%(Extension)' == '.dll'" />
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute" Condition="'@(_EditorBuildPath)' != ''">
+        <_Parameter1>EditorPath</_Parameter1>
+        <_Parameter2>@(_EditorBuildPath)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+
+</Project>

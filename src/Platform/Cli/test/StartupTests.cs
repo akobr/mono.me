@@ -101,7 +101,7 @@ public class StartupTests
         // What the host registers before Startup: McMaster's hosting adds the console.
         var services = new ServiceCollection();
         services.AddSingleton<IConsole>(PhysicalConsole.Singleton);
-        new Startup(environment.Object).ConfigureServices(services, new ConfigurationBuilder().Build());
+        new Startup(environment.Object, new Dictionary<object, object>()).ConfigureServices(services, new ConfigurationBuilder().Build());
         return services;
     }
 

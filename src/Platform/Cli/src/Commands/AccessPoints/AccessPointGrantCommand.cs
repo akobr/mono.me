@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
@@ -50,6 +51,12 @@ public class AccessPointGrantCommand : BaseCommand
             AccountId = AccountId[1..];
         }
 
+        // The list to choose from needs a terminal: without one, fail before any call.
+        if (string.IsNullOrWhiteSpace(ProjectKey))
+        {
+            Console.EnsureInteractiveValue("the access point", "Pass it with -p|--point <organizationName>[.<projectName>].");
+        }
+
         _42.Platform.Storyteller.Sdk.Account account;
 
         try
@@ -74,13 +81,22 @@ public class AccessPointGrantCommand : BaseCommand
             ? SelectPossiblePoint(account)
             : ProjectKey;
 
-        var point = await _accessApi.GrantUserAccessAsync(new Permission
+        try
         {
-            CreatedById = account.Id,
-            AccountId = AccountId,
-            AccessPointKey = projectKey,
-            Role = role,
-        });
+            await _accessApi.GrantUserAccessAsync(new Permission
+            {
+                CreatedById = account.Id,
+                AccountId = AccountId,
+                AccessPointKey = projectKey,
+                Role = role,
+            });
+        }
+        catch (ApiException e) when (e.StatusCode is not ((int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden))
+        {
+            // for example 409 or 400 of a role the API does not grant: the server's message, exit code 2; a 401 and a 403 go
+            // to Program.Main
+            return Console.WriteApiError(e);
+        }
 
         Console.WriteLine(
             "Access granted to ",

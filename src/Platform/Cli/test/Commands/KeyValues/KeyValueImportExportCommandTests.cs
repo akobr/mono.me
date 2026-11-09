@@ -77,6 +77,20 @@ public class KeyValueImportExportCommandTests
         _api.Verify(api => api.ImportKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueDocument>(), "Replace", null, "db."), Times.Once);
     }
 
+    [Theory]
+    [InlineData("public")]
+    [InlineData("hyok")]
+    public async Task Import_SecretsAsPublicOrHyok_IsWrongInput(string protection)
+    {
+        var files = KeyValueTestContext.Files(("prod.env", "DB__PASSWORD=s3cret"));
+
+        var exitCode = await new KeyValueImportCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, files) { File = "prod.env", SecretGlobs = ["*password*"], Protection = protection }.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _imports.ShouldBeEmpty();
+        _console.Lines.ShouldContain(line => line.Contains("--protection takes standard, hsm or byok"));
+    }
+
     [Fact]
     public async Task Import_UnknownModeOrMissingFile_IsWrongInput()
     {
@@ -107,19 +121,80 @@ public class KeyValueImportExportCommandTests
             .Callback<string, string, string, KeyValueExportRequest, CancellationToken>((_, _, _, request, _) => sent = request)
             .ReturnsAsync(document);
 
+        _console.UseInnerConsole(redirectedInput: false);
+
         var env = await new KeyValueExportCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Format = "env", Prefix = "db.", Protections = ["public", "standard"] }.OnExecuteAsync();
 
+        // The document alone on standard output, as it is; the note on standard error.
         env.ShouldBe(ExitCodes.SUCCESS);
-        _console.Lines.ShouldContain("DB__HOST=sql");
-        _console.Lines.ShouldContain(line => line.Contains("left out") && line.Contains("db.password"));
+        _console.OutputText.ShouldBe("DB__HOST=sql\n");
+        _console.ErrorLines.ShouldHaveSingleItem().ShouldBe("1 secret(s) without a value were left out of the env output: db.password. Add --include-secrets, or use the json format.");
+        _console.Lines.ShouldBeEmpty();
         sent!.KeyPrefix.ShouldBe("db.");
         sent.Protections.ShouldBe([Protections.Public, Protections.Standard]);
         sent.IncludeSecrets.ShouldBeFalse();
 
         var json = await new KeyValueExportCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { IncludeSecrets = true }.OnExecuteAsync();
         json.ShouldBe(ExitCodes.SUCCESS);
-        _console.Lines.ShouldContain(line => line.Contains("\"Format\": \"2s.key-values.v1\""));
+        var printed = _console.OutputText["DB__HOST=sql\n".Length..];
+        printed.ShouldStartWith("{\n");
+        printed.ShouldContain("\n  \"Format\": \"2s.key-values.v1\"");
+        printed.ShouldEndWith("}\n");
+        printed.ShouldNotContain("\r");
         sent!.IncludeSecrets.ShouldBeTrue();
+    }
+
+    // kv export --format env > .env: every line as it is, without the margin and the wrapping of the console, also a
+    // value longer than any terminal, such as a hyok JWE.
+    [Fact]
+    public async Task Export_ToTheStandardOutput_IsWrittenAsItIs()
+    {
+        var token = new string('x', 600);
+        _api.Setup(api => api.ExportKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueExportRequest>()))
+            .ReturnsAsync(new KeyValueDocument
+            {
+                Items =
+                [
+                    new KeyValueDocumentItem { Key = "db.host", Protection = KeyValueDocumentItemProtection.Public, Value = "sql" },
+                    new KeyValueDocumentItem { Key = "api.token", Protection = KeyValueDocumentItemProtection.Public, Value = token },
+                ],
+            });
+        _console.UseInnerConsole(redirectedInput: false);
+
+        var exitCode = await new KeyValueExportCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Format = "env" }.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _console.OutputText.ShouldBe($"DB__HOST=sql\nAPI__TOKEN={token}\n");
+        _console.ErrorText.ShouldBeEmpty();
+        _console.Lines.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("A=1", "A=1\n")]
+    [InlineData("A=1\n", "A=1\n")]
+    [InlineData("{\r\n  \"A\": \"1\"\r\n}", "{\n  \"A\": \"1\"\n}\n")]
+    [InlineData("A=\"a\u2028b\u2029c\u0085d\fe\"", "A=\"a\u2028b\u2029c\u0085d\fe\"\n")]
+    public void ToPayload_HasLfLineEndsAndAFinalOne(string text, string expected)
+    {
+        KeyValueExportCommand.ToPayload(text).ShouldBe(expected);
+    }
+
+    // A quoted env value keeps the Unicode line and paragraph separators, NEL and form feed as they are: standard
+    // output gets the same document as -o, and an import reads the value back unchanged.
+    [Fact]
+    public async Task Export_Env_ToTheStandardOutput_KeepsTheUnicodeSeparatorsOfAValue()
+    {
+        const string value = "a\u2028b\u2029c\u0085d\fe";
+        _api.Setup(api => api.ExportKeyValuesAsync("org1", "proj1", "default", It.IsAny<KeyValueExportRequest>()))
+            .ReturnsAsync(new KeyValueDocument { Items = [new KeyValueDocumentItem { Key = "app.text", Protection = KeyValueDocumentItemProtection.Public, Value = value }] });
+        _console.UseInnerConsole(redirectedInput: false);
+
+        var exitCode = await new KeyValueExportCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Format = "env" }.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _console.OutputText.ShouldBe($"APP__TEXT=\"{value}\"\n");
+        KeyValueFormats.ParseEnv(_console.OutputText).ShouldHaveSingleItem().ShouldBe(("app.text", value));
     }
 
     [Fact]

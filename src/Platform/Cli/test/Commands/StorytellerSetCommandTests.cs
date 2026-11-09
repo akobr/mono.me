@@ -188,14 +188,17 @@ public class StorytellerSetCommandTests
     public async Task DeletedKey_WithRedirectedInputAndNoOption_StopsAndNamesBothOptions()
     {
         DeletedAmong(Key);
-        _fixture.InnerConsole.SetupGet(console => console.IsInputRedirected).Returns(true);
+        _fixture.Console.UseInnerConsole(redirectedInput: true);
 
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _calls.ShouldBeEmpty();
-        _fixture.Line("Choose").ShouldContain("--restore-deleted");
-        _fixture.Line("Choose").ShouldContain("--recreate");
+        _fixture.Console.ErrorLines.ShouldBe(
+        [
+            "! sform cannot ask for what happens to the deleted annotations: the input is redirected.",
+            "  Choose with an option: --restore-deleted restores and updates them, --recreate creates them new.",
+        ]);
         _fixture.Console.Mock.Verify(console => console.Select(It.IsAny<SelectOptions<string>>()), Times.Never);
     }
 
@@ -265,7 +268,7 @@ public class StorytellerSetCommandTests
         var exitCode = await Execute();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _fixture.Console.Lines.ShouldContain("Too many annotation keys.");
+        _fixture.Console.Lines.ShouldBe(["! Too many annotation keys.", "Error code: InvalidKey"]);
         _calls.ShouldBeEmpty();
     }
 
@@ -295,16 +298,21 @@ public class StorytellerSetCommandTests
         _calls.ShouldBeEmpty();
     }
 
-    [Fact]
-    public async Task InvalidAnnotation_PrintsTheServerMessage()
+    // Every refusal of the write prints the server's message and code, with the exit code of its status: a rejected
+    // annotation (400) and a concurrent change or a deleted annotation (409) are 2, a failure of the service 3.
+    [Theory]
+    [InlineData(400, "InvalidAnnotation", "Title has 201 characters, at most 200 are allowed.", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(409, "Conflict", "The annotation was changed by another request.", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(500, "Unexpected", "The server failed.", ExitCodes.ERROR_SERVICE_FAILURE)]
+    public async Task RefusedWrite_PrintsTheServerMessageWithTheCodeOfItsStatus(int status, string errorCode, string message, int expected)
     {
         DeletedAmong();
-        Patches(AnnotationCommandFixture.Error(400, "InvalidAnnotation", "Title has 201 characters, at most 200 are allowed."));
+        Patches(AnnotationCommandFixture.Error(status, errorCode, message));
 
         var exitCode = await Execute();
 
-        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _fixture.Console.Lines.ShouldContain("Title has 201 characters, at most 200 are allowed.");
+        exitCode.ShouldBe(expected);
+        _fixture.Console.Lines.ShouldBe([$"! {message}", $"Error code: {errorCode}"]);
     }
 
     [Fact]
@@ -315,8 +323,9 @@ public class StorytellerSetCommandTests
 
         var exitCode = await Execute();
 
-        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
-        _fixture.Console.Lines.ShouldContain("The annotations changed concurrently three times in a row.");
+        // A concurrent change is refused input (2) with the server's message, not a crash.
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _fixture.Console.Lines.ShouldContain("! The annotations changed concurrently three times in a row.");
     }
 
     private static VersionedResponse<Annotation> Versioned(string? etag = null)

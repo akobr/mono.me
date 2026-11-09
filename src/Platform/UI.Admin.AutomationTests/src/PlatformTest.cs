@@ -18,7 +18,7 @@ public abstract partial class PlatformTest : UiTest
     // A pool user who may create and edit in the target's project, Contributor and up: a Reader gets no create, edit or
     // save action. [UserRole(Role.Editor)] asks for it; the Roles of Users:Pool are the users' roles in the target's
     // organization and project.
-    protected static UserRequirement EditingUser { get; } = UserRequirement.WithAnyRole(OwnerRole, AdministratorRole, ContributorWithSecretsRole, ContributorRole);
+    protected static UserRequirement EditingUser => PlatformRoles.Editing;
 
     protected PlatformTarget Target => Settings.Bind<PlatformTarget>(PlatformTarget.Section);
 

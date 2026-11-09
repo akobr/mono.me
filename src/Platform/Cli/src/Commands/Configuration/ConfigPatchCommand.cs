@@ -57,6 +57,14 @@ public class ConfigPatchCommand : BaseContextCommand
     /// </summary>
     protected override async Task<int> ExecuteAsync()
     {
+        // The patch is confirmed before it is applied. A patch made in the editor would be lost at a confirmation that
+        // cannot be answered, so without a terminal that path stops before the editor and any call; a patch file is
+        // checked first (the missing configuration, the empty patch) and stops at the confirmation.
+        if (!Yes && ImportFilePath is null)
+        {
+            EnsurePatchCanBeConfirmed();
+        }
+
         JArray? patchFromFile = null;
 
         if (ImportFilePath is not null)
@@ -137,6 +145,8 @@ public class ConfigPatchCommand : BaseContextCommand
 
         if (!Yes)
         {
+            EnsurePatchCanBeConfirmed();
+
             var shouldApply = Console.Confirm(new ConfirmOptions
             {
                 Message = $"Apply this patch to '{AnnotationKey}'",
@@ -177,24 +187,17 @@ public class ConfigPatchCommand : BaseContextCommand
         }
     }
 
+    private void EnsurePatchCanBeConfirmed()
+    {
+        Console.EnsureInteractive("the confirmation of the patch", "Pass -y|--yes to apply it without asking.");
+    }
+
+    // A schema violation lists the configurations (2). Otherwise the server's message and code: a failing test operation
+    // (412 PatchTestFailed), a concurrent change or a deleted annotation (409), an invalid patch (400) and a missing
+    // configuration (404) are 2, a refusal (403) 44, and a failure of the service 3.
     private int WritePatchError(ApiException exception)
     {
-        if (SchemaValidationConsole.TryWrite(Console, exception))
-        {
-            return ExitCodes.ERROR_WRONG_INPUT;
-        }
-
-        if (exception is ApiException<ErrorResponse> error
-            && !string.IsNullOrWhiteSpace(error.Result?.Message))
-        {
-            Console.WriteLine(error.Result.Message);
-            return exception.StatusCode is (int)HttpStatusCode.BadRequest or (int)HttpStatusCode.NotFound
-                ? ExitCodes.ERROR_WRONG_INPUT
-                : ExitCodes.ERROR_CRASH;
-        }
-
-        Console.WriteLine($"Error occurred: {exception.Message}");
-        return ExitCodes.ERROR_CRASH;
+        return SchemaValidationConsole.WriteWriteError(Console, exception);
     }
 
     private static bool ContainsPointerEscape(JArray patch)

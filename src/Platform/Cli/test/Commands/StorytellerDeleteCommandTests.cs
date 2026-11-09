@@ -140,12 +140,18 @@ public class StorytellerDeleteCommandTests
         ActiveKey(descendants: 0);
         _fixture.Api
             .Setup(api => api.PurgeAnnotationAsync("org1", "proj1", "default", Key))
-            .ThrowsAsync(AnnotationCommandFixture.Error(403, "AccessDenied", "Denied."));
+            .ThrowsAsync(AnnotationCommandFixture.Error(403, "AccessDenied", "No Administrator access to 'org1.proj1'."));
 
         var exitCode = await Execute(permanent: true, yes: true);
 
-        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _fixture.Line("Only").ShouldBe("Only an Administrator or Owner can delete permanently.");
+        // a refusal like any other: the server's message and code, exit code 44, then the role it takes
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _fixture.Console.Lines.ShouldBe(
+        [
+            "! No Administrator access to 'org1.proj1'.",
+            "Error code: AccessDenied",
+            "Only an Administrator or Owner can delete permanently.",
+        ]);
         _fixture.Api.Verify(api => api.DeleteAnnotationAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         _fixture.Console.Mock.Verify(console => console.Confirm(It.IsAny<ConfirmOptions>()), Times.Never);
     }

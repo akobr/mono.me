@@ -65,7 +65,7 @@ public class AuthKitAuthenticationServiceTests
             poll.Authorization.ShouldBeNull();
         }
 
-        user.ShouldBe(new SignedInUser("user_01", "ada@example.com", "Ada Lovelace"));
+        user.ShouldBe(new SignedInUser("user_01", "ada@example.com", "Ada Lovelace", "org_01"));
         _store.Session.ShouldNotBeNull();
         _store.Session.AccessToken.ShouldBe(accessToken);
         _store.Session.RefreshToken.ShouldBe("refresh-1");
@@ -279,13 +279,13 @@ public class AuthKitAuthenticationServiceTests
     }
 
     [Fact]
-    public async Task GetSignedInUser_ReturnsTheStoredUser()
+    public async Task GetSignedInUser_ReturnsTheStoredUserAndOrganization()
     {
         _store.Session = Session("access-fresh", "refresh-1", Start.AddMinutes(2));
 
         var user = await CreateService().GetSignedInUserAsync();
 
-        user.ShouldBe(new SignedInUser("user_01", "ada@example.com", "Ada Lovelace"));
+        user.ShouldBe(new SignedInUser("user_01", "ada@example.com", "Ada Lovelace", "org_01"));
     }
 
     [Fact]
@@ -308,6 +308,76 @@ public class AuthKitAuthenticationServiceTests
         await CreateService().LoginWithDeviceCodeAsync(_ => Task.CompletedTask);
 
         _store.Session!.AccessTokenExpiresAt.ShouldBe(Start.AddMinutes(5));
+    }
+
+    // -o of a user in one organization: WorkOS signs in to it directly, so the session has to be of that organization.
+    [Theory]
+    [InlineData("org_01")]
+    [InlineData("ORG_01")]
+    public async Task Login_WithTheOrganizationOfTheSession_StoresIt(string requested)
+    {
+        _http.Respond(HttpStatusCode.OK, DeviceAuthorization)
+            .Respond(HttpStatusCode.OK, TestTokens.SessionJson(TestTokens.AccessToken(Start.AddMinutes(5)), "refresh-1", "org_01"));
+
+        await CreateService().LoginWithDeviceCodeAsync(_ => Task.CompletedTask, organizationId: requested);
+
+        _store.Writes.ShouldBe(1);
+        _store.Session!.OrganizationId.ShouldBe("org_01");
+    }
+
+    [Theory]
+    [InlineData("org_01", "You are not a member of the organization 'org_99': WorkOS signed you in to your only organization, 'org_01'.")]
+    [InlineData(null, "You are not a member of the organization 'org_99': WorkOS signed you in without an organization.")]
+    public async Task Login_WithAnotherOrganizationThanTheSession_FailsAndStoresNothing(string? sessionOrganization, string message)
+    {
+        _http.Respond(HttpStatusCode.OK, DeviceAuthorization)
+            .Respond(HttpStatusCode.OK, TestTokens.SessionJson(TestTokens.AccessToken(Start.AddMinutes(5)), "refresh-1", sessionOrganization));
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(
+            () => CreateService().LoginWithDeviceCodeAsync(_ => Task.CompletedTask, organizationId: "org_99"));
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe(message);
+        _store.Writes.ShouldBe(0);
+        _store.Session.ShouldBeNull();
+    }
+
+    // -o among several organizations: the selection grant gets it, and the selector is never asked.
+    [Fact]
+    public async Task Login_OrganizationSelection_WithARequestedOrganization_SelectsItWithoutAsking()
+    {
+        _http.Respond(HttpStatusCode.OK, DeviceAuthorization)
+            .Respond(HttpStatusCode.Forbidden, """{"code":"organization_selection_required","pending_authentication_token":"pending-xyz","organizations":[{"id":"org_a","name":"Alpha"},{"id":"org_b","name":"Beta"}]}""")
+            .Respond(HttpStatusCode.OK, TestTokens.SessionJson(TestTokens.AccessToken(Start.AddMinutes(5)), "refresh-1", "org_b"));
+        var asked = false;
+
+        await CreateService().LoginWithDeviceCodeAsync(
+            _ => Task.CompletedTask,
+            _ =>
+            {
+                asked = true;
+                return Task.FromResult("org_a");
+            },
+            "Org_B");
+
+        asked.ShouldBeFalse();
+        _http.Requests[2].Form["organization_id"].ShouldBe("org_b");
+        _store.Session!.OrganizationId.ShouldBe("org_b");
+    }
+
+    [Fact]
+    public async Task Login_OrganizationSelection_WithAnOrganizationNotOffered_FailsListingThemAndStoresNothing()
+    {
+        _http.Respond(HttpStatusCode.OK, DeviceAuthorization)
+            .Respond(HttpStatusCode.Forbidden, """{"code":"organization_selection_required","pending_authentication_token":"pending-xyz","organizations":[{"id":"org_a","name":"Alpha"},{"id":"org_b","name":"Beta"}]}""");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(
+            () => CreateService().LoginWithDeviceCodeAsync(_ => Task.CompletedTask, organizationId: "org_99"));
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe("You are not a member of the organization 'org_99'. Your organizations: org_a (Alpha), org_b (Beta).");
+        _http.Requests.Count.ShouldBe(2);
+        _store.Writes.ShouldBe(0);
     }
 
     private static AuthKitSession Session(string accessToken, string refreshToken, DateTimeOffset expiresAt)
