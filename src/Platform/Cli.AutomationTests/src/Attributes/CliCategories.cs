@@ -17,6 +17,10 @@ public static class CliCategories
     // [DisposableProject]: creates a project in the target's organization (mode P).
     public const string DisposableProject = "DisposableProject";
 
+    // [CertificateKinds]: needs the credential kind Certificate or CertificateAndApiKey, which a deployment may turn off
+    // (MachineAuth:DisabledCredentialKinds).
+    public const string CertificateKinds = "CertificateKinds";
+
     // [RequiresFeature("<Feature>")]: "Requires-<Feature>", skipped unless Target:Features lists it (mode X).
     public const string RequiresPrefix = "Requires-";
 

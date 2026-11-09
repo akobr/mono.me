@@ -19,6 +19,7 @@ public sealed class MachineCredentialTests : MachineAccessTest
     [TestCase(304)]
     [UserRole(Role.Editor)]
     [Covers("account machine create", "-k", "--credential-kind", "--credential-kind=Certificate", "-o", "--output", "-l", "--lifetime-days")]
+    [CertificateKinds]
     public async Task Machine_Certificate_SignsInWithPfx()
     {
         var key = await CreateAnnotationAsync();
@@ -52,6 +53,7 @@ public sealed class MachineCredentialTests : MachineAccessTest
     [UserRole(Role.Owner)]
     [DisposableProject]
     [Covers("account machine create", "-k", "--credential-kind=CertificateAndApiKey", "-s", "--shared-certificate")]
+    [CertificateKinds]
     public async Task Machine_CertificateAndApiKey_SharedCertificate()
     {
         await CreateDisposableProjectAsync();
@@ -155,6 +157,7 @@ public sealed class MachineCredentialTests : MachineAccessTest
     [TestCase(308)]
     [UserRole(Role.Editor)]
     [Covers("account machine renew", "arg0", "-c", "--certificate", "--password-stdin", "-o", "--output")]
+    [CertificateKinds]
     public async Task Machine_Renew_WritesNewPfx()
     {
         var key = await CreateAnnotationAsync();

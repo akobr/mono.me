@@ -33,6 +33,7 @@ public sealed class MachineContextTests : MachineAccessTest
     [Covers("account machine rules", "--projectKey", "-v", "--view")]
     [Covers("account machine delete", "--projectKey", "-v", "--view")]
     [Covers("account machine issuer delete", "--projectKey", "-v", "--view")]
+    [CertificateKinds]
     public async Task MachineCommands_ContextOptions_TargetProject()
     {
         const string secondIssuerUrl = "https://issuer2.test/";

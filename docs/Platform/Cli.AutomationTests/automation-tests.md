@@ -263,11 +263,12 @@ await terminal.SendLineAsync("nightly");
 | `[FreshSignIn]` | Mode F: the test's user runs use an empty home of its own; the test signs in itself |
 | `[Terminal]` | Mode T: skipped where no pseudo terminal is supported |
 | `[DisposableProject]` | Mode P: creates its own project (`CreateDisposableProjectAsync`, needs a pseudo terminal). The project stays: neither sform nor the API can delete a project yet, so each run leaves its P projects in `Target:Organization`, named `cli-<runId>-prj-…` (the run id starts with its date); remove those of past runs by hand from time to time, or skip mode P with `--treenode-filter "/**[Category!=DisposableProject]"` |
+| `[CertificateKinds]` | Needs the credential kind `Certificate` or `CertificateAndApiKey` (a machine of that kind, its renewal, a shared certificate, or a policy that enables them): 11 cases of Machines, Shared Certificates and Key/Values. A deployment that turns these kinds off (`MachineAuth:DisabledCredentialKinds`, e.g. one without mTLS) refuses them, so leave them out there with `--treenode-filter "/**[Category!=CertificateKinds]"` |
 | `[RequiresFeature("<Feature>")]` | Mode X: skipped unless `Target:Features` lists it |
 | `[RequiresMachine("<name>")]` | Skipped unless `Machines:<name>` is configured with a credential |
 | `[Covers("<command path>", "<item>", …)]` | What the test exercises: the command path as typed after sform, and the options (each form), fixed values (`--protection=public`) and arguments (`arg0`) of that command whose effect it checks; repeat it per command, or put it on the class for all its tests. The rules of [the command coverage](#command-coverage) |
 
-Categories (`CliCategories`): `MachineOnly`, `FreshSignIn`, `Terminal`, `DisposableProject`, `Requires-<Feature>`, `Machine-<name>`, `SelfTest`, `Coverage`, plus the library's `Elementary`, `Serial`, `Area-<section>`.
+Categories (`CliCategories`): `MachineOnly`, `FreshSignIn`, `Terminal`, `DisposableProject`, `CertificateKinds`, `Requires-<Feature>`, `Machine-<name>`, `SelfTest`, `Coverage`, plus the library's `Elementary`, `Serial`, `Area-<section>`.
 
 ### Data and secrets
 

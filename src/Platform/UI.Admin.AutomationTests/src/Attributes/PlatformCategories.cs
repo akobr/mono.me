@@ -13,4 +13,8 @@ public static class PlatformCategories
 
     // [DisposableProject]: creates a project in the target's organization (PlatformTest.CreateDisposableProjectAsync).
     public const string DisposableProject = "DisposableProject";
+
+    // [CertificateKinds]: needs the credential kind Certificate or CertificateAndApiKey, which a deployment may turn off
+    // (MachineAuth:DisabledCredentialKinds).
+    public const string CertificateKinds = "CertificateKinds";
 }
