@@ -176,8 +176,12 @@ public class CosmosKeyValueServiceTests(Startup startup)
     }
 
     [Fact]
+    [Trait(CosmosTestEmulator.TraitName, CosmosTestEmulator.ClassicTrait)]
     public async Task HistoryVersion_ExpiresAfterTheVersionRetention()
     {
+        // the vNext emulator does not expire the version items within a minute
+        Assert.SkipUnless(Context.Emulator.IsLikeTheService, CosmosTestEmulator.SkipReasonOnVNext);
+
         var project = NewProject("version-ttl");
         var shortLived = CreateService(versionRetention: TimeSpan.FromSeconds(3), deletedRetention: TimeSpan.FromSeconds(60));
 

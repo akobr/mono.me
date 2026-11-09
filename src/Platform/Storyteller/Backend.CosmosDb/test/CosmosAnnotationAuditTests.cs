@@ -159,6 +159,7 @@ public class CosmosAnnotationAuditTests(Startup startup)
     }
 
     [Fact]
+    [Trait(CosmosTestEmulator.TraitName, CosmosTestEmulator.ClassicTrait)]
     public async Task Audit_IsTrimmedToItsSizeLimit()
     {
         var configuration = new ConfigurationBuilder()
@@ -185,6 +186,9 @@ public class CosmosAnnotationAuditTests(Startup startup)
         history!.IsTrimmed.Should().BeTrue();
         history.Entries.Count.Should().BeLessThan(41);
         history.Entries[0].Fields!.Single(f => f.Field == "Title").Value!.ToString().Should().StartWith("Title 39 ");
+
+        // the stored size: only an emulator like the service returns the document as stored (vNext formats it)
+        Assert.SkipUnless(Context.Emulator.IsLikeTheService, CosmosTestEmulator.SkipReasonOnVNext);
 
         using var response = await Container.ReadItemStreamAsync("default.adt.sbt.tr-s", Key("sbt.tr-s").GetCosmosPartitionKey());
         response.StatusCode.Should().Be(HttpStatusCode.OK);

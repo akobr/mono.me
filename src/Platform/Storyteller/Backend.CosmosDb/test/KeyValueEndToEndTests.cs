@@ -90,7 +90,8 @@ public class KeyValueEndToEndTests(Startup startup)
 
         raw.Should().NotContain("hunter");
         raw.Should().Contain($"{_vaultUri.Host}");
-        raw.Should().Contain("\"Algorithm\":\"RSA-OAEP-256\"");
+        // parsed, not matched as text: the vNext emulator returns the stored document formatted
+        System.Text.Json.Nodes.JsonNode.Parse(raw)!["Content"]!["Encrypted"]!["Algorithm"]!.GetValue<string>().Should().Be("RSA-OAEP-256");
     }
 
     // 424-167: the first Standard secret records the vault's key in the project's policy.
