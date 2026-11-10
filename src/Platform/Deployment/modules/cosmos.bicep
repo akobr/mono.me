@@ -14,7 +14,10 @@ param tags object
 @description('The free tier; only the first Cosmos DB account of a subscription can have it, and only at creation.')
 param enableFreeTier bool = true
 
-@description('The most throughput the account accepts in RU/s: the free tier\'s 1000, so a mistake fails instead of being billed.')
+// With a limit, Cosmos DB refuses to create a container without explicit throughput, so the shared-throughput
+// containers of DbCreator (and of the probe) can't be created under it: the limit is turned on after them.
+@description('The most throughput the account accepts in RU/s (1000: the free tier), or -1 for no limit. -1 until DbCreator has created the containers.')
+@minValue(-1)
 param totalThroughputLimit int = 1000
 
 resource account 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' = {
@@ -35,7 +38,8 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' = {
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
     }
-    // The sum of every database's and container's throughput (autoscale counts its maximum) can't exceed it.
+    // The sum of every database's and container's throughput (autoscale counts its maximum) can't exceed it; -1 is
+    // no limit.
     capacity: {
       totalThroughputLimit: totalThroughputLimit
     }
