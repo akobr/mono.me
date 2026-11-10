@@ -10,6 +10,7 @@ namespace _42.Platform.Cli.Commands.Schemas;
     typeof(SchemaDescendantEditCommand),
     typeof(SchemaDescendantDeleteCommand),
     typeof(SchemaDescendantVersionsCommand),
+    typeof(SchemaDescendantRestoreCommand),
     typeof(SchemaDescendantDiffCommand))]
 
 [Command(CommandNames.DESCENDANT, Description = "Get and manage the configuration schema of a descendant type under an ancestor in the view.")]

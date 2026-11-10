@@ -201,6 +201,24 @@ internal static class SchemaOperations
         return ExitCodes.SUCCESS;
     }
 
+    // Stores the content of a version as the new version of the schema: "Restored vN of the schema for … as vM." (0), or
+    // nothing changed (42); a refusal as the other writes (VersionRestoreConsole.RestoreVersionAsync).
+    public static Task<int> RestoreAsync(
+        IExtendedConsole console,
+        ISchemasApiClient api,
+        ICommandContext context,
+        SchemaLayer layer,
+        string? annotationType,
+        string? annotationKey,
+        int version,
+        bool force)
+    {
+        var subject = $"the schema for {Describe(layer, annotationType, annotationKey)}";
+        return console.RestoreVersionAsync(
+            subject,
+            () => RestoreVersionAsync(api, context, layer, annotationType, annotationKey, version, force));
+    }
+
     public static async Task<int> DiffAsync(
         IExtendedConsole console,
         ISchemasApiClient api,
@@ -398,6 +416,43 @@ internal static class SchemaOperations
                 annotationKey!,
                 annotationType!,
                 version),
+            _ => throw new ArgumentOutOfRangeException(nameof(layer)),
+        };
+    }
+
+    private static Task<VersionRestoreResult> RestoreVersionAsync(
+        ISchemasApiClient api,
+        ICommandContext context,
+        SchemaLayer layer,
+        string? annotationType,
+        string? annotationKey,
+        int version,
+        bool force)
+    {
+        return layer switch
+        {
+            SchemaLayer.Type => api.RestoreSchemaVersionAsync(
+                context.OrganizationName,
+                context.ProjectName,
+                context.ViewName,
+                annotationType!,
+                version,
+                force),
+            SchemaLayer.Annotation => api.RestoreAnnotationSchemaVersionAsync(
+                context.OrganizationName,
+                context.ProjectName,
+                context.ViewName,
+                annotationKey!,
+                version,
+                force),
+            SchemaLayer.Descendant => api.RestoreDescendantTypeSchemaVersionAsync(
+                context.OrganizationName,
+                context.ProjectName,
+                context.ViewName,
+                annotationKey!,
+                annotationType!,
+                version,
+                force),
             _ => throw new ArgumentOutOfRangeException(nameof(layer)),
         };
     }

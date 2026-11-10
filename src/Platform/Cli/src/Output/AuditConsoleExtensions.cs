@@ -89,7 +89,10 @@ public static class AuditConsoleExtensions
 
         if (entry.ConfigurationVersion is { } version)
         {
-            parts.Add($"config v{version.ToString(CultureInfo.InvariantCulture)}");
+            // a restore of a version names the version it copied: "config v5 from v2"
+            parts.Add(entry.FromVersion is { } fromVersion
+                ? $"config v{version.ToString(CultureInfo.InvariantCulture)} from v{fromVersion.ToString(CultureInfo.InvariantCulture)}"
+                : $"config v{version.ToString(CultureInfo.InvariantCulture)}");
         }
 
         return string.Join("; ", parts);
@@ -113,6 +116,7 @@ public static class AuditConsoleExtensions
             AnnotationAuditEntryAction.Recreated => "Re-created",
             AnnotationAuditEntryAction.ConfigurationChanged => "Config changed",
             AnnotationAuditEntryAction.ConfigurationDeleted => "Config deleted",
+            AnnotationAuditEntryAction.ConfigurationRestored => "Config restored",
             _ => action.ToString(),
         };
     }

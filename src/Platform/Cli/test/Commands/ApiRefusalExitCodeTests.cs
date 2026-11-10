@@ -308,6 +308,64 @@ public class ApiRefusalExitCodeTests
         Lines.ShouldBe(["! The server refused it.", "Error code: SomeCode"]);
     }
 
+    // 424-221: the refusals of config restore. The client reads every 409 of the restore as a SchemaValidationErrorResponse
+    // (a deleted annotation, a concurrent change: a message without entries), any other status as an ErrorResponse.
+    [Theory]
+    [InlineData(400, "InvalidKey", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(404, "VersionNotFound", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(404, "AnnotationNotFound", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(409, "AnnotationDeleted", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(409, "Conflict", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(403, "AccessDenied", ExitCodes.WARNING_UNAUTHORIZED_ACCESS)]
+    [InlineData(500, "Unexpected", ExitCodes.ERROR_SERVICE_FAILURE)]
+    [InlineData(503, "Unavailable", ExitCodes.ERROR_SERVICE_FAILURE)]
+    public async Task ConfigRestore_ApiError_PrintsTheServerMessageWithTheCodeOfItsStatus(int status, string errorCode, int expected)
+    {
+        ApiException error = status == 409
+            ? new ApiException<SchemaValidationErrorResponse>(
+                "The version violates the schema.",
+                409,
+                string.Empty,
+                new Dictionary<string, IEnumerable<string>>(),
+                new SchemaValidationErrorResponse { Message = "The server refused it.", ErrorCode = errorCode },
+                null)
+            : AnnotationCommandFixture.Error(status, errorCode, "The server refused it.");
+        _configurations
+            .Setup(api => api.RestoreConfigurationVersionAsync("org1", "proj1", "default", Key, 2, false, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(error);
+
+        var exitCode = await new ConfigRestoreCommand(_fixture.Console.Object, _fixture.Context.Object, _configurations.Object)
+        {
+            AnnotationKey = Key,
+            Version = 2,
+        }.OnExecuteAsync();
+
+        exitCode.ShouldBe(expected);
+        Lines.ShouldBe(["! The server refused it.", $"Error code: {errorCode}"]);
+        Lines.ShouldNotContain(line => line.StartsWith("Error occurred", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(404, "VersionNotFound", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(409, "Conflict", ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(403, "AccessDenied", ExitCodes.WARNING_UNAUTHORIZED_ACCESS)]
+    [InlineData(502, "Unexpected", ExitCodes.ERROR_SERVICE_FAILURE)]
+    public async Task TemplateRestore_ApiError_PrintsTheServerMessageWithTheCodeOfItsStatus(int status, string errorCode, int expected)
+    {
+        _templates
+            .Setup(api => api.RestoreTemplateVersionAsync("org1", "proj1", "default", "unt", 2, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(AnnotationCommandFixture.Error(status, errorCode, "The server refused it."));
+
+        var exitCode = await new TemplateRestoreCommand(_fixture.Console.Object, _fixture.Context.Object, _templates.Object)
+        {
+            AnnotationType = "unt",
+            Version = 2,
+        }.OnExecuteAsync();
+
+        exitCode.ShouldBe(expected);
+        Lines.ShouldBe(["! The server refused it.", $"Error code: {errorCode}"]);
+    }
+
     // D4 (ANN-SET-07): a key the API cannot parse.
     [Fact]
     public async Task StoryGet_KeyTheApiCannotParse_IsAWrongInputWithTheServerMessage()

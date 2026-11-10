@@ -13,6 +13,7 @@ namespace _42.Platform.Cli.Commands.Templates;
     typeof(TemplateEditCommand),
     typeof(TemplateDeleteCommand),
     typeof(TemplateVersionsCommand),
+    typeof(TemplateRestoreCommand),
     typeof(TemplateDiffCommand))]
 
 [Command(CommandNames.TEMPLATE, CommandNames.TEMPLATES, Description = "Get and manage the configuration template of an annotation type in the view.")]

@@ -128,8 +128,8 @@ A machine can do what its scopes allow, and it gets them when it is created. **R
 | `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config <key> --resolved`, `sform story config export <key>`, `sform story kv export --include-secrets` |
 | `secrets-write` | `Secrets.Write` | `SecretsWrite` | Runtime | `sform story kv set` of a secret, and `sform story kv protect` |
 | `configuration-transfer` | `Configuration.Transfer` | `ConfigurationTransfer` | Management | `sform story export` and `import`, `sform story kv export` and `import`; an import of a view also needs `schema-write`, `template-write` and `annotation-manage` for those kinds |
-| `schema-write` | `Schema.Write` | `SchemaWrite` | Management | the writes and deletes of `sform story schema`, and `sform story import` of schemas |
-| `template-write` | `Template.Write` | `TemplateWrite` | Management | `sform story template set`, `edit` and `delete`, and `sform story import` of templates |
+| `schema-write` | `Schema.Write` | `SchemaWrite` | Management | the writes (`restore` too) and deletes of `sform story schema`, and `sform story import` of schemas |
+| `template-write` | `Template.Write` | `TemplateWrite` | Management | `sform story template set`, `edit`, `delete` and `restore`, and `sform story import` of templates |
 | `annotation-manage` | `Annotation.Manage` | `AnnotationManage` | Management | `sform story delete` and `restore`, `sform story set --restore-deleted`, the **Restore and edit** of `sform story edit`, and `sform story import` of annotations |
 | `keyvalue-manage` | `KeyValue.Manage` | `KeyValueManage` | Management | `sform story kv protect` and `restore` |
 
@@ -349,15 +349,37 @@ An unquoted `a['b.c']=1` reaches `sform` as `a[b.c]=1`, and an expanded `$bindin
 
 **Patch and edit.** `sform story config patch <key>` applies a JSON Patch, from `-i <file>` or from the changes made in the editor, and `sform story config edit <key>` replaces the stored content with what you saved in the editor.
 
+**Restore a version.** `sform story config restore <key> --version <n>` stores the content of version `n` as the new version of the configuration, whole and as it was stored: nothing is merged, and the history keeps every version. `sform story config versions <key>` lists the versions. It also brings back a configuration that `config delete` deleted. The content is checked against the schema, as any write, and `-f` stores it anyway. When `n` is the current version, or the current version has its content, nothing is stored and the command ends with `42`. A version that was never written or has expired ends with `2` and the error code `VersionNotFound`. `--version` has no short form, as `-v` is the view. This restores a version of a document, while `sform story restore <key>` restores a deleted annotation; that comes first, as a restore of a version of a deleted annotation ends with `2` and the error code `AnnotationDeleted`.
+
+``` text
+sform story config restore <key> --version <n> [-f|--force]
+sform story template restore <type> --version <n>
+sform story schema type restore <type> --version <n> [-f|--force]
+sform story schema annotation restore <key> --version <n> [-f|--force]
+sform story schema descendant restore <key> <type> --version <n> [-f|--force]
+```
+
+``` text
+Restored v2 of the configuration for 'exe.northwind.invoicing.production' as v5.
+v5 is already the current version of the configuration for 'exe.northwind.invoicing.production'.
+v2 equals the current version v5 of the configuration for 'exe.northwind.invoicing.production'; nothing changed.
+```
+
+::: warning
+The `restore` commands of `config`, `template` and `schema` are newer than the `sform` on NuGet, which ends them as an unrecognized command or argument, and they need an API that has the restore routes. Until a release has them, install a `sform` packed from the repository, as [Until sform is published](/cli/github-action#until-sform-is-published) shows.
+:::
+
+`template restore` and the three `schema … restore` commands work the same way for a template and for the schemas of a type, an annotation and a descendant type. A template has no schema, so it takes no `-f`; the `-f` of a schema stores it even when configurations in the view do not comply with it, which are listed otherwise. `sform story history <key>` shows the restore of a configuration as `Config restored`, with the change `config v5 from v2`, and the versions tables of `config`, `template` and `schema … versions` get a column `Restored from` when a listed version was restored.
+
 A configuration has no custom properties or labels of its own: they belong to the annotation, and `sform story set <key> -c <name=value> -l <label>` sets them. Earlier versions of `config set` accepted `-c` and `-l` and sent nothing; they are now unknown options, which end the command with `-1`.
 
 | Exit code | When |
 |---|---|
-| `0` | The configuration was stored |
-| `42` | Nothing changed (`--replace`, `patch` and `edit`) |
+| `0` | The configuration was stored, or a version restored as a new version |
+| `42` | Nothing changed (`--replace`, `patch`, `edit` and `restore`) |
 | `40` | You declined the confirmation of `patch` or `edit` |
 | `43` | `patch` or `edit` without `-y\|--yes` and without a terminal, see [Run without a terminal](#run-without-a-terminal) |
-| `2` | The content violates the schema, which lists the failing configurations; a file that is not a JSON object; a request the API rejects (`400`, `404`, `409`, `501`); a `test` operation of a patch that fails (`412` `PatchTestFailed`) |
+| `2` | The content violates the schema, which lists the failing configurations; a file that is not a JSON object; `restore` without `--version`; a request the API rejects (`400`, `404`, `409`, `501`), for example a version that does not exist (`VersionNotFound`) or a deleted annotation (`AnnotationDeleted`); a `test` operation of a patch that fails (`412` `PatchTestFailed`) |
 | `44` | The API refused the write (`401`, or `403` with its message, for example for a Reader or a machine without `Configuration.Write`) |
 | `3` | The service failed (`5xx` but `501` and `505`, `408`, `429`) or could not be reached |
 | `1` | The editor of `edit` or `patch` exited with a non-zero code |
