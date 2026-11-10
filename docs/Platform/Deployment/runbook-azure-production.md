@@ -294,7 +294,7 @@ curl.exe -sI https://app.2s.42for.net                             # TLS works (c
 az staticwebapp hostname list -g prod-2s-eusec-rg -n prod-2s-app-swa --query "[].{name:name, status:status}" -o table   # Ready
 ```
 
-**Then** set `apiHostNameBound = true` in `parameters/prod.domains.bicepparam`, commit and push it: a later run of `domains.bicep` keeps the API's TLS on (it binds with SNI directly). With `false`, a rerun switches TLS off for a few seconds.
+The first run binds the host name without TLS before the certificate exists. **If the certificate or the SNI binding fails, `api.2s.42for.net` stays without TLS** until you fix the cause and run `domains.bicep` again, or bind the certificate in the portal (above); check with the `curl.exe` below. A later run reads the current binding and keeps an existing SNI binding, so it doesn't switch TLS off.
 
 ## 8. AuthKit client id (and API key), third run
 
