@@ -31,6 +31,22 @@ internal static class ToolFixtures
         return JObject.Parse(result.StructuredContent!.Value.GetRawText());
     }
 
+    // The answer of a restore of a version: FromVersion is the version asked for, Version the new or the current one.
+    public static Sdk.VersionRestoreResult Restore(Sdk.VersionRestoreResultOutcome outcome, long fromVersion, long version)
+    {
+        return new Sdk.VersionRestoreResult
+        {
+            Outcome = outcome,
+            FromVersion = fromVersion,
+            Version = version,
+            Modified = new Sdk.AuditStamp
+            {
+                At = new DateTimeOffset(2026, 11, 10, 9, 0, 0, TimeSpan.Zero),
+                By = new Sdk.AuditActor { Kind = Sdk.AuditActorKind.Account, Id = "user-1", Name = "Ada" },
+            },
+        };
+    }
+
     public static Sdk.AnnotationDeletion Deletion(string root)
     {
         return new Sdk.AnnotationDeletion

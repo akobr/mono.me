@@ -25,9 +25,9 @@ public sealed class ManagementToolsHostTests : IDisposable
         "delete_annotation", "list_deleted_annotations", "restore_annotations", "purge_annotation", "get_annotation_history",
         "list_configurations", "get_configuration", "set_configuration", "replace_configuration", "revert_configuration",
         "patch_configuration", "delete_configuration", "list_configuration_versions", "diff_configuration",
-        "list_schemas", "get_schema", "set_schema", "delete_schema", "get_combined_schema", "list_schema_versions", "diff_schema",
-        "list_templates", "get_template", "set_template", "replace_template", "patch_template", "delete_template",
-        "list_template_versions", "diff_template",
+        "list_schemas", "get_schema", "set_schema", "revert_schema", "delete_schema", "get_combined_schema", "list_schema_versions",
+        "diff_schema", "list_templates", "get_template", "set_template", "replace_template", "revert_template", "patch_template",
+        "delete_template", "list_template_versions", "diff_template",
     ];
 
     private readonly McpTestHost _host = new();
@@ -99,6 +99,74 @@ public sealed class ManagementToolsHostTests : IDisposable
 
         result.IsError.ShouldBe(true);
         result.Text().ShouldContain("412 PatchTestFailed");
+    }
+
+    [Fact]
+    public async Task RevertConfiguration_ChecksTheAnnotation_ThenPostsTheRestoreOfTheVersion()
+    {
+        _host.Api.Respond = request => request.Method == HttpMethod.Get
+            ? RecordingApiHandler.Json(AnnotationJson)
+            : RecordingApiHandler.Json(RestoreJson("Restored", 3, 8));
+        await using var client = await _host.ConnectAsync();
+
+        var result = await client.CallAsync("revert_configuration", new { organization = "house", project = "main", key = Key, version = 3, force = true });
+
+        result.IsError.ShouldNotBe(true, result.Text());
+        var requests = _host.Api.Requests.ToList();
+        requests.Count.ShouldBe(2);
+        requests[0].Uri.ToString().ShouldBe($"{Base}/annotations/{Key}?includeInactive=true&includeDeleted=true");
+        requests[1].Method.ShouldBe(HttpMethod.Post);
+        requests[1].Uri.ToString().ShouldBe($"{Base}/configuration/{Key}/versions/3/restore?force=true");
+        result.Text().ShouldContain("\"Outcome\":\"Restored\"");
+        result.Text().ShouldContain("\"FromVersion\":3,\"Version\":8");
+        result.Text().ShouldContain("\"Changed\":true");
+    }
+
+    [Fact]
+    public async Task RevertConfiguration_SchemaViolation_IsAToolErrorWithTheMessages()
+    {
+        _host.Api.Respond = request => request.Method == HttpMethod.Get
+            ? RecordingApiHandler.Json(AnnotationJson)
+            : RecordingApiHandler.Json(
+                """{"Message":"The configuration does not comply with the schema.","Errors":[{"AnnotationKey":"exe.northwind.billing.prod","ViewName":"default","Errors":["#/port: IntegerExpected"]}]}""",
+                HttpStatusCode.Conflict);
+        await using var client = await _host.ConnectAsync();
+
+        var result = await client.CallAsync("revert_configuration", new { organization = "house", project = "main", key = Key, version = 3 });
+
+        result.IsError.ShouldBe(true);
+        result.Text().ShouldContain("409");
+        _host.Api.Requests.Last().Uri.ToString().ShouldBe($"{Base}/configuration/{Key}/versions/3/restore");
+        var errors = result.StructuredContent!.Value.GetProperty("Errors");
+        errors[0].GetProperty("Errors")[0].GetString().ShouldBe("#/port: IntegerExpected");
+    }
+
+    [Fact]
+    public async Task RevertTemplateAndSchema_PostTheRestoreOfTheirDocument()
+    {
+        _host.Api.Respond = _ => RecordingApiHandler.Json(RestoreJson("Unchanged", 2, 4));
+        await using var client = await _host.ConnectAsync();
+        var calls = new (string Tool, object Arguments, string Path)[]
+        {
+            ("revert_template", new { organization = "house", project = "main", annotationType = "exe", version = 2 }, "/template/exe/versions/2/restore"),
+            ("revert_schema", new { organization = "house", project = "main", level = "type", annotationType = "exe", version = 2 }, "/configuration-schema/type/exe/versions/2/restore"),
+            ("revert_schema", new { organization = "house", project = "main", level = "annotation", key = "sbt.northwind", version = 2, force = true }, "/configuration-schema/sbt.northwind/versions/2/restore?force=true"),
+            ("revert_schema", new { organization = "house", project = "main", level = "descendantType", annotationType = "cnt", key = "sbt.northwind", version = 2 }, "/configuration-schema/sbt.northwind/type/cnt/versions/2/restore"),
+        };
+
+        foreach (var (tool, arguments, path) in calls)
+        {
+            var result = await client.CallAsync(tool, arguments);
+
+            result.IsError.ShouldNotBe(true, result.Text());
+            result.Text().ShouldContain("\"Outcome\":\"Unchanged\"");
+            result.Text().ShouldContain("\"Changed\":false");
+            var request = _host.Api.Requests.Last();
+            request.Method.ShouldBe(HttpMethod.Post);
+            request.Uri.ToString().ShouldBe(Base + path);
+        }
+
+        _host.Api.Requests.Count.ShouldBe(calls.Length);
     }
 
     [Fact]
@@ -208,6 +276,17 @@ public sealed class ManagementToolsHostTests : IDisposable
     public void Dispose()
     {
         _host.Dispose();
+    }
+
+    private static string RestoreJson(string outcome, long fromVersion, long version)
+    {
+        return new JObject
+        {
+            ["Outcome"] = outcome,
+            ["FromVersion"] = fromVersion,
+            ["Version"] = version,
+            ["Modified"] = JObject.Parse("""{"At":"2026-11-10T09:00:00+00:00","By":{"Kind":"Account","Id":"user-1","Name":"Ada"}}"""),
+        }.ToString(Formatting.None);
     }
 
     // A request body as the API reads it: date-like strings stay text.

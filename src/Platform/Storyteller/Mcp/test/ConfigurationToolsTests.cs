@@ -130,16 +130,49 @@ public class ConfigurationToolsTests
     }
 
     [Fact]
-    public async Task RevertConfiguration_ReplacesTheStoredDocumentWithTheVersion()
+    public async Task RevertConfiguration_RestoresTheVersionOnTheServer()
     {
-        Own(7, """{"retries":5}""");
-        _configurations.Setup(api => api.GetConfigurationVersionAsync(Organization, Project, ViewName, Key, 3, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Sdk.Configuration { AnnotationKey = Key, Version = 3, Content = JObject.Parse("""{"retries":2,"old":true}""") });
+        // the version is neither read nor written by the tool: the API copies it as stored (a "$remove" in it included)
+        _configurations.Setup(api => api.RestoreConfigurationVersionAsync(Organization, Project, ViewName, Key, 3, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Restore(Sdk.VersionRestoreResultOutcome.Restored, 3, 8));
 
-        await Tools.RevertConfiguration(Organization, Project, Key, 3);
+        var result = (await Tools.RevertConfiguration(Organization, Project, Key, 3)).Structured();
 
-        _sentBody.ShouldBeOfType<JArray>().ToString(Formatting.None).ShouldBe(
-            """[{"op":"test","path":"/retries","value":5},{"op":"replace","path":"/retries","value":2},{"op":"add","path":"/old","value":true}]""");
+        result.Value<string>("Outcome").ShouldBe("Restored");
+        result.Value<long>("FromVersion").ShouldBe(3);
+        result.Value<long>("Version").ShouldBe(8);
+        result["Modified"]!["By"]!.Value<string>("Name").ShouldBe("Ada");
+        result.Value<bool>("Changed").ShouldBeTrue();
+        _sentBody.ShouldBeNull();
+        _configurations.Verify(api => api.RestoreConfigurationVersionAsync(Organization, Project, ViewName, Key, 3, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RevertConfiguration_Force_IsSent()
+    {
+        _configurations.Setup(api => api.RestoreConfigurationVersionAsync(Organization, Project, ViewName, Key, 3, true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Restore(Sdk.VersionRestoreResultOutcome.Restored, 3, 8));
+
+        await Tools.RevertConfiguration(Organization, Project, Key, 3, force: true);
+
+        _configurations.Verify(api => api.RestoreConfigurationVersionAsync(Organization, Project, ViewName, Key, 3, true, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // Version 7 is the current one, or the current version 7 already has the content of version 3.
+    [Theory]
+    [InlineData(7)]
+    [InlineData(3)]
+    public async Task RevertConfiguration_Unchanged_SaysNothingChanged(int version)
+    {
+        _configurations.Setup(api => api.RestoreConfigurationVersionAsync(Organization, Project, ViewName, Key, version, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Restore(Sdk.VersionRestoreResultOutcome.Unchanged, version, 7));
+
+        var result = (await Tools.RevertConfiguration(Organization, Project, Key, version)).Structured();
+
+        result.Value<string>("Outcome").ShouldBe("Unchanged");
+        result.Value<long>("FromVersion").ShouldBe(version);
+        result.Value<long>("Version").ShouldBe(7);
+        result.Value<bool>("Changed").ShouldBeFalse();
     }
 
     [Fact]

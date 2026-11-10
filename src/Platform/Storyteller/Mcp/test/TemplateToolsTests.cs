@@ -75,6 +75,23 @@ public class TemplateToolsTests
         _sentBody.ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData(Sdk.VersionRestoreResultOutcome.Restored, 4L, true)]
+    [InlineData(Sdk.VersionRestoreResultOutcome.Unchanged, 3L, false)]
+    public async Task RevertTemplate_RestoresTheVersionOnTheServer(Sdk.VersionRestoreResultOutcome outcome, long version, bool changed)
+    {
+        _api.Setup(api => api.RestoreTemplateVersionAsync(Organization, Project, ViewName, "exe", 1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Restore(outcome, 1, version));
+
+        var result = (await Tools.RevertTemplate(Organization, Project, "EXE", 1)).Structured();
+
+        result.Value<string>("Outcome").ShouldBe(outcome.ToString());
+        result.Value<long>("FromVersion").ShouldBe(1);
+        result.Value<long>("Version").ShouldBe(version);
+        result.Value<bool>("Changed").ShouldBe(changed);
+        _sentBody.ShouldBeNull();
+    }
+
     [Fact]
     public async Task UnknownTypeCode_IsRefused()
     {

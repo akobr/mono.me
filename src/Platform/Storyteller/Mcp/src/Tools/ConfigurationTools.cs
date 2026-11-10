@@ -142,10 +142,13 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
 
     [McpServerTool(Name = "revert_configuration", Title = "Revert a configuration to a version", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
-        "Makes the annotation's own stored document equal a previous version (list_configuration_versions), the way "
-        + "replace_configuration does: the result is a new version and the history is kept. It also brings back a "
-        + "document removed by delete_configuration. " + NeedsAnnotation + " The result is checked against the combined "
-        + "schema unless force is true. Needs the Contributor role. Returns the stored own document, its Version and "
+        "Restores a previous version of the annotation's own stored document (list_configuration_versions) as a new "
+        + "version, in one step on the server: the version's content is copied as it was stored, the history is kept, "
+        + "and the annotation history records ConfigurationRestored. Reverting to the current version, or to one the "
+        + "current version equals, changes nothing. A document cleared by delete_configuration is brought back this way. "
+        + "An unknown or expired version answers 404 VersionNotFound. " + NeedsAnnotation + " The version is checked "
+        + "against the combined schema unless force is true. Needs the Contributor role. Returns Outcome (Restored or "
+        + "Unchanged), FromVersion, Version (the new version, or the current one when nothing changed), Modified and "
         + "Changed.")]
     public async Task<CallToolResult> RevertConfiguration(
         [Description(ToolText.Organization)] string organization,
@@ -159,11 +162,7 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
         var annotationKey = AnnotationKeys.Parse(key).ToString();
         await AnnotationGuards.EnsureAnnotationExistsAsync(annotations, organization, project, view, annotationKey, cancellationToken);
 
-        var previous = await configurations.GetConfigurationVersionAsync(organization, project, view, annotationKey, version, cancellationToken);
-        var desired = ToolResults.ToToken(previous.Content) as JObject ?? new JObject();
-        DocumentWrites.EnsureNoDirectives(desired, $"Version {version}");
-
-        return await ReplaceAsync(organization, project, view, annotationKey, desired, force, cancellationToken);
+        return DocumentWrites.Reverted(await configurations.RestoreConfigurationVersionAsync(organization, project, view, annotationKey, version, Force(force), cancellationToken));
     }
 
     [McpServerTool(Name = "patch_configuration", Title = "Patch a configuration", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
@@ -220,8 +219,9 @@ public sealed class ConfigurationTools(Sdk.IConfigurationsApiClient configuratio
 
     [McpServerTool(Name = "list_configuration_versions", Title = "List configuration versions", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(
-        "Lists the versions of the own stored document of an annotation: Version, Modified (who wrote it and when) and "
-        + "ExpirationTime; versions other than the current one expire 365 days after their write. Needs the Reader role.")]
+        "Lists the versions of the own stored document of an annotation: Version, Modified (who wrote it and when), "
+        + "ExpirationTime, and RestoredFrom on a version restored from an earlier one (revert_configuration); versions "
+        + "other than the current one expire 365 days after their write. Needs the Reader role.")]
     public async Task<CallToolResult> ListConfigurationVersions(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
