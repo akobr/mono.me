@@ -383,7 +383,7 @@ public class SchemaOperationsTests
         var exitCode = await RestoreCommand(Enum.Parse<SchemaLayer>(layerName), -3, false).OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        Lines.ShouldBe(["! The version to restore must be 1 or more, not -3; 'versions' lists them."]);
+        Lines.ShouldBe(["! The version to restore cannot be negative, not -3; 'versions' lists them."]);
         _api.VerifyNoOtherCalls();
     }
 
