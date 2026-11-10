@@ -5,9 +5,12 @@
 //     --parameters parameters/prod.domains.bicepparam
 //
 // The first run binds the host name without TLS (the managed certificate needs a bound, validated host name), issues
-// the certificate and binds it with SNI. Once the domain is bound, set apiHostNameBound = true in the parameters file:
-// later runs skip the step without TLS and write the binding with SNI and the certificate's current thumbprint
-// directly, so HTTPS stays up. The certificates renew themselves.
+// the certificate and binds it with SNI. A later run reads the site's current binding first: a host name already bound
+// with SNI keeps its TLS (the first write repeats it with its thumbprint), then the certificate is put again (an
+// existing managed certificate is kept) and bound with its current thumbprint. The certificates renew themselves.
+//
+// If the first run fails after the binding without TLS (the certificate isn't issued, or the SNI binding fails), the
+// host name stays without TLS until a run of this template, or the portal, binds the certificate.
 
 import { environmentName, resourceNames, resourceTags } from 'naming.bicep'
 
@@ -27,9 +30,6 @@ param appHostName string
 
 param location string = resourceGroup().location
 
-@description('true once the API\'s host name is bound with its certificate: reruns then keep TLS on (no binding without TLS).')
-param apiHostNameBound bool = false
-
 var names = resourceNames(environment, product, company, regionCode)
 var tags = resourceTags(environment)
 
@@ -41,13 +41,21 @@ resource staticWebApp 'Microsoft.Web/staticSites@2025-03-01' existing = {
   name: names.staticWebApp
 }
 
-// The API: bind the host name (validated by the TXT record asuid.<host>), issue the site-scoped managed certificate,
-// then bind it with SNI.
-module apiHostName_bind 'modules/hostname-binding.bicep' = if (!apiHostNameBound) {
+// The API's binding as the site has it now (read when the deployment runs): bound with SNI on a rerun, none at first.
+var apiSniStates = filter(
+  functionApp.properties.hostNameSslStates,
+  state => state.name == apiHostName && state.sslState == 'SniEnabled' && !empty(state.?thumbprint ?? '')
+)
+
+// The API: bind the host name (validated by the TXT record asuid.<host>) without TLS the first time, or keep its SNI
+// binding as it is when it exists; then issue the site-scoped managed certificate and bind it with SNI.
+module apiHostName_bind 'modules/hostname-binding.bicep' = {
   name: 'platform-api-hostname'
   params: {
     siteName: functionApp.name
     hostName: apiHostName
+    sslState: empty(apiSniStates) ? 'Disabled' : 'SniEnabled'
+    thumbprint: empty(apiSniStates) ? '' : apiSniStates[0].thumbprint
   }
 }
 
