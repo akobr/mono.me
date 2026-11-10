@@ -226,7 +226,7 @@ az role assignment list --assignee $deployment.PrincipalId --all --query "[].{ro
    }
    ```
 
-   `aud` must equal the API's `Auth__AuthKit__Audience` (`https://2s.42for.net`, the default of `main.bicep`). The template is shared by every application of the environment; before a second product signs users in, the API needs its `client_id` check ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)).
+   `aud` must equal the API's `Auth__AuthKit__Audience` (`https://2s.42for.net`, the default of `main.bicep`). The template is shared by every application of the environment; before a second product signs users in, the API accepts only the audiences of the 2S applications, and enabling Multiple Applications changes the `aud` ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)). Don't enable Multiple Applications in production before that change.
 4. **Redirects**: redirect URI `https://app.2s.42for.net/callback`, sign-out URI `https://app.2s.42for.net/login`, allowed origin `https://app.2s.42for.net`.
 5. **CLI Auth** on.
 6. **Invitation link**: `https://app.2s.42for.net/invitations/accept`.
