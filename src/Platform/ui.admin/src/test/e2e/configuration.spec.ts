@@ -229,6 +229,25 @@ test('saves a change and compares it with the previous version', async ({ page }
   await expect(page.locator('.cm-mergeView, .cm-changedLine, .cm-deletedChunk').first()).toBeVisible()
 })
 
+test('restores a previous version as the newest one (424-221)', async ({ page }) => {
+  await openFromTemplate(page)
+  await editJson(page, (content) => (content.retries = 4))
+  await page.getByRole('button', { name: /^Save/ }).click()
+  await expect(page.getByText(/^Configuration saved \(v2\)$/)).toBeVisible()
+
+  await page.getByRole('link', { name: 'Versions' }).click()
+  // the current version has no Restore
+  await expect(page.getByRole('button', { name: 'Restore v2' })).toBeHidden()
+  await page.getByRole('button', { name: 'Restore v1' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Restore v1?' })
+  await dialog.getByRole('button', { name: 'Restore v1' }).click()
+
+  await expect(page.getByText('Restored v1 as v3', { exact: true })).toBeVisible()
+  await expect(page.getByText('restored from v1')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Restore v2' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Restore v3' })).toBeHidden()
+})
+
 test('compare views preselects the only other view', async ({ page }) => {
   // The seeded project has the views default and staging.
   await openApp(page, `/acme/billing/default/modeling/compare?key=${key}`)
