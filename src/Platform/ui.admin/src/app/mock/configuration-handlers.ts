@@ -20,8 +20,12 @@ import {
   deleteDocument,
   documentIds,
   getDocument,
+  getHistory,
   latest,
+  planRestore,
   putVersion,
+  restoreResult,
+  versionList,
   type DocumentId,
   type ScopeRef,
 } from './documents'
@@ -52,6 +56,37 @@ function missingOrDeleted(db: MockDb, params: KeyParams, status: 404 | 409): Res
   return annotationsOf(db, params.org, params.project, params.view).has(params.key)
     ? undefined
     : errorResponse(404, `The annotation ${params.key} does not exist.`, 'NotFound')
+}
+
+/**
+ * Like the API, the restore of a version of a document that belongs to an annotation (a configuration, an annotation
+ * schema or a descendant-type schema) needs the annotation: a deleted one answers 409 (restore it first), a missing or
+ * purged one 404.
+ */
+export function restoreTargetRefusal(db: MockDb, params: ScopeParams, key: string): Response | undefined {
+  if (isDeleted(db, params, key)) {
+    return errorResponse(
+      409,
+      `The annotation '${key}' is deleted; restore it before restoring a version of its documents.`,
+      'AnnotationDeleted',
+    )
+  }
+  return annotationsOf(db, params.org, params.project, params.view).has(key)
+    ? undefined
+    : errorResponse(404, `The annotation ${key} does not exist.`, 'AnnotationNotFound')
+}
+
+/** The 409 of a configuration that does not comply with its schema, as every write answers it. */
+function schemaViolation(params: KeyParams, errors: string[]): Response {
+  return HttpResponse.json(
+    {
+      Message: `The configuration of ${params.key} does not comply with its schema.`,
+      Hint: 'Fix the values or save with force=true.',
+      ErrorCode: 'SchemaValidationFailed',
+      Errors: [{ AnnotationKey: params.key, ViewName: params.view, Errors: errors }],
+    },
+    { status: 409 },
+  )
 }
 
 export function ownContent(db: MockDb, scope: ScopeRef, key: string): Record<string, unknown> | undefined {
@@ -350,15 +385,7 @@ const writeConfiguration = withDb<KeyParams>(async (db, { params, request }) => 
       ? []
       : schemaErrors(combinedSchema(db, scope, params.key)?.MergedContent, content)
   if (errors.length) {
-    return HttpResponse.json(
-      {
-        Message: `The configuration of ${params.key} does not comply with its schema.`,
-        Hint: 'Fix the values or save with force=true.',
-        ErrorCode: 'SchemaValidationFailed',
-        Errors: [{ AnnotationKey: params.key, ViewName: params.view, Errors: errors }],
-      },
-      { status: 409 },
-    )
+    return schemaViolation(params, errors)
   }
   const saved = putVersion(db, scope, `configuration:${params.key}`, content)
   appendAudit(db, scope, params.key, newEntry(db, 'ConfigurationChanged', { ConfigurationVersion: saved.Version }))
@@ -468,15 +495,7 @@ export const configurationHandlers: HttpHandler[] = [
       const force = new URL(request.url).searchParams.get('force') === 'true'
       const errors = force ? [] : schemaErrors(combinedSchema(db, scope, params.key)?.MergedContent, patched)
       if (errors.length) {
-        return HttpResponse.json(
-          {
-            Message: `The configuration of ${params.key} does not comply with its schema.`,
-            Hint: 'Fix the values or save with force=true.',
-            ErrorCode: 'SchemaValidationFailed',
-            Errors: [{ AnnotationKey: params.key, ViewName: params.view, Errors: errors }],
-          },
-          { status: 409 },
-        )
+        return schemaViolation(params, errors)
       }
 
       const saved = putVersion(db, scope, `configuration:${params.key}`, patched)
@@ -534,21 +553,16 @@ export const configurationHandlers: HttpHandler[] = [
     }),
   ),
 
+  // Like the API, the versions of a soft-deleted annotation are hidden until it is restored; those of a deleted
+  // configuration and of a purged annotation stay listed and readable.
   http.get<KeyParams>(
     `${api}/configuration/:key/versions`,
     withDb((db, { params }) => {
       const denied = requireRole(db, projectKey(params), 'Reader')
-      const document = getDocument(db, scopeOf(params), `configuration:${params.key}`)
-      return (
-        denied ??
-        HttpResponse.json(
-          (document?.versions ?? []).map(({ Version, Modified, ExpirationTime }) => ({
-            Version,
-            Modified,
-            ExpirationTime,
-          })),
-        )
-      )
+      const document = isDeleted(db, params, params.key)
+        ? undefined
+        : getHistory(db, scopeOf(params), `configuration:${params.key}`)
+      return denied ?? HttpResponse.json(versionList(document))
     }),
   ),
 
@@ -559,7 +573,10 @@ export const configurationHandlers: HttpHandler[] = [
       if (denied) {
         return denied
       }
-      const version = getDocument(db, scopeOf(params), `configuration:${params.key}`)?.versions.find(
+      if (isDeleted(db, params, params.key)) {
+        return missingOrDeleted(db, params, 404)!
+      }
+      const version = getHistory(db, scopeOf(params), `configuration:${params.key}`)?.versions.find(
         (entry) => entry.Version === Number(params.version),
       )
       return version?.Content
@@ -580,7 +597,10 @@ export const configurationHandlers: HttpHandler[] = [
       if (denied) {
         return denied
       }
-      const versions = getDocument(db, scopeOf(params), `configuration:${params.key}`)?.versions ?? []
+      if (isDeleted(db, params, params.key)) {
+        return missingOrDeleted(db, params, 404)!
+      }
+      const versions = getHistory(db, scopeOf(params), `configuration:${params.key}`)?.versions ?? []
       const find = (value: string) => versions.find((entry) => entry.Version === Number(value))
       const [to, from] = [find(params.version), find(params.from)]
       if (!to || !from) {
@@ -588,6 +608,44 @@ export const configurationHandlers: HttpHandler[] = [
       }
       // Expired documents still have their recorded changes on the server; the mock diffs what it has.
       return HttpResponse.json(diffDocuments(from.Content ?? {}, to.Content ?? {}))
+    }),
+  ),
+
+  // Stores the content of a version as the next one, whole (no merge), also after the configuration was deleted.
+  http.post<KeyParams & { version: string }>(
+    `${api}/configuration/:key/versions/:version/restore`,
+    withDb((db, { params, request }) => {
+      const denied = requireRole(db, projectKey(params), 'Contributor') ?? restoreTargetRefusal(db, params, params.key)
+      if (denied) {
+        return denied
+      }
+      const scope = scopeOf(params)
+      const id: DocumentId = `configuration:${params.key}`
+      const from = Number(params.version)
+      const plan = planRestore(db, scope, id, from)
+      if (plan.kind === 'not-found') {
+        return errorResponse(
+          404,
+          `Version ${params.version} of the configuration for '${params.key}' does not exist or has expired.`,
+          'VersionNotFound',
+        )
+      }
+      if (plan.kind === 'unchanged') {
+        return HttpResponse.json(restoreResult('Unchanged', from, plan.current))
+      }
+      const force = new URL(request.url).searchParams.get('force') === 'true'
+      const errors = force ? [] : schemaErrors(combinedSchema(db, scope, params.key)?.MergedContent, plan.content)
+      if (errors.length) {
+        return schemaViolation(params, errors)
+      }
+      const saved = putVersion(db, scope, id, plan.content, from)
+      appendAudit(
+        db,
+        scope,
+        params.key,
+        newEntry(db, 'ConfigurationRestored', { ConfigurationVersion: saved.Version, FromVersion: from }),
+      )
+      return HttpResponse.json(restoreResult('Restored', from, saved))
     }),
   ),
 

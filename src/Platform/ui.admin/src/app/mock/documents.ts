@@ -1,12 +1,15 @@
-import type { Annotation, AuditActor, AuditStamp } from '@42for.net/2splatform.sdk'
+import type { Annotation, AuditActor, AuditStamp, VersionRestoreResult } from '@42for.net/2splatform.sdk'
 import { codeOfKey, typeCodes, type AnnotationTypeCode } from '@/utils/annotation-key'
+import { sameJson } from '@/utils/json-patch'
 import { accountActor, stamp } from './audit'
 import { annotationsOf, type MockDb } from './db'
 import { templates, typeSchemas } from './schemas'
 import { showcaseScope } from './showcase'
 
 // Versioned documents of the mock API: configurations, templates and the three schema kinds. The generated base
-// history is deterministic; edits copy the document into the stored overrides (db.documents) and append versions.
+// history is deterministic; edits copy the document into the stored overrides (db.documents) and append versions. A
+// deleted document keeps its versions, as on the API: they stay listed and readable, a restore of one brings the
+// document back, and the next write continues their numbering.
 
 export interface StoredVersion {
   Version: number
@@ -15,10 +18,14 @@ export interface StoredVersion {
   ExpirationTime?: string
   /** undefined: the version's document has expired. */
   Content?: Record<string, unknown>
+  /** The version a restore copied into this one (ConfigurationVersion.RestoredFrom). */
+  RestoredFrom?: number
 }
 
 export interface StoredDocument {
   versions: StoredVersion[]
+  /** The document is deleted: it has no current version, but its versions stay. */
+  deleted?: boolean
 }
 
 export type DocumentId =
@@ -164,43 +171,105 @@ function baseDocument(db: MockDb, scope: ScopeRef, id: DocumentId): StoredDocume
   return undefined
 }
 
+// null marks a deletion stored before deleted documents kept their versions.
 const storeOf = (db: MockDb, scope: ScopeRef) =>
   ((db.documents ??= {})[scopeId(scope)] ??= {}) as Record<string, StoredDocument | null>
 
-export function getDocument(db: MockDb, scope: ScopeRef, id: DocumentId): StoredDocument | undefined {
+/** The document with every version, also when it is deleted (`deleted`); undefined when it never had one. */
+export function getHistory(db: MockDb, scope: ScopeRef, id: DocumentId): StoredDocument | undefined {
   const stored = storeOf(db, scope)[id]
-  if (stored === null) {
-    return undefined
-  }
-  return stored ?? baseDocument(db, scope, id)
+  return stored === null ? undefined : (stored ?? baseDocument(db, scope, id))
+}
+
+/** The document that exists: undefined when it is deleted or was never written. */
+export function getDocument(db: MockDb, scope: ScopeRef, id: DocumentId): StoredDocument | undefined {
+  const document = getHistory(db, scope, id)
+  return document?.deleted ? undefined : document
 }
 
 export function latest(document: StoredDocument | undefined): StoredVersion | undefined {
   return document?.versions.at(-1)
 }
 
+/** Stores the next version; a deleted document comes back with it. `restoredFrom` records the version a restore copied. */
 export function putVersion(
   db: MockDb,
   scope: ScopeRef,
   id: DocumentId,
   content: Record<string, unknown>,
+  restoredFrom?: number,
 ): StoredVersion {
-  const document = structuredClone(getDocument(db, scope, id) ?? { versions: [] })
+  const { versions } = structuredClone(getHistory(db, scope, id) ?? { versions: [] })
   const now = new Date()
   const version: StoredVersion = {
-    Version: (latest(document)?.Version ?? 0) + 1,
+    Version: (versions.at(-1)?.Version ?? 0) + 1,
     Modified: stamp(db, now),
     ExpirationTime: new Date(now.getTime() + 30 * day).toISOString(),
     Content: content,
+    ...(restoredFrom === undefined ? {} : { RestoredFrom: restoredFrom }),
   }
-  document.versions.push(version)
-  storeOf(db, scope)[id] = document
+  versions.push(version)
+  storeOf(db, scope)[id] = { versions }
   return version
 }
 
+/** Deletes the current document; its versions stay. */
 export function deleteDocument(db: MockDb, scope: ScopeRef, id: DocumentId): void {
-  storeOf(db, scope)[id] = null
+  const document = getHistory(db, scope, id)
+  storeOf(db, scope)[id] = document ? { versions: structuredClone(document.versions), deleted: true } : null
 }
+
+/** The versions of a document as the version lists of the API answer them (ConfigurationVersion). */
+export function versionList(document: StoredDocument | undefined) {
+  return (document?.versions ?? []).map(({ Version, Modified, ExpirationTime, RestoredFrom }) => ({
+    Version,
+    Modified,
+    ExpirationTime,
+    RestoredFrom,
+  }))
+}
+
+const isExpired = (version: StoredVersion, now = Date.now()) =>
+  !version.Content || (!!version.ExpirationTime && Date.parse(version.ExpirationTime) <= now)
+
+/** What a restore of a version does, by the rules of the API: the content to store, or why nothing is written. */
+export type RestorePlan =
+  | { kind: 'not-found' }
+  | { kind: 'unchanged'; current: StoredVersion }
+  | { kind: 'restore'; content: Record<string, unknown> }
+
+/**
+ * The restore of version `number` (spec 1 of Restore a Previous Version): the current version, or a current document
+ * equal to it, changes nothing; an unknown or expired version is not found; otherwise its content is stored as a new
+ * version, also when the document is deleted. The caller checks the content before it calls `putVersion`.
+ */
+export function planRestore(db: MockDb, scope: ScopeRef, id: DocumentId, number: number): RestorePlan {
+  const document = getHistory(db, scope, id)
+  const current = document?.deleted ? undefined : latest(document)
+  if (current && current.Version === number) {
+    return { kind: 'unchanged', current }
+  }
+  const source = document?.versions.find((entry) => entry.Version === number)
+  if (!source || isExpired(source)) {
+    return { kind: 'not-found' }
+  }
+  if (current?.Content && sameJson(current.Content, source.Content)) {
+    return { kind: 'unchanged', current }
+  }
+  return { kind: 'restore', content: structuredClone(source.Content!) }
+}
+
+/** The response of a restore: the version asked for, and the new version or the current one. */
+export const restoreResult = (
+  outcome: 'Restored' | 'Unchanged',
+  fromVersion: number,
+  version: StoredVersion,
+): VersionRestoreResult => ({
+  Outcome: outcome,
+  FromVersion: fromVersion,
+  Version: version.Version,
+  Modified: version.Modified,
+})
 
 /**
  * The showcase's documents of a kind in the scope. A configuration is listed while its annotation is active, as the

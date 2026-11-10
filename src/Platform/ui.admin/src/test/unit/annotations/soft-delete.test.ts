@@ -12,6 +12,7 @@ import {
   getDeletedAnnotations,
   purgeAnnotation,
   restoreAnnotations,
+  restoreConfigurationVersion,
   setAnnotation,
   setConfiguration,
   type Annotation,
@@ -113,6 +114,16 @@ describe('audit presentation', () => {
       { kind: 'value', key: 'legacy', text: 'legacy removed' },
       { kind: 'configuration', version: 7 },
     ])
+  })
+
+  it('names the version a configuration restore copied (424-221)', () => {
+    expect(auditChanges(entry({ Action: 'ConfigurationRestored', ConfigurationVersion: 8, FromVersion: 5 }))).toEqual([
+      { kind: 'configuration', version: 8, from: 5 },
+    ])
+    // an ordinary save has no FromVersion, and null is none
+    expect(auditChanges(entry({ Action: 'ConfigurationChanged', ConfigurationVersion: 8, FromVersion: null }))).toEqual(
+      [{ kind: 'configuration', version: 8 }],
+    )
   })
 
   it('names actors and causes', () => {
@@ -287,6 +298,20 @@ describe('AnnotationHistory', () => {
     expect(text).toMatch(/Configuration saved as v\d+/)
     expect(text).toContain('Ada Lovelace')
     expect(text).toContain('System')
+    screen.host.unmount()
+  })
+
+  it('links a restored configuration with the version it came from (424-221)', async () => {
+    const key = 'usg.northwind.invoicing'
+    const first = await setConfiguration(org, project, view, key, { mode: 'batch' })
+    await setConfiguration(org, project, view, key, { mode: 'stream' })
+    const restored = await restoreConfigurationVersion(org, project, view, key, first.Version!)
+
+    const screen = await mountScreen(AnnotationHistory, { annotationKey: key })
+    await settle(10)
+
+    expect(restored.Outcome).toBe('Restored')
+    expect(screen.host.text()).toContain(`Configuration restored as v${restored.Version} from v${first.Version}`)
     screen.host.unmount()
   })
 

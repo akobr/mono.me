@@ -12,6 +12,7 @@ import {
   isNotFound,
   isPreconditionFailed,
   patchTemplate,
+  restoreTemplateVersion,
   setTemplate,
   type DiffResult,
 } from '@42for.net/2splatform.sdk'
@@ -100,6 +101,7 @@ const tab = computed({
 const versionSource = computed<VersionSource>(() => {
   const [org, project, view, type] = [context.org!, context.project!, context.view!, props.type]
   return {
+    document: 'template',
     queryKey: queryKey.value,
     list: (signal) => getTemplateVersions(org, project, view, type, { signal }),
     content: async (version, signal) =>
@@ -109,6 +111,9 @@ const versionSource = computed<VersionSource>(() => {
         signal,
       })) as DiffResult,
     current: template.data.value?.Version,
+    // a template has no schema, so no force
+    restore: (version) => restoreTemplateVersion(org, project, view, type, version),
+    afterRestore: () => afterSave({ org, project, view }),
   }
 })
 
@@ -205,8 +210,13 @@ defineShortcuts({
       />
     </div>
 
-    <VersionsView v-if="tab === 'versions' && !missing" :source="versionSource" />
-    <EmptyState v-else-if="tab === 'versions'" icon="i-lucide-history" title="No template, no history" />
+    <!-- A deleted template keeps its versions: restoring one brings it back. -->
+    <VersionsView
+      v-if="tab === 'versions'"
+      :source="versionSource"
+      :deleted="missing"
+      empty-title="No template, no history"
+    />
 
     <template v-else>
       <LoadingState v-if="template.isPending.value" />

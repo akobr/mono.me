@@ -94,7 +94,15 @@ const affected = computed(() => {
   return keys.filter((key) => api.value.appliesTo(key, catalog.ancestorsOf(key))).length
 })
 
-const versionSource = computed<VersionSource>(() => ({ ...api.value.versions, current: schema.data.value?.Version }))
+const versionSource = computed<VersionSource>(() => {
+  const scope = context.scope!
+  return {
+    ...api.value.versions,
+    current: schema.data.value?.Version,
+    // As after a save: every schema query (the combined schemas too) is read again.
+    afterRestore: () => invalidateSchemas(queryClient, scope),
+  }
+})
 
 async function save(force = false) {
   if (!context.scope || !draft.value || saving.value) {
@@ -171,8 +179,13 @@ defineShortcuts({
       />
     </div>
 
-    <VersionsView v-if="tab === 'versions' && !missing" :source="versionSource" />
-    <EmptyState v-else-if="tab === 'versions'" icon="i-lucide-history" title="No schema, no history" />
+    <!-- A deleted schema keeps its versions: restoring one brings it back. -->
+    <VersionsView
+      v-if="tab === 'versions'"
+      :source="versionSource"
+      :deleted="missing"
+      empty-title="No schema, no history"
+    />
 
     <template v-else>
       <LoadingState v-if="schema.isPending.value" />

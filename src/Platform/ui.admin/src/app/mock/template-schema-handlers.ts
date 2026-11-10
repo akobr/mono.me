@@ -8,13 +8,17 @@ import type {
 import { canDescend, cannotDescendMessage, metaOf, typeCodes, type AnnotationTypeCode } from '@/utils/annotation-key'
 import { stamp } from './audit'
 import type { MockDb } from './db'
-import { combinedSchema, ownContent, schemaErrors } from './configuration-handlers'
+import { combinedSchema, ownContent, restoreTargetRefusal, schemaErrors } from './configuration-handlers'
 import {
   deleteDocument,
   documentIds,
   getDocument,
+  getHistory,
   latest,
+  planRestore,
   putVersion,
+  restoreResult,
+  versionList,
   type DocumentId,
   type ScopeRef,
   type StoredVersion,
@@ -33,7 +37,21 @@ const projectKey = (params: ScopeParams) => `${params.org}.${params.project}`
 const scopeOf = (params: ScopeParams): ScopeRef => ({ org: params.org, project: params.project, view: params.view })
 const code = (type: string | undefined) => metaOf(type)?.code as AnnotationTypeCode | undefined
 
-/** The read, write and history endpoints of one kind of versioned document. */
+/** The 409 of a schema write that stored configurations would not comply with. */
+const nonCompliantResponse = (errors: SchemaValidationErrorDetail[]) =>
+  HttpResponse.json(
+    {
+      Message: 'Existing configurations do not comply with the new schema.',
+      ErrorCode: 'SchemaValidationFailed',
+      Errors: errors,
+    },
+    { status: 409 },
+  )
+
+/**
+ * The read, write, history and restore endpoints of one kind of versioned document. The current document is read with
+ * `getDocument`; the versions, also of a deleted document, with `getHistory`.
+ */
 function versionedHandlers(
   route: string,
   idOf: (params: Params) => DocumentId | undefined,
@@ -51,11 +69,17 @@ function versionedHandlers(
       params: Params,
       content: Record<string, unknown>,
     ) => SchemaValidationErrorDetail[]
+    /** The annotation the document belongs to: a restore of its versions needs it active. */
+    annotationKey?: (params: Params) => string
   },
 ): HttpHandler[] {
   const read = (db: MockDb, params: Params) => {
     const id = idOf(params)
     return id ? getDocument(db, scopeOf(params), id) : undefined
+  }
+  const history = (db: MockDb, params: Params) => {
+    const id = idOf(params)
+    return id ? getHistory(db, scopeOf(params), id) : undefined
   }
 
   return [
@@ -88,14 +112,7 @@ function versionedHandlers(
           const force = new URL(request.url).searchParams.get('force') === 'true'
           const errors = force ? [] : (options.validate?.(db, scopeOf(params), params, content) ?? [])
           if (errors.length) {
-            return HttpResponse.json(
-              {
-                Message: 'Existing configurations do not comply with the new schema.',
-                ErrorCode: 'SchemaValidationFailed',
-                Errors: errors,
-              },
-              { status: 409 },
-            )
+            return nonCompliantResponse(errors)
           }
           return HttpResponse.json(wrap(params, putVersion(db, scopeOf(params), id, content)))
         }),
@@ -147,12 +164,7 @@ function versionedHandlers(
       `${api}/${route}/versions`,
       withDb((db, { params }) => {
         const denied = requireRole(db, projectKey(params), 'Reader')
-        return (
-          denied ??
-          HttpResponse.json(
-            (read(db, params)?.versions ?? []).map(({ Version, Modified, ExpirationTime }) => ({ Version, Modified, ExpirationTime })),
-          )
-        )
+        return denied ?? HttpResponse.json(versionList(history(db, params)))
       }),
     ),
 
@@ -160,7 +172,7 @@ function versionedHandlers(
       `${api}/${route}/versions/:version`,
       withDb((db, { params }) => {
         const denied = requireRole(db, projectKey(params), 'Reader')
-        const version = read(db, params)?.versions.find((entry) => entry.Version === Number(params.version))
+        const version = history(db, params)?.versions.find((entry) => entry.Version === Number(params.version))
         return (
           denied ??
           (version?.Content
@@ -174,7 +186,7 @@ function versionedHandlers(
       `${api}/${route}/versions/:version/diff/:from`,
       withDb((db, { params }) => {
         const denied = requireRole(db, projectKey(params), 'Reader')
-        const versions = read(db, params)?.versions ?? []
+        const versions = history(db, params)?.versions ?? []
         const find = (value?: string) => versions.find((entry) => entry.Version === Number(value))
         const [to, from] = [find(params.version), find(params.from)]
         return (
@@ -183,6 +195,43 @@ function versionedHandlers(
             ? HttpResponse.json(diffDocuments(from.Content ?? {}, to.Content ?? {}))
             : errorResponse(404, 'Not found.', 'NotFound'))
         )
+      }),
+    ),
+
+    // Stores the content of a version as the next one, also after the document was deleted; checked as the writes
+    // check it (the pair of a descendant-type schema, the compliance of the configurations unless force=true).
+    http.post<Params>(
+      `${api}/${route}/versions/:version/restore`,
+      withDb((db, { params, request }) => {
+        const denied = requireRole(db, projectKey(params), 'Contributor')
+        const id = idOf(params)
+        if (denied || !id) {
+          return denied ?? errorResponse(400, 'Unknown annotation type.', 'InvalidInput')
+        }
+        const rejected = options.reject?.(params)
+        if (rejected) {
+          return errorResponse(400, rejected.message, rejected.errorCode)
+        }
+        const annotationKey = options.annotationKey?.(params)
+        const refused = annotationKey ? restoreTargetRefusal(db, params, annotationKey) : undefined
+        if (refused) {
+          return refused
+        }
+        const scope = scopeOf(params)
+        const from = Number(params.version)
+        const plan = planRestore(db, scope, id, from)
+        if (plan.kind === 'not-found') {
+          return errorResponse(404, `Version ${params.version} does not exist or has expired.`, 'VersionNotFound')
+        }
+        if (plan.kind === 'unchanged') {
+          return HttpResponse.json(restoreResult('Unchanged', from, plan.current))
+        }
+        const force = new URL(request.url).searchParams.get('force') === 'true'
+        const errors = force ? [] : (options.validate?.(db, scope, params, plan.content) ?? [])
+        if (errors.length) {
+          return nonCompliantResponse(errors)
+        }
+        return HttpResponse.json(restoreResult('Restored', from, putVersion(db, scope, id, plan.content, from)))
       }),
     ),
   ]
@@ -306,6 +355,7 @@ export const templateSchemaHandlers: HttpHandler[] = [
           : { message: cannotDescendMessage(params.key!, code(params.type)!), errorCode: 'InvalidKey' },
       validate: (db, scope, params, content) =>
         nonCompliant(db, scope, `schema:descendant:${params.key}:${code(params.type)}`, content),
+      annotationKey: (params) => params.key!,
     },
   ),
 
@@ -313,6 +363,9 @@ export const templateSchemaHandlers: HttpHandler[] = [
     'configuration-schema/:key',
     (params) => `schema:annotation:${params.key}`,
     schemaWrap((params) => ({ AnnotationKey: params.key })),
-    { validate: (db, scope, params, content) => nonCompliant(db, scope, `schema:annotation:${params.key}`, content) },
+    {
+      validate: (db, scope, params, content) => nonCompliant(db, scope, `schema:annotation:${params.key}`, content),
+      annotationKey: (params) => params.key!,
+    },
   ),
 ]
