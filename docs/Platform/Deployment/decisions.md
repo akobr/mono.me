@@ -11,7 +11,7 @@ Each entry says what to decide, why it is final, a recommendation, and what was 
 | 1 | API domain `api.2s.42for.net` (`MachineAuth:Federation:PublicBaseUrl` = `https://api.2s.42for.net/api`) |
 | 2 | Trust domain `2s.42for.net` |
 | 3 | AuthKit in WorkOS production from day one |
-| 4 | Custom AuthKit domain `auth.42for.net`, shared with the other products of 42for.net (one WorkOS environment: one issuer, one JWT template and its `aud`, one invitation link; to be checked before the second product, see below) |
+| 4 | Custom AuthKit domain `auth.42for.net` and **one WorkOS production environment for every product of 42for.net**: one login and one account everywhere, one WorkOS Application per product (see below) |
 | 5 | Sweden Central |
 | 6 | One Cosmos DB account, the free tier on |
 | 7 | `prod-2s-42fornet-cdb` |
@@ -29,7 +29,21 @@ Naming: `{environment}-{product}-{name}-{type}`, the resource group with the reg
 Open points from these answers:
 
 - **One subscription for the products of 42for.net.** A subscription has one free-tier Cosmos DB account and one Flex Consumption free grant. 2S takes both in `prod-42fornet-sub`; another product there gets a paid Cosmos DB account, or the same account with its own database.
-- **One WorkOS environment for every product.** The 2S API accepts every token of the environment's issuer with its `aud`, so a token issued to another 42for.net product would be accepted too, and the invitation link points to one admin UI. Check whether WorkOS gives each application its own audience before the second product signs users in.
+- **One WorkOS environment for every product** (decided 2026-11-10, the plan below).
+
+### One WorkOS environment for the products of 42for.net
+
+**Goal:** one login and one account for everything of 42for.net. Users and organizations belong to a WorkOS environment, so separate environments would give separate accounts: every product signs users in through the one production environment and `auth.42for.net`.
+
+**What one environment shares.** One issuer (`https://auth.42for.net`) and one JWT template, so one `aud` for every token the environment issues. The 2S API accepts a token by its issuer, `aud` and signature (`Auth:AuthKit:Issuer`, `Audience`), and gives every signed-in user `User.Impersonation`. A token that another 42for.net product gets for a user is therefore also a full token of that user for the 2S API: if that product leaks or hands its tokens on (a compromised front end, an assistant or MCP server, a log), the leak reaches 2S too.
+
+**The plan.**
+
+1. **One environment, one custom domain** `auth.42for.net` (decisions 3 and 4), shared by every product.
+2. **One WorkOS Application per product** ([Applications](https://workos.com/docs/authkit/applications)): each has its own client id, redirect URIs, session settings and branding, while users and organizations stay shared. Password resets, sign-in flows and invitation links route to the application they were started from; invitations sent from the dashboard use the **default application**, which is the 2S Platform (its admin UI and `sform`).
+3. **`aud` stays `https://2s.42for.net`** in the one JWT template while 2S is the only product (it must equal `Auth__AuthKit__Audience`). The template is per environment, so it can't give each product its own audience.
+4. **Before a second product signs users in**, the 2S API also checks the token's `client_id` claim (the application the user signed in to) against an allow-list of the 2S applications, e.g. a new setting `Auth:AuthKit:AllowedClientIds`. Tokens of other products are then refused, while the user still signs in once. That setting doesn't exist yet: a Storyteller change for the second product, not for the launch of 2S.
+5. **Check with the second product** that a session of one application signs the user in to the others without a new password prompt; the WorkOS docs describe "a unified login experience" but don't say it outright.
 
 Accepted exposure:
 

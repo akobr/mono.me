@@ -214,7 +214,7 @@ az role assignment list --assignee $deployment.PrincipalId --all --query "[].{ro
 **By hand, WorkOS dashboard, environment Production:**
 
 1. **Custom domain** for AuthKit: `auth.42for.net`. Note the DNS records WorkOS shows (they go into phase 6). Final: it is the issuer the API checks.
-2. Note the **client id** (`client_…`): phase 8 and phase 11.
+2. **Applications**: name the default application `2S Platform` and note its **client id** (`client_…`): phase 8 and phase 11. Later 42for.net products get their own applications in this environment (one login, one account).
 3. **JWT template**:
 
    ```json
@@ -226,7 +226,7 @@ az role assignment list --assignee $deployment.PrincipalId --all --query "[].{ro
    }
    ```
 
-   `aud` must equal the API's `Auth__AuthKit__Audience` (`https://2s.42for.net`, the default of `main.bicep`). Decide the open point on a shared `aud` before you save it.
+   `aud` must equal the API's `Auth__AuthKit__Audience` (`https://2s.42for.net`, the default of `main.bicep`). The template is shared by every application of the environment; before a second product signs users in, the API needs its `client_id` check ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)).
 4. **Redirects**: redirect URI `https://app.2s.42for.net/callback`, sign-out URI `https://app.2s.42for.net/login`, allowed origin `https://app.2s.42for.net`.
 5. **CLI Auth** on.
 6. **Invitation link**: `https://app.2s.42for.net/invitations/accept`.
