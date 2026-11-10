@@ -118,6 +118,24 @@ public partial class RouteTableTests
     }
 
     [Theory]
+    [InlineData("POST v1/{}/{}/{}/configuration/{}/versions/{}/restore")]
+    [InlineData("POST v1/{}/{}/{}/template/{}/versions/{}/restore")]
+    [InlineData("POST v1/{}/{}/{}/configuration-schema/type/{}/versions/{}/restore")]
+    [InlineData("POST v1/{}/{}/{}/configuration-schema/{}/versions/{}/restore")]
+    [InlineData("POST v1/{}/{}/{}/configuration-schema/{}/type/{}/versions/{}/restore")]
+    public void VersionRestoreRoutes_AreRegistered(string expected)
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
+
+        routes.ShouldContain(expected);
+    }
+
+    [Theory]
     [InlineData("GET v1/access/points/{}/machine-authentication")]
     [InlineData("PUT v1/access/points/{}/machine-authentication")]
     public void MachineAuthenticationRoutes_AreRegistered(string expected)

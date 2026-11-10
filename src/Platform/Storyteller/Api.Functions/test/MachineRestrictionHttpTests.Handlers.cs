@@ -50,6 +50,7 @@ public partial class MachineRestrictionHttpTests
         new(nameof(ConfigurationHttp.GetConfigurationVersionDiff), nameof(IConfigurationService.GetConfigurationVersionChangesAsync), FullKeyArg, (http, key) => http.Configuration.GetConfigurationVersionDiff(http.Request(), Org, Project, DefaultView, key, Version), MachineScope.ConfigurationRead),
         new(nameof(ConfigurationHttp.GetConfigurationVersionDiffCustom), nameof(IConfigurationService.GetConfigurationVersionChangesAsync), FullKeyArg, (http, key) => http.Configuration.GetConfigurationVersionDiffCustom(http.Request(), Org, Project, DefaultView, key, Version, VersionFrom), MachineScope.ConfigurationRead),
         new(nameof(ConfigurationHttp.GetConfigurationViewDiff), nameof(IConfigurationService.GetConfigurationViewChangesAsync), FullKeyArg, (http, key) => http.Configuration.GetConfigurationViewDiff(http.Request(), Org, Project, DefaultView, key, OtherView), MachineScope.ConfigurationRead),
+        new(nameof(ConfigurationHttp.RestoreConfigurationVersion), nameof(IConfigurationService.RestoreConfigurationVersionAsync), FullKeyArg, (http, key) => http.Configuration.RestoreConfigurationVersion(http.Request("POST"), Org, Project, DefaultView, key, Version), MachineScope.ConfigurationWrite),
 
         new(nameof(ConfigurationSchemaHttp.GetAnnotationSchema), nameof(IConfigurationSchemaService.GetAnnotationSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.GetAnnotationSchema(http.Request(), Org, Project, DefaultView, key), MachineScope.ConfigurationRead),
         new(nameof(ConfigurationSchemaHttp.SetAnnotationSchema), nameof(IConfigurationSchemaService.SetAnnotationSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.SetAnnotationSchema(http.Request("PUT", "{}"), Org, Project, DefaultView, key), MachineScope.ConfigurationWrite, MachineScope.SchemaWrite),
@@ -67,6 +68,8 @@ public partial class MachineRestrictionHttpTests
         new(nameof(ConfigurationSchemaHttp.GetDescendantTypeSchemaVersion), nameof(IConfigurationSchemaService.GetDescendantTypeSchemaVersionContentAsync), SchemaKeyArg, (http, key) => http.Schemas.GetDescendantTypeSchemaVersion(http.Request(), Org, Project, DefaultView, key, DescendantType, Version), MachineScope.ConfigurationRead, WithDescendant: false),
         new(nameof(ConfigurationSchemaHttp.GetDescendantTypeSchemaVersionDiff), nameof(IConfigurationSchemaService.GetDescendantTypeSchemaVersionChangesAsync), SchemaKeyArg, (http, key) => http.Schemas.GetDescendantTypeSchemaVersionDiff(http.Request(), Org, Project, DefaultView, key, DescendantType, Version), MachineScope.ConfigurationRead, WithDescendant: false),
         new(nameof(ConfigurationSchemaHttp.GetDescendantTypeSchemaVersionDiffCustom), nameof(IConfigurationSchemaService.GetDescendantTypeSchemaVersionChangesAsync), SchemaKeyArg, (http, key) => http.Schemas.GetDescendantTypeSchemaVersionDiffCustom(http.Request(), Org, Project, DefaultView, key, DescendantType, Version, VersionFrom), MachineScope.ConfigurationRead, WithDescendant: false),
+        new(nameof(ConfigurationSchemaHttp.RestoreAnnotationSchemaVersion), nameof(IConfigurationSchemaService.RestoreAnnotationSchemaVersionAsync), SchemaKeyArg, (http, key) => http.Schemas.RestoreAnnotationSchemaVersion(http.Request("POST"), Org, Project, DefaultView, key, Version), MachineScope.ConfigurationWrite, MachineScope.SchemaWrite),
+        new(nameof(ConfigurationSchemaHttp.RestoreDescendantTypeSchemaVersion), nameof(IConfigurationSchemaService.RestoreDescendantTypeSchemaVersionAsync), SchemaKeyArg, (http, key) => http.Schemas.RestoreDescendantTypeSchemaVersion(http.Request("POST"), Org, Project, DefaultView, key, DescendantType, Version), MachineScope.ConfigurationWrite, MachineScope.SchemaWrite, WithDescendant: false),
     ];
 
     // Project-wide handlers, even for the type of the restriction or a key inside of it.
@@ -94,6 +97,7 @@ public partial class MachineRestrictionHttpTests
         new(nameof(ConfigurationSchemaHttp.GetSchemaVersion), http => http.Schemas.GetSchemaVersion(http.Request(), Org, Project, DefaultView, RestrictionType, Version), MachineScope.ConfigurationRead),
         new(nameof(ConfigurationSchemaHttp.GetSchemaVersionDiff), http => http.Schemas.GetSchemaVersionDiff(http.Request(), Org, Project, DefaultView, RestrictionType, Version), MachineScope.ConfigurationRead),
         new(nameof(ConfigurationSchemaHttp.GetSchemaVersionDiffCustom), http => http.Schemas.GetSchemaVersionDiffCustom(http.Request(), Org, Project, DefaultView, RestrictionType, Version, VersionFrom), MachineScope.ConfigurationRead),
+        new(nameof(ConfigurationSchemaHttp.RestoreSchemaVersion), http => http.Schemas.RestoreSchemaVersion(http.Request("POST"), Org, Project, DefaultView, RestrictionType, Version), MachineScope.ConfigurationWrite, MachineScope.SchemaWrite),
 
         new(nameof(TemplateHttp.GetTemplates), http => http.Templates.GetTemplates(http.Request(), Org, Project, DefaultView), MachineScope.ConfigurationRead),
         new(nameof(TemplateHttp.GetTemplate), http => http.Templates.GetTemplate(http.Request(), Org, Project, DefaultView, RestrictionType), MachineScope.ConfigurationRead),
@@ -104,6 +108,7 @@ public partial class MachineRestrictionHttpTests
         new(nameof(TemplateHttp.GetTemplateVersion), http => http.Templates.GetTemplateVersion(http.Request(), Org, Project, DefaultView, RestrictionType, Version), MachineScope.ConfigurationRead),
         new(nameof(TemplateHttp.GetTemplateVersionDiff), http => http.Templates.GetTemplateVersionDiff(http.Request(), Org, Project, DefaultView, RestrictionType, Version), MachineScope.ConfigurationRead),
         new(nameof(TemplateHttp.GetTemplateVersionDiffCustom), http => http.Templates.GetTemplateVersionDiffCustom(http.Request(), Org, Project, DefaultView, RestrictionType, Version, VersionFrom), MachineScope.ConfigurationRead),
+        new(nameof(TemplateHttp.RestoreTemplateVersion), http => http.Templates.RestoreTemplateVersion(http.Request("POST"), Org, Project, DefaultView, RestrictionType, Version), MachineScope.ConfigurationWrite, MachineScope.TemplateWrite),
     ];
 
     // The handlers whose keys come in the body (MachineRestrictionHttpTests.cs has their restriction cases), and the

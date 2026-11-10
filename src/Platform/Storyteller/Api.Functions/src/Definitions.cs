@@ -153,6 +153,7 @@ public static class Definitions
                 public const string Version = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}";
                 public const string VersionDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff";
                 public const string VersionDiffCustom = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff/{{{Parameters.VersionFrom}}}";
+                public const string VersionRestore = $"{Version}/restore";
                 public const string ViewDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/diff/{{{Parameters.ViewTo}}}";
             }
         }
@@ -186,16 +187,19 @@ public static class Definitions
                 public const string SchemaTypeVersion = $"{SchemaType}/versions/{{{Parameters.Version}}}";
                 public const string SchemaTypeVersionDiff = $"{SchemaTypeVersion}/diff";
                 public const string SchemaTypeVersionDiffCustom = $"{SchemaTypeVersionDiff}/{{{Parameters.VersionFrom}}}";
+                public const string SchemaTypeVersionRestore = $"{SchemaTypeVersion}/restore";
 
                 public const string SchemaAnnotationVersions = $"{SchemaAnnotation}/versions";
                 public const string SchemaAnnotationVersion = $"{SchemaAnnotation}/versions/{{{Parameters.Version}}}";
                 public const string SchemaAnnotationVersionDiff = $"{SchemaAnnotationVersion}/diff";
                 public const string SchemaAnnotationVersionDiffCustom = $"{SchemaAnnotationVersionDiff}/{{{Parameters.VersionFrom}}}";
+                public const string SchemaAnnotationVersionRestore = $"{SchemaAnnotationVersion}/restore";
 
                 public const string SchemaDescendantTypeVersions = $"{SchemaDescendantType}/versions";
                 public const string SchemaDescendantTypeVersion = $"{SchemaDescendantType}/versions/{{{Parameters.Version}}}";
                 public const string SchemaDescendantTypeVersionDiff = $"{SchemaDescendantTypeVersion}/diff";
                 public const string SchemaDescendantTypeVersionDiffCustom = $"{SchemaDescendantTypeVersionDiff}/{{{Parameters.VersionFrom}}}";
+                public const string SchemaDescendantTypeVersionRestore = $"{SchemaDescendantTypeVersion}/restore";
             }
         }
 
@@ -246,6 +250,7 @@ public static class Definitions
                 public const string Version = $"{Template}/versions/{{{Parameters.Version}}}";
                 public const string VersionDiff = $"{Template}/versions/{{{Parameters.Version}}}/diff";
                 public const string VersionDiffCustom = $"{Template}/versions/{{{Parameters.Version}}}/diff/{{{Parameters.VersionFrom}}}";
+                public const string VersionRestore = $"{Version}/restore";
             }
         }
     }
@@ -361,6 +366,7 @@ public static class Definitions
             public const string GetConfigurationVersion = nameof(GetConfigurationVersion);
             public const string GetConfigurationVersionDiff = nameof(GetConfigurationVersionDiff);
             public const string GetConfigurationVersionDiffCustom = nameof(GetConfigurationVersionDiffCustom);
+            public const string RestoreConfigurationVersion = nameof(RestoreConfigurationVersion);
             public const string GetConfigurationViewDiff = nameof(GetConfigurationViewDiff);
         }
 
@@ -394,16 +400,19 @@ public static class Definitions
             public const string GetSchemaVersion = nameof(GetSchemaVersion);
             public const string GetSchemaVersionDiff = nameof(GetSchemaVersionDiff);
             public const string GetSchemaVersionDiffCustom = nameof(GetSchemaVersionDiffCustom);
+            public const string RestoreSchemaVersion = nameof(RestoreSchemaVersion);
 
             public const string GetAnnotationSchemaVersions = nameof(GetAnnotationSchemaVersions);
             public const string GetAnnotationSchemaVersion = nameof(GetAnnotationSchemaVersion);
             public const string GetAnnotationSchemaVersionDiff = nameof(GetAnnotationSchemaVersionDiff);
             public const string GetAnnotationSchemaVersionDiffCustom = nameof(GetAnnotationSchemaVersionDiffCustom);
+            public const string RestoreAnnotationSchemaVersion = nameof(RestoreAnnotationSchemaVersion);
 
             public const string GetDescendantTypeSchemaVersions = nameof(GetDescendantTypeSchemaVersions);
             public const string GetDescendantTypeSchemaVersion = nameof(GetDescendantTypeSchemaVersion);
             public const string GetDescendantTypeSchemaVersionDiff = nameof(GetDescendantTypeSchemaVersionDiff);
             public const string GetDescendantTypeSchemaVersionDiffCustom = nameof(GetDescendantTypeSchemaVersionDiffCustom);
+            public const string RestoreDescendantTypeSchemaVersion = nameof(RestoreDescendantTypeSchemaVersion);
         }
 
         public static class KeyValues
@@ -451,6 +460,7 @@ public static class Definitions
             public const string GetTemplateVersion = nameof(GetTemplateVersion);
             public const string GetTemplateVersionDiff = nameof(GetTemplateVersionDiff);
             public const string GetTemplateVersionDiffCustom = nameof(GetTemplateVersionDiffCustom);
+            public const string RestoreTemplateVersion = nameof(RestoreTemplateVersion);
         }
     }
 
@@ -559,6 +569,20 @@ public static class Definitions
         public const string ResponseAnnotationPreconditionFailed = "A condition of the write does not hold (ErrorCode AnnotationPreconditionFailed): If-Match names another version, or the annotation does not exist or is deleted; If-None-Match: * and the annotation exists. Read it again and retry.";
         public const string ResponseAnnotationPatchPreconditionFailed = "If-Match names another version of the annotation (ErrorCode AnnotationPreconditionFailed), or a JSON Patch test operation did not match (ErrorCode PatchTestFailed). Read it again and retry.";
         public const string ResponseInternalServerError = "Unexpected error occurred on the service.";
+
+        // The restores of a version of a configuration, a template or a schema (424-221).
+        public const string RestoreVersion = "The version whose content becomes the new version, from the list of versions.";
+        public const string ResponseVersionRestored = "Outcome Restored: the content of FromVersion is stored as the new version Version. Outcome Unchanged: FromVersion is the current version, or the current version Version has its content, so nothing was written.";
+        public const string ResponseVersionRestoreNotFound = "The version was never written or has expired (ErrorCode VersionNotFound).";
+        public const string ResponseAnnotationVersionRestoreNotFound = "The version was never written or has expired (ErrorCode VersionNotFound), or the annotation does not exist or was deleted permanently (ErrorCode AnnotationNotFound).";
+        public const string ResponseSchemaVersionRestoreBadRequest = "The request is not well formed, or the version is no usable schema (ErrorCode InvalidSchema, ExternalSchemaReference or SchemaValidationTimeout), whatever force is.";
+        public const string ResponseDescendantTypeSchemaVersionRestoreBadRequest = "The request is not well formed, the descendant type cannot descend from the annotation key (ErrorCode InvalidKey), or the version is no usable schema (ErrorCode InvalidSchema, ExternalSchemaReference or SchemaValidationTimeout), whatever force is.";
+        public const string ResponseConfigurationVersionRestoreConflict = "The version violates the schema (force=true stores it anyway), the annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.";
+        public const string ResponseSchemaVersionRestoreConflict = "Stored configurations of the view do not comply with the version (force=true restores it anyway), or the schema was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.";
+        public const string ResponseAnnotationSchemaVersionRestoreConflict = "Stored configurations do not comply with the version (force=true restores it anyway), the annotation is deleted (ErrorCode AnnotationDeleted), or the schema was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.";
+        public const string ResponseTemplateVersionRestoreConflict = "The template was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.";
+        public const string ForceConfigurationRestore = "When true, restore the version even if it violates the schema.";
+        public const string ForceSchemaRestore = "When true, restore the version even if stored configurations in the view do not comply.";
 
         // The security schemes. Whether a machine's kind is accepted also depends on the project's machine authentication
         // policy, which the requirements of an operation cannot say.
