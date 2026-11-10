@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import * as zod from "zod";
 
@@ -474,6 +474,7 @@ export const GetConfigurationVersionsResponseItem = zod.object({
     })
     .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
+  RestoredFrom: zod.int().nullish(),
 });
 export const GetConfigurationVersionsResponse = zod.array(
   GetConfigurationVersionsResponseItem,
@@ -511,6 +512,54 @@ export const GetConfigurationVersionResponse = zod.object({
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+/**
+ * Stores the content of a version of the annotation's own document as its new version, whole and as stored (no merge), also after the configuration was deleted. The version's content is checked against the schema unless force is true. The restore is in the annotation's history as ConfigurationRestored, and the new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.
+ */
+export const RestoreConfigurationVersionParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  key: zod.string().describe("The key of the requested annotation."),
+  version: zod
+    .int()
+    .describe(
+      "The version whose content becomes the new version, from the list of versions.",
+    ),
+});
+
+export const RestoreConfigurationVersionQueryParams = zod.object({
+  force: zod
+    .boolean()
+    .optional()
+    .describe("When true, restore the version even if it violates the schema."),
+});
+
+export const restoreConfigurationVersionResponseOutcomeDefault = `Restored`;
+export const restoreConfigurationVersionResponseModifiedByKindDefault = `Account`;
+
+export const RestoreConfigurationVersionResponse = zod.object({
+  Outcome: zod
+    .enum(["Restored", "Unchanged"])
+    .default(restoreConfigurationVersionResponseOutcomeDefault),
+  FromVersion: zod.int().optional(),
+  Version: zod.int().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(restoreConfigurationVersionResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const GetConfigurationVersionDiffParams = zod.object({

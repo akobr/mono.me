@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import { faker } from "@faker-js/faker";
 
@@ -17,6 +17,7 @@ import type {
   ConfigurationVersion,
   ConfigurationsResponse,
   DiffResult,
+  VersionRestoreResult,
 } from "../../model";
 
 export const getGetBindingCatalogResponseMock = (
@@ -603,6 +604,7 @@ export const getGetConfigurationVersionsResponseMock =
         faker.date.past().toISOString().slice(0, 19) + "Z",
         undefined,
       ]),
+      RestoredFrom: faker.helpers.arrayElement([faker.number.int(), null]),
     }));
 
 export const getGetConfigurationVersionResponseMock = (
@@ -659,6 +661,46 @@ export const getGetConfigurationVersionResponseMock = (
   Values: faker.helpers.arrayElement([
     {
       [faker.string.alphanumeric(5)]: {},
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getRestoreConfigurationVersionResponseMock = (
+  overrideResponse: Partial<Extract<VersionRestoreResult, object>> = {},
+): VersionRestoreResult => ({
+  Outcome: faker.helpers.arrayElement(["Restored", "Unchanged"] as const),
+  FromVersion: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
     },
     undefined,
   ]),
@@ -1142,6 +1184,30 @@ export const getGetConfigurationVersionMockHandler = (
   );
 };
 
+export const getRestoreConfigurationVersionMockHandler = (
+  overrideResponse?:
+    | VersionRestoreResult
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<VersionRestoreResult> | VersionRestoreResult),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/:organization/:project/:view/configuration/:key/versions/:version/restore",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getRestoreConfigurationVersionResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetConfigurationVersionDiffMockHandler = (
   overrideResponse?:
     | DiffResult
@@ -1230,6 +1296,7 @@ export const getConfigurationsMock = () => [
   getGetResolvedConfigurationMockHandler(),
   getGetConfigurationVersionsMockHandler(),
   getGetConfigurationVersionMockHandler(),
+  getRestoreConfigurationVersionMockHandler(),
   getGetConfigurationVersionDiffMockHandler(),
   getGetConfigurationVersionDiffCustomMockHandler(),
   getGetConfigurationViewDiffMockHandler(),

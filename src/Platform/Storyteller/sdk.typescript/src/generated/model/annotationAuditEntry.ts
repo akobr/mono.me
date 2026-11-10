@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import type { AnnotationAuditCause } from "./annotationAuditCause";
 import type { AnnotationAuditEntryAction } from "./annotationAuditEntryAction";
@@ -26,4 +26,6 @@ export interface AnnotationAuditEntry {
   Values?: AnnotationValueChange[];
   /** @nullable */
   ConfigurationVersion?: number | null;
+  /** @nullable */
+  FromVersion?: number | null;
 }

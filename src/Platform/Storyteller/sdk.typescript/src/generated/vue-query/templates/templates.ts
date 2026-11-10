@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -31,6 +31,7 @@ import type {
   GetTemplateVersionDiffParams,
   JsonPatchOperation,
   SetTemplateBody,
+  VersionRestoreResult,
 } from "../../model";
 
 import { storytellerFetch } from "../../../lib/fetcher";
@@ -990,6 +991,130 @@ export function useGetTemplateVersion<
   return query;
 }
 
+export const getRestoreTemplateVersionUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  annotationType: string,
+  version: number,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/restore`;
+};
+
+/**
+ * Stores the content of a version of the template as its new version, whole and as stored (no merge), also after the template was deleted. The new version records RestoredFrom.
+ */
+export const restoreTemplateVersion = async (
+  organization: string,
+  project: string,
+  view: string,
+  annotationType: string,
+  version: number,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<VersionRestoreResult> => {
+  return storytellerFetch<VersionRestoreResult>(
+    getRestoreTemplateVersionUrl(
+      organization,
+      project,
+      view,
+      annotationType,
+      version,
+    ),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getRestoreTemplateVersionMutationKey = () =>
+  ["restoreTemplateVersion"] as const;
+
+export const getRestoreTemplateVersionMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreTemplateVersion>>,
+    TError,
+    RestoreTemplateVersionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreTemplateVersion>>,
+  TError,
+  RestoreTemplateVersionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreTemplateVersionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreTemplateVersion>>,
+    RestoreTemplateVersionMutationVariables
+  > = (props) => {
+    const { organization, project, view, annotationType, version } =
+      props ?? {};
+
+    return restoreTemplateVersion(
+      organization,
+      project,
+      view,
+      annotationType,
+      version,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreTemplateVersionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreTemplateVersion>>
+>;
+
+export type RestoreTemplateVersionMutationError =
+  ErrorType<ErrorResponse | void>;
+export type RestoreTemplateVersionMutationVariables = {
+  organization: string;
+  project: string;
+  view: string;
+  annotationType: string;
+  version: number;
+};
+
+export const useRestoreTemplateVersion = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreTemplateVersion>>,
+      TError,
+      RestoreTemplateVersionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof restoreTemplateVersion>>,
+  TError,
+  RestoreTemplateVersionMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getRestoreTemplateVersionMutationOptions(options),
+    queryClient,
+  );
+};
 export const getGetTemplateVersionDiffUrl = (
   organization: string,
   project: string,

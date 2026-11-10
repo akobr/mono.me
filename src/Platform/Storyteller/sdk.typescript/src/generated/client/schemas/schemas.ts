@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import type {
   CombinedConfigurationSchema,
@@ -17,12 +17,16 @@ import type {
   GetDescendantTypeSchemaVersionDiffParams,
   GetSchemaVersionDiffCustomParams,
   GetSchemaVersionDiffParams,
+  RestoreAnnotationSchemaVersionParams,
+  RestoreDescendantTypeSchemaVersionParams,
+  RestoreSchemaVersionParams,
   SetAnnotationSchemaBody,
   SetAnnotationSchemaParams,
   SetConfigurationSchemaBody,
   SetConfigurationSchemaParams,
   SetDescendantTypeSchemaBody,
   SetDescendantTypeSchemaParams,
+  VersionRestoreResult,
 } from "../../model";
 
 import { storytellerFetch } from "../../../lib/fetcher";
@@ -458,6 +462,162 @@ export const getConfigurationSchemas = async (
     {
       ...options,
       method: "GET",
+    },
+  );
+};
+
+export const getRestoreSchemaVersionUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  annotationType: string,
+  version: number,
+  params?: RestoreSchemaVersionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/restore?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/restore`;
+};
+
+/**
+ * Stores the content of a version of the type schema as its new version, also after the schema was deleted. The version must be a usable schema, and the stored configurations of the type in the view must comply with it unless force is true. The new version records RestoredFrom.
+ */
+export const restoreSchemaVersion = async (
+  organization: string,
+  project: string,
+  view: string,
+  annotationType: string,
+  version: number,
+  params?: RestoreSchemaVersionParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<VersionRestoreResult> => {
+  return storytellerFetch<VersionRestoreResult>(
+    getRestoreSchemaVersionUrl(
+      organization,
+      project,
+      view,
+      annotationType,
+      version,
+      params,
+    ),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getRestoreAnnotationSchemaVersionUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  version: number,
+  params?: RestoreAnnotationSchemaVersionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/restore?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/restore`;
+};
+
+/**
+ * Stores the content of a version of the annotation's schema as its new version, also after the schema was deleted. The version must be a usable schema, and the annotation's stored configuration must comply with it unless force is true. The new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.
+ */
+export const restoreAnnotationSchemaVersion = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  version: number,
+  params?: RestoreAnnotationSchemaVersionParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<VersionRestoreResult> => {
+  return storytellerFetch<VersionRestoreResult>(
+    getRestoreAnnotationSchemaVersionUrl(
+      organization,
+      project,
+      view,
+      key,
+      version,
+      params,
+    ),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getRestoreDescendantTypeSchemaVersionUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  annotationType: string,
+  version: number,
+  params?: RestoreDescendantTypeSchemaVersionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/restore?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/restore`;
+};
+
+/**
+ * Stores the content of a version of the descendant-type schema as its new version, also after the schema was deleted. The type must be able to descend from the key, the version must be a usable schema, and the stored configurations of the type under the key must comply with it unless force is true. The new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.
+ */
+export const restoreDescendantTypeSchemaVersion = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  annotationType: string,
+  version: number,
+  params?: RestoreDescendantTypeSchemaVersionParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<VersionRestoreResult> => {
+  return storytellerFetch<VersionRestoreResult>(
+    getRestoreDescendantTypeSchemaVersionUrl(
+      organization,
+      project,
+      view,
+      key,
+      annotationType,
+      version,
+      params,
+    ),
+    {
+      ...options,
+      method: "POST",
     },
   );
 };
