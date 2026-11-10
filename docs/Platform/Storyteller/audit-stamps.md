@@ -36,6 +36,7 @@ Audit-log entries have their own time and carry only `Actor`.
 | `AnnotationAuditEntry`, `KeyValueAuditEvent` | `Actor` |
 | `Configuration`, `ConfigurationTemplate`, `ConfigurationSchema` | `Modified` |
 | `ConfigurationVersion` (configurations, templates and schemas) | `Modified` |
+| `VersionRestoreResult` | `Modified` (the write of its `Version`) |
 | `ConfigurationSummary`, `ConfigurationTemplateSummary`, `ConfigurationSchemaSummary` | `Modified` |
 | `View` | `Created` (null for a view that is not registered) |
 | `KeyValue` | `Created`, `Modified`, `Deleted` |
@@ -44,6 +45,8 @@ Audit-log entries have their own time and carry only `Actor`.
 | `ClientEncryptionRecipient` | `Created` |
 
 A configuration version keeps the time of its write. The configuration item is also rewritten by the platform when the effective document is cached or invalidated, but that changes neither `Modified` nor the listed time. A configuration that was never written (version 0, calculated on read) is stamped as the calculation by `System`.
+
+A version restore of a configuration, template or schema is a write: the new version's `Modified` is the caller who restored it, at the time of the restore, not the author of the version it copies. The copied version is named in the new version's `RestoredFrom`, so a version list shows both. A restore that changes nothing writes no stamp, and its `VersionRestoreResult` carries the `Modified` of the current version.
 
 ## Clients
 
