@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from 'vue'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { useToast } from '@nuxt/ui/composables'
 import {
@@ -132,6 +133,25 @@ describe('the restore of a configuration version in the mock API', () => {
     expect(ownContent(loadDb(), scope, key)).toEqual({ retries: 20 })
   })
 
+  it('does not check an empty version against the schema, as the API and every write', async () => {
+    const db = loadDb()
+    const key = documentIds(db, scope, 'configuration:')
+      .find((id) => id.startsWith('configuration:exe.'))!
+      .slice('configuration:'.length)
+    const id = `configuration:${key}` as const
+    // the schema of the execution type requires retries, which the empty version does not have
+    const empty = putVersion(db, scope, id, {}).Version
+    const current = putVersion(db, scope, id, { retries: 4 }).Version
+    saveDb(db)
+
+    expect(await restoreConfigurationVersion(org, project, view, key, empty)).toMatchObject({
+      Outcome: 'Restored',
+      FromVersion: empty,
+      Version: current + 1,
+    })
+    expect(ownContent(loadDb(), scope, key)).toEqual({})
+  })
+
   it('refuses an unknown or expired version and a Reader', async () => {
     const { key, valid } = configuredExecution()
     const db = loadDb()
@@ -162,7 +182,10 @@ describe('the restore of a configuration version in the mock API', () => {
       errorCode: 'AnnotationDeleted',
     })
     // as the API: the versions of a deleted annotation are hidden until it is restored
-    expect(await getConfigurationVersions(org, project, view, key)).toEqual([])
+    await expect(getConfigurationVersions(org, project, view, key)).rejects.toMatchObject({
+      status: 404,
+      errorCode: 'AnnotationDeleted',
+    })
 
     await purgeAnnotation(org, project, view, key)
     await expect(restoreConfigurationVersion(org, project, view, key, valid)).rejects.toMatchObject({
@@ -480,6 +503,51 @@ describe('the versions of a deleted document', () => {
     expect(document.body.textContent).toContain(`Restored v${current} as v${current + 1}`)
     expect(ownContent(loadDb(), scope, key)).toEqual({ retries: 5 })
     await vi.waitFor(() => expect(screen.host.text()).not.toContain('The configuration is deleted'))
+    screen.host.unmount()
+  })
+
+  it('are hidden while the annotation is deleted: it has to be restored first, no Retry', async () => {
+    const { key } = configuredExecution()
+    await deleteAnnotation(org, project, view, key)
+    const screen = await mountScreen(
+      ConfigurationVersions,
+      { annotationKey: key },
+      { path: `/acme/billing/default/configurations/${key}/versions?v=2` },
+    )
+    await settle(10)
+
+    const text = screen.host.text()
+    expect(text).toContain('The annotation is deleted')
+    expect(text).toContain('Restore the annotation before its configuration versions can be seen or restored.')
+    expect(screen.host.find(`a[href="/acme/billing/default/annotations/${key}"]`).text()).toBe('Open the annotation')
+    expect(text).not.toContain('Retry')
+    expect(text).not.toContain('No configuration, no history')
+    expect(screen.host.find('button[aria-label^="Restore v"]').exists()).toBe(false)
+    screen.host.unmount()
+  })
+
+  it('are hidden also when only the version list answers that the annotation is deleted', async () => {
+    const { key } = configuredExecution()
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/configuration/:key/versions', () =>
+        HttpResponse.json(
+          {
+            Message: `The annotation '${key}' is deleted; restore it to see its configuration.`,
+            ErrorCode: 'AnnotationDeleted',
+          },
+          { status: 404 },
+        ),
+      ),
+    )
+    const screen = await mountScreen(
+      ConfigurationVersions,
+      { annotationKey: key },
+      { path: `/acme/billing/default/configurations/${key}/versions` },
+    )
+    await settle(10)
+
+    expect(screen.host.text()).toContain('The annotation is deleted')
+    expect(screen.host.text()).not.toContain('Retry')
     screen.host.unmount()
   })
 
