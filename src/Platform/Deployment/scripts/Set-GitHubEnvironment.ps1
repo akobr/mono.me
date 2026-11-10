@@ -123,6 +123,10 @@ Set-GitHubVariable 'VITE_POSTHOG_HOST' $PostHogHost
 
 Write-Host 'Secrets:'
 $token = az staticwebapp secrets list --resource-group (Get-Output 'resourceGroupName') --name (Get-Output 'staticWebAppName') --query properties.apiKey -o tsv
+if ([string]::IsNullOrWhiteSpace($token)) {
+    throw "The Static Web App $(Get-Output 'staticWebAppName') returned no deployment token."
+}
+
 try {
     Set-GitHubSecret 'AZURE_STATIC_WEB_APPS_API_TOKEN' $token
 }

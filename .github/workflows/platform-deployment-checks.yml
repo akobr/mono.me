@@ -1,0 +1,72 @@
+name: Platform deployment checks
+
+# The checks of the Bicep templates and scripts of src/Platform/Deployment, on every pull request and push to main that
+# touches them: both entry points and both parameter files build with the linter of bicepconfig.json (an error fails, a
+# warning is an annotation), and PSScriptAnalyzer finds no error in the scripts. Nothing is deployed and no Azure
+# sign-in or secret is used.
+on:
+  pull_request:
+    paths:
+      - 'src/Platform/Deployment/**'
+      - '.github/workflows/platform-deployment-checks.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/Platform/Deployment/**'
+      - '.github/workflows/platform-deployment-checks.yml'
+
+concurrency:
+  group: platform-deployment-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Bicep build and lint, PSScriptAnalyzer
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/Platform/Deployment
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Bicep CLI
+        shell: bash
+        run: |
+          az bicep install
+          az bicep version
+
+      # Dummy owner values: the parameter file reads them from the environment and only needs them to compile.
+      - name: Build the templates and parameter files
+        shell: bash
+        env:
+          PLATFORM_OWNER_OBJECT_ID: 00000000-0000-0000-0000-000000000000
+          PLATFORM_OWNER_EMAIL: owner@example.com
+        run: |
+          set -euo pipefail
+          bicep="$HOME/.azure/bin/bicep"
+          # An error fails the step; a warning (e.g. an API version growing old) is shown as an annotation.
+          for file in main.bicep domains.bicep; do
+            "$bicep" build "$file" --stdout > /dev/null 2> "build-$file.txt" || { cat "build-$file.txt"; exit 1; }
+            grep -E ' : Warning ' "build-$file.txt" | sed 's/^/::warning::/' || true
+          done
+          for file in parameters/prod.bicepparam parameters/prod.domains.bicepparam; do
+            "$bicep" build-params "$file" --stdout > /dev/null
+          done
+
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
+          $results = @(Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Warning, Error `
+            -ExcludeRule PSAvoidUsingWriteHost)
+          $results | Format-Table -AutoSize -Property Severity, RuleName, ScriptName, Line, Message | Out-String -Width 240
+          if ($results | Where-Object Severity -eq 'Error') {
+            throw "PSScriptAnalyzer found $(@($results | Where-Object Severity -eq 'Error').Count) error(s)."
+          }

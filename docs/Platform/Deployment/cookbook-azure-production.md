@@ -422,17 +422,16 @@ EOF
 az ad app federated-credential create --id "$DEPLOY_CLIENT_ID" --parameters deploy-fic.json
 rm deploy-fic.json
 
-RG_ID=$(az group show -n "$RG" --query id -o tsv)
 az role assignment create --assignee-object-id "$DEPLOY_SP_ID" --assignee-principal-type ServicePrincipal \
-  --role Contributor --scope "$RG_ID"
+  --role "Website Contributor" --scope "$FUNC_ID"                                  # deploy the API's code
 az role assignment create --assignee-object-id "$DEPLOY_SP_ID" --assignee-principal-type ServicePrincipal \
-  --role "Key Vault Secrets User" --scope "$KV_ID"          # DbCreator reads cosmos-connection
+  --role "Key Vault Secrets User" --scope "$KV_ID/secrets/cosmos-connection"         # DbCreator reads this secret only
 az role assignment create --assignee-object-id "$DEPLOY_SP_ID" --assignee-principal-type ServicePrincipal \
-  --role "Storage Blob Data Contributor" --scope "$SA_ID"   # the Flex deployment package
+  --role "Storage Blob Data Contributor" --scope "$SA_ID/blobServices/default/containers/deployments"   # the Flex package
 echo "client $DEPLOY_CLIENT_ID tenant $TENANT_ID subscription $(az account show --query id -o tsv)"
 ```
 
-`Contributor` on the resource group is enough for deploying code. The role assignments of steps 6 and 7 are done by you here; when the Bicep templates take over, the identity also needs **Role Based Access Control Administrator** limited to those roles (spec, section 10).
+These roles are the least that deploying code needs. The identity gets nothing on the resource group: Contributor there would let it list the Cosmos DB keys, and Secrets User on the whole vault would let it read every secret. Running the Bicep templates from a pipeline needs more (the resource group, the budget, locks and role assignments; spec, section 10).
 
 ## 12. DNS records (zone `42for.net`)
 
