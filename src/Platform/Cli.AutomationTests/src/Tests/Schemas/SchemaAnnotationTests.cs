@@ -194,4 +194,43 @@ public sealed class SchemaAnnotationTests : CliTest
             (await Sform(InProject("story", "schema", "annotation", "versions", key))).ShouldListVersions(1);
         }
     }
+
+    // SCH-ANN-06: schema annotation restore stores an earlier version of the schema; -f or --force when the configuration
+    // does not comply.
+    // The schema of <rst> requires req (version 1), then does not (version 2), and <rst> gets the configuration {a: 1}.
+    // schema annotation restore <rst> --version 1 ends with 2 and names <rst> (<view>), and version 2 stays the current
+    // one; with -f it says "Restored v1 of the schema for '<rst>' as v3."; --version 3 says "v3 is already the current
+    // version of the schema for '<rst>'." and ends with 42; --version 2 says "Restored v2 of the schema for '<rst>' as v4.",
+    // and --version 1 --force "Restored v1 of the schema for '<rst>' as v5."; get then returns version 5 with the content
+    // of version 1.
+    [Test]
+    [TestCase(489)]
+    [UserRole(Role.Owner)]
+    [DisposableProject]
+    [Covers("story schema annotation restore", "arg0", "--version", "-f", "--force")]
+    public async Task SchemaAnnotation_Restore()
+    {
+        await CreateDisposableProjectAsync();
+        var rst = CliData.ResponsibilityKey();
+        (await Sform(InProject("story", "set", rst))).ShouldSucceed();
+        var requiresReq = SchemaChecks.RequiringSchema("req");
+        await WriteFileAsync("requires-req.json", requiresReq);
+        await WriteFileAsync("s.json", SchemaChecks.ObjectSchema("req"));
+        (await Sform(InProject("story", "schema", "annotation", "set", rst, "-i", "requires-req.json"))).ShouldSucceed().ShouldHaveVersion(1);
+        (await Sform(InProject("story", "schema", "annotation", "set", rst, "-i", "s.json"))).ShouldSucceed().ShouldHaveVersion(2);
+        (await Sform(InProject("story", "config", "set", rst, "-x", "a=1"))).ShouldSucceed();
+        var subject = $"the schema for '{rst}'";
+
+        (await Sform(Restore("1"))).ShouldRefuseForConfiguration(rst, View);
+        (await Sform(InProject("story", "schema", "annotation", "get", rst))).ShouldSucceed().ShouldHaveVersion(2);
+
+        (await Sform(Restore("1", "-f"))).ShouldSucceed().ShouldContain($"Restored v1 of {subject} as v3.");
+        (await Sform(Restore("3"))).ShouldExitWith(CliExit.NoWorkNeeded).ShouldContain($"v3 is already the current version of {subject}.");
+        (await Sform(Restore("2"))).ShouldSucceed().ShouldContain($"Restored v2 of {subject} as v4.");
+        (await Sform(Restore("1", "--force"))).ShouldSucceed().ShouldContain($"Restored v1 of {subject} as v5.");
+
+        (await Sform(InProject("story", "schema", "annotation", "get", rst))).ShouldSucceed().ShouldPrintSchema(requiresReq, 5);
+
+        string[] Restore(string version, params string[] options) => InProject(["story", "schema", "annotation", "restore", rst, "--version", version, .. options]);
+    }
 }

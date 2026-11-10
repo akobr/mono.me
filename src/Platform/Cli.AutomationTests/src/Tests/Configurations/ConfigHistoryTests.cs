@@ -3,12 +3,13 @@ using System.Text.Json.Nodes;
 using _42.Platform.Cli.AutomationTests.Access;
 using _42.Platform.Cli.AutomationTests.Editing;
 using _42.Platform.Cli.AutomationTests.Running;
+using _42.Platform.Cli.AutomationTests.Tests.Annotations;
 using _42.Testing.UI.Automation;
 using _42.Testing.UI.Automation.Runtime.TUnit;
 
 namespace _42.Platform.Cli.AutomationTests.Tests.Configurations;
 
-// Versions, Diff, Composition and Edit: sform story config versions, diff, composition and edit.
+// Versions, Diff, Composition and Edit: sform story config versions, diff, composition, edit and restore (of a version).
 [Area(Area.Configurations)]
 public sealed class ConfigHistoryTests : CliTest
 {
@@ -227,6 +228,115 @@ public sealed class ConfigHistoryTests : CliTest
         string[] At(params string[] arguments) => ConfigOutput.In(ProjectKey, view, arguments);
     }
 
+    // CFG-HIS-07: config restore stores the content of an earlier version as a new version.
+    // As an Editor, with three versions of <rst> (a=1, a=2, a=3): config restore <rst> --version 1 says "Restored v1 of the
+    // configuration for '<rst>' as v4." (0); config <rst> then has a=1 in v4, config versions <rst> lists the four versions
+    // with v4 restored from v1 (its Restored from cell, "—" for v3), and the newest entry of story history <rst> is "Config
+    // restored" with "config v4 from v1". config restore <rst> --version 4 says "v4 is already the current version of the
+    // configuration for '<rst>'." and ends with 42, and v4 stays the current version; config restore <rst> --version 9 ends
+    // with 2 and "Error code: VersionNotFound".
+    [Test]
+    [TestCase(485)]
+    [UserRole(Role.Editor)]
+    [Covers("story config restore", "arg0", "--version")]
+    public async Task Config_Restore_StoresAnEarlierVersion()
+    {
+        var key = CliData.ResponsibilityKey();
+        var written = await WriteVersionsAsync(InProject, key, "1", "2", "3");
+        var restored = written[2] + 1;
+
+        (await Sform(InProject("story", "config", "restore", key, "--version", Text(written[0]))))
+            .ShouldSucceed()
+            .ShouldContain($"Restored v{written[0]} of the configuration for '{key}' as v{restored}.");
+        await AssertStoredAsync(InProject("story", "config", key), restored, 1);
+
+        var listed = (await Sform(InProject("story", "config", "versions", key))).ShouldSucceed();
+        await Assert.That(Join(listed.VersionRows(ConfigOutput.ConfigurationVersions))).IsEqualTo(Join([restored, .. written.Reverse()]));
+        var restoredFrom = ConfigOutput.VersionRestoredFrom(listed, ConfigOutput.ConfigurationVersions);
+        await Assert.That(restoredFrom.GetValueOrDefault(restored)).IsEqualTo($"v{written[0]}").Because(listed.PlainStdOut);
+        await Assert.That(restoredFrom.GetValueOrDefault(written[2]) ?? string.Empty).DoesNotStartWith("v").Because(listed.PlainStdOut);
+
+        var history = (await Sform(InProject("story", "history", key))).ShouldSucceed();
+        var rows = AnnotationOutput.HistoryRows(history);
+        var newest = rows.Count > 0 ? rows[0] : string.Empty;
+        await Assert.That(newest).Contains("Config restored").Because(history.PlainStdOut);
+        await Assert.That(newest).Contains($"config v{restored} from v{written[0]}").Because(history.PlainStdOut);
+
+        (await Sform(InProject("story", "config", "restore", key, "--version", Text(restored))))
+            .ShouldExitWith(CliExit.NoWorkNeeded)
+            .ShouldContain($"v{restored} is already the current version of the configuration for '{key}'.");
+        await AssertStoredAsync(InProject("story", "config", key), restored, 1);
+
+        (await Sform(InProject("story", "config", "restore", key, "--version", Text(restored + 5))))
+            .ShouldExitWith(CliExit.WrongInput)
+            .ShouldContain("Error code: VersionNotFound");
+    }
+
+    // CFG-HIS-08: config restore brings back a deleted configuration.
+    // As an Editor, with two versions of <rst> (a=1, a=2), deleted by config delete <rst>: config restore <rst> --version 2
+    // says "Restored v2 of the configuration for '<rst>' as v3." (0); config <rst> then has a=2 in v3, and config versions
+    // <rst> lists the three versions.
+    [Test]
+    [TestCase(486)]
+    [UserRole(Role.Editor)]
+    [Covers("story config restore", "arg0", "--version")]
+    public async Task Config_Restore_AfterDelete()
+    {
+        var key = CliData.ResponsibilityKey();
+        var written = await WriteVersionsAsync(InProject, key, "1", "2");
+        (await Sform(InProject("story", "config", "delete", key)))
+            .ShouldSucceed()
+            .ShouldContain($"The configuration for '{key}' has been deleted.");
+        var restored = written[1] + 1;
+
+        (await Sform(InProject("story", "config", "restore", key, "--version", Text(written[1]))))
+            .ShouldSucceed()
+            .ShouldContain($"Restored v{written[1]} of the configuration for '{key}' as v{restored}.");
+        await AssertStoredAsync(InProject("story", "config", key), restored, 2);
+
+        var listed = (await Sform(InProject("story", "config", "versions", key))).ShouldSucceed();
+        await Assert.That(Join(listed.VersionRows(ConfigOutput.ConfigurationVersions))).IsEqualTo(Join([restored, .. written.Reverse()]));
+    }
+
+    // CFG-HIS-09: config restore of a version that violates the schema fails, and -f or --force stores it.
+    // As an Editor, in a generated view: versions a=text (v1) and a=1 (v2) of <rst>, then a type schema of rst that requires
+    // a to be a number. config restore <rst> --version 1 ends with 2 and the violation ("<rst> (<view>)"), and v2 stays the
+    // current version; config restore <rst> --version 1 -f says "Restored v1 of the configuration for '<rst>' as v3."; after
+    // config set <rst> -x a=2 (v4), config restore <rst> --version 1 --force says "… as v5.", and the configuration has
+    // a=text in v5.
+    [Test]
+    [TestCase(487)]
+    [UserRole(Role.Editor)]
+    [Covers("story config restore", "-f", "--force")]
+    public async Task Config_Restore_SchemaViolation_Force()
+    {
+        var view = CliData.ViewName();
+        var key = CliData.ResponsibilityKey();
+        var written = await WriteVersionsAsync(At, key, "text", "1");
+        await WriteFileAsync("a-number.json", ANumberSchema);
+        (await Sform(At("story", "schema", "type", "set", "rst", "-i", "a-number.json"))).ShouldSucceed();
+
+        (await Sform(At("story", "config", "restore", key, "--version", Text(written[0]))))
+            .ShouldExitWith(CliExit.WrongInput)
+            .ShouldContain($"{key} ({view})");
+        await AssertStoredAsync(At("story", "config", key), written[1], 1);
+
+        (await Sform(At("story", "config", "restore", key, "--version", Text(written[0]), "-f")))
+            .ShouldSucceed()
+            .ShouldContain($"Restored v{written[0]} of the configuration for '{key}' as v{written[1] + 1}.");
+
+        var set = (await Sform(At("story", "config", "set", key, "-x", "a=2"))).ShouldSucceed().JsonNode()["Version"]!.GetValue<long>();
+        (await Sform(At("story", "config", "restore", key, "--version", Text(written[0]), "--force")))
+            .ShouldSucceed()
+            .ShouldContain($"Restored v{written[0]} of the configuration for '{key}' as v{set + 1}.");
+
+        var current = (await Sform(At("story", "config", key))).ShouldSucceed().JsonNode();
+        await Assert.That(current["Version"]?.GetValue<long>()).IsEqualTo(set + 1);
+        await Assert.That(current["Content"]?["a"]?.GetValue<string>()).IsEqualTo("text");
+
+        string[] At(params string[] arguments) => ConfigOutput.In(ProjectKey, view, arguments);
+    }
+
     private static string Text(long version) => version.ToString(CultureInfo.InvariantCulture);
 
     private static string Join(IEnumerable<long> versions) => string.Join(", ", versions);
@@ -256,6 +366,21 @@ public sealed class ConfigHistoryTests : CliTest
         for (var index = 0; index < versions.Length; index++)
         {
             var set = (await editor.Sform(InProject("story", "config", "set", key, "-x", $"a={index + 1}"))).ShouldSucceed();
+            versions[index] = set.JsonNode()["Version"]!.GetValue<long>();
+        }
+
+        return versions;
+    }
+
+    // A new annotation of the key and a version of its configuration per value (a=<value>), written by the leased user with
+    // the context of at (InProject, or another view); their versions in order.
+    private async Task<long[]> WriteVersionsAsync(Func<string[], string[]> at, string key, params string[] values)
+    {
+        (await Sform(at(["story", "set", key]))).ShouldSucceed();
+        var versions = new long[values.Length];
+        for (var index = 0; index < versions.Length; index++)
+        {
+            var set = (await Sform(at(["story", "config", "set", key, "-x", $"a={values[index]}"]))).ShouldSucceed();
             versions[index] = set.JsonNode()["Version"]!.GetValue<long>();
         }
 
