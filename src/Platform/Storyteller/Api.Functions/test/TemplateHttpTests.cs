@@ -29,6 +29,7 @@ public class TemplateHttpTests
         new("SetTemplate (PUT)", "PUT", "{}", nameof(IConfigurationTemplateService.CreateOrUpdateTemplateAsync), (http, request) => http.SetTemplate(request, Org, Project, View, Type)),
         new(nameof(TemplateHttp.PatchTemplate), "PATCH", "[]", nameof(IConfigurationTemplateService.PatchTemplateAsync), (http, request) => http.PatchTemplate(request, Org, Project, View, Type)),
         new(nameof(TemplateHttp.DeleteTemplate), "DELETE", null, nameof(IConfigurationTemplateService.DeleteTemplateAsync), (http, request) => http.DeleteTemplate(request, Org, Project, View, Type)),
+        new(nameof(TemplateHttp.RestoreTemplateVersion), "POST", null, nameof(IConfigurationTemplateService.RestoreTemplateVersionAsync), (http, request) => http.RestoreTemplateVersion(request, Org, Project, View, Type, 1)),
     ];
 
     private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;

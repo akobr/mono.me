@@ -361,6 +361,54 @@ public class TemplateHttp
         return new OkObjectResult(template);
     }
 
+    [Function(nameof(RestoreTemplateVersion))]
+    [OpenApiOperation(Definitions.RouteIds.Template.RestoreTemplateVersion, Definitions.Tags.Templates, Description = "Stores the content of a version of the template as its new version, whole and as stored (no merge), also after the template was deleted. The new version records RestoredFrom.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
+    [OpenApiParameter(Definitions.Parameters.Version, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = Definitions.Descriptions.RestoreVersion)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(VersionRestoreResult), Description = Definitions.Descriptions.ResponseVersionRestored)]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseVersionRestoreNotFound)]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTemplateVersionRestoreConflict)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite)]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> RestoreTemplateVersion(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Template.V1.VersionRestore)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view,
+        string annotationType,
+        uint version)
+    {
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineScope.ConfigurationWrite, MachineScope.TemplateWrite);
+
+        if (!AnnotationTypeValidation.TryValidate(annotationType, _logger, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
+        try
+        {
+            var result = await _templates.RestoreTemplateVersionAsync(organization, project, view, annotationType, version, request.GetAuditActor());
+            return new OkObjectResult(result);
+        }
+        catch (StorytellerException ex)
+        {
+            // an unknown or expired version answers 404 VersionNotFound
+            return ErrorResponseMapping.ToActionResult(ex);
+        }
+        catch (TemplateConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message) { ErrorCode = ErrorCodes.Conflict });
+        }
+    }
+
     [Function(nameof(GetTemplateVersionDiff))]
     [OpenApiOperation(Definitions.RouteIds.Template.GetTemplateVersionDiff, Definitions.Tags.Templates)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
