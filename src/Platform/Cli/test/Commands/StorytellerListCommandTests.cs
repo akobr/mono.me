@@ -115,6 +115,123 @@ public class StorytellerListCommandTests
         Listed().ShouldBe(["- cnt.northwind.prod [disabled]"]);
     }
 
+    [Fact]
+    public async Task Tree_WithoutRoot_IsTheTreeOfSubjects()
+    {
+        SetupSubjects();
+
+        var command = Command();
+        command.ShowAsTree = true;
+        var exitCode = await command.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _fixture.Api.Verify(api => api.GetSubjectsAsync("org1", "proj1", "default", null, null, null, null), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("subject")]
+    [InlineData("sbt")]
+    [InlineData("SUBJECT")]
+    [InlineData(" Sbt ")]
+    public async Task Tree_WithSubjectRoot_IsTheTreeOfSubjects(string root)
+    {
+        SetupSubjects();
+
+        var command = Command();
+        command.ShowAsTree = true;
+        command.TreeBaseAnnotationType = root;
+        var exitCode = await command.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _fixture.Api.Verify(api => api.GetSubjectsAsync("org1", "proj1", "default", null, null, null, null), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("responsibility")]
+    [InlineData("rst")]
+    [InlineData("Responsibility")]
+    [InlineData("RST")]
+    public async Task Tree_WithResponsibilityRoot_IsTheTreeOfResponsibilities(string root)
+    {
+        SetupResponsibilities();
+
+        var command = Command();
+        command.ShowAsTree = true;
+        command.TreeBaseAnnotationType = root;
+        var exitCode = await command.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _fixture.Api.Verify(api => api.GetResponsibilitiesAsync("org1", "proj1", "default", null, null, null, null), Times.Once);
+    }
+
+    // --tree-root names the root of a tree, so it asks for the tree without --tree.
+    [Theory]
+    [InlineData("rst", true)]
+    [InlineData("subject", false)]
+    public async Task TreeRoot_WithoutTree_RendersTheTree(string root, bool isResponsibility)
+    {
+        SetupSubjects();
+        SetupResponsibilities();
+
+        var command = Command();
+        command.TreeBaseAnnotationType = root;
+        var exitCode = await command.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _fixture.Api.Verify(api => api.GetResponsibilitiesAsync("org1", "proj1", "default", null, null, null, null), Times.Exactly(isResponsibility ? 1 : 0));
+        _fixture.Api.Verify(api => api.GetSubjectsAsync("org1", "proj1", "default", null, null, null, null), Times.Exactly(isResponsibility ? 0 : 1));
+        _fixture.Api.Verify(api => api.GetAnnotationsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool?>(), It.IsAny<bool?>()), Times.Never);
+    }
+
+    // Any other value ends before the first call (the API mock is strict) with the accepted values on stderr.
+    [Theory]
+    [InlineData("context", true)]
+    [InlineData("cnt", true)]
+    [InlineData("subjects", true)]
+    [InlineData("responsibilty", false)]
+    [InlineData("", true)]
+    [InlineData("  ", false)]
+    public async Task TreeRoot_Unknown_IsRefusedWithTheAcceptedValues(string root, bool showAsTree)
+    {
+        _fixture.Console.UseInnerConsole(redirectedInput: false);
+
+        var command = Command();
+        command.ShowAsTree = showAsTree;
+        command.TreeBaseAnnotationType = root;
+        var exitCode = await command.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _fixture.Console.ErrorLines.ShouldBe([$"Unknown tree root '{root}'; use subject (sbt) or responsibility (rst)."]);
+        _fixture.Console.Lines.ShouldBeEmpty();
+        _fixture.Api.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData(null, true, StoryTreeRoot.Subject)]
+    [InlineData("subject", true, StoryTreeRoot.Subject)]
+    [InlineData("SBT", true, StoryTreeRoot.Subject)]
+    [InlineData("responsibility", true, StoryTreeRoot.Responsibility)]
+    [InlineData(" rst ", true, StoryTreeRoot.Responsibility)]
+    [InlineData("usg", false, StoryTreeRoot.Subject)]
+    [InlineData("", false, StoryTreeRoot.Subject)]
+    public void TryParseTreeRoot_TakesOnlyTheTwoRoots(string? value, bool expected, StoryTreeRoot expectedRoot)
+    {
+        StorytellerListCommand.TryParseTreeRoot(value, out var root).ShouldBe(expected);
+        root.ShouldBe(expectedRoot);
+    }
+
+    [Fact]
+    public void Help_NamesTheValuesOfTreeRoot()
+    {
+        var app = new CommandLineApplication<StorytellerListCommand>(NullConsole.Singleton);
+        app.Conventions.UseDefaultConventions();
+
+        var treeRoot = app.Options.Single(option => option.LongName == "tree-root");
+
+        treeRoot.ShortName.ShouldBe("b");
+        treeRoot.Description.ShouldBe("The root of the tree: subject (sbt, the default) or responsibility (rst). Implies --tree.");
+    }
+
     // The command line as the host builds it: edit is a sub-command of sform story, and its help lists it.
     [Fact]
     public void Edit_IsASubCommandOfStory_AndItsHelpListsIt()
@@ -143,6 +260,21 @@ public class StorytellerListCommandTests
     private static AnnotationsResponse Response(params Annotation[] annotations)
     {
         return new AnnotationsResponse { Annotations = annotations.ToList(), Count = annotations.Length };
+    }
+
+    // No subject, so the tree asks for no executions.
+    private void SetupSubjects()
+    {
+        _fixture.Api
+            .Setup(api => api.GetSubjectsAsync("org1", "proj1", "default", null, null, null, null))
+            .ReturnsAsync(new AnnotationsResponse_Subject { Annotations = [] });
+    }
+
+    private void SetupResponsibilities()
+    {
+        _fixture.Api
+            .Setup(api => api.GetResponsibilitiesAsync("org1", "proj1", "default", null, null, null, null))
+            .ReturnsAsync(new AnnotationsResponse_Responsibility { Annotations = [] });
     }
 
     private StorytellerListCommand Command()

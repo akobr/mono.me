@@ -176,14 +176,16 @@ public sealed class AnnotationListTests : CliTest
 
     // ANN-LST-06: -t renders a tree by subjects, and -b picks the tree's root type.
     // An Editor creates sbt.<s>, rst.<r>, their usage, the contexts <c1> and <c2> of <s> and the executions of <r> in
-    // both. As a Reader, story -t and story --tree -b sbt print "Tree of subjects" with <s> [subject], below it the
-    // contexts and below each context <r> [responsibility]; story -t --tree-root rst and story -t -b responsibility print
-    // "Tree of responsibilities" with <r> [responsibility], below it <s> [subject] and below that both contexts (two, so
-    // the tree keeps them: a subject with a single context is shown without it).
+    // both. As a Reader, story -t, story --tree -b sbt and story -t --tree-root subject print "Tree of subjects" with
+    // <s> [subject], below it the contexts and below each context <r> [responsibility]; story -t --tree-root rst,
+    // story -t -b responsibility and story -b rst (-b implies -t) print "Tree of responsibilities" with <r>
+    // [responsibility], below it <s> [subject] and below that both contexts (two, so the tree keeps them: a subject with
+    // a single context is shown without it). story -t -b context ends with exit 2, the accepted values on stderr, and no
+    // tree.
     [Test]
     [TestCase(255)]
     [UserRole(Role.Reader)]
-    [Covers("story", "-t", "--tree", "-b", "--tree-root", "--tree-root=sbt", "--tree-root=rst", "--tree-root=responsibility")]
+    [Covers("story", "-t", "--tree", "-b", "--tree-root", "--tree-root=sbt", "--tree-root=subject", "--tree-root=rst", "--tree-root=responsibility")]
     public async Task Story_Tree_Rendered()
     {
         var editor = await ArrangeInOwnViewAsync();
@@ -193,7 +195,7 @@ public sealed class AnnotationListTests : CliTest
         var contextNode = $"{tree.ContextName} [context]";
         var otherContextNode = $"{tree.OtherContextName} [context]";
 
-        foreach (var arguments in new[] { new[] { "story", "-t" }, new[] { "story", "--tree", "-b", "sbt" } })
+        foreach (var arguments in new[] { new[] { "story", "-t" }, new[] { "story", "--tree", "-b", "sbt" }, new[] { "story", "-t", "--tree-root", "subject" } })
         {
             var subjects = (await Sform(InProject(arguments))).ShouldSucceed().ShouldContain("Tree of subjects").ShouldNotContain("Tree of responsibilities");
             var lines = subjects.Lines;
@@ -205,7 +207,7 @@ public sealed class AnnotationListTests : CliTest
             await Assert.That(AnnotationOutput.IndexOfLine(lines, otherContextNode)).IsGreaterThan(subjectLine);
         }
 
-        foreach (var arguments in new[] { new[] { "story", "-t", "--tree-root", "rst" }, new[] { "story", "-t", "-b", "responsibility" } })
+        foreach (var arguments in new[] { new[] { "story", "-t", "--tree-root", "rst" }, new[] { "story", "-t", "-b", "responsibility" }, new[] { "story", "-b", "rst" } })
         {
             var responsibilities = (await Sform(InProject(arguments))).ShouldSucceed().ShouldContain("Tree of responsibilities").ShouldNotContain("Tree of subjects");
             var lines = responsibilities.Lines;
@@ -216,6 +218,11 @@ public sealed class AnnotationListTests : CliTest
             await Assert.That(AnnotationOutput.IndexOfLine(lines, contextNode)).IsGreaterThan(subjectLine);
             await Assert.That(AnnotationOutput.IndexOfLine(lines, otherContextNode)).IsGreaterThan(subjectLine);
         }
+
+        (await Sform(InProject("story", "-t", "-b", "context")))
+            .ShouldExitWith(CliExit.WrongInput)
+            .ShouldContain("Unknown tree root 'context'; use subject (sbt) or responsibility (rst).", SformStream.StdErr)
+            .ShouldNotContain("Tree of");
     }
 
     // ANN-LST-07: -k continues a long list with the printed continuation token.
