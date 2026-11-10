@@ -74,8 +74,9 @@ function Set-FederatedCredential {
     }
 
     $existing = @(az ad app federated-credential list --id $AppId -o json | ConvertFrom-Json | Where-Object { $_.name -eq $Name })
-    $audiencesMatch = $existing.Count -eq 1 -and (@($existing[0].audiences) -join ' ') -eq ($credential.audiences -join ' ')
-    if ($audiencesMatch -and $existing[0].issuer -eq $Issuer -and $existing[0].subject -eq $Subject) {
+    # Case-sensitive: Entra compares the issuer, subject and audiences of a token exactly.
+    $audiencesMatch = $existing.Count -eq 1 -and (@($existing[0].audiences) -join ' ') -ceq ($credential.audiences -join ' ')
+    if ($audiencesMatch -and $existing[0].issuer -ceq $Issuer -and $existing[0].subject -ceq $Subject) {
         Write-Host "Federated credential '$Name' is up to date (subject $Subject)."
         return
     }

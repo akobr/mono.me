@@ -94,15 +94,16 @@ $environmentBody = @{
 } | ConvertTo-Json -Depth 5
 $environmentBody | gh api --method PUT "repos/$Repository/environments/$Environment" --input - --silent
 
-# Deployments from main only: remove every other branch policy, and add main when it is missing.
+# Deployments from the branch main only: remove every other policy (a tag policy named main too), and add the branch
+# policy main when it is missing.
 $policiesPath = "repos/$Repository/environments/$Environment/deployment-branch-policies"
-$policies = @(gh api $policiesPath --paginate --jq '.branch_policies[] | {id, name}' | ForEach-Object { $_ | ConvertFrom-Json })
-foreach ($policy in $policies | Where-Object { $_.name -ne 'main' }) {
+$policies = @(gh api $policiesPath --paginate --jq '.branch_policies[] | {id, name, type}' | ForEach-Object { $_ | ConvertFrom-Json })
+foreach ($policy in $policies | Where-Object { -not ($_.name -ceq 'main' -and $_.type -ceq 'branch') }) {
     gh api --method DELETE "$policiesPath/$($policy.id)" --silent
-    Write-Host "  removed the branch policy '$($policy.name)'"
+    Write-Host "  removed the $($policy.type) policy '$($policy.name)'"
 }
 
-if (-not ($policies | Where-Object { $_.name -eq 'main' })) {
+if (-not ($policies | Where-Object { $_.name -ceq 'main' -and $_.type -ceq 'branch' })) {
     gh api --method POST $policiesPath -f name=main -f type=branch --silent
 }
 

@@ -12,6 +12,13 @@ param identityPrincipalId string
 @description('The Cosmos DB account whose key becomes the secret cosmos-connection.')
 param cosmosAccountName string
 
+@description('The key of the account written to cosmos-connection; switched to rotate the other one without downtime.')
+@allowed([
+  'primary'
+  'secondary'
+])
+param cosmosConnectionKey string = 'primary'
+
 var cosmosSecretName = 'cosmos-connection'
 
 var roles = {
@@ -67,7 +74,7 @@ resource cosmosSecret 'Microsoft.KeyVault/vaults/secrets@2025-05-01' = {
   parent: vault
   name: cosmosSecretName
   properties: {
-    value: 'AccountEndpoint=${cosmos.properties.documentEndpoint};AccountKey=${cosmos.listKeys().primaryMasterKey};'
+    value: 'AccountEndpoint=${cosmos.properties.documentEndpoint};AccountKey=${cosmosConnectionKey == 'secondary' ? cosmos.listKeys().secondaryMasterKey : cosmos.listKeys().primaryMasterKey};'
     contentType: 'Cosmos DB connection string'
   }
 }

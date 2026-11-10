@@ -4,7 +4,9 @@
 // - the deployment identity of GitHub Actions (cookbook, step 11.2), once it exists, with the least it needs:
 //   Website Contributor on the Function App (deploy the code), Key Vault Secrets User on the secret cosmos-connection
 //   only (DbCreator), and Storage Blob Data Contributor on the container deployments only (the Flex package). It gets
-//   nothing on the resource group, so it can't list the Cosmos DB keys or read the vault's other secrets.
+//   nothing on the resource group, so it can't list the Cosmos DB keys or read other secrets directly. That is no
+//   isolation from the API's secrets: the code it deploys runs as the app's managed identity, which reads every secret
+//   of the vault (keyvault.bicep), so the deployment identity is trusted with all of them.
 
 @description('The object id of the owner (an Entra user).')
 param ownerObjectId string
