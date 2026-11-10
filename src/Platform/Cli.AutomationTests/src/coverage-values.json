@@ -75,8 +75,8 @@
     {
       "command": "storyteller",
       "option": "--tree-root",
-      "values": [ "rst", "responsibility", "sbt" ],
-      "source": "StorytellerListCommand.RenderTreeAsync: 'responsibility' or rst (AnnotationTypeCodes.Responsibility) renders the tree of responsibilities, anything else (sbt) the tree of subjects."
+      "values": [ "sbt", "subject", "rst", "responsibility" ],
+      "source": "StorytellerListCommand.TryParseTreeRoot: subject or sbt (AnnotationTypeCodes.Subject, the default) renders the tree of subjects, responsibility or rst (AnnotationTypeCodes.Responsibility) the tree of responsibilities, in any case; another value ends with exit 2 (\"Unknown tree root '<value>'; use subject (sbt) or responsibility (rst).\"). The option implies --tree."
     },
     {
       "command": "storyteller export",

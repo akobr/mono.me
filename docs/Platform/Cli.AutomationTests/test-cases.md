@@ -306,7 +306,7 @@ The preferences of `sform.settings.json` in `SFORM_HOME` (the user's `.42for.net
 | ANN-LST-03 | 252 | `-u` adds the usages of the queried responsibilities or subjects | Medium | Reader | | `-u`, `--usages` | `Story_Usages_Combined` |
 | ANN-LST-04 | 253 | `-c` queries contexts, and `-e` adds executions | Medium | Reader | | `-c`, `--contexts`, `-e`, `--executions` | `Story_ContextsAndExecutions` |
 | ANN-LST-05 | 254 | `-d` lists the descendants of one annotation | Medium | Reader | | `-d`, `--descendants` | `Story_Descendants_Listed` |
-| ANN-LST-06 | 255 | `-t` renders a tree by subjects, and `-b` picks the tree's root type | Low | Reader | | `-t`, `--tree`, `-b`, `--tree-root`, `--tree-root=sbt`, `--tree-root=rst`, `--tree-root=responsibility` | `Story_Tree_Rendered` |
+| ANN-LST-06 | 255 | `-t` renders a tree by subjects, and `-b` picks the tree's root type | Low | Reader | | `-t`, `--tree`, `-b`, `--tree-root`, `--tree-root=sbt`, `--tree-root=subject`, `--tree-root=rst`, `--tree-root=responsibility` | `Story_Tree_Rendered` |
 | ANN-LST-07 | 256 | `-k` continues a long list with the printed continuation token | Medium | Owner | P | `-k`, `--continuation-token` | `Story_ContinuationToken_NextPage` |
 | ANN-LST-08 | 257 | `-i`, `--deleted` and `-a` include inactive, deleted, or all annotations | Medium | Reader | | `-i`, `--inactive`, `--deleted`, `-a`, `--all` | `Story_IncludeInactiveDeletedAll` |
 
@@ -315,7 +315,7 @@ The preferences of `sform.settings.json` in `SFORM_HOME` (the user's `.42for.net
 - `ANN-LST-03`: *Pre:* a usage below a subject. *Steps:* `story -s <name> -u`; `story -r <name> --usages`. *Expect:* the usages appear with their owners.
 - `ANN-LST-04`: *Pre:* a context and an execution. *Steps:* `story -c <name>`, `--contexts <name> -e`, `-r <name> --executions`. *Expect:* contexts, then their executions.
 - `ANN-LST-05`: *Steps:* `story -d <rst>`, `--descendants <rst>`. *Expect:* the descendants of `<rst>` only.
-- `ANN-LST-06`: *Steps:* `story -t`; `story --tree -b sbt`; `story -t --tree-root rst`; `story -t -b responsibility`. *Expect:* the first two print "Tree of subjects" (subject, context, responsibility); the last two print "Tree of responsibilities" (responsibility, subject, context). `-b` takes effect with `-t` only, and any other value renders the subject tree.
+- `ANN-LST-06`: *Steps:* `story -t`; `story --tree -b sbt`; `story -t --tree-root subject`; `story -t --tree-root rst`; `story -t -b responsibility`; `story -b rst`; `story -t -b context`. *Expect:* the first three print "Tree of subjects" (subject, context, responsibility); the next three print "Tree of responsibilities" (responsibility, subject, context), the last of them without `-t` (`-b` implies it). `story -t -b context` exits 2 with "Unknown tree root 'context'; use subject (sbt) or responsibility (rst)." on stderr and prints no tree: `-b` takes `subject`, `sbt`, `responsibility` and `rst` in any case, and nothing else.
 - `ANN-LST-07`: *Pre:* more annotations than a page in the disposable project. *Steps:* `story`; then `story -k <token>`; `--continuation-token <token 2>`. *Expect:* each page continues the previous, with no repeated keys.
 - `ANN-LST-08`: *Pre:* a disabled, a scheduled and a deleted annotation. *Steps:* `story`, `story -i`, `--inactive`, `--deleted`, `-a`, `--all`. *Expect:* the default list has none of them; `-i` adds disabled and scheduled; `--deleted` adds deleted; `-a` has all three.
 

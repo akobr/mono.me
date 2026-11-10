@@ -62,10 +62,10 @@ public class StorytellerListCommand : BaseContextCommand
     [Option("-d|--descendants", CommandOptionType.SingleValue, Description = "Retrieve descendants of a specific annotation.")]
     public string? QueryDescendants { get; set; }
 
-    [Option("-t|--tree", CommandOptionType.NoValue, Description = "Show results as tree based by subjects.")]
+    [Option("-t|--tree", CommandOptionType.NoValue, Description = "Show the results as a tree, of subjects unless --tree-root names another root.")]
     public bool ShowAsTree { get; set; }
 
-    [Option("-b|--tree-root", CommandOptionType.SingleValue, Description = "An annotation type to render the tree based on.")]
+    [Option("-b|--tree-root", CommandOptionType.SingleValue, Description = "The root of the tree: subject (sbt, the default) or responsibility (rst). Implies --tree.")]
     public string? TreeBaseAnnotationType { get; set; }
 
     [Option("-k|--continuation-token", CommandOptionType.SingleValue, Description = "The continuation token for next results page.")]
@@ -87,13 +87,42 @@ public class StorytellerListCommand : BaseContextCommand
 
     private DateTimeOffset Now { get; set; }
 
+    // The tree --tree-root asks for, in any case and without the surrounding white space: subject or sbt, responsibility
+    // or rst. Without the option it is the tree of subjects; any other value, an empty one included, is refused.
+    internal static bool TryParseTreeRoot(string? value, out StoryTreeRoot root)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case null:
+            case "subject":
+            case AnnotationTypeCodes.Subject:
+                root = StoryTreeRoot.Subject;
+                return true;
+            case "responsibility":
+            case AnnotationTypeCodes.Responsibility:
+                root = StoryTreeRoot.Responsibility;
+                return true;
+            default:
+                root = default;
+                return false;
+        }
+    }
+
     protected override async Task<int> ExecuteAsync()
     {
         Now = DateTimeOffset.UtcNow;
 
-        if (ShowAsTree)
+        // checked before any call, whether or not --tree is given
+        if (!TryParseTreeRoot(TreeBaseAnnotationType, out var treeRoot))
         {
-            await RenderTreeAsync();
+            Console.WriteErrorLine($"Unknown tree root '{TreeBaseAnnotationType}'; use subject (sbt) or responsibility (rst).");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
+        // --tree-root names the root of a tree, so it asks for the tree too
+        if (ShowAsTree || TreeBaseAnnotationType is not null)
+        {
+            await RenderTreeAsync(treeRoot);
             return ExitCodes.SUCCESS;
         }
 
@@ -388,18 +417,11 @@ public class StorytellerListCommand : BaseContextCommand
         }
     }
 
-    private async Task RenderTreeAsync()
+    private Task RenderTreeAsync(StoryTreeRoot root)
     {
-        if (!string.IsNullOrWhiteSpace(TreeBaseAnnotationType)
-            && (string.Equals(TreeBaseAnnotationType, "responsibility", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(TreeBaseAnnotationType, AnnotationTypeCodes.Responsibility, StringComparison.OrdinalIgnoreCase)))
-        {
-            await RenderResponsibilityTreeAsync();
-        }
-        else
-        {
-            await RenderSubjectTreeAsync();
-        }
+        return root == StoryTreeRoot.Responsibility
+            ? RenderResponsibilityTreeAsync()
+            : RenderSubjectTreeAsync();
     }
 
     private async Task RenderResponsibilityTreeAsync()
