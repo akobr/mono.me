@@ -55,6 +55,8 @@ Only the owner's personal values come from environment variables, so the reposit
 
 ## First run
 
+The complete first deployment, with every `what-if` and what it must show, the manual steps in between and the deployment of the code, is the [runbook](../../../docs/Platform/Deployment/runbook-azure-production.md). The sections below are the short version.
+
 PowerShell; the `az` commands are the same in bash.
 
 ### 1. The subscription (step 1)
