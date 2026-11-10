@@ -371,6 +371,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             ViewName = configuration.ViewName,
             Content = configuration.Content,
             Modified = configuration.Modified,
+            RestoredFrom = configuration.RestoredFrom,
         };
     }
 

@@ -15,6 +15,9 @@ public enum AnnotationAuditAction
     Restored,
     ConfigurationChanged,
     ConfigurationDeleted,
+
+    // A previous version of the configuration became its new version (FromVersion, ConfigurationVersion).
+    ConfigurationRestored,
 }
 
 // Why an entry happened without being requested for this key.
@@ -132,8 +135,12 @@ public record class AnnotationAuditEntry
 
     public IReadOnlyList<AnnotationValueChange>? Values { get; init; }
 
-    // ConfigurationChanged: the new version; ConfigurationDeleted: the version that went to history.
+    // ConfigurationChanged and ConfigurationRestored: the new version; ConfigurationDeleted: the version that went to
+    // history.
     public ulong? ConfigurationVersion { get; init; }
+
+    // ConfigurationRestored: the version whose content the new version holds.
+    public ulong? FromVersion { get; init; }
 }
 
 public record class AnnotationHistory

@@ -13,6 +13,9 @@ public record class ConfigurationSchemaHistoryEntity : Entity
     // The write that produced this version.
     public required AuditStamp Modified { get; init; }
 
+    // The version whose content a restore copied into this version.
+    public ulong? RestoredFrom { get; init; }
+
     [JsonProperty("ttl")]
     [JsonPropertyName("ttl")]
     public int TimeToLiveInSeconds { get; init; } = 60 * 60 * 24 * 365;

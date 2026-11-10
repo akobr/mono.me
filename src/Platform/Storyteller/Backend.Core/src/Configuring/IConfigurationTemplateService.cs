@@ -24,6 +24,11 @@ public interface IConfigurationTemplateService
 
     Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint fromVersion, uint toVersion);
 
+    // Stores the content of a version as a new version, whole and as stored, also after a delete; the new version
+    // records RestoredFrom. An unknown or expired version throws NotFoundException (VersionNotFound). The current
+    // version, or one whose content the current version has, changes nothing (Unchanged).
+    Task<VersionRestoreResult> RestoreTemplateVersionAsync(string organization, string project, string view, string annotationType, uint version, AuditActor actor);
+
     // The templates of a view and their versions still in the history, one per type code, for an export. An empty
     // document is not a version; a deleted template has versions but no current document.
     Task<IReadOnlyList<TemplateHistory>> GetTemplateHistoriesAsync(

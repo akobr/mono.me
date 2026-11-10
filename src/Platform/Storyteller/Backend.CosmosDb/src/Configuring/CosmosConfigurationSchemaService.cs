@@ -473,61 +473,12 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
 
             if (!isChecked)
             {
-                IReadOnlyList<SchemaValidationError> errors;
-
-                try
-                {
-                    errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, schemaContent, modified);
-                }
-                catch (InvalidInputException exception) when (force && ConfigurationSchemaChecker.IsCheckFailure(exception))
-                {
-                    // the configurations could not be checked (another stored layer refers outside itself, or a check
-                    // runs out of time); force stores the schema anyway, as it stores one that they violate
-                    LogForcedUncheckedCompliance(organization, project, view, identity, exception);
-                    errors = [];
-                }
-
-                if (errors.Count > 0 && !force)
-                {
-                    throw new SchemaValidationException(errors);
-                }
-
-                LogForcedViolations(organization, project, view, identity, errors);
+                await CheckComplianceAsync(organization, project, view, identity, schemaContent, modified, force, repository, partitionKey);
             }
 
-            var version = existing is null
-                ? (state?.LastVersion ?? 0) + 1
-                : existing.Version + 1;
+            var updated = await TryWriteVersionAsync(repository, partitionKeyValue, project, view, identity, existing, etag, state, stateEtag, schemaContent, modified);
 
-            var updated = new ConfigurationSchemaEntity
-            {
-                PartitionKey = partitionKeyValue,
-                Organization = organization,
-                Id = identity.CurrentId,
-                AnnotationKey = identity.AnnotationKey,
-                Name = identity.Name,
-                ProjectName = project,
-                ViewName = view,
-                Content = schemaContent,
-                Modified = modified,
-                Version = version,
-            };
-
-            var batch = repository.Container.CreateTransactionalBatch(partitionKey);
-
-            if (existing is null)
-            {
-                batch.CreateItem(updated);
-            }
-            else
-            {
-                batch.CreateItem(existing.ToHistory(identity.HistoryId(existing.Version)));
-                batch.ReplaceItem(existing.Id, updated, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
-            }
-
-            AddStateWrite(batch, updated, identity, state, stateEtag, version);
-
-            if (await TryExecuteWriteAsync(batch, identity.CurrentId) is null)
+            if (updated is null)
             {
                 continue;
             }
@@ -536,6 +487,91 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         }
 
         throw new SchemaConcurrencyException(project, view, identity.CurrentId, MaxRetries);
+    }
+
+    // The stored configurations the schema applies to must comply with it, unless forced: SchemaValidationException.
+    private async Task CheckComplianceAsync(
+        string organization,
+        string project,
+        string view,
+        SchemaIdentity identity,
+        JObject schemaContent,
+        AuditStamp modified,
+        bool force,
+        OrganizationContainer repository,
+        PartitionKey partitionKey)
+    {
+        IReadOnlyList<SchemaValidationError> errors;
+
+        try
+        {
+            errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, schemaContent, modified);
+        }
+        catch (InvalidInputException exception) when (force && ConfigurationSchemaChecker.IsCheckFailure(exception))
+        {
+            // the configurations could not be checked (another stored layer refers outside itself, or a check
+            // runs out of time); force stores the schema anyway, as it stores one that they violate
+            LogForcedUncheckedCompliance(organization, project, view, identity, exception);
+            errors = [];
+        }
+
+        if (errors.Count > 0 && !force)
+        {
+            throw new SchemaValidationException(errors);
+        }
+
+        LogForcedViolations(organization, project, view, identity, errors);
+    }
+
+    // Writes the next version, the history of the stored one and the state in one batch, guarded by the ETags of the
+    // read. Returns null on a concurrent change. restoredFrom marks a restore.
+    private static async Task<ConfigurationSchemaEntity?> TryWriteVersionAsync(
+        OrganizationContainer repository,
+        string partitionKeyValue,
+        string project,
+        string view,
+        SchemaIdentity identity,
+        ConfigurationSchemaEntity? existing,
+        string? etag,
+        ConfigurationSchemaStateEntity? state,
+        string? stateEtag,
+        JObject schemaContent,
+        AuditStamp modified,
+        ulong? restoredFrom = null)
+    {
+        var version = existing is null
+            ? (state?.LastVersion ?? 0) + 1
+            : existing.Version + 1;
+
+        var updated = new ConfigurationSchemaEntity
+        {
+            PartitionKey = partitionKeyValue,
+            Organization = repository.Organization,
+            Id = identity.CurrentId,
+            AnnotationKey = identity.AnnotationKey,
+            Name = identity.Name,
+            ProjectName = project,
+            ViewName = view,
+            Content = schemaContent,
+            Modified = modified,
+            Version = version,
+            RestoredFrom = restoredFrom,
+        };
+
+        var batch = repository.Container.CreateTransactionalBatch(repository.Key(partitionKeyValue));
+
+        if (existing is null)
+        {
+            batch.CreateItem(updated);
+        }
+        else
+        {
+            batch.CreateItem(existing.ToHistory(identity.HistoryId(existing.Version)));
+            batch.ReplaceItem(existing.Id, updated, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
+        }
+
+        AddStateWrite(batch, updated, identity, state, stateEtag, version);
+        return await TryExecuteWriteAsync(batch, identity.CurrentId) is null ? null : updated;
     }
 
     // A forced write of a schema that configurations violate is logged per configuration.

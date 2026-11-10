@@ -203,6 +203,8 @@ internal sealed class FakeConfigurationService(ExportReads? reads = null, Import
 
     public Task<DiffResult> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView) => throw new NotSupportedException();
 
+    public Task<VersionRestoreResult> RestoreConfigurationVersionAsync(FullKey key, uint version, AuditActor actor, bool force = false) => throw new NotSupportedException();
+
     public bool HasBindings(Configuration effective) => throw new NotSupportedException();
 
     public Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false, BindingDependencies? dependencies = null) => throw new NotSupportedException();

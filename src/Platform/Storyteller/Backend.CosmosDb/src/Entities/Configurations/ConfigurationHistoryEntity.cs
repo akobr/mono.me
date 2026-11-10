@@ -13,6 +13,9 @@ public record class ConfigurationHistoryEntity : Entity
     // The write that produced this version.
     public required AuditStamp Modified { get; init; }
 
+    // The version whose content a restore copied into this version.
+    public ulong? RestoredFrom { get; init; }
+
     // The token of the clear or delete that archived this version while its cache invalidation hasn't finished yet.
     public string? PendingInvalidationId { get; init; }
 

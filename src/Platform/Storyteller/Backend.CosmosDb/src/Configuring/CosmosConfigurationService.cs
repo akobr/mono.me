@@ -415,27 +415,10 @@ public partial class CosmosConfigurationService : IConfigurationService
                     await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, input);
                 }
 
-                var configuration = new ConfigurationEntity
-                {
-                    PartitionKey = partitionKeyValue,
-                    Organization = key.OrganizationName,
-                    Id = id,
-                    AnnotationKey = annotationKey,
-                    IsServerSubstitutionDisabled = false,
-                    Name = key.Annotation.Name,
-                    ProjectName = key.ProjectName,
-                    ViewName = key.ViewName,
-                    Content = input,
-                    Version = await GetHighestArchivedVersionAsync(key, repository) + 1,
-                    Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-                    PendingInvalidationId = NewInvalidationId(key),
-                };
-
                 // a calculation may have created the row meanwhile (409), then the next attempt updates it
-                var batch = repository.Container.CreateTransactionalBatch(partitionKey);
-                batch.CreateItem(configuration);
+                var configuration = await TryCreateVersionAsync(key, repository, input, actor);
 
-                if (!await TryExecuteWriteAsync(batch, annotationKey, partitionKeyValue))
+                if (configuration is null)
                 {
                     continue;
                 }
@@ -1236,15 +1219,49 @@ public partial class CosmosConfigurationService : IConfigurationService
         return version > 0 || content.HasValues;
     }
 
+    // Creates the row of a configuration that has none, as the version after the archived ones. Returns null when a
+    // calculation or another writer created the row meanwhile. restoredFrom marks a restore.
+    private async Task<ConfigurationEntity?> TryCreateVersionAsync(
+        FullKey key,
+        OrganizationContainer repository,
+        JObject content,
+        AuditActor actor,
+        ulong? restoredFrom = null)
+    {
+        var annotationKey = key.Annotation.ToString();
+        var partitionKeyValue = key.GetPartitionKey();
+        var configuration = new ConfigurationEntity
+        {
+            PartitionKey = partitionKeyValue,
+            Organization = key.OrganizationName,
+            Id = GetConfigurationId(key),
+            AnnotationKey = annotationKey,
+            IsServerSubstitutionDisabled = false,
+            Name = key.Annotation.Name,
+            ProjectName = key.ProjectName,
+            ViewName = key.ViewName,
+            Content = content,
+            Version = await GetHighestArchivedVersionAsync(key, repository) + 1,
+            Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
+            RestoredFrom = restoredFrom,
+            PendingInvalidationId = NewInvalidationId(key),
+        };
+
+        var batch = repository.Container.CreateTransactionalBatch(repository.Key(partitionKeyValue));
+        batch.CreateItem(configuration);
+        return await TryExecuteWriteAsync(batch, annotationKey, partitionKeyValue) ? configuration : null;
+    }
+
     // Archives the stored version and writes the next one, guarded by the ETag of the read. Returns null when another
-    // writer changed or deleted the row meanwhile.
+    // writer changed or deleted the row meanwhile. restoredFrom marks a restore; any other write clears the mark.
     private async Task<ConfigurationEntity?> TryWriteNextVersionAsync(
         FullKey key,
         OrganizationContainer repository,
         ConfigurationEntity existing,
         string etag,
         JObject newContent,
-        AuditActor actor)
+        AuditActor actor,
+        ulong? restoredFrom = null)
     {
         var annotationKey = key.Annotation.ToString();
         var partitionKeyValue = key.GetPartitionKey();
@@ -1259,6 +1276,7 @@ public partial class CosmosConfigurationService : IConfigurationService
             Version = archive.NextVersion,
             Content = newContent,
             Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
+            RestoredFrom = restoredFrom,
             CalculatedContent = null,
             CalculatedContentHash = null,
             PendingInvalidationId = NewInvalidationId(key),
@@ -1548,6 +1566,7 @@ public partial class CosmosConfigurationService : IConfigurationService
             ViewName = current.ViewName,
             Content = current.Content,
             Modified = current.Modified,
+            RestoredFrom = current.RestoredFrom,
             PendingInvalidationId = pendingInvalidationId,
         };
     }
@@ -1645,7 +1664,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
     // Configuration changes appear in the annotation's history as version references. Best effort: the configuration
     // is already written, so a failed append is logged and the request still succeeds.
-    private async Task AuditConfigurationAsync(FullKey key, OrganizationContainer repository, AuditActor? actor, AnnotationAuditAction action, ulong version)
+    private async Task AuditConfigurationAsync(FullKey key, OrganizationContainer repository, AuditActor? actor, AnnotationAuditAction action, ulong version, ulong? fromVersion = null)
     {
         if (actor is null || _auditStore is null)
         {
@@ -1654,7 +1673,7 @@ public partial class CosmosConfigurationService : IConfigurationService
 
         try
         {
-            var entry = AnnotationAuditStore.NewEntry(action, actor, _auditStore.GetNow()) with { ConfigurationVersion = version };
+            var entry = AnnotationAuditStore.NewEntry(action, actor, _auditStore.GetNow()) with { ConfigurationVersion = version, FromVersion = fromVersion };
             await _auditStore.AppendAsync(repository.Container, key, entry);
         }
         catch (Exception exception)

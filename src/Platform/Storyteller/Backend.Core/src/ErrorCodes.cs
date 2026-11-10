@@ -118,6 +118,10 @@ public static class ErrorCodes
     public const string ExternalSchemaReference = "ExternalSchemaReference";
     public const string SchemaValidationTimeout = "SchemaValidationTimeout";
 
+    // A restore of a version of a configuration, a template or a schema that the version list does not show: never
+    // written, expired, or (a configuration) an archive above the current version (404).
+    public const string VersionNotFound = "VersionNotFound";
+
     // Export and import of a view: warnings of written documents.
     public const string AncestorCreated = "AncestorCreated";
     public const string AnnotationRecreated = "AnnotationRecreated";

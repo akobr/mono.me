@@ -67,6 +67,13 @@ public interface IConfigurationService
 
     Task<DiffResult> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView);
 
+    // Stores the content of a listed version as a new version, whole and as stored, also after a clear. A soft-deleted
+    // annotation throws ConflictException (AnnotationDeleted), a missing one NotFoundException (AnnotationNotFound), a
+    // version the list does not show NotFoundException (VersionNotFound). The current version, or one whose content the
+    // current version has, changes nothing (Unchanged). The content is checked against the schema unless forced; the
+    // restore is recorded in the annotation's audit as ConfigurationRestored and on the new version as RestoredFrom.
+    Task<VersionRestoreResult> RestoreConfigurationVersionAsync(FullKey key, uint version, AuditActor actor, bool force = false);
+
     // The own documents of every configuration in a view and their versions still in the history, for an export.
     // Configurations of soft-deleted annotations are left out; an empty document is not a version.
     Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(

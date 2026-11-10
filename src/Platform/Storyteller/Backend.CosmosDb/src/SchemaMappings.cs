@@ -30,6 +30,7 @@ internal static class SchemaMappings
         Version = (uint)entity.Version,
         Modified = entity.Modified,
         ExpirationTime = DateTimeOffset.MaxValue,
+        RestoredFrom = (uint?)entity.RestoredFrom,
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this ConfigurationSchemaHistoryEntity entity) => new()
@@ -37,6 +38,7 @@ internal static class SchemaMappings
         Version = (uint)entity.Version,
         Modified = entity.Modified,
         ExpirationTime = entity.GetExpirationTime(),
+        RestoredFrom = (uint?)entity.RestoredFrom,
     };
 
     public static ConfigurationSchemaHistoryEntity ToHistory(this ConfigurationSchemaEntity entity, string historyId) => new()
@@ -51,5 +53,6 @@ internal static class SchemaMappings
         Version = entity.Version,
         Content = entity.Content,
         Modified = entity.Modified,
+        RestoredFrom = entity.RestoredFrom,
     };
 }

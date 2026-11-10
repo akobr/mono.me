@@ -27,6 +27,7 @@ internal static class TemplateMappings
         Version = (uint)e.Version,
         Modified = e.Modified,
         ExpirationTime = DateTimeOffset.MaxValue,
+        RestoredFrom = (uint?)e.RestoredFrom,
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this GenerateTemplateHistoryEntity e) => new()
@@ -34,6 +35,7 @@ internal static class TemplateMappings
         Version = (uint)e.Version,
         Modified = e.Modified,
         ExpirationTime = e.GetExpirationTime(),
+        RestoredFrom = (uint?)e.RestoredFrom,
     };
 
     public static GenerateTemplateHistoryEntity ToHistory(this GenerateTemplateEntity e) => new()
@@ -48,5 +50,6 @@ internal static class TemplateMappings
         Version = e.Version,
         Content = e.Content,
         Modified = e.Modified,
+        RestoredFrom = e.RestoredFrom,
     };
 }

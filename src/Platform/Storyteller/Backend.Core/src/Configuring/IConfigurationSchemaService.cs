@@ -59,6 +59,19 @@ public interface IConfigurationSchemaService
 
     Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint fromVersion, uint toVersion);
 
+    // The restores store the content of a version as a new version, also after a delete; the new version records
+    // RestoredFrom. The content must be a usable schema (InvalidInputException, also when forced) and the stored
+    // configurations must comply unless forced (SchemaValidationException). An unknown or expired version throws
+    // NotFoundException (VersionNotFound). The current version, or one whose content the current version has, changes
+    // nothing (Unchanged). The schemas of an annotation also refuse a soft-deleted annotation (ConflictException,
+    // AnnotationDeleted) and a missing one (NotFoundException, AnnotationNotFound), and a descendant type checks the
+    // pair first (InvalidInputException, InvalidKey).
+    Task<VersionRestoreResult> RestoreSchemaVersionAsync(string organization, string project, string view, string annotationType, uint version, AuditActor actor, bool force);
+
+    Task<VersionRestoreResult> RestoreAnnotationSchemaVersionAsync(string organization, string project, string view, string annotationKey, uint version, AuditActor actor, bool force);
+
+    Task<VersionRestoreResult> RestoreDescendantTypeSchemaVersionAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint version, AuditActor actor, bool force);
+
     // The schemas of a view and their versions still in the history, one per document (kind, type, key), for an
     // export. The annotation and descendant-type schemas of an annotation that is deleted or missing are left out. An
     // empty document is not a version; a deleted schema has versions but no current document.
