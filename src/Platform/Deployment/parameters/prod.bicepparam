@@ -41,6 +41,11 @@ param cosmosTotalThroughputLimit = -1
 // The Cosmos DB key in the secret cosmos-connection; switch it only to rotate the other key (cookbook, step 7).
 param cosmosConnectionKey = 'primary'
 
-param budgetAmount = 5
+// The credit period of the free account, until 2026-12-07: switch these back to 5, 0 and '0.15' on 7 December
+// (runbook, "The credit period"). Only settings that can go back without a rebuild.
+param budgetAmount = 50
+param functionAlwaysReadyInstances = 1
+param logDailyCapGb = '1'
+
 // The month of the first run; if that is a later month, set its first day before the run, then never change it.
 param budgetStartDate = '2026-11-01'

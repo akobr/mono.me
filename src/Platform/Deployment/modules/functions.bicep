@@ -66,6 +66,10 @@ param maximumInstanceCount int
 ])
 param instanceMemoryMB int
 
+@description('Always-ready instances of the HTTP functions (the http group); 0 keeps none.')
+@minValue(0)
+param alwaysReadyInstances int
+
 var authKitBaseUrl = 'https://${authKitDomain}'
 
 var baseSettings = {
@@ -181,7 +185,14 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
       scaleAndConcurrency: {
         maximumInstanceCount: maximumInstanceCount
         instanceMemoryMB: instanceMemoryMB
-        alwaysReady: []
+        alwaysReady: alwaysReadyInstances == 0
+          ? []
+          : [
+              {
+                name: 'http'
+                instanceCount: alwaysReadyInstances
+              }
+            ]
       }
       runtime: {
         name: 'dotnet-isolated'

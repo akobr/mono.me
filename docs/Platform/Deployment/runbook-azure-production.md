@@ -497,6 +497,12 @@ az lock list -g prod-2s-eusec-rg -o table                               # the ac
 
 Then tick the acceptance criteria of [424-231](https://linear.app/424fun/issue/424-231/create-the-production-environment-of-the-2s-platform-in-azure).
 
+## The credit period (until 7 December 2026)
+
+While the free account's credit lasts, `parameters/prod.bicepparam` raises three settings, to use the credit and to see what the platform costs: `budgetAmount = 50`, `functionAlwaysReadyInstances = 1` (one always-ready instance of the API's HTTP functions: no cold starts, billed all the time, and no free grants of Flex Consumption while it is on) and `logDailyCapGb = '1'`. Each goes back without a rebuild.
+
+**On 7 December**: set `budgetAmount = 5`, `functionAlwaysReadyInstances = 0`, `logDailyCapGb = '0.15'`; commit through a pull request; what-if (expect `Modify` of the budget's amount, the site's `alwaysReady`, and the workspace's `dailyQuotaGb`, nothing else); create. Also remove what was added by hand for the period (the Application Insights availability test, the Azure Load Testing resource, the Defender for Cloud plans) and check Cost Management for the month.
+
 ## Later
 
 - Every later infrastructure change: what-if, then create, from an up-to-date checkout, with the two `PLATFORM_OWNER_*` variables. The template owns the app settings: add a setting to `modules/functions.bicep`, never in the portal.
