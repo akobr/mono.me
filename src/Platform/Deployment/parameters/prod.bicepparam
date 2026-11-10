@@ -31,6 +31,9 @@ param deploymentPrincipalId = ''
 
 param ownerObjectId = readEnvironmentVariable('PLATFORM_OWNER_OBJECT_ID')
 param ownerEmail = readEnvironmentVariable('PLATFORM_OWNER_EMAIL')
+// The Cosmos DB key in the secret cosmos-connection; switch it only to rotate the other key (cookbook, step 7).
+param cosmosConnectionKey = 'primary'
+
 param budgetAmount = 5
 // The month of the first run; if that is a later month, set its first day before the run, then never change it.
 param budgetStartDate = '2026-11-01'

@@ -234,7 +234,12 @@ unset COSMOS_CS
 
 Check: `az keyvault show -n "$KV" --query "{purge:properties.enablePurgeProtection, rbac:properties.enableRbacAuthorization, sku:properties.sku.name}" -o table` prints `True True premium`.
 
-**Rotating the Cosmos DB key.** The secret holds the account's primary key and has no expiry: an expired secret would break the API's Key Vault reference. To rotate, regenerate the primary key (`az cosmosdb keys regenerate -g "$RG" -n "$COSMOS" --key-kind primary`), write the new connection string to `cosmos-connection` at once (the commands above, or a run of `main.bicep`, which reads it from `listKeys()`), then restart the Function App (`az functionapp restart -g "$RG" -n "$FUNC"`), as Key Vault references are cached for up to a day. The API's Cosmos DB calls fail between the regeneration and the restart, so rotate in a quiet moment.
+**Rotating the Cosmos DB keys.** The secret holds one of the account's two keys and has no expiry (an expired secret would break the API's Key Vault reference). Rotate the key the API doesn't use, after moving the API to the other one, so the API never runs with a regenerated key. With the Bicep templates, the key in the secret is the parameter `cosmosConnectionKey` of `parameters/prod.bicepparam` (`primary` by default), and a run of `main.bicep` writes that key, so change the parameter, never the secret by hand:
+
+1. Set `cosmosConnectionKey = 'secondary'`, commit, and run `main.bicep` (what-if: only `cosmos-connection` changes). By hand: write the secondary connection string (`--query "connectionStrings[?description=='Secondary SQL Connection String'].connectionString | [0]"` in the commands above).
+2. Restart the Function App (`az functionapp restart -g "$RG" -n "$FUNC"`): Key Vault references without a version are cached for up to a day. Check that the API answers and Application Insights shows no Cosmos DB `401`.
+3. Regenerate the primary key: `az cosmosdb keys regenerate -g "$RG" -n "$COSMOS" --key-kind primary`. Nothing uses it now.
+4. To go back to the primary key (and rotate the secondary one next time), repeat 1–3 with `primary` and `--key-kind secondary`. Leaving the API on the secondary key is fine too; the parameter in the repository always says which key is in use.
 
 ## 8. Function App (the API)
 
@@ -431,7 +436,7 @@ az role assignment create --assignee-object-id "$DEPLOY_SP_ID" --assignee-princi
 echo "client $DEPLOY_CLIENT_ID tenant $TENANT_ID subscription $(az account show --query id -o tsv)"
 ```
 
-These roles are the least that deploying code needs. The identity gets nothing on the resource group: Contributor there would let it list the Cosmos DB keys, and Secrets User on the whole vault would let it read every secret. Running the Bicep templates from a pipeline needs more (the resource group, the budget, locks and role assignments; spec, section 10).
+These roles are the least that deploying code needs. The identity gets nothing on the resource group: Contributor there would let it list the Cosmos DB keys, and Secrets User on the whole vault would let it read every secret directly. It is still trusted with the API's secrets: Website Contributor on the Function App lets it deploy code, and that code runs as the app's managed identity, which reads every secret of the vault: the deployment identity is trusted with all the secrets of the API. Protect it like the secrets: the GitHub environment `production` with a required reviewer and the branch `main` only. Running the Bicep templates from a pipeline needs more (the resource group, the budget, locks and role assignments; spec, section 10).
 
 ## 12. DNS records (zone `42for.net`)
 
@@ -539,7 +544,9 @@ API_BASE_URL="https://$API_HOST/api" AUTH_API_HOSTNAME="$AUTH_HOST" ENVIRONMENT_
 SENTRY_DSN="<dsn>" POSTHOG_PROJECT_TOKEN="<token>" POSTHOG_HOST="https://eu.i.posthog.com" RELEASE="$(git rev-parse HEAD)" \
   node build/write-environment-config.ts
 grep -cE "__(API_ORIGIN|AUTH_HOSTNAME|SENTRY_ORIGIN|POSTHOG_ORIGIN)__" dist/staticwebapp.config.json   # must print 0
+SWA_TOKEN=$(az staticwebapp secrets list -g "$RG" -n "$SWA" --query properties.apiKey -o tsv)   # also when step 9 was the templates
 npx @azure/static-web-apps-cli deploy ./dist --deployment-token "$SWA_TOKEN" --env production
+unset SWA_TOKEN
 cd -
 ```
 

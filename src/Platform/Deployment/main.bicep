@@ -74,6 +74,13 @@ param budgetAmount int = 5
 @description('The first day of the budget\'s first month (yyyy-MM-01). Fixed once the budget exists: a budget can be created with the current or a future month, and its start date is not moved by later runs.')
 param budgetStartDate string
 
+@description('The Cosmos DB key the API uses (the secret cosmos-connection): primary or secondary, switched to rotate the other key (cookbook, step 7).')
+@allowed([
+  'primary'
+  'secondary'
+])
+param cosmosConnectionKey string = 'primary'
+
 @description('The daily cap of Log Analytics in GB.')
 param logDailyCapGb string = '0.15'
 
@@ -204,6 +211,7 @@ module keyVault 'modules/keyvault.bicep' = {
     tags: tags
     identityPrincipalId: identity.outputs.principalId
     cosmosAccountName: cosmos.outputs.name
+    cosmosConnectionKey: cosmosConnectionKey
   }
 }
 

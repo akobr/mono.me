@@ -96,7 +96,7 @@ $deployment = ./scripts/New-DeploymentApplication.ps1
 $deployment.PrincipalId                        # deploymentPrincipalId
 ```
 
-Put both ids into `parameters/prod.bicepparam`, commit them, and run `main.bicep` again (the `create` command of step 2). The run adds `KeyValues__Protection__Byok__ClientId` and the deployment identity's roles, scoped to what it deploys: Website Contributor on the Function App, Key Vault Secrets User on the secret `cosmos-connection` only, and Storage Blob Data Contributor on the container `deployments` only. It gets nothing on the resource group, so it can't list the Cosmos DB keys or read other secrets. Start the publisher verification of `2S Platform Customer Keys` before the first BYOK customer.
+Put both ids into `parameters/prod.bicepparam`, commit them, and run `main.bicep` again (the `create` command of step 2). The run adds `KeyValues__Protection__Byok__ClientId` and the deployment identity's roles, scoped to what it deploys: Website Contributor on the Function App, Key Vault Secrets User on the secret `cosmos-connection` only, and Storage Blob Data Contributor on the container `deployments` only. It gets nothing on the resource group, so it can't list the Cosmos DB keys or read other secrets directly. It is still trusted with every secret of the API: Website Contributor on the Function App lets it deploy code, and that code runs as the app's managed identity, which reads every secret of the vault. Start the publisher verification of `2S Platform Customer Keys` before the first BYOK customer.
 
 ### 4. DNS and the custom domains (steps 12 and 10)
 
@@ -141,7 +141,7 @@ Run `what-if`, then `create`, from an up-to-date checkout with the two owner var
 
 - **The app settings belong to the template.** A setting added by hand in the portal is removed by the next run; add it to `modules/functions.bicep`, and its value to the parameters file.
 - **The managed identity is never re-created**: its principal id is the subject of the BYOK federation.
-- **After a rotation of the Cosmos DB key** (cookbook, step 7), run `main.bicep` to write the new key, then restart the Function App: the app setting references the secret without a version, and the app refreshes such references only about once a day.
+- **Rotating the Cosmos DB keys** (cookbook, step 7): switch `cosmosConnectionKey` to the other key, run `main.bicep`, restart the Function App (the app setting references the secret without a version, which the app refreshes only about once a day), then regenerate the key no longer in use.
 - `domains.bicep` is not part of a normal run. A second run writes the binding without TLS, then puts the certificate again (an existing managed certificate is kept, not reissued) and binds it: the API's domain is without TLS for a few seconds.
 - `MachineAuth__DisabledCredentialKinds__*` is read by the API only once [424-232](https://linear.app/424fun/issue/424-232/turn-off-machine-credential-kinds-per-deployment) is merged. Until then the setting has no effect. That is safe: with `IsCertificateHeaderFromClientAllowed=false` a certificate machine can't sign in anyway, but projects can still enable the kinds.
 
