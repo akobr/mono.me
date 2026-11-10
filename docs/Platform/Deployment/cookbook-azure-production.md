@@ -316,7 +316,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | Setting | Why |
 | --- | --- |
 | `Auth__AuthKit__Issuer` | must equal the `iss` of WorkOS tokens: the custom domain `https://auth.42for.net` |
-| `Auth__AuthKit__Audience` | tokens must carry this `aud` (the JWT template, step 13). `https://2s.42for.net` is the proposal; confirm it before the first sign-in, see "Open points" |
+| `Auth__AuthKit__Audience` | tokens must carry this `aud` (the JWT template, step 13): `https://2s.42for.net`, shared by every application of the environment (see "Open points") |
 | `Auth__AuthKit__DefaultUserScopes__0` | every signed-in user gets `User.Impersonation`, and their roles decide the rest; without it (and without a permission map) every user gets `401` |
 | `Auth__TokenExchange__Enabled=false` | no MCP server in this phase |
 | `MachineAuth__DisabledCredentialKinds__*` | no mTLS yet: projects can't enable certificate machines or issue shared certificates |
@@ -455,7 +455,7 @@ Keep the TTL low (300 s) until everything works.
 In the WorkOS dashboard, environment **Production**:
 
 1. **Custom domain** for AuthKit: `auth.42for.net`, with the DNS records WorkOS shows (step 12). This is the issuer the API checks; it is final (decision 4).
-2. Note the **client id** (`client_…`) for `Auth__AuthKit__ClientId` and `VITE_*` of step 15.
+2. **The 2S Platform is the default application** of the environment (**Applications**): name it `2S Platform`, and note its **client id** (`client_…`) for `Auth__AuthKit__ClientId` and `VITE_*` of step 15. Every later 42for.net product gets its own application in the same environment, not a new environment ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)): one login and one account everywhere.
 3. **JWT template**, so tokens carry the audience and the profile fields the platform stores:
 
    ```json
@@ -585,7 +585,7 @@ What raises it: Cosmos DB throughput above 1000 RU/s, a second region or zone re
 
 ## 19. Open points (decide before or during the work)
 
-- **The `aud` of the JWT template** (step 13): `https://2s.42for.net` is proposed. `auth.42for.net` is meant to be shared with the other products of 42for.net, which means one WorkOS environment, one JWT template and one `aud`: a token issued to another 42for.net product would then also be accepted by the 2S API. Check whether WorkOS lets each application have its own audience before the second product signs users in.
-- **The invitation link** is one per WorkOS environment, so it points to the 2S admin UI while the environment is shared.
+- **The shared WorkOS environment** (step 13): decided, one environment and one WorkOS Application per product ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)). The JWT template's `aud` stays `https://2s.42for.net`. **Before a second product signs users in**, the 2S API has to check the token's `client_id` against an allow-list of the 2S applications (a new setting, e.g. `Auth:AuthKit:AllowedClientIds`); until then, a token another product gets for a user would also be accepted by the 2S API.
+- **Invitations** route to the application they were sent from; invitations sent from the WorkOS dashboard go to the default application, the 2S Platform.
 - **Publisher verification** of `2S Platform Customer Keys` (step 11.1), before the first BYOK customer.
 - **The development environment** comes later as a new subscription (`dev-42fornet-sub`) from the same Bicep templates (spec, section 11), with WorkOS staging, its own trust domain and its own BYOK application.
