@@ -61,6 +61,18 @@ public class ConfigRestoreCommandTests
         Lines.ShouldBe([$"! v3 equals the current version v5 of the configuration for '{Key}'; nothing changed."]);
     }
 
+    // a configuration written before versions were counted can list a version 0, so the API decides
+    [Fact]
+    public async Task VersionZero_GoesToTheApi()
+    {
+        Restore(0, false).ReturnsAsync(Result(VersionRestoreResultOutcome.Restored, 0, 4));
+
+        var exitCode = await Command(0).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        Lines.ShouldBe([$"! Restored v0 of the configuration for '{Key}' as v4."]);
+    }
+
     [Fact]
     public async Task Force_IsPassedThrough()
     {
@@ -83,14 +95,14 @@ public class ConfigRestoreCommandTests
     }
 
     [Theory]
-    [InlineData(0)]
     [InlineData(-1)]
-    public async Task VersionBelowOne_SaysSoBeforeAnyCall(int version)
+    [InlineData(-7)]
+    public async Task NegativeVersion_SaysSoBeforeAnyCall(int version)
     {
         var exitCode = await Command(version).OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        Lines.ShouldBe([$"! The version to restore must be 1 or more, not {version}; 'versions' lists them."]);
+        Lines.ShouldBe([$"! The version to restore cannot be negative, not {version}; 'versions' lists them."]);
         _api.VerifyNoOtherCalls();
     }
 

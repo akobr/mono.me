@@ -75,7 +75,7 @@ public class TemplateRestoreCommandTests
         var exitCode = await Command(-2).OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        Lines.ShouldBe(["! The version to restore must be 1 or more, not -2; 'versions' lists them."]);
+        Lines.ShouldBe(["! The version to restore cannot be negative, not -2; 'versions' lists them."]);
         _api.VerifyNoOtherCalls();
     }
 

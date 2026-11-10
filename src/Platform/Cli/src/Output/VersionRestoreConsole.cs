@@ -17,8 +17,9 @@ public static class VersionRestoreConsole
     public const string MissingVersionMessage = "Please specify the version to restore with --version.";
 
     /// <summary>
-    /// The version of <c>--version</c>. Without it, or with a version below 1 (versions start at 1), writes why and throws
-    /// a <see cref="WrongInputException"/> before any call.
+    /// The version of <c>--version</c>. Without it, or with a negative version, writes why and throws
+    /// a <see cref="WrongInputException"/> before any call. Version 0 goes to the API: a configuration written before
+    /// versions were counted can list it.
     /// </summary>
     public static int ValidateVersionToRestore(this IExtendedConsole @this, int? version)
     {
@@ -28,9 +29,9 @@ public static class VersionRestoreConsole
             throw new WrongInputException();
         }
 
-        if (value < 1)
+        if (value < 0)
         {
-            @this.WriteImportant($"The version to restore must be 1 or more, not {value.ToString(CultureInfo.InvariantCulture)}; 'versions' lists them.");
+            @this.WriteImportant($"The version to restore cannot be negative, not {value.ToString(CultureInfo.InvariantCulture)}; 'versions' lists them.");
             throw new WrongInputException();
         }
 
