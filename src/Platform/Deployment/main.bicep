@@ -94,6 +94,10 @@ param functionMaximumInstanceCount int = 10
 @description('The memory of an instance of the API in MB.')
 param functionInstanceMemoryMB int = 512
 
+@description('Always-ready instances of the API\'s HTTP functions: 0 (none, nothing billed when idle) or more (no cold starts, billed all the time, no free grants).')
+@minValue(0)
+param functionAlwaysReadyInstances int = 0
+
 @description('The machine credential kinds turned off until mTLS exists (MachineAuth:DisabledCredentialKinds).')
 param disabledCredentialKinds string[] = [
   'Certificate'
@@ -250,6 +254,7 @@ module functions 'modules/functions.bicep' = {
     runtimeEnvironment: runtimeEnvironment
     maximumInstanceCount: functionMaximumInstanceCount
     instanceMemoryMB: functionInstanceMemoryMB
+    alwaysReadyInstances: functionAlwaysReadyInstances
   }
 }
 
