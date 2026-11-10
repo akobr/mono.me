@@ -44,7 +44,7 @@ resource staticWebApp 'Microsoft.Web/staticSites@2025-03-01' existing = {
 // The API's binding as the site has it now (read when the deployment runs): bound with SNI on a rerun, none at first.
 var apiSniStates = filter(
   functionApp.properties.hostNameSslStates,
-  state => state.name == apiHostName && state.sslState == 'SniEnabled' && !empty(state.?thumbprint ?? '')
+  state => state.name =~ apiHostName && state.sslState == 'SniEnabled' && !empty(state.?thumbprint ?? '')
 )
 
 // The API: bind the host name (validated by the TXT record asuid.<host>) without TLS the first time, or keep its SNI
