@@ -553,16 +553,19 @@ export const configurationHandlers: HttpHandler[] = [
     }),
   ),
 
-  // Like the API, the versions of a soft-deleted annotation are hidden until it is restored; those of a deleted
-  // configuration and of a purged annotation stay listed and readable.
+  // Like the API, the versions of a soft-deleted annotation are hidden until it is restored (404 AnnotationDeleted);
+  // those of a deleted configuration and of a purged annotation stay listed and readable.
   http.get<KeyParams>(
     `${api}/configuration/:key/versions`,
     withDb((db, { params }) => {
       const denied = requireRole(db, projectKey(params), 'Reader')
-      const document = isDeleted(db, params, params.key)
-        ? undefined
-        : getHistory(db, scopeOf(params), `configuration:${params.key}`)
-      return denied ?? HttpResponse.json(versionList(document))
+      if (denied) {
+        return denied
+      }
+      if (isDeleted(db, params, params.key)) {
+        return missingOrDeleted(db, params, 404)!
+      }
+      return HttpResponse.json(versionList(getHistory(db, scopeOf(params), `configuration:${params.key}`)))
     }),
   ),
 
@@ -633,8 +636,12 @@ export const configurationHandlers: HttpHandler[] = [
       if (plan.kind === 'unchanged') {
         return HttpResponse.json(restoreResult('Unchanged', from, plan.current))
       }
+      // Like the API and every write: content without values is not checked against the schema.
       const force = new URL(request.url).searchParams.get('force') === 'true'
-      const errors = force ? [] : schemaErrors(combinedSchema(db, scope, params.key)?.MergedContent, plan.content)
+      const errors =
+        force || !Object.keys(plan.content).length
+          ? []
+          : schemaErrors(combinedSchema(db, scope, params.key)?.MergedContent, plan.content)
       if (errors.length) {
         return schemaViolation(params, errors)
       }

@@ -6,7 +6,7 @@ import { isConflict, type SchemaValidationErrorDetail, type VersionRestoreResult
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import { parseServerErrors } from '@/utils/schema-validation'
-import { versionExpired, type VersionSource } from './version-source'
+import { versionExpired, versionsQueryKey, type VersionSource } from './version-source'
 
 /**
  * Timeline, single-version view and compare, addressed by `?v=7&from=5` (spec section 11.3). Reused by
@@ -26,7 +26,7 @@ const toast = useToast()
 const canEdit = useCan('edit')
 
 const versions = useQuery({
-  queryKey: computed(() => [...props.source.queryKey, 'versions']),
+  queryKey: computed(() => versionsQueryKey(props.source)),
   queryFn: ({ signal }) => props.source.list(signal),
 })
 

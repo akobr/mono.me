@@ -24,6 +24,9 @@ export interface VersionSource {
   afterRestore?: (result: VersionRestoreResult) => Promise<void>
 }
 
+/** The query key of the version list of a source; the history and its host share the one query. */
+export const versionsQueryKey = (source: VersionSource) => [...source.queryKey, 'versions']
+
 /** Has the version expired? Its document may no longer load, and it cannot be restored. */
 export const versionExpired = (entry: ConfigurationVersion, now = Date.now()) =>
   !!entry.ExpirationTime && Date.parse(entry.ExpirationTime) <= now
