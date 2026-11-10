@@ -53,7 +53,7 @@ node --version                     # v24 (phase 11, the admin UI)
 **The checkout.** Until [PR #183](https://github.com/akobr/mono.me/pull/183) is merged, work on its branch; afterwards on a short branch from `main` (the parameters file gets commits in phases 4 and 8):
 
 ```powershell
-git switch feat/424-231            # or: git switch -c chore/prod-environment-ids origin/main
+git switch feat/424-231            # or: git switch --no-track -c chore/prod-environment-ids origin/main
 git pull
 cd src/Platform/Deployment
 ```
@@ -62,6 +62,7 @@ cd src/Platform/Deployment
 
 ```powershell
 az login
+az account set --subscription prod-42fornet-sub     # after phase 1; az login may pick another subscription
 $env:PLATFORM_OWNER_EMAIL = '<your email for the budget alerts>'
 $env:PLATFORM_OWNER_OBJECT_ID = az ad signed-in-user show --query id -o tsv
 ```
@@ -106,7 +107,7 @@ az deployment sub what-if --name prod-2s-main --location swedencentral `
 
 - `prod-2s-eusec-rg`, the budget `prod-2s-budget` (5, alerts to your email);
 - `prod-2s-api-mi`, `prod-2s-log`, `prod-2s-api-appi`;
-- `prod-2s-42fornet-cdb` with **`enableFreeTier: true`**, `backupPolicy.type: Continuous`, `capacity.totalThroughputLimit: 1000`, and the lock `do-not-delete`;
+- `prod-2s-42fornet-cdb` with **`enableFreeTier: true`**, `backupPolicy.type: Continuous`, `capacity.totalThroughputLimit: -1` (no limit until phase 11.2), and the lock `do-not-delete`;
 - `prod2s42fornetsa` with `allowSharedKeyAccess: false`, containers `deployments` and `configuration-transfers`, three role assignments;
 - `prod-2s-42fornet-kv` with `sku.name: premium`, `enablePurgeProtection: true`, `enableRbacAuthorization: true`, the lock, the secret `cosmos-connection`, three role assignments;
 - `prod-2s-api-asp` (`FC1`), `prod-2s-api-fa` with `siteScopedCertificatesEnabled: true` and its `appsettings` (**no** `Auth__AuthKit__ClientId` and **no** `KeyValues__Protection__Byok__ClientId` yet), two `basicPublishingCredentialsPolicies`;
@@ -126,7 +127,7 @@ If it fails part-way, read the error, fix the cause and run the same command aga
 
 ```powershell
 az cosmosdb show -g prod-2s-eusec-rg -n prod-2s-42fornet-cdb `
-  --query "{freeTier:enableFreeTier, backup:backupPolicy.type, limit:capacity.totalThroughputLimit}" -o table   # True Continuous 1000
+  --query "{freeTier:enableFreeTier, backup:backupPolicy.type, limit:capacity.totalThroughputLimit}" -o table   # True Continuous -1
 az keyvault show -n prod-2s-42fornet-kv `
   --query "{purge:properties.enablePurgeProtection, rbac:properties.enableRbacAuthorization, sku:properties.sku.name}" -o table   # True True premium
 az storage account show -n prod2s42fornetsa --query allowSharedKeyAccess    # false
@@ -157,7 +158,7 @@ git worktree remove ../mono.me-hpk-probe
 cd src/Platform/Deployment
 ```
 
-**Expect:** `19 passed, 0 failed`. **Then:** attach `hpk-probe-azure-swedencentral.txt` to 424-230, and check that the probe removed its database (the account allows 1000 RU/s in total, which DbCreator needs later):
+**Expect:** `19 passed, 0 failed`. **Then:** attach `hpk-probe-azure-swedencentral.txt` to 424-230, and check that the probe removed its database (its 1000 RU/s and DbCreator's 1000 RU/s together would leave the free tier):
 
 ```powershell
 az cosmosdb sql database list -g prod-2s-eusec-rg -a prod-2s-42fornet-cdb --query "[].name" -o tsv   # nothing
@@ -176,7 +177,7 @@ $deployment                                             # ClientId, PrincipalId,
 **By hand:**
 
 1. In `parameters/prod.bicepparam` set `byokClientId = '<application id of 2S Platform Customer Keys>'` and `deploymentPrincipalId = '<$deployment.PrincipalId>'`.
-2. Commit and push: `git commit -am "chore(platform): the Entra application ids of production (424-231)"`, `git push`.
+2. Commit and push: `git commit -am "chore(platform): the Entra application ids of production (424-231)"`, `git push -u origin HEAD` (the first push of a new branch sets its upstream).
 3. Note `$deployment.ClientId` for phase 10 (running the script again prints it again).
 4. In the Entra admin center, **App registrations → 2S Platform Customer Keys → Branding & properties**: start **publisher verification** (a Microsoft Partner Network id) before the first BYOK customer.
 
@@ -303,7 +304,7 @@ Run `domains.bicep` again only to rebind: it switches the API's TLS off for a fe
    az keyvault secret set --vault-name prod-2s-42fornet-kv --name authkit-api-key --value '<sk_…>' --output none
    ```
 
-3. Commit and push: `git commit -am "chore(platform): the WorkOS production client id (424-231)"`, `git push`.
+3. Commit and push: `git commit -am "chore(platform): the WorkOS production client id (424-231)"`, `git push -u origin HEAD`.
 
 **What-if:**
 
@@ -349,19 +350,23 @@ gh auth login                                           # an admin of akobr/mono
 
 The infrastructure is done. Steps 11–12 deploy the code.
 
+**Merge the parameter commits into `main` now**: PR #183, or a pull request of the branch with the commits of phases 4 and 8. Phase 11 and every later run of `main.bicep` start from `main`; a `main` without those ids would remove the BYOK and AuthKit app settings at its next run (check with what-if: no `-` in `appsettings`).
+
 ## 11. The code (after 424-230 and 424-232 are merged) [C16]
 
-From an up-to-date `main` at the repository root:
+From an up-to-date `main` (with the parameter commits) at the repository root, in a terminal where a failing command stops the block, so an old build is never deployed:
 
 ```powershell
 git switch main; git pull
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true     # PowerShell 7.4+: a nonzero exit of dotnet, npm or az throws
 ```
 
 ### 11.1 The API
 
 ```powershell
+Remove-Item .publish/api, .publish/api.zip -Recurse -Force -ErrorAction Ignore
 dotnet publish src/Platform/Storyteller/Api.Functions/src -c Release -o .publish/api
-Remove-Item .publish/api.zip -ErrorAction Ignore
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory("$PWD/.publish/api", "$PWD/.publish/api.zip")
 az functionapp deployment source config-zip -g prod-2s-eusec-rg -n prod-2s-api-fa --src .publish/api.zip
@@ -388,11 +393,27 @@ Remove-Item Env:CosmosDb__Connection, Env:CosmosDb__ShouldAcceptAnyCertificate, 
 az cosmosdb sql container list -g prod-2s-eusec-rg -a prod-2s-42fornet-cdb -d 42.Platform.2S --query "[].name" -o tsv   # core, organizations
 ```
 
+**Then cap the account** at the free tier, now that the containers exist (a capped account refuses containers without explicit throughput, so the limit couldn't be on before): set `cosmosTotalThroughputLimit = 1000` in `src/Platform/Deployment/parameters/prod.bicepparam`, commit it to `main` through a pull request, and run `main.bicep` (with the two `PLATFORM_OWNER_*` variables of phase 0):
+
+```powershell
+Push-Location src/Platform/Deployment
+az deployment sub what-if --name prod-2s-main --location swedencentral `
+  --template-file main.bicep --parameters parameters/prod.bicepparam `
+  --exclude-change-types NoChange Ignore      # only: Modify prod-2s-42fornet-cdb, capacity.totalThroughputLimit -1 => 1000
+az deployment sub create --name prod-2s-main --location swedencentral `
+  --template-file main.bicep --parameters parameters/prod.bicepparam
+Pop-Location
+az cosmosdb show -g prod-2s-eusec-rg -n prod-2s-42fornet-cdb --query capacity.totalThroughputLimit   # 1000
+```
+
+A later schema change that adds a container needs the limit back at `-1` for the run of DbCreator.
+
 ### 11.3 The admin UI
 
 ```powershell
 Push-Location src/Platform/Storyteller/sdk.typescript/src; npm ci; npm run build; Pop-Location
 Push-Location src/Platform/ui.admin/src
+Remove-Item dist -Recurse -Force -ErrorAction Ignore
 npm ci
 npm run build
 

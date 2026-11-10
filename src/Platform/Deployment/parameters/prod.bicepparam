@@ -31,6 +31,10 @@ param deploymentPrincipalId = ''
 
 param ownerObjectId = readEnvironmentVariable('PLATFORM_OWNER_OBJECT_ID')
 param ownerEmail = readEnvironmentVariable('PLATFORM_OWNER_EMAIL')
+// No account-wide throughput limit until DbCreator has created core and organizations (a capped account refuses
+// containers without explicit throughput); then 1000, the free tier (runbook, phase 11.2).
+param cosmosTotalThroughputLimit = -1
+
 // The Cosmos DB key in the secret cosmos-connection; switch it only to rotate the other key (cookbook, step 7).
 param cosmosConnectionKey = 'primary'
 

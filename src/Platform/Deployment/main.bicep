@@ -81,6 +81,10 @@ param budgetStartDate string
 ])
 param cosmosConnectionKey string = 'primary'
 
+@description('The account-wide throughput limit of Cosmos DB in RU/s, or -1 for none. A capped account refuses containers without explicit throughput, so it stays -1 until DbCreator has created the shared-throughput containers, then 1000 (the free tier).')
+@minValue(-1)
+param cosmosTotalThroughputLimit int = 1000
+
 @description('The daily cap of Log Analytics in GB.')
 param logDailyCapGb string = '0.15'
 
@@ -186,6 +190,7 @@ module cosmos 'modules/cosmos.bicep' = {
     name: names.cosmos
     location: location
     tags: tags
+    totalThroughputLimit: cosmosTotalThroughputLimit
   }
 }
 
