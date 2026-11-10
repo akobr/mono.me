@@ -74,7 +74,7 @@ Verification:
   - Its steps add `story -t --tree-root subject`, `story -b rst` and `story -t -b context`.
   - Its expectation explains that `-b` implies `-t` and refuses any value but the four, with exit 2 and the message.
 - No other document outside `specs/` mentions the options. `launchSettings.json` (`story --tree --tree-root responsibility`) stays valid.
-- **Open:** Testiny case 255 (project `2SC`) still has the old steps. The catalogue is its source of truth, and this change does not update Testiny.
+- Testiny case 255 (project `2SC`) follows the catalogue: its precondition lists `--tree-root=subject` in Covers, and its seven steps are those of the row, the last one the refused `story -t -b context`.
 
 ### 7. Out of scope
 
