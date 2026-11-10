@@ -8,6 +8,9 @@ using '../main.bicep'
 
 param environment = 'prod'
 param location = 'swedencentral'
+// Static Web Apps offer Central US, East US 2, West US 2, West Europe and East Asia; West Europe refuses new tenants
+// (https://aka.ms/locationineligible). Only the app's metadata is there; the admin UI is served from the global edge.
+param staticWebAppLocation = 'eastus2'
 param regionCode = 'eusec'
 
 param dnsZone = '42for.net'

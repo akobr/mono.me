@@ -1,4 +1,4 @@
-// Cookbook, step 9: the admin UI on the Free plan. Static Web Apps have no Sweden Central location: the location only
+// Cookbook, step 9: the admin UI on the Free plan. Static Web Apps have no Sweden Central location (and West Europe refuses new tenants): the location only
 // holds the app's metadata, the content is served from the global edge. No repository link: the deployment uses the
 // app's deployment token (the one secret of the GitHub environment, step 15).
 

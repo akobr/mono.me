@@ -114,7 +114,7 @@ az deployment sub what-if --name prod-2s-main --location swedencentral `
 - `prod2s42fornetsa` with `allowSharedKeyAccess: false`, containers `deployments` and `configuration-transfers`, three role assignments;
 - `prod-2s-42fornet-kv` with `sku.name: premium`, `enablePurgeProtection: true`, `enableRbacAuthorization: true`, the lock, the secret `cosmos-connection`, three role assignments;
 - `prod-2s-api-asp` (`FC1`), `prod-2s-api-fa` with `siteScopedCertificatesEnabled: true` and its `appsettings` (**no** `Auth__AuthKit__ClientId` and **no** `KeyValues__Protection__Byok__ClientId` yet), two `basicPublishingCredentialsPolicies`;
-- `prod-2s-app-swa` (Free, `westeurope`);
+- `prod-2s-app-swa` (Free, `eastus2`: metadata only, West Europe, the only European one, refuses new tenants);
 - two role assignments for you (Key Vault Administrator, Storage Blob Data Contributor).
 
 **Run:**

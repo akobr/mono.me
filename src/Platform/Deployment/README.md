@@ -16,7 +16,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `modules/storage.bicep` | 6 | `prod2s42fornetsa`: LRS, **shared keys off**, containers `deployments` and `configuration-transfers`, the identity's roles |
 | `modules/keyvault.bicep` | 7 | `prod-2s-42fornet-kv`: Premium, RBAC, **purge protection**, delete lock, the secret `cosmos-connection`, the identity's roles |
 | `modules/functions.bicep` | 8 | `prod-2s-api-asp` and `prod-2s-api-fa`: Flex Consumption, .NET 10 isolated, 512 MB, at most 10 instances, the app settings |
-| `modules/staticwebapp.bicep` | 9 | `prod-2s-app-swa`: Free, `westeurope` (metadata only) |
+| `modules/staticwebapp.bicep` | 9 | `prod-2s-app-swa`: Free, `eastus2` (metadata only; West Europe, the only European one, refuses new tenants) |
 | `modules/access.bicep` | 6, 7, 11.2 | the owner's roles, and the deployment identity's roles once it exists |
 | `domains.bicep`, `modules/hostname-binding.bicep` | 10 | `api.2s.42for.net` with a managed certificate, `app.2s.42for.net` |
 | `scripts/New-ByokApplication.ps1` | 11.1 | the Entra app `2S Platform Customer Keys` and its federation with the identity |

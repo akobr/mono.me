@@ -352,13 +352,13 @@ Check: `az functionapp config appsettings list -g "$RG" -n "$FUNC" --query "[?st
 ## 9. Static Web App (the admin UI)
 
 ```sh
-az staticwebapp create --resource-group "$RG" --name "$SWA" --location westeurope --sku Free --tags $TAGS
+az staticwebapp create --resource-group "$RG" --name "$SWA" --location eastus2 --sku Free --tags $TAGS
 SWA_HOST=$(az staticwebapp show -g "$RG" -n "$SWA" --query defaultHostname -o tsv)
 SWA_TOKEN=$(az staticwebapp secrets list -g "$RG" -n "$SWA" --query properties.apiKey -o tsv)
 echo "$SWA_HOST"
 ```
 
-The location only holds the app's metadata (Static Web Apps offer a few regions, Sweden Central isn't one); the content is served from the global edge. The deployment token `SWA_TOKEN` goes to GitHub in step 15; don't keep it elsewhere.
+The location only holds the app's metadata (Static Web Apps offer Central US, East US 2, West US 2, West Europe and East Asia; Sweden Central isn't one, and West Europe refuses new tenants: https://aka.ms/locationineligible); the content is served from the global edge. The deployment token `SWA_TOKEN` goes to GitHub in step 15; don't keep it elsewhere.
 
 ## 10. Custom domains
 
