@@ -354,22 +354,29 @@ The infrastructure is done. Steps 11–12 deploy the code.
 
 ## 11. The code (after 424-230 and 424-232 are merged) [C16]
 
-From an up-to-date `main` (with the parameter commits) at the repository root, in a terminal where a failing command stops the block, so an old build is never deployed:
+From an up-to-date `main` (with the parameter commits) at the repository root:
 
 ```powershell
 git switch main; git pull
-$ErrorActionPreference = 'Stop'
-$PSNativeCommandUseErrorActionPreference = $true     # PowerShell 7.4+: a nonzero exit of dotnet, npm or az throws
 ```
+
+Each build-and-deploy below is **one script block** (`& { … }`): paste it whole. In it, a failing command (`$PSNativeCommandUseErrorActionPreference`, PowerShell 7.4+: a nonzero exit of `dotnet`, `npm` or `az` throws) stops the whole block, so an old or half-built output is never deployed. Lines pasted one by one would not stop: the console runs the next line after an error. A cleanup that can't delete an old output stops the block too; only a missing path is skipped.
 
 ### 11.1 The API
 
 ```powershell
-Remove-Item .publish/api, .publish/api.zip -Recurse -Force -ErrorAction Ignore
-dotnet publish src/Platform/Storyteller/Api.Functions/src -c Release -o .publish/api
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory("$PWD/.publish/api", "$PWD/.publish/api.zip")
-az functionapp deployment source config-zip -g prod-2s-eusec-rg -n prod-2s-api-fa --src .publish/api.zip
+& {
+  $ErrorActionPreference = 'Stop'
+  $PSNativeCommandUseErrorActionPreference = $true
+  foreach ($path in '.publish/api', '.publish/api.zip') {
+    if (Test-Path $path) { Remove-Item $path -Recurse -Force }
+  }
+
+  dotnet publish src/Platform/Storyteller/Api.Functions/src -c Release -o .publish/api
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  [System.IO.Compression.ZipFile]::CreateFromDirectory("$PWD/.publish/api", "$PWD/.publish/api.zip")
+  az functionapp deployment source config-zip -g prod-2s-eusec-rg -n prod-2s-api-fa --src .publish/api.zip
+}
 ```
 
 **Check:** `curl.exe -s https://api.2s.42for.net/api/v1/auth/configuration` returns `200` with `"Provider":"AuthKit"`.
@@ -379,12 +386,21 @@ az functionapp deployment source config-zip -g prod-2s-eusec-rg -n prod-2s-api-f
 Creates `42.Platform.2S` (autoscale up to 1000 RU/s), the containers `core` and `organizations`, and the organization `42dotnet` with you as its owner.
 
 ```powershell
-$env:CosmosDb__Connection = az keyvault secret show --vault-name prod-2s-42fornet-kv --name cosmos-connection --query value -o tsv
-$env:CosmosDb__ShouldAcceptAnyCertificate = 'false'    # app.config.json accepts any certificate (the local emulator's)
-$env:baseAccount__id = '<user_01…>'                    # your WorkOS production user id (phase 5)
-$env:stagingSeed__enabled = 'false'                    # never true here: it seeds the staging test accounts
-dotnet run --project src/Platform/Storyteller/DbCreator/src -c Release
-Remove-Item Env:CosmosDb__Connection, Env:CosmosDb__ShouldAcceptAnyCertificate, Env:baseAccount__id, Env:stagingSeed__enabled
+& {
+  $ErrorActionPreference = 'Stop'
+  $PSNativeCommandUseErrorActionPreference = $true
+  try {
+    $env:CosmosDb__Connection = az keyvault secret show --vault-name prod-2s-42fornet-kv --name cosmos-connection --query value -o tsv
+    $env:CosmosDb__ShouldAcceptAnyCertificate = 'false'    # app.config.json accepts any certificate (the local emulator's)
+    $env:baseAccount__id = '<user_01…>'                    # your WorkOS production user id (phase 5)
+    $env:stagingSeed__enabled = 'false'                    # never true here: it seeds the staging test accounts
+    dotnet run --project src/Platform/Storyteller/DbCreator/src -c Release
+  }
+  finally {
+    Remove-Item Env:CosmosDb__Connection, Env:CosmosDb__ShouldAcceptAnyCertificate, Env:baseAccount__id, Env:stagingSeed__enabled `
+      -ErrorAction SilentlyContinue
+  }
+}
 ```
 
 **Check:**
@@ -400,6 +416,11 @@ Push-Location src/Platform/Deployment
 az deployment sub what-if --name prod-2s-main --location swedencentral `
   --template-file main.bicep --parameters parameters/prod.bicepparam `
   --exclude-change-types NoChange Ignore      # only: Modify prod-2s-42fornet-cdb, capacity.totalThroughputLimit -1 => 1000
+```
+
+When the what-if shows only that change:
+
+```powershell
 az deployment sub create --name prod-2s-main --location swedencentral `
   --template-file main.bicep --parameters parameters/prod.bicepparam
 Pop-Location
@@ -411,26 +432,41 @@ A later schema change that adds a container needs the limit back at `-1` for the
 ### 11.3 The admin UI
 
 ```powershell
-Push-Location src/Platform/Storyteller/sdk.typescript/src; npm ci; npm run build; Pop-Location
-Push-Location src/Platform/ui.admin/src
-Remove-Item dist -Recurse -Force -ErrorAction Ignore
-npm ci
-npm run build
+& {
+  $ErrorActionPreference = 'Stop'
+  $PSNativeCommandUseErrorActionPreference = $true
+  Push-Location src/Platform/Storyteller/sdk.typescript/src
+  try { npm ci; npm run build } finally { Pop-Location }
 
-$env:API_BASE_URL = 'https://api.2s.42for.net/api'
-$env:AUTH_API_HOSTNAME = 'auth.42for.net'
-$env:ENVIRONMENT_NAME = 'production'
-$env:SENTRY_DSN = '<dsn>'
-$env:POSTHOG_PROJECT_TOKEN = '<phc_…>'
-$env:POSTHOG_HOST = 'https://eu.i.posthog.com'
-$env:RELEASE = git rev-parse HEAD
-node build/write-environment-config.ts
-Select-String -Path dist/staticwebapp.config.json -Pattern '__(API_ORIGIN|AUTH_HOSTNAME|SENTRY_ORIGIN|POSTHOG_ORIGIN)__'   # must print nothing
+  Push-Location src/Platform/ui.admin/src
+  try {
+    if (Test-Path dist) { Remove-Item dist -Recurse -Force }
+    npm ci
+    npm run build
 
-$token = az staticwebapp secrets list -g prod-2s-eusec-rg -n prod-2s-app-swa --query properties.apiKey -o tsv
-npx @azure/static-web-apps-cli deploy ./dist --deployment-token $token --env production
-Remove-Variable token
-Pop-Location
+    # Removed again by the finally below.
+    $env:API_BASE_URL = 'https://api.2s.42for.net/api'
+    $env:AUTH_API_HOSTNAME = 'auth.42for.net'
+    $env:ENVIRONMENT_NAME = 'production'
+    $env:SENTRY_DSN = '<dsn>'
+    $env:POSTHOG_PROJECT_TOKEN = '<phc_…>'
+    $env:POSTHOG_HOST = 'https://eu.i.posthog.com'
+    $env:RELEASE = git rev-parse HEAD
+    node build/write-environment-config.ts
+    if (Select-String -Path dist/staticwebapp.config.json -Pattern '__(API_ORIGIN|AUTH_HOSTNAME|SENTRY_ORIGIN|POSTHOG_ORIGIN)__') {
+      throw 'dist/staticwebapp.config.json still has CSP placeholders.'
+    }
+
+    $token = az staticwebapp secrets list -g prod-2s-eusec-rg -n prod-2s-app-swa --query properties.apiKey -o tsv
+    if (-not $token) { throw 'The Static Web App returned no deployment token.' }
+    npx @azure/static-web-apps-cli deploy ./dist --deployment-token $token --env production
+  }
+  finally {
+    Remove-Item Env:API_BASE_URL, Env:AUTH_API_HOSTNAME, Env:ENVIRONMENT_NAME, Env:SENTRY_DSN, Env:POSTHOG_PROJECT_TOKEN, `
+      Env:POSTHOG_HOST, Env:RELEASE -ErrorAction SilentlyContinue
+    Pop-Location
+  }
+}
 ```
 
 ## 12. Verify [C17]
