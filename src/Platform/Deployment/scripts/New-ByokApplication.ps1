@@ -10,13 +10,14 @@
     service principal Key Vault Crypto Service Encryption User on their key.
 
     Run it after the first run of main.bicep (the identity must exist), as an Application Administrator of the tenant.
-    Then run main.bicep again with PLATFORM_BYOK_CLIENT_ID set to the printed application id. Safe to run again.
+    Then put the printed application id into byokClientId of parameters/prod.bicepparam, commit it, and run main.bicep
+    again. Safe to run again.
 
     Before the first BYOK customer, start publisher verification of the application (a Microsoft Partner Network id),
     or customers see an "unverified" warning when they consent.
 
 .EXAMPLE
-    $env:PLATFORM_BYOK_CLIENT_ID = ./scripts/New-ByokApplication.ps1
+    ./scripts/New-ByokApplication.ps1
 #>
 [CmdletBinding()]
 param(
@@ -43,5 +44,5 @@ Set-FederatedCredential -AppId $appId `
     -Subject $principalId `
     -Description "The managed identity $IdentityName of the 2S API"
 
-Write-Host "Set PLATFORM_BYOK_CLIENT_ID=$appId and run main.bicep again (KeyValues__Protection__Byok__ClientId)."
+Write-Host "Put byokClientId = '$appId' into parameters/prod.bicepparam, commit it and run main.bicep again."
 Write-Output $appId

@@ -157,7 +157,9 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
     siteScopedCertificatesEnabled: true
     siteConfig: {
       minTlsVersion: '1.2'
+      scmMinTlsVersion: '1.2'
       ftpsState: 'Disabled'
+      http20Enabled: true
       cors: {
         allowedOrigins: [
           'https://${appHostName}'

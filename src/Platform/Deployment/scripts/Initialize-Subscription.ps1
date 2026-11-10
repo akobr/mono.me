@@ -36,6 +36,8 @@ $providers = @(
     'Microsoft.OperationalInsights'
     'Microsoft.ManagedIdentity'
     'Microsoft.Consumption'
+    # the smart detection alert rules that Application Insights creates
+    'Microsoft.AlertsManagement'
 )
 
 az account set --subscription $Subscription

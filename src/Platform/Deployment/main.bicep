@@ -71,8 +71,8 @@ param deploymentPrincipalId string = ''
 @minValue(1)
 param budgetAmount int = 5
 
-@description('The first day of the budget\'s period: always the current month, as a budget refuses older start dates.')
-param budgetStartDate string = utcNow('yyyy-MM-01')
+@description('The first day of the budget\'s first month (yyyy-MM-01). Fixed once the budget exists: a budget can be created with the current or a future month, and its start date is not moved by later runs.')
+param budgetStartDate string
 
 @description('The daily cap of Log Analytics in GB.')
 param logDailyCapGb string = '0.15'
@@ -259,7 +259,10 @@ module access 'modules/access.bicep' = {
     ownerObjectId: ownerObjectId
     deploymentPrincipalId: deploymentPrincipalId
     storageAccountName: storage.outputs.name
+    deploymentContainerName: storage.outputs.deploymentContainerName
     keyVaultName: keyVault.outputs.name
+    cosmosSecretName: keyVault.outputs.cosmosSecretName
+    functionAppName: functions.outputs.name
   }
 }
 

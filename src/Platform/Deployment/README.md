@@ -34,20 +34,24 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 - Run everything from this folder: `cd src/Platform/Deployment`.
 - Read **Never do** in the cookbook (step 0). The templates create two things that can't be undone: the Cosmos DB free tier and the vault's purge protection.
 
-### Parameters from variables
+### Parameters
 
-`prod.bicepparam` holds the decided values. The values that are personal, or exist only after a later step, come from environment variables, so the repository holds none of them:
+`prod.bicepparam` holds every value of the environment as a literal, including those that exist only after a later step. **Commit each of them as soon as it is known** (none is a secret): `main.bicep` owns the whole set of the API's app settings, so a run from a checkout where one is still empty removes its setting (an empty client id leaves its setting out, as an empty BYOK client id would be taken as one).
 
-| Variable | Parameter | When |
+| Parameter | What | Known after |
 | --- | --- | --- |
-| `PLATFORM_OWNER_EMAIL` | `ownerEmail`: the budget's alerts | always (required) |
-| `PLATFORM_OWNER_OBJECT_ID` | `ownerObjectId`: Key Vault Administrator, Storage Blob Data Contributor | always (required): `az ad signed-in-user show --query id -o tsv` |
-| `PLATFORM_BYOK_CLIENT_ID` | `byokClientId`: `KeyValues__Protection__Byok__ClientId` | after step 11.1 |
-| `PLATFORM_DEPLOYMENT_PRINCIPAL_ID` | `deploymentPrincipalId`: the deployment identity's roles | after step 11.2 |
-| `PLATFORM_AUTHKIT_CLIENT_ID` | `authKitClientId`: `Auth__AuthKit__ClientId` | after step 13 |
-| `PLATFORM_AUTHKIT_API_KEY_ENABLED` | `authKitApiKeyEnabled`: `Auth__AuthKit__ApiKey` as a Key Vault reference | `true` once the secret `authkit-api-key` is in the vault |
+| `byokClientId` | `KeyValues__Protection__Byok__ClientId` | step 11.1 |
+| `deploymentPrincipalId` | the deployment identity's roles | step 11.2 |
+| `authKitClientId` | `Auth__AuthKit__ClientId` | step 13 |
+| `authKitApiKeyEnabled` | `Auth__AuthKit__ApiKey` as a Key Vault reference | `true` once the secret `authkit-api-key` is in the vault |
+| `budgetStartDate` | the budget's first month, never moved afterwards | the month of the first run |
 
-An empty client id leaves its app setting out (an empty BYOK client id would be taken as one). Keep the variables of the later steps set for every later run: `main.bicep` owns the whole set of app settings, and a run without them removes them.
+Only the owner's personal values come from environment variables, so the repository doesn't hold them:
+
+| Variable | Parameter |
+| --- | --- |
+| `PLATFORM_OWNER_EMAIL` | `ownerEmail`: the budget's alerts (required) |
+| `PLATFORM_OWNER_OBJECT_ID` | `ownerObjectId`: Key Vault Administrator, Storage Blob Data Contributor (required): `az ad signed-in-user show --query id -o tsv` |
 
 ## First run
 
@@ -76,22 +80,21 @@ az deployment sub create --name prod-2s-main --location swedencentral `
   --template-file main.bicep --parameters parameters/prod.bicepparam
 ```
 
-Then run the hierarchical partition key probe against the account (cookbook, **step 5a**), before anything else touches the database.
+The Function App may log `403` errors from storage or the vault for a few minutes after its first start: new role assignments take a while to reach the data planes. If they don't stop, restart it (`az functionapp restart -g prod-2s-eusec-rg -n prod-2s-api-fa`).
+
+Then run the hierarchical partition key probe against the account (cookbook, **step 5a**), before anything else touches the database. The account accepts at most 1000 RU/s in total (`capacity.totalThroughputLimit`, the free tier), so the probe's database must be gone (it deletes it) before DbCreator creates `42.Platform.2S`.
 
 The cookbook's steps 5a and 16 are bash, run from the **repository root** (their paths, such as `src/Platform/Storyteller/...`, are relative to it), with the variable block of the cookbook's step 0 pasted first: `RG`, `COSMOS`, `KV`, `FUNC`, `SWA` and the host names hold the same names as `naming.bicep`. On Windows use Git Bash, or translate each `X=…` to `$X = …` in PowerShell. Come back to this folder (`cd src/Platform/Deployment`) for the next step.
 
 ### 3. The Entra applications (step 11)
 
 ```powershell
-$env:PLATFORM_BYOK_CLIENT_ID = ./scripts/New-ByokApplication.ps1
+./scripts/New-ByokApplication.ps1              # prints the application id: byokClientId
 $deployment = ./scripts/New-DeploymentApplication.ps1
-$env:PLATFORM_DEPLOYMENT_PRINCIPAL_ID = $deployment.PrincipalId
-
-az deployment sub create --name prod-2s-main --location swedencentral `
-  --template-file main.bicep --parameters parameters/prod.bicepparam
+$deployment.PrincipalId                        # deploymentPrincipalId
 ```
 
-The second run adds `KeyValues__Protection__Byok__ClientId` and the deployment identity's roles (Contributor on the resource group, Key Vault Secrets User, Storage Blob Data Contributor). Start the publisher verification of `2S Platform Customer Keys` before the first BYOK customer.
+Put both ids into `parameters/prod.bicepparam`, commit them, and run `main.bicep` again (the `create` command of step 2). The run adds `KeyValues__Protection__Byok__ClientId` and the deployment identity's roles, scoped to what it deploys: Website Contributor on the Function App, Key Vault Secrets User on the secret `cosmos-connection` only, and Storage Blob Data Contributor on the container `deployments` only. It gets nothing on the resource group, so it can't list the Cosmos DB keys or read other secrets. Start the publisher verification of `2S Platform Customer Keys` before the first BYOK customer.
 
 ### 4. DNS and the custom domains (steps 12 and 10)
 
@@ -110,15 +113,9 @@ It binds `api.2s.42for.net` to the Function App, issues its free managed certifi
 
 ### 5. WorkOS, Sentry and PostHog (steps 13 and 14)
 
-By hand, as in the cookbook. Then add the WorkOS client id to the app settings:
+By hand, as in the cookbook. Then put the WorkOS client id into `authKitClientId` of `parameters/prod.bicepparam`, commit it, and run `main.bicep` again.
 
-```powershell
-$env:PLATFORM_AUTHKIT_CLIENT_ID = '<client_…>'
-az deployment sub create --name prod-2s-main --location swedencentral `
-  --template-file main.bicep --parameters parameters/prod.bicepparam
-```
-
-For invitation emails, put the WorkOS management key into the vault and run `main.bicep` again with `PLATFORM_AUTHKIT_API_KEY_ENABLED=true`:
+For invitation emails, put the WorkOS management key into the vault, set `authKitApiKeyEnabled = true` in the parameters file, commit it, and run `main.bicep` again:
 
 ```powershell
 az keyvault secret set --vault-name prod-2s-42fornet-kv --name authkit-api-key --value '<sk_…>' --output none
@@ -138,18 +135,20 @@ Continue with the cookbook's step 16 once its blockers are merged.
 
 ## Later runs
 
-Run `what-if`, then `create`, with the same variables. Every run is idempotent: names, role assignments (`guid(scope, principal, role)`) and locks are stable, the budget's start date moves to the current month, and the `cosmos-connection` secret is written from the account's current key.
+Run `what-if`, then `create`, from an up-to-date checkout with the two owner variables. Every run is idempotent: names, role assignments (`guid(scope, principal, role)`), locks and the budget's start date are stable, and the `cosmos-connection` secret is written from the account's current key.
 
-- **The app settings belong to the template.** A setting added by hand in the portal is removed by the next run; add it to `modules/functions.bicep`.
+- **The app settings belong to the template.** A setting added by hand in the portal is removed by the next run; add it to `modules/functions.bicep`, and its value to the parameters file.
 - **The managed identity is never re-created**: its principal id is the subject of the BYOK federation.
-- `domains.bicep` is not part of a normal run.
+- **After a rotation of the Cosmos DB key** (cookbook, step 7), run `main.bicep` to write the new key, then restart the Function App: the app setting references the secret without a version, and the app refreshes such references only about once a day.
+- `domains.bicep` is not part of a normal run. A second run writes the binding without TLS, then puts the certificate again (an existing managed certificate is kept, not reissued) and binds it: the API's domain is without TLS for a few seconds.
+- `MachineAuth__DisabledCredentialKinds__*` is read by the API only once [424-232](https://linear.app/424fun/issue/424-232/turn-off-machine-credential-kinds-per-deployment) is merged. Until then the setting has no effect. That is safe: with `IsCertificateHeaderFromClientAllowed=false` a certificate machine can't sign in anyway, but projects can still enable the kinds.
 
 ## Checks
 
 ```powershell
 az bicep build --file main.bicep --stdout > $null
 az bicep build --file domains.bicep --stdout > $null
-az bicep build-params --file parameters/prod.bicepparam --stdout > $null   # needs the two required variables
+az bicep build-params --file parameters/prod.bicepparam --stdout > $null   # needs the two owner variables
 
 az cosmosdb show -g prod-2s-eusec-rg -n prod-2s-42fornet-cdb --query "{freeTier:enableFreeTier, backup:backupPolicy.type}" -o table
 az keyvault show -n prod-2s-42fornet-kv --query "{purge:properties.enablePurgeProtection, rbac:properties.enableRbacAuthorization, sku:properties.sku.name}" -o table

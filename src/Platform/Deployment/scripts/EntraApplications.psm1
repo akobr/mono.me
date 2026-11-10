@@ -74,7 +74,8 @@ function Set-FederatedCredential {
     }
 
     $existing = @(az ad app federated-credential list --id $AppId -o json | ConvertFrom-Json | Where-Object { $_.name -eq $Name })
-    if ($existing.Count -eq 1 -and $existing[0].issuer -eq $Issuer -and $existing[0].subject -eq $Subject) {
+    $audiencesMatch = $existing.Count -eq 1 -and (@($existing[0].audiences) -join ' ') -eq ($credential.audiences -join ' ')
+    if ($audiencesMatch -and $existing[0].issuer -eq $Issuer -and $existing[0].subject -eq $Subject) {
         Write-Host "Federated credential '$Name' is up to date (subject $Subject)."
         return
     }
@@ -83,7 +84,7 @@ function Set-FederatedCredential {
     try {
         $credential | ConvertTo-Json | Set-Content -Path $file.FullName -Encoding utf8NoBOM
         if ($existing.Count -eq 1) {
-            Write-Host "Federated credential '$Name' had the subject $($existing[0].subject); updating it to $Subject."
+            Write-Host "Federated credential '$Name' differs (subject $($existing[0].subject), audiences $(@($existing[0].audiences) -join ', ')); updating it."
             az ad app federated-credential update --id $AppId --federated-credential-id $existing[0].id --parameters $file.FullName --output none
         }
         else {
