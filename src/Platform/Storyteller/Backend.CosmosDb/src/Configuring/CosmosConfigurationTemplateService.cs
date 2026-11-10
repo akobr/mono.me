@@ -246,6 +246,72 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             $"Unknown version {toVersion} of the template for {annotationType} in view {view}.");
     }
 
+    // Stores the content of a version as a new version, whole and as stored: no merge, and a stored "$remove" or
+    // "$patch" stays a property. A deleted template is created again. Every attempt reads the template and its state
+    // with their ETags and writes guarded by them, as a write does.
+    public async Task<VersionRestoreResult> RestoreTemplateVersionAsync(string organization, string project, string view, string annotationType, uint version, AuditActor actor)
+    {
+        annotationType = NormalizeAnnotationType(annotationType);
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var partitionKey = PartitionKeys.GetCosmosTemplate(organization, project);
+        var id = GetTemplateId(view, annotationType);
+
+        // history items are written once, so the requested one is read once; the template is read again by every attempt
+        GenerateTemplateHistoryEntity? history = null;
+        var isHistoryRead = false;
+
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            var (existing, etag) = await ReadTemplateAsync(repository, partitionKey, id);
+            var (state, stateEtag) = await ReadStateAsync(repository, partitionKey, view, annotationType);
+
+            if (existing is not null && existing.Version == version)
+            {
+                // no change, but finish an invalidation of an earlier committed change
+                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
+                return VersionRestoreResult.Unchanged(version, existing.Version, existing.Modified);
+            }
+
+            if (!isHistoryRead)
+            {
+                history = await repository.Container.TryReadItemAsync(
+                    $"{GetTemplateVersionIdPrefix(view, annotationType)}{version}",
+                    partitionKey,
+                    stream => stream.DeserializeNewtonsoft<GenerateTemplateHistoryEntity>(_serializerOptions));
+                isHistoryRead = true;
+            }
+
+            if (history is null)
+            {
+                throw new NotFoundException(
+                    $"The template for {annotationType} in view {view} has no version {version}: it was never written, or it has expired.",
+                    ErrorCodes.VersionNotFound);
+            }
+
+            // an equal document writes nothing, as every write
+            if (existing is not null && JToken.DeepEquals(existing.Content, history.Content))
+            {
+                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
+                return VersionRestoreResult.Unchanged(version, existing.Version, existing.Modified);
+            }
+
+            var content = (JObject)history.Content.DeepClone();
+            var modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow());
+            var written = existing is null
+                ? await TryCreateVersionAsync(repository, project, view, annotationType, state, stateEtag, content, modified, restoredFrom: version)
+                : await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, content, modified, restoredFrom: version);
+
+            if (written is null)
+            {
+                continue;
+            }
+
+            return VersionRestoreResult.Restored(version, written.Version, written.Modified);
+        }
+
+        throw new TemplateConcurrencyException(project, view, annotationType, MaxRetries);
+    }
+
     public async Task<IReadOnlyList<TemplateHistory>> GetTemplateHistoriesAsync(
         string organization,
         string project,
@@ -429,33 +495,12 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                 input = input.RemoveRequested();
                 input = await input.ApplyPatchRequested();
 
-                // the state keeps the last version even after a deletion and an expiration of the history
-                var lastVersion = state?.LastVersion ?? await GetMaxHistoryVersionAsync(repository, partitionKey, view, annotationType);
-                var template = new GenerateTemplateEntity
-                {
-                    PartitionKey = partitionKeyValue,
-                    Organization = organization,
-                    Id = id,
-                    AnnotationKey = annotationType,
-                    Name = annotationType,
-                    ProjectName = project,
-                    ViewName = view,
-                    Content = input,
-                    Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-                    Version = lastVersion + 1,
-                };
-
-                // the version allocation and the creation are atomic, guarded by the state etag
-                var createBatch = repository.Container.CreateTransactionalBatch(partitionKey);
-                createBatch.CreateItem(template);
-                AddStateWrite(createBatch, template, state, stateEtag, template.Version);
-                var createdStateEtag = await TryExecuteWriteAsync(createBatch, id);
-                if (createdStateEtag is null)
+                var template = await TryCreateVersionAsync(repository, project, view, annotationType, state, stateEtag, input, AuditStamp.Of(actor, _timeProvider.GetUtcNow()));
+                if (template is null)
                 {
                     continue;
                 }
 
-                await InvalidateAsync(repository, partitionKey, project, view, annotationType, createdStateEtag);
                 return template;
             }
 
@@ -505,6 +550,56 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         return maxVersionResponse.Resource;
     }
 
+    // Creates the template of a type that has none, as the version after the last one ever allocated. Returns null when
+    // another writer changed the template or its state meanwhile. restoredFrom marks a restore.
+    private async Task<GenerateTemplateEntity?> TryCreateVersionAsync(
+        OrganizationContainer repository,
+        string project,
+        string view,
+        string annotationType,
+        GenerateTemplateStateEntity? state,
+        string? stateEtag,
+        JObject content,
+        AuditStamp modified,
+        ulong? restoredFrom = null)
+    {
+        var partitionKeyValue = PartitionKeys.GetTemplate(project);
+        var partitionKey = repository.Key(partitionKeyValue);
+        var id = GetTemplateId(view, annotationType);
+
+        // the state keeps the last version even after a deletion and an expiration of the history
+        var lastVersion = state?.LastVersion ?? await GetMaxHistoryVersionAsync(repository, partitionKey, view, annotationType);
+        var template = new GenerateTemplateEntity
+        {
+            PartitionKey = partitionKeyValue,
+            Organization = repository.Organization,
+            Id = id,
+            AnnotationKey = annotationType,
+            Name = annotationType,
+            ProjectName = project,
+            ViewName = view,
+            Content = content,
+            Modified = modified,
+            Version = lastVersion + 1,
+            RestoredFrom = restoredFrom,
+        };
+
+        // the version allocation and the creation are atomic, guarded by the state etag
+        var createBatch = repository.Container.CreateTransactionalBatch(partitionKey);
+        createBatch.CreateItem(template);
+        AddStateWrite(createBatch, template, state, stateEtag, template.Version);
+        var createdStateEtag = await TryExecuteWriteAsync(createBatch, id);
+        if (createdStateEtag is null)
+        {
+            return null;
+        }
+
+        await InvalidateAsync(repository, partitionKey, project, view, annotationType, createdStateEtag);
+        return template;
+    }
+
+    // Archives the stored version and writes the next one, guarded by the ETags of the template and its state. Returns
+    // null on a concurrent change. restoredFrom marks a restore; any other write clears the mark.
     private static async Task<GenerateTemplateEntity?> TryWriteNextVersionAsync(
         OrganizationContainer repository,
         PartitionKey partitionKey,
@@ -514,13 +609,15 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         GenerateTemplateStateEntity? state,
         string? stateEtag,
         JObject newContent,
-        AuditStamp modified)
+        AuditStamp modified,
+        ulong? restoredFrom = null)
     {
         var updated = existing with
         {
             Version = Math.Max(existing.Version, state?.LastVersion ?? 0) + 1,
             Content = newContent,
             Modified = modified,
+            RestoredFrom = restoredFrom,
         };
 
         // save history of the previous version together with the next version atomically

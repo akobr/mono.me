@@ -19,6 +19,9 @@ public record class ConfigurationEntity : ExtendableEntity
     // The write that produced the current version.
     public required AuditStamp Modified { get; init; }
 
+    // The version whose content a restore copied into the current version; null after any other write.
+    public ulong? RestoredFrom { get; init; }
+
     public JObject? CalculatedContent { get; init; }
 
     public string? CalculatedContentHash { get; init; }

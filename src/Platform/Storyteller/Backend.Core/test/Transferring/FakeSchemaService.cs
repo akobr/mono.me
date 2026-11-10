@@ -81,4 +81,10 @@ internal sealed class FakeSchemaService(ExportReads? reads = null, ImportLog? im
     public Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint version) => throw new NotSupportedException();
 
     public Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint fromVersion, uint toVersion) => throw new NotSupportedException();
+
+    public Task<VersionRestoreResult> RestoreSchemaVersionAsync(string organization, string project, string view, string annotationType, uint version, AuditActor actor, bool force) => throw new NotSupportedException();
+
+    public Task<VersionRestoreResult> RestoreAnnotationSchemaVersionAsync(string organization, string project, string view, string annotationKey, uint version, AuditActor actor, bool force) => throw new NotSupportedException();
+
+    public Task<VersionRestoreResult> RestoreDescendantTypeSchemaVersionAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint version, AuditActor actor, bool force) => throw new NotSupportedException();
 }
