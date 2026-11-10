@@ -30,7 +30,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 ## Before you start
 
 - **Owner** of the subscription and **Application Administrator** of its tenant (the first runs create role assignments, locks and Entra applications).
-- Azure CLI 2.71 or newer with Bicep (`az bicep install`, `az bicep upgrade`), PowerShell 7.4 or newer (a failing `az` or `gh` call stops the scripts), and for step 15 the GitHub CLI signed in as an admin of the repository.
+- Azure CLI 2.71 or newer with Bicep (`az bicep install`, `az bicep upgrade`), PowerShell 7.4 or newer (a failing `az` or `gh` call stops the scripts), for step 15 the GitHub CLI signed in as an admin of the repository, and, only to store the WorkOS API key from the shell instead of the portal, the Az PowerShell modules `Az.Accounts` and `Az.KeyVault` (`Install-Module Az.Accounts, Az.KeyVault -Scope CurrentUser`).
 - Run everything from this folder: `cd src/Platform/Deployment`.
 - Read **Never do** in the cookbook (step 0). The templates create two things that can't be undone: the Cosmos DB free tier and the vault's purge protection.
 

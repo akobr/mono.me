@@ -46,6 +46,8 @@ $PSVersionTable.PSVersion          # 7.4 or newer
 az version                         # azure-cli 2.71 or newer
 az bicep install; az bicep upgrade
 gh --version
+# Only to store the WorkOS API key from the shell (phase 8; the portal needs nothing):
+Install-Module Az.Accounts, Az.KeyVault -Scope CurrentUser   # Connect-AzAccount, Set-AzKeyVaultSecret
 dotnet --version                   # 10.0.401 or newer (phase 3 and 11)
 node --version                     # v24 (phase 11, the admin UI)
 ```
