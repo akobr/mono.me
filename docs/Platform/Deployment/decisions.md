@@ -12,7 +12,7 @@ Each entry says what to decide, why it is final, a recommendation, and what was 
 | 2 | Trust domain `2s.42for.net` |
 | 3 | AuthKit in WorkOS production from day one |
 | 4 | Custom AuthKit domain `auth.42for.net` and **one WorkOS production environment for every product of 42for.net**: one login and one account everywhere, one WorkOS Application per product (see below) |
-| 5 | Sweden Central |
+| 5 | Sweden Central; only the Static Web App's metadata is in East US 2 (no Sweden Central location, West Europe closed to new tenants; the admin UI holds no customer data and is served from the global edge) |
 | 6 | One Cosmos DB account, the free tier on |
 | 7 | `prod-2s-42fornet-cdb` |
 | 8 | One Premium vault `prod-2s-42fornet-kv`, purge protection on, RBAC mode, a delete lock |

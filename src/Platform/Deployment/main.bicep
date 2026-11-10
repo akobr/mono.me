@@ -25,8 +25,8 @@ param product string = '2s'
 @description('The company part of the globally unique names.')
 param company string = '42fornet'
 
-@description('The location of the Static Web App\'s metadata (Static Web Apps have no Sweden Central location).')
-param staticWebAppLocation string = 'westeurope'
+@description('The location of the Static Web App\'s metadata only (Static Web Apps have no Sweden Central location, and West Europe refuses new tenants).')
+param staticWebAppLocation string = 'eastus2'
 
 @description('The DNS zone of the host names, for the DNS records of the outputs.')
 param dnsZone string
