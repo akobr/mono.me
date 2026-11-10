@@ -13,8 +13,8 @@ namespace _42.Platform.Cli.AutomationTests.Tests.Configurations;
 //     (WriteNumberedText, the gutter removed), LastJson the last model WriteJson printed (config patch prints the JSON
 //     Patch first, then the saved model);
 //   - ConfigurationVersions, TemplateVersions: the headers of config versions and template versions, whose rows
-//     SformResult.VersionRows reads (top to bottom, the newest first), and VersionAuthors the first word of their Author
-//     cells;
+//     SformResult.VersionRows reads (top to bottom, the newest first), VersionAuthors the first word of their Author
+//     cells, and VersionRestoredFrom their last cell when the table has the column Restored from;
 //   - HasDiffLine: a deleted ('-') or added ('+') line of a diff (WriteDiffResult: "<old> <new> │ - <line>");
 //   - SavedVersion: N of "… has been saved (version N)." of config edit and template edit;
 //   - GitHubEnvNames, GitHubEnvValueOf: the heredoc entries of a GITHUB_ENV file (NAME<<ghadelimiter_…, the value, the
@@ -119,6 +119,33 @@ internal static partial class ConfigOutput
             .ToList();
     }
 
+    // The Restored from cell of each row of a versions table, by version: the last cell of the row, "v<n>" for a version
+    // that a restore of version n stored, else "—" (or what the console's code page made of it). sform adds the column
+    // only when a listed version was restored; fails the run's assertion without the header or the column.
+    public static IReadOnlyDictionary<long, string> VersionRestoredFrom(SformResult result, string headerStart)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentException.ThrowIfNullOrWhiteSpace(headerStart);
+        var lines = result.Lines.ToList();
+        var header = lines.FindIndex(line => line.Contains(headerStart, StringComparison.Ordinal));
+        if (header < 0)
+        {
+            throw result.Fail($"printed no \"{headerStart} …\" header");
+        }
+
+        if (!lines.Skip(header + 1).Any(line => line.Contains("Restored from", StringComparison.Ordinal)))
+        {
+            throw result.Fail("printed no column \"Restored from\" in its versions table");
+        }
+
+        return lines.Skip(header + 1)
+            .Select(line => VersionRestoredFromPattern().Match(line))
+            .Where(match => match.Success)
+            .ToDictionary(
+                match => long.Parse(match.Groups["version"].Value, NumberStyles.None, CultureInfo.InvariantCulture),
+                match => match.Groups["from"].Value);
+    }
+
     // N of "… has been saved (version N)."; fails the run's assertion without it.
     public static long SavedVersion(SformResult result)
     {
@@ -161,6 +188,10 @@ internal static partial class ConfigOutput
     // A row of a versions table: its version, white space and the first word of the Author cell.
     [GeneratedRegex(@"^\s*\d+\s+(?<author>\S+)", RegexOptions.CultureInvariant)]
     private static partial Regex VersionAuthorPattern();
+
+    // A row of a versions table: its version, the next cell and, last, the Restored from cell.
+    [GeneratedRegex(@"^\s*(?<version>\d+)\s+\S.*\s(?<from>\S+)\s*$", RegexOptions.CultureInvariant)]
+    private static partial Regex VersionRestoredFromPattern();
 
     [GeneratedRegex(@"has been saved \(version (?<version>\d+)\)\.", RegexOptions.CultureInvariant)]
     private static partial Regex SavedPattern();

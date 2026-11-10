@@ -1,3 +1,4 @@
+using System.Globalization;
 using _42.Platform.Cli.AutomationTests.Editing;
 using _42.Platform.Cli.AutomationTests.Running;
 using _42.Testing.UI.Automation;
@@ -15,8 +16,9 @@ public sealed class ConfigContextTests : CliTest
     // --projectKey <B> --view <view> on <rst> and once with --projectKey <B> -v <view> on <rst2>: config set (a=1),
     // config (reads a=1), config edit -y (the fake editor adds b), config patch -i p.json -y (adds c), config versions
     // (three versions), config diff (c added), config composition, config export -e ctx.env (A=1, B=2 and C=3 in the
-    // file), config delete. Before the deletes neither key has a configuration in the default project <A> (its view
-    // default or <view>) or in the view default of <B>; after them the stored content in <view> of <B> is gone ({}).
+    // file), config restore --version 1 ("Restored v1 of the configuration for '<key>' as v4."), config delete. Before the
+    // restores neither key has a configuration in the default project <A> (its view default or <view>) or in the view
+    // default of <B>; after the deletes the stored content in <view> of <B> is gone ({}).
     [Test]
     [TestCase(441)]
     [UserRole(Role.Owner)]
@@ -29,6 +31,7 @@ public sealed class ConfigContextTests : CliTest
     [Covers("story config diff", "--projectKey", "-v", "--view")]
     [Covers("story config composition", "--projectKey", "-v", "--view")]
     [Covers("story config export", "--projectKey", "-v", "--view")]
+    [Covers("story config restore", "--projectKey", "-v", "--view")]
     [Covers("story config delete", "--projectKey", "-v", "--view")]
     public async Task ConfigCommands_ContextOptions_TargetProjectAndView()
     {
@@ -62,7 +65,8 @@ public sealed class ConfigContextTests : CliTest
             await Assert.That(content?["c"]?.GetValue<long>()).IsEqualTo(3L);
 
             var versions = (await Sform(In("story", "config", "versions", annotation))).ShouldSucceed();
-            await Assert.That(versions.VersionRows(ConfigOutput.ConfigurationVersions).Count).IsEqualTo(3);
+            var listed = versions.VersionRows(ConfigOutput.ConfigurationVersions);
+            await Assert.That(listed.Count).IsEqualTo(3);
 
             var diff = (await Sform(In("story", "config", "diff", annotation))).ShouldSucceed();
             await Assert.That(ConfigOutput.HasDiffLine(diff, '+', "\"c\": 3")).IsTrue().Because(diff.PlainStdOut);
@@ -87,6 +91,11 @@ public sealed class ConfigContextTests : CliTest
             (await Sform("story", "config", annotation, "-p", b))
                 .ShouldExitWith(CliExit.WrongInput)
                 .ShouldContain($"The configuration for '{annotation}' has not been found.");
+
+            var first = set["Version"]!.GetValue<long>();
+            (await Sform(In("story", "config", "restore", annotation, "--version", first.ToString(CultureInfo.InvariantCulture))))
+                .ShouldSucceed()
+                .ShouldContain($"Restored v{first} of the configuration for '{annotation}' as v{listed.Max() + 1}.");
 
             (await Sform(In("story", "config", "delete", annotation)))
                 .ShouldSucceed()

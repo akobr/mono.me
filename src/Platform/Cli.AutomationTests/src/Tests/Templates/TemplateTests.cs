@@ -240,9 +240,9 @@ public sealed class TemplateTests : CliTest
     // The Owner creates the disposable project <B> and sets the target project <A> as the default (account set -p <A>).
     // Each template command runs once with --projectKey <B> --view <view> on unt and once with --projectKey <B> -v
     // <view> on sbt (<view> a generated view): template set (a=1), template (reads a=1), template edit -y (the fake
-    // editor adds b), template versions (two versions), template diff (b added), template delete. Before the deletes
-    // neither type has a template in <view> of <A> (the default project) or in the view default of <B>; after them none
-    // in <view> of <B> either.
+    // editor adds b), template versions (two versions), template diff (b added), template restore --version 1 ("Restored
+    // v1 of the template for '<type>' as v3."), template delete. Before the restores neither type has a template in <view>
+    // of <A> (the default project) or in the view default of <B>; after the deletes none in <view> of <B> either.
     [Test]
     [TestCase(425)]
     [UserRole(Role.Owner)]
@@ -252,6 +252,7 @@ public sealed class TemplateTests : CliTest
     [Covers("story template edit", "--projectKey", "-v", "--view")]
     [Covers("story template versions", "--projectKey", "-v", "--view")]
     [Covers("story template diff", "--projectKey", "-v", "--view")]
+    [Covers("story template restore", "--projectKey", "-v", "--view")]
     [Covers("story template delete", "--projectKey", "-v", "--view")]
     public async Task TemplateCommands_ContextOptions_TargetProjectAndView()
     {
@@ -274,7 +275,8 @@ public sealed class TemplateTests : CliTest
             await Assert.That(editor.ReadLog(added).Single().OriginalJson()!["a"]!.GetValue<long>()).IsEqualTo(1L);
 
             var versions = (await Sform(In("story", "template", "versions", type))).ShouldSucceed();
-            await Assert.That(versions.VersionRows(ConfigOutput.TemplateVersions).Count).IsEqualTo(2);
+            var listed = versions.VersionRows(ConfigOutput.TemplateVersions);
+            await Assert.That(listed.Count).IsEqualTo(2);
 
             var diff = (await Sform(In("story", "template", "diff", type))).ShouldSucceed();
             await Assert.That(ConfigOutput.HasDiffLine(diff, '+', "\"b\": 2")).IsTrue().Because(diff.PlainStdOut);
@@ -287,6 +289,11 @@ public sealed class TemplateTests : CliTest
                 .ShouldExitWith(CliExit.WrongInput)
                 .ShouldContain($"The template for '{type}' has not been found.");
 
+            var first = set["Version"]!.GetValue<long>();
+            (await Sform(In("story", "template", "restore", type, "--version", Text(first))))
+                .ShouldSucceed()
+                .ShouldContain($"Restored v{first} of the template for '{type}' as v{listed.Max() + 1}.");
+
             (await Sform(In("story", "template", "delete", type)))
                 .ShouldSucceed()
                 .ShouldContain($"The template for '{type}' has been deleted.");
@@ -298,15 +305,64 @@ public sealed class TemplateTests : CliTest
         }
     }
 
+    // TPL-TPL-10: template restore stores the content of an earlier version as a new version, also after a delete.
+    // In the disposable project, with two versions of the unt template (v=1, v=2): template restore unt --version 1 says
+    // "Restored v1 of the template for 'unt' as v3." and template unt holds v=1; template restore unt --version 3 says "v3
+    // is already the current version of the template for 'unt'." and ends with 42; after template delete unt, template
+    // restore unt --version 2 says "Restored v2 of the template for 'unt' as v4.", and template unt holds v=2 in v4.
+    [Test]
+    [TestCase(488)]
+    [UserRole(Role.Owner)]
+    [DisposableProject]
+    [Covers("story template restore", "arg0", "--version")]
+    public async Task Template_Restore_StoresAnEarlierVersion()
+    {
+        await CreateDisposableProjectAsync();
+        var written = await WriteVersionsAsync("unt", 2);
+        var first = written[1] + 1;
+
+        (await Sform(InProject("story", "template", "restore", "unt", "--version", Text(written[0]))))
+            .ShouldSucceed()
+            .ShouldContain($"Restored v{written[0]} of the template for 'unt' as v{first}.");
+        await AssertTemplateAsync(first, 1);
+
+        (await Sform(InProject("story", "template", "restore", "unt", "--version", Text(first))))
+            .ShouldExitWith(CliExit.NoWorkNeeded)
+            .ShouldContain($"v{first} is already the current version of the template for 'unt'.");
+        await AssertTemplateAsync(first, 1);
+
+        (await Sform(InProject("story", "template", "delete", "unt"))).ShouldSucceed().ShouldContain("The template for 'unt' has been deleted.");
+        var second = first + 1;
+        (await Sform(InProject("story", "template", "restore", "unt", "--version", Text(written[1]))))
+            .ShouldSucceed()
+            .ShouldContain($"Restored v{written[1]} of the template for 'unt' as v{second}.");
+        await AssertTemplateAsync(second, 2);
+    }
+
     private static string Text(long version) => version.ToString(CultureInfo.InvariantCulture);
 
     // The property names of a content, in order, e.g. "a, b".
     private static string Names(JsonObject content) => string.Join(", ", content.Select(property => property.Key));
 
-    // Three versions of the template of the type in the acting project (v=1, v=2, v=3); their versions in order.
-    private async Task<long[]> WriteThreeVersionsAsync(string type)
+    // template unt in the acting project is the version with the content { "v": <v> }.
+    private async Task AssertTemplateAsync(long version, long v)
     {
-        var versions = new long[3];
+        var read = (await Sform(InProject("story", "template", "unt"))).ShouldSucceed().JsonNode();
+        await Assert.That(read["Version"]?.GetValue<long>()).IsEqualTo(version);
+        await Assert.That(Names(read["Content"]!.AsObject())).IsEqualTo("v");
+        await Assert.That(read["Content"]?["v"]?.GetValue<long>()).IsEqualTo(v);
+    }
+
+    // Three versions of the template of the type in the acting project (v=1, v=2, v=3); their versions in order.
+    private Task<long[]> WriteThreeVersionsAsync(string type)
+    {
+        return WriteVersionsAsync(type, 3);
+    }
+
+    // The versions of the template of the type in the acting project (v=1, v=2, …, v=count); their versions in order.
+    private async Task<long[]> WriteVersionsAsync(string type, int count)
+    {
+        var versions = new long[count];
         for (var index = 0; index < versions.Length; index++)
         {
             var set = (await Sform(InProject("story", "template", "set", type, "-x", $"v={index + 1}"))).ShouldSucceed();

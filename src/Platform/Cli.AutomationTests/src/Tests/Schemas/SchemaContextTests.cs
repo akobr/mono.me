@@ -18,9 +18,10 @@ public sealed class SchemaContextTests : CliTest
     // first of each pair) or -v <view> (the second): set -i s.json stores version 1 there, get returns it, edit -y (the fake
     // editor adds a property of its own) saves version 2 from the document of <view> in <B>, versions lists 2 and 1, diff
     // shows the added property; schema definition <unt1> (with --view, then -v) combines the type schema of unt and the
-    // descendant schema below <rst1> with both added properties; the deletes delete each. The view default of <B> has no
-    // version of any of these schemas, <A> none of <rst1>'s, and the versions of the type schemas of unt and sbt in <A> are
-    // the same as before the steps.
+    // descendant schema below <rst1> with both added properties; restore --version 1 stores version 1 again as version 3
+    // ("Restored v1 of the schema for <subject> as v3."; the type schemas with -f for unt and --force for sbt, the case of
+    // schema type restore); the deletes delete each. The view default of <B> has no version of any of these schemas, <A>
+    // none of <rst1>'s, and the versions of the type schemas of unt and sbt in <A> are the same as before the steps.
     [Test]
     [TestCase(336)]
     [UserRole(Role.Owner)]
@@ -30,16 +31,19 @@ public sealed class SchemaContextTests : CliTest
     [Covers("story schema type edit", "--projectKey", "-v", "--view")]
     [Covers("story schema type versions", "--projectKey", "-v", "--view")]
     [Covers("story schema type diff", "--projectKey", "-v", "--view")]
+    [Covers("story schema type restore", "arg0", "--version", "-f", "--force", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation set", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation get", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation edit", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation versions", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation diff", "--projectKey", "-v", "--view")]
+    [Covers("story schema annotation restore", "--projectKey", "-v", "--view")]
     [Covers("story schema descendant set", "--projectKey", "-v", "--view")]
     [Covers("story schema descendant get", "--projectKey", "-v", "--view")]
     [Covers("story schema descendant edit", "--projectKey", "-v", "--view")]
     [Covers("story schema descendant versions", "--projectKey", "-v", "--view")]
     [Covers("story schema descendant diff", "--projectKey", "-v", "--view")]
+    [Covers("story schema descendant restore", "--projectKey", "-v", "--view")]
     [Covers("story schema definition", "--projectKey", "-v", "--view")]
     [Covers("story schema type delete", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation delete", "--projectKey", "-v", "--view")]
@@ -65,8 +69,8 @@ public sealed class SchemaContextTests : CliTest
 
         Subject[] subjects =
         [
-            new("type", ["unt"], "'unt'", "--view", "ctx_type_unt"),
-            new("type", ["sbt"], "'sbt'", "-v", "ctx_type_sbt"),
+            new("type", ["unt"], "'unt'", "--view", "ctx_type_unt", "-f"),
+            new("type", ["sbt"], "'sbt'", "-v", "ctx_type_sbt", "--force"),
             new("annotation", [rst1], $"'{rst1}'", "--view", "ctx_annotation_1"),
             new("annotation", [rst2], $"'{rst2}'", "-v", "ctx_annotation_2"),
             new("descendant", [rst1, "unt"], $"'unt' under '{rst1}'", "--view", "ctx_descendant_unt"),
@@ -125,6 +129,14 @@ public sealed class SchemaContextTests : CliTest
 
         foreach (var subject in subjects)
         {
+            string[] restore = subject.Force is null ? ["--version", "1"] : ["--version", "1", subject.Force];
+            (await Sform(subject.Command(b, view, "restore", restore)))
+                .ShouldSucceed()
+                .ShouldContain($"Restored v1 of the schema for {subject.Description} as v3.");
+        }
+
+        foreach (var subject in subjects)
+        {
             (await Sform(subject.Command(b, view, "delete"))).ShouldSucceed().ShouldContain($"The schema for {subject.Description} has been deleted.");
         }
 
@@ -145,8 +157,9 @@ public sealed class SchemaContextTests : CliTest
     }
 
     // One schema of the steps: its layer (type, annotation, descendant), its arguments, how sform names it, the form of the
-    // view option its commands use, and the property the fake editor adds to it.
-    private sealed record Subject(string Layer, string[] Arguments, string Description, string ViewOption, string Added)
+    // view option its commands use, the property the fake editor adds to it, and the force option of its restore (-f or
+    // --force, which the type schemas use: SCH-CTX-01 is the case of schema type restore).
+    private sealed record Subject(string Layer, string[] Arguments, string Description, string ViewOption, string Added, string? Force = null)
     {
         // story schema <layer> <verb> <arguments> <options> --projectKey <project> <view option> <view>
         public string[] Command(string projectKey, string view, string verb, params string[] options)
