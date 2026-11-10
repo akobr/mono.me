@@ -119,8 +119,12 @@ By hand, as in the cookbook. Then put the WorkOS client id into `authKitClientId
 
 For invitation emails, put the WorkOS management key into the vault, set `authKitApiKeyEnabled = true` in the parameters file, commit it, and run `main.bicep` again:
 
+Store the key so that the key never goes on a command line (it would stay in the shell history and the process list). Either in the portal: **prod-2s-42fornet-kv → Objects → Secrets → Generate/Import**, name `authkit-api-key`, paste the `sk_…` value (you are Key Vault Administrator); or with Az PowerShell, which prompts for it:
+
 ```powershell
-az keyvault secret set --vault-name prod-2s-42fornet-kv --name authkit-api-key --value '<sk_…>' --output none
+Connect-AzAccount -Subscription prod-42fornet-sub   # once, if Az PowerShell isn't signed in
+Set-AzKeyVaultSecret -VaultName prod-2s-42fornet-kv -Name authkit-api-key `
+  -SecretValue (Read-Host -AsSecureString -Prompt 'WorkOS API key (sk_…)') | Out-Null
 ```
 
 ### 6. The GitHub environment (step 15)
