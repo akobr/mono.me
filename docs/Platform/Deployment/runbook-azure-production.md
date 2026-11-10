@@ -135,7 +135,7 @@ az keyvault show -n prod-2s-42fornet-kv `
   --query "{purge:properties.enablePurgeProtection, rbac:properties.enableRbacAuthorization, sku:properties.sku.name}" -o table   # True True premium
 az storage account show -n prod2s42fornetsa --query allowSharedKeyAccess    # false
 az lock list -g prod-2s-eusec-rg -o table                                  # the account and the vault
-az consumption budget show --budget-name prod-2s-budget --query "{amount:amount, start:timePeriod.start}" -o table
+az consumption budget show --budget-name prod-2s-budget --query "{amount:amount, start:timePeriod.startDate}" -o table
 ```
 
 In the portal (**Cost Management → Budgets**) the budget shows four alert conditions. The Function App has no code yet; a few `403` logs right after its first start are role assignments still propagating.
