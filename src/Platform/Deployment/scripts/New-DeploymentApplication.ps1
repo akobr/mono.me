@@ -1,4 +1,4 @@
-#Requires -Version 7.3
+#Requires -Version 7.4
 <#
 .SYNOPSIS
     Cookbook, step 11.2: the identity of the deployment workflows, "2S Platform Deployment".

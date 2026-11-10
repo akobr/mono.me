@@ -1,4 +1,4 @@
-#Requires -Version 7.3
+#Requires -Version 7.4
 <#
 .SYNOPSIS
     Cookbook, step 15: the GitHub environment of the deployment workflows.
@@ -41,6 +41,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# PowerShell 7.4+: a native command (az, gh) that exits with a nonzero code throws, so the script stops there.
 $PSNativeCommandUseErrorActionPreference = $true
 
 function Set-GitHubVariable([string] $Name, [string] $Value) {
@@ -93,9 +94,16 @@ $environmentBody = @{
 } | ConvertTo-Json -Depth 5
 $environmentBody | gh api --method PUT "repos/$Repository/environments/$Environment" --input - --silent
 
-$branches = @(gh api "repos/$Repository/environments/$Environment/deployment-branch-policies" --jq '.branch_policies[].name')
-if ($branches -notcontains 'main') {
-    gh api --method POST "repos/$Repository/environments/$Environment/deployment-branch-policies" -f name=main -f type=branch --silent
+# Deployments from main only: remove every other branch policy, and add main when it is missing.
+$policiesPath = "repos/$Repository/environments/$Environment/deployment-branch-policies"
+$policies = @(gh api $policiesPath --paginate --jq '.branch_policies[] | {id, name}' | ForEach-Object { $_ | ConvertFrom-Json })
+foreach ($policy in $policies | Where-Object { $_.name -ne 'main' }) {
+    gh api --method DELETE "$policiesPath/$($policy.id)" --silent
+    Write-Host "  removed the branch policy '$($policy.name)'"
+}
+
+if (-not ($policies | Where-Object { $_.name -eq 'main' })) {
+    gh api --method POST $policiesPath -f name=main -f type=branch --silent
 }
 
 Write-Host 'Variables:'

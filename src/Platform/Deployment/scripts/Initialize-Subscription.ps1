@@ -1,4 +1,4 @@
-#Requires -Version 7.3
+#Requires -Version 7.4
 <#
 .SYNOPSIS
     Cookbook, step 1.3-1.4: prepares the subscription of an environment for main.bicep.
@@ -71,7 +71,7 @@ if ($flex -notcontains $Location) {
 Write-Host "Flex Consumption is offered in $Location."
 
 # The free tier is chosen when an account is created, and a subscription has one free-tier account.
-$freeTier = @(az cosmosdb list --query "[?enableFreeTier].name" -o tsv | Where-Object { $_ })
+$freeTier = @(az cosmosdb list --subscription $Subscription --query "[?enableFreeTier].name" -o tsv | Where-Object { $_ })
 $others = @($freeTier | Where-Object { $_ -ne $CosmosAccountName })
 if ($others.Count -gt 0) {
     throw "The subscription's free tier of Cosmos DB is taken by $($others -join ', '): main.bicep would fail to create $CosmosAccountName with it."

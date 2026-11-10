@@ -30,7 +30,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 ## Before you start
 
 - **Owner** of the subscription and **Application Administrator** of its tenant (the first runs create role assignments, locks and Entra applications).
-- Azure CLI 2.71 or newer with Bicep (`az bicep install`, `az bicep upgrade`), PowerShell 7.3 or newer, and for step 15 the GitHub CLI signed in as an admin of the repository.
+- Azure CLI 2.71 or newer with Bicep (`az bicep install`, `az bicep upgrade`), PowerShell 7.4 or newer (a failing `az` or `gh` call stops the scripts), and for step 15 the GitHub CLI signed in as an admin of the repository.
 - Run everything from this folder: `cd src/Platform/Deployment`.
 - Read **Never do** in the cookbook (step 0). The templates create two things that can't be undone: the Cosmos DB free tier and the vault's purge protection.
 
@@ -77,6 +77,8 @@ az deployment sub create --name prod-2s-main --location swedencentral `
 ```
 
 Then run the hierarchical partition key probe against the account (cookbook, **step 5a**), before anything else touches the database.
+
+The cookbook's steps 5a and 16 are bash, run from the **repository root** (their paths, such as `src/Platform/Storyteller/...`, are relative to it), with the variable block of the cookbook's step 0 pasted first: `RG`, `COSMOS`, `KV`, `FUNC`, `SWA` and the host names hold the same names as `naming.bicep`. On Windows use Git Bash, or translate each `X=…` to `$X = …` in PowerShell. Come back to this folder (`cd src/Platform/Deployment`) for the next step.
 
 ### 3. The Entra applications (step 11)
 
