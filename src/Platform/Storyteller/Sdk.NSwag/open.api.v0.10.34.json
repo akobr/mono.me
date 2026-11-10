@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.31.6881"
+    "version": "0.10.34.56348"
   },
   "servers": [
     {
@@ -5969,6 +5969,157 @@
         ]
       }
     },
+    "/v1/{organization}/{project}/{view}/configuration/{key}/versions/{version}/restore": {
+      "post": {
+        "tags": [
+          "Configurations"
+        ],
+        "description": "Stores the content of a version of the annotation's own document as its new version, whole and as stored (no merge), also after the configuration was deleted. The version's content is checked against the schema unless force is true. The restore is in the annotation's history as ConfigurationRestored, and the new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.",
+        "operationId": "RestoreConfigurationVersion",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version whose content becomes the new version, from the list of versions.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "description": "When true, restore the version even if it violates the schema.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outcome Restored: the content of FromVersion is stored as the new version Version. Outcome Unchanged: FromVersion is the current version, or the current version Version has its content, so nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionRestoreResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The version was never written or has expired (ErrorCode VersionNotFound), or the annotation does not exist or was deleted permanently (ErrorCode AnnotationNotFound).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The version violates the schema (force=true stores it anyway), the annotation is deleted (ErrorCode AnnotationDeleted), or the configuration was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
+          }
+        ]
+      }
+    },
     "/v1/{organization}/{project}/{view}/configuration/{key}/versions/{version}/diff": {
       "get": {
         "tags": [
@@ -7703,6 +7854,468 @@
           },
           "403": {
             "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scope Configuration.Read (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}/versions/{version}/restore": {
+      "post": {
+        "tags": [
+          "Schemas"
+        ],
+        "description": "Stores the content of a version of the type schema as its new version, also after the schema was deleted. The version must be a usable schema, and the stored configurations of the type in the view must comply with it unless force is true. The new version records RestoredFrom.",
+        "operationId": "RestoreSchemaVersion",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "annotationType",
+            "in": "path",
+            "description": "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version whose content becomes the new version, from the list of versions.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "description": "When true, restore the version even if stored configurations in the view do not comply.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outcome Restored: the content of FromVersion is stored as the new version Version. Outcome Unchanged: FromVersion is the current version, or the current version Version has its content, so nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionRestoreResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed, or the version is no usable schema (ErrorCode InvalidSchema, ExternalSchemaReference or SchemaValidationTimeout), whatever force is.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The version was never written or has expired (ErrorCode VersionNotFound).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stored configurations of the view do not comply with the version (force=true restores it anyway), or the schema was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scopes Configuration.Write and Schema.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration-schema/{key}/versions/{version}/restore": {
+      "post": {
+        "tags": [
+          "Schemas"
+        ],
+        "description": "Stores the content of a version of the annotation's schema as its new version, also after the schema was deleted. The version must be a usable schema, and the annotation's stored configuration must comply with it unless force is true. The new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.",
+        "operationId": "RestoreAnnotationSchemaVersion",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version whose content becomes the new version, from the list of versions.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "description": "When true, restore the version even if stored configurations in the view do not comply.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outcome Restored: the content of FromVersion is stored as the new version Version. Outcome Unchanged: FromVersion is the current version, or the current version Version has its content, so nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionRestoreResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed, or the version is no usable schema (ErrorCode InvalidSchema, ExternalSchemaReference or SchemaValidationTimeout), whatever force is.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The version was never written or has expired (ErrorCode VersionNotFound), or the annotation does not exist or was deleted permanently (ErrorCode AnnotationNotFound).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stored configurations do not comply with the version (force=true restores it anyway), the annotation is deleted (ErrorCode AnnotationDeleted), or the schema was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scopes Configuration.Write and Schema.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}/versions/{version}/restore": {
+      "post": {
+        "tags": [
+          "Schemas"
+        ],
+        "description": "Stores the content of a version of the descendant-type schema as its new version, also after the schema was deleted. The type must be able to descend from the key, the version must be a usable schema, and the stored configurations of the type under the key must comply with it unless force is true. The new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.",
+        "operationId": "RestoreDescendantTypeSchemaVersion",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "annotationType",
+            "in": "path",
+            "description": "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version whose content becomes the new version, from the list of versions.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "description": "When true, restore the version even if stored configurations in the view do not comply.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outcome Restored: the content of FromVersion is stored as the new version Version. Outcome Unchanged: FromVersion is the current version, or the current version Version has its content, so nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionRestoreResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed, the descendant type cannot descend from the annotation key (ErrorCode InvalidKey), or the version is no usable schema (ErrorCode InvalidSchema, ExternalSchemaReference or SchemaValidationTimeout), whatever force is.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The version was never written or has expired (ErrorCode VersionNotFound), or the annotation does not exist or was deleted permanently (ErrorCode AnnotationNotFound).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stored configurations do not comply with the version (force=true restores it anyway), the annotation is deleted (ErrorCode AnnotationDeleted), or the schema was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scopes Configuration.Write and Schema.Write (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -14823,6 +15436,149 @@
         ]
       }
     },
+    "/v1/{organization}/{project}/{view}/template/{annotationType}/versions/{version}/restore": {
+      "post": {
+        "tags": [
+          "Templates"
+        ],
+        "description": "Stores the content of a version of the template as its new version, whole and as stored (no merge), also after the template was deleted. The new version records RestoredFrom.",
+        "operationId": "RestoreTemplateVersion",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "annotationType",
+            "in": "path",
+            "description": "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version whose content becomes the new version, from the list of versions.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Outcome Restored: the content of FromVersion is stored as the new version Version. Outcome Unchanged: FromVersion is the current version, or the current version Version has its content, so nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionRestoreResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The version was never written or has expired (ErrorCode VersionNotFound).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The template was changed concurrently too many times (ErrorCode Conflict), and the request can be repeated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine needs the scopes Configuration.Write and Template.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          },
+          {
+            "apiKey": [ ]
+          },
+          {
+            "mtls": [ ]
+          },
+          {
+            "mtls": [ ],
+            "apiKey": [ ]
+          }
+        ]
+      }
+    },
     "/v1/{organization}/{project}/{view}/template/{annotationType}/versions/{version}/diff": {
       "get": {
         "tags": [
@@ -16386,7 +17142,8 @@
               "Deleted",
               "Restored",
               "ConfigurationChanged",
-              "ConfigurationDeleted"
+              "ConfigurationDeleted",
+              "ConfigurationRestored"
             ],
             "type": "string",
             "default": "Created"
@@ -16421,6 +17178,11 @@
             }
           },
           "ConfigurationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "FromVersion": {
             "type": "integer",
             "format": "int64",
             "nullable": true
@@ -17548,6 +18310,11 @@
           "ExpirationTime": {
             "type": "string",
             "format": "date-time"
+          },
+          "RestoredFrom": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -19361,6 +20128,30 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "VersionRestoreResult": {
+        "type": "object",
+        "properties": {
+          "Outcome": {
+            "enum": [
+              "Restored",
+              "Unchanged"
+            ],
+            "type": "string",
+            "default": "Restored"
+          },
+          "FromVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "Version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           }
         }
       },

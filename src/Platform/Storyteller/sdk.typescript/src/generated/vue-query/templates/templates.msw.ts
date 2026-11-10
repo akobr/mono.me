@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import { faker } from "@faker-js/faker";
 
@@ -15,6 +15,7 @@ import type {
   ConfigurationTemplateSummary,
   ConfigurationVersion,
   DiffResult,
+  VersionRestoreResult,
 } from "../../model";
 
 export const getGetTemplatesResponseMock = (): ConfigurationTemplateSummary[] =>
@@ -230,6 +231,7 @@ export const getGetTemplateVersionsResponseMock = (): ConfigurationVersion[] =>
       faker.date.past().toISOString().slice(0, 19) + "Z",
       undefined,
     ]),
+    RestoredFrom: faker.helpers.arrayElement([faker.number.int(), null]),
   }));
 
 export const getGetTemplateVersionResponseMock = (
@@ -241,6 +243,46 @@ export const getGetTemplateVersionResponseMock = (
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
   Content: faker.helpers.arrayElement([{}, undefined]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getRestoreTemplateVersionResponseMock = (
+  overrideResponse: Partial<Extract<VersionRestoreResult, object>> = {},
+): VersionRestoreResult => ({
+  Outcome: faker.helpers.arrayElement(["Restored", "Unchanged"] as const),
+  FromVersion: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
   Modified: faker.helpers.arrayElement([
     {
       At: faker.helpers.arrayElement([
@@ -602,6 +644,30 @@ export const getGetTemplateVersionMockHandler = (
   );
 };
 
+export const getRestoreTemplateVersionMockHandler = (
+  overrideResponse?:
+    | VersionRestoreResult
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<VersionRestoreResult> | VersionRestoreResult),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/:organization/:project/:view/template/:annotationType/versions/:version/restore",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getRestoreTemplateVersionResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetTemplateVersionDiffMockHandler = (
   overrideResponse?:
     | DiffResult
@@ -661,6 +727,7 @@ export const getTemplatesMock = () => [
   getDeleteTemplateMockHandler(),
   getGetTemplateVersionsMockHandler(),
   getGetTemplateVersionMockHandler(),
+  getRestoreTemplateVersionMockHandler(),
   getGetTemplateVersionDiffMockHandler(),
   getGetTemplateVersionDiffCustomMockHandler(),
 ];

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import * as zod from "zod";
 
@@ -2732,6 +2732,7 @@ export const GetAnnotationHistoryResponse = zod.object({
             "Restored",
             "ConfigurationChanged",
             "ConfigurationDeleted",
+            "ConfigurationRestored",
           ])
           .default(getAnnotationHistoryResponseEntriesItemActionDefault),
         Actor: zod
@@ -2810,6 +2811,7 @@ export const GetAnnotationHistoryResponse = zod.object({
           )
           .optional(),
         ConfigurationVersion: zod.int().nullish(),
+        FromVersion: zod.int().nullish(),
       }),
     )
     .optional(),

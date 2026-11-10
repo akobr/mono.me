@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import * as zod from "zod";
 
@@ -356,6 +356,169 @@ export const GetConfigurationSchemasResponse = zod.array(
   GetConfigurationSchemasResponseItem,
 );
 
+/**
+ * Stores the content of a version of the type schema as its new version, also after the schema was deleted. The version must be a usable schema, and the stored configurations of the type in the view must comply with it unless force is true. The new version records RestoredFrom.
+ */
+export const RestoreSchemaVersionParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  annotationType: zod
+    .string()
+    .describe(
+      "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).",
+    ),
+  version: zod
+    .int()
+    .describe(
+      "The version whose content becomes the new version, from the list of versions.",
+    ),
+});
+
+export const RestoreSchemaVersionQueryParams = zod.object({
+  force: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, restore the version even if stored configurations in the view do not comply.",
+    ),
+});
+
+export const restoreSchemaVersionResponseOutcomeDefault = `Restored`;
+export const restoreSchemaVersionResponseModifiedByKindDefault = `Account`;
+
+export const RestoreSchemaVersionResponse = zod.object({
+  Outcome: zod
+    .enum(["Restored", "Unchanged"])
+    .default(restoreSchemaVersionResponseOutcomeDefault),
+  FromVersion: zod.int().optional(),
+  Version: zod.int().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(restoreSchemaVersionResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Stores the content of a version of the annotation's schema as its new version, also after the schema was deleted. The version must be a usable schema, and the annotation's stored configuration must comply with it unless force is true. The new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.
+ */
+export const RestoreAnnotationSchemaVersionParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  key: zod.string().describe("The key of the requested annotation."),
+  version: zod
+    .int()
+    .describe(
+      "The version whose content becomes the new version, from the list of versions.",
+    ),
+});
+
+export const RestoreAnnotationSchemaVersionQueryParams = zod.object({
+  force: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, restore the version even if stored configurations in the view do not comply.",
+    ),
+});
+
+export const restoreAnnotationSchemaVersionResponseOutcomeDefault = `Restored`;
+export const restoreAnnotationSchemaVersionResponseModifiedByKindDefault = `Account`;
+
+export const RestoreAnnotationSchemaVersionResponse = zod.object({
+  Outcome: zod
+    .enum(["Restored", "Unchanged"])
+    .default(restoreAnnotationSchemaVersionResponseOutcomeDefault),
+  FromVersion: zod.int().optional(),
+  Version: zod.int().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(
+              restoreAnnotationSchemaVersionResponseModifiedByKindDefault,
+            ),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Stores the content of a version of the descendant-type schema as its new version, also after the schema was deleted. The type must be able to descend from the key, the version must be a usable schema, and the stored configurations of the type under the key must comply with it unless force is true. The new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.
+ */
+export const RestoreDescendantTypeSchemaVersionParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  key: zod.string().describe("The key of the requested annotation."),
+  annotationType: zod
+    .string()
+    .describe(
+      "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).",
+    ),
+  version: zod
+    .int()
+    .describe(
+      "The version whose content becomes the new version, from the list of versions.",
+    ),
+});
+
+export const RestoreDescendantTypeSchemaVersionQueryParams = zod.object({
+  force: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, restore the version even if stored configurations in the view do not comply.",
+    ),
+});
+
+export const restoreDescendantTypeSchemaVersionResponseOutcomeDefault = `Restored`;
+export const restoreDescendantTypeSchemaVersionResponseModifiedByKindDefault = `Account`;
+
+export const RestoreDescendantTypeSchemaVersionResponse = zod.object({
+  Outcome: zod
+    .enum(["Restored", "Unchanged"])
+    .default(restoreDescendantTypeSchemaVersionResponseOutcomeDefault),
+  FromVersion: zod.int().optional(),
+  Version: zod.int().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(
+              restoreDescendantTypeSchemaVersionResponseModifiedByKindDefault,
+            ),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+          Via: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
+
 export const GetSchemaVersionsParams = zod.object({
   organization: zod.string().describe("Target organization name."),
   project: zod.string().describe("Target project name."),
@@ -387,6 +550,7 @@ export const GetSchemaVersionsResponseItem = zod.object({
     })
     .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
+  RestoredFrom: zod.int().nullish(),
 });
 export const GetSchemaVersionsResponse = zod.array(
   GetSchemaVersionsResponseItem,
@@ -587,6 +751,7 @@ export const GetAnnotationSchemaVersionsResponseItem = zod.object({
     })
     .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
+  RestoredFrom: zod.int().nullish(),
 });
 export const GetAnnotationSchemaVersionsResponse = zod.array(
   GetAnnotationSchemaVersionsResponseItem,
@@ -778,6 +943,7 @@ export const GetDescendantTypeSchemaVersionsResponseItem = zod.object({
     })
     .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
+  RestoredFrom: zod.int().nullish(),
 });
 export const GetDescendantTypeSchemaVersionsResponse = zod.array(
   GetDescendantTypeSchemaVersionsResponseItem,

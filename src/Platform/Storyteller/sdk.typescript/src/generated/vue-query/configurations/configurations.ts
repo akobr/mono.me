@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -35,9 +35,11 @@ import type {
   GetConfigurationsParams,
   JsonPatchOperation,
   PatchConfigurationParams,
+  RestoreConfigurationVersionParams,
   SchemaValidationErrorResponse,
   SetConfigurationBody,
   SetConfigurationParams,
+  VersionRestoreResult,
 } from "../../model";
 
 import { storytellerFetch } from "../../../lib/fetcher";
@@ -1526,6 +1528,147 @@ export function useGetConfigurationVersion<
   return query;
 }
 
+export const getRestoreConfigurationVersionUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  version: number,
+  params?: RestoreConfigurationVersionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/restore?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/restore`;
+};
+
+/**
+ * Stores the content of a version of the annotation's own document as its new version, whole and as stored (no merge), also after the configuration was deleted. The version's content is checked against the schema unless force is true. The restore is in the annotation's history as ConfigurationRestored, and the new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.
+ */
+export const restoreConfigurationVersion = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  version: number,
+  params?: RestoreConfigurationVersionParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<VersionRestoreResult> => {
+  return storytellerFetch<VersionRestoreResult>(
+    getRestoreConfigurationVersionUrl(
+      organization,
+      project,
+      view,
+      key,
+      version,
+      params,
+    ),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getRestoreConfigurationVersionMutationKey = () =>
+  ["restoreConfigurationVersion"] as const;
+
+export const getRestoreConfigurationVersionMutationOptions = <
+  TError = ErrorType<ErrorResponse | void | SchemaValidationErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreConfigurationVersion>>,
+    TError,
+    RestoreConfigurationVersionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreConfigurationVersion>>,
+  TError,
+  RestoreConfigurationVersionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreConfigurationVersionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreConfigurationVersion>>,
+    RestoreConfigurationVersionMutationVariables
+  > = (props) => {
+    const { organization, project, view, key, version, params } = props ?? {};
+
+    return restoreConfigurationVersion(
+      organization,
+      project,
+      view,
+      key,
+      version,
+      params,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreConfigurationVersionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreConfigurationVersion>>
+>;
+
+export type RestoreConfigurationVersionMutationError = ErrorType<
+  ErrorResponse | void | SchemaValidationErrorResponse
+>;
+export type RestoreConfigurationVersionMutationVariables = {
+  organization: string;
+  project: string;
+  view: string;
+  key: string;
+  version: number;
+  params?: RestoreConfigurationVersionParams;
+};
+
+export const useRestoreConfigurationVersion = <
+  TError = ErrorType<ErrorResponse | void | SchemaValidationErrorResponse>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreConfigurationVersion>>,
+      TError,
+      RestoreConfigurationVersionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof restoreConfigurationVersion>>,
+  TError,
+  RestoreConfigurationVersionMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getRestoreConfigurationVersionMutationOptions(options),
+    queryClient,
+  );
+};
 export const getGetConfigurationVersionDiffUrl = (
   organization: string,
   project: string,

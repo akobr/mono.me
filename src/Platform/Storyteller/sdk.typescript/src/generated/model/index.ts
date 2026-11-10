@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 
 export * from "./accessPoint";
@@ -223,6 +223,10 @@ export * from "./publicJsonWebKey";
 export * from "./publicJsonWebKeySet";
 export * from "./responsibility";
 export * from "./responsibilityAnnotationType";
+export * from "./restoreAnnotationSchemaVersionParams";
+export * from "./restoreConfigurationVersionParams";
+export * from "./restoreDescendantTypeSchemaVersionParams";
+export * from "./restoreSchemaVersionParams";
 export * from "./rewrapStatus";
 export * from "./rewrapStatusProtection";
 export * from "./rsaJsonWebKey";
@@ -252,6 +256,8 @@ export * from "./usage";
 export * from "./usageAnnotationType";
 export * from "./userTokenRequest";
 export * from "./userTokenResponse";
+export * from "./versionRestoreResult";
+export * from "./versionRestoreResultOutcome";
 export * from "./view";
 export * from "./viewArchiveContent";
 export * from "./viewCreate";
