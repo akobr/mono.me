@@ -1,4 +1,4 @@
-#Requires -Version 7.3
+#Requires -Version 7.4
 <#
 .SYNOPSIS
     Cookbook, step 11.1: the multi-tenant BYOK application "2S Platform Customer Keys".

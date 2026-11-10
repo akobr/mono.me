@@ -12,7 +12,7 @@ Work through the steps in order. Each step says what it creates, the commands, a
 | --- | --- |
 | **Owner** of the subscription `prod-42fornet-sub`, and **Application Administrator** (or Global Administrator) in its Entra tenant | resources, role assignments, app registrations |
 | Azure CLI 2.71 or newer (`az version`), logged in with `az login` | every command below; Flex Consumption options are in preview in the CLI |
-| .NET 10 SDK (10.0.401+), Node.js 22+, `npm` | building the API, DbCreator and the admin UI |
+| .NET 10 SDK (10.0.401+), Node.js 24 (the admin UI's `.nvmrc`), `npm` | building the API, DbCreator and the admin UI |
 | Access to the DNS zone of `42for.net` | the records of step 12 |
 | The WorkOS dashboard, **production** environment | step 13 |
 | Sentry (EU, `de.sentry.io`) and PostHog (EU cloud) | step 14 |
@@ -155,7 +155,15 @@ az cosmosdb show -g "$RG" -n "$COSMOS" --query "{freeTier:enableFreeTier, backup
 
 ### 5a. Run the hierarchical partition key probe (once, before DbCreator)
 
-While the account has no database yet, run the probe of [the cookbook of the probe](../Storyteller/cookbooks/hierarchical-partition-key-probe.md) (run 4). Its database is then the only one, so its 1000 RU/s stay inside the free tier, and it deletes it at the end.
+While the account has no database yet, run the probe of [the cookbook of the probe](../Storyteller/cookbooks/hierarchical-partition-key-probe.md) (run 4). The probe (`src/Platform/Storyteller/scripts/hpk-probe/hpk-probe.cs`) and its cookbook come with [424-230](https://linear.app/424fun/issue/424-230/store-all-organizations-in-one-shared-cosmos-db-container-remove-the): until it is merged, run the commands below from a checkout of the branch `feat/424-230`, e.g. a worktree next to the repository:
+
+```sh
+git fetch origin feat/424-230
+git worktree add ../mono.me-hpk-probe origin/feat/424-230
+cd ../mono.me-hpk-probe        # afterwards: cd - && git worktree remove ../mono.me-hpk-probe
+```
+
+ Its database is then the only one, so its 1000 RU/s stay inside the free tier, and it deletes it at the end.
 
 ```sh
 KEY=$(az cosmosdb keys list -g "$RG" -n "$COSMOS" --query primaryMasterKey -o tsv)
@@ -225,6 +233,8 @@ unset COSMOS_CS
 ```
 
 Check: `az keyvault show -n "$KV" --query "{purge:properties.enablePurgeProtection, rbac:properties.enableRbacAuthorization, sku:properties.sku.name}" -o table` prints `True True premium`.
+
+**Rotating the Cosmos DB key.** The secret holds the account's primary key and has no expiry: an expired secret would break the API's Key Vault reference. To rotate, regenerate the primary key (`az cosmosdb keys regenerate -g "$RG" -n "$COSMOS" --key-kind primary`), write the new connection string to `cosmos-connection` at once (the commands above, or a run of `main.bicep`, which reads it from `listKeys()`), then restart the Function App (`az functionapp restart -g "$RG" -n "$FUNC"`), as Key Vault references are cached for up to a day. The API's Cosmos DB calls fail between the regeneration and the restart, so rotate in a quiet moment.
 
 ## 8. Function App (the API)
 
@@ -509,26 +519,32 @@ DbCreator creates the database `42.Platform.2S` (shared autoscale up to 1000 RU/
 ```sh
 export CosmosDb__Connection="$(az keyvault secret show --vault-name "$KV" --name cosmos-connection --query value -o tsv)"
 export baseAccount__id="<your WorkOS production user id, user_01…>"
+export CosmosDb__ShouldAcceptAnyCertificate=false   # app.config.json accepts any certificate (the local emulator's)
 export stagingSeed__enabled=false
 dotnet run --project src/Platform/Storyteller/DbCreator/src -c Release
-unset CosmosDb__Connection
+unset CosmosDb__Connection CosmosDb__ShouldAcceptAnyCertificate
 ```
 
-`app.config.json` of DbCreator points at the local emulator; the environment variables override it. Never set `stagingSeed__enabled=true` here: it seeds the AuthKit staging test accounts.
+`app.config.json` of DbCreator points at the local emulator and sets `shouldAcceptAnyCertificate: true` for its self-signed certificate; the environment variables override both, so the production run checks the certificate of Cosmos DB. Never set `stagingSeed__enabled=true` here: it seeds the AuthKit staging test accounts.
 
 ### 16.3 The admin UI
 
+The UI installs the TypeScript SDK from its folder (`file:../../Storyteller/sdk.typescript/src`), so the SDK is built first, as in `.github/workflows/ui-admin.yml`. One build serves every environment: `build/write-environment-config.ts` writes `dist/app-config.json` and resolves the CSP placeholders (`__API_ORIGIN__`, `__AUTH_HOSTNAME__`, `__SENTRY_ORIGIN__`, `__POSTHOG_ORIGIN__`) of `dist/staticwebapp.config.json` for this deployment.
+
 ```sh
+(cd src/Platform/Storyteller/sdk.typescript/src && npm ci && npm run build)
 cd src/Platform/ui.admin/src
 npm ci
-VITE_API_BASE_URL="https://$API_HOST/api" VITE_AUTH_API_HOSTNAME="$AUTH_HOST" VITE_ENVIRONMENT_NAME=production \
-VITE_SENTRY_DSN="<dsn>" VITE_POSTHOG_PROJECT_TOKEN="<token>" VITE_POSTHOG_HOST="https://eu.i.posthog.com" \
-  npm run build
+npm run build
+API_BASE_URL="https://$API_HOST/api" AUTH_API_HOSTNAME="$AUTH_HOST" ENVIRONMENT_NAME=production \
+SENTRY_DSN="<dsn>" POSTHOG_PROJECT_TOKEN="<token>" POSTHOG_HOST="https://eu.i.posthog.com" RELEASE="$(git rev-parse HEAD)" \
+  node build/write-environment-config.ts
+grep -cE "__(API_ORIGIN|AUTH_HOSTNAME|SENTRY_ORIGIN|POSTHOG_ORIGIN)__" dist/staticwebapp.config.json   # must print 0
 npx @azure/static-web-apps-cli deploy ./dist --deployment-token "$SWA_TOKEN" --env production
 cd -
 ```
 
-The UI's `public/staticwebapp.config.json` gives the SPA fallback and the headers.
+The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with the CSP origins written by the step above.
 
 ## 17. Verify
 

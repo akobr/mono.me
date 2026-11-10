@@ -31,6 +31,10 @@ Open points from these answers:
 - **One subscription for the products of 42for.net.** A subscription has one free-tier Cosmos DB account and one Flex Consumption free grant. 2S takes both in `prod-42fornet-sub`; another product there gets a paid Cosmos DB account, or the same account with its own database.
 - **One WorkOS environment for every product.** The 2S API accepts every token of the environment's issuer with its `aud`, so a token issued to another 42for.net product would be accepted too, and the invitation link points to one admin UI. Check whether WorkOS gives each application its own audience before the second product signs users in.
 
+Accepted exposure:
+
+- **The Key Vault is reachable from the public internet** (`publicNetworkAccess` on, network rules `Allow`). Every request still needs an Entra token with an RBAC role on the vault; the Flex Consumption API has no fixed outbound address to allow, and a virtual network is not part of this phase. When one comes (the NAT gateway for BYOK, spec section 13), restrict the vault to it with an IP firewall or a private endpoint: a setting, not a decision that can't change.
+
 ## Must be decided before the first deployment
 
 | # | Decision | Why it can't change later | Recommendation |
