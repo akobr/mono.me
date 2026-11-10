@@ -19,8 +19,8 @@ public sealed class SchemaContextTests : CliTest
     // editor adds a property of its own) saves version 2 from the document of <view> in <B>, versions lists 2 and 1, diff
     // shows the added property; schema definition <unt1> (with --view, then -v) combines the type schema of unt and the
     // descendant schema below <rst1> with both added properties; restore --version 1 stores version 1 again as version 3
-    // ("Restored v1 of the schema for <subject> as v3."; the type schemas with -f for unt and --force for sbt, the case of
-    // schema type restore); the deletes delete each. The view default of <B> has no version of any of these schemas, <A>
+    // ("Restored v1 of the schema for <subject> as v3."; the type schemas with -f for unt and --force for sbt, which change
+    // nothing in <view>); the deletes delete each. The view default of <B> has no version of any of these schemas, <A>
     // none of <rst1>'s, and the versions of the type schemas of unt and sbt in <A> are the same as before the steps.
     [Test]
     [TestCase(336)]
@@ -31,7 +31,7 @@ public sealed class SchemaContextTests : CliTest
     [Covers("story schema type edit", "--projectKey", "-v", "--view")]
     [Covers("story schema type versions", "--projectKey", "-v", "--view")]
     [Covers("story schema type diff", "--projectKey", "-v", "--view")]
-    [Covers("story schema type restore", "arg0", "--version", "-f", "--force", "--projectKey", "-v", "--view")]
+    [Covers("story schema type restore", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation set", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation get", "--projectKey", "-v", "--view")]
     [Covers("story schema annotation edit", "--projectKey", "-v", "--view")]
@@ -158,7 +158,7 @@ public sealed class SchemaContextTests : CliTest
 
     // One schema of the steps: its layer (type, annotation, descendant), its arguments, how sform names it, the form of the
     // view option its commands use, the property the fake editor adds to it, and the force option of its restore (-f or
-    // --force, which the type schemas use: SCH-CTX-01 is the case of schema type restore).
+    // --force, which the type schemas use; SCH-TYP-06 checks what they do).
     private sealed record Subject(string Layer, string[] Arguments, string Description, string ViewOption, string Added, string? Force = null)
     {
         // story schema <layer> <verb> <arguments> <options> --projectKey <project> <view option> <view>

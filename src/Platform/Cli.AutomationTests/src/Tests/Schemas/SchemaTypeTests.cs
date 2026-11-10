@@ -189,4 +189,44 @@ public sealed class SchemaTypeTests : CliTest
             (await Sform(InProject("story", "schema", "type", "versions", code))).ShouldListVersions(1);
         }
     }
+
+    // SCH-TYP-06: schema type restore --version stores an earlier version; configurations that break it need -f.
+    // A unit <unt> of <rst>. The type schema of unt requires req (version 1), then does not (version 2), and <unt> gets the
+    // configuration {a: 1}. schema type restore unt --version 1 ends with 2 and names <unt> (<view>), and version 2 stays
+    // the current one; with -f it says "Restored v1 of the schema for 'unt' as v3."; --version 3 says "v3 is already the
+    // current version of the schema for 'unt'." and ends with 42; --version 2 says "Restored v2 of the schema for 'unt' as
+    // v4.", and --version 1 --force "Restored v1 of the schema for 'unt' as v5."; get then returns version 5 with the content
+    // of version 1.
+    [Test]
+    [TestCase(491)]
+    [UserRole(Role.Owner)]
+    [DisposableProject]
+    [Covers("story schema type restore", "arg0", "--version", "-f", "--force")]
+    public async Task SchemaType_Restore()
+    {
+        await CreateDisposableProjectAsync();
+        var rst = CliData.ResponsibilityKey();
+        var unt = CliData.UnitKeyOf(rst);
+        (await Sform(InProject("story", "set", rst))).ShouldSucceed();
+        (await Sform(InProject("story", "set", unt))).ShouldSucceed();
+        var requiresReq = SchemaChecks.RequiringSchema("req");
+        await WriteFileAsync("requires-req.json", requiresReq);
+        await WriteFileAsync("s.json", SchemaChecks.ObjectSchema("req"));
+        (await Sform(InProject("story", "schema", "type", "set", "unt", "-i", "requires-req.json"))).ShouldSucceed().ShouldHaveVersion(1);
+        (await Sform(InProject("story", "schema", "type", "set", "unt", "-i", "s.json"))).ShouldSucceed().ShouldHaveVersion(2);
+        (await Sform(InProject("story", "config", "set", unt, "-x", "a=1"))).ShouldSucceed();
+        const string subject = "the schema for 'unt'";
+
+        (await Sform(Restore("1"))).ShouldRefuseForConfiguration(unt, View);
+        (await Sform(InProject("story", "schema", "type", "get", "unt"))).ShouldSucceed().ShouldHaveVersion(2);
+
+        (await Sform(Restore("1", "-f"))).ShouldSucceed().ShouldContain($"Restored v1 of {subject} as v3.");
+        (await Sform(Restore("3"))).ShouldExitWith(CliExit.NoWorkNeeded).ShouldContain($"v3 is already the current version of {subject}.");
+        (await Sform(Restore("2"))).ShouldSucceed().ShouldContain($"Restored v2 of {subject} as v4.");
+        (await Sform(Restore("1", "--force"))).ShouldSucceed().ShouldContain($"Restored v1 of {subject} as v5.");
+
+        (await Sform(InProject("story", "schema", "type", "get", "unt"))).ShouldSucceed().ShouldPrintSchema(requiresReq, 5);
+
+        string[] Restore(string version, params string[] options) => InProject(["story", "schema", "type", "restore", "unt", "--version", version, .. options]);
+    }
 }
