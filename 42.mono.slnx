@@ -46,6 +46,7 @@
     <Project Path="src/Libraries/CLI/Toolkit.Example/src/Toolkit.Example.csproj" />
     <Project Path="src/Libraries/CLI/Toolkit/src/Toolkit.csproj" />
   </Folder>
+  <Folder Name="/Libraries/Platform/" />
   <Folder Name="/Libraries/Platform/Storyteller/">
     <Project Path="src/Libraries/Platform/Storyteller/Aspire.Hosting/src/Aspire.Hosting.csproj" />
     <Project Path="src/Libraries/Platform/Storyteller/Aspire.Hosting/test/Aspire.Hosting.UnitTests.csproj" />
@@ -92,17 +93,19 @@
   <Folder Name="/Platform/">
     <Project Path="src/Platform/Aspire.Host/src/Aspire.Host.Platform.csproj" />
     <Project Path="src/Platform/Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
-    <Project Path="src/Platform/Automation.Shared/src/Automation.Shared.csproj" />
-    <Project Path="src/Platform/Automation.Shared/test/Automation.Shared.UnitTests.csproj" />
-    <Project Path="src/Platform/Cli.AutomationTests/editor/Cli.AutomationTests.Editor.csproj" />
-    <Project Path="src/Platform/Cli.AutomationTests/src/Cli.AutomationTests.csproj" />
     <Project Path="src/Platform/Cli/src/Cli.csproj" />
     <Project Path="src/Platform/Cli/test/Cli.UnitTests.csproj" />
-    <Project Path="src/Platform/UI.Admin.AutomationTests/src/UI.Admin.AutomationTests.csproj" />
     <Project Path="src/Platform/ui.admin/src/ui.admin.esproj">
       <Build />
       <Deploy />
     </Project>
+  </Folder>
+  <Folder Name="/Platform/AutomationTests/">
+    <Project Path="src/Platform/Automation.Shared/src/Automation.Shared.csproj" />
+    <Project Path="src/Platform/Automation.Shared/test/Automation.Shared.UnitTests.csproj" />
+    <Project Path="src/Platform/Cli.AutomationTests/editor/Cli.AutomationTests.Editor.csproj" />
+    <Project Path="src/Platform/Cli.AutomationTests/src/Cli.AutomationTests.csproj" />
+    <Project Path="src/Platform/UI.Admin.AutomationTests/src/UI.Admin.AutomationTests.csproj" />
   </Folder>
   <Folder Name="/Platform/Examples/">
     <Project Path="src/Platform/Examples/CustomClientApp/src/CustomClientApp.csproj" />
