@@ -70,10 +70,10 @@ TAGS="product=2s-platform environment=prod managedBy=manual"
 ```sh
 az account set --subscription "$SUBSCRIPTION"
 for p in Microsoft.Web Microsoft.App Microsoft.DocumentDB Microsoft.KeyVault Microsoft.Storage \
-         Microsoft.Insights Microsoft.OperationalInsights Microsoft.ManagedIdentity Microsoft.Consumption; do
+         Microsoft.Insights Microsoft.OperationalInsights Microsoft.ManagedIdentity Microsoft.Consumption \n         Microsoft.AlertsManagement; do
   az provider register --namespace "$p"
 done
-az provider list --query "[?registrationState!='Registered' && contains(namespace,'Microsoft.')].namespace" -o tsv | grep -E "Web|App|DocumentDB|KeyVault|Storage|Insights|OperationalInsights|ManagedIdentity|Consumption" || echo "all registered"
+az provider list --query "[?registrationState!='Registered' && contains(namespace,'Microsoft.')].namespace" -o tsv | grep -E "Web|App|DocumentDB|KeyVault|Storage|Insights|OperationalInsights|ManagedIdentity|Consumption|AlertsManagement" || echo "all registered"
 ```
 
 4. Check that Flex Consumption is offered in Sweden Central:
