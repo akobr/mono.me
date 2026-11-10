@@ -16,7 +16,8 @@ public enum CosmosEmulatorKind
     Local,
 
     // The Linux vNext emulator in a container: the default with STORYTELLER_TESTS_USE_CONTAINER=true. No request
-    // charges (a flat 1 RU), no range or composite indexes, and replacing container settings does nothing.
+    // charges (a flat 1 RU), no range or composite indexes, no paging of an ORDER BY query from a Linux client (one page, whatever its
+    // MaxItemCount), and replacing container settings does nothing.
     VNext,
 
     // The classic Linux emulator in a container (STORYTELLER_TESTS_EMULATOR=classic): the engine of the service, with
