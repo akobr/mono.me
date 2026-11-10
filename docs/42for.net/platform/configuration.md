@@ -25,7 +25,7 @@ Writing again merges into the stored document. Objects combine property by prope
 - `$remove` — an array of JSON paths to drop from the stored document after the merge
 - `$patch` — a JSON Patch array applied after `$remove`
 
-Both instructions are consumed by the write. They are not left in the stored document. A JSON Patch may start with `test` operations that check the values the client last read. When a value has changed in the meantime, the API answers `412 Precondition Failed` with the error code `PatchTestFailed` and stores nothing, so two editors cannot silently overwrite each other. Any other invalid patch answers `400` with `PatchInvalid`. A JSON Patch sent on its own needs a stored document: for an annotation that has none (it only inherits values), the API answers `404`, and the first document is written with `PUT` or `POST`. Writing a configuration needs the `Contributor` role on the project. Each change that actually alters the document becomes a version, with an author and a timestamp, and the previous document is kept. You can read any version and diff any two versions of that annotation's own document.
+Both instructions are consumed by the write. They are not left in the stored document. A JSON Patch may start with `test` operations that check the values the client last read. When a value has changed in the meantime, the API answers `412 Precondition Failed` with the error code `PatchTestFailed` and stores nothing, so two editors cannot silently overwrite each other. Any other invalid patch answers `400` with `PatchInvalid`. A JSON Patch sent on its own needs a stored document: for an annotation that has none (it only inherits values), the API answers `404`, and the first document is written with `PUT` or `POST`. Writing a configuration needs the `Contributor` role on the project. Each change that actually alters the document becomes a version, with an author and a timestamp, and the previous document is kept. You can read any version and diff any two versions of that annotation's own document, and restore a version: its document is stored again, whole, as the newest version, so a bad change or a cleared document can be undone. Templates and schemas restore their versions the same way.
 
 ## The effective document
 
@@ -208,7 +208,7 @@ Secrets, effective and resolved documents, the audit of annotations, and deleted
 - **A place for every difference.** Customer, environment, version, and one-off each have a document. Shared behavior is written once.
 - **A single answer at runtime.** The service reads the execution and receives the merge. It does not reimplement inheritance.
 - **A shape you can enforce.** Schemas follow the same ancestry, so a module can define what a valid usage of itself looks like.
-- **A history.** Versions, authors, and diffs are kept per annotation, and two views can be compared before a rollout.
+- **A history.** Versions, authors, and diffs are kept per annotation, an earlier version can be restored, and two views can be compared before a rollout.
 - **Secrets stay behind an explicit read.** The catalog can name a secret without becoming a place that stores it.
 
 The next page is the practical assignment of these levels to a real product: [How to model](modeling). The address of each document, and the HTTP API that reads and writes it, is in [Using the platform](using-the-platform).

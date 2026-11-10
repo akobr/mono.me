@@ -93,12 +93,13 @@ Before templates were versioned, a template lived inside the annotation partitio
 | `GetTemplateVersionsAsync` | Lists the history versions and the current version, oldest first. |
 | `GetTemplateVersionContentAsync` | Returns the content of one version, or `null`. |
 | `GetTemplateVersionChangesAsync` | Diff of `version - 1 → version`, or of any `from → to` pair. Version `0` is an empty object. An unknown version throws `InvalidOperationException`. |
+| `RestoreTemplateVersionAsync` | Stores the content of one version as a new version, whole and as stored: no merge, and a stored `$remove` or `$patch` stays a property. Works after a delete too. A version that is current, or whose content the current template has, writes nothing (`Unchanged`). An unknown or expired version throws `NotFoundException` with `VersionNotFound`. Returns a `VersionRestoreResult` (see [Versions](#versions)). |
 | `GetTemplateHistoriesAsync` | Every template of the view with its versions still in the history, for an [export](export-import.md), in one query of the partition. An empty document is not a version. A deleted template has versions and no current document. |
 | `ImportTemplateAsync` | Imports the file of a template ([export-import.md](export-import.md#templates)). It **replaces** the template rather than merging into it: `$remove` and `$patch` apply to the file's document alone, as on a create. `{}` is skipped (`EmptyDocument`), an equal template is unchanged, and with `Existing` set to `Skip` a different stored template is kept (`DocumentExists`). A dry run writes nothing. |
 
 `CreateOrUpdateTemplateAsync` and `ImportTemplateAsync` share one write path with a `merge` flag: a set merges, an import replaces. Merging would keep the properties the imported file removed. Both allocate the version from `LastVersion` and invalidate the cache like every template write ([Cache](#cache)).
 
-Every write uses the ETag of the item it read. When another writer changed the template in the meantime, the write is retried on fresh data, up to three times; after that `TemplateConcurrencyException` is thrown. An unexpected storage failure throws `ConfigurationStorageException`.
+Every write, a version restore included, uses the ETag of the item it read. When another writer changed the template in the meantime, the write is retried on fresh data, up to three times; after that `TemplateConcurrencyException` is thrown. An unexpected storage failure throws `ConfigurationStorageException`.
 
 Every write is one transactional batch: the history item (for an update or delete), the template change, and the state record `GenerateTemplateStateEntity` (id `{viewName}.gns.{typeCode}`, same partition, guarded by its ETag). The state record survives a deletion of the template and the expiration of its history. It holds:
 
@@ -122,10 +123,12 @@ The routes include the view, like configuration routes:
 | GET | `…/template/{annotationType}/versions/{version}` | `GetTemplateVersion` |
 | GET | `…/template/{annotationType}/versions/{version}/diff` | `GetTemplateVersionDiff` |
 | GET | `…/template/{annotationType}/versions/{version}/diff/{versionFrom}` | `GetTemplateVersionDiffCustom` |
+| POST | `…/template/{annotationType}/versions/{version}/restore` | `RestoreTemplateVersion`: stores that version as the new version |
 
 - Reads require the `Reader` role in the project. A machine needs the scope `Configuration.Read` instead.
-- Writes (`SetTemplate`, `PatchTemplate`, `DeleteTemplate`) require the `Contributor` role in the project. A machine has no role; it needs `Configuration.Write` and the management scope `Template.Write`, both stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Scopes of machines](authentication.md#scopes-of-machines)).
+- Writes (`SetTemplate`, `PatchTemplate`, `DeleteTemplate`, `RestoreTemplateVersion`) require the `Contributor` role in the project. A machine has no role; it needs `Configuration.Write` and the management scope `Template.Write`, both stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Scopes of machines](authentication.md#scopes-of-machines)).
 - Write status codes: `400` for invalid input (JSON, `$patch`, JSON Patch; `ErrorCode` `PatchInvalid` for patch errors), `413` with `ErrorCode` `BodyTooLarge` for a body (a template or a JSON Patch) larger than 4 MiB, `404` for a patch of a missing template, `409` when the concurrency retries run out (`TemplateConcurrencyException`), `412` when a JSON Patch `test` operation does not match the stored template (`ErrorCode` `PatchTestFailed`), `500` for a storage or cache-invalidation failure. A client that puts `test` operations before its changes gets optimistic concurrency: a stale view of the template returns 412 instead of overwriting newer content.
+- `RestoreTemplateVersion` has no body and no `force`, as templates have no schema. It answers `200` with `VersionRestoreResult`, `400` for an unknown type code, `404` with `ErrorCode` `VersionNotFound` for a version that was never written or has expired, `409` with `ErrorCode` `Conflict` when the concurrency retries run out, and `500` for a storage or cache-invalidation failure.
 - Diff endpoints return a `DiffResult`, or unified diff text with `?format=unified`. An unknown version returns `404`.
 
 ## Versions
@@ -136,7 +139,9 @@ Versioning follows configuration versioning:
 - Before a change, the current item is copied into a `GenerateTemplateHistoryEntity` with id `{viewName}.gnv.{typeCode}.{version}`, in the same `{project}.template` partition. Every view has its own version sequence. The copy and the change are written in one transactional batch.
 - A delete also writes the history item of the deleted version. A template created again later continues the numbering after `LastVersion` of the state record, even when the history has already expired. Templates written before the state record existed fall back to the highest history version.
 - History items expire after 365 days (`ttl`). The current version never expires. The expiry is enforced since the containers got item-level TTL with the [key/value pairs](key-values.md#lifecycle) (`DefaultTimeToLive = -1`, set by `ContainerFactory` on the container `organizations`, see the [container settings](annotation-lifecycle.md#containers)); before that, the `ttl` was stored but ignored.
-- `ConfigurationVersion` describes a version: `Version`, `Modified` (who wrote the version and when, see [audit stamps](audit-stamps.md)), `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
+- A restore of version N (`RestoreTemplateVersionAsync`) stores N's content as the next version, stamped with the caller, and keeps the history append-only. A deleted template is brought back this way: the restored version continues after `LastVersion`, as a template created again does. When N is the current version, or the current template has N's content, nothing is written and the result is `Unchanged` with the current version; a pending cache invalidation is still finished, as an equal write finishes it. Otherwise the restore clears the cached calculations as every template write does ([Cache](#cache)). Templates have no audit, so the version records the restore.
+- `VersionRestoreResult` is the answer of a restore: `Outcome` (`Restored` or `Unchanged`), `FromVersion` (N), `Version` (the new version, or the current one when nothing changed) and `Modified` (the write of `Version`).
+- `ConfigurationVersion` describes a version: `Version`, `Modified` (who wrote the version and when, see [audit stamps](audit-stamps.md)), `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version), and `RestoredFrom` (the version a restore copied into this one, null for any other write; the next write drops it).
 
 ## Merge
 
@@ -231,7 +236,7 @@ These writes clear cached calculations, which makes the following read load the 
 - `PatchConfigurationAsync` does the same for an existing item. `ImportConfigurationAsync` writes through the same two paths.
 - `ClearConfigurationAsync`, when stored `Content` has values, deletes the item and then invalidates affected configurations. `DeleteAsync` deletes the item and then invalidates.
 - Every one of them writes first and invalidates after; a failed invalidation is finished by the next write request on the same configuration ([inheritance.md](inheritance.md#cache-and-descendant-freshness)).
-- Every template write (`CreateOrUpdateTemplateAsync` or `ImportTemplateAsync` with a changed content, `PatchTemplateAsync`, `DeleteTemplateAsync`) invalidates the configurations that merge the template, after the template has been written.
+- Every template write (`CreateOrUpdateTemplateAsync` or `ImportTemplateAsync` with a changed content, `PatchTemplateAsync`, `DeleteTemplateAsync`, `RestoreTemplateVersionAsync` that writes a version) invalidates the configurations that merge the template, after the template has been written.
 
 Invalidation (`ConfigurationCacheInvalidator`, `Backend.CosmosDb/src/Configuring/`) sets `CalculatedContent` and `CalculatedContentHash` to null and increments `AffectedCounter`. It works level by level along the ancestor graph (responsibilities and subjects, then units, usages and contexts, then executions, then units of execution), and queries a level only after every patch of the levels above it has finished ([inheritance.md](inheritance.md#cache-and-descendant-freshness) explains why). The patches are sent in transactional batches of at most 100 items per partition, which is the Cosmos DB limit. A failed batch is reported as an error and stops before the next level. If an item was deleted in the meantime, its batch falls back to patching items one by one, skipping deleted ones.
 
@@ -255,7 +260,7 @@ A template write invalidates, in the template's view only, all configurations of
 
 This is a cross-partition operation over all annotation partitions of the view. Changing an `rst` or `sbt` template touches almost every configuration in the view. Configurations of other views are never touched.
 
-When the invalidation after a template write fails, the write stays committed and the state record keeps `IsInvalidationPending`. Repeating the request — even one that changes nothing, a patch of a missing template, or a delete of an already deleted template — finishes the invalidation. So does an import of an equal template that is not a dry run.
+When the invalidation after a template write fails, the write stays committed and the state record keeps `IsInvalidationPending`. Repeating the request — even one that changes nothing, a patch of a missing template, a delete of an already deleted template, or a version restore that changes nothing — finishes the invalidation. So does an import of an equal template that is not a dry run.
 
 A template item written directly into Cosmos, bypassing the service, leaves existing `CalculatedContent` in place. That template is applied on the next calculation, after one of the writes above has cleared the cached document.
 
@@ -288,6 +293,7 @@ sform story template edit <type>
 sform story template delete|remove <type>
 sform story template versions <type>
 sform story template diff <type> [to] [from]
+sform story template restore <type> --version <n>
 ```
 
 | Command | Behaviour |
@@ -296,10 +302,11 @@ sform story template diff <type> [to] [from]
 | `set` | Builds a document from `--import` and `--properties` and merges it into the template (`SetTemplate`). The name of a property is a path in the syntax of [JSON paths](configuration-formats.md#rules-shared-by-every-format), written over the file in order: `-x "db.port=5432"`, `-x "hosts[0]=a"`, `-x "Logging.LogLevel['Microsoft.AspNetCore']=Warning"` (see [Write a configuration](https://42for.net/cli/sform#write-a-configuration)). With `--replace`, the template content is replaced by the document instead: the CLI sends a JSON Patch computed from the current content, so properties that are not in the document are removed and arrays are replaced, not unioned. |
 | `edit` | Opens the current template (or `{}`) in the configured editor, shows the changes, and after a confirmation replaces the template with the edited document, the same way as `set --replace`. |
 | `delete` | Deletes the template; its history is kept. |
-| `versions` | Lists the versions, newest first: version, author, creation time, and expiration time (`—` for the current version). |
+| `versions` | Lists the versions, newest first: version, author, creation time, and expiration time (`—` for the current version), with a `Restored from` column when a listed version was restored. |
 | `diff` | Shows the diff of the latest version against its previous one, of `to` against its previous one, or of `from → to`. |
+| `restore` | Stores version `--version` as the new version (`RestoreTemplateVersion`), also after a delete. It prints `Restored v2 of the template for 'exe' as v5.` and exits with `0`. When nothing changed, it prints `v2 is already the current version of the template for 'exe'.`, or `v2 equals the current version v5 of the template for 'exe'; nothing changed.`, and exits with `42`. `--version` is required and has no short form, as `-v` is the view; without it, or with a version below 1, the command says so and exits with `2` before any request. A version that was never written or has expired prints the server's message and `Error code: VersionNotFound`, and exits with `2`. |
 
-When the API refuses `set`, `edit` or `delete` with `403`, for example for a machine without the management scope `Template.Write`, the command prints the server's message ("This operation needs the scope Template.Write, which the machine was not created with.") and `Error code: AccessDenied`, and exits with `44`.
+When the API refuses `set`, `edit`, `delete` or `restore` with `403`, for example for a machine without the management scope `Template.Write`, the command prints the server's message ("This operation needs the scope Template.Write, which the machine was not created with.") and `Error code: AccessDenied`, and exits with `44`.
 
 Examples, for the `default` view of the current project:
 
@@ -312,10 +319,11 @@ sform story template edit exe
 sform story template versions exe
 sform story template diff exe 3 1
 sform story template exe --version 2 -e exe-v2.json
+sform story template restore exe --version 2
 sform story template delete exe -v rollout
 ```
 
-The configuration commands work the same way. `sform story config <key> [-r|--resolved | --version <n>] [-f|--format json|flat|properties|env|yaml] [--content-only] [-e|--export <file>]` prints the effective configuration, the resolved one or the stored content of a version: the whole model, or with `--format` or `--content-only` the content alone, formatted by `sform` as the API formats `?format=` (see [Configuration Formats](configuration-formats.md)). `--env-prefix` prefixes the names of `--format env`. `sform story config export <key>` exports a resolved configuration into a GitHub Actions job (`--github-env`) or a file (`--export`), with masks, see [Export to GitHub Actions](https://42for.net/cli/sform#export-to-github-actions). `sform story config versions <key>` lists configuration versions, and `config set --replace` and `config edit` replace the stored content through a JSON Patch. `config edit` edits the stored content of the configuration, without inherited values and templates. The edit commands (`config edit`, `config patch`, `template edit`, `schema … edit`, `sform story edit`) read the saved file as the SDK reads documents: a date-like string stays the string you wrote, up to 256 levels deep, and a property twice in one object is invalid JSON, which re-opens the editor.
+The configuration commands work the same way. `sform story config <key> [-r|--resolved | --version <n>] [-f|--format json|flat|properties|env|yaml] [--content-only] [-e|--export <file>]` prints the effective configuration, the resolved one or the stored content of a version: the whole model, or with `--format` or `--content-only` the content alone, formatted by `sform` as the API formats `?format=` (see [Configuration Formats](configuration-formats.md)). `--env-prefix` prefixes the names of `--format env`. `sform story config export <key>` exports a resolved configuration into a GitHub Actions job (`--github-env`) or a file (`--export`), with masks, see [Export to GitHub Actions](https://42for.net/cli/sform#export-to-github-actions). `sform story config versions <key>` lists configuration versions, and `config set --replace` and `config edit` replace the stored content through a JSON Patch. `sform story config restore <key> --version <n> [-f|--force]` stores a version of the stored content as the new version, whole and as stored, also after `config delete` cleared it ([inheritance.md](inheritance.md#cache-and-descendant-freshness)). It answers as `template restore` does, about `the configuration for '<key>'`. A version that violates the schema prints the violations and exits with `2`; `--force` stores it anyway. A deleted or missing annotation prints the server's message and `Error code: AnnotationDeleted` or `AnnotationNotFound`, and exits with `2`. `config edit` edits the stored content of the configuration, without inherited values and templates. The edit commands (`config edit`, `config patch`, `template edit`, `schema … edit`, `sform story edit`) read the saved file as the SDK reads documents: a date-like string stays the string you wrote, up to 256 levels deep, and a property twice in one object is invalid JSON, which re-opens the editor.
 
 `sform story config composition <key> [-e|--export <file>]` shows how the effective document of `<key>` is composed. It prints a table of the merges in order (`Step`, `Applied at` indented by depth, `Source`, `Version`, `Presence`, and `Values`, the number of values the merge set) and then the effective document with the step that set each line. `--export` writes the whole composition response. A machine restricted to one annotation gets the server's `403 AnnotationRestricted`. See [inheritance.md](inheritance.md#composition-read).
 

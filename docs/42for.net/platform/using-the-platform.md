@@ -160,6 +160,14 @@ GET /v1/{org}/{project}/{view}/configuration/{key}/versions/{version}/diff
 GET /v1/{org}/{project}/{view}/configuration/{key}/versions/{version}/diff/{versionFrom}
 ```
 
+To go back to an earlier version, restore it:
+
+```text
+POST /v1/{org}/{project}/{view}/configuration/{key}/versions/{version}/restore
+```
+
+The document of that version is stored again, as it was, as the newest version, also after `DELETE` cleared it. The new version names the one it came from (`RestoredFrom`), and the annotation's history records the restore. Restoring the current version, or a version with the current document, changes nothing and says so (`Outcome` `Unchanged`). A version that fails the schema is rejected with `409` unless you add `?force=true`. For a deleted annotation it answers `409 AnnotationDeleted`: restore the annotation first. A version that expired or never existed answers `404 VersionNotFound`.
+
 A diff between views compares the effective configuration:
 
 ```text
@@ -180,6 +188,8 @@ Schemas belong to a view, like configuration: each view has its own schemas, wit
 | The merged schema a write will be checked against | `GET /v1/{org}/{project}/{view}/configuration-schema/{key}/definition` |
 
 `annotationType` is the short code: `rst`, `sbt`, `cnt`, `usg`, `exe`, `unt`, `uxe`. The body is a JSON Schema. A write of configuration that fails the combined schema is rejected, and the error names the key.
+
+Each layer keeps its versions under `…/versions` of its path, as configuration does, and `POST …/versions/{version}/restore` brings one back as the newest version. When stored configurations do not comply with it, the restore is rejected with `409`, unless you add `?force=true`. Templates do the same under `/v1/{org}/{project}/{view}/template/{annotationType}/versions/{version}/restore`.
 
 ## Exporting and importing a view
 
