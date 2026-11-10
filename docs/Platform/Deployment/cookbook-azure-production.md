@@ -327,7 +327,8 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 Invitation emails need the WorkOS management key. When you want them, store it and add the setting:
 
 ```sh
-az keyvault secret set --vault-name "$KV" --name authkit-api-key --value "<sk_…>" --output none
+# Store the key as the secret authkit-api-key without putting it on a command line: in the portal
+# (the vault -> Objects -> Secrets -> Generate/Import), or with Az PowerShell's prompt (src/Platform/Deployment/README.md).
 az functionapp config appsettings set -g "$RG" -n "$FUNC" --output none \
   --settings "Auth__AuthKit__ApiKey=@Microsoft.KeyVault(VaultName=$KV;SecretName=authkit-api-key)"
 ```
@@ -545,7 +546,7 @@ SENTRY_DSN="<dsn>" POSTHOG_PROJECT_TOKEN="<token>" POSTHOG_HOST="https://eu.i.po
   node build/write-environment-config.ts
 grep -cE "__(API_ORIGIN|AUTH_HOSTNAME|SENTRY_ORIGIN|POSTHOG_ORIGIN)__" dist/staticwebapp.config.json   # must print 0
 SWA_TOKEN=$(az staticwebapp secrets list -g "$RG" -n "$SWA" --query properties.apiKey -o tsv)   # also when step 9 was the templates
-npx @azure/static-web-apps-cli deploy ./dist --deployment-token "$SWA_TOKEN" --env production
+SWA_CLI_DEPLOYMENT_TOKEN="$SWA_TOKEN" npx @azure/static-web-apps-cli deploy ./dist --env production   # the token isn't an argument
 unset SWA_TOKEN
 cd -
 ```

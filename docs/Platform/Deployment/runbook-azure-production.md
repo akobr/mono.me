@@ -53,8 +53,9 @@ node --version                     # v24 (phase 11, the admin UI)
 **The checkout.** Until [PR #183](https://github.com/akobr/mono.me/pull/183) is merged, work on its branch; afterwards on a short branch from `main` (the parameters file gets commits in phases 4 and 8):
 
 ```powershell
-git switch feat/424-231            # or: git switch --no-track -c chore/prod-environment-ids origin/main
-git pull
+git fetch origin
+git switch feat/424-231; git pull                                   # while PR #183 is open
+# or, after it is merged: git switch --no-track -c chore/prod-environment-ids origin/main   (no pull: origin/main is fresh)
 cd src/Platform/Deployment
 ```
 
@@ -298,10 +299,12 @@ Run `domains.bicep` again only to rebind: it switches the API's TLS off for a fe
 **By hand:**
 
 1. In `parameters/prod.bicepparam` set `authKitClientId = '<client_…>'`.
-2. Optional, invitation emails: store the WorkOS API key and set `authKitApiKeyEnabled = true`:
+2. Optional, invitation emails: store the WorkOS API key as the secret `authkit-api-key` and set `authKitApiKeyEnabled = true`. the key never goes on a command line (it would stay in the shell history and the process list). Either in the portal: **prod-2s-42fornet-kv → Objects → Secrets → Generate/Import**, name `authkit-api-key`, paste the `sk_…` value (you are Key Vault Administrator); or with Az PowerShell, which prompts for it:
 
    ```powershell
-   az keyvault secret set --vault-name prod-2s-42fornet-kv --name authkit-api-key --value '<sk_…>' --output none
+   Connect-AzAccount -Subscription prod-42fornet-sub   # once, if Az PowerShell isn't signed in
+   Set-AzKeyVaultSecret -VaultName prod-2s-42fornet-kv -Name authkit-api-key `
+     -SecretValue (Read-Host -AsSecureString -Prompt 'WorkOS API key (sk_…)') | Out-Null
    ```
 
 3. Commit and push: `git commit -am "chore(platform): the WorkOS production client id (424-231)"`, `git push -u origin HEAD`.
@@ -457,13 +460,14 @@ A later schema change that adds a container needs the limit back at `-1` for the
       throw 'dist/staticwebapp.config.json still has CSP placeholders.'
     }
 
-    $token = az staticwebapp secrets list -g prod-2s-eusec-rg -n prod-2s-app-swa --query properties.apiKey -o tsv
-    if (-not $token) { throw 'The Static Web App returned no deployment token.' }
-    npx @azure/static-web-apps-cli deploy ./dist --deployment-token $token --env production
+    # The SWA CLI reads the token from SWA_CLI_DEPLOYMENT_TOKEN, so it is never a command-line argument.
+    $env:SWA_CLI_DEPLOYMENT_TOKEN = az staticwebapp secrets list -g prod-2s-eusec-rg -n prod-2s-app-swa --query properties.apiKey -o tsv
+    if (-not $env:SWA_CLI_DEPLOYMENT_TOKEN) { throw 'The Static Web App returned no deployment token.' }
+    npx @azure/static-web-apps-cli deploy ./dist --env production
   }
   finally {
     Remove-Item Env:API_BASE_URL, Env:AUTH_API_HOSTNAME, Env:ENVIRONMENT_NAME, Env:SENTRY_DSN, Env:POSTHOG_PROJECT_TOKEN, `
-      Env:POSTHOG_HOST, Env:RELEASE -ErrorAction SilentlyContinue
+      Env:POSTHOG_HOST, Env:RELEASE, Env:SWA_CLI_DEPLOYMENT_TOKEN -ErrorAction SilentlyContinue
     Pop-Location
   }
 }
