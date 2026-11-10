@@ -10,6 +10,7 @@ namespace _42.Platform.Cli.Commands.Schemas;
     typeof(SchemaTypeEditCommand),
     typeof(SchemaTypeDeleteCommand),
     typeof(SchemaTypeVersionsCommand),
+    typeof(SchemaTypeRestoreCommand),
     typeof(SchemaTypeDiffCommand))]
 
 [Command(CommandNames.TYPE, Description = "Get and manage the configuration schema of an annotation type in the view.")]

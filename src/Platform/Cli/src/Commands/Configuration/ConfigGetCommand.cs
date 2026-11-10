@@ -22,6 +22,7 @@ namespace _42.Platform.Cli.Commands.Configuration;
     typeof(ConfigDeleteCommand),
     typeof(ConfigDiffCommand),
     typeof(ConfigVersionsCommand),
+    typeof(ConfigRestoreCommand),
     typeof(ConfigCompositionCommand),
     typeof(ConfigExportCommand))]
 
