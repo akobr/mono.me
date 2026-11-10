@@ -17,7 +17,8 @@ public enum CosmosEmulatorKind
 
     // The Linux vNext emulator in a container: the default with STORYTELLER_TESTS_USE_CONTAINER=true. No request
     // charges (a flat 1 RU), no range or composite indexes, no paging of an ORDER BY query from a Linux client (one page, whatever its
-    // MaxItemCount), and replacing container settings does nothing.
+    // MaxItemCount), the id of an expired item taken for about a second after reads stop returning it, and replacing
+    // container settings does nothing.
     VNext,
 
     // The classic Linux emulator in a container (STORYTELLER_TESTS_EMULATOR=classic): the engine of the service, with
@@ -55,7 +56,7 @@ public sealed class CosmosTestEmulator
     // Request charges, indexing policies and container settings behave as in Azure.
     public bool IsLikeTheService => Kind != CosmosEmulatorKind.VNext;
 
-    public static string SkipReasonOnVNext => "The vNext emulator has no request charges, no range indexes, does not apply container settings, and does not keep the page size of every query; run with STORYTELLER_TESTS_EMULATOR=classic or the local emulator.";
+    public static string SkipReasonOnVNext => "The vNext emulator has no request charges, no range indexes, does not apply container settings, does not keep the page size of every query, and frees the id of an expired item late; run with STORYTELLER_TESTS_EMULATOR=classic or the local emulator.";
 
     // reuseLabel keeps one reused emulator per test module: the cleanup deletes the platform database, and Testcontainers'
     // reuse is not safe when two modules start the same container at once (two containers, one hash).

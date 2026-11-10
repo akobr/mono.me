@@ -77,6 +77,16 @@ The findings of the review of pull request #182, which delivers the spec [Shared
 - `Listing_Pages` now carries the trait `Emulator=Classic` and skips itself on vNext. The skip reason of `CosmosTestEmulator` names the page size. On the classic emulator it passes (the 5 classic tests, 5 of 5).
 - The rest of the vNext suite passed on Linux in that job, so no other test depends on the page size.
 
+### 9. A later pull request run
+
+- The vNext job of run 3 ([42726450097](https://github.com/akobr/mono.me/actions/runs/42726450097), commit `fc41cc2`) failed in one test, `CosmosKeyValueServiceTests.ExpiredDeletedKey_IsGoneAndANewCreateContinuesAfterItsVersions`: the recreate of the expired key threw `ConflictException` (changed concurrently 8 times). Run 2 (commit `b06a392`, the same code) had passed it.
+- The cause is the vNext emulator, not the shared container:
+  - After the deleted key's time to live, a point read answers 404, but `CreateItemAsync` with the same id answers 409 Conflict for about 0.95 seconds more. A throwaway probe measured it in every round, with the hierarchical key and with a plain `/PartitionKey` container alike.
+  - `SetAsync` reads 404, creates, gets 409 and retries; its 8 attempts back off about 0.6 seconds in all, so it gives up inside that second.
+  - The test polls the read every 2 seconds and sees the 404 about 4 seconds after the delete, right at the end of the 3-second retention and the second after it. Whether the recreate lands before or after the id is freed is a matter of timing, so the test passes or fails from run to run.
+  - The classic emulator, the engine of the service, frees the id with the expiry: the same probe created the item again within 20 ms of the first 404, with no conflict.
+- The test now carries the trait `Emulator=Classic` and skips itself on vNext, so it runs in the classic job of every pull request. The test and its assertions are unchanged. The skip reason and the vNext notes of `CosmosTestEmulator` name the late id. `SetAsync` stays as it is: it is right on the service.
+
 ### Validation
 
 - The affected projects build: `DbCreator`, `Api.Functions`, `Api.Web` and both Cosmos DB test projects.
@@ -84,6 +94,6 @@ The findings of the review of pull request #182, which delivers the spec [Shared
   - `Backend.CosmosDb/test` without the classic trait, with the guard: 778 of 778;
   - `Access.Certificates/testint`: 73 of 73.
 - On the pinned classic emulator:
-  - the `Emulator=Classic` tests: 4 of 4, and 5 of 5 with `Listing_Pages`;
+  - the `Emulator=Classic` tests: 4 of 4, 5 of 5 with `Listing_Pages`, and 6 of 6 with `ExpiredDeletedKey_IsGoneAndANewCreateContinuesAfterItsVersions`;
   - the guard tests and the isolation tests of annotations, configurations and transfers: 35 of 35.
 - The pull request trigger of the workflow runs once this branch is pushed.

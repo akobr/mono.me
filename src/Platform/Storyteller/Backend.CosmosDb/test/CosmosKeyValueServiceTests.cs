@@ -154,8 +154,13 @@ public class CosmosKeyValueServiceTests(Startup startup)
     }
 
     [Fact]
+    [Trait(CosmosTestEmulator.TraitName, CosmosTestEmulator.ClassicTrait)]
     public async Task ExpiredDeletedKey_IsGoneAndANewCreateContinuesAfterItsVersions()
     {
+        // The vNext emulator (vnext-EN20261019) hides an expired item from reads about a second before it frees its id: a
+        // create in that second answers 409 Conflict, and the recreate runs out of attempts. The service frees it at once.
+        Assert.SkipUnless(Context.Emulator.IsLikeTheService, CosmosTestEmulator.SkipReasonOnVNext);
+
         var project = NewProject("expiry");
         var shortLived = CreateService(versionRetention: TimeSpan.FromSeconds(40), deletedRetention: TimeSpan.FromSeconds(3));
 

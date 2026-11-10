@@ -61,7 +61,7 @@ docker stop hpk-probe-classic
 
 ## Run 2: the vNext Linux emulator
 
-The vNext emulator is lighter and starts in seconds, but it has no stored procedures, no request charges and no range indexes yet, and it answers an `ORDER BY` query from a Linux client (whose SDK gets the query plan from the emulator) in one page, whatever its `MaxItemCount`. The .NET SDK needs it in HTTPS mode.
+The vNext emulator is lighter and starts in seconds, but it has no stored procedures, no request charges and no range indexes yet, and it answers an `ORDER BY` query from a Linux client (whose SDK gets the query plan from the emulator) in one page, whatever its `MaxItemCount`. An expired item stays in the way of a create with its id (409 Conflict) for about a second after reads stop returning it. The .NET SDK needs it in HTTPS mode.
 
 ```sh
 docker run --rm -d --name hpk-probe-vnext -p 28081:8081 -p 28080:8080 \
