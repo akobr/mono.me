@@ -4,9 +4,10 @@
 //   az deployment group create --resource-group prod-2s-eusec-rg --template-file domains.bicep \
 //     --parameters parameters/prod.domains.bicepparam
 //
-// It is apart from main.bicep because the first binding of a managed certificate writes the hostname binding twice
-// (without TLS, then with the issued certificate): in main.bicep every run would switch TLS off for a few seconds.
-// Run it again only to rebind. The certificates renew themselves.
+// The first run binds the host name without TLS (the managed certificate needs a bound, validated host name), issues
+// the certificate and binds it with SNI. Once the domain is bound, set apiHostNameBound = true in the parameters file:
+// later runs skip the step without TLS and write the binding with SNI and the certificate's current thumbprint
+// directly, so HTTPS stays up. The certificates renew themselves.
 
 import { environmentName, resourceNames, resourceTags } from 'naming.bicep'
 
@@ -26,6 +27,9 @@ param appHostName string
 
 param location string = resourceGroup().location
 
+@description('true once the API\'s host name is bound with its certificate: reruns then keep TLS on (no binding without TLS).')
+param apiHostNameBound bool = false
+
 var names = resourceNames(environment, product, company, regionCode)
 var tags = resourceTags(environment)
 
@@ -39,7 +43,7 @@ resource staticWebApp 'Microsoft.Web/staticSites@2025-03-01' existing = {
 
 // The API: bind the host name (validated by the TXT record asuid.<host>), issue the site-scoped managed certificate,
 // then bind it with SNI.
-module apiHostName_bind 'modules/hostname-binding.bicep' = {
+module apiHostName_bind 'modules/hostname-binding.bicep' = if (!apiHostNameBound) {
   name: 'platform-api-hostname'
   params: {
     siteName: functionApp.name

@@ -111,7 +111,7 @@ az deployment group create --name prod-2s-domains --resource-group prod-2s-eusec
   --template-file domains.bicep --parameters parameters/prod.domains.bicepparam
 ```
 
-It binds `api.2s.42for.net` to the Function App, issues its free managed certificate (site-scoped, as Flex Consumption has it) and binds it with SNI, and adds `app.2s.42for.net` to the Static Web App. If ARM refuses the managed certificate of the Function App, add the domain in the portal as the cookbook says (**Function App → Custom domains → Add custom domain**, App Service Managed Certificate). Run `domains.bicep` again only to rebind: its first binding switches TLS off for a few seconds.
+It binds `api.2s.42for.net` to the Function App, issues its free managed certificate (site-scoped, as Flex Consumption has it) and binds it with SNI, and adds `app.2s.42for.net` to the Static Web App. If ARM refuses the managed certificate of the Function App, add the domain in the portal as the cookbook says (**Function App → Custom domains → Add custom domain**, App Service Managed Certificate). After the first run, set `apiHostNameBound = true` in `parameters/prod.domains.bicepparam` and commit it: a later run then writes the binding with SNI and the certificate's current thumbprint directly, without switching TLS off.
 
 ### 5. WorkOS, Sentry and PostHog (steps 13 and 14)
 
@@ -146,7 +146,7 @@ Run `what-if`, then `create`, from an up-to-date checkout with the two owner var
 - **The app settings belong to the template.** A setting added by hand in the portal is removed by the next run; add it to `modules/functions.bicep`, and its value to the parameters file.
 - **The managed identity is never re-created**: its principal id is the subject of the BYOK federation.
 - **Rotating the Cosmos DB keys** (cookbook, step 7): switch `cosmosConnectionKey` to the other key, run `main.bicep`, restart the Function App (the app setting references the secret without a version, which the app refreshes only about once a day), then regenerate the key no longer in use.
-- `domains.bicep` is not part of a normal run. A second run writes the binding without TLS, then puts the certificate again (an existing managed certificate is kept, not reissued) and binds it: the API's domain is without TLS for a few seconds.
+- `domains.bicep` is not part of a normal run. With `apiHostNameBound = true` a rerun puts the certificate again (an existing managed certificate is kept, not reissued) and writes the binding with SNI directly, so TLS stays on; with `false` it first writes the binding without TLS, and the API's domain is without TLS for a few seconds.
 - `MachineAuth__DisabledCredentialKinds__*` is read by the API only once [424-232](https://linear.app/424fun/issue/424-232/turn-off-machine-credential-kinds-per-deployment) is merged. Until then the setting has no effect. That is safe: with `IsCertificateHeaderFromClientAllowed=false` a certificate machine can't sign in anyway, but projects can still enable the kinds.
 
 ## Checks
