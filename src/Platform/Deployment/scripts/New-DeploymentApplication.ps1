@@ -35,8 +35,15 @@ $account = az account show --query '{tenantId:tenantId, subscriptionId:id}' -o j
 
 # Entra allows only letters, digits, '-' and '_' in the name, so the environment's other characters become '-', and a
 # short hash of the environment keeps distinct environments (prod.42.Team-A, prod.42.Team.A) apart.
+# GitHub puts the environment into the subject as it is, so a ':' would make the subject ambiguous.
+if ($GitHubEnvironment.Contains(':')) {
+    throw "The GitHub environment '$GitHubEnvironment' contains ':', which the naming convention never uses."
+}
+
 $hash = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($GitHubEnvironment))).Substring(0, 8).ToLowerInvariant()
-$credentialName = "github-$($GitHubEnvironment -replace '[^A-Za-z0-9_-]', '-')-$hash"
+# Entra allows at most 120 characters: 'github-' (7) + 104 + '-' + 8.
+$sanitized = $GitHubEnvironment -replace '[^A-Za-z0-9_-]', '-'
+$credentialName = "github-$($sanitized.Substring(0, [Math]::Min(104, $sanitized.Length)))-$hash"
 
 $appId = Get-OrCreateApplication -DisplayName $DisplayName -SignInAudience AzureADMyOrg
 $principalId = Get-OrCreateServicePrincipal -AppId $appId
