@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -7,10 +8,15 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import { mockServiceWorker } from './build/mock-service-worker.ts'
 import { sdkFreshness } from './build/sdk-freshness.ts'
 
+// The real path of the project. Vite gives modules their real paths, so through a junction or symlink (such as
+// C:/Users/me/work -> D:/work) the router plugin, which resolves the pages from the working directory, would match no
+// page and leave definePage() in the bundle ("definePage is not defined" at run time).
+const root = realpathSync.native(fileURLToPath(new URL('.', import.meta.url)))
+
 export default defineConfig(({ command, mode }) => ({
   plugins: [
     // Vue Router 5 file-based routing; must come before vue().
-    VueRouter({ routesFolder: 'app/pages', dts: 'app/typed-router.d.ts' }),
+    VueRouter({ root, routesFolder: 'app/pages', dts: 'app/typed-router.d.ts' }),
     vue(),
     ui({
       ui: { colors: { primary: 'purple', neutral: 'zinc' } },
