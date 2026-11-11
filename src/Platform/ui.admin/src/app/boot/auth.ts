@@ -60,7 +60,9 @@ const currentPath = () => `${location.pathname}${location.search}${location.hash
 
 /**
  * Creates the AuthKit client. Without a custom AuthKit domain the refresh token lives in localStorage
- * (devMode), so that is allowed on localhost only; any other host without authApiHostname is a configuration error.
+ * (devMode), so that is allowed on localhost, and on a deployed host only when its configuration opts in with
+ * authLocalStorageSession (a stopgap until the custom domain exists); otherwise a host without authApiHostname is a
+ * configuration error.
  */
 export async function createAuth(config: AppConfig): Promise<AuthBoot> {
   const configuration = await loadAuthConfiguration(config)
@@ -75,11 +77,14 @@ export async function createAuth(config: AppConfig): Promise<AuthBoot> {
 
   const local = isLocalhost()
 
-  if (!local && !config.authApiHostname) {
+  const localStorageSession = !local && !config.authApiHostname && config.authLocalStorageSession === true
+
+  if (!local && !config.authApiHostname && !localStorageSession) {
     return {
       status: 'error',
       message:
-        'authApiHostname is missing in /app-config.json. Deployed environments must use a custom AuthKit domain.',
+        'authApiHostname is missing in /app-config.json. Deployed environments must use a custom AuthKit domain, ' +
+        'or opt in to a localStorage session with authLocalStorageSession.',
     }
   }
 
@@ -87,7 +92,7 @@ export async function createAuth(config: AppConfig): Promise<AuthBoot> {
 
   const client = await createClient(configuration.ClientId, {
     apiHostname: local ? undefined : config.authApiHostname,
-    devMode: local,
+    devMode: local || localStorageSession,
     redirectUri: `${location.origin}/callback`,
     onRedirectCallback: ({ state }) => {
       returnTo = safeReturnTo(state?.returnTo)

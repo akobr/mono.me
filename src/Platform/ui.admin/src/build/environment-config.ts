@@ -6,6 +6,8 @@
 export interface EnvironmentVariables {
   API_BASE_URL?: string
   AUTH_API_HOSTNAME?: string
+  /** "true" allows the deployment without AUTH_API_HOSTNAME: the refresh token lives in localStorage (a stopgap). */
+  AUTH_LOCAL_STORAGE_SESSION?: string
   ENVIRONMENT_NAME?: string
   SENTRY_DSN?: string
   POSTHOG_PROJECT_TOKEN?: string
@@ -17,7 +19,8 @@ export interface EnvironmentVariables {
 /** The content of app-config.json, read by app/boot/app-config.ts. */
 export interface AppConfigFile {
   apiBaseUrl: string
-  authApiHostname: string
+  authApiHostname?: string
+  authLocalStorageSession?: boolean
   environmentName?: string
   sentryDsn?: string
   posthogProjectToken?: string
@@ -32,6 +35,9 @@ export interface EnvironmentConfig {
   /** The value of each placeholder of staticwebapp.config.json. */
   replacements: Record<Placeholder, string>
 }
+
+/** The host AuthKit uses without a custom AuthKit domain. */
+export const DEFAULT_AUTH_HOSTNAME = 'api.workos.com'
 
 /** The host the app uses when posthogHost is missing (app/boot/app-config.ts). */
 export const DEFAULT_POSTHOG_HOST = 'https://eu.i.posthog.com'
@@ -59,8 +65,13 @@ function httpsOrigin(value: string, variable: string): string {
 export function environmentConfig(variables: EnvironmentVariables): EnvironmentConfig {
   const apiBaseUrl = nonEmpty(variables.API_BASE_URL)
   const authApiHostname = nonEmpty(variables.AUTH_API_HOSTNAME)
-  if (!apiBaseUrl || !authApiHostname) {
-    throw new Error('UI_ADMIN_API_BASE_URL and UI_ADMIN_AUTH_API_HOSTNAME are required.')
+  // Only without a custom AuthKit domain: the domain wins when both are set.
+  const authLocalStorageSession = !authApiHostname && variables.AUTH_LOCAL_STORAGE_SESSION === 'true'
+  if (!apiBaseUrl || (!authApiHostname && !authLocalStorageSession)) {
+    throw new Error(
+      'UI_ADMIN_API_BASE_URL and UI_ADMIN_AUTH_API_HOSTNAME are required ' +
+        '(or UI_ADMIN_AUTH_LOCAL_STORAGE_SESSION=true without a custom AuthKit domain).',
+    )
   }
 
   const sentryDsn = nonEmpty(variables.SENTRY_DSN)
@@ -74,6 +85,7 @@ export function environmentConfig(variables: EnvironmentVariables): EnvironmentC
     appConfig: {
       apiBaseUrl,
       authApiHostname,
+      authLocalStorageSession: authLocalStorageSession || undefined,
       environmentName: nonEmpty(variables.ENVIRONMENT_NAME),
       sentryDsn,
       posthogProjectToken,
@@ -82,7 +94,7 @@ export function environmentConfig(variables: EnvironmentVariables): EnvironmentC
     },
     replacements: {
       __API_ORIGIN__: new URL(apiBaseUrl).origin,
-      __AUTH_HOSTNAME__: authApiHostname,
+      __AUTH_HOSTNAME__: authApiHostname ?? DEFAULT_AUTH_HOSTNAME,
       __SENTRY_ORIGIN__: sentryOrigin,
       // PostHog does not start without its token, whatever the host.
       __POSTHOG_ORIGIN__: posthogProjectToken ? posthogOrigin : '',
