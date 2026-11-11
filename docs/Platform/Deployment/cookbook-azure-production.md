@@ -284,10 +284,10 @@ The values of step 13 (WorkOS) are needed for the `Auth__AuthKit__*` settings; f
 ```sh
 AUTHKIT_CLIENT_ID="<WorkOS production client id, client_…>"
 AUTHKIT_AUDIENCE="https://$TRUST_DOMAIN"        # the aud of the JWT template of step 13
-# Without the custom AuthKit domain (step 13, 424-247): the WorkOS issuer and the environment's AuthKit domain.
-# With it: AUTHKIT_ISSUER="https://$AUTH_HOST" AUTHKIT_DOMAIN="https://$AUTH_HOST"
-AUTHKIT_ISSUER="https://api.workos.com/"
+# Without the custom AuthKit domain (step 13, 424-247) the environment's AuthKit domain is both the issuer of user
+# tokens and the AuthKit domain; with it: AUTHKIT_DOMAIN="https://$AUTH_HOST"
 AUTHKIT_DOMAIN="https://<subdomain>.authkit.app"
+AUTHKIT_ISSUER="$AUTHKIT_DOMAIN"
 BYOK_CLIENT_ID="<application id of '2S Platform Customer Keys', step 11>"
 
 az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
@@ -320,7 +320,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 
 | Setting | Why |
 | --- | --- |
-| `Auth__AuthKit__Issuer` | must equal the `iss` of WorkOS tokens: `https://api.workos.com/` until the custom domain exists, then `https://auth.42for.net` |
+| `Auth__AuthKit__Issuer` | must equal the `iss` of WorkOS tokens: the environment's AuthKit domain (`https://<subdomain>.authkit.app`, the `issuer` of its `/.well-known/openid-configuration`) until the custom domain exists, then `https://auth.42for.net` |
 | `Auth__AuthKit__Audience` | tokens must carry this `aud` (the JWT template, step 13): `https://2s.42for.net`, shared by every application of the environment (see "Open points") |
 | `Auth__AuthKit__DefaultUserScopes__0` | every signed-in user gets `User.Impersonation`, and their roles decide the rest; without it (and without a permission map) every user gets `401` |
 | `Auth__TokenExchange__Enabled=false` | no MCP server in this phase |
@@ -460,7 +460,7 @@ Keep the TTL low (300 s) until everything works.
 
 In the WorkOS dashboard, environment **Production**:
 
-1. **Custom domain** for AuthKit: `auth.42for.net`, with the DNS records WorkOS shows (step 12). This is the issuer the API checks (decision 4). **Production starts without it** (about 99 USD a month) and adds it before the first customer ([424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)): until then the issuer is `https://api.workos.com/`, `Auth__AuthKit__AuthKitDomain` is the environment's `<subdomain>.authkit.app`, and the admin UI is built with `AUTH_LOCAL_STORAGE_SESSION=true` ([decisions](decisions.md#without-the-custom-authkit-domain-until-the-first-customer)).
+1. **Custom domain** for AuthKit: `auth.42for.net`, with the DNS records WorkOS shows (step 12). This is the issuer the API checks (decision 4). **Production starts without it** (about 99 USD a month) and adds it before the first customer ([424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)): until then the issuer and `Auth__AuthKit__AuthKitDomain` are the environment's `https://<subdomain>.authkit.app`, and the admin UI is built with `AUTH_LOCAL_STORAGE_SESSION=true` ([decisions](decisions.md#without-the-custom-authkit-domain-until-the-first-customer)).
 2. **The 2S Platform is the default application** of the environment (**Applications**): name it `2S Platform`, and note its **client id** (`client_…`) for `Auth__AuthKit__ClientId` and `VITE_*` of step 15. Every later 42for.net product gets its own application in the same environment, not a new environment ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)): one login and one account everywhere.
 3. **JWT template**, so tokens carry the audience and the profile fields the platform stores:
 
@@ -547,7 +547,7 @@ The UI installs the TypeScript SDK from its folder (`file:../../Storyteller/sdk.
 cd src/Platform/ui.admin/src
 npm ci
 npm run build
-unset AUTH_API_HOSTNAME   # no custom AuthKit domain yet; with it: AUTH_API_HOSTNAME="$AUTH_HOST" and no AUTH_LOCAL_STORAGE_SESSION
+unset AUTH_API_HOSTNAME   # no custom AuthKit domain yet; with it: export AUTH_API_HOSTNAME="$AUTH_HOST" and no AUTH_LOCAL_STORAGE_SESSION
 API_BASE_URL="https://$API_HOST/api" AUTH_LOCAL_STORAGE_SESSION=true ENVIRONMENT_NAME=production \
 SENTRY_DSN="<dsn>" POSTHOG_PROJECT_TOKEN="<token>" POSTHOG_HOST="https://eu.i.posthog.com" RELEASE="$(git rev-parse HEAD)" \
   node build/write-environment-config.ts

@@ -40,7 +40,7 @@ param appHostName string
 @description('The AuthKit domain of WorkOS production: the custom domain (auth.42for.net) or, until it exists, the environment\'s <subdomain>.authkit.app; empty leaves Auth__AuthKit__AuthKitDomain out (decision 4).')
 param authKitDomain string
 
-@description('true when authKitDomain is the custom AuthKit domain: it is then the issuer of user tokens and the admin UI\'s AuthKit host. false: the issuer is the WorkOS API and the admin UI keeps its session in localStorage, a stopgap until the custom domain exists.')
+@description('true when authKitDomain is the custom AuthKit domain: it is then the admin UI\'s AuthKit host. false: the admin UI keeps its session in localStorage, a stopgap until the custom domain exists.')
 param authKitCustomDomain bool = true
 
 @description('The trust domain of Storyteller tokens; final (decision 2).')
@@ -248,7 +248,6 @@ module functions 'modules/functions.bicep' = {
     apiHostName: apiHostName
     appHostName: appHostName
     authKitDomain: authKitDomain
-    authKitCustomDomain: authKitCustomDomain
     trustDomain: trustDomain
     authKitClientId: authKitClientId
     authKitAudience: authKitAudience

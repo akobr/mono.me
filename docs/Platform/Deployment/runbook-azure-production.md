@@ -216,7 +216,7 @@ az role assignment list --assignee $deployment.PrincipalId --all --query "[].{ro
 
 **By hand, WorkOS dashboard, environment Production:**
 
-1. **No custom domain yet** (about 99 USD a month; added before the first customer, [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)). Note the environment's **AuthKit domain** (`<subdomain>.authkit.app`, under **Domains**) for `authKitDomain` in phase 8. Until the custom domain exists, the issuer the API checks is `https://api.workos.com/` and the admin UI keeps its session in `localStorage` ([decisions](decisions.md#without-the-custom-authkit-domain-until-the-first-customer)).
+1. **No custom domain yet** (about 99 USD a month; added before the first customer, [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)). Note the environment's **AuthKit domain** (`<subdomain>.authkit.app`, under **Domains**) for `authKitDomain` in phase 8. Until the custom domain exists, the issuer the API checks is that AuthKit domain (`https://<subdomain>.authkit.app`) and the admin UI keeps its session in `localStorage` ([decisions](decisions.md#without-the-custom-authkit-domain-until-the-first-customer)).
 2. **Applications**: name the default application `2S Platform` and note its **client id** (`client_…`): phase 8 and phase 11. Later 42for.net products get their own applications in this environment (one login, one account).
 3. **JWT template**:
 
