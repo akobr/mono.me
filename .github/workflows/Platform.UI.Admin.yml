@@ -1,4 +1,4 @@
-name: Administration UI
+name: Platform.UI.Admin
 
 # Lint, type-check, test and build the Administration UI and its TypeScript SDK, run the Playwright suites against
 # the mocked API, and deploy main to Azure Static Web Apps (spec section 17).
@@ -9,14 +9,14 @@ on:
     paths:
       - src/Platform/ui.admin/**
       - src/Platform/Storyteller/sdk.typescript/**
-      - .github/workflows/ui-admin.yml
+      - .github/workflows/Platform.UI.Admin.yml
   pull_request:
     branches:
       - main
     paths:
       - src/Platform/ui.admin/**
       - src/Platform/Storyteller/sdk.typescript/**
-      - .github/workflows/ui-admin.yml
+      - .github/workflows/Platform.UI.Admin.yml
 
 concurrency:
   group: ui-admin-${{ github.ref }}

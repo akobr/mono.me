@@ -185,7 +185,7 @@ No workflow tests the action (section 9 of the first spec): nothing in GitHub bu
 
 ## Releasing
 
-For maintainers. The workflow [Storyteller action release](https://github.com/akobr/mono.me/blob/main/.github/workflows/storyteller-action-release.yml) of the monorepo copies the action into a repository of its own, which holds the action alone and which GitHub Marketplace lists. The spec is [Publishing the GitHub Action and Secrets in CI](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Publishing%20the%20GitHub%20Action%20and%20Secrets%20in%20CI.md).
+For maintainers. The workflow [Storyteller action release](https://github.com/akobr/mono.me/blob/main/.github/workflows/Platform.GitHubAction-release.yml) of the monorepo copies the action into a repository of its own, which holds the action alone and which GitHub Marketplace lists. The spec is [Publishing the GitHub Action and Secrets in CI](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Publishing%20the%20GitHub%20Action%20and%20Secrets%20in%20CI.md).
 
 Once, before the first release:
 

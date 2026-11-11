@@ -278,11 +278,11 @@ A deployed target is reachable as it is; the mock on `localhost` needs BrowserSt
 
 ## Playwright 1.63
 
-`Microsoft.Playwright` is pinned to **1.63.0** in `Directory.Packages.props` (the spec planned 1.64.1): a Playwright server refuses a client of another minor version, and BrowserStack's [version table](https://www.browserstack.com/docs/automate/playwright/browsers-and-os) ends at 1.63. Raise it only when BrowserStack runs the new version, and change with it the CI image and `PLAYWRIGHT_VERSION` in `.github/workflows/ui-admin-automation.yml` (its step "Playwright version matches the image", after the checkout, fails unless the pin, `PLAYWRIGHT_VERSION` and the job's image `mcr.microsoft.com/playwright/dotnet:v<version>-noble` agree, and prints all three) and the local browsers (`playwright.ps1 install`). The browsers of 1.63 share the machine's Playwright cache with the admin UI's TypeScript suite (`@playwright/test` 1.64): installing one version's browsers can remove the other's, so run `npx playwright install` in `src/Platform/ui.admin/src` before its e2e suite again.
+`Microsoft.Playwright` is pinned to **1.63.0** in `Directory.Packages.props` (the spec planned 1.64.1): a Playwright server refuses a client of another minor version, and BrowserStack's [version table](https://www.browserstack.com/docs/automate/playwright/browsers-and-os) ends at 1.63. Raise it only when BrowserStack runs the new version, and change with it the CI image and `PLAYWRIGHT_VERSION` in `.github/workflows/Platform.UI.Admin.AutomationTests.yml` (its step "Playwright version matches the image", after the checkout, fails unless the pin, `PLAYWRIGHT_VERSION` and the job's image `mcr.microsoft.com/playwright/dotnet:v<version>-noble` agree, and prints all three) and the local browsers (`playwright.ps1 install`). The browsers of 1.63 share the machine's Playwright cache with the admin UI's TypeScript suite (`@playwright/test` 1.64): installing one version's browsers can remove the other's, so run `npx playwright install` in `src/Platform/ui.admin/src` before its e2e suite again.
 
-## CI: `ui-admin-automation.yml`
+## CI: `Platform.UI.Admin.AutomationTests.yml`
 
-`.github/workflows/ui-admin-automation.yml` runs the suite by hand (`workflow_dispatch`) or from another workflow (`workflow_call`); it has no push or pull request trigger yet (gating pull requests on the Elementary set, and a staging deployment per pull request, are follow-ups). The job runs in `mcr.microsoft.com/playwright/dotnet:v1.63.0-noble` (the browsers of the pinned Playwright, and a .NET 10 SDK that `global.json` accepts) as the runner's user 1001 (`--user 1001`, Playwright's own CI setup: Firefox refuses to start as the image's root when `HOME` belongs to another user), builds the project in Release and runs:
+`.github/workflows/Platform.UI.Admin.AutomationTests.yml` runs the suite by hand (`workflow_dispatch`) or from another workflow (`workflow_call`); it has no push or pull request trigger yet (gating pull requests on the Elementary set, and a staging deployment per pull request, are follow-ups). The job runs in `mcr.microsoft.com/playwright/dotnet:v1.63.0-noble` (the browsers of the pinned Playwright, and a .NET 10 SDK that `global.json` accepts) as the runner's user 1001 (`--user 1001`, Playwright's own CI setup: Firefox refuses to start as the image's root when `HOME` belongs to another user), builds the project in Release and runs:
 
 ```bash
 dotnet run --project src/Platform/UI.Admin.AutomationTests/src -c Release --no-build -- --treenode-filter "<filter>" --report-trx --results-directory TestResults/ui-admin-automation
@@ -316,20 +316,20 @@ A caller passes the secrets explicitly (or `secrets: inherit`); a secret of the 
 
 ```bash
 # once the workflow is on main; --ref runs a branch's version of it
-gh workflow run ui-admin-automation.yml --ref feat/my-branch -f use_mock_ui=true
-gh workflow run ui-admin-automation.yml -f use_mock_ui=true -f profile=mobile -f filter=''
-gh workflow run ui-admin-automation.yml -f target_url=https://admin.staging.example.com -f report_testiny=true
-gh workflow run ui-admin-automation.yml -f profile=browserstack-win-chrome
+gh workflow run Platform.UI.Admin.AutomationTests.yml --ref feat/my-branch -f use_mock_ui=true
+gh workflow run Platform.UI.Admin.AutomationTests.yml -f use_mock_ui=true -f profile=mobile -f filter=''
+gh workflow run Platform.UI.Admin.AutomationTests.yml -f target_url=https://admin.staging.example.com -f report_testiny=true
+gh workflow run Platform.UI.Admin.AutomationTests.yml -f profile=browserstack-win-chrome
 ```
 
 ```yaml
 jobs:
   ui-mock:
-    uses: ./.github/workflows/ui-admin-automation.yml
+    uses: ./.github/workflows/Platform.UI.Admin.AutomationTests.yml
     with:
       use_mock_ui: true
   ui-staging:
-    uses: ./.github/workflows/ui-admin-automation.yml
+    uses: ./.github/workflows/Platform.UI.Admin.AutomationTests.yml
     with:
       target_url: https://admin.staging.example.com
       profile: browserstack-win-chrome

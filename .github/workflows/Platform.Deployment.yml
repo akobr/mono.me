@@ -1,4 +1,4 @@
-name: Platform deployment checks
+name: Platform.Deployment
 
 # The checks of the Bicep templates and scripts of src/Platform/Deployment, on every pull request and push to main that
 # touches them: both entry points and both parameter files build with the linter of bicepconfig.json (an error fails, a
@@ -8,12 +8,12 @@ on:
   pull_request:
     paths:
       - 'src/Platform/Deployment/**'
-      - '.github/workflows/platform-deployment-checks.yml'
+      - '.github/workflows/Platform.Deployment.yml'
   push:
     branches: [ main ]
     paths:
       - 'src/Platform/Deployment/**'
-      - '.github/workflows/platform-deployment-checks.yml'
+      - '.github/workflows/Platform.Deployment.yml'
 
 concurrency:
   group: platform-deployment-checks-${{ github.ref }}

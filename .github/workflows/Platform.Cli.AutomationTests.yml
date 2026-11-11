@@ -1,4 +1,4 @@
-name: CLI automation
+name: Platform.Cli.AutomationTests
 run-name: CLI automation (${{ inputs.target_url || 'environment target' }}${{ inputs.profile && format(', {0}', inputs.profile) || '' }})
 
 # The TUnit suite of src/Platform/Cli.AutomationTests: the source build of sform, run out of process against a deployed

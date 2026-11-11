@@ -585,7 +585,7 @@ Project **`2SC`** (id 2), created by hand in the Testiny app. Its cases were cre
 
 ## CI
 
-`.github/workflows/cli-automation.yml` runs the suite on `ubuntu-latest` with the SDK of `global.json`, by hand (`workflow_dispatch`) or from another workflow (`workflow_call`); it has no push or pull request trigger yet (gating pull requests on the Elementary set is a follow-up). What needs no target runs on every pull request that touches the CLI or its tests: `.github/workflows/cli-checks.yml` runs the unit tests of the CLI and the self tests and coverage checks of this project (`--treenode-filter "/**[(Category=SelfTest)|(Category=Coverage)]"`), without secrets. The runs share the CLI pool, so they share one concurrency group: one at a time, the others queued, a running one never cancelled.
+`.github/workflows/Platform.Cli.AutomationTests.yml` runs the suite on `ubuntu-latest` with the SDK of `global.json`, by hand (`workflow_dispatch`) or from another workflow (`workflow_call`); it has no push or pull request trigger yet (gating pull requests on the Elementary set is a follow-up). What needs no target runs on every pull request that touches the CLI or its tests: `.github/workflows/Platform.Cli.UnitTests.yml` runs the unit tests of the CLI and the self tests and coverage checks of this project (`--treenode-filter "/**[(Category=SelfTest)|(Category=Coverage)]"`), without secrets. The runs share the CLI pool, so they share one concurrency group: one at a time, the others queued, a running one never cancelled.
 
 | Input | Default | Meaning |
 |---|---|---|

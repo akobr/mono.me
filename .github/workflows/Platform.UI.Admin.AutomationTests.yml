@@ -1,4 +1,4 @@
-name: Admin UI automation
+name: Platform.UI.Admin.AutomationTests
 run-name: Admin UI automation (${{ inputs.use_mock_ui && 'mock UI' || inputs.target_url || 'environment target' }}${{ inputs.profile && format(', {0}', inputs.profile) || '' }})
 
 # The TUnit + Playwright suite of src/Platform/UI.Admin.AutomationTests against a deployed admin UI (target_url, or the
@@ -168,7 +168,7 @@ jobs:
       - name: Playwright version matches the image
         run: |
           pinned=$(grep -o '<PackageVersion Include="Microsoft.Playwright" Version="[^"]*"' Directory.Packages.props | sed 's/.*Version="\([^"]*\)"/\1/')
-          image=$(grep -E '^[[:space:]]*image:[[:space:]]*mcr\.microsoft\.com/playwright/dotnet:' .github/workflows/ui-admin-automation.yml | grep -oE 'mcr\.microsoft\.com/playwright/dotnet:[^[:space:]]+' | head -n 1)
+          image=$(grep -E '^[[:space:]]*image:[[:space:]]*mcr\.microsoft\.com/playwright/dotnet:' .github/workflows/Platform.UI.Admin.AutomationTests.yml | grep -oE 'mcr\.microsoft\.com/playwright/dotnet:[^[:space:]]+' | head -n 1)
           echo "Microsoft.Playwright $pinned, PLAYWRIGHT_VERSION $PLAYWRIGHT_VERSION, image $image"
           if [ "$pinned" != "$PLAYWRIGHT_VERSION" ] || [ "$image" != "mcr.microsoft.com/playwright/dotnet:v$PLAYWRIGHT_VERSION-noble" ]; then
             echo "::error::Directory.Packages.props pins Microsoft.Playwright $pinned, PLAYWRIGHT_VERSION is $PLAYWRIGHT_VERSION and the job's image is $image; set all three to the same version (the image mcr.microsoft.com/playwright/dotnet:v<version>-noble)."

@@ -159,7 +159,7 @@ The admin origin must also be in the CORS settings of the Function App.
 
 ### Deployment
 
-`.github/workflows/ui-admin.yml` covers SDK and UI changes. On pull requests and on `main`, it runs these steps:
+`.github/workflows/Platform.UI.Admin.yml` covers SDK and UI changes. On pull requests and on `main`, it runs these steps:
 
 - `npm ci`, and a check that the generated SDK matches the OpenAPI document;
 - lint, unit tests and the build;

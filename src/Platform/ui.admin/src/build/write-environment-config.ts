@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { applyReplacements, environmentConfig } from './environment-config.ts'
 
-// The "Environment configuration" step of the deploy job (.github/workflows/ui-admin.yml) runs it in the package
+// The "Environment configuration" step of the deploy job (.github/workflows/Platform.UI.Admin.yml) runs it in the package
 // folder after the build: node build/write-environment-config.ts (Node 24 strips the types).
 const { appConfig, replacements } = environmentConfig(process.env)
 

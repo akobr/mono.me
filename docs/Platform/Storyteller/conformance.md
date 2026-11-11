@@ -204,12 +204,12 @@ npx vitest run test/conformance
 
 ## CI and the release gate
 
-**`.github/workflows/storyteller-conformance.yml`** runs the suite on every push and pull request to `main` that touches the suite, the projects that run it, or the build settings. It can also be run by hand, and called by another workflow.
+**`.github/workflows/Platform.Storyteller-conformance.yml`** runs the suite on every push and pull request to `main` that touches the suite, the projects that run it, or the build settings. It can also be run by hand, and called by another workflow.
 
 - The .NET job runs both test projects in full on Linux and Windows.
 - The TypeScript job type-checks and tests the SDK.
 
-**`.github/workflows/storyteller-sdk-release.yml`** releases the SDKs and is run by hand.
+**`.github/workflows/Platform.Storyteller.Sdk-release.yml`** releases the SDKs and is run by hand.
 
 1. **Gate.** It calls the conformance workflow first.
 2. **Pack.** Only then does it pack, once, from that commit:
