@@ -1,4 +1,4 @@
-name: Storyteller SDK release
+name: Platform.Storyteller.Sdk-release
 run-name: ${{ inputs.publish && 'Publish' || 'Pack' }} the Storyteller SDKs (${{ inputs.packages }})
 
 # Releases the Storyteller SDKs once the conformance suite passes on the same commit: the NuGet packages of the .NET
@@ -45,7 +45,7 @@ defaults:
 jobs:
   conformance:
     name: Conformance
-    uses: ./.github/workflows/storyteller-conformance.yml
+    uses: ./.github/workflows/Platform.Storyteller-conformance.yml
 
   pack:
     name: Pack

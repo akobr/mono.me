@@ -24,15 +24,32 @@ project uses the project's path, a workflow that spans a whole area uses the are
 
 | Item | Format | Example |
 |---|---|---|
-| Workflow name (`name:`) | `<dotted-path>[.<Purpose>]` | `Platform.Storyteller.Conformance` |
-| YAML file | `<dotted-path>[.<Purpose>].yml` | `Platform.Storyteller.Conformance.yml` |
+| Workflow name (`name:`) | `<dotted-path>[-<suffix>]` | `Platform.UI.Admin`, `Platform.Storyteller-conformance` |
+| YAML file | `<dotted-path>[-<suffix>].yml` | `Platform.UI.Admin.yml`, `Platform.Storyteller.Sdk-release.yml` |
 
 - Workflows and their files do not carry the `42` prefix: it is used only in environment names.
 - The file name is the workflow name with `.yml`, so a run in the Actions list maps to its file at a glance.
-- `<Purpose>` is added when a workspace or project has more than one workflow. Use one of: `Checks` (build, lint,
-  tests on pushes and pull requests), `Automation` (automation test runs), `Release` (publishing packages or actions),
-  `Deploy` (deployment), or a narrower noun when none fits (`Conformance`, `Cosmos`).
-- Every segment, the purpose included, is Pascal case, as in the assembly names.
+- The dotted path names the project the workflow serves, in Pascal case as in the assembly names; it may point to a
+  test project (`Platform.Cli.UnitTests`, `Platform.UI.Admin.AutomationTests`) or a folder outside `src/`
+  (`Docs.42for.net` for `docs/42for.net`).
+- The optional `-<suffix>` after a dash is a custom description or purpose of the workflow, in lower case
+  (`-release`, `-conformance`, `-deploy`). Use it when the path alone does not say what the workflow does, or when a
+  project has more than one workflow.
+
+### Current workflows
+
+| File | Serves |
+|---|---|
+| `Docs.42for.net.yml` | the docs site `docs/42for.net` |
+| `Platform.UI.Admin.yml` | the admin UI |
+| `Platform.UI.Admin.AutomationTests.yml` | the admin UI automation tests |
+| `Platform.Cli.UnitTests.yml` | the CLI unit tests and the automation self checks |
+| `Platform.Cli.AutomationTests.yml` | the CLI automation tests |
+| `Platform.Deployment.yml` | the Azure deployment templates |
+| `Platform.Storyteller-conformance.yml` | the Storyteller conformance suite |
+| `Platform.Storyteller.CosmosDb.yml` | the Cosmos DB suites of the Storyteller backend |
+| `Platform.Storyteller.Sdk-release.yml` | the release of the Storyteller SDKs |
+| `Platform.GitHubAction-release.yml` | the release of the GitHub Action |
 
 ## Environments
 
@@ -48,8 +65,8 @@ project uses the project's path, a workflow that spans a whole area uses the are
 
 ## Applying the convention
 
-The current workflows predate this convention (see [workflows.md](workflows.md)). New workflows and environments use
-it; existing ones are renamed when they are touched. A rename should keep in mind that:
+The workflows follow this convention (see [workflows.md](workflows.md)); the environments are renamed when they are
+touched. A rename should keep in mind that:
 
 - renaming a workflow file starts a new run history in the Actions list, and every `uses: ./.github/workflows/<file>`
   of a calling workflow and every status badge must follow the new name;

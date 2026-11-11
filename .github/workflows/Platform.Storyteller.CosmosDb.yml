@@ -1,4 +1,4 @@
-name: Storyteller Cosmos DB
+name: Platform.Storyteller.CosmosDb
 
 # The Cosmos DB suites of the Storyteller backend (Backend.CosmosDb/test and Access.Certificates/testint) on
 # Testcontainers emulators. The vNext job is the everyday run: the light Linux emulator, without the tests that only the
@@ -20,7 +20,7 @@ on:
       - nuget.config
       - stylecop.json
       - version.json
-      - .github/workflows/storyteller-cosmos.yml
+      - .github/workflows/Platform.Storyteller.CosmosDb.yml
   workflow_dispatch:
   workflow_call:
 

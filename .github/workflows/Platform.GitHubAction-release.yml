@@ -1,4 +1,4 @@
-name: Storyteller action release
+name: Platform.GitHubAction-release
 run-name: Release the Storyteller configuration action v${{ inputs.version }}
 
 # Releases src/Platform/GitHubAction into the repository of its own that GitHub Marketplace lists: one commit with

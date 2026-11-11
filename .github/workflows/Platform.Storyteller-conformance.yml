@@ -1,4 +1,4 @@
-name: Storyteller conformance
+name: Platform.Storyteller-conformance
 
 # The conformance suite of the configuration providers and SDKs, src/Platform/Storyteller/conformance: the .NET
 # reference (the formats library and the provider, with all their tests) on Linux and Windows, and the TypeScript SDK,
@@ -26,7 +26,7 @@ on:
       - nuget.config
       - stylecop.json
       - version.json
-      - .github/workflows/storyteller-conformance.yml
+      - .github/workflows/Platform.Storyteller-conformance.yml
   pull_request:
     branches:
       - main
@@ -48,9 +48,9 @@ on:
       - nuget.config
       - stylecop.json
       - version.json
-      - .github/workflows/storyteller-conformance.yml
+      - .github/workflows/Platform.Storyteller-conformance.yml
   workflow_dispatch:
-  # The gate of storyteller-sdk-release.yml; path filters do not apply to a call.
+  # The gate of Platform.Storyteller.Sdk-release.yml; path filters do not apply to a call.
   workflow_call:
 
 # Under workflow_call the context is the caller's, so the group differs from the caller's own and a release never

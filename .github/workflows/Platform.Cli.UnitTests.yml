@@ -1,9 +1,9 @@
-name: CLI checks
+name: Platform.Cli.UnitTests
 
 # The checks of sform that need no deployment, on every pull request and push to main that touches the CLI or its tests:
 # the unit tests of the CLI, and the self tests and coverage checks of the CLI automation tests (every command, alias,
 # option, argument and fixed value of sform is covered by a case, and every case of the catalogue has its test). The case
-# tests themselves need a target and run in cli-automation.yml. No secret is used.
+# tests themselves need a target and run in Platform.Cli.AutomationTests.yml. No secret is used.
 on:
   pull_request:
     paths:
@@ -15,7 +15,7 @@ on:
       - 'src/Platform/Storyteller/Sdk.NSwag/**'
       - 'docs/Platform/Cli.AutomationTests/test-cases.md'
       - 'Directory.Packages.props'
-      - '.github/workflows/cli-checks.yml'
+      - '.github/workflows/Platform.Cli.UnitTests.yml'
   push:
     branches: [ main ]
     paths:
@@ -27,7 +27,7 @@ on:
       - 'src/Platform/Storyteller/Sdk.NSwag/**'
       - 'docs/Platform/Cli.AutomationTests/test-cases.md'
       - 'Directory.Packages.props'
-      - '.github/workflows/cli-checks.yml'
+      - '.github/workflows/Platform.Cli.UnitTests.yml'
 
 concurrency:
   group: cli-checks-${{ github.ref }}

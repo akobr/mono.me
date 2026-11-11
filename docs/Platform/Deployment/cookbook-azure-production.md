@@ -540,7 +540,7 @@ unset CosmosDb__Connection CosmosDb__ShouldAcceptAnyCertificate
 
 ### 16.3 The admin UI
 
-The UI installs the TypeScript SDK from its folder (`file:../../Storyteller/sdk.typescript/src`), so the SDK is built first, as in `.github/workflows/ui-admin.yml`. One build serves every environment: `build/write-environment-config.ts` writes `dist/app-config.json` and resolves the CSP placeholders (`__API_ORIGIN__`, `__AUTH_HOSTNAME__`, `__SENTRY_ORIGIN__`, `__POSTHOG_ORIGIN__`) of `dist/staticwebapp.config.json` for this deployment.
+The UI installs the TypeScript SDK from its folder (`file:../../Storyteller/sdk.typescript/src`), so the SDK is built first, as in `.github/workflows/Platform.UI.Admin.yml`. One build serves every environment: `build/write-environment-config.ts` writes `dist/app-config.json` and resolves the CSP placeholders (`__API_ORIGIN__`, `__AUTH_HOSTNAME__`, `__SENTRY_ORIGIN__`, `__POSTHOG_ORIGIN__`) of `dist/staticwebapp.config.json` for this deployment.
 
 ```sh
 (cd src/Platform/Storyteller/sdk.typescript/src && npm ci && npm run build)
