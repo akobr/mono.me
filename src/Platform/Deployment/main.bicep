@@ -248,6 +248,7 @@ module functions 'modules/functions.bicep' = {
     apiHostName: apiHostName
     appHostName: appHostName
     authKitDomain: authKitDomain
+    authKitCustomDomain: authKitCustomDomain
     trustDomain: trustDomain
     authKitClientId: authKitClientId
     authKitAudience: authKitAudience

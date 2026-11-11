@@ -70,9 +70,12 @@ param instanceMemoryMB int
 @minValue(0)
 param alwaysReadyInstances int
 
-// WorkOS issues user tokens (the admin UI's and the CLI's device flow) as the environment's AuthKit domain, the
-// <subdomain>.authkit.app one or the custom one: the iss of its /.well-known/openid-configuration.
-var authKitIssuer = 'https://${authKitDomain}'
+@description('true: authKitDomain is the custom AuthKit domain and issues the user tokens. false: the WorkOS API issues them.')
+param authKitCustomDomain bool
+
+// Without a custom domain, the user tokens the admin UI and sform get from the WorkOS API (user_management/authenticate)
+// carry iss https://api.workos.com/user_management/<client id> (checked on a production token, 2026-11-11).
+var authKitIssuer = authKitCustomDomain ? 'https://${authKitDomain}' : 'https://api.workos.com/user_management/${authKitClientId}'
 
 var baseSettings = {
   AZURE_FUNCTIONS_ENVIRONMENT: runtimeEnvironment
