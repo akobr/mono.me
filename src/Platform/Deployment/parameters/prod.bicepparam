@@ -16,8 +16,8 @@ param regionCode = 'eusec'
 param dnsZone = '42for.net'
 param apiHostName = 'api.2s.42for.net'
 param appHostName = 'app.2s.42for.net'
-// No custom AuthKit domain yet (USD 99 a month): the issuer is the environment's AuthKit domain and the admin UI keeps
-// its session in localStorage. authKitDomain is the environment's AuthKit domain (WorkOS dashboard, phase 5), committed once known.
+// No custom AuthKit domain yet (USD 99 a month): the WorkOS API issues the user tokens (per client id) and the admin
+// UI keeps its session in localStorage. authKitDomain is the environment's AuthKit domain (WorkOS dashboard, phase 5), committed once known.
 // With the custom domain later: authKitDomain = 'auth.42for.net', authKitCustomDomain = true (runbook, "Adding the
 // custom AuthKit domain").
 param authKitDomain = 'palatial-omen-84.authkit.app'
