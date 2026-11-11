@@ -284,6 +284,10 @@ The values of step 13 (WorkOS) are needed for the `Auth__AuthKit__*` settings; f
 ```sh
 AUTHKIT_CLIENT_ID="<WorkOS production client id, client_…>"
 AUTHKIT_AUDIENCE="https://$TRUST_DOMAIN"        # the aud of the JWT template of step 13
+# Without the custom AuthKit domain (step 13, 424-247): the WorkOS issuer and the environment's AuthKit domain.
+# With it: AUTHKIT_ISSUER="https://$AUTH_HOST" AUTHKIT_DOMAIN="https://$AUTH_HOST"
+AUTHKIT_ISSUER="https://api.workos.com/"
+AUTHKIT_DOMAIN="https://<subdomain>.authkit.app"
 BYOK_CLIENT_ID="<application id of '2S Platform Customer Keys', step 11>"
 
 az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
@@ -293,9 +297,9 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
   "CosmosDb__Connection=@Microsoft.KeyVault(VaultName=$KV;SecretName=cosmos-connection)" \
   Auth__Provider=AuthKit \
   Auth__AuthKit__ClientId="$AUTHKIT_CLIENT_ID" \
-  Auth__AuthKit__Issuer="https://$AUTH_HOST" \
+  Auth__AuthKit__Issuer="$AUTHKIT_ISSUER" \
   Auth__AuthKit__Audience="$AUTHKIT_AUDIENCE" \
-  Auth__AuthKit__AuthKitDomain="https://$AUTH_HOST" \
+  Auth__AuthKit__AuthKitDomain="$AUTHKIT_DOMAIN" \
   Auth__AuthKit__DefaultUserScopes__0=User.Impersonation \
   Auth__TokenExchange__Enabled=false \
   MachineAuth__DefaultCredentialKind=ApiKey \
@@ -316,7 +320,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 
 | Setting | Why |
 | --- | --- |
-| `Auth__AuthKit__Issuer` | must equal the `iss` of WorkOS tokens: the custom domain `https://auth.42for.net` |
+| `Auth__AuthKit__Issuer` | must equal the `iss` of WorkOS tokens: `https://api.workos.com/` until the custom domain exists, then `https://auth.42for.net` |
 | `Auth__AuthKit__Audience` | tokens must carry this `aud` (the JWT template, step 13): `https://2s.42for.net`, shared by every application of the environment (see "Open points") |
 | `Auth__AuthKit__DefaultUserScopes__0` | every signed-in user gets `User.Impersonation`, and their roles decide the rest; without it (and without a permission map) every user gets `401` |
 | `Auth__TokenExchange__Enabled=false` | no MCP server in this phase |
@@ -543,7 +547,8 @@ The UI installs the TypeScript SDK from its folder (`file:../../Storyteller/sdk.
 cd src/Platform/ui.admin/src
 npm ci
 npm run build
-API_BASE_URL="https://$API_HOST/api" AUTH_API_HOSTNAME="$AUTH_HOST" ENVIRONMENT_NAME=production \
+unset AUTH_API_HOSTNAME   # no custom AuthKit domain yet; with it: AUTH_API_HOSTNAME="$AUTH_HOST" and no AUTH_LOCAL_STORAGE_SESSION
+API_BASE_URL="https://$API_HOST/api" AUTH_LOCAL_STORAGE_SESSION=true ENVIRONMENT_NAME=production \
 SENTRY_DSN="<dsn>" POSTHOG_PROJECT_TOKEN="<token>" POSTHOG_HOST="https://eu.i.posthog.com" RELEASE="$(git rev-parse HEAD)" \
   node build/write-environment-config.ts
 grep -cE "__(API_ORIGIN|AUTH_HOSTNAME|SENTRY_ORIGIN|POSTHOG_ORIGIN)__" dist/staticwebapp.config.json   # must print 0

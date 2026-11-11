@@ -79,6 +79,10 @@ function Set-FederatedCredential {
     # existing credential is never replaced by a renamed one.
     $sameSubject = @($all | Where-Object { $_.issuer -ceq $Issuer -and $_.subject -ceq $Subject })
     if ($sameSubject.Count -gt 0 -and $sameSubject[0].name -ne $Name) {
+        if ((@($sameSubject[0].audiences) -join ' ') -cne ($credential.audiences -join ' ')) {
+            throw "Federated credential '$($sameSubject[0].name)' trusts $Subject with the audiences $(@($sameSubject[0].audiences) -join ', '), not $($credential.audiences -join ', '). Fix or remove it by hand; it was left as it is."
+        }
+
         Write-Host "Federated credential '$($sameSubject[0].name)' already trusts $Subject; kept as it is."
         return
     }
