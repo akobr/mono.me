@@ -33,11 +33,16 @@ Import-Module (Join-Path $PSScriptRoot 'EntraApplications.psm1') -Force
 
 $account = az account show --query '{tenantId:tenantId, subscriptionId:id}' -o json | ConvertFrom-Json
 
+# Entra allows only letters, digits, '-' and '_' in the name, so the environment's other characters become '-', and a
+# short hash of the environment keeps distinct environments (prod.42.Team-A, prod.42.Team.A) apart.
+$hash = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($GitHubEnvironment))).Substring(0, 8).ToLowerInvariant()
+$credentialName = "github-$($GitHubEnvironment -replace '[^A-Za-z0-9_-]', '-')-$hash"
+
 $appId = Get-OrCreateApplication -DisplayName $DisplayName -SignInAudience AzureADMyOrg
 $principalId = Get-OrCreateServicePrincipal -AppId $appId
 
 Set-FederatedCredential -AppId $appId `
-    -Name ("github-" + ($GitHubEnvironment -replace '[^A-Za-z0-9_-]', '-')) `
+    -Name $credentialName `
     -Issuer 'https://token.actions.githubusercontent.com' `
     -Subject "repo:${Repository}:environment:$GitHubEnvironment" `
     -Description "GitHub Actions, environment $GitHubEnvironment"

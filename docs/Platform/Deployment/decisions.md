@@ -55,7 +55,7 @@ The WorkOS custom domain costs about 99 USD a month, so production starts withou
 
 ### GitHub environments
 
-The repository holds many projects, so a GitHub environment is named `<environment>.42.<area dotted path>`: the 2S Platform's production is **`prod.42.Platform`** (decided 2026-11-11; it was `production`). The deployment identity's federated credential pins it (`repo:akobr/mono.me:environment:prod.42.Platform`), so a rename means a new credential (`New-DeploymentApplication.ps1 -GitHubEnvironment`). The credential's name can't hold dots: `github-prod-42-Platform`. The admin UI's own environment name (`VITE_ENVIRONMENT_NAME`, for Sentry and PostHog) stays `production`.
+The repository holds many projects, so a GitHub environment is named `<environment>.42.<area dotted path>`: the 2S Platform's production is **`prod.42.Platform`** (decided 2026-11-11; it was `production`). The deployment identity's federated credential pins it (`repo:akobr/mono.me:environment:prod.42.Platform`), so a rename means a new credential (`New-DeploymentApplication.ps1 -GitHubEnvironment`). The credential's name can't hold dots: the script names it `github-<environment, other characters as '-'>-<8 hex of its SHA-256>`, so distinct environments never share a name, and keeps any existing credential of the same subject (such as `github-prod-42-Platform`) whatever its name. The admin UI's own environment name (`VITE_ENVIRONMENT_NAME`, for Sentry and PostHog) stays `production`.
 
 Accepted exposure:
 

@@ -498,7 +498,8 @@ In the repository settings, **Environments → New environment → `prod.42.Plat
 | variable | `AZURE_KEYVAULT_NAME` | `prod-2s-42fornet-kv` |
 | variable | `STORYTELLER_BASE_ACCOUNT_ID` | your WorkOS production user id |
 | variable | `VITE_API_BASE_URL` | `https://api.2s.42for.net/api` |
-| variable | `VITE_AUTH_API_HOSTNAME` | `auth.42for.net` |
+| variable | `VITE_AUTH_API_HOSTNAME` | empty until the custom AuthKit domain exists; then `auth.42for.net` |
+| variable | `VITE_AUTH_LOCAL_STORAGE_SESSION` | `true` until the custom AuthKit domain exists; then remove it |
 | variable | `VITE_ENVIRONMENT_NAME` | `production` |
 | variable | `VITE_SENTRY_DSN` | step 14 |
 | variable | `VITE_POSTHOG_PROJECT_TOKEN`, `VITE_POSTHOG_HOST` | step 14 |
