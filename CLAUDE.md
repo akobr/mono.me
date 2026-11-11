@@ -351,6 +351,8 @@ StyleCop is enabled by default (opt-out with `<EnableStyleCop>false</EnableStyle
 
 ## CI/CD
 
+- Overview of every workflow (purpose and triggers): [`docs/github/workflows.md`](docs/github/workflows.md)
+- Naming convention of workflows, their YAML files and GitHub environments (`<Area>.<Project>[.<Purpose>]` without `42`, environments `<environment>.42.<Area>.<Project>`, e.g. `prod.42.Platform`): [`docs/github/naming-convention.md`](docs/github/naming-convention.md); follow it for every new workflow and environment, and keep `docs/github/workflows.md` up to date when a workflow changes
 - GitHub Actions workflow: `.github/workflows/azure-static-web-apps-victorious-cliff-019dda503.yml`
   - Triggers on push/PR to `main` for `docs/42for.net/**`
   - Deploys the VitePress docs site to Azure Static Web Apps
