@@ -177,7 +177,7 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
 ## AuthKit dashboard setup
 
 1. Note the **client ID** of the environment and set `Auth:AuthKit:ClientId`.
-2. Decode a real access token (for example one issued to the AuthKit sample app) and copy its `iss` into `Auth:AuthKit:Issuer`. It is `https://api.workos.com/` unless the environment uses a custom auth domain.
+2. Decode a real access token (for example one issued to the AuthKit sample app) and copy its `iss` into `Auth:AuthKit:Issuer`. It is the environment's AuthKit domain (`https://<subdomain>.authkit.app`, or the custom auth domain), the `issuer` of its `/.well-known/openid-configuration`, as in `local.settings.json` for staging.
 3. Add a **JWT template** so tokens carry an audience and the profile fields Storyteller stores on the account:
 
    ```json

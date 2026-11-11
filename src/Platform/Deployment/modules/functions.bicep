@@ -34,9 +34,6 @@ param appHostName string
 @description('The AuthKit domain: the custom domain (e.g. auth.42for.net) or the environment\'s <subdomain>.authkit.app; empty leaves Auth__AuthKit__AuthKitDomain out.')
 param authKitDomain string
 
-@description('true: authKitDomain is the custom domain and the issuer of user tokens. false: the issuer is the WorkOS API.')
-param authKitCustomDomain bool
-
 @description('The trust domain of Storyteller tokens, e.g. 2s.42for.net; final (decision 2).')
 param trustDomain string
 
@@ -73,8 +70,9 @@ param instanceMemoryMB int
 @minValue(0)
 param alwaysReadyInstances int
 
-// Without a custom domain, WorkOS issues user tokens as https://api.workos.com/ (docs/Platform/Storyteller/authentication.md).
-var authKitIssuer = authKitCustomDomain ? 'https://${authKitDomain}' : 'https://api.workos.com/'
+// WorkOS issues user tokens (the admin UI's and the CLI's device flow) as the environment's AuthKit domain, the
+// <subdomain>.authkit.app one or the custom one: the iss of its /.well-known/openid-configuration.
+var authKitIssuer = 'https://${authKitDomain}'
 
 var baseSettings = {
   AZURE_FUNCTIONS_ENVIRONMENT: runtimeEnvironment
