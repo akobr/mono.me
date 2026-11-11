@@ -23,7 +23,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `scripts/New-DeploymentApplication.ps1` | 11.2 | the Entra app `2S Platform Deployment` and its federation with GitHub |
 | — (outputs of `main.bicep`) | 12 | the DNS records |
 | — (by hand, cookbook) | 13, 14 | WorkOS production, Sentry, PostHog |
-| `scripts/Set-GitHubEnvironment.ps1` | 15 | the GitHub environment `production`, its variables and its one secret |
+| `scripts/Set-GitHubEnvironment.ps1` | 15 | the GitHub environment `prod.42.Platform`, its variables and its one secret |
 | `naming.bicep` | — | the naming convention, imported by both entry points |
 | `parameters/prod.bicepparam`, `parameters/prod.domains.bicepparam` | — | production |
 

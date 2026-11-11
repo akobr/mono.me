@@ -21,7 +21,8 @@
 param(
     [string] $DisplayName = '2S Platform Deployment',
     [string] $Repository = 'akobr/mono.me',
-    [string] $GitHubEnvironment = 'production'
+    # <environment>.42.<area dotted path> (decisions, "GitHub environments")
+    [string] $GitHubEnvironment = 'prod.42.Platform'
 )
 
 Set-StrictMode -Version Latest
@@ -36,7 +37,7 @@ $appId = Get-OrCreateApplication -DisplayName $DisplayName -SignInAudience Azure
 $principalId = Get-OrCreateServicePrincipal -AppId $appId
 
 Set-FederatedCredential -AppId $appId `
-    -Name "github-$GitHubEnvironment" `
+    -Name ("github-" + ($GitHubEnvironment -replace '[^A-Za-z0-9_-]', '-')) `
     -Issuer 'https://token.actions.githubusercontent.com' `
     -Subject "repo:${Repository}:environment:$GitHubEnvironment" `
     -Description "GitHub Actions, environment $GitHubEnvironment"

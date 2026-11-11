@@ -53,6 +53,10 @@ The WorkOS custom domain costs about 99 USD a month, so production starts withou
 - **The admin UI's session:** AuthKit keeps the refresh token in `localStorage` (devMode) instead of an HttpOnly cookie on our domain, because the browser would block the cookie of `api.workos.com` as a third-party one. The admin UI allows that outside localhost only with the explicit `authLocalStorageSession` of its `app-config.json` (`AUTH_LOCAL_STORAGE_SESSION=true` at deployment). A script injected into the page through an XSS bug could read the token. **Accepted only while the owner and testers are the only users.**
 - **Switching later loses nothing:** accounts are the WorkOS user ids (`sub`) of the environment, not of the domain, and machines use Storyteller's own tokens. Everyone signs in again once. So decision 4 is "final" only once customers sign in.
 
+### GitHub environments
+
+The repository holds many projects, so a GitHub environment is named `<environment>.42.<area dotted path>`: the 2S Platform's production is **`prod.42.Platform`** (decided 2026-11-11; it was `production`). The deployment identity's federated credential pins it (`repo:akobr/mono.me:environment:prod.42.Platform`), so a rename means a new credential (`New-DeploymentApplication.ps1 -GitHubEnvironment`). The credential's name can't hold dots: `github-prod-42-Platform`. The admin UI's own environment name (`VITE_ENVIRONMENT_NAME`, for Sentry and PostHog) stays `production`.
+
 Accepted exposure:
 
 - **The Key Vault is reachable from the public internet** (`publicNetworkAccess` on, network rules `Allow`). Every request still needs an Entra token with an RBAC role on the vault; the Flex Consumption API has no fixed outbound address to allow, and a virtual network is not part of this phase. When one comes (the NAT gateway for BYOK, spec section 13), restrict the vault to it with an IP firewall or a private endpoint: a setting, not a decision that can't change.

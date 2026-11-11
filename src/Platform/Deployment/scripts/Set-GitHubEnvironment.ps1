@@ -18,7 +18,11 @@
 [CmdletBinding()]
 param(
     [string] $Repository = 'akobr/mono.me',
-    [string] $Environment = 'production',
+    # The GitHub environment: <environment>.42.<area dotted path> (decisions, "GitHub environments").
+    [string] $Environment = 'prod.42.Platform',
+
+    [Parameter(HelpMessage = 'VITE_ENVIRONMENT_NAME of the admin UI (Sentry and PostHog environment), not the GitHub environment.')]
+    [string] $EnvironmentName = 'production',
 
     [string] $Subscription = 'prod-42fornet-sub',
 
@@ -118,7 +122,7 @@ Set-GitHubVariable 'STORYTELLER_BASE_ACCOUNT_ID' $BaseAccountId
 Set-GitHubVariable 'VITE_API_BASE_URL' (Get-Output 'apiBaseUrl')
 Set-GitHubVariable 'VITE_AUTH_API_HOSTNAME' (Get-Output 'authApiHostname')
 Set-GitHubVariable 'VITE_AUTH_LOCAL_STORAGE_SESSION' ([string](Get-Output 'authLocalStorageSession')).ToLowerInvariant()
-Set-GitHubVariable 'VITE_ENVIRONMENT_NAME' $Environment
+Set-GitHubVariable 'VITE_ENVIRONMENT_NAME' $EnvironmentName
 Set-GitHubVariable 'VITE_SENTRY_DSN' $SentryDsn
 Set-GitHubVariable 'VITE_POSTHOG_PROJECT_TOKEN' $PostHogProjectToken
 Set-GitHubVariable 'VITE_POSTHOG_HOST' $PostHogHost
