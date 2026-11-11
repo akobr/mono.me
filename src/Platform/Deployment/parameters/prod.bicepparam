@@ -20,7 +20,7 @@ param appHostName = 'app.2s.42for.net'
 // localStorage. authKitDomain is the environment's AuthKit domain (WorkOS dashboard, phase 5), committed once known.
 // With the custom domain later: authKitDomain = 'auth.42for.net', authKitCustomDomain = true (runbook, "Adding the
 // custom AuthKit domain").
-param authKitDomain = ''
+param authKitDomain = 'palatial-omen-84.authkit.app'
 param authKitCustomDomain = false
 param trustDomain = '2s.42for.net'
 
@@ -28,9 +28,9 @@ param trustDomain = '2s.42for.net'
 // confirmed.
 
 // Step 13: the WorkOS production client id (client_…).
-param authKitClientId = ''
+param authKitClientId = 'client_01M3MMVAP9HG798GFH9WS2NB8J'
 // true once the secret authkit-api-key is in the vault (invitation emails).
-param authKitApiKeyEnabled = false
+param authKitApiKeyEnabled = true
 
 // Step 11.1: the application id of "2S Platform Customer Keys" (New-ByokApplication.ps1).
 param byokClientId = 'cb2da9e3-9316-4fd8-b428-7c7161bdd685'
