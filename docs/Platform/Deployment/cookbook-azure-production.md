@@ -411,7 +411,7 @@ A customer whose vault has a firewall needs a static egress IP of the platform. 
 
 ### 11.2 `2S Platform Deployment` (GitHub Actions)
 
-The identity of the deployment workflows, with a federated credential for the GitHub environment `production`. No secret.
+The identity of the deployment workflows, with a federated credential for the GitHub environment `prod.42.Platform` (`<environment>.42.<area dotted path>`, decisions). No secret.
 
 ```sh
 DEPLOY_CLIENT_ID=$(az ad app create --display-name "2S Platform Deployment" --query appId -o tsv)
@@ -419,11 +419,11 @@ DEPLOY_SP_ID=$(az ad sp create --id "$DEPLOY_CLIENT_ID" --query id -o tsv)
 
 cat > deploy-fic.json <<EOF
 {
-  "name": "github-production",
+  "name": "github-prod-42-Platform",
   "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:$GITHUB_REPO:environment:production",
+  "subject": "repo:$GITHUB_REPO:environment:prod.42.Platform",
   "audiences": ["api://AzureADTokenExchange"],
-  "description": "GitHub Actions, environment production"
+  "description": "GitHub Actions, environment prod.42.Platform"
 }
 EOF
 az ad app federated-credential create --id "$DEPLOY_CLIENT_ID" --parameters deploy-fic.json
@@ -438,7 +438,7 @@ az role assignment create --assignee-object-id "$DEPLOY_SP_ID" --assignee-princi
 echo "client $DEPLOY_CLIENT_ID tenant $TENANT_ID subscription $(az account show --query id -o tsv)"
 ```
 
-These roles are the least that deploying code needs. The identity gets nothing on the resource group: Contributor there would let it list the Cosmos DB keys, and Secrets User on the whole vault would let it read every secret directly. It is still trusted with the API's secrets: Website Contributor on the Function App lets it deploy code, and that code runs as the app's managed identity, which reads every secret of the vault: the deployment identity is trusted with all the secrets of the API. Protect it like the secrets: the GitHub environment `production` with a required reviewer and the branch `main` only. Running the Bicep templates from a pipeline needs more (the resource group, the budget, locks and role assignments; spec, section 10).
+These roles are the least that deploying code needs. The identity gets nothing on the resource group: Contributor there would let it list the Cosmos DB keys, and Secrets User on the whole vault would let it read every secret directly. It is still trusted with the API's secrets: Website Contributor on the Function App lets it deploy code, and that code runs as the app's managed identity, which reads every secret of the vault: the deployment identity is trusted with all the secrets of the API. Protect it like the secrets: the GitHub environment `prod.42.Platform` with a required reviewer and the branch `main` only. Running the Bicep templates from a pipeline needs more (the resource group, the budget, locks and role assignments; spec, section 10).
 
 ## 12. DNS records (zone `42for.net`)
 
@@ -484,9 +484,9 @@ The checklist of the admin UI ([README](../../../src/Platform/ui.admin/README.md
 
 The API has no Sentry SDK; its errors are in Application Insights.
 
-## 15. GitHub environment `production`
+## 15. GitHub environment `prod.42.Platform`
 
-In the repository settings, **Environments → New environment → `production`**: required reviewer the owner, deployment branch `main` only.
+In the repository settings, **Environments → New environment → `prod.42.Platform`**: required reviewer the owner, deployment branch `main` only.
 
 | Kind | Name | Value |
 | --- | --- | --- |

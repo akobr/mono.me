@@ -339,7 +339,7 @@ az functionapp config appsettings list -g prod-2s-eusec-rg -n prod-2s-api-fa --q
 - **Sentry** (EU): a project `2s-admin-ui`; note its **DSN**. Add an **uptime monitor** on `https://api.2s.42for.net/api/v1/auth/configuration` (expects 200; it turns green after phase 11).
 - **PostHog** (EU cloud): the production project's **token** (`phc_…`); the host is `https://eu.i.posthog.com`.
 
-## 10. GitHub environment `production` [C15]
+## 10. GitHub environment `prod.42.Platform` [C15]
 
 **Run:**
 
@@ -349,7 +349,7 @@ gh auth login                                           # an admin of akobr/mono
   -SentryDsn '<dsn>' -PostHogProjectToken '<phc_…>'
 ```
 
-**Check** in **Settings → Environments → production**: required reviewer you, deployment branch `main` only, the variables of the cookbook's step 15 and the secret `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+**Check** in **Settings → Environments → prod.42.Platform**: required reviewer you, deployment branch `main` only, the variables of the cookbook's step 15 and the secret `AZURE_STATIC_WEB_APPS_API_TOKEN`.
 
 The infrastructure is done. Steps 11–12 deploy the code.
 
