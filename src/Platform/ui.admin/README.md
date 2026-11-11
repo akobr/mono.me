@@ -165,18 +165,18 @@ The admin origin must also be in the CORS settings of the Function App.
 - lint, unit tests and the build;
 - the Playwright suites in the Playwright image.
 
-On `main` it also deploys `dist/` to Azure Static Web Apps (`skip_app_build`). The `ui-admin` GitHub environment provides:
+On `main` it also deploys `dist/` to Azure Static Web Apps (`skip_app_build`). The GitHub environment `prod.42.Platform` provides (`Set-GitHubEnvironment.ps1` of `src/Platform/Deployment` sets them):
 
 | Name | Kind | Value |
 | --- | --- | --- |
-| `UI_ADMIN_API_BASE_URL` | variable | `apiBaseUrl`; its origin goes into the CSP `connect-src` |
-| `UI_ADMIN_AUTH_API_HOSTNAME` | variable | `authApiHostname`; goes into `connect-src` and `form-action` |
-| `UI_ADMIN_AUTH_LOCAL_STORAGE_SESSION` | variable | `true` writes `authLocalStorageSession` and allows a deployment without `UI_ADMIN_AUTH_API_HOSTNAME` (the CSP then names `api.workos.com`); ignored when the hostname is set |
-| `UI_ADMIN_ENVIRONMENT_NAME` | variable | optional `environmentName` |
-| `UI_ADMIN_SENTRY_DSN` | variable | optional `sentryDsn`; its origin, without the key, goes into `connect-src` |
-| `UI_ADMIN_POSTHOG_PROJECT_TOKEN` | variable | optional `posthogProjectToken`; puts the PostHog host into `connect-src` |
-| `UI_ADMIN_POSTHOG_HOST` | variable | optional `posthogHost`; its origin goes into `connect-src` (`https://eu.i.posthog.com` when missing) |
-| `AZURE_STATIC_WEB_APPS_API_TOKEN_UI_ADMIN` | secret | deployment token of the Static Web App |
+| `VITE_API_BASE_URL` | variable | `apiBaseUrl`; its origin goes into the CSP `connect-src` |
+| `VITE_AUTH_API_HOSTNAME` | variable | `authApiHostname`; goes into `connect-src` and `form-action` |
+| `VITE_AUTH_LOCAL_STORAGE_SESSION` | variable | `true` writes `authLocalStorageSession` and allows a deployment without `VITE_AUTH_API_HOSTNAME` (the CSP then names `api.workos.com`); ignored when the hostname is set |
+| `VITE_ENVIRONMENT_NAME` | variable | optional `environmentName` |
+| `VITE_SENTRY_DSN` | variable | optional `sentryDsn`; its origin, without the key, goes into `connect-src` |
+| `VITE_POSTHOG_PROJECT_TOKEN` | variable | optional `posthogProjectToken`; puts the PostHog host into `connect-src` |
+| `VITE_POSTHOG_HOST` | variable | optional `posthogHost`; its origin goes into `connect-src` (`https://eu.i.posthog.com` when missing) |
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | secret | deployment token of the Static Web App |
 
 The deploy step runs `node build/write-environment-config.ts` (Node 24 runs TypeScript). It writes `dist/app-config.json`, with `release` set to the commit SHA, and replaces `__API_ORIGIN__`, `__AUTH_HOSTNAME__`, `__SENTRY_ORIGIN__` and `__POSTHOG_ORIGIN__` in `dist/staticwebapp.config.json`. Without a DSN or a PostHog token, the Sentry or PostHog origin is empty, and a deployment without the three variables deploys as before. A DSN or host that is not an absolute `https` URL fails the step. Playwright serves `vite preview` without the CSP, so `test/unit/build/csp.test.ts` and `environment-config.test.ts` check the policy and the step, and `write-environment-config.test.ts` runs the script with Node, as the deploy step does: syntax that Node's type stripping rejects, such as an `enum`, fails `npm test` instead of the deployment. The config file (from `public/`) sets the following:
 

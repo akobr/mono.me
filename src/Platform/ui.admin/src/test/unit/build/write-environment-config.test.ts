@@ -73,7 +73,7 @@ describe('the environment configuration step of the deployment', () => {
 
     // A non-zero exit rejects; the code itself differs per platform.
     await expect(failure).rejects.toMatchObject({
-      stderr: expect.stringContaining('UI_ADMIN_SENTRY_DSN must be an absolute https URL.'),
+      stderr: expect.stringContaining('VITE_SENTRY_DSN must be an absolute https URL.'),
     })
     await expect(failure).rejects.toMatchObject({ stderr: expect.not.stringContaining(dsnKey) })
     await expect(access(path.join(cwd, 'dist/app-config.json'))).rejects.toThrow()

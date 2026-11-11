@@ -61,7 +61,7 @@ describe('environment configuration of a deployment', () => {
     ['both', { API_BASE_URL: undefined, AUTH_API_HOSTNAME: undefined }],
   ])('fails without %s', (_name, missing) => {
     expect(() => environmentConfig({ ...deployment, ...missing })).toThrow(
-      'UI_ADMIN_API_BASE_URL and UI_ADMIN_AUTH_API_HOSTNAME are required',
+      'VITE_API_BASE_URL and VITE_AUTH_API_HOSTNAME are required',
     )
   })
 
@@ -77,7 +77,7 @@ describe('environment configuration of a deployment', () => {
     expect(appConfig.authApiHostname).toBeUndefined()
     expect(replacements).toMatchObject({ __AUTH_HOSTNAME__: 'api.workos.com' })
     expect(() => environmentConfig({ ...variables, AUTH_LOCAL_STORAGE_SESSION: 'false' })).toThrow(
-      'UI_ADMIN_AUTH_LOCAL_STORAGE_SESSION=true',
+      'VITE_AUTH_LOCAL_STORAGE_SESSION=true',
     )
   })
 
@@ -152,10 +152,10 @@ describe('environment configuration of a deployment', () => {
     'fails for the DSN or the PostHog host %s, which is not an absolute https URL',
     (value) => {
       expect(() => environmentConfig({ ...deployment, SENTRY_DSN: value })).toThrow(
-        'UI_ADMIN_SENTRY_DSN must be an absolute https URL.',
+        'VITE_SENTRY_DSN must be an absolute https URL.',
       )
       expect(() => environmentConfig({ ...deployment, POSTHOG_PROJECT_TOKEN: token, POSTHOG_HOST: value })).toThrow(
-        'UI_ADMIN_POSTHOG_HOST must be an absolute https URL.',
+        'VITE_POSTHOG_HOST must be an absolute https URL.',
       )
     },
   )
