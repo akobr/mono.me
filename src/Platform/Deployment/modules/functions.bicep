@@ -31,8 +31,11 @@ param apiHostName string
 @description('The host name of the admin UI, the only CORS origin, e.g. app.2s.42for.net.')
 param appHostName string
 
-@description('The custom AuthKit domain, the issuer the API checks, e.g. auth.42for.net; final (decision 4).')
+@description('The AuthKit domain: the custom domain (e.g. auth.42for.net) or the environment\'s <subdomain>.authkit.app; empty leaves Auth__AuthKit__AuthKitDomain out.')
 param authKitDomain string
+
+@description('true: authKitDomain is the custom domain and the issuer of user tokens. false: the issuer is the WorkOS API.')
+param authKitCustomDomain bool
 
 @description('The trust domain of Storyteller tokens, e.g. 2s.42for.net; final (decision 2).')
 param trustDomain string
@@ -70,7 +73,8 @@ param instanceMemoryMB int
 @minValue(0)
 param alwaysReadyInstances int
 
-var authKitBaseUrl = 'https://${authKitDomain}'
+// Without a custom domain, WorkOS issues user tokens as https://api.workos.com/ (docs/Platform/Storyteller/authentication.md).
+var authKitIssuer = authKitCustomDomain ? 'https://${authKitDomain}' : 'https://api.workos.com/'
 
 var baseSettings = {
   AZURE_FUNCTIONS_ENVIRONMENT: runtimeEnvironment
@@ -86,8 +90,7 @@ var baseSettings = {
   CosmosDb__Connection: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${cosmosSecretName})'
 
   Auth__Provider: 'AuthKit'
-  Auth__AuthKit__Issuer: authKitBaseUrl
-  Auth__AuthKit__AuthKitDomain: authKitBaseUrl
+  Auth__AuthKit__Issuer: authKitIssuer
   Auth__AuthKit__Audience: authKitAudience
   // Every signed-in user gets User.Impersonation and their roles decide the rest; without it every user gets 401.
   Auth__AuthKit__DefaultUserScopes__0: 'User.Impersonation'
@@ -116,6 +119,8 @@ var disabledKindSettings = toObject(
 )
 
 var authKitClientIdSetting = empty(authKitClientId) ? {} : { Auth__AuthKit__ClientId: authKitClientId }
+
+var authKitDomainSetting = empty(authKitDomain) ? {} : { Auth__AuthKit__AuthKitDomain: 'https://${authKitDomain}' }
 
 var authKitApiKeySetting = authKitApiKeyEnabled
   ? { Auth__AuthKit__ApiKey: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=authkit-api-key)' }
@@ -206,7 +211,7 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
 resource appSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   parent: site
   name: 'appsettings'
-  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitApiKeySetting, byokSetting)
+  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting)
 }
 
 resource scmCredentials 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2025-03-01' = {

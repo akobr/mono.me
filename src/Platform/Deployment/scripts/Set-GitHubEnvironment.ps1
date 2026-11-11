@@ -116,7 +116,8 @@ Set-GitHubVariable 'AZURE_FUNCTIONAPP_NAME' (Get-Output 'functionAppName')
 Set-GitHubVariable 'AZURE_KEYVAULT_NAME' (Get-Output 'keyVaultName')
 Set-GitHubVariable 'STORYTELLER_BASE_ACCOUNT_ID' $BaseAccountId
 Set-GitHubVariable 'VITE_API_BASE_URL' (Get-Output 'apiBaseUrl')
-Set-GitHubVariable 'VITE_AUTH_API_HOSTNAME' (Get-Output 'authKitDomain')
+Set-GitHubVariable 'VITE_AUTH_API_HOSTNAME' (Get-Output 'authApiHostname')
+Set-GitHubVariable 'VITE_AUTH_LOCAL_STORAGE_SESSION' ([string](Get-Output 'authLocalStorageSession')).ToLowerInvariant()
 Set-GitHubVariable 'VITE_ENVIRONMENT_NAME' $Environment
 Set-GitHubVariable 'VITE_SENTRY_DSN' $SentryDsn
 Set-GitHubVariable 'VITE_POSTHOG_PROJECT_TOKEN' $PostHogProjectToken

@@ -44,6 +44,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `deploymentPrincipalId` | the deployment identity's roles | step 11.2 |
 | `authKitClientId` | `Auth__AuthKit__ClientId` | step 13 |
 | `authKitApiKeyEnabled` | `Auth__AuthKit__ApiKey` as a Key Vault reference | `true` once the secret `authkit-api-key` is in the vault |
+| `authKitDomain`, `authKitCustomDomain` | the AuthKit domain; `false` until the custom domain `auth.42for.net` exists (the issuer is then the WorkOS API, and the admin UI keeps its session in `localStorage`; [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)) | the environment's `….authkit.app` domain: step 13 |
 | `budgetStartDate` | the budget's first month, never moved afterwards | the month of the first run |
 
 Only the owner's personal values come from environment variables, so the repository doesn't hold them:
