@@ -216,7 +216,7 @@ az role assignment list --assignee $deployment.PrincipalId --all --query "[].{ro
 
 **By hand, WorkOS dashboard, environment Production:**
 
-1. **Custom domain** for AuthKit: `auth.42for.net`. Note the DNS records WorkOS shows (they go into phase 6). Final: it is the issuer the API checks.
+1. **No custom domain yet** (about 99 USD a month; added before the first customer, [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)). Note the environment's **AuthKit domain** (`<subdomain>.authkit.app`, under **Domains**) for `authKitDomain` in phase 8. Until the custom domain exists, the issuer the API checks is `https://api.workos.com/` and the admin UI keeps its session in `localStorage` ([decisions](decisions.md#without-the-custom-authkit-domain-until-the-first-customer)).
 2. **Applications**: name the default application `2S Platform` and note its **client id** (`client_…`): phase 8 and phase 11. Later 42for.net products get their own applications in this environment (one login, one account).
 3. **JWT template**:
 
@@ -251,7 +251,6 @@ az deployment sub show --name prod-2s-main --query properties.outputs.dnsRecords
 | `api.2s` | CNAME | `prod-2s-api-fa.<…>.azurewebsites.net` (output) |
 | `asuid.api.2s` | TXT | the `customDomainVerificationId` (output) |
 | `app.2s` | CNAME | `<…>.azurestaticapps.net` (output) |
-| `auth` | CNAME | the target WorkOS shows (phase 5) |
 | | | any verification record WorkOS asks for |
 
 **Wait until they resolve:**
@@ -260,10 +259,9 @@ az deployment sub show --name prod-2s-main --query properties.outputs.dnsRecords
 Resolve-DnsName api.2s.42for.net -Type CNAME -Server 1.1.1.1
 Resolve-DnsName asuid.api.2s.42for.net -Type TXT -Server 1.1.1.1
 Resolve-DnsName app.2s.42for.net -Type CNAME -Server 1.1.1.1
-Resolve-DnsName auth.42for.net -Type CNAME -Server 1.1.1.1
 ```
 
-Then verify the domain in WorkOS (it shows **Verified**).
+(The `auth` record comes with the custom AuthKit domain later, see "Adding the custom AuthKit domain".)
 
 ## 7. Custom domains with `domains.bicep` [C10]
 
@@ -300,7 +298,7 @@ The first run binds the host name without TLS before the certificate exists. **I
 
 **By hand:**
 
-1. In `parameters/prod.bicepparam` set `authKitClientId = '<client_…>'`.
+1. In `parameters/prod.bicepparam` set `authKitClientId = '<client_…>'` and `authKitDomain = '<subdomain>.authkit.app'` (phase 5; `authKitCustomDomain` stays `false`).
 2. Optional, invitation emails: store the WorkOS API key as the secret `authkit-api-key` and set `authKitApiKeyEnabled = true`. the key never goes on a command line (it would stay in the shell history and the process list). Either in the portal: **prod-2s-42fornet-kv → Objects → Secrets → Generate/Import**, name `authkit-api-key`, paste the `sk_…` value (you are Key Vault Administrator); or with Az PowerShell, which prompts for it:
 
    ```powershell
@@ -451,7 +449,7 @@ A later schema change that adds a container needs the limit back at `-1` for the
 
     # Removed again by the finally below.
     $env:API_BASE_URL = 'https://api.2s.42for.net/api'
-    $env:AUTH_API_HOSTNAME = 'auth.42for.net'
+    $env:AUTH_LOCAL_STORAGE_SESSION = 'true'                # no custom AuthKit domain yet; with it: $env:AUTH_API_HOSTNAME = 'auth.42for.net'
     $env:ENVIRONMENT_NAME = 'production'
     $env:SENTRY_DSN = '<dsn>'
     $env:POSTHOG_PROJECT_TOKEN = '<phc_…>'
@@ -468,7 +466,7 @@ A later schema change that adds a container needs the limit back at `-1` for the
     npx @azure/static-web-apps-cli deploy ./dist --env production
   }
   finally {
-    Remove-Item Env:API_BASE_URL, Env:AUTH_API_HOSTNAME, Env:ENVIRONMENT_NAME, Env:SENTRY_DSN, Env:POSTHOG_PROJECT_TOKEN, `
+    Remove-Item Env:API_BASE_URL, Env:AUTH_API_HOSTNAME, Env:AUTH_LOCAL_STORAGE_SESSION, Env:ENVIRONMENT_NAME, Env:SENTRY_DSN, Env:POSTHOG_PROJECT_TOKEN, `
       Env:POSTHOG_HOST, Env:RELEASE, Env:SWA_CLI_DEPLOYMENT_TOKEN -ErrorAction SilentlyContinue
     Pop-Location
   }
@@ -478,7 +476,7 @@ A later schema change that adds a container needs the limit back at `-1` for the
 ## 12. Verify [C17]
 
 ```powershell
-curl.exe -s https://api.2s.42for.net/api/v1/auth/configuration          # 200, "Provider":"AuthKit", "AuthKitDomain":"https://auth.42for.net"
+curl.exe -s https://api.2s.42for.net/api/v1/auth/configuration          # 200, "Provider":"AuthKit", "AuthKitDomain":"https://<subdomain>.authkit.app"
 curl.exe -sI http://api.2s.42for.net/api/v1/auth/configuration         # a redirect to https
 curl.exe -sI -X OPTIONS -H "Origin: https://app.2s.42for.net" -H "Access-Control-Request-Method: GET" `
   https://api.2s.42for.net/api/v1/auth/configuration                    # Access-Control-Allow-Origin: https://app.2s.42for.net
@@ -502,6 +500,15 @@ Then tick the acceptance criteria of [424-231](https://linear.app/424fun/issue/4
 While the free account's credit lasts, `parameters/prod.bicepparam` raises three settings, to use the credit and to see what the platform costs: `budgetAmount = 50`, `functionAlwaysReadyInstances = 1` (one always-ready instance of the API's HTTP functions: no cold starts, billed all the time, and no free grants of Flex Consumption while it is on) and `logDailyCapGb = '1'`. Each goes back without a rebuild.
 
 **On 7 December**: set `budgetAmount = 5`, `functionAlwaysReadyInstances = 0`, `logDailyCapGb = '0.15'`; commit through a pull request; what-if (expect `Modify` of the budget's amount, the site's `alwaysReady`, and the workspace's `dailyQuotaGb`, nothing else); create. Also remove what was added by hand for the period (the Application Insights availability test, the Azure Load Testing resource, the Defender for Cloud plans) and check Cost Management for the month.
+
+## Adding the custom AuthKit domain (before the first customer)
+
+Tracked in [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer). Everyone signs in again once afterwards; no data changes.
+
+1. WorkOS (production): **Domains → Configure AuthKit domain** `auth.42for.net`; create the records it shows in the zone `42for.net` (an `auth` CNAME and any verification record) and wait for **Verified**.
+2. `parameters/prod.bicepparam`: `authKitDomain = 'auth.42for.net'`, `authKitCustomDomain = true`; commit through a pull request; what-if (expect `Auth__AuthKit__Issuer` and `Auth__AuthKit__AuthKitDomain` → `https://auth.42for.net`), then create.
+3. The admin UI: `AUTH_API_HOSTNAME=auth.42for.net` and no `AUTH_LOCAL_STORAGE_SESSION` (phase 11.3, or the GitHub environment), then build and deploy it again.
+4. Check: the discovery answers `"AuthKitDomain":"https://auth.42for.net"`, the sign-in goes through `auth.42for.net`, the browser's `localStorage` holds no AuthKit refresh token, and `sform` signs in.
 
 ## Later
 

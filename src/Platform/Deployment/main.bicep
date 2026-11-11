@@ -37,8 +37,11 @@ param apiHostName string
 @description('The host name of the admin UI (decision 13).')
 param appHostName string
 
-@description('The custom AuthKit domain of WorkOS production; final (decision 4).')
+@description('The AuthKit domain of WorkOS production: the custom domain (auth.42for.net) or, until it exists, the environment\'s <subdomain>.authkit.app; empty leaves Auth__AuthKit__AuthKitDomain out (decision 4).')
 param authKitDomain string
+
+@description('true when authKitDomain is the custom AuthKit domain: it is then the issuer of user tokens and the admin UI\'s AuthKit host. false: the issuer is the WorkOS API and the admin UI keeps its session in localStorage, a stopgap until the custom domain exists.')
+param authKitCustomDomain bool = true
 
 @description('The trust domain of Storyteller tokens; final (decision 2).')
 param trustDomain string
@@ -245,6 +248,7 @@ module functions 'modules/functions.bicep' = {
     apiHostName: apiHostName
     appHostName: appHostName
     authKitDomain: authKitDomain
+    authKitCustomDomain: authKitCustomDomain
     trustDomain: trustDomain
     authKitClientId: authKitClientId
     authKitAudience: authKitAudience
@@ -306,6 +310,10 @@ output staticWebAppDefaultHostName string = staticWebApp.outputs.defaultHostName
 // For the build of the admin UI (step 15).
 output apiBaseUrl string = 'https://${apiHostName}/api'
 output authKitDomain string = authKitDomain
+// The admin UI's AuthKit host (AUTH_API_HOSTNAME): the custom domain, or empty without one.
+output authApiHostname string = authKitCustomDomain ? authKitDomain : ''
+// AUTH_LOCAL_STORAGE_SESSION of the admin UI: true only without a custom AuthKit domain.
+output authLocalStorageSession bool = !authKitCustomDomain
 
 @description('The records of step 12 in the zone dnsZone. The auth record (and its verification) comes from WorkOS.')
 output dnsRecords object[] = [

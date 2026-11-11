@@ -456,7 +456,7 @@ Keep the TTL low (300 s) until everything works.
 
 In the WorkOS dashboard, environment **Production**:
 
-1. **Custom domain** for AuthKit: `auth.42for.net`, with the DNS records WorkOS shows (step 12). This is the issuer the API checks; it is final (decision 4).
+1. **Custom domain** for AuthKit: `auth.42for.net`, with the DNS records WorkOS shows (step 12). This is the issuer the API checks (decision 4). **Production starts without it** (about 99 USD a month) and adds it before the first customer ([424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)): until then the issuer is `https://api.workos.com/`, `Auth__AuthKit__AuthKitDomain` is the environment's `<subdomain>.authkit.app`, and the admin UI is built with `AUTH_LOCAL_STORAGE_SESSION=true` ([decisions](decisions.md#without-the-custom-authkit-domain-until-the-first-customer)).
 2. **The 2S Platform is the default application** of the environment (**Applications**): name it `2S Platform`, and note its **client id** (`client_…`) for `Auth__AuthKit__ClientId` and `VITE_*` of step 15. Every later 42for.net product gets its own application in the same environment, not a new environment ([decisions](decisions.md#one-workos-environment-for-the-products-of-42fornet)): one login and one account everywhere.
 3. **JWT template**, so tokens carry the audience and the profile fields the platform stores:
 
