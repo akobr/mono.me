@@ -69,16 +69,16 @@ export function environmentConfig(variables: EnvironmentVariables): EnvironmentC
   const authLocalStorageSession = !authApiHostname && variables.AUTH_LOCAL_STORAGE_SESSION === 'true'
   if (!apiBaseUrl || (!authApiHostname && !authLocalStorageSession)) {
     throw new Error(
-      'UI_ADMIN_API_BASE_URL and UI_ADMIN_AUTH_API_HOSTNAME are required ' +
-        '(or UI_ADMIN_AUTH_LOCAL_STORAGE_SESSION=true without a custom AuthKit domain).',
+      'VITE_API_BASE_URL and VITE_AUTH_API_HOSTNAME are required ' +
+        '(or VITE_AUTH_LOCAL_STORAGE_SESSION=true without a custom AuthKit domain).',
     )
   }
 
   const sentryDsn = nonEmpty(variables.SENTRY_DSN)
   const posthogProjectToken = nonEmpty(variables.POSTHOG_PROJECT_TOKEN)
   const posthogHost = nonEmpty(variables.POSTHOG_HOST)
-  const sentryOrigin = sentryDsn ? httpsOrigin(sentryDsn, 'UI_ADMIN_SENTRY_DSN') : ''
-  const posthogOrigin = posthogHost ? httpsOrigin(posthogHost, 'UI_ADMIN_POSTHOG_HOST') : DEFAULT_POSTHOG_HOST
+  const sentryOrigin = sentryDsn ? httpsOrigin(sentryDsn, 'VITE_SENTRY_DSN') : ''
+  const posthogOrigin = posthogHost ? httpsOrigin(posthogHost, 'VITE_POSTHOG_HOST') : DEFAULT_POSTHOG_HOST
 
   return {
     // JSON.stringify leaves out the undefined fields.
