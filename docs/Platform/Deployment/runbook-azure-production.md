@@ -449,6 +449,7 @@ A later schema change that adds a container needs the limit back at `-1` for the
 
     # Removed again by the finally below.
     $env:API_BASE_URL = 'https://api.2s.42for.net/api'
+    Remove-Item Env:AUTH_API_HOSTNAME -ErrorAction SilentlyContinue   # a value left in the session would win over the switch
     $env:AUTH_LOCAL_STORAGE_SESSION = 'true'                # no custom AuthKit domain yet; with it: $env:AUTH_API_HOSTNAME = 'auth.42for.net'
     $env:ENVIRONMENT_NAME = 'production'
     $env:SENTRY_DSN = '<dsn>'

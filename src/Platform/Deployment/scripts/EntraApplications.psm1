@@ -73,7 +73,17 @@ function Set-FederatedCredential {
         description = $Description
     }
 
-    $existing = @(az ad app federated-credential list --id $AppId -o json | ConvertFrom-Json | Where-Object { $_.name -eq $Name })
+    $all = @(az ad app federated-credential list --id $AppId -o json | ConvertFrom-Json)
+
+    # A credential for the same issuer and subject is kept whatever its name (Entra allows one per pair), so an
+    # existing credential is never replaced by a renamed one.
+    $sameSubject = @($all | Where-Object { $_.issuer -ceq $Issuer -and $_.subject -ceq $Subject })
+    if ($sameSubject.Count -gt 0 -and $sameSubject[0].name -ne $Name) {
+        Write-Host "Federated credential '$($sameSubject[0].name)' already trusts $Subject; kept as it is."
+        return
+    }
+
+    $existing = @($all | Where-Object { $_.name -eq $Name })
     # Case-sensitive: Entra compares the issuer, subject and audiences of a token exactly.
     $audiencesMatch = $existing.Count -eq 1 -and (@($existing[0].audiences) -join ' ') -ceq ($credential.audiences -join ' ')
     if ($audiencesMatch -and $existing[0].issuer -ceq $Issuer -and $existing[0].subject -ceq $Subject) {
