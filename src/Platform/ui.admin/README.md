@@ -133,7 +133,8 @@ One build serves every environment. At start-up the app reads `/app-config.json`
 | `app-config.json` | Variable | Meaning |
 | --- | --- | --- |
 | `apiBaseUrl` | `VITE_API_BASE_URL` | API root including `/api`, for example `https://api.2s.42for.net/api`. A relative value means the app's origin. |
-| `authApiHostname` | `VITE_AUTH_API_HOSTNAME` | Custom AuthKit domain, for example `auth.42for.net`. **Required on every host except localhost**: without it AuthKit keeps the refresh token in `localStorage` (devMode), so the app refuses to start. |
+| `authApiHostname` | `VITE_AUTH_API_HOSTNAME` | Custom AuthKit domain, for example `auth.42for.net`. **Required on every host except localhost**: without it AuthKit keeps the refresh token in `localStorage` (devMode), so the app refuses to start, unless `authLocalStorageSession` opts in. |
+| `authLocalStorageSession` | `VITE_AUTH_LOCAL_STORAGE_SESSION` (`true`) | A deployed host without a custom AuthKit domain: AuthKit runs in devMode and keeps the refresh token in `localStorage`, where an injected script could read it. A deliberate stopgap until the custom domain exists (production until its first customer, see `docs/Platform/Deployment/decisions.md`); ignored when `authApiHostname` is set. |
 | `environmentName` | `VITE_ENVIRONMENT_NAME` | Shown in the sidebar footer. |
 | `sentryDsn` | `VITE_SENTRY_DSN` | Sentry DSN of the admin UI project; no Sentry without it. |
 | `posthogProjectToken` | `VITE_POSTHOG_PROJECT_TOKEN` | PostHog project token (`phc_…`); no PostHog without it. |
@@ -170,6 +171,7 @@ On `main` it also deploys `dist/` to Azure Static Web Apps (`skip_app_build`). T
 | --- | --- | --- |
 | `UI_ADMIN_API_BASE_URL` | variable | `apiBaseUrl`; its origin goes into the CSP `connect-src` |
 | `UI_ADMIN_AUTH_API_HOSTNAME` | variable | `authApiHostname`; goes into `connect-src` and `form-action` |
+| `UI_ADMIN_AUTH_LOCAL_STORAGE_SESSION` | variable | `true` writes `authLocalStorageSession` and allows a deployment without `UI_ADMIN_AUTH_API_HOSTNAME` (the CSP then names `api.workos.com`); ignored when the hostname is set |
 | `UI_ADMIN_ENVIRONMENT_NAME` | variable | optional `environmentName` |
 | `UI_ADMIN_SENTRY_DSN` | variable | optional `sentryDsn`; its origin, without the key, goes into `connect-src` |
 | `UI_ADMIN_POSTHOG_PROJECT_TOKEN` | variable | optional `posthogProjectToken`; puts the PostHog host into `connect-src` |

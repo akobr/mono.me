@@ -3,6 +3,12 @@ export interface AppConfig {
   apiBaseUrl: string
   /** Custom AuthKit domain (refresh token in an HttpOnly cookie). Required on every host except localhost. */
   authApiHostname?: string
+  /**
+   * Allows a deployed environment without a custom AuthKit domain: the refresh token then lives in localStorage
+   * (AuthKit devMode), where a script injected into the page could read it. A deliberate stopgap until the custom
+   * domain exists; ignored when authApiHostname is set.
+   */
+  authLocalStorageSession?: boolean
   environmentName: string
   /** Sentry DSN of the admin UI project; no error reporting without it. */
   sentryDsn?: string
@@ -51,6 +57,7 @@ export async function loadAppConfig(
     // A relative value ("/api") means the same origin as the app, for example behind a reverse proxy.
     apiBaseUrl: new URL(apiBaseUrl, location.origin).href.replace(/\/+$/, ''),
     authApiHostname: nonEmpty(file.authApiHostname) ?? nonEmpty(env.VITE_AUTH_API_HOSTNAME),
+    authLocalStorageSession: file.authLocalStorageSession === true || env.VITE_AUTH_LOCAL_STORAGE_SESSION === 'true' || undefined,
     environmentName: nonEmpty(file.environmentName) ?? nonEmpty(env.VITE_ENVIRONMENT_NAME) ?? 'unknown',
     sentryDsn: nonEmpty(file.sentryDsn) ?? nonEmpty(env.VITE_SENTRY_DSN),
     posthogProjectToken: nonEmpty(file.posthogProjectToken) ?? nonEmpty(env.VITE_POSTHOG_PROJECT_TOKEN),

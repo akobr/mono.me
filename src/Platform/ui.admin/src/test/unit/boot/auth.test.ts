@@ -2,6 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppConfig } from '@/boot/app-config'
 import { createAuth, type AuthService } from '@/boot/auth'
 
+const host = vi.hoisted(() => ({ local: true }))
+
+vi.mock('@/boot/app-config', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/boot/app-config')>()),
+  isLocalhost: () => host.local,
+}))
+
 // authkit-js is mocked: createClient resolves a fake client, and its error classes stay classes, so the service's
 // instanceof checks work.
 const authkit = vi.hoisted(() => {
@@ -27,13 +34,13 @@ vi.mock('@workos-inc/authkit-js', () => ({
 const config: AppConfig = { apiBaseUrl: 'http://api.test/api', environmentName: 'test' }
 
 /** The AuthKit service, with GET v1/auth/configuration answered from its sessionStorage cache. */
-async function authKitService(): Promise<AuthService> {
+async function authKitService(appConfig: AppConfig = config): Promise<AuthService> {
   sessionStorage.setItem(
-    `2s-admin:auth-configuration:${config.apiBaseUrl}`,
+    `2s-admin:auth-configuration:${appConfig.apiBaseUrl}`,
     JSON.stringify({ Provider: 'AuthKit', ClientId: 'client_test' }),
   )
 
-  const boot = await createAuth(config)
+  const boot = await createAuth(appConfig)
   if (boot.status !== 'ready') {
     throw new Error(`The AuthKit service did not start: ${boot.status}`)
   }
@@ -45,6 +52,43 @@ describe('AuthKit service', () => {
   beforeEach(() => {
     authkit.createClient.mockClear()
     authkit.client.signOut.mockReset()
+    host.local = true
+  })
+
+  describe('on a deployed host', () => {
+    beforeEach(() => {
+      host.local = false
+    })
+
+    it('uses the custom AuthKit domain and no devMode', async () => {
+      await authKitService({ ...config, authApiHostname: 'auth.test', authLocalStorageSession: true })
+
+      expect(authkit.createClient).toHaveBeenCalledWith(
+        'client_test',
+        expect.objectContaining({ devMode: false, apiHostname: 'auth.test' }),
+      )
+    })
+
+    it('uses devMode without a custom domain only when the configuration opts in', async () => {
+      await authKitService({ ...config, authLocalStorageSession: true })
+
+      expect(authkit.createClient).toHaveBeenCalledWith(
+        'client_test',
+        expect.objectContaining({ devMode: true, apiHostname: undefined }),
+      )
+    })
+
+    it('refuses to start without a custom domain or the opt-in', async () => {
+      sessionStorage.setItem(
+        `2s-admin:auth-configuration:${config.apiBaseUrl}`,
+        JSON.stringify({ Provider: 'AuthKit', ClientId: 'client_test' }),
+      )
+
+      const boot = await createAuth(config)
+
+      expect(boot).toMatchObject({ status: 'error' })
+      expect(authkit.createClient).not.toHaveBeenCalled()
+    })
   })
 
   it('creates the client in devMode on localhost, returning to /callback', async () => {

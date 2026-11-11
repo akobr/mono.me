@@ -61,8 +61,30 @@ describe('environment configuration of a deployment', () => {
     ['both', { API_BASE_URL: undefined, AUTH_API_HOSTNAME: undefined }],
   ])('fails without %s', (_name, missing) => {
     expect(() => environmentConfig({ ...deployment, ...missing })).toThrow(
-      'UI_ADMIN_API_BASE_URL and UI_ADMIN_AUTH_API_HOSTNAME are required.',
+      'UI_ADMIN_API_BASE_URL and UI_ADMIN_AUTH_API_HOSTNAME are required',
     )
+  })
+
+  it('allows no AuthKit domain only with a localStorage session, and the CSP then names the WorkOS API', () => {
+    const variables = { ...deployment, AUTH_API_HOSTNAME: '', AUTH_LOCAL_STORAGE_SESSION: 'true' }
+    const { appConfig, replacements } = environmentConfig(variables)
+
+    expect(JSON.parse(appConfigJson(variables))).toEqual({
+      apiBaseUrl: 'https://api.2s.42for.net/api',
+      authLocalStorageSession: true,
+      environmentName: 'production',
+    })
+    expect(appConfig.authApiHostname).toBeUndefined()
+    expect(replacements).toMatchObject({ __AUTH_HOSTNAME__: 'api.workos.com' })
+    expect(() => environmentConfig({ ...variables, AUTH_LOCAL_STORAGE_SESSION: 'false' })).toThrow(
+      'UI_ADMIN_AUTH_LOCAL_STORAGE_SESSION=true',
+    )
+  })
+
+  it('ignores the localStorage session when the AuthKit domain is set', () => {
+    const variables = { ...deployment, AUTH_LOCAL_STORAGE_SESSION: 'true' }
+
+    expect(appConfigJson(variables)).toBe(previousAppConfigJson(deployment))
   })
 
   it('writes the Sentry DSN, the PostHog token and host and the release', () => {
