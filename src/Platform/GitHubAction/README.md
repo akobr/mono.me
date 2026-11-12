@@ -185,7 +185,7 @@ No workflow tests the action (section 9 of the first spec): nothing in GitHub bu
 
 ## Releasing
 
-For maintainers. The workflow [Storyteller action release](https://github.com/akobr/mono.me/blob/main/.github/workflows/Platform.GitHubAction-release.yml) of the monorepo copies the action into a repository of its own, which holds the action alone and which GitHub Marketplace lists. The spec is [Publishing the GitHub Action and Secrets in CI](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Publishing%20the%20GitHub%20Action%20and%20Secrets%20in%20CI.md).
+For maintainers. The workflow [Platform.GitHubAction-release](https://github.com/akobr/mono.me/blob/main/.github/workflows/Platform.GitHubAction-release.yml) of the monorepo copies the action into a repository of its own, which holds the action alone and which GitHub Marketplace lists. The spec is [Publishing the GitHub Action and Secrets in CI](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/specs/2026-10-27%20Publishing%20the%20GitHub%20Action%20and%20Secrets%20in%20CI.md).
 
 Once, before the first release:
 
@@ -196,7 +196,7 @@ Once, before the first release:
 
 Each release:
 
-1. Run **Storyteller action release** from `main` (Actions, Run workflow) with the input `version`, `X.Y.Z`, for example `1.0.0`. The workflow fails before it clones anything when it runs from another branch, when the version is not `X.Y.Z`, or when the variable or the secret is missing; the message names them. It then fails when this README does not use `<owner>/<name>@vX` for the major version of the release. The token of the run only reads the monorepo.
+1. Run **Platform.GitHubAction-release** from `main` (Actions, Run workflow) with the input `version`, `X.Y.Z`, for example `1.0.0`. The workflow fails before it clones anything when it runs from another branch, when the version is not `X.Y.Z`, or when the variable or the secret is missing; the message names them. It then fails when this README does not use `<owner>/<name>@vX` for the major version of the release. The token of the run only reads the monorepo.
 2. It clones the repository of the action (an empty one too, which gets the branch `main`), replaces everything but `.git` with `action.yml`, `README.md` and `LICENSE` of `src/Platform/GitHubAction`, and commits `Release vX.Y.Z` with the source commit of the monorepo in the body. No workflow file reaches that repository.
 3. It refuses a tag `vX.Y.Z` that exists, creates it, moves the major tag `vX` to it, and pushes the branch and the two tags in one atomic push. It refuses a version that does not sort above the newest release; a fix of an older major version is not released by this workflow. The token never appears in a URL or in the log: git gets it from a credential helper that reads the environment of the step.
 4. It creates a **draft** release `vX.Y.Z` whose notes link the source commit, and names it in the summary of the run. Open it in the repository of the action, check **Publish this Action to the GitHub Marketplace**, choose the categories at the first release, and publish it. The API cannot list an action on the Marketplace, so this step stays by hand.
