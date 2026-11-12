@@ -467,6 +467,39 @@ describe('the Restore of the history', () => {
     screen.host.unmount()
   })
 
+  it('says that a restored version was not refreshed, never that it was not restored', async () => {
+    const restore = vi.fn((version: number) =>
+      Promise.resolve<VersionRestoreResult>({ Outcome: 'Restored', FromVersion: version, Version: 4, Modified: stamp }),
+    )
+    const { source } = fakeSource(restore)
+    source.afterRestore = () => Promise.reject(new Error('The network is down.'))
+    const screen = await mountView(source)
+
+    await confirmRestore(screen, 2)
+
+    expect(page()).toContain('Restored v2 as v4')
+    expect(page()).toContain('The views were not refreshed')
+    expect(page()).not.toContain('v2 was not restored')
+    screen.host.unmount()
+  })
+
+  it('warns in the confirmation that unsaved changes of the editor are discarded', async () => {
+    const restore = vi.fn()
+    const { source } = fakeSource(restore)
+    source.unsavedChanges = true
+    const screen = await mountView(source)
+
+    await screen.host.find('button[aria-label="Restore v1"]').trigger('click')
+    await settle()
+
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain(
+      'Your unsaved changes in the editor are discarded.',
+    )
+    dialogButton('Cancel')!.click()
+    await settle(6)
+    screen.host.unmount()
+  })
+
   it('offers no Restore to a Reader', async () => {
     const screen = await mountView(fakeSource(vi.fn()).source, { 'acme.billing': 'Reader' })
 
