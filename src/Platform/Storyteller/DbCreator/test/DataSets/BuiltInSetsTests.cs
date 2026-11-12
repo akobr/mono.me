@@ -1,7 +1,9 @@
 using System.IO.Abstractions;
+using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using _42.Platform.Storyteller.Transferring;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.DbCreator.UnitTests.DataSets;
 
@@ -165,6 +167,58 @@ public class BuiltInSetsTests
             content.Documents.Files.ShouldAllBe(file => file.ErrorCode == null, set.Name);
             (content.Lines?.Annotations ?? []).ShouldAllBe(line => line.ErrorCode == null, set.Name);
         }
+    }
+
+    // The import stores a binding as it is, but a resolved read of a configuration parses every binding of it and of the
+    // template of its type (merged into it), and one that does not parse fails every such read.
+    [Fact]
+    public void EverySetOfTheRepository_HasBindingsThatParse()
+    {
+        // the check is the parser of the platform: a hyphen in a path, as the showcase once had, does not parse
+        Should.Throw<BindingSyntaxException>(() => Parse("@(northwind.adyen-merchant, primaryVault)"));
+
+        var playground = FileSystem.Path.Combine(RepositoryRoot(), "src", "Platform", "Storyteller", "Playground", "data");
+
+        foreach (var set in new DataSetCatalog(FileSystem).GetSets([playground]))
+        {
+            var content = DataSetContent.Read(FileSystem, set.Folder, DataSetTarget.Resolve([set], "probe", "probe"));
+            var documents = content.Documents.Files
+                .Where(file => file.Kind is ViewDocumentKind.Configuration or ViewDocumentKind.Template && file.Content is not null);
+
+            foreach (var document in documents)
+            {
+                foreach (var binding in Bindings(document.Content!))
+                {
+                    var text = binding.Value<string>()!;
+                    var where = $"{set.Name}: {document.Path} at {binding.Path}";
+
+                    text.Length.ShouldBeLessThanOrEqualTo(BindingExpressionLimits.MaxLength, where);
+                    Should.NotThrow(() => Parse(text), where);
+                }
+            }
+        }
+    }
+
+    // As BindingExecutor reads an '@' string, without evaluating it.
+    private static BindingNode Parse(string binding)
+    {
+        return new Parser(new Tokenizer(binding).Tokenize()).Parse();
+    }
+
+    // The strings a resolved read binds, as ConfigurationBindingResolver walks a document: every string that starts with
+    // '@', in objects and arrays at any depth, except in the $definition of an object binding (an object with a string
+    // $binding), which is the program of its engine and is passed through.
+    private static IEnumerable<JValue> Bindings(JObject content)
+    {
+        return content.Descendants()
+            .OfType<JValue>()
+            .Where(value => value.Type == JTokenType.String && value.Value<string>()!.StartsWith('@'))
+            .Where(value => !value.Ancestors().OfType<JProperty>().Any(IsProgram));
+    }
+
+    private static bool IsProgram(JProperty property)
+    {
+        return property.Name == "$definition" && property.Parent is JObject envelope && envelope["$binding"]?.Type == JTokenType.String;
     }
 
     // The folder of 42.mono.slnx above the output of the tests.
