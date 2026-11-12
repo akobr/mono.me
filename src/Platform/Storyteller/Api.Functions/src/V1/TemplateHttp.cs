@@ -144,7 +144,7 @@ public class TemplateHttp
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error occurred while parsing input template.");
+            _logger.LogWarning(e, "Error occurred while parsing input template.");
             return new BadRequestObjectResult(new ErrorResponse($"Invalid input template model: {e.Message}"));
         }
 
@@ -218,7 +218,7 @@ public class TemplateHttp
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error occurred while parsing JSON Patch document.");
+            _logger.LogWarning(e, "Error occurred while parsing JSON Patch document.");
             return new BadRequestObjectResult(new ErrorResponse($"Invalid JSON Patch document: {e.Message}"));
         }
 
