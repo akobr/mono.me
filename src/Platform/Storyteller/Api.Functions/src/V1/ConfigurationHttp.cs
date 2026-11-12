@@ -309,7 +309,7 @@ public partial class ConfigurationHttp
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error occurred while parsing input configuration.");
+            _logger.LogWarning(e, "Error occurred while parsing input configuration.");
             return new BadRequestObjectResult(new ErrorResponse($"Invalid input configuration model: {e.Message}"));
         }
 
@@ -398,7 +398,7 @@ public partial class ConfigurationHttp
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error occurred while parsing JSON Patch document.");
+            _logger.LogWarning(e, "Error occurred while parsing JSON Patch document.");
             return new BadRequestObjectResult(new ErrorResponse($"Invalid JSON Patch document: {e.Message}"));
         }
 

@@ -22,7 +22,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `scripts/New-ByokApplication.ps1` | 11.1 | the Entra app `2S Platform Customer Keys` and its federation with the identity |
 | `scripts/New-DeploymentApplication.ps1` | 11.2 | the Entra app `2S Platform Deployment` and its federation with GitHub |
 | — (outputs of `main.bicep`) | 12 | the DNS records |
-| — (by hand, cookbook) | 13, 14 | WorkOS production, Sentry, PostHog |
+| — (by hand, cookbook) | 13, 14 | WorkOS production, Sentry (the projects `2s-admin-ui` and `2s-api`), PostHog |
 | `scripts/Set-GitHubEnvironment.ps1` | 15 | the GitHub environment `prod.42.Platform`, its variables and its one secret |
 | `naming.bicep` | — | the naming convention, imported by both entry points |
 | `parameters/prod.bicepparam`, `parameters/prod.domains.bicepparam` | — | production |
@@ -43,6 +43,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `byokClientId` | `KeyValues__Protection__Byok__ClientId` | step 11.1 |
 | `deploymentPrincipalId` | the deployment identity's roles | step 11.2 |
 | `authKitClientId` | `Auth__AuthKit__ClientId` | step 13 |
+| `sentryDsn` | `Sentry__Dsn`, the DSN of the Sentry project `2s-api` (the API reports its errors there; [error reporting](../../../docs/Platform/Storyteller/error-reporting.md)) | step 14 |
 | `authKitApiKeyEnabled` | `Auth__AuthKit__ApiKey` as a Key Vault reference | `true` once the secret `authkit-api-key` is in the vault |
 | `authKitDomain`, `authKitCustomDomain` | the AuthKit domain; `false` until the custom domain `auth.42for.net` exists (the admin UI keeps its session in `localStorage`; [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)) | the environment's `….authkit.app` domain: step 13 |
 | `budgetStartDate` | the budget's first month, never moved afterwards | the month of the first run |
@@ -116,7 +117,7 @@ It binds `api.2s.42for.net` to the Function App, issues its free managed certifi
 
 ### 5. WorkOS, Sentry and PostHog (steps 13 and 14)
 
-By hand, as in the cookbook. Then put the WorkOS client id into `authKitClientId` of `parameters/prod.bicepparam`, commit it, and run `main.bicep` again.
+By hand, as in the cookbook. Then put the WorkOS client id into `authKitClientId` and the DSN of the Sentry project `2s-api` into `sentryDsn` of `parameters/prod.bicepparam`, commit them, and run `main.bicep` again (what-if: `+ Auth__AuthKit__ClientId`, `+ Sentry__Dsn`). The admin UI's DSN goes to the GitHub environment instead (step 15).
 
 For invitation emails, put the WorkOS management key into the vault, set `authKitApiKeyEnabled = true` in the parameters file, commit it, and run `main.bicep` again:
 
