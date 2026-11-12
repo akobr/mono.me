@@ -58,7 +58,7 @@ invoicing/
 - **Ignored files** are counted and never fail a seed: version files (`rst.payments.conf.3.json`), `export.json`, a `set.json` below the root, and any other name, such as a `README.md`.
 - **Skipped paths** are neither read, nor counted, nor hashed: a path with a segment that starts with `.` (`.git`, `.vscode`, `.DS_Store`), and a first folder `__MACOSX`.
 - **An unpacked export** of a view (`sform story export -x`, either format) is a set once it gets a `set.json`.
-- **Limits.** A set holds at most 1,000,000 files and 2 GiB of document files, and a document at most 2 MB, one Cosmos DB item. The upload limits of an import job do not apply. A seed checks them from the sizes of the files before it writes anything.
+- **Limits.** A set holds at most 1,000,000 files and 2 GiB of document files, and a document at most 2 MB (2,097,152 bytes), one Cosmos DB item; a file that is not a document, such as a version file or a `README.md`, may be of any size. The upload limits of an import job do not apply. A seed checks them from the sizes of the files before it writes anything, and a set beyond them is wrong input (exit `2`), for `sets` too: a document over 2 MB refuses the whole set, with the file in the message, where an import job fails only that file.
 
 What a set cannot carry: key/value pairs, accounts and roles (a created organization and project get the owner only), the history of a document (only its current version is written), deleted annotations, and the stamps of other actors (everything is stamped by `System`).
 
@@ -115,6 +115,7 @@ One JSON object per line: the members of an annotation file ([Annotations](expor
 
   Member names are not changed. `$count` must be a whole number of 1 or more and `$start` one of 0 or more, as JSON numbers (`5`, not `5.0` or `"5"`). Both member names match in any case. A line without `$count` is taken literally.
 - **At most 200,000 annotations** per set, every line and every index counted (a line that cannot be read counts as one). The count runs before any line is expanded, and a set above it is wrong input (exit `2`), with the line where it goes over, before anything is written.
+- **At most 2 MB per line**, the limit of a document file, counted in UTF-8 bytes of the line as written (a generator's annotations are a few bytes longer once their placeholders are replaced). A longer line makes the set wrong input (exit `2`), with its line number (`'annotations.jsonl' has a line of more than 2,097,152 bytes at line 7, the most a document holds.`), before anything is written.
 - **Duplicates.** A key that an annotation file holds fails its line with `DuplicateFile` (`The file 'annotations/rst.payments.json' already holds the annotation rst.payments.`), and so does a key of an earlier line (`Line 3 of annotations.jsonl already holds the annotation …`).
 
 A line that cannot be read fails with its line number:
@@ -149,7 +150,7 @@ One run has one target: an organization, a project and a view.
 
 A missing organization or project, and sets that disagree, are wrong input, and the message names the option to give. The dependencies go into the same target, whatever their own manifests say.
 
-The names are checked before anything is written, with the rules of the API (`NameRules`): the project always, the view unless it is `default`, and the organization when the seed creates it. A name with a dot is never an organization, even when it is the key of an existing project (`42dotnet.main`).
+The names are checked before anything of the target is written, with the rules of the API (`NameRules`): the project always, the view unless it is `default`, and the organization when the seed creates it. The plan checks the project, the view and an organization with a dot (a name with a dot is never an organization, even when it is the key of an existing project, `42dotnet.main`) before the database is touched. Whether the organization is new only the database tells, so the name of an organization without a dot is checked when the seed reads its access point (step 1 below): after the database and its containers are ensured, and before the account, the organization or the project is written. An existing organization is used by its name, whatever the rules say today.
 
 ### The owner and the creation of the target
 
@@ -188,7 +189,7 @@ The record has no `ViewName`, `ProjectName` or `AnnotationType`, and its id does
 | No record of the set | Seeds the set |
 | A record with the same `Version` and `Hash` | Reports the set as seeded already and reads nothing more; exit `0`. `--again` seeds it anyway |
 | A record of another version or hash: the set changed | Seeds the set: new documents are created, what exists stays. A changed document is `Skipped` with `DocumentExists`, not updated |
-| No record after a run that stopped halfway: a crash, a stop, a failed document | Seeds the set: what the earlier run wrote is `Unchanged`, and the rest is created |
+| No record after a run that stopped halfway: a crash, a stop, a failed document | Seeds the set: what the earlier run wrote is `Unchanged`, the rest is created, and the relation arrays the earlier run left incomplete are completed (see [Seeding a set](#seeding-a-set)) |
 
 A seed never overwrites and never deletes. To change a seeded document, change it through the API, `sform` or the admin UI, or import it with `sform story import` (which overwrites by default). A deleted annotation is not re-created: it is `Skipped` with `AnnotationDeleted`, with what hangs on it. The record is written only by a real run without a `Failed` outcome; warnings and skipped documents do not keep a set from being recorded.
 
@@ -200,10 +201,11 @@ A seed never overwrites and never deletes. To change a seeded document, change i
 2. The documents and `annotations.jsonl` are read. A line that cannot be read is `Failed`, and its key joins the overlay's failed annotations before anything is written, so a file below it is `DependencyFailed` instead of creating the key with defaults.
 3. **The annotations, in rounds.** A round imports its annotation files through `IViewImporter` (one document at a time, ancestors first), then sends its lines to `IAnnotationBulkWriter`. A set without a line above a file has one round: the files, then the lines. A file below a line comes in a later round than the line, and a line below a file comes after the file. Both the importer and the bulk writer create a missing ancestor with defaults, and `Skip` would then keep the defaults over the line or the file of that key.
 4. A line on or below an annotation that failed, in a file or a line, is `Skipped` with `DependencyFailed` and is not sent.
-5. The schemas, templates and configurations go through `IViewImporter`, with the same overlay.
-6. The record is written (see above).
+5. **The relation arrays of the annotation files are completed** (`IAnnotationBulkWriter.CompleteRelationsAsync`, also in a dry run, which only counts). A create commits the key first and the arrays of its active parents in its last wave, and an import that finds the key active again reports it `Unchanged` without a look at the parents. So a run that stopped between the two, by a crash, a stop or a request that failed after the retries of the Cosmos DB client, would leave a parent without the name of its child, and the next run would record the set so. The keys of the files and their ancestors are read in reads of many items, and an active parent that misses an active child gets the name in one replace under its ETag, without an audit entry and without a change of `Modified`. On a first seed nothing is missing, and the step costs a read of many items per 1,000 keys. The seed prints the number of annotations it completed, when there are any. The lines need no such step: the bulk writer does the same for the keys of every call.
+6. The schemas, templates and configurations go through `IViewImporter`, with the same overlay.
+7. The record is written (see above).
 
-A run seeds its sets in the order of their dependencies. A set that depends on a set with failures is not seeded (`The data set 'b' is not seeded: the set 'a' it depends on failed.`), and the run exits `4`; a set that does not depend on it is seeded.
+A run seeds its sets in the order of their dependencies. A set that depends on a set with failures is not seeded, and the run exits `4`; a set that does not depend on it is seeded. `seed` prints it under the heading of the set (`# b  version 1, built-in`) as `! Not seeded: the set 'a' it depends on failed.`
 
 The outcomes, codes and warnings are those of an import ([Outcomes, codes and warnings](export-import.md#outcomes-codes-and-warnings)): `Created` (with the warning `AncestorCreated` when missing ancestors are created with defaults), `Unchanged`, `Skipped` (`DocumentExists`, `AnnotationDeleted`, `DependencyFailed`, `AnnotationNotFound` for a document whose annotation is missing), and `Failed` (`InvalidDocument`, `InvalidKey`, `InvalidAnnotation`, `DuplicateFile`, `SchemaViolation`, …). Warnings never fail a seed. A configuration is validated against its schemas as in an import; `--force` stores schemas and configurations that break each other, with a warning.
 
@@ -216,8 +218,9 @@ The outcomes, codes and warnings are those of an import ([Outcomes, codes and wa
 - **Decisions.** Every key is decided as a sequential import with `Skip` decides it, in the import's order (depth, type, key): an active key is `Unchanged` when it is equal and `Skipped` with `DocumentExists` otherwise; a deleted key, or one below a deleted ancestor, is `Skipped` with `AnnotationDeleted`, with what hangs on it; a missing key is `Created`. A missing ancestor that is not in the input is created with the defaults of the first key that needs it, with the audit cause `Ancestor` and the warning `AncestorCreated`. Invalid annotations fail with `InvalidAnnotation`, a key given twice with `DuplicateFile`. The project and view of the call win over those of the annotations.
 - **Reads.** The keys and all their ancestors are read in reads of many items (at most 1,000 ids each). The audits are read only for the keys the writer creates, and not at all in a dry run.
 - **Writes.** Each created key is one unit: its annotation item and its audit entry, in one transactional batch of its partition. The units run in waves by depth, roots first. Within a wave they are sorted by partition and cut into batches of at most 100 operations and about 1.5 MB, in plans of at most `MaxUnitsPerPlan` (2,000) units with `MaxParallelBatches` (4) batches at once. A last wave adds the new names to the relation arrays of active parents: one replace per parent, guarded by its ETag, without an audit entry and without a change of `Modified`, as a create does. It also adds active children that a parent does not list, which repairs a run whose last wave failed.
-- **Retries.** A concurrent change (`409`, `412`) runs the whole procedure again. A throttle (`429`) that outlasts the retries of the Cosmos DB client waits its `RetryAfter` (without one, 1 s after the first attempt, 2 s after the second, and so on) and runs it again. After 5 attempts the call ends with a `Conflict` error or the `429`; the seed then stops, and a run again completes it. Keys an earlier attempt committed are still reported `Created`.
-- **Progress.** After each plan of a real run, the seed prints the number of annotations written so far: `… 2,000 annotations of annotations.jsonl written`.
+- **Retries.** A concurrent change (`409`, `412`) runs the whole procedure again. A throttle (`429`) that outlasts the retries of the Cosmos DB client waits its `RetryAfter` (without one, 1 s after the first attempt, 2 s after the second, and so on) and runs it again. After 5 attempts the call ends with a `Conflict` error or the `429`; the seed then stops, and a run again completes it. Keys an earlier attempt committed are still reported `Created`, also when an ancestor was deleted since (the key exists; what hangs on the deleted ancestor and is not written yet is `Skipped` with `AnnotationDeleted`).
+- **Completion.** `CompleteRelationsAsync` is the last wave alone, for keys written before: it reads the keys and their ancestors and adds every active one to the arrays of its active parents that miss it, with the same replaces and retries. It creates nothing, and a missing or deleted key stays as it is. The seed calls it for the annotation files (see [Seeding a set](#seeding-a-set)).
+- **Progress.** After each plan of a real run, the seed prints the number of annotations written so far, for example `… 2,506 annotations of annotations.jsonl written`. A plan holds at most 2,000 annotations of one depth, so the numbers follow the waves: for `large`, 506 (the depth 0: 6 responsibilities and 500 subjects), then 2,506, 4,506 and 4,517 (the 4,011 contexts, usages and units of depth 1), and so on to 16,017.
 
 ### Timings
 
@@ -270,16 +273,19 @@ The build of the database (see [What DbCreator does](#what-dbcreator-does)). Aft
 
 A seed:
 
-1. **Plans** from the files and the options alone, so wrong input exits `2` before the database is touched: an unknown set, an invalid manifest, a cycle, a missing or invalid name of the target, an invalid owner id, a missing `--path` folder, a set beyond the limits.
+1. **Plans** from the files and the options alone, so wrong input exits `2` before the database is touched: an unknown set, an invalid manifest, a cycle, a missing name of the target, an invalid project, view or organization with a dot, an invalid owner id, a missing `--path` folder, a set beyond the limits (a document or a line over 2 MB included).
 2. Prints the plan (`Seeding the set 'large' into 'acme/billing/default' for the owner … (#…).`), and in a dry run that nothing is written.
 3. Checks the layout of the database and ensures the database and its containers, as the root command does (exit `3` for the earlier layout).
-4. Makes the target exist and seeds the sets in order.
-5. Prints each set: its counts per kind, the line of `annotations.jsonl` with the ancestors the bulk writer created and the relation arrays it updated, the ignored files, the failures (at most 20, then `… and N more`), the warnings by code, the other outcomes that are not `Created` or `Unchanged` by code, and the time. Then what the target got and the end:
+4. Makes the target exist and seeds the sets in order. What only the database tells is checked here, before anything of the target is written (exit `2`): the name of an organization the seed creates, and a missing project in an organization whose Owner is not the owner (see [The owner and the creation of the target](#the-owner-and-the-creation-of-the-target)).
+5. Prints each set: its counts per kind, the line of `annotations.jsonl` with the ancestors the bulk writer created and the relation arrays it updated, the relation arrays it completed for the annotation files, the ignored files, the failures (at most 20, then `… and N more`), the warnings by code, the other outcomes that are not `Created` or `Unchanged` by code, and the time. Then what the target got and the end:
 
 ```text
 Seeding the set 'large' into 'acme/billing/default' for the owner Aleš Kobr (#user_01…).
 Containers 'core' and 'organizations' are ready, the settings of 'organizations' are up to date.
-  … 2,000 annotations of annotations.jsonl written
+  … 506 annotations of annotations.jsonl written
+  … 2,506 annotations of annotations.jsonl written
+  … 4,506 annotations of annotations.jsonl written
+  … 4,517 annotations of annotations.jsonl written
   …
   … 16,017 annotations of annotations.jsonl written
 
@@ -297,7 +303,7 @@ Done in 43.2 s: 1 set seeded, 0 sets seeded already.
 2sInitDb sets [--path <folder>]…
 ```
 
-Lists the built-in sets and those of the `--path` folders: the name, the version and where it comes from (`built-in` or `--path`), the description, the default target (with a hint when the manifest names no organization or project), the dependencies (one that is not in the catalog is marked), the documents per kind with those that cannot be read and the ignored files, the lines, generators and annotations of `annotations.jsonl` with those that cannot be read, and the folder. It reads the files only and never touches the database.
+Lists the built-in sets and those of the `--path` folders: the name, the version and where it comes from (`built-in` or `--path`), the description, the default target (with a hint when the manifest names no organization or project), the dependencies (one that is not in the catalog is marked), the documents per kind with those that cannot be read and the ignored files, the lines, generators and annotations of `annotations.jsonl` with those that cannot be read, and the folder. It reads the files only and never touches the database. A set beyond the [limits](#a-set) ends the listing as wrong input (exit `2`), as it ends a seed.
 
 ### Exit codes
 
@@ -306,7 +312,7 @@ Lists the built-in sets and those of the `--path` folders: the name, the version
 | `0` | Success, also for a set seeded already, and with warnings or skipped documents |
 | `-1` (`255` on Linux and macOS) | The command line cannot be parsed: an unknown command, option or argument, a missing value, a single value given twice |
 | `1` | The tool crashed, for example when the database cannot be reached or the bulk writer runs out of retries; the log file has the details |
-| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, or more than 200,000 annotations), a cycle, a name found twice, a missing or invalid name of the target, an organization the owner does not own, an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id` |
+| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner (an existing project is used whoever owns it), an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the missing project are known only after the database and its containers are ensured |
 | `3` | The database has the containers of the earlier layout (one per organization); nothing was written |
 | `4` | A document or an annotation of a set failed (also in a dry run that would fail), or a set was not seeded because a set it depends on failed |
 
@@ -381,7 +387,7 @@ dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed large --orga
 dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed --path src/Platform/Storyteller/Playground/data
 ```
 
-**Aspire.** The host of [local development](../Aspire.Host/local-development.md) has two resources of DbCreator, both started from the dashboard: `db-creator` runs `2sInitDb`, and `db-seed` runs `2sInitDb seed showcase` against the same emulator. The host passes its `BaseAccount:Id` user secret to both as `baseAccount__id`, so the same account owns `42dotnet` and the organization `fabrikam` the seed creates. `db-seed` ensures the containers itself and needs nothing of `core`; a second start reports the set as seeded already. To seed another set into the Aspire emulator, run DbCreator from the command line with the `ConnectionStrings__cosmos` that the dashboard shows in the environment of `db-creator`.
+**Aspire.** The host of [local development](../Aspire.Host/local-development.md) has two resources of DbCreator, both started from the dashboard: `db-creator` runs `2sInitDb`, and `db-seed` runs `2sInitDb seed showcase` against the same emulator. The host passes its `BaseAccount:Id` user secret to both as `baseAccount__id`, so the same account owns `42dotnet` and the organization `fabrikam` the seed creates. Without it, when the host seeds the AuthKit staging accounts (the container emulator, or `StagingSeed:Enabled`), `db-seed` runs with `--owner user_01M41P6G2TTSXXMM88WNVMRQKG`, the default staging user whom `db-creator` makes a second owner of `42dotnet`, so the same local sign-in opens both; otherwise the owner is DbCreator's legacy Entra ID `sub`, which matches no account. The owner of `fabrikam` is fixed by the seed that creates it: a later seed, also with `--again`, uses the project as it is. To change it, reset the emulator's volume, or seed into another organization with `--organization`. `db-seed` ensures the containers itself and needs nothing of `core`; a second start reports the set as seeded already. To seed another set into the Aspire emulator, run DbCreator from the command line with the `ConnectionStrings__cosmos` that the dashboard shows in the environment of `db-creator`.
 
 **The tool.** DbCreator packs as the dotnet tool `2sInitDb` (package `42.Platform.Storyteller.DbCreator`): `dotnet pack src/Platform/Storyteller/DbCreator/src` writes it to `.artifacts/`, the local feed of `nuget.config`. The package carries `app.config.json` and the built-in sets.
 
@@ -392,8 +398,8 @@ dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed --path src/P
 | Project | What it checks |
 | --- | --- |
 | `DbCreator/test` (`42.Platform.Storyteller.DbCreator.UnitTests`) | The manifest, `annotations.jsonl` and its generators, the files, the hash, the catalog, the target, the owner, the provisioning, the seeder over fakes of the importer, the bulk writer and the record store, the command line and the commands, and every set of the repository (their shape, that they read without failures, and that their bindings parse). No database |
-| `DbCreator/testint` (`42.Platform.Storyteller.DbCreator.IntegrationTests`) | Seeds against a Cosmos DB emulator through the tool's own registrations: a first seed with the target, the owner's access, the view and the documents; a second run that writes nothing; a partly seeded target and a run that stopped halfway, completed without overwriting; a changed set; a dry run; the refusal of another owner's organization; 10,000 generated annotations in bulk with their relation arrays and audit entries; and the sets `core`, `large`, `showcase` and the playground |
-| `Backend.CosmosDb/test` | The bulk writer (`CosmosAnnotationBulkWriterTests`: equal to an import of the same annotations, retries, throttles, cancellation, thousands of keys), and `core` through `OrganizationsContainerStructureTests` |
+| `DbCreator/testint` (`42.Platform.Storyteller.DbCreator.IntegrationTests`) | Seeds against a Cosmos DB emulator through the tool's own registrations: a first seed with the target, the owner's access, the view and the documents; a second run that writes nothing; a partly seeded target and a run that stopped halfway (also between the creates of files and their relation arrays), completed without overwriting; a changed set; a dry run; the refusal of another owner's organization; 10,000 generated annotations in bulk with their relation arrays and audit entries; and the sets `core`, `large`, `showcase` and the playground |
+| `Backend.CosmosDb/test` | The bulk writer (`CosmosAnnotationBulkWriterTests`: equal to an import of the same annotations, retries, throttles, cancellation, thousands of keys, the completion of relation arrays after an interrupted import), and `core` through `OrganizationsContainerStructureTests` |
 | `Backend.Core/test` | The importer (`ViewImporterTests`), the tally and the reader of loose files |
 
 ```sh

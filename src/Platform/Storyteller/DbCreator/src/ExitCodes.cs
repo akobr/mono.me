@@ -12,8 +12,8 @@ public static class ExitCodes
     // errors 1 - 39
     public const int ERROR_CRASH = 1;
 
-    // wrong input: an unknown set, an invalid manifest or annotations.jsonl, a cycle, a bad name, an organization the
-    // owner does not own, an invalid account id (DataSetException)
+    // wrong input: an unknown set, an invalid manifest or annotations.jsonl, a set beyond the limits, a cycle, a bad
+    // name, a missing project in an organization whose Owner is not the owner, an invalid account id (DataSetException)
     public const int ERROR_WRONG_INPUT = 2;
 
     // the database does not have the layout of the shared container organizations, see DatabaseLayoutException
