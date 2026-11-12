@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
@@ -178,6 +179,51 @@ public class CosmosSchemaRestoreTests(Startup startup)
 
         var missing = () => Schemas.RestoreDescendantTypeSchemaVersionAsync(TestConstants.Organization, project, View, "rst.gamma", AnnotationTypeCodes.Unit, 1, Editor, false);
         (await missing.Should().ThrowAsync<NotFoundException>()).Which.ErrorCode.Should().Be(ErrorCodes.AnnotationNotFound);
+    }
+
+    [Fact]
+    public async Task TypeSchema_Restore_RetriesAConcurrentChange_AndGivesUpAfterThreeMore()
+    {
+        var project = $"{ProjectPrefix}-concurrent";
+        await SetTypeAsync(project, NameSchema);
+        await SetTypeAsync(project, CountSchema);
+        var storage = new InterceptedRepositoryProvider(Context.Services.GetRequiredService<IContainerRepositoryProvider>());
+        var schemas = ActivatorUtilities.CreateInstance<CosmosConfigurationSchemaService>(Context.Services, storage);
+        var id = $"{View}.cfs.t.{Type}";
+        var changes = 0;
+        var always = false;
+
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (batch.Contains(BatchOperationKind.Replace, id) && (always || changes++ == 0))
+            {
+                await TouchAsync(project, id);
+            }
+
+            return null;
+        };
+
+        var restored = await schemas.RestoreSchemaVersionAsync(TestConstants.Organization, project, View, Type, 1, Editor, false);
+
+        changes.Should().Be(2, "the first attempt lost to the concurrent change, the second wrote");
+        restored.Version.Should().Be(3);
+
+        always = true;
+        var act = () => schemas.RestoreSchemaVersionAsync(TestConstants.Organization, project, View, Type, 2, Editor, false);
+
+        await act.Should().ThrowAsync<SchemaConcurrencyException>();
+        (await Schemas.GetSchemaAsync(TestConstants.Organization, project, View, Type))!.Version.Should().Be(3);
+    }
+
+    // A change of the item that leaves its document as it is.
+    private async Task TouchAsync(string project, string id)
+    {
+        using var response = await GetContainer().PatchItemStreamAsync(
+            id,
+            OrganizationKeys.Key(TestConstants.Organization, $"{project}.schema"),
+            [PatchOperation.Set("/touched", Guid.NewGuid().ToString("N"))]);
+
+        response.IsSuccessStatusCode.Should().BeTrue();
     }
 
     private Task SetTypeAsync(string project, JObject schema)
