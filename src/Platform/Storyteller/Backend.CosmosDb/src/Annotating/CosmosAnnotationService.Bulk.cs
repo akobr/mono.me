@@ -191,6 +191,12 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
         bool IsKept(string keyText) => commits.HasKey(keyText) && nodes[keyText].State == AnnotationItemState.Active;
         AnnotationItemState StateOf(string keyText) => IsKept(keyText) ? AnnotationItemState.Missing : nodes[keyText].State;
 
+        // in a dry run, a key an earlier step of it made active is not stored, but counts as an active ancestor, as the
+        // overlay of an import does
+        bool IsAssumedActive(string keyText) => options.DryRun
+                                                && options.DryRunActiveKeys?.Contains(keyText) == true
+                                                && nodes[keyText].State != AnnotationItemState.Active;
+
         var results = new Dictionary<int, ViewImportResult>();
         var creates = new List<BulkCreate>();
         var marked = new HashSet<string>(StringComparer.Ordinal);
@@ -208,7 +214,9 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
 
             // the keys the create writes, ancestors first; an ancestor an earlier key of the input creates is not among them
             var written = input.Ancestors
-                .Where(ancestor => StateOf(ancestor.ToString()) != AnnotationItemState.Active && !marked.Contains(ancestor.ToString()))
+                .Where(ancestor => StateOf(ancestor.ToString()) != AnnotationItemState.Active
+                                   && !marked.Contains(ancestor.ToString())
+                                   && !IsAssumedActive(ancestor.ToString()))
                 .Append(input.Key)
                 .ToList();
             var deleted = written.Where(key => StateOf(key.ToString()) == AnnotationItemState.Deleted).ToList();
@@ -256,7 +264,15 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
 
         if (options.DryRun)
         {
-            return new BulkOutcome(results, ancestorsCreated, updates.Count);
+            // an assumed parent has nothing stored to replace, but the real run replaces its arrays once
+            var assumedParents = toWrite
+                .SelectMany(create => AnnotationRelations.GetParentRelations(create.Node.Key.Annotation))
+                .Select(relation => relation.Parent.ToString())
+                .Where(parentText => !entities.ContainsKey(parentText) && IsAssumedActive(parentText))
+                .Distinct(StringComparer.Ordinal)
+                .Count();
+
+            return new BulkOutcome(results, ancestorsCreated, updates.Count + assumedParents);
         }
 
         await store.LoadAuditsAsync(toWrite.Select(create => create.Node), cancellationToken);

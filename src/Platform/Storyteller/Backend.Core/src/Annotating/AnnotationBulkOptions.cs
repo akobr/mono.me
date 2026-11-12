@@ -13,4 +13,10 @@ public sealed record class AnnotationBulkOptions
 
     // The annotations committed so far, reported after each executed plan.
     public IProgress<int>? Progress { get; init; }
+
+    // In a dry run, the keys that earlier steps of the same dry run made active without storing them (the active keys of
+    // an import's overlay). An ancestor among them counts as active, as an annotation import counts the overlay: it is
+    // not created with defaults, and a parent among them counts as a relation update. A real run reads what the earlier
+    // steps wrote and ignores them.
+    public IReadOnlySet<string>? DryRunActiveKeys { get; init; }
 }

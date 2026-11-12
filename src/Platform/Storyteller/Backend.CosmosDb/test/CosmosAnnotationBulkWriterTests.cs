@@ -324,6 +324,51 @@ public class CosmosAnnotationBulkWriterTests(Startup startup)
     }
 
     [Fact]
+    public async Task CreateMissing_DryRunCountsTheKeysOfEarlierStepsAsActiveAncestors()
+    {
+        const string project = "bulk-dry-active";
+        IReadOnlyList<Annotation> annotations = [Read("exe.early.pay.prod", "{}", project), Read("cnt.early.prod", "{}", project)];
+
+        // the keys an earlier step of the dry run (the annotation files of a set) would create; nothing is stored
+        var dryRun = await Writer.CreateMissingAnnotationsAsync(
+            Organization,
+            project,
+            View,
+            annotations,
+            Seeder,
+            new AnnotationBulkOptions { DryRun = true, DryRunActiveKeys = new HashSet<string>(["sbt.early", "rst.pay"], StringComparer.Ordinal) });
+
+        dryRun.Items.Select(item => item.Result.Outcome).Should().Equal(ViewImportOutcome.Created, ViewImportOutcome.Created);
+        dryRun.Items[0].Result.Warnings!.Single().Message.Should().Be("The missing ancestor usg.early.pay is created with defaults.");
+        dryRun.Items[1].Result.Warnings.Should().BeNull();
+        dryRun.AncestorsCreated.Should().Equal("usg.early.pay");
+        dryRun.RelationUpdates.Should().Be(1, "sbt.early gains a context and a responsibility in one replace");
+
+        foreach (var key in new[] { "sbt.early", "rst.pay", "usg.early.pay", "cnt.early.prod", "exe.early.pay.prod" })
+        {
+            (await Annotations.ExistAnnotationAsync(Key(key, project))).Should().BeFalse($"'{key}' is not written");
+        }
+
+        // the real run after the earlier step does what the dry run said, and ignores the keys: usg.early.pay is not
+        // stored, so it is created
+        await Annotations.CreateAnnotationsFromStringAsync(Organization, project, View, ["sbt.early", "rst.pay"], Creator);
+
+        var run = await Writer.CreateMissingAnnotationsAsync(
+            Organization,
+            project,
+            View,
+            annotations,
+            Seeder,
+            new AnnotationBulkOptions { DryRunActiveKeys = new HashSet<string>(["sbt.early", "rst.pay", "usg.early.pay"], StringComparer.Ordinal) });
+
+        run.Should().BeEquivalentTo(dryRun);
+        (await Annotations.ExistAnnotationAsync(Key("usg.early.pay", project))).Should().BeTrue();
+        var subject = (Subject)await GetAsync("sbt.early", project);
+        subject.ContextNames.Should().Equal("prod");
+        subject.ResponsibilityNames.Should().Equal("pay");
+    }
+
+    [Fact]
     public async Task CreateMissing_ContinuesTheAuditOfAMissingKey()
     {
         const string project = "bulk-orphan-audit";
