@@ -4,7 +4,7 @@ using _42.Platform.Storyteller.Transferring;
 namespace _42.Platform.Storyteller.DbCreator.UnitTests.DataSets;
 
 // An importer that makes every file Created, fails the annotation keys it is told to, and tracks the overlay as the
-// real one does for annotations; it records each call with what the overlay held when it started.
+// real one does for annotations and configurations; it records each call with what the overlay held when it started.
 internal sealed class FakeViewImporter : IViewImporter
 {
     public HashSet<string> FailingKeys { get; } = new(StringComparer.Ordinal);
@@ -21,7 +21,16 @@ internal sealed class FakeViewImporter : IViewImporter
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         overlay ??= new ViewImportOverlay();
-        Calls.Add(new ImporterCall(organization, project, view, files, options, overlay, overlay.ActiveAnnotations.ToHashSet(), overlay.FailedAnnotations.ToHashSet()));
+        Calls.Add(new ImporterCall(
+            organization,
+            project,
+            view,
+            files,
+            options,
+            overlay,
+            overlay.ActiveAnnotations.ToHashSet(),
+            overlay.FailedAnnotations.ToHashSet(),
+            overlay.Configurations.Keys.ToHashSet()));
 
         foreach (var file in files)
         {
@@ -43,6 +52,10 @@ internal sealed class FakeViewImporter : IViewImporter
                 {
                     overlay.AddActiveAnnotation(file.AnnotationKey!);
                 }
+            }
+            else if (file.Kind == ViewDocumentKind.Configuration && result.Outcome == ViewImportOutcome.Created)
+            {
+                overlay.SetConfiguration(file.AnnotationKey!, file.Content!);
             }
 
             yield return new ViewImportFileResult(file, result);

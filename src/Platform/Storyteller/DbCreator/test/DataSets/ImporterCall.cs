@@ -10,4 +10,5 @@ internal sealed record class ImporterCall(
     ViewImportOptions Options,
     ViewImportOverlay Overlay,
     IReadOnlySet<string> ActiveAtStart,
-    IReadOnlySet<string> FailedAtStart);
+    IReadOnlySet<string> FailedAtStart,
+    IReadOnlySet<string> ConfigurationsAtStart);

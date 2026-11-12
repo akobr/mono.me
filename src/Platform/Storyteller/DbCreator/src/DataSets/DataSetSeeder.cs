@@ -116,6 +116,9 @@ public sealed class DataSetSeeder
         var results = new List<DataSetSeedResult>(plan.Sets.Count);
         var failed = new HashSet<string>(StringComparer.Ordinal);
 
+        // a dry run stores nothing, so each set starts from what the sets before it would have written
+        var written = options.DryRun ? new ViewImportOverlay() : null;
+
         foreach (var set in plan.Sets)
         {
             var failedDependency = set.Manifest.DependsOn.FirstOrDefault(failed.Contains);
@@ -128,7 +131,7 @@ public sealed class DataSetSeeder
                 continue;
             }
 
-            var result = await SeedSetAsync(set, target, options, cancellationToken);
+            var result = await SeedSetAsync(set, target, options, written, cancellationToken);
             results.Add(result);
 
             if (result.HasFailures)
@@ -140,71 +143,14 @@ public sealed class DataSetSeeder
         return new DataSetRunResult(target, plan.Owner, provisioning, results, options.DryRun);
     }
 
-    // One set into a target that exists: the annotation files (ancestors first), the annotations of
-    // annotations.jsonl in bulk, then the schemas, templates and configurations, all with one overlay, so each step
-    // sees what the earlier ones made active or failed (also in a dry run). The record is written after a seed without
-    // failures; a set whose record has its version and hash is not read further, unless Again.
-    public async Task<DataSetSeedResult> SeedSetAsync(DataSet set, DataSetTarget target, DataSetSeedOptions options, CancellationToken cancellationToken = default)
+    // One set into a target that exists: the annotation files (ancestors first) and the annotations of
+    // annotations.jsonl in bulk, in rounds so that neither creates an annotation of the other with defaults (GetRounds),
+    // then the schemas, templates and configurations, all with one overlay, so each step sees what the earlier ones
+    // made active or failed (also in a dry run). The record is written after a seed without failures; a set whose
+    // record has its version and hash is not read further, unless Again.
+    public Task<DataSetSeedResult> SeedSetAsync(DataSet set, DataSetTarget target, DataSetSeedOptions options, CancellationToken cancellationToken = default)
     {
-        var started = _time.GetTimestamp();
-        var hash = DataSetFolder.ComputeHash(_fileSystem, set.Folder);
-        var record = await _records.GetAsync(target, set.Name, cancellationToken);
-
-        if (!options.Again && record is not null && record.Version == set.Manifest.Version && record.Hash == hash)
-        {
-            _logger.LogInformation("The set {Set} is seeded in {Target} already (version {Version}).", set.Name, target, record.Version);
-            return new DataSetSeedResult { Set = set, Hash = hash, IsAlreadySeeded = true, Elapsed = _time.GetElapsedTime(started) };
-        }
-
-        _logger.LogInformation("Seeding the set {Set} (version {Version}) into {Target}.", set.Name, set.Manifest.Version, target);
-
-        var content = DataSetContent.Read(_fileSystem, set.Folder, target);
-        var importOptions = new ViewImportOptions
-        {
-            Actor = AuditActor.System,
-            Existing = ViewImportExisting.Skip,
-            Force = options.Force,
-            DryRun = options.DryRun,
-        };
-        var overlay = new ViewImportOverlay();
-        var documents = new ViewImportTally(
-            null,
-            content.Documents.Files.Count,
-            content.Documents.IgnoredFiles,
-            content.Documents.ExcludedFiles);
-        var items = new List<DataSetSeedItem>();
-
-        await ImportAsync(target, content.Documents.Files.Where(IsAnnotation).ToList(), importOptions, overlay, documents, items, cancellationToken);
-        var lines = await WriteLinesAsync(target, content.Lines, options, overlay, items, cancellationToken);
-        await ImportAsync(target, content.Documents.Files.Where(file => !IsAnnotation(file)).ToList(), importOptions, overlay, documents, items, cancellationToken);
-
-        var isRecorded = false;
-
-        if (!options.DryRun && items.All(item => item.Outcome != ViewImportOutcome.Failed))
-        {
-            await _records.SaveAsync(CreateRecord(set, target, hash, documents, lines, _time.GetUtcNow()), cancellationToken);
-            isRecorded = true;
-        }
-
-        var result = new DataSetSeedResult
-        {
-            Set = set,
-            Hash = hash,
-            Documents = documents,
-            Lines = lines,
-            Items = items,
-            IsRecorded = isRecorded,
-            Elapsed = _time.GetElapsedTime(started),
-        };
-
-        _logger.LogInformation(
-            "Seeded the set {Set} into {Target} in {Elapsed}: {Failed} failed, recorded: {IsRecorded}.",
-            set.Name,
-            target,
-            result.Elapsed,
-            result.Failures.Count(),
-            isRecorded);
-        return result;
+        return SeedSetAsync(set, target, options, null, cancellationToken);
     }
 
     private static bool IsAnnotation(ViewArchiveFile file)
@@ -279,130 +225,106 @@ public sealed class DataSetSeeder
         };
     }
 
-    private async Task ImportAsync(
-        DataSetTarget target,
-        IReadOnlyList<ViewArchiveFile> files,
-        ViewImportOptions options,
-        ViewImportOverlay overlay,
-        ViewImportTally tally,
-        List<DataSetSeedItem> items,
-        CancellationToken cancellationToken)
+    // What one overlay says the view will hold, added to another: the active annotations, the schemas and the
+    // configurations, not the failures (a set that depends on a failed set is not seeded at all).
+    private static void AddWritten(ViewImportOverlay from, ViewImportOverlay to)
     {
-        if (files.Count == 0)
+        foreach (var key in from.ActiveAnnotations)
         {
-            return;
+            to.AddActiveAnnotation(AnnotationKey.Parse(key), from.RecreatedAnnotations.Contains(key));
         }
 
-        await foreach (var (file, result) in _importer.ImportAsync(target.Organization, target.Project, target.View, files, options, overlay, cancellationToken))
+        foreach (var (key, schema) in from.Schemas)
         {
-            tally.Add(file, result);
+            to.SetSchema(key, schema);
+        }
 
-            if (IsListed(result))
-            {
-                items.Add(ToItem(file, result));
-            }
+        foreach (var (key, document) in from.Configurations)
+        {
+            to.SetConfiguration(AnnotationKey.Parse(key), document);
         }
     }
 
-    // The annotations of annotations.jsonl through the bulk writer, after the annotation files. One that could not
-    // be read is Failed; one on or below an annotation that failed (in a file or a line) is DependencyFailed without
-    // being sent, as the importer does. The failures join the overlay for the configurations and schemas after it, and
-    // in a dry run so do the keys the writer would create.
-    private async Task<DataSetLinesResult?> WriteLinesAsync(
-        DataSetTarget target,
-        DataSetAnnotationLines? lines,
-        DataSetSeedOptions options,
-        ViewImportOverlay overlay,
-        List<DataSetSeedItem> items,
-        CancellationToken cancellationToken)
+    // A line that could not be read is Failed, and its key fails what hangs on it, the files below it included, unless
+    // the line is a duplicate, whose first occurrence counts. The other lines are decided later (null).
+    private static ViewImportResult?[] FailUnreadableLines(IReadOnlyList<DataSetAnnotationLine> annotations, ViewImportOverlay overlay)
     {
-        if (lines is null)
-        {
-            return null;
-        }
-
-        var annotations = lines.Annotations;
         var results = new ViewImportResult?[annotations.Count];
 
         for (var index = 0; index < annotations.Count; index++)
         {
             var annotation = annotations[index];
 
-            if (annotation.Annotation is null)
+            if (annotation.Annotation is not null)
             {
-                results[index] = new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: annotation.ErrorCode, Message: annotation.Message);
-
-                if (annotation.Key is not null && IsFailedAnnotation(results[index]!))
-                {
-                    overlay.AddFailedAnnotation(annotation.Key);
-                }
-            }
-        }
-
-        // ancestors first, so a key below a DependencyFailed one is DependencyFailed too
-        var sent = new List<int>();
-
-        foreach (var index in Enumerable.Range(0, annotations.Count).Where(index => results[index] is null).OrderBy(index => annotations[index].Key!.GetDepth()))
-        {
-            var key = annotations[index].Key!;
-            var failed = key.GetAllAncestorKeys()
-                .Append(key)
-                .Select(candidate => candidate.ToString())
-                .Where(overlay.FailedAnnotations.Contains)
-                .ToList();
-
-            if (failed.Count > 0)
-            {
-                results[index] = DependencyFailed(key, failed);
-                overlay.AddFailedAnnotation(key);
                 continue;
             }
 
-            sent.Add(index);
+            var result = new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: annotation.ErrorCode, Message: annotation.Message);
+            results[index] = result;
+
+            if (annotation.Key is not null && IsFailedAnnotation(result))
+            {
+                overlay.AddFailedAnnotation(annotation.Key);
+            }
         }
 
-        sent.Sort();
-        IReadOnlyList<string> ancestorsCreated = [];
-        var relationUpdates = 0;
+        return results;
+    }
 
-        if (sent.Count > 0)
+    // The round of every annotation file and of every line still to send. A file comes after the lines that are its
+    // ancestors, and a line after the files that are its ancestors: both a file and the bulk writer create a missing
+    // ancestor with defaults, and Skip would then keep the defaults over the line or the file of that key. A round
+    // imports its files, then writes its lines; ancestors of the same source share a round, as the importer and the
+    // bulk writer both take ancestors first. Without a line above a file, every annotation is in round 0.
+    private static (int[] Files, int[] Lines) GetRounds(
+        IReadOnlyList<ViewArchiveFile> files,
+        IReadOnlyList<DataSetAnnotationLine> annotations,
+        IReadOnlyList<ViewImportResult?> results)
+    {
+        var fileRounds = new int[files.Count];
+        var lineRounds = new int[annotations.Count];
+        var placed = new Dictionary<string, (bool IsFile, int Round)>(StringComparer.Ordinal);
+        var keyed = files
+            .Select((file, index) => (Key: file.AnnotationKey, IsFile: true, Index: index))
+            .Concat(annotations
+                .Select((annotation, index) => (Key: annotation.Key, IsFile: false, Index: index))
+                .Where(line => results[line.Index] is null))
+            .Where(item => item.Key is not null)
+            .Select(item => (Key: item.Key!, item.IsFile, item.Index))
+            .OrderBy(item => item.Key.GetDepth());
+
+        foreach (var (key, isFile, index) in keyed)
         {
-            var bulk = await _bulkWriter.CreateMissingAnnotationsAsync(
-                target.Organization,
-                target.Project,
-                target.View,
-                sent.Select(index => annotations[index].Annotation!).ToList(),
-                AuditActor.System,
-                new AnnotationBulkOptions { DryRun = options.DryRun, Progress = options.AnnotationProgress },
-                cancellationToken);
+            var round = 0;
 
-            for (var position = 0; position < sent.Count; position++)
+            foreach (var ancestor in key.GetAllAncestorKeys())
             {
-                var index = sent[position];
-                var result = bulk.Items[position].Result;
-                results[index] = result;
-
-                if (IsFailedAnnotation(result))
+                if (placed.TryGetValue(ancestor.ToString(), out var above))
                 {
-                    overlay.AddFailedAnnotation(annotations[index].Key!);
-                }
-                else if (options.DryRun && result.Outcome == ViewImportOutcome.Created)
-                {
-                    overlay.AddActiveAnnotation(annotations[index].Key!);
+                    round = Math.Max(round, isFile && !above.IsFile ? above.Round + 1 : above.Round);
                 }
             }
 
-            if (options.DryRun)
-            {
-                foreach (var ancestor in bulk.AncestorsCreated)
-                {
-                    overlay.AddActiveAnnotation(AnnotationKey.Parse(ancestor));
-                }
-            }
+            placed.TryAdd(key.ToString(), (isFile, round));
 
-            ancestorsCreated = bulk.AncestorsCreated;
-            relationUpdates = bulk.RelationUpdates;
+            if (isFile)
+            {
+                fileRounds[index] = round;
+            }
+            else
+            {
+                lineRounds[index] = round;
+            }
         }
+
+        return (fileRounds, lineRounds);
+    }
+
+    // The outcomes of annotations.jsonl in line order: the counts, and an item per listed outcome.
+    private static DataSetLinesResult CompleteLines(DataSetAnnotationLines lines, IReadOnlyList<ViewImportResult?> results, BulkTotals totals, List<DataSetSeedItem> items)
+    {
+        var annotations = lines.Annotations;
 
         // the counts only: the items of a large set would be every created annotation
         var tally = new ViewImportTally([ViewArchiveContent.Annotations], annotations.Count, maxItems: 0);
@@ -431,7 +353,238 @@ public sealed class DataSetSeeder
             lines.GeneratorLines,
             annotations.Count,
             tally.Summaries[0],
-            ancestorsCreated,
-            relationUpdates);
+            totals.AncestorsCreated,
+            totals.RelationUpdates);
+    }
+
+    // written: in a dry run of several sets, what the sets before this one would have written; this set's overlay
+    // starts from it, and adds to it what this set would write.
+    private async Task<DataSetSeedResult> SeedSetAsync(
+        DataSet set,
+        DataSetTarget target,
+        DataSetSeedOptions options,
+        ViewImportOverlay? written,
+        CancellationToken cancellationToken)
+    {
+        var started = _time.GetTimestamp();
+        var hash = DataSetFolder.ComputeHash(_fileSystem, set.Folder);
+        var record = await _records.GetAsync(target, set.Name, cancellationToken);
+
+        if (!options.Again && record is not null && record.Version == set.Manifest.Version && record.Hash == hash)
+        {
+            _logger.LogInformation("The set {Set} is seeded in {Target} already (version {Version}).", set.Name, target, record.Version);
+            return new DataSetSeedResult { Set = set, Hash = hash, IsAlreadySeeded = true, Elapsed = _time.GetElapsedTime(started) };
+        }
+
+        _logger.LogInformation("Seeding the set {Set} (version {Version}) into {Target}.", set.Name, set.Manifest.Version, target);
+
+        var content = DataSetContent.Read(_fileSystem, set.Folder, target);
+        var importOptions = new ViewImportOptions
+        {
+            Actor = AuditActor.System,
+            Existing = ViewImportExisting.Skip,
+            Force = options.Force,
+            DryRun = options.DryRun,
+        };
+        var overlay = new ViewImportOverlay();
+
+        if (written is not null)
+        {
+            AddWritten(written, overlay);
+        }
+
+        var documents = new ViewImportTally(
+            null,
+            content.Documents.Files.Count,
+            content.Documents.IgnoredFiles,
+            content.Documents.ExcludedFiles);
+        var items = new List<DataSetSeedItem>();
+        var files = content.Documents.Files.Where(IsAnnotation).ToList();
+        var annotations = content.Lines?.Annotations ?? [];
+        var results = FailUnreadableLines(annotations, overlay);
+        var (fileRounds, lineRounds) = GetRounds(files, annotations, results);
+        var rounds = fileRounds.Concat(lineRounds).DefaultIfEmpty(0).Max() + 1;
+        var totals = new BulkTotals();
+
+        for (var round = 0; round < rounds; round++)
+        {
+            var current = round;
+            var roundFiles = files.Where((_, index) => fileRounds[index] == current).ToList();
+            await ImportAsync(target, roundFiles, importOptions, overlay, documents, items, cancellationToken);
+
+            var roundLines = Enumerable.Range(0, annotations.Count).Where(index => results[index] is null && lineRounds[index] == current).ToList();
+            await WriteLinesAsync(target, annotations, results, roundLines, options, overlay, totals, cancellationToken);
+        }
+
+        var lines = content.Lines is null ? null : CompleteLines(content.Lines, results, totals, items);
+        await ImportAsync(target, content.Documents.Files.Where(file => !IsAnnotation(file)).ToList(), importOptions, overlay, documents, items, cancellationToken);
+
+        if (written is not null)
+        {
+            AddWritten(overlay, written);
+        }
+
+        var isRecorded = false;
+
+        if (!options.DryRun && items.All(item => item.Outcome != ViewImportOutcome.Failed))
+        {
+            await _records.SaveAsync(CreateRecord(set, target, hash, documents, lines, _time.GetUtcNow()), cancellationToken);
+            isRecorded = true;
+        }
+
+        var result = new DataSetSeedResult
+        {
+            Set = set,
+            Hash = hash,
+            Documents = documents,
+            Lines = lines,
+            Items = items,
+            IsRecorded = isRecorded,
+            Elapsed = _time.GetElapsedTime(started),
+        };
+
+        _logger.LogInformation(
+            "Seeded the set {Set} into {Target} in {Elapsed}: {Failed} failed, recorded: {IsRecorded}.",
+            set.Name,
+            target,
+            result.Elapsed,
+            result.Failures.Count(),
+            isRecorded);
+        return result;
+    }
+
+    private async Task ImportAsync(
+        DataSetTarget target,
+        IReadOnlyList<ViewArchiveFile> files,
+        ViewImportOptions options,
+        ViewImportOverlay overlay,
+        ViewImportTally tally,
+        List<DataSetSeedItem> items,
+        CancellationToken cancellationToken)
+    {
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        await foreach (var (file, result) in _importer.ImportAsync(target.Organization, target.Project, target.View, files, options, overlay, cancellationToken))
+        {
+            tally.Add(file, result);
+
+            if (IsListed(result))
+            {
+                items.Add(ToItem(file, result));
+            }
+        }
+    }
+
+    // The lines of one round (indexes in line order) through the bulk writer. One on or below an annotation that
+    // failed (in a file or a line) is DependencyFailed without being sent, as the importer does. The failures join the
+    // overlay for what comes after them; in a dry run so do the keys the writer would create, and the writer is given
+    // the keys the dry run made active so far, which nothing stored.
+    private async Task WriteLinesAsync(
+        DataSetTarget target,
+        IReadOnlyList<DataSetAnnotationLine> annotations,
+        ViewImportResult?[] results,
+        IReadOnlyList<int> round,
+        DataSetSeedOptions options,
+        ViewImportOverlay overlay,
+        BulkTotals totals,
+        CancellationToken cancellationToken)
+    {
+        // ancestors first, so a key below a DependencyFailed one is DependencyFailed too
+        var sent = new List<int>();
+
+        foreach (var index in round.OrderBy(index => annotations[index].Key!.GetDepth()))
+        {
+            var key = annotations[index].Key!;
+            var failed = key.GetAllAncestorKeys()
+                .Append(key)
+                .Select(candidate => candidate.ToString())
+                .Where(overlay.FailedAnnotations.Contains)
+                .ToList();
+
+            if (failed.Count > 0)
+            {
+                results[index] = DependencyFailed(key, failed);
+                overlay.AddFailedAnnotation(key);
+                continue;
+            }
+
+            sent.Add(index);
+        }
+
+        if (sent.Count == 0)
+        {
+            return;
+        }
+
+        sent.Sort();
+        var progress = totals.Committed > 0 && options.AnnotationProgress is not null
+            ? new OffsetProgress(options.AnnotationProgress, totals.Committed)
+            : options.AnnotationProgress;
+        var bulk = await _bulkWriter.CreateMissingAnnotationsAsync(
+            target.Organization,
+            target.Project,
+            target.View,
+            sent.Select(index => annotations[index].Annotation!).ToList(),
+            AuditActor.System,
+            new AnnotationBulkOptions
+            {
+                DryRun = options.DryRun,
+                Progress = progress,
+                DryRunActiveKeys = options.DryRun ? overlay.ActiveAnnotations : null,
+            },
+            cancellationToken);
+
+        for (var position = 0; position < sent.Count; position++)
+        {
+            var index = sent[position];
+            var result = bulk.Items[position].Result;
+            results[index] = result;
+
+            if (IsFailedAnnotation(result))
+            {
+                overlay.AddFailedAnnotation(annotations[index].Key!);
+            }
+            else if (options.DryRun && result.Outcome == ViewImportOutcome.Created)
+            {
+                overlay.AddActiveAnnotation(annotations[index].Key!);
+            }
+        }
+
+        if (options.DryRun)
+        {
+            foreach (var ancestor in bulk.AncestorsCreated)
+            {
+                overlay.AddActiveAnnotation(AnnotationKey.Parse(ancestor));
+            }
+        }
+        else
+        {
+            totals.Committed += bulk.Items.Count(item => item.Result.Outcome == ViewImportOutcome.Created) + bulk.AncestorsCreated.Count;
+        }
+
+        totals.AncestorsCreated.AddRange(bulk.AncestorsCreated);
+        totals.RelationUpdates += bulk.RelationUpdates;
+    }
+
+    // What the bulk writer reported over the rounds of one set, and what it committed, for the progress.
+    private sealed class BulkTotals
+    {
+        public List<string> AncestorsCreated { get; } = [];
+
+        public int RelationUpdates { get; set; }
+
+        public int Committed { get; set; }
+    }
+
+    // The progress of a later round of the bulk writer, counted on from what the earlier rounds committed.
+    private sealed class OffsetProgress(IProgress<int> progress, int offset) : IProgress<int>
+    {
+        public void Report(int value)
+        {
+            progress.Report(offset + value);
+        }
     }
 }
