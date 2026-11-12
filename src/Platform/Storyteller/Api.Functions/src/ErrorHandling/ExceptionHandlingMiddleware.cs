@@ -38,7 +38,17 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Error processing invocation");
+            if (exception is OperationCanceledException && context.CancellationToken.IsCancellationRequested)
+            {
+                // The caller went away or the host drains the instance: not a defect, so not an error (nor a Sentry event).
+                // A timeout's cancellation (another token) stays an error.
+                _logger.LogWarning(exception, "The invocation was cancelled.");
+            }
+            else
+            {
+                _logger.LogError(exception, "Error processing invocation");
+            }
+
             var httpReqData = await context.GetHttpRequestDataAsync();
 
             if (httpReqData is null)

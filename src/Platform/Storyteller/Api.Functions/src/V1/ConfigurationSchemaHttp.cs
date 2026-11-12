@@ -119,7 +119,7 @@ public partial class ConfigurationSchemaHttp
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error occurred while parsing input JSON schema.");
+            _logger.LogWarning(e, "Error occurred while parsing input JSON schema.");
             return new BadRequestObjectResult(new ErrorResponse($"Invalid input JSON schema: {e.Message}"));
         }
 
@@ -270,7 +270,7 @@ public partial class ConfigurationSchemaHttp
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error occurred while parsing input JSON schema.");
+            _logger.LogWarning(e, "Error occurred while parsing input JSON schema.");
             return new BadRequestObjectResult(new ErrorResponse($"Invalid input JSON schema: {e.Message}"));
         }
 
@@ -435,7 +435,7 @@ public partial class ConfigurationSchemaHttp
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Error occurred while parsing input JSON schema.");
+            _logger.LogWarning(e, "Error occurred while parsing input JSON schema.");
             return new BadRequestObjectResult(new ErrorResponse($"Invalid input JSON schema: {e.Message}"));
         }
 

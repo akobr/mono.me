@@ -11,7 +11,9 @@ internal sealed class TestFunctionContext : FunctionContext
         InstanceServices = services;
     }
 
-    public override string InvocationId { get; } = "invocation";
+    public override string InvocationId => Invocation;
+
+    public string Invocation { get; set; } = "invocation";
 
     public override string FunctionId { get; } = "function";
 

@@ -4,6 +4,7 @@ using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api;
 using _42.Platform.Storyteller.Api.ConditionalReads;
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Api.ErrorReporting;
 using _42.Platform.Storyteller.Api.Json;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
@@ -27,7 +28,7 @@ using Microsoft.Extensions.Logging;
 ProcessDefaults.Apply();
 
 var host = new HostBuilder()
-    .ConfigureFunctionsWebApplication(worker =>
+    .ConfigureFunctionsWebApplication((context, worker) =>
     {
         // worker.UseNewtonsoftJson(new JsonSerializerSettings
         // {
@@ -35,6 +36,13 @@ var host = new HostBuilder()
         //     ContractResolver = new DefaultContractResolver { NamingStrategy = new DefaultNamingStrategy() },
         //     Converters = new List<JsonConverter> { new StringEnumConverter(new DefaultNamingStrategy()) },
         // });
+
+        // First, when errors go to Sentry: the invocation's scope (route template, function, its own breadcrumbs) must
+        // wrap the error log of ExceptionHandlingMiddleware.
+        if (context.Configuration.IsErrorReportingEnabled())
+        {
+            worker.UseMiddleware<SentryScopeMiddleware>();
+        }
 
         worker.UseMiddleware<ExceptionHandlingMiddleware>();
         worker.UseMiddleware<TransportSecurityMiddleware>();
@@ -95,6 +103,9 @@ var host = new HostBuilder()
                 builder.AddDebug();
             });
         }
+
+        // Errors to Sentry next to Application Insights, only with a Sentry:Dsn (docs/Platform/Storyteller/error-reporting.md).
+        services.AddErrorReporting(context.Configuration, context.HostingEnvironment);
 
         // Add persistant and logic layer
         services.AddCosmosDbAnnotations(context.Configuration, "cosmos");
