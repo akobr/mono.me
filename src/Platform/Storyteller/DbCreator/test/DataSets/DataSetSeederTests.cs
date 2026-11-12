@@ -225,6 +225,31 @@ public class DataSetSeederTests
         await Should.ThrowAsync<DataSetException>(() => Seeder().SeedAsync(new DataSetSeedRequest(), TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public void Plan_DecidesFromTheFilesAndTheOptionsAlone()
+    {
+        AddSet("base", """{ "Organization": "fabrikam", "Project": "invoicing-suite", "ProjectDescription": "The base.", "ViewDescription": "A base view." }""");
+        AddShowcase(withFailures: false);
+        AddSet("top", """{ "DependsOn": [ "base" ] }""");
+
+        var plan = Seeder().Plan(new DataSetSeedRequest { Sets = ["top", "showcase"], Owner = Owner });
+
+        plan.Sets.Select(set => set.Name).ShouldBe(["base", "top", "showcase"]);
+        plan.Named.Select(set => set.Name).ShouldBe(["top", "showcase"]);
+        plan.Target.ShouldBe(new DataSetTarget(Organization, Project, "preview"));
+        plan.Owner.Id.ShouldBe(Owner);
+
+        // a named set's descriptions before those of a dependency
+        (plan.ProjectDescription, plan.ViewDescription).ShouldBe(("The invoices.", "A preview."));
+
+        // the project and the view are checked here; the organization once the provisioning knows it is new
+        Should.Throw<DataSetException>(() => Seeder().Plan(new DataSetSeedRequest { Sets = ["base"], Project = "Not Valid" }));
+        Should.Throw<DataSetException>(() => Seeder().Plan(new DataSetSeedRequest { Sets = ["base"], View = "views" }));
+        Seeder().Plan(new DataSetSeedRequest { Sets = ["base"], Organization = "Existing Org" }).Target.Organization.ShouldBe("Existing Org");
+        _access.Invocations.ShouldBeEmpty();
+        _views.Invocations.ShouldBeEmpty();
+    }
+
     private static string Folder(string name) => Path.Combine(Tool, "data-sets", name);
 
     private static AccessPoint Point(string key, string ownerId, AccountRole otherRole = AccountRole.None, string? other = null)
