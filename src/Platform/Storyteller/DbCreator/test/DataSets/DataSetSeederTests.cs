@@ -307,6 +307,19 @@ public class DataSetSeederTests
             () => Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["big"], Owner = Owner }, TestContext.Current.CancellationToken));
 
         exception.Message.ShouldContain("more than 200,000 annotations");
+
+        // a document or a line larger than an item, from the sizes of the files
+        var blob = new string('x', DataSetFolder.ReaderOptions.MaxDocumentBytes);
+        AddSet("big-file", """{ "Organization": "fabrikam", "Project": "invoicing-suite", "DependsOn": [ "first" ] }""", ("annotations/rst.big.json", $"{{ \"Description\": \"{blob}\" }}"));
+        AddSet("big-line", """{ "Organization": "fabrikam", "Project": "invoicing-suite", "DependsOn": [ "first" ] }""", ("annotations.jsonl", $"{{\"AnnotationKey\":\"rst.big\",\"Values\":{{\"blob\":\"{blob}\"}}}}"));
+
+        (await Should.ThrowAsync<DataSetException>(
+                () => Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["big-file"], Owner = Owner }, TestContext.Current.CancellationToken)))
+            .Message.ShouldContain("the file 'annotations/rst.big.json' is larger than 2,097,152 bytes");
+        (await Should.ThrowAsync<DataSetException>(
+                () => Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["big-line"], Owner = Owner }, TestContext.Current.CancellationToken)))
+            .Message.ShouldContain("a line of more than 2,097,152 bytes at line 1");
+
         _access.Invocations.ShouldBeEmpty();
         _importer.Calls.ShouldBeEmpty();
         _records.Saves.ShouldBe(0);

@@ -94,6 +94,30 @@ public class DataSetFolderTests
     }
 
     [Fact]
+    public void ValidateAndReadDocuments_RefuseADocumentLargerThanAnItem()
+    {
+        var maxBytes = DataSetFolder.ReaderOptions.MaxDocumentBytes;
+        var over = "{}" + new string(' ', maxBytes - 1);
+        var fileSystem = SetFiles.Create(
+            Folder,
+            ("set.json", "{}"),
+            ("annotations/sbt.fits.json", "{}" + new string(' ', maxBytes - 2)),
+            ("configurations/sbt.fits.conf.3.json", over),
+            ("README.md", over),
+            ("annotations/rst.big.json", over));
+
+        // from the lengths alone, before a file is read
+        var exception = Should.Throw<DataSetException>(() => DataSetFolder.Validate(fileSystem, Folder));
+        exception.Message.ShouldBe($"The set '{Folder}' cannot be read: the file 'annotations/rst.big.json' is larger than 2,097,152 bytes, the most a document holds.");
+        Should.Throw<DataSetException>(() => DataSetFolder.ReadDocuments(fileSystem, Folder)).Message.ShouldBe(exception.Message);
+
+        // a document of the limit fits, and a version file or a README.md is not a document
+        fileSystem.RemoveFile(Path.Combine(Folder, "annotations", "rst.big.json"));
+        DataSetFolder.Validate(fileSystem, Folder);
+        DataSetFolder.ReadDocuments(fileSystem, Folder).Files.ShouldHaveSingleItem().ErrorCode.ShouldBeNull();
+    }
+
+    [Fact]
     public void ComputeHash_IsTheSameForCrlfAndLfLineEnds()
     {
         var lf = SetFiles.Create(Folder, ("set.json", "{\n  \"Name\": \"showcase\"\n}\n"), ("annotations/sbt.a.json", "{\n}\n"));

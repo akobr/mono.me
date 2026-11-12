@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Security.Cryptography;
@@ -44,12 +45,15 @@ public static class DataSetFolder
             .ToList();
     }
 
-    // DataSetException when the folder is beyond the limits of the reader.
+    // DataSetException when the folder is beyond the limits of the reader, or a document beyond MaxDocumentBytes.
     public static ViewArchiveDocuments ReadDocuments(IFileSystem fileSystem, string folder)
     {
+        var entries = GetEntries(fileSystem, folder);
+        EnsureDocumentSizes(entries, folder);
+
         try
         {
-            return ViewArchiveReader.Read(GetEntries(fileSystem, folder), ReaderOptions);
+            return ViewArchiveReader.Read(entries, ReaderOptions);
         }
         catch (InvalidInputException exception)
         {
@@ -57,18 +61,22 @@ public static class DataSetFolder
         }
     }
 
-    // The limits of the reader from the number and the lengths of the files, without reading one, so a seed checks its
-    // sets before anything is written. DataSetException as ReadDocuments.
+    // The limits of the reader and of a document from the number and the lengths of the files, without reading one,
+    // so a seed checks its sets before anything is written. DataSetException as ReadDocuments.
     public static void Validate(IFileSystem fileSystem, string folder)
     {
+        var entries = GetEntries(fileSystem, folder);
+
         try
         {
-            ViewArchiveReader.Validate(GetEntries(fileSystem, folder), ReaderOptions);
+            ViewArchiveReader.Validate(entries, ReaderOptions);
         }
         catch (InvalidInputException exception)
         {
             throw CannotBeRead(folder, exception);
         }
+
+        EnsureDocumentSizes(entries, folder);
     }
 
     // SHA-256 (lower-case hex) over the path and the content of every file of the set in path order, so any change of
@@ -119,6 +127,28 @@ public static class DataSetFolder
     private static DataSetException CannotBeRead(string folder, InvalidInputException exception)
     {
         return new DataSetException($"The set '{folder}' cannot be read: {exception.Message}", exception);
+    }
+
+    // A document is one Cosmos DB item, so a set with a larger one is refused as a whole, before anything is written,
+    // and not failed file by file halfway through a seed, as an import of an archive fails it. A file that is not a
+    // document (a version file, a README.md) is never read and may be of any size.
+    private static void EnsureDocumentSizes(IReadOnlyList<ViewArchiveEntry> entries, string folder)
+    {
+        var maxBytes = ReaderOptions.MaxDocumentBytes;
+        var tooLarge = entries.FirstOrDefault(entry => entry.Length > maxBytes && IsDocument(entry.Path));
+
+        if (tooLarge is not null)
+        {
+            throw new DataSetException(
+                $"The set '{folder}' cannot be read: the file '{tooLarge.Path}' is larger than {maxBytes.ToString("N0", CultureInfo.InvariantCulture)} bytes, the most a document holds.");
+        }
+    }
+
+    // As the reader tells a document (ViewArchiveReader): a name of an export, not of a version.
+    private static bool IsDocument(string path)
+    {
+        var fileName = path[(path.LastIndexOf('/') + 1)..];
+        return ViewArchiveNames.TryParse(fileName, out var name) && !name.Version.HasValue;
     }
 
     private static void Collect(IFileSystem fileSystem, string directory, string prefix, List<DataSetFile> files)
