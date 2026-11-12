@@ -1,0 +1,12 @@
+{
+  "Title": "Northridge Fitness",
+  "Labels": [
+    "standard",
+    "eu"
+  ],
+  "Values": {
+    "crmId": "CRM-1014",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

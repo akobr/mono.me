@@ -1,0 +1,9 @@
+{
+  "Title": "Credit notes",
+  "Description": "Corrections and refunds of issued invoices.",
+  "DocumentationLink": "https://docs.fabrikam.example/invoicing-suite/modules/credit-notes",
+  "Labels": [
+    "add-on"
+  ],
+  "TimeZone": "Europe/Oslo"
+}

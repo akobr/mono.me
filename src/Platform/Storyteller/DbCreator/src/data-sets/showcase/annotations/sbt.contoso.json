@@ -1,0 +1,11 @@
+{
+  "Title": "Contoso Ltd.",
+  "Labels": [
+    "standard"
+  ],
+  "Values": {
+    "crmId": "CRM-1002",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

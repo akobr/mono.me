@@ -832,6 +832,43 @@ public class ViewTransferServiceTests
     }
 
     [Fact]
+    public async Task ProcessImport_StopsWhenAnotherWorkerTakesTheJob()
+    {
+        var files = Enumerable.Range(0, 60).Select(index => ($"rst.k{index:D3}.conf.json", "{\"a\":1}")).ToArray();
+        using var zip = Zip(files);
+        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, null, ViewImportExisting.Overwrite, false, false, Actor);
+        var message = _queue.Messages.Single();
+
+        // the existence reads done by the time of each save of the job
+        var readsAtSaves = new List<(int? ProcessedCount, int Reads)>();
+        _store.Saved = saved => readsAtSaves.Add((saved.Import!.ProcessedCount, _annotations.ActiveReads.Count));
+
+        // while the 50th file is imported, another worker takes the job, so the progress save after it fails
+        _configurations.Import = (_, _) =>
+        {
+            if (_configurations.Imports.Count == 50)
+            {
+                _store.TakeOver(started.Id);
+            }
+
+            return new ViewImportResult(ViewImportOutcome.Created, 1);
+        };
+
+        await _service.ProcessAsync(message);
+
+        // this worker imports no further file and leaves the job and its archive to the other one
+        _configurations.Imports.Count.ShouldBe(50);
+        var import = (await _service.GetImportAsync("acme", "main", "default", started.Id))!;
+        import.Status.ShouldBe(ViewTransferStatus.Running);
+        import.ProcessedCount.ShouldBe(0);
+        _storage.Archives.Keys.ShouldContain(ViewTransferNames.GetArchiveName(message));
+
+        // the importer's pre-reads run after the first save of the progress, once
+        readsAtSaves.ShouldBe([(null, 0), (0, 0)]);
+        _annotations.ActiveReads.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Process_LeavesAFinishedJobAlone()
     {
         using var zip = Zip(("rst.a.conf.json", """{"a":1}"""));

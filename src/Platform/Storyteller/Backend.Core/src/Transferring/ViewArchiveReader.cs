@@ -6,24 +6,39 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Transferring;
 
-// Reads the document files of a zip by their names (ViewArchiveNames), in any folder, so a flat zip, the folders of
-// an export and a repository read alike. Hidden paths (.git, .github, .DS_Store, ._*) and __MACOSX are skipped
-// without being counted. A file of a kind the include filter leaves out is counted as excluded and never
-// decompressed; version files, export.json and names that are not documents are counted as ignored.
+// Reads the document files of a zip, or of loose entries such as the files of a folder, by their names
+// (ViewArchiveNames), in any folder, so a flat zip, the folders of an export and a repository read alike. Hidden paths
+// (.git, .github, .DS_Store, ._*) and __MACOSX are skipped without being counted. A file of a kind the include filter
+// leaves out is counted as excluded and never opened; version files, export.json and names that are not documents are
+// counted as ignored.
 public static class ViewArchiveReader
 {
     // Checks the central directory only, before anything is decompressed; every kind counts against the limits.
     public static void Validate(Stream archive, ViewTransferOptions options)
     {
         using var zip = Open(archive);
-        _ = Inspect(zip, options, ViewArchiveInclude.All);
+        Validate(GetEntries(zip), options);
+    }
+
+    // The same check for entries of any origin: their count and declared lengths, without opening one.
+    public static void Validate(IReadOnlyCollection<ViewArchiveEntry> entries, ViewTransferOptions options)
+    {
+        _ = Inspect(entries, options, ViewArchiveInclude.All);
     }
 
     // The include filter: null or empty means all four kinds.
     public static ViewArchiveDocuments Read(Stream archive, ViewTransferOptions options, IEnumerable<ViewArchiveContent>? include = null)
     {
+        // the entries open lazily, so they are read while the zip is open
         using var zip = Open(archive);
-        var inspection = Inspect(zip, options, ViewArchiveInclude.Resolve(include));
+        return Read(GetEntries(zip), options, include);
+    }
+
+    // The same reading for entries of any origin, with the same limits: the count of the entries, and their declared
+    // lengths for the extracted size.
+    public static ViewArchiveDocuments Read(IReadOnlyCollection<ViewArchiveEntry> entries, ViewTransferOptions options, IEnumerable<ViewArchiveContent>? include = null)
+    {
+        var inspection = Inspect(entries, options, ViewArchiveInclude.Resolve(include));
         var files = new List<ViewArchiveFile>(inspection.Entries.Count);
         var seen = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -58,25 +73,30 @@ public static class ViewArchiveReader
         }
     }
 
+    private static List<ViewArchiveEntry> GetEntries(ZipArchive zip)
+    {
+        return zip.Entries.Select(entry => new ViewArchiveEntry(entry.FullName, entry.Length, entry.Open)).ToList();
+    }
+
     // The document files of the included kinds in path order, and the counts of the other files. The limits apply
     // to the included files together.
-    private static Inspection Inspect(ZipArchive zip, ViewTransferOptions options, IReadOnlyList<ViewArchiveContent> include)
+    private static Inspection Inspect(IReadOnlyCollection<ViewArchiveEntry> entries, ViewTransferOptions options, IReadOnlyList<ViewArchiveContent> include)
     {
-        if (zip.Entries.Count > options.MaxArchiveEntries)
+        if (entries.Count > options.MaxArchiveEntries)
         {
             throw new InvalidInputException(
-                $"The archive has {zip.Entries.Count} entries, at most {options.MaxArchiveEntries} are allowed.",
+                $"The archive has {entries.Count} entries, at most {options.MaxArchiveEntries} are allowed.",
                 ErrorCodes.InvalidArchive);
         }
 
-        var entries = new List<(string Path, ViewArchiveName Name, ZipArchiveEntry Entry)>();
+        var documents = new List<(string Path, ViewArchiveName Name, ViewArchiveEntry Entry)>();
         var ignored = 0;
         var excluded = 0;
         var declared = 0L;
 
-        foreach (var entry in zip.Entries)
+        foreach (var entry in entries)
         {
-            var path = entry.FullName.Replace('\\', '/');
+            var path = entry.Path.Replace('\\', '/');
 
             if (path.EndsWith('/') || ViewArchiveNames.IsSkippedPath(path))
             {
@@ -107,14 +127,14 @@ public static class ViewArchiveReader
                     ErrorCodes.InvalidArchive);
             }
 
-            entries.Add((path, name, entry));
+            documents.Add((path, name, entry));
         }
 
-        entries.Sort((left, right) => string.CompareOrdinal(left.Path, right.Path));
-        return new Inspection(entries, ignored, excluded);
+        documents.Sort((left, right) => string.CompareOrdinal(left.Path, right.Path));
+        return new Inspection(documents, ignored, excluded);
     }
 
-    private static ViewArchiveFile ReadFile(string path, ViewArchiveName name, ZipArchiveEntry entry, int maxBytes)
+    private static ViewArchiveFile ReadFile(string path, ViewArchiveName name, ViewArchiveEntry entry, int maxBytes)
     {
         if (entry.Length > maxBytes)
         {
@@ -146,6 +166,11 @@ public static class ViewArchiveReader
         catch (InvalidDataException exception)
         {
             return Failed(path, name, ErrorCodes.InvalidDocument, $"The file cannot be decompressed: {exception.Message}");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // a loose file can vanish or be locked between the listing and the read
+            return Failed(path, name, ErrorCodes.InvalidDocument, $"The file cannot be read: {exception.Message}");
         }
 
         try
@@ -183,7 +208,7 @@ public static class ViewArchiveReader
     }
 
     private sealed record class Inspection(
-        IReadOnlyList<(string Path, ViewArchiveName Name, ZipArchiveEntry Entry)> Entries,
+        IReadOnlyList<(string Path, ViewArchiveName Name, ViewArchiveEntry Entry)> Entries,
         int Ignored,
         int Excluded);
 }

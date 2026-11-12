@@ -1,0 +1,13 @@
+{
+  "baseCurrency": "EUR",
+  "retryPolicy": {
+    "attempts": 5,
+    "backoffSeconds": 60
+  },
+  "features": [
+    "pdf",
+    "email",
+    "credit-notes",
+    "e-invoice"
+  ]
+}

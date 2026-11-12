@@ -1,0 +1,5 @@
+{
+  "region": "eastus",
+  "logLevel": "debug",
+  "hostname": "relecloud.pilot.invoicing.fabrikam.example"
+}

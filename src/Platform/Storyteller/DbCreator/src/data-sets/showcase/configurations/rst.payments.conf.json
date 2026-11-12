@@ -1,0 +1,8 @@
+{
+  "providers": [
+    "adyen",
+    "stripe"
+  ],
+  "settlementDay": "mon",
+  "captureDelayHours": 0
+}

@@ -1,0 +1,5 @@
+{
+  "format": "csv",
+  "target": "sftp",
+  "includeDrafts": false
+}

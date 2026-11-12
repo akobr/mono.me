@@ -20,6 +20,9 @@ internal sealed class InMemoryTransferStore : IViewTransferStore
 
     public List<ViewTransferRecord> Saves { get; } = [];
 
+    // Called with each saved record, while the caller waits for the save.
+    public Action<ViewTransferRecord>? Saved { get; set; }
+
     public int ActiveCount { get; set; }
 
     public Task<ViewTransferRecord> CreateAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
@@ -27,7 +30,15 @@ internal sealed class InMemoryTransferStore : IViewTransferStore
         var saved = record with { ETag = $"\"{++_version}\"" };
         _records.Add(Key(record.Organization, record.Project, record.View, record.Kind, record.Id), saved);
         Saves.Add(saved);
+        Saved?.Invoke(saved);
         return Task.FromResult(saved);
+    }
+
+    // A write of another worker: the stored job gets a new ETag, so the next replace of the worker that held it fails.
+    public void TakeOver(string id)
+    {
+        var key = _records.Keys.Single(key => key.EndsWith($"|{id}", StringComparison.Ordinal));
+        _records[key] = _records[key] with { ETag = $"\"{++_version}\"" };
     }
 
     public Task<ViewTransferRecord?> GetAsync(string organization, string project, string view, ViewTransferKind kind, string id, CancellationToken cancellationToken = default)
@@ -47,6 +58,7 @@ internal sealed class InMemoryTransferStore : IViewTransferStore
         var saved = record with { ETag = $"\"{++_version}\"" };
         _records[key] = saved;
         Saves.Add(saved);
+        Saved?.Invoke(saved);
         return Task.FromResult<ViewTransferRecord?>(saved);
     }
 

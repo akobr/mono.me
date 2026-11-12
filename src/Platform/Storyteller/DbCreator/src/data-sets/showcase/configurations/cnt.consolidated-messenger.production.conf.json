@@ -1,0 +1,5 @@
+{
+  "region": "eastus2",
+  "logLevel": "warn",
+  "hostname": "consolidated-messenger.production.invoicing.fabrikam.example"
+}

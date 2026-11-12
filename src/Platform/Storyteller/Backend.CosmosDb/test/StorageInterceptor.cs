@@ -24,6 +24,10 @@ public sealed class StorageInterceptor
     // Runs after a point read through ReadItemStreamAsync, with the id of the item.
     public Func<string, Task> AfterRead { get; set; }
 
+    // Runs before a read of many items through ReadManyItemsStreamAsync, with the ids of the items. A returned response
+    // answers the read instead of the service, without running it.
+    public Func<IReadOnlyList<string>, Task<ResponseMessage>> BeforeReadMany { get; set; }
+
     // The batches in the order they finished.
     public IReadOnlyList<RecordedBatch> Batches => _batches.ToArray();
 
@@ -32,6 +36,7 @@ public sealed class StorageInterceptor
         BeforeBatch = null;
         AfterBatch = null;
         AfterRead = null;
+        BeforeReadMany = null;
         _batches.Clear();
     }
 
@@ -41,7 +46,7 @@ public sealed class StorageInterceptor
         batch.Start = Interlocked.Increment(ref _sequence);
 
         var response = failure is { } statusCode
-            ? new FailedBatchResponse(statusCode, batch.Operations.Count)
+            ? new FailedBatchResponse(statusCode, batch.Operations.Count, batch.RetryAfter)
             : await execute();
 
         batch.StatusCode = response.StatusCode;
@@ -59,5 +64,11 @@ public sealed class StorageInterceptor
     internal Task OnReadAsync(string id)
     {
         return AfterRead?.Invoke(id) ?? Task.CompletedTask;
+    }
+
+    internal async Task<ResponseMessage> ReadManyAsync(IReadOnlyList<string> ids, Func<Task<ResponseMessage>> read)
+    {
+        var answer = BeforeReadMany is null ? null : await BeforeReadMany(ids);
+        return answer ?? await read();
     }
 }

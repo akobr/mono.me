@@ -1,4 +1,5 @@
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.DbCreator;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
@@ -66,7 +67,8 @@ public class CosmosFixture : IAsyncLifetime
         // Federated machines next to it, with the Cosmos DB issuer and signing key stores.
         services.AddFederatedMachineAccess(Configuration);
 
-        services.AddSingleton<CoreDbStructureBuilder>();
+        // the structure builder with what it seeds (the set core), as the tool registers it
+        services.AddDbCreator(Configuration);
 
         Services = services.BuildServiceProvider();
 

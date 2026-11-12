@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.Platform.Storyteller.DbCreator.Configuration;
+using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
@@ -9,7 +10,8 @@ using Console = Colorful.Console;
 
 namespace _42.Platform.Storyteller.DbCreator.Commands;
 
-[Command("2sInitDb", Description = "Initialize database for 2S platform.")]
+[Command("2sInitDb", Description = "Initialize the database of the 2S platform: the containers, the access of the base owner and the data set core. The subcommands seed and list data sets.")]
+[Subcommand(typeof(SeedCommand), typeof(SetsCommand))]
 public class InitDbCommand : IAsyncCommand
 {
     private readonly CoreDbStructureBuilder _coreOrgBuilder;
@@ -42,22 +44,23 @@ public class InitDbCommand : IAsyncCommand
 
         try
         {
-            await _coreOrgBuilder.BuildAsync();
+            var run = await _coreOrgBuilder.BuildAsync();
+            DataSetOutput.WriteSummary(run);
+
+            if (run.HasFailures)
+            {
+                return ExitCodes.Of(run);
+            }
         }
         catch (DatabaseLayoutException exception)
         {
-            Console.Write("! ", Color.Magenta);
-            Console.WriteLine(
-                $"The database '{CosmosConstants.DatabaseName}' does not have the layout of the shared container '{CosmosConstants.OrganizationsContainerName}'. Nothing was written.");
-
-            foreach (var problem in exception.Problems)
-            {
-                Console.WriteLine($"  {problem}");
-            }
-
-            Console.WriteLine(
-                $"  Its data is not migrated: delete the database '{CosmosConstants.DatabaseName}' (or start the emulator with a new data volume), then run DbCreator again to seed it.");
+            DataSetOutput.WriteLayoutProblems(exception);
             return ExitCodes.ERROR_DATABASE_LAYOUT;
+        }
+        catch (DataSetException exception)
+        {
+            DataSetOutput.WriteWrongInput(exception);
+            return ExitCodes.ERROR_WRONG_INPUT;
         }
 
         await _review.RenderReview();

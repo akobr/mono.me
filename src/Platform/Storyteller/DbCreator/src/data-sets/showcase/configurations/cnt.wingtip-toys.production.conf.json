@@ -1,0 +1,5 @@
+{
+  "region": "westus2",
+  "logLevel": "warn",
+  "hostname": "wingtip-toys.production.invoicing.fabrikam.example"
+}

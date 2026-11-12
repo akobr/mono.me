@@ -386,7 +386,7 @@ Each build-and-deploy below is **one script block** (`& { … }`): paste it whol
 
 ### 11.2 The database (DbCreator, once)
 
-Creates `42.Platform.2S` (autoscale up to 1000 RU/s), the containers `core` and `organizations`, and the organization `42dotnet` with you as its owner.
+Creates `42.Platform.2S` (autoscale up to 1000 RU/s), the containers `core` and `organizations`, and the organization `42dotnet` with you as its owner, then seeds the built-in data set `core` (the platform's own annotations of `42dotnet`) through the services of the API ([data sets](../Storyteller/data-sets.md)).
 
 ```powershell
 & {

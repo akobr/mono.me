@@ -1,0 +1,6 @@
+{
+  "Title": "Month-end reports",
+  "TimeZone": "Europe/Oslo",
+  "UnitType": "time",
+  "UnitDefinition": "0 3 1 * *"
+}

@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "plan": {
+      "enum": [
+        "standard",
+        "enterprise"
+      ]
+    }
+  },
+  "required": [
+    "plan"
+  ]
+}

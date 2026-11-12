@@ -1,0 +1,12 @@
+{
+  "Title": "Woodgrove Bank",
+  "Labels": [
+    "enterprise",
+    "uk"
+  ],
+  "Values": {
+    "crmId": "CRM-1021",
+    "accountManager": "Grace Hopper"
+  },
+  "TimeZone": "Europe/Oslo"
+}
