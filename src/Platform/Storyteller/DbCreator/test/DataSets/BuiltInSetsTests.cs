@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
+using _42.Platform.Storyteller.Transferring;
 
 namespace _42.Platform.Storyteller.DbCreator.UnitTests.DataSets;
 
@@ -106,20 +107,16 @@ public class BuiltInSetsTests
 
         var content = DataSetContent.Read(FileSystem, showcase.Folder, target);
 
-        // the files a Git export of the scope gives (ui.admin's test/unit/mock/showcase-set.test.ts writes them)
+        // the files a Git export of the scope gives (ui.admin's test/unit/mock/showcase-set.test.ts writes them): every
+        // file of the folder is a document in the folder of its kind. The counts come from the folder, so a change of
+        // the mock needs no change here.
         content.Lines.ShouldBeNull();
         content.Documents.IgnoredFiles.ShouldBe(0);
+        content.Documents.Files.Count.ShouldBe(DataSetFolder.GetEntries(FileSystem, showcase.Folder).Count);
         content.Documents.Files.ShouldAllBe(file => file.ErrorCode == null);
-        content.Documents.Files
-            .GroupBy(file => file.Kind)
-            .ToDictionary(group => group.Key, group => group.Count())
-            .ShouldBe(new Dictionary<ViewDocumentKind, int>
-            {
-                [ViewDocumentKind.Annotation] = 242,
-                [ViewDocumentKind.Configuration] = 153,
-                [ViewDocumentKind.DescendantTypeSchema] = 2,
-                [ViewDocumentKind.Template] = 1,
-            });
+        content.Documents.Files.ShouldAllBe(file => file.Path.StartsWith(ViewArchiveNames.GetFolder(ViewArchiveNames.GetContent(file.Kind)) + "/"));
+        content.Documents.Files.ShouldContain(file => file.Kind == ViewDocumentKind.Annotation);
+        content.Documents.Files.ShouldContain(file => file.Kind == ViewDocumentKind.Configuration);
 
         // every document hangs on an annotation of the set, so the import creates no ancestor with defaults
         var keys = content.Documents.Files
