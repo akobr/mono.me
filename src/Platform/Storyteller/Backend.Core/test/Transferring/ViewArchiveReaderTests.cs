@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text;
 using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -260,6 +261,126 @@ public class ViewArchiveReaderTests
         files["exe.schema.json"].Content!["at"]!.Type.ShouldBe(JTokenType.Date);
         files["rst.a.json"].Content!["Values"]!["at"]!.Type.ShouldBe(JTokenType.String);
         files["rst.a.json"].Content!["ValidFrom"]!.Value<string>().ShouldBe("2026-10-14T01:30:12+02:00");
+    }
+
+    [Fact]
+    public void ReadEntries_GivesTheFilesOfTheSameZip()
+    {
+        (string Path, string Content)[] files =
+        [
+            .. Documents.Select(document => ($"view/{document.Path}", document.Content)),
+            ("view/rst.payments.conf.1.json", """{"retries":1}"""),
+            ("view/export.json", "{}"),
+            ("set.json", """{"Name":"showcase"}"""),
+            ("annotations.jsonl", """{"AnnotationKey":"rst.payments"}"""),
+            (".git/HEAD", "ref: refs/heads/main"),
+            ("view/rst.number.json", """{"Values":{"amount":1.50},"ValidFrom":"2026-10-14T01:30:12+02:00"}"""),
+            ("copy/rst.payments.json", """{"Title":"Again"}"""),
+        ];
+        using var zip = Zip(files);
+
+        var fromZip = ViewArchiveReader.Read(zip, Options);
+        var fromEntries = ViewArchiveReader.Read(Entries(files), Options);
+
+        // one code path: names, duplicates, ignored files and the parsing of annotations alike
+        Describe(fromEntries).ShouldBe(Describe(fromZip));
+        fromEntries.Files.Select(file => (file.Path, file.ErrorCode)).ShouldBe(fromZip.Files.Select(file => (file.Path, file.ErrorCode)));
+        fromEntries.IgnoredFiles.ShouldBe(4);
+        fromEntries.IgnoredFiles.ShouldBe(fromZip.IgnoredFiles);
+        fromEntries.Files.Single(file => file.Path == "view/rst.number.json").Content!.ToString(Formatting.None)
+            .ShouldBe("""{"Values":{"amount":1.50},"ValidFrom":"2026-10-14T01:30:12+02:00"}""");
+    }
+
+    [Fact]
+    public void ReadEntries_TakesBackslashesAndSkipsHiddenPaths()
+    {
+        var content = ViewArchiveReader.Read(
+            Entries(
+                (@"annotations\rst.payments.json", "{}"),
+                (@".git\rst.inside.json", "{}"),
+                (@"sets\.hidden\exe.template.json", "{}"),
+                (@"configurations\rst.payments.conf.json", "{}")),
+            Options);
+
+        content.Files.Select(file => file.Path).ShouldBe(["annotations/rst.payments.json", "configurations/rst.payments.conf.json"]);
+        content.IgnoredFiles.ShouldBe(0);
+    }
+
+    [Fact]
+    public void ReadEntries_OpensOnlyTheDocumentsItReads()
+    {
+        var opened = new List<string>();
+        var options = new ViewTransferOptions { MaxDocumentBytes = 100 };
+        var entries = new[]
+            {
+                ("rst.payments.json", "{}", 2L),
+                ("rst.payments.conf.json", """{"a":1}""", 7L),
+                ("x/rst.payments.conf.json", """{"a":2}""", 7L),
+                ("exe.s.r.c.rst.schema.json", "{}", 2L),
+                ("rst.big.conf.json", "{}", 101L),
+                ("export.json", "{}", 2L),
+                (".git/rst.a.conf.json", "{}", 2L),
+            }
+            .Select(entry => new ViewArchiveEntry(entry.Item1, entry.Item3, () =>
+            {
+                opened.Add(entry.Item1);
+                return new MemoryStream(Encoding.UTF8.GetBytes(entry.Item2), writable: false);
+            }))
+            .ToList();
+
+        var content = ViewArchiveReader.Read(entries, options, [ViewArchiveContent.Schemas, ViewArchiveContent.Configurations]);
+
+        // excluded, ignored, skipped, misnamed, duplicate and declared too large: none is opened
+        opened.ShouldBe(["rst.payments.conf.json"]);
+        content.Files.Select(file => (file.Path, file.ErrorCode)).ShouldBe(
+        [
+            ("exe.s.r.c.rst.schema.json", ErrorCodes.InvalidKey),
+            ("rst.big.conf.json", ErrorCodes.InvalidDocument),
+            ("rst.payments.conf.json", null),
+            ("x/rst.payments.conf.json", ErrorCodes.DuplicateFile),
+        ]);
+        content.ExcludedFiles.ShouldBe(1);
+        content.IgnoredFiles.ShouldBe(1);
+    }
+
+    [Fact]
+    public void ReadEntries_AppliesTheLimitsOfAZip()
+    {
+        var entries = Entries(("rst.a.json", "{}"), ("exe.template.json", "{}"), ("notes.txt", "notes"));
+
+        Should.Throw<InvalidInputException>(() => ViewArchiveReader.Read(entries, new ViewTransferOptions { MaxArchiveEntries = 2 }))
+            .ErrorCode.ShouldBe(ErrorCodes.InvalidArchive);
+
+        // the declared lengths count against the extracted size, before anything is opened
+        var declared = new[] { new ViewArchiveEntry("rst.a.json", 80, () => throw new InvalidOperationException("opened")), new ViewArchiveEntry("rst.b.json", 80, () => throw new InvalidOperationException("opened")) };
+        Should.Throw<InvalidInputException>(() => ViewArchiveReader.Read(declared, new ViewTransferOptions { MaxExtractedBytes = 150, MaxDocumentBytes = 100 }))
+            .ErrorCode.ShouldBe(ErrorCodes.InvalidArchive);
+
+        // a length that lies stops the read one byte after the limit
+        var body = $"{{\"a\":\"{new string('x', 200)}\"}}";
+        var lying = new ViewArchiveEntry("rst.a.conf.json", 2, () => new MemoryStream(Encoding.UTF8.GetBytes(body), writable: false));
+        var file = ViewArchiveReader.Read([lying], new ViewTransferOptions { MaxDocumentBytes = 100 }).Files.Single();
+        file.ErrorCode.ShouldBe(ErrorCodes.InvalidDocument);
+        file.Message.ShouldBe("The file is larger than 100 bytes.");
+    }
+
+    [Fact]
+    public void ReadEntries_FailsAFileThatCannotBeRead()
+    {
+        var entries = new List<ViewArchiveEntry>
+        {
+            new("rst.locked.conf.json", 10, () => throw new IOException("The file is locked.")),
+            new("rst.denied.conf.json", 10, () => throw new UnauthorizedAccessException("Access is denied.")),
+            Entry("rst.fine.conf.json", """{"a":1}"""),
+        };
+
+        var files = ViewArchiveReader.Read(entries, Options).Files.ToDictionary(file => file.Path);
+
+        files["rst.locked.conf.json"].ErrorCode.ShouldBe(ErrorCodes.InvalidDocument);
+        files["rst.locked.conf.json"].Message.ShouldBe("The file cannot be read: The file is locked.");
+        files["rst.denied.conf.json"].ErrorCode.ShouldBe(ErrorCodes.InvalidDocument);
+        files["rst.denied.conf.json"].Message.ShouldBe("The file cannot be read: Access is denied.");
+        files["rst.fine.conf.json"].ErrorCode.ShouldBeNull();
     }
 
     [Fact]
