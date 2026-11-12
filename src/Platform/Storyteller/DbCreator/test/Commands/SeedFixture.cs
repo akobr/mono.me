@@ -1,4 +1,5 @@
 using System.IO.Abstractions.TestingHelpers;
+using System.Net;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.DbCreator.Configuration;
@@ -14,18 +15,23 @@ namespace _42.Platform.Storyteller.DbCreator.UnitTests.Commands;
 
 // The services of the commands over fakes: built-in sets in a MockFileSystem, the access model and the views of Moq
 // (nothing exists, every write succeeds), the importer, bulk writer and record store of the seeder tests, and a
-// container factory that finds the layout fine unless told otherwise.
+// container factory that finds the layout fine unless told otherwise, with a container where every item is missing
+// (the access seed of the root reads and creates).
 internal sealed class SeedFixture
 {
     public static readonly string Tool = MockUnixSupport.Path(@"C:\tool");
 
     public SeedFixture()
     {
-        var container = new Mock<Container>().Object;
+        Container
+            .Setup(container => container.ReadItemAsync<It.IsAnyType>(It.IsAny<string>(), It.IsAny<PartitionKey>(), It.IsAny<ItemRequestOptions>(), It.IsAny<CancellationToken>()))
+            .Throws(new CosmosException("The item does not exist.", HttpStatusCode.NotFound, 0, string.Empty, 0));
         Containers.Setup(factory => factory.FindLayoutProblemsAsync()).ReturnsAsync(() => LayoutProblems.ToList());
-        Containers.Setup(factory => factory.CreateContainerIfNotExistsAsync(It.IsAny<string>())).ReturnsAsync(container);
-        Containers.Setup(factory => factory.EnsureOrganizationsContainerAsync()).ReturnsAsync(container);
+        Containers.Setup(factory => factory.CreateContainerIfNotExistsAsync(It.IsAny<string>())).ReturnsAsync(Container.Object);
+        Containers.Setup(factory => factory.EnsureOrganizationsContainerAsync()).ReturnsAsync(Container.Object);
     }
+
+    public Mock<Container> Container { get; } = new();
 
     public MockFileSystem FileSystem { get; } = new();
 
