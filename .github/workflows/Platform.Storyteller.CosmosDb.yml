@@ -1,13 +1,15 @@
 name: Platform.Storyteller.CosmosDb
 
-# The Cosmos DB suites of the Storyteller backend (Backend.CosmosDb/test and Access.Certificates/testint) on
-# Testcontainers emulators. The vNext job is the everyday run: the light Linux emulator, without the tests that only the
-# engine of the service answers right (the trait Emulator=Classic: request charges, stored sizes, expiry timing, the
-# paging of an ORDER BY query from a Linux client, which vNext answers in one page). The
-# classic job runs the whole suites on the classic Linux emulator, which charges request units and enforces the indexing
-# policy like Azure, so an ORDER BY on an excluded path or a costlier query fails here. Spec:
+# The Cosmos DB suites of the Storyteller backend (Backend.CosmosDb/test, Access.Certificates/testint and
+# DbCreator/testint, the seed of data sets) on Testcontainers emulators. The vNext job is the everyday run: the light
+# Linux emulator, without the tests that only the engine of the service answers right (the trait Emulator=Classic:
+# request charges, stored sizes, expiry timing, the paging of an ORDER BY query from a Linux client, which vNext answers
+# in one page). The classic job runs the whole suites on the classic Linux emulator, which charges request units and
+# enforces the indexing policy like Azure, so an ORDER BY on an excluded path or a costlier query fails here. Spec:
 # docs/Platform/Storyteller/specs/2026-11-09 Shared Organization Container.md, sections 8 and 10. On a pull request the
-# classic job runs only the Emulator=Classic tests; by hand or called, the whole suites.
+# classic job runs only the Emulator=Classic tests (Backend.CosmosDb has them, the two integration suites none); by
+# hand or called, the whole suites. The vNext job also runs the unit tests of DbCreator (no emulator): no other workflow
+# runs the Storyteller unit tests, and the seed's integration suite builds on them.
 on:
   pull_request:
     paths:
@@ -37,6 +39,8 @@ env:
   STORYTELLER_TESTS_USE_CONTAINER: 'true'
   BACKEND_TESTS: src/Platform/Storyteller/Backend.CosmosDb/test/Backend.CosmosDb.UnitTests.csproj
   CERTIFICATE_TESTS: src/Platform/Storyteller/Access.Certificates/testint/Access.Certificates.IntegrationTests.csproj
+  DBCREATOR_TESTS: src/Platform/Storyteller/DbCreator/testint/DbCreator.IntegrationTests.csproj
+  DBCREATOR_UNIT_TESTS: src/Platform/Storyteller/DbCreator/test/DbCreator.UnitTests.csproj
 
 defaults:
   run:
@@ -66,6 +70,13 @@ jobs:
 
       - name: Access.Certificates integration
         run: dotnet test --project "$CERTIFICATE_TESTS" --filter-not-trait "Emulator=Classic" --report-trx --results-directory TestResults/certificates
+
+      - name: DbCreator integration
+        run: dotnet test --project "$DBCREATOR_TESTS" --filter-not-trait "Emulator=Classic" --report-trx --results-directory TestResults/dbcreator
+
+      # No emulator: the set files, the catalog, the seeder over fakes and the commands.
+      - name: DbCreator unit
+        run: dotnet test --project "$DBCREATOR_UNIT_TESTS" --report-trx --results-directory TestResults/dbcreator-unit
 
       - name: Test results
         if: always()
@@ -102,6 +113,11 @@ jobs:
       - name: Access.Certificates integration
         if: github.event_name != 'pull_request'
         run: dotnet test --project "$CERTIFICATE_TESTS" --report-trx --results-directory TestResults/certificates
+
+      # Its suite has no Emulator=Classic tests either.
+      - name: DbCreator integration
+        if: github.event_name != 'pull_request'
+        run: dotnet test --project "$DBCREATOR_TESTS" --report-trx --results-directory TestResults/dbcreator
 
       - name: Test results
         if: always()
