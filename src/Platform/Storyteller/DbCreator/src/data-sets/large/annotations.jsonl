@@ -1,0 +1,64 @@
+// The built-in set large: the shape of the admin UI mock's large dataset (app/mock/annotations.ts, npm run dev:mock --
+// --large) without its random choices. Six responsibilities with their units, then 500 subjects, each with the
+// contexts prod and staging, a usage of every responsibility, an execution per usage and context, and a unit of
+// execution per unit in prod: 17 + 500 x 32 = 16 017 annotations. The relation arrays stay small: a subject lists 2
+// contexts and 6 responsibilities, nothing lists the 500 subjects.
+//
+// The responsibilities and their units.
+{"AnnotationKey":"rst.invoicing","Title":"Invoicing","Description":"Issues the invoices of the customers.","Labels":["billing"]}
+{"AnnotationKey":"unt.invoicing.pdf","Title":"Invoice PDF","UnitType":"file","UnitDefinition":"invoice.pdf"}
+{"AnnotationKey":"unt.invoicing.email","Title":"Invoice e-mail","UnitType":"message","UnitDefinition":"invoice-issued"}
+{"AnnotationKey":"rst.payments","Title":"Payments","Description":"Collects the payments of the invoices.","Labels":["billing","pci"]}
+{"AnnotationKey":"unt.payments.card","Title":"Card payments","UnitType":"event","UnitDefinition":"card-captured"}
+{"AnnotationKey":"unt.payments.sepa","Title":"SEPA direct debits","UnitType":"time","UnitDefinition":"0 6 * * 1-5"}
+{"AnnotationKey":"rst.reporting","Title":"Reporting","Description":"Exports the reports of the month."}
+{"AnnotationKey":"unt.reporting.csv","Title":"CSV export","UnitType":"file","UnitDefinition":"report.csv"}
+{"AnnotationKey":"unt.reporting.xlsx","Title":"Excel export","UnitType":"file","UnitDefinition":"report.xlsx"}
+{"AnnotationKey":"rst.notifications","Title":"Notifications","Description":"Tells the customers what happened."}
+{"AnnotationKey":"unt.notifications.sms","Title":"SMS","UnitType":"message","UnitDefinition":"notification-sms"}
+{"AnnotationKey":"unt.notifications.email","Title":"E-mail","UnitType":"message","UnitDefinition":"notification-email"}
+{"AnnotationKey":"unt.notifications.push","Title":"Push notification","UnitType":"message","UnitDefinition":"notification-push"}
+{"AnnotationKey":"rst.archiving","Title":"Archiving","Description":"Keeps the documents for their retention period.","Labels":["gdpr"]}
+{"AnnotationKey":"unt.archiving.s3","Title":"S3 archive","UnitType":"time","UnitDefinition":"0 2 * * *"}
+{"AnnotationKey":"rst.dunning","Title":"Dunning","Description":"Reminds the customers of unpaid invoices."}
+{"AnnotationKey":"unt.dunning.letter","Title":"Reminder letter","UnitType":"file","UnitDefinition":"reminder.pdf"}
+//
+// The subjects customer-001 to customer-500 and their contexts.
+{"$count":500,"AnnotationKey":"sbt.customer-{000}","Title":"Customer {n}","Labels":["generated"],"Values":{"customerNumber":"C-{00000}"}}
+{"$count":500,"AnnotationKey":"cnt.customer-{000}.prod","Title":"Customer {n} production","TimeZone":"Europe/Prague"}
+{"$count":500,"AnnotationKey":"cnt.customer-{000}.staging","Title":"Customer {n} staging","Labels":["non-production"]}
+//
+// A usage of every responsibility by every subject.
+{"$count":500,"AnnotationKey":"usg.customer-{000}.invoicing","Title":"Invoicing of customer {n}"}
+{"$count":500,"AnnotationKey":"usg.customer-{000}.payments","Title":"Payments of customer {n}"}
+{"$count":500,"AnnotationKey":"usg.customer-{000}.reporting","Title":"Reporting of customer {n}"}
+{"$count":500,"AnnotationKey":"usg.customer-{000}.notifications","Title":"Notifications of customer {n}"}
+{"$count":500,"AnnotationKey":"usg.customer-{000}.archiving","Title":"Archiving of customer {n}"}
+{"$count":500,"AnnotationKey":"usg.customer-{000}.dunning","Title":"Dunning of customer {n}"}
+//
+// An execution per usage and context.
+{"$count":500,"AnnotationKey":"exe.customer-{000}.invoicing.prod","Title":"Invoicing of customer {n} in production"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.invoicing.staging","Title":"Invoicing of customer {n} in staging"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.payments.prod","Title":"Payments of customer {n} in production"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.payments.staging","Title":"Payments of customer {n} in staging"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.reporting.prod","Title":"Reporting of customer {n} in production"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.reporting.staging","Title":"Reporting of customer {n} in staging"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.notifications.prod","Title":"Notifications of customer {n} in production"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.notifications.staging","Title":"Notifications of customer {n} in staging"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.archiving.prod","Title":"Archiving of customer {n} in production"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.archiving.staging","Title":"Archiving of customer {n} in staging"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.dunning.prod","Title":"Dunning of customer {n} in production"}
+{"$count":500,"AnnotationKey":"exe.customer-{000}.dunning.staging","Title":"Dunning of customer {n} in staging"}
+//
+// A unit of execution per unit, in prod.
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.invoicing.prod.pdf","Title":"Invoice PDF of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.invoicing.prod.email","Title":"Invoice e-mail of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.payments.prod.card","Title":"Card payments of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.payments.prod.sepa","Title":"SEPA direct debits of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.reporting.prod.csv","Title":"CSV export of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.reporting.prod.xlsx","Title":"Excel export of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.notifications.prod.sms","Title":"SMS of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.notifications.prod.email","Title":"E-mail of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.notifications.prod.push","Title":"Push notification of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.archiving.prod.s3","Title":"S3 archive of customer {n} in production"}
+{"$count":500,"AnnotationKey":"uxe.customer-{000}.dunning.prod.letter","Title":"Reminder letter of customer {n} in production"}
