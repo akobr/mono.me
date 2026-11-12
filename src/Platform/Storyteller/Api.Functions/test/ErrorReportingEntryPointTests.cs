@@ -20,7 +20,18 @@ public class ErrorReportingEntryPointTests
         "not a dsn",
         "https://o1.ingest.de.sentry.io/1",          // no public key
         "https://public@o1.ingest.de.sentry.io/",    // no project id
+        "https://public@o1.ingest.de.sentry.io/1/",  // Sentry reads an empty project id after the last '/'
+        "https://public@o1.ingest.de.sentry.io/1#/",
         "ftp://public@o1.ingest.de.sentry.io/1",
+    };
+
+    // DSNs Sentry itself parses: each must start the SDK without an exception.
+    public static TheoryData<string> ValidDsns => new()
+    {
+        ErrorReportingHarness.Dsn,
+        $"  {ErrorReportingHarness.Dsn}  ",
+        "https://public:secret@o1.ingest.de.sentry.io/1",
+        "https://public@sentry.example.com/prefix/42",
     };
 
     [Theory]
@@ -38,6 +49,17 @@ public class ErrorReportingEntryPointTests
         configuration.IsErrorReportingEnabled().ShouldBeFalse();
     }
 
+    [Fact]
+    public void AddErrorReporting_WithoutADsn_IgnoresMalformedVolumeSettings()
+    {
+        var configuration = Configuration(null, ("Sentry:RepeatInterval", "1h"), ("Sentry:MaxEventsPerDay", "forty"));
+        var services = new ServiceCollection();
+
+        services.AddErrorReporting(configuration, new TestHostEnvironment("Production"));
+
+        services.ShouldBeEmpty();
+    }
+
     [Theory]
     [MemberData(nameof(MalformedDsns))]
     public void AddErrorReporting_AMalformedDsn_OnlyWarnsAtStartup(string dsn)
@@ -47,22 +69,85 @@ public class ErrorReportingEntryPointTests
 
         services.AddErrorReporting(configuration, new TestHostEnvironment("Production"));
 
-        var registration = services.ShouldHaveSingleItem();
-        registration.ServiceType.ShouldBe(typeof(IHostedService));
-        registration.ImplementationType.ShouldBe(typeof(InvalidDsnWarning));
+        services.ShouldHaveSingleItem().ServiceType.ShouldBe(typeof(IHostedService));
+        Warnings(services).ShouldBe(["Sentry:Dsn is not a valid DSN; errors are not reported to Sentry."]);
         configuration.IsErrorReportingEnabled().ShouldBeFalse();
     }
 
-    [Fact]
-    public async Task InvalidDsnWarning_Start_WarnsWithoutTheValue()
+    [Theory]
+    [MemberData(nameof(ValidDsns))]
+    public async Task AddErrorReporting_AValidDsn_StartsTheSdk(string dsn)
     {
-        var logger = new CapturingLogger<InvalidDsnWarning>();
+        var configuration = Configuration(dsn);
+        configuration.IsErrorReportingEnabled().ShouldBeTrue();
 
-        await new InvalidDsnWarning(logger).StartAsync(TestContext.Current.CancellationToken);
+        var services = new ServiceCollection()
+            .AddErrorReporting(configuration, new TestHostEnvironment("Production"), ErrorReportingHarness.ConfigureForTests(new RecordingTransport()));
 
-        var entry = logger.Entries.ShouldHaveSingleItem();
-        entry.Level.ShouldBe(LogLevel.Warning);
-        entry.Message.ShouldBe("Sentry:Dsn is not a valid DSN; errors are not reported to Sentry.");
+        await using var provider = services.BuildServiceProvider();
+
+        try
+        {
+            // the logger factory builds the Sentry provider, which parses the DSN
+            Should.NotThrow(() => provider.GetRequiredService<ILoggerFactory>());
+        }
+        finally
+        {
+            SentrySdk.Close();
+        }
+    }
+
+    [Fact]
+    public void AddErrorReporting_MalformedVolumeSettings_KeepTheirDefaultsAndWarn()
+    {
+        var configuration = Configuration(
+            ErrorReportingHarness.Dsn,
+            ("Sentry:RepeatInterval", "1h"),
+            ("Sentry:MaxEventsPerHour", "-5"),
+            ("Sentry:MaxEventsPerDay", "forty"));
+        var services = new ServiceCollection();
+
+        services.AddErrorReporting(configuration, new TestHostEnvironment("Production"), ErrorReportingHarness.ConfigureForTests(new RecordingTransport()));
+
+        Warnings(services).ShouldBe(
+        [
+            "Sentry:RepeatInterval is not valid; its default is used.",
+            "Sentry:MaxEventsPerHour is not valid; its default is used.",
+            "Sentry:MaxEventsPerDay is not valid; its default is used.",
+        ]);
+
+        var (options, invalid) = ErrorReportingEntryPoint.ReadOptions(configuration.GetSection("Sentry"));
+        invalid.Count.ShouldBe(3);
+        options.RepeatInterval.ShouldBe(TimeSpan.FromHours(1));
+        options.MaxEventsPerHour.ShouldBe(10);
+        options.MaxEventsPerDay.ShouldBe(40);
+    }
+
+    [Fact]
+    public void ReadOptions_ValidVolumeSettings_AreUsed()
+    {
+        var configuration = Configuration(
+            ErrorReportingHarness.Dsn,
+            ("Sentry:RepeatInterval", "00:30:00"),
+            ("Sentry:MaxEventsPerHour", "0"),
+            ("Sentry:MaxEventsPerDay", "100"));
+
+        var (options, invalid) = ErrorReportingEntryPoint.ReadOptions(configuration.GetSection("Sentry"));
+
+        invalid.ShouldBeEmpty();
+        options.RepeatInterval.ShouldBe(TimeSpan.FromMinutes(30));
+        options.MaxEventsPerHour.ShouldBe(0);
+        options.MaxEventsPerDay.ShouldBe(100);
+    }
+
+    [Fact]
+    public async Task ErrorReportingWarnings_Start_WarnsEachMessage()
+    {
+        var logger = new CapturingLogger<ErrorReportingWarnings>();
+
+        await new ErrorReportingWarnings(logger, ["first", "second"]).StartAsync(TestContext.Current.CancellationToken);
+
+        logger.Entries.Select(entry => (entry.Level, entry.Message)).ShouldBe([(LogLevel.Warning, "first"), (LogLevel.Warning, "second")]);
     }
 
     [Fact]
@@ -70,6 +155,26 @@ public class ErrorReportingEntryPointTests
     {
         Configuration(ErrorReportingHarness.Dsn).IsErrorReportingEnabled().ShouldBeTrue();
         Configuration($"  {ErrorReportingHarness.Dsn}  ").IsErrorReportingEnabled().ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AddErrorReporting_ALaterConfiguration_CannotWeakenTheOptions()
+    {
+        var services = new ServiceCollection()
+            .AddErrorReporting(Configuration(ErrorReportingHarness.Dsn), new TestHostEnvironment("Production"));
+        services.Configure<SentryLoggingOptions>(options =>
+        {
+            options.SendDefaultPii = true;
+            options.CaptureFailedRequests = true;
+            options.MinimumEventLevel = LogLevel.Debug;
+        });
+        using var provider = services.BuildServiceProvider();
+
+        var options = provider.GetRequiredService<IOptions<SentryLoggingOptions>>().Value;
+
+        options.SendDefaultPii.ShouldBeFalse();
+        options.CaptureFailedRequests.ShouldBeFalse();
+        options.MinimumEventLevel.ShouldBe(LogLevel.Error);
     }
 
     [Fact]
@@ -183,10 +288,38 @@ public class ErrorReportingEntryPointTests
             .ShouldBeFalse();
     }
 
-    private static IConfiguration Configuration(string? dsn)
+    private static IConfiguration Configuration(string? dsn, params (string Key, string Value)[] settings)
     {
-        return new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Sentry:Dsn"] = dsn })
-            .Build();
+        var values = new Dictionary<string, string?> { ["Sentry:Dsn"] = dsn };
+
+        foreach (var (key, value) in settings)
+        {
+            values[key] = value;
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+
+    // The messages of the start warning, as the host would run it.
+    private static List<string> Warnings(IServiceCollection services)
+    {
+        IServiceCollection all = new ServiceCollection();
+
+        foreach (var service in services)
+        {
+            all.Add(service);
+        }
+
+        using var provider = all.AddLogging().BuildServiceProvider();
+
+        try
+        {
+            return provider.GetServices<IHostedService>().OfType<ErrorReportingWarnings>().SelectMany(warnings => warnings.Messages).ToList();
+        }
+        finally
+        {
+            // a valid DSN starts the SDK with the logger factory
+            SentrySdk.Close();
+        }
     }
 }

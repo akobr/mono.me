@@ -36,6 +36,18 @@ internal sealed class SentryEventThrottle
         _maxPerDay = options.MaxEventsPerDay;
     }
 
+    // The errors it remembers (at most MaxSignatures).
+    internal int Count
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _signatures.Count;
+            }
+        }
+    }
+
     public bool ShouldSend(SentryEvent sentryEvent)
     {
         var key = GetSignature(sentryEvent);

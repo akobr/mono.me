@@ -123,34 +123,69 @@ public class ErrorReportingLeakTests
     }
 
     [Fact]
-    public async Task Invoke_TwoInvocations_DoNotShareTheirScope()
+    public async Task Invoke_ConcurrentInvocations_DoNotShareTheirScope()
     {
         await using var reporting = ErrorReportingHarness.Start();
         var logger = reporting.Logger(FunctionCategory);
+        var logged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        // The first invocation logs and waits; the second one runs whole meanwhile; then the first one fails.
         var (first, _) = CreateKeyValueWrite(reporting, "invocation-1");
-        await InvokeAsync(reporting, first, _ =>
+        var firstRun = InvokeAsync(reporting, first, async _ =>
         {
             logger.LogWarning("The first invocation's breadcrumb");
+            logged.SetResult();
+            await release.Task;
             throw new InvalidOperationException("The first failure.");
         });
+        await logged.Task;
 
         var (second, _) = FunctionTestDoubles.CreateRequest(reporting.Services, method: "GET");
         second.Definition = new NamedFunctionDefinition("GetKeyValue");
         second.Invocation = "invocation-2";
         SetBindings(second);
-        await InvokeAsync(reporting, second, _ => throw new InvalidOperationException("The second failure."));
+        await InvokeAsync(reporting, second, _ =>
+        {
+            logger.LogWarning("The second invocation's breadcrumb");
+            throw new InvalidOperationException("The second failure.");
+        });
 
+        release.SetResult();
+        await firstRun;
+
+        // and the worker's entry after both, outside any invocation: it must not take a scope of theirs
+        reporting.Logger(WorkerCategory).LogError(new IOException("The archive stream broke."), WorkerTemplate, "SetKeyValue", "invocation-w");
         await reporting.FlushAsync();
 
         var events = reporting.Transport.Events;
-        events.Count.ShouldBe(2);
-        var firstEvent = events.Single(sentryEvent => sentryEvent.GetProperty("transaction").GetString() == KeyValueTransaction);
-        var secondEvent = events.Single(sentryEvent => sentryEvent.GetProperty("transaction").GetString()!.StartsWith("GET ", StringComparison.Ordinal));
+        events.Count.ShouldBe(3);
+        var firstEvent = events.Single(sentryEvent => Context(sentryEvent, "invocation_id") == "invocation-1");
+        var secondEvent = events.Single(sentryEvent => Context(sentryEvent, "invocation_id") == "invocation-2");
+        var workerEvent = events.Single(sentryEvent => Context(sentryEvent, "invocation_id") == "invocation-w");
 
+        ShouldBeClean(firstEvent, KeyValueTransaction, "SetKeyValue", "invocation-1");
+        Breadcrumbs(firstEvent).ShouldBe(["The first invocation's breadcrumb"]);
         ShouldBeClean(secondEvent, "GET /api/v1/{organization}/{project}/{view}/key-values/{key}", "GetKeyValue", "invocation-2");
-        Breadcrumbs(secondEvent).ShouldNotContain("The first invocation's breadcrumb");
+        Breadcrumbs(secondEvent).ShouldBe(["The second invocation's breadcrumb"]);
+        ShouldBeClean(workerEvent, KeyValueTransaction, "SetKeyValue", "invocation-w");
+        Breadcrumbs(workerEvent).ShouldBeEmpty();
         TraceId(secondEvent).ShouldNotBe(TraceId(firstEvent));
+    }
+
+    [Fact]
+    public async Task Invoke_ATimeoutsCancellation_StaysAnError()
+    {
+        await using var reporting = ErrorReportingHarness.Start();
+        using var timeout = new CancellationTokenSource();
+        await timeout.CancelAsync();
+
+        // another token than the invocation's, which runs on
+        var (context, _) = CreateKeyValueWrite(reporting, "invocation-t");
+        await InvokeAsync(reporting, context, _ => throw new OperationCanceledException(timeout.Token));
+        await reporting.FlushAsync();
+
+        ShouldBeClean(reporting.Transport.Events.ShouldHaveSingleItem(), KeyValueTransaction, "SetKeyValue", "invocation-t");
     }
 
     [Fact]
@@ -195,20 +230,37 @@ public class ErrorReportingLeakTests
     public async Task Log_WorkerErrorOutsideTheMiddlewares_GetsTheFunctionsTransaction()
     {
         await using var reporting = ErrorReportingHarness.Start();
+        reporting.Logger(BackgroundCategory).LogWarning(
+            "Could not flush the key/value usage of {Organization}.{Project}", "background-org", "background-project");
+        var worker = reporting.Logger(WorkerCategory);
 
-        // e.g. an IActionResult that fails while the proxying middleware writes it, after the API's middlewares returned
-        reporting.Logger(WorkerCategory).LogError(
-            new IOException("The archive stream broke."), WorkerTemplate, "SetKeyValue", "invocation-w");
+        // As the worker runs an invocation: its own logging scope around the middlewares, and its error entry after them,
+        // e.g. of an IActionResult that fails while the proxying middleware writes it.
+        using (worker.BeginScope(new List<KeyValuePair<string, object>> { new("AzureFunctions_FunctionName", "SetKeyValue"), new("AzureFunctions_InvocationId", "invocation-w") }))
+        {
+            var (context, _) = CreateKeyValueWrite(reporting, "invocation-w");
+            await InvokeAsync(reporting, context, _ =>
+            {
+                reporting.Logger(FunctionCategory).LogWarning("The invocation's own breadcrumb");
+                return Task.CompletedTask;
+            });
+
+            worker.LogError(new IOException("The archive stream broke."), WorkerTemplate, "SetKeyValue", "invocation-w");
+        }
+
         await reporting.FlushAsync();
 
         var sentryEvent = reporting.Transport.Events.ShouldHaveSingleItem();
         ShouldBeClean(sentryEvent, KeyValueTransaction, "SetKeyValue", "invocation-w");
+        Breadcrumbs(sentryEvent).ShouldBeEmpty();
+        reporting.Transport.AllText.ShouldNotContain("background-org");
     }
 
     [Fact]
     public async Task Invoke_RepeatedError_IsSentOncePerInterval()
     {
-        await using var reporting = ErrorReportingHarness.Start(new Dictionary<string, string?> { ["Sentry:RepeatInterval"] = "01:00:00" });
+        var time = new ManualTimeProvider();
+        await using var reporting = ErrorReportingHarness.Start(new Dictionary<string, string?> { ["Sentry:RepeatInterval"] = "01:00:00" }, time);
 
         for (var index = 0; index < 3; index++)
         {
@@ -217,8 +269,18 @@ public class ErrorReportingLeakTests
         }
 
         await reporting.FlushAsync();
-
         reporting.Transport.Events.ShouldHaveSingleItem();
+
+        // after the interval: sent again, with the count of the two repeats it dropped
+        time.Now += TimeSpan.FromHours(1);
+        var (next, _) = CreateKeyValueWrite(reporting, "invocation-3");
+        await InvokeAsync(reporting, next, _ => Fail());
+        await reporting.FlushAsync();
+
+        var events = reporting.Transport.Events;
+        events.Count.ShouldBe(2);
+        events.Count(sentryEvent => sentryEvent.GetProperty("contexts").TryGetProperty("throttle", out var throttle)
+            && throttle.GetProperty("suppressed").GetInt32() == 2).ShouldBe(1);
     }
 
     [Fact]
@@ -347,6 +409,11 @@ public class ErrorReportingLeakTests
         return values.EnumerateArray()
             .Select(breadcrumb => breadcrumb.TryGetProperty("message", out var message) ? message.GetString() ?? string.Empty : string.Empty)
             .ToList();
+    }
+
+    private static string? Context(JsonElement sentryEvent, string property)
+    {
+        return sentryEvent.GetProperty("contexts").GetProperty("function").GetProperty(property).GetString();
     }
 
     private static string? TraceId(JsonElement sentryEvent)

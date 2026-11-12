@@ -111,6 +111,8 @@ public class SentryScrubberTests
         sentryEvent.SetExtra("state", new { Secret = "s3cret" });
         sentryEvent.Contexts["leak"] = new { Secret = "s3cret" };
         sentryEvent.Contexts[SentryScrubber.FunctionContext] = new Dictionary<string, string> { ["name"] = "SetKeyValue" };
+        sentryEvent.Contexts[SentryEventThrottle.ContextName] = new Dictionary<string, object> { ["suppressed"] = 2 };
+        sentryEvent.Contexts["runtime"] = new { Name = ".NET" };
 
         SentryScrubber.ScrubEvent(sentryEvent);
 
@@ -126,6 +128,8 @@ public class SentryScrubberTests
         sentryEvent.Extra["state"].ShouldBe(Filtered);
         sentryEvent.Contexts.ContainsKey("leak").ShouldBeFalse();
         sentryEvent.Contexts.ContainsKey(SentryScrubber.FunctionContext).ShouldBeTrue();
+        sentryEvent.Contexts.ContainsKey(SentryEventThrottle.ContextName).ShouldBeTrue();
+        sentryEvent.Contexts.ContainsKey("runtime").ShouldBeTrue();
 
         var exception = sentryEvent.SentryExceptions!.Single();
         exception.Value.ShouldBe($"AccountKey={Filtered}");

@@ -14,7 +14,8 @@ The code is in `src/Platform/Storyteller/Api.Functions/src/ErrorReporting/`; the
 | `Sentry:MaxEventsPerDay` | `Sentry__MaxEventsPerDay` | `40` | Events an instance sends in a UTC day; `0` is no limit. |
 
 - In production, `main.bicep` writes `Sentry__Dsn` from `sentryDsn` of `parameters/prod.bicepparam`, and leaves the setting out while it is empty ([Deployment README](../../../src/Platform/Deployment/README.md#parameters)).
-- A malformed DSN doesn't stop the API: Sentry stays off, and the API logs one Warning at start, *"Sentry:Dsn is not a valid DSN; errors are not reported to Sentry."*, without the value.
+- A malformed DSN doesn't stop the API: Sentry stays off, and the API logs one Warning at start, *"Sentry:Dsn is not a valid DSN; errors are not reported to Sentry."*, without the value. The check is Sentry's own (a public key, and a project id after the last `/`: a trailing `/` is malformed).
+- A malformed or negative volume setting doesn't stop the API either: it keeps its default, and the API warns at start, e.g. *"Sentry:RepeatInterval is not valid; its default is used."* Without a DSN the volume settings aren't read at all.
 - `SENTRY_DSN`, `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE` are ignored, and so is a `Logging:Sentry` section: everything else is fixed in code.
 - Locally, under Aspire and in the tests there is no DSN, so nothing is sent. To try it, set the DSN of a test project as a user secret of the API (`dotnet user-secrets set "Sentry:Dsn" "<dsn>"`); the environment is then `development`.
 
@@ -22,6 +23,7 @@ The code is in `src/Platform/Storyteller/Api.Functions/src/ErrorReporting/`; the
 
 - A log entry of level **Error** or **Critical** becomes an event, with its exception. Every unexpected exception of a function reaches `ExceptionHandlingMiddleware`, which logs it at Error: an HTTP request answers `500`, a queue or timer invocation fails and is delivered again. The worker logs the same exception again; that entry carries the same exception and is not sent twice.
 - **Information** and **Warning** become breadcrumbs of the invocation: the trail an event of the same invocation shows. Only the platform's own categories (`_42.…`) leave breadcrumbs below Warning; the Information of ASP.NET Core, `HttpClient`, the Azure SDK, Cosmos DB and the Functions worker quote URLs and stay out.
+- Breadcrumbs are kept only while an invocation runs. What is logged outside one (the key/value usage flush, refresh callbacks, the worker before and after the API's middlewares) leaves none, so another invocation's or another organization's trail never rides along; an error outside an invocation is an event without breadcrumbs.
 - **Debug** and **Trace** never reach Sentry.
 - Client errors are Warnings, not errors: a rejected request (`4xx` of a domain rule), a body that isn't valid JSON, a binding that can't be evaluated. So is a cancelled invocation (the caller went away, or the host drains the instance).
 - Sentry doesn't see: errors while the host starts (before Sentry exists), the Functions host's own failures (timeouts, restarts), and what the front end answers. Application Insights and Sentry's uptime monitor on `GET /api/v1/auth/configuration` cover them.
@@ -35,6 +37,7 @@ The code is in `src/Platform/Storyteller/Api.Functions/src/ErrorReporting/`; the
 - **Context** `function`: the name and the **invocation id**, which is the invocation's id in Application Insights: an event leads to its requests, traces and dependencies there.
 - The message, the exceptions with their stack traces, and the breadcrumbs, all scrubbed (below).
 - Each invocation has a scope of its own: its own breadcrumbs only, its own trace id. No performance tracing: no transactions are sent, only errors.
+- The worker's own error entry, written after the API's middlewares (e.g. an `IActionResult` that fails while it is written), gets the same transaction, tag and context from the function and invocation the worker names.
 
 ## Privacy
 
