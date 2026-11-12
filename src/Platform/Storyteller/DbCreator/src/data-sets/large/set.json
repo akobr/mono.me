@@ -1,0 +1,9 @@
+{
+  "Name": "large",
+  "Version": 1,
+  "Description": "16 017 generated annotations in the shape of the admin UI mock's large dataset (npm run dev:mock -- --large), in its scope acme / billing / default: six responsibilities with their units, and 500 subjects customer-001 to customer-500, each with the contexts prod and staging, a usage of every responsibility, an execution per usage and context, and a unit of execution per unit in prod.",
+  "Organization": "acme",
+  "Project": "billing",
+  "View": "default",
+  "ProjectDescription": "The built-in data set large of 2sInitDb: 500 generated customers of six responsibilities, about 16 000 annotations."
+}

@@ -1,0 +1,8 @@
+{
+  "Name": "playground",
+  "Version": 1,
+  "Description": "The data of the Storyteller playground (docs/Platform/Storyteller/playground.md): the responsibility playground with its units nightly-export and archive, the subjects northwind and contoso with their usages, executions and units of execution in the context production, and their configurations. 2sInitDb seed --path src/Platform/Storyteller/Playground/data seeds it; sform story import counts this file as ignored.",
+  "Organization": "42dotnet",
+  "Project": "main",
+  "View": "default"
+}
