@@ -113,7 +113,7 @@ dotnet user-secrets set "Mcp:Actor:ClientSecret" "<the secret, not its hash>"
 dotnet run --project src/Platform/Aspire.Host/src --launch-profile https-local-cosmos   # or without the profile for the Cosmos container
 ```
 
-1. Wait for `cosmos`, `storage`, `keyvault` and `api-functions`. Run `db-creator` once for a new database (with `BaseAccount:Id` = your WorkOS `user_…` id in the host's user secrets). For data to look at, start `db-seed` too: it seeds the `fabrikam` / `invoicing-suite` project of the admin UI's showcase, with you as its Owner (see [Seed data](#seed-data)).
+1. Wait for `cosmos`, `storage`, `keyvault` and `api-functions`. Run `db-creator` once for a new database (with `BaseAccount:Id` = your WorkOS `user_…` id in the host's user secrets). For data to look at, start `db-seed` too: it seeds the `fabrikam` / `invoicing-suite` project of the admin UI's showcase, with you as its Owner (see [Seed data](#seed-data)). Its first start fixes that Owner, so set `BaseAccount:Id` before it.
 2. Start `mcp` from the dashboard. Its console log shows `The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: https://localhost:7180/mcp.` and `Now listening on: https://localhost:<random port>`; always use port 7180, the proxy.
 3. Make sure you have an account in the local database: sign in once through the admin UI or `sform` against `http://localhost:7071/api` (sform reads the AuthKit details from `v1/auth/configuration`).
 
