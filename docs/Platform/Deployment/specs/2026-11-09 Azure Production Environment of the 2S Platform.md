@@ -173,7 +173,7 @@ src/Platform/Deployment/
 ### 8. Monitoring
 
 - Log Analytics `prod-2s-log` with a **daily cap of 0.15 GB** (within the 5 GB a month free) and 30-day retention; workspace-based Application Insights `prod-2s-api-appi`.
-- Sentry (EU region, `de.sentry.io`): the project `2s-admin-ui` for the admin UI with `environment=production`. The API has no Sentry SDK; adding one is out of scope (its errors are in Application Insights).
+- Sentry (EU region, `de.sentry.io`): the project `2s-admin-ui` for the admin UI with `environment=production`. The API has no Sentry SDK; adding one is out of scope (its errors are in Application Insights). (Superseded on 2026-11-12: [Report the API Errors to Sentry](../../Storyteller/specs/2026-11-12%20Report%20the%20API%20Errors%20to%20Sentry.md) adds it, with the project `2s-api`.)
 - PostHog (EU cloud, `https://eu.i.posthog.com`): the production project's token goes to the admin UI build. When development is added, it gets its own PostHog project, so production analytics never contain test traffic.
 - An availability test is not created (charged); Sentry's uptime monitor on `GET https://api.2s.42for.net/api/v1/auth/configuration` is used instead.
 
@@ -219,7 +219,7 @@ src/Platform/Deployment/
 - mTLS machines: a test Flex app with incoming client certificates (`clientCertEnabled=true`, `clientCertMode=Optional`) to check that the front end passes `X-ARR-ClientCert`; then `IsCertificateHeaderFromClientAllowed=true`, `DisabledCredentialKinds` emptied, and the projects' `RequireMtlsForSecretDelivery` working as designed. Fallbacks if Flex does not pass the header: Windows Consumption, or Container Apps with a parser of `X-Forwarded-Client-Cert`.
 - The MCP server on Container Apps (consumption, scale to zero, image from GHCR) with `Auth:TokenExchange:Enabled=true` and its actor.
 - Cosmos DB with Entra RBAC instead of the key; private endpoints; NAT gateway for BYOK firewalls.
-- A Sentry SDK in the API; an always-ready instance; zone redundancy; a second region.
+- A Sentry SDK in the API; an always-ready instance; zone redundancy; a second region. (Superseded on 2026-11-12 for the Sentry SDK: [Report the API Errors to Sentry](../../Storyteller/specs/2026-11-12%20Report%20the%20API%20Errors%20to%20Sentry.md).)
 - The admin UI hiding the turned-off kinds (it shows the API's 400 message today).
 
 ### 14. Expected cost

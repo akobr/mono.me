@@ -49,6 +49,9 @@ param authKitApiKeyEnabled bool
 @description('The application id of the BYOK application; the setting is left out while it is empty (an empty value would be used as a client id).')
 param byokClientId string
 
+@description('The DSN of the Sentry project of the API (2s-api); the setting is left out while it is empty, and the API reports nothing.')
+param sentryDsn string
+
 @description('The machine credential kinds turned off until mTLS exists.')
 param disabledCredentialKinds string[]
 
@@ -128,6 +131,8 @@ var authKitApiKeySetting = authKitApiKeyEnabled
   : {}
 
 var byokSetting = empty(byokClientId) ? {} : { KeyValues__Protection__Byok__ClientId: byokClientId }
+
+var sentryDsnSetting = empty(sentryDsn) ? {} : { Sentry__Dsn: sentryDsn }
 
 resource plan 'Microsoft.Web/serverfarms@2025-03-01' = {
   name: planName
@@ -212,7 +217,7 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
 resource appSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   parent: site
   name: 'appsettings'
-  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting)
+  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting, sentryDsnSetting)
 }
 
 resource scmCredentials 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2025-03-01' = {
