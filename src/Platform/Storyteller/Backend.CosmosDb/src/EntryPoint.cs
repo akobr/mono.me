@@ -143,6 +143,10 @@ public static class EntryPoint
         services.AddSingleton<IConfigurationTemplateService, CosmosConfigurationTemplateService>();
         services.AddSingleton<IViewService, CosmosViewService>();
 
+        // The bulk create of annotations (DbCreator's data sets): the annotation service holds no state, so a second
+        // instance of it is as good as the first.
+        services.AddSingleton<IAnnotationBulkWriter, CosmosAnnotationService>();
+
         // Key/value pairs: the Key Vault providers of the protection levels are added by the deployment.
         services.Configure<KeyValueOptions>(configuration.GetSection(KeyValueOptions.SectionName));
         services.TryAddSingleton<IValueProtector, EnvelopeValueProtector>();
