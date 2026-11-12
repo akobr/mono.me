@@ -3,11 +3,11 @@ using Newtonsoft.Json.Linq;
 namespace _42.Platform.Storyteller.Transferring;
 
 // The view as the import will leave it, for the checks that look beyond one document. One import fills it in pass
-// order, so it is not thread-safe:
+// order (or several sequential calls of the importer that share it), so it is not thread-safe:
 // - the annotation imports record the keys they make active, also in a dry run, which writes nothing, so the later
 //   passes ask here first;
-// - the transfer service records the failed annotations, and after the annotation pass the schemas and
-//   configurations the archive will write; a document that then fails or is skipped is removed again.
+// - the importer records the failed annotations, and after the annotation pass the schemas and configurations the
+//   archive will write; a document that then fails or is skipped is removed again.
 // The annotation keys are canonical (AnnotationKey.ToString()).
 public sealed class ViewImportOverlay
 {
