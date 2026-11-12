@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -20,6 +21,9 @@ public sealed class RecordedBatch(PartitionKey partitionKey)
     public int End { get; internal set; }
 
     public HttpStatusCode StatusCode { get; internal set; }
+
+    // The wait the response asks for when BeforeBatch fails the batch with 429; the hook sets it.
+    public TimeSpan? RetryAfter { get; set; }
 
     // the cache invalidation patches items and does nothing else
     public bool IsInvalidation => _operations.Count > 0 && _operations.All(operation => operation.Kind == BatchOperationKind.Patch);

@@ -7,15 +7,17 @@ using Microsoft.Azure.Cosmos;
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 // The response of a batch that the test failed before it ran: like the service, the first operation carries the
-// status and the others 424 Failed Dependency.
+// status and the others 424 Failed Dependency; a throttled one can ask for a wait.
 public sealed class FailedBatchResponse : TransactionalBatchResponse
 {
     private readonly HttpStatusCode _statusCode;
+    private readonly TimeSpan? _retryAfter;
     private readonly List<TransactionalBatchOperationResult> _results;
 
-    public FailedBatchResponse(HttpStatusCode statusCode, int count)
+    public FailedBatchResponse(HttpStatusCode statusCode, int count, TimeSpan? retryAfter = null)
     {
         _statusCode = statusCode;
+        _retryAfter = retryAfter;
         _results = Enumerable.Range(0, count)
             .Select(index => (TransactionalBatchOperationResult)new FailedResult(index == 0 ? statusCode : HttpStatusCode.FailedDependency))
             .ToList();
@@ -28,6 +30,8 @@ public sealed class FailedBatchResponse : TransactionalBatchResponse
     public override string ErrorMessage => "Failed by the test.";
 
     public override string ActivityId => "test";
+
+    public override TimeSpan? RetryAfter => _retryAfter;
 
     public override int Count => _results.Count;
 

@@ -394,7 +394,12 @@ internal sealed class AnnotationItemStore
                 chunk.Select(request => (request.Key, _repository.Key(request.Value.Node.PartitionKey))).ToList(),
                 cancellationToken: cancellationToken);
 
-            EnsureSuccess(response);
+            // with the wait of a throttle, which the bulk writer honours before it reads again
+            if (!response.IsSuccessStatusCode)
+            {
+                throw CosmosRequestFailedException.From(response);
+            }
+
             using var page = await JsonDocument.ParseAsync(response.Content, cancellationToken: cancellationToken);
 
             foreach (var element in page.RootElement.GetProperty("Documents").EnumerateArray())

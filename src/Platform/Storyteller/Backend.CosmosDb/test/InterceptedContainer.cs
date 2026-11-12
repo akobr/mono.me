@@ -10,7 +10,8 @@ using Microsoft.Azure.Cosmos.Scripts;
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 // A container that forwards every call to a real one, and lets a StorageInterceptor record and fail transactional
-// batches and run actions around them and after point reads. Every operation still runs against the emulator.
+// batches and run actions around them and after point reads, and answer reads of many items. Every operation that
+// the interceptor does not answer still runs against the emulator.
 public sealed class InterceptedContainer(Container inner, StorageInterceptor interceptor) : Container
 {
     public override string Id => inner.Id;
@@ -86,7 +87,7 @@ public sealed class InterceptedContainer(Container inner, StorageInterceptor int
 
 #pragma warning disable SA1316 // the tuple names are those of the overridden members
     public override Task<ResponseMessage> ReadManyItemsStreamAsync(IReadOnlyList<(string id, PartitionKey partitionKey)> items, ReadManyRequestOptions readManyRequestOptions = null, CancellationToken cancellationToken = default)
-        => inner.ReadManyItemsStreamAsync(items, readManyRequestOptions, cancellationToken);
+        => interceptor.ReadManyAsync(items.Select(item => item.id).ToList(), () => inner.ReadManyItemsStreamAsync(items, readManyRequestOptions, cancellationToken));
 
     public override Task<FeedResponse<T>> ReadManyItemsAsync<T>(IReadOnlyList<(string id, PartitionKey partitionKey)> items, ReadManyRequestOptions readManyRequestOptions = null, CancellationToken cancellationToken = default)
         => inner.ReadManyItemsAsync<T>(items, readManyRequestOptions, cancellationToken);

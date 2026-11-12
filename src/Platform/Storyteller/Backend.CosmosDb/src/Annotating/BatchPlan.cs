@@ -163,7 +163,7 @@ internal sealed class BatchPlan : IDisposable
                     $"A concurrent change in partition '{partitionKey}' stopped the write ({(int)response.StatusCode}).");
             }
 
-            throw new BatchFailedException(
+            throw new CosmosRequestFailedException(
                 $"A transactional batch in partition '{partitionKey}' failed: {response.ErrorMessage}",
                 response.StatusCode,
                 response.ActivityId,
@@ -177,12 +177,4 @@ internal sealed class BatchPlan : IDisposable
     }
 
     private sealed record Unit(int Wave, string PartitionKey, List<BatchOperation> Operations, long PayloadBytes);
-
-    // The CosmosException of a failed batch, with the wait of a throttled one (429 left after the retries of the
-    // client), which an exception made by its public constructor does not carry.
-    private sealed class BatchFailedException(string message, HttpStatusCode statusCode, string activityId, double requestCharge, TimeSpan? retryAfter)
-        : CosmosException(message, statusCode, 0, activityId, requestCharge)
-    {
-        public override TimeSpan? RetryAfter => retryAfter;
-    }
 }
