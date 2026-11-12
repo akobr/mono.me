@@ -289,6 +289,7 @@ AUTHKIT_AUDIENCE="https://$TRUST_DOMAIN"        # the aud of the JWT template of
 AUTHKIT_ISSUER="https://api.workos.com/user_management/$AUTHKIT_CLIENT_ID"
 AUTHKIT_DOMAIN="https://<subdomain>.authkit.app"
 BYOK_CLIENT_ID="<application id of '2S Platform Customer Keys', step 11>"
+SENTRY_API_DSN="<DSN of the Sentry project 2s-api, step 14>"
 
 az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
   AZURE_FUNCTIONS_ENVIRONMENT=Production \
@@ -315,6 +316,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
   KeyValues__Protection__Byok__ClientId="$BYOK_CLIENT_ID" \
   KeyValues__Protection__Byok__ManagedIdentityClientId="$MI_CLIENT_ID" \
   APPLICATIONINSIGHTS_CONNECTION_STRING="$APPI_CS" \
+  Sentry__Dsn="$SENTRY_API_DSN" \
   --output none
 ```
 
@@ -328,6 +330,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | `MachineAuth__IsCertificateHeaderFromClientAllowed=false` | the API never reads `X-ARR-ClientCert`, so nobody can fake a certificate with it |
 | `MachineAuth__TrustDomain`, `__Federation__PublicBaseUrl` | the issuer and audience of Storyteller tokens, and the token endpoint that federation rules pin; **final** (decisions 1 and 2) |
 | `AzureKeyVaults__default`, `__premium` | both vault names of the API point at the one Premium vault |
+| `Sentry__Dsn` | the API reports its errors to the Sentry project `2s-api` (step 14), next to Application Insights; without it, nothing is sent ([error reporting](../Storyteller/error-reporting.md)) |
 
 Invitation emails need the WorkOS management key. When you want them, store it and add the setting:
 
@@ -483,10 +486,14 @@ The checklist of the admin UI ([README](../../../src/Platform/ui.admin/README.md
 
 ## 14. Sentry and PostHog
 
-- **Sentry** (EU, `de.sentry.io`): a project `2s-admin-ui`. Its DSN goes to `VITE_SENTRY_DSN`; the environment is `production`. Add an **uptime monitor** on `https://api.2s.42for.net/api/v1/auth/configuration` (expects 200).
+- **Sentry** (EU, `de.sentry.io`): two projects, both with the environment `production`:
+  - `2s-admin-ui` (platform Vue): its DSN goes to `VITE_SENTRY_DSN`;
+  - `2s-api` (platform .NET): its DSN goes to `sentryDsn` of `parameters/prod.bicepparam`, which `main.bicep` writes to the app setting `Sentry__Dsn` (step 8.3 by hand); commit it and run `main.bicep` again.
+
+  Add an **uptime monitor** on `https://api.2s.42for.net/api/v1/auth/configuration` (expects 200). Turn on **spike protection** for the organization: both projects share the plan's errors, and a storm of one must not use them up.
 - **PostHog** (EU cloud): the production project's token goes to `VITE_POSTHOG_PROJECT_TOKEN`, the host is `https://eu.i.posthog.com`.
 
-The API has no Sentry SDK; its errors are in Application Insights.
+The API reports its errors to `2s-api` and keeps them in Application Insights. Its events carry the route template, the environment and the release, never a request, a token or a value ([error reporting](../Storyteller/error-reporting.md)).
 
 ## 15. GitHub environment `prod.42.Platform`
 
@@ -576,6 +583,7 @@ The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with
 | Storage key off | `az storage account show -n "$SA" --query allowSharedKeyAccess` | `false` |
 | Locks | `az lock list -g "$RG" -o table` | the Cosmos DB account and the vault |
 | Uptime | Sentry | the monitor is green |
+| API errors | an invalid message on the queue `configuration-transfers` ([error reporting](../Storyteller/error-reporting.md#check-it-in-production)) | one event in `2s-api` with the transaction `queue ProcessViewTransfer`, the environment `production` and the API's release |
 
 ## 18. Costs to expect
 
@@ -587,6 +595,7 @@ The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with
 | Storage account | under 1 USD |
 | Key Vault (keys and operations; HSM keys only when a project allows them) | under 1 USD |
 | Log Analytics, Application Insights (capped) | 0 |
+| Sentry Developer (5k errors a month for both projects; the API sends at most 40 a day per instance) | 0 |
 | **Total** | **about 0–2 USD** |
 
 What raises it: Cosmos DB throughput above 1000 RU/s, a second region or zone redundancy, an always-ready instance, HSM keys (about 1 USD per key a month), a NAT gateway (about 35 USD), a Managed HSM (thousands of USD). The budget of step 2 warns at 2.50 USD.

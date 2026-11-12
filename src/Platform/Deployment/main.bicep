@@ -58,6 +58,9 @@ param authKitApiKeyEnabled bool = false
 @description('The application id of "2S Platform Customer Keys", known after step 11.1.')
 param byokClientId string = ''
 
+@description('The DSN of the Sentry project of the API (2s-api), known after step 14; the setting is left out while it is empty.')
+param sentryDsn string = ''
+
 @description('The object id of the owner: Key Vault Administrator, Storage Blob Data Contributor.')
 @minLength(36)
 @maxLength(36)
@@ -254,6 +257,7 @@ module functions 'modules/functions.bicep' = {
     authKitAudience: authKitAudience
     authKitApiKeyEnabled: authKitApiKeyEnabled
     byokClientId: byokClientId
+    sentryDsn: sentryDsn
     disabledCredentialKinds: disabledCredentialKinds
     runtimeEnvironment: runtimeEnvironment
     maximumInstanceCount: functionMaximumInstanceCount

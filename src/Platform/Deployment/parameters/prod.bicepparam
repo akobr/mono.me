@@ -37,6 +37,10 @@ param byokClientId = 'cb2da9e3-9316-4fd8-b428-7c7161bdd685'
 // Step 11.2: the object id of the service principal of "2S Platform Deployment" (New-DeploymentApplication.ps1).
 param deploymentPrincipalId = '2a9df1b7-89a4-42e5-b007-5fe1763b8898'
 
+// Step 14: the DSN of the API's Sentry project 2s-api (https://<key>@o<org>.ingest.de.sentry.io/<project>); empty until
+// the project exists, and the API reports nothing to Sentry. Not a secret: it only lets a sender add events to the project.
+param sentryDsn = ''
+
 param ownerObjectId = readEnvironmentVariable('PLATFORM_OWNER_OBJECT_ID')
 param ownerEmail = readEnvironmentVariable('PLATFORM_OWNER_EMAIL')
 // No account-wide throughput limit until DbCreator has created core and organizations (a capped account refuses

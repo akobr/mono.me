@@ -75,6 +75,8 @@ $secret = "<a random string>"
 
 The **hash** goes to the API, the **secret itself** to the MCP server. Giving the MCP server the hash makes every tool call answer *"The Storyteller API does not accept the MCP server as an actor of its token exchange…"*.
 
+**Sentry**: locally `Sentry:Dsn` is empty, so the API reports nothing to Sentry (nor does Aspire). To try it, set the DSN of a test project as a user secret (`dotnet user-secrets set "Sentry:Dsn" "<dsn>"`), never the production one; [error reporting](Storyteller/error-reporting.md) describes what an event carries.
+
 ## 5. MCP server settings
 
 `src/Platform/Storyteller/Mcp/src/appsettings.Development.json` (tracked, so keep secrets out of it), or the same keys as user secrets of the MCP server:

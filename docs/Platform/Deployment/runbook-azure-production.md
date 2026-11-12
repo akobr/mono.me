@@ -113,7 +113,7 @@ az deployment sub what-if --name prod-2s-main --location swedencentral `
 - `prod-2s-42fornet-cdb` with **`enableFreeTier: true`**, `backupPolicy.type: Continuous`, `capacity.totalThroughputLimit: -1` (no limit until phase 11.2), and the lock `do-not-delete`;
 - `prod2s42fornetsa` with `allowSharedKeyAccess: false`, containers `deployments` and `configuration-transfers`, three role assignments;
 - `prod-2s-42fornet-kv` with `sku.name: premium`, `enablePurgeProtection: true`, `enableRbacAuthorization: true`, the lock, the secret `cosmos-connection`, three role assignments;
-- `prod-2s-api-asp` (`FC1`), `prod-2s-api-fa` with `siteScopedCertificatesEnabled: true` and its `appsettings` (**no** `Auth__AuthKit__ClientId` and **no** `KeyValues__Protection__Byok__ClientId` yet), two `basicPublishingCredentialsPolicies`;
+- `prod-2s-api-asp` (`FC1`), `prod-2s-api-fa` with `siteScopedCertificatesEnabled: true` and its `appsettings` (**no** `Auth__AuthKit__ClientId`, **no** `KeyValues__Protection__Byok__ClientId` and **no** `Sentry__Dsn` yet), two `basicPublishingCredentialsPolicies`;
 - `prod-2s-app-swa` (Free, `eastus2`: metadata only, West Europe, the only European one, refuses new tenants);
 - two role assignments for you (Key Vault Administrator, Storage Blob Data Contributor).
 
@@ -336,7 +336,8 @@ az functionapp config appsettings list -g prod-2s-eusec-rg -n prod-2s-api-fa --q
 
 **By hand:**
 
-- **Sentry** (EU): a project `2s-admin-ui`; note its **DSN**. Add an **uptime monitor** on `https://api.2s.42for.net/api/v1/auth/configuration` (expects 200; it turns green after phase 11).
+- **Sentry** (EU): a project `2s-admin-ui`; note its **DSN** (phase 10). Add an **uptime monitor** on `https://api.2s.42for.net/api/v1/auth/configuration` (expects 200; it turns green after phase 11). Turn on **spike protection** for the organization.
+- **Sentry** (EU): a project `2s-api` (.NET) for the API's errors. Put its DSN into `sentryDsn` of `parameters/prod.bicepparam`, commit it with the other parameter commits, and run `main.bicep` again as in phase 8 (what-if: only `+ Sentry__Dsn` in `prod-2s-api-fa/appsettings`); or do it later, as in "Adding the API's Sentry project".
 - **PostHog** (EU cloud): the production project's **token** (`phc_…`); the host is `https://eu.i.posthog.com`.
 
 ## 10. GitHub environment `prod.42.Platform` [C15]
@@ -492,6 +493,7 @@ az lock list -g prod-2s-eusec-rg -o table                               # the ac
 - **Settings → Machines**: enabling `Certificate` answers `400` "… is turned off in this deployment."
 - Application Insights (`prod-2s-api-appi`), **Logs → traces**: `KeyValueProtectionTimer` runs hourly without errors.
 - Sentry: the uptime monitor is green.
+- Sentry, once `sentryDsn` is set: the check of [error reporting](../Storyteller/error-reporting.md#check-it-in-production) gives one event in `2s-api`.
 - **A day later**, Cost Management: Cosmos DB at 0.
 
 Then tick the acceptance criteria of [424-231](https://linear.app/424fun/issue/424-231/create-the-production-environment-of-the-2s-platform-in-azure).
@@ -510,6 +512,15 @@ Tracked in [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-auth
 2. `parameters/prod.bicepparam`: `authKitDomain = 'auth.42for.net'`, `authKitCustomDomain = true`; commit through a pull request; what-if (expect `Auth__AuthKit__Issuer` and `Auth__AuthKit__AuthKitDomain` → `https://auth.42for.net`), then create.
 3. The admin UI: `AUTH_API_HOSTNAME=auth.42for.net` and no `AUTH_LOCAL_STORAGE_SESSION` (phase 11.3, or the GitHub environment), then build and deploy it again.
 4. Check: the discovery answers `"AuthKitDomain":"https://auth.42for.net"`, the sign-in goes through `auth.42for.net`, the browser's `localStorage` holds no AuthKit refresh token, and `sform` signs in.
+
+## Adding the API's Sentry project
+
+Tracked in [424-248](https://linear.app/424fun/issue/424-248/report-the-apis-errors-to-sentry). The API reports its errors to Sentry only with the app setting `Sentry__Dsn`; until then it sends nothing ([error reporting](../Storyteller/error-reporting.md)).
+
+1. Sentry (EU, `de.sentry.io`): **Projects → Create project**, platform .NET, name `2s-api`; copy its DSN (`https://<key>@o<org>.ingest.de.sentry.io/<project>`). Spike protection of the organization is on (phase 9).
+2. `parameters/prod.bicepparam`: `sentryDsn = '<dsn>'`; commit through a pull request; what-if (expect only a `Modify` of `prod-2s-api-fa/appsettings`: `+ Sentry__Dsn`, nothing removed), then create. Changing the app settings restarts the Function App.
+3. If the running build of the API predates the Sentry SDK (424-248), publish the API from an up-to-date `main` as in phase 11.1. The order of 2 and 3 doesn't matter: an older build ignores the setting, a newer one without it sends nothing.
+4. Check as in [error reporting](../Storyteller/error-reporting.md#check-it-in-production): one event in `2s-api` with the transaction `queue ProcessViewTransfer`, the environment `production` and the release `42.Platform.Storyteller.Api.Functions@<version>`.
 
 ## Later
 
