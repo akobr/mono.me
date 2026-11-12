@@ -35,7 +35,6 @@ public partial class CosmosConfigurationService
         // archives are written once, so the requested one is read once; the row is read again by every attempt
         ConfigurationHistoryEntity? archive = null;
         var isArchiveRead = false;
-        var isValidated = force || _schemaService is null;
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -74,13 +73,12 @@ public partial class CosmosConfigurationService
 
             var content = (JObject)archive.Content.DeepClone();
 
-            // validate before any write, so a rejection cannot leave a history item
-            if (!isValidated && content.HasValues)
+            // validate before any write, so a rejection cannot leave a history item; every attempt checks again, as the
+            // schema may have changed since the attempt that lost
+            if (!force && _schemaService is not null && content.HasValues)
             {
-                await _schemaService!.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, content);
+                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, content);
             }
-
-            isValidated = true;
 
             // a cleared configuration has no row; one that only caches a calculation has a cache row
             var written = existing is null

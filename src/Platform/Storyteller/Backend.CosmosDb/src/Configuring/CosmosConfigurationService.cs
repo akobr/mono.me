@@ -1220,7 +1220,9 @@ public partial class CosmosConfigurationService : IConfigurationService
     }
 
     // Creates the row of a configuration that has none, as the version after the archived ones. Returns null when a
-    // calculation or another writer created the row meanwhile. restoredFrom marks a restore.
+    // calculation or another writer created the row meanwhile. restoredFrom marks a restore. Nothing guards the insert
+    // against a soft delete of the annotation after the caller checked it: a transactional batch can only read the
+    // annotation item, and Cosmos DB does not apply If-Match to a read in a batch.
     private async Task<ConfigurationEntity?> TryCreateVersionAsync(
         FullKey key,
         OrganizationContainer repository,

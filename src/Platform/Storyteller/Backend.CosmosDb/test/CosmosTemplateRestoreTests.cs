@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
@@ -134,6 +135,51 @@ public class CosmosTemplateRestoreTests(Startup startup)
 
         var stored = (await Templates.GetTemplateAsync(TestConstants.Organization, project, View, Type))!.Content;
         JToken.DeepEquals(stored, JObject.Parse("""{ "owner": "platform", "$patch": [] }""")).Should().BeTrue("the stored version is copied as it is: {0}", stored);
+    }
+
+    [Fact]
+    public async Task Restore_RetriesAConcurrentChange_AndGivesUpAfterThreeMore()
+    {
+        var project = $"{ProjectPrefix}-concurrent";
+        await WriteAsync(project, """{ "owner": "platform" }""");
+        await WriteAsync(project, """{ "owner": "team" }""");
+        var storage = new InterceptedRepositoryProvider(Context.Services.GetRequiredService<IContainerRepositoryProvider>());
+        var templates = ActivatorUtilities.CreateInstance<CosmosConfigurationTemplateService>(Context.Services, storage);
+        var id = $"{View}.gen.{Type}";
+        var changes = 0;
+        var always = false;
+
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (batch.Contains(BatchOperationKind.Replace, id) && (always || changes++ == 0))
+            {
+                await TouchAsync(project, id);
+            }
+
+            return null;
+        };
+
+        var restored = await templates.RestoreTemplateVersionAsync(TestConstants.Organization, project, View, Type, 1, Editor);
+
+        changes.Should().Be(2, "the first attempt lost to the concurrent change, the second wrote");
+        restored.Version.Should().Be(3);
+
+        always = true;
+        var act = () => templates.RestoreTemplateVersionAsync(TestConstants.Organization, project, View, Type, 2, Editor);
+
+        await act.Should().ThrowAsync<TemplateConcurrencyException>();
+        (await Templates.GetTemplateAsync(TestConstants.Organization, project, View, Type))!.Version.Should().Be(3);
+    }
+
+    // A change of the item that leaves its document as it is.
+    private async Task TouchAsync(string project, string id)
+    {
+        using var response = await GetContainer().PatchItemStreamAsync(
+            id,
+            PartitionKeys.GetCosmosTemplate(TestConstants.Organization, project),
+            [PatchOperation.Set("/touched", Guid.NewGuid().ToString("N"))]);
+
+        response.IsSuccessStatusCode.Should().BeTrue();
     }
 
     private Task WriteAsync(string project, string json)
