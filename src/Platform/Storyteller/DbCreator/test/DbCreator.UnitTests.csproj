@@ -25,6 +25,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- the binding parser, to check the bindings of the built-in sets -->
+    <ProjectReference Include="..\..\Binding.Language\src\Binding.Language.csproj" />
     <ProjectReference Include="..\src\DbCreator.csproj" />
   </ItemGroup>
 

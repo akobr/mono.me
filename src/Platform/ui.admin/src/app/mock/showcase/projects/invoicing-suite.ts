@@ -403,7 +403,8 @@ function documentedCustomers(b: ScopeBuilder) {
   b.execution('northwind', 'invoicing', 'sandbox', { title: 'Northwind sandbox invoicing' })
   b.configure('exe.northwind.invoicing.sandbox', { taxProfile: 'no-mva-custom', invoiceLimit: 1000 })
   b.execution('northwind', 'payments', 'production')
-  b.configure('exe.northwind.payments.production', { merchantId: '@(northwind.adyen-merchant, primaryVault)' })
+  // A path of identifiers: the binding language reads no hyphen, and Key Vault no underscore in a secret name.
+  b.configure('exe.northwind.payments.production', { merchantId: '@(northwind.adyenMerchant, primaryVault)' })
   b.execution('northwind', 'portal', 'production')
   b.configure('exe.northwind.portal.production', { customDomain: 'billing.northwind.example', branding: 'northwind' })
   b.execution('northwind', 'portal', 'sandbox')
