@@ -154,6 +154,114 @@ public class DataSetSeederTests
     }
 
     [Fact]
+    public async Task Seed_WritesTheLinesAboveAnAnnotationFileBeforeTheFile()
+    {
+        AddMixed();
+        _bulkWriter.AncestorsCreated = [];
+        var progress = new RecordingProgress();
+
+        var run = await Seeder().SeedAsync(
+            new DataSetSeedRequest { Sets = ["mixed"], Owner = Owner, Options = new DataSetSeedOptions { AnnotationProgress = progress } },
+            TestContext.Current.CancellationToken);
+
+        // round 0: the file without a line above it, then the lines it does not hang on; round 1: the file below the
+        // line rst.payments, then the line below that file; then the other documents
+        _importer.Calls.Select(call => call.Files.Select(file => file.Path).ToList()).ShouldBe(
+        [
+            ["annotations/sbt.other.json"],
+            ["annotations/unt.payments.ledger.json"],
+            ["configurations/rst.payments.conf.json"],
+        ]);
+        _bulkWriter.Calls.Select(call => call.Annotations.Select(annotation => annotation.AnnotationKey).ToList()).ShouldBe(
+        [
+            ["rst.payments", "sbt.acme"],
+            ["uxe.acme.payments.prod.ledger"],
+        ]);
+        _importer.Calls.ShouldAllBe(call => call.Overlay == _importer.Calls[0].Overlay);
+
+        // the progress counts on over the rounds
+        progress.Values.ShouldBe([2, 3]);
+
+        var set = run.Sets.Single();
+        set.Items.ShouldBeEmpty();
+        var lines = set.Lines.ShouldNotBeNull();
+        lines.Summary.Created.ShouldBe(3);
+        lines.RelationUpdates.ShouldBe(4);
+        set.IsRecorded.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Seed_DryRunGivesEachStepWhatTheStepsBeforeWouldMakeActive()
+    {
+        AddMixed();
+
+        await Seeder().SeedAsync(
+            new DataSetSeedRequest { Sets = ["mixed"], Owner = Owner, Options = new DataSetSeedOptions { DryRun = true } },
+            TestContext.Current.CancellationToken);
+
+        // the bulk writer gets the keys the files would create, and the files the keys the bulk writer would create
+        _bulkWriter.Calls.Count.ShouldBe(2);
+        _bulkWriter.Calls[0].DryRunActiveAtStart.ShouldNotBeNull().ShouldBe(["sbt.other"]);
+        _bulkWriter.Calls[1].DryRunActiveAtStart.ShouldNotBeNull().ShouldBe(["sbt.other", "rst.payments", "sbt.acme", "rst.made-on-the-way", "unt.payments.ledger"], ignoreOrder: true);
+        _importer.Calls[1].ActiveAtStart.ShouldBe(["sbt.other", "rst.payments", "sbt.acme", "rst.made-on-the-way"], ignoreOrder: true);
+        _records.Saves.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Seed_ALineThatCannotBeReadFailsTheFilesBelowIt()
+    {
+        AddSet(
+            "broken",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""",
+            ("annotations.jsonl", """{"AnnotationKey":"rst.payments","Colour":"red"}"""),
+            ("annotations/unt.payments.ledger.json", "{}"));
+
+        var run = await Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["broken"], Owner = Owner }, TestContext.Current.CancellationToken);
+
+        // the file is imported with the line's key failed, so the importer skips it instead of creating the line's
+        // annotation with defaults
+        _importer.Calls.ShouldHaveSingleItem().FailedAtStart.ShouldBe(["rst.payments"]);
+        _bulkWriter.Calls.ShouldBeEmpty();
+        run.Sets.Single().Failures.ShouldHaveSingleItem().Line.ShouldBe(1);
+        _records.Saves.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Seed_DryRunCarriesWhatTheSetsBeforeWouldWriteButNotTheirFailures()
+    {
+        AddSet(
+            "base",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""",
+            ("annotations/rst.x.json", "{}"),
+            ("annotations/sbt.bad.json", "{}"),
+            ("configurations/rst.x.conf.json", """{ "a": 1 }"""));
+        AddSet(
+            "side",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""",
+            ("annotations.jsonl", """{"AnnotationKey":"unt.x.u"}"""),
+            ("annotations/sbt.y.json", "{}"));
+        _importer.FailingKeys.Add("sbt.bad");
+        var request = new DataSetSeedRequest { Sets = ["base", "side"], Owner = Owner, Options = new DataSetSeedOptions { DryRun = true } };
+
+        var run = await Seeder().SeedAsync(request, TestContext.Current.CancellationToken);
+
+        run.Sets.Select(set => set.IsSeeded).ShouldBe([true, true]);
+        var side = _importer.Calls[2];
+        side.Files.Single().Path.ShouldBe("annotations/sbt.y.json");
+        side.Overlay.ShouldNotBeSameAs(_importer.Calls[0].Overlay);
+        side.ActiveAtStart.ShouldBe(["rst.x"]);
+        side.ConfigurationsAtStart.ShouldBe(["rst.x"]);
+        side.FailedAtStart.ShouldBeEmpty();
+        _bulkWriter.Calls.Single().DryRunActiveAtStart.ShouldNotBeNull().ShouldBe(["rst.x", "sbt.y"], ignoreOrder: true);
+
+        // a real run reads what the sets before wrote
+        await Seeder().SeedAsync(request with { Options = new DataSetSeedOptions() }, TestContext.Current.CancellationToken);
+
+        _importer.Calls[2].ActiveAtStart.ShouldBeEmpty();
+        _bulkWriter.Calls.Single().DryRunActiveAtStart.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Seed_RefusesASetBeyondTheLimitsBeforeAnythingIsWritten()
     {
         AddSet("first", """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""", ("annotations/sbt.first.json", "{}"));
@@ -306,6 +414,23 @@ public class DataSetSeederTests
         SetFiles.Add(_fileSystem, Folder(name), [("set.json", manifest), .. files]);
     }
 
+    // the lines rst.payments and sbt.acme above the file unt.payments.ledger, a line below that file, a file without a
+    // line above it, and a configuration
+    private void AddMixed()
+    {
+        AddSet(
+            "mixed",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""",
+            ("annotations.jsonl", """
+                                  {"AnnotationKey":"uxe.acme.payments.prod.ledger"}
+                                  {"AnnotationKey":"rst.payments","Title":"Payments"}
+                                  {"AnnotationKey":"sbt.acme"}
+                                  """),
+            ("annotations/unt.payments.ledger.json", "{}"),
+            ("annotations/sbt.other.json", "{}"),
+            ("configurations/rst.payments.conf.json", """{ "a": 1 }"""));
+    }
+
     // sbt.bad fails in its file when the test says so; below it a line of annotations.jsonl and one below that
     private void AddShowcase(bool withFailures = true)
     {
@@ -340,5 +465,15 @@ public class DataSetSeederTests
                 .. withFailures ? [("annotations/sbt.bad.json", "{}"), ("configurations/cnt.bad.x.conf.json", """{ "a": 1 }""")] : Array.Empty<(string, string)>(),
                 ("configurations/sbt.a.conf.json", """{ "a": 1 }"""),
             ]);
+    }
+
+    private sealed class RecordingProgress : IProgress<int>
+    {
+        public List<int> Values { get; } = [];
+
+        public void Report(int value)
+        {
+            Values.Add(value);
+        }
     }
 }
