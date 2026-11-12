@@ -212,9 +212,14 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
                 continue;
             }
 
-            // the keys the create writes, ancestors first; an ancestor an earlier key of the input creates is not among them
+            // the keys the create writes, ancestors first; an ancestor an earlier key of the input creates is not among
+            // them. A key an earlier attempt committed that still reads active was created, also when an ancestor was
+            // deleted since: it is reported so, as the create of an import reports it, and the deleted ancestor stays
+            // as it is (what hangs on it and is not created yet is still skipped)
+            var isKept = IsKept(input.KeyText);
             var written = input.Ancestors
                 .Where(ancestor => StateOf(ancestor.ToString()) != AnnotationItemState.Active
+                                   && !(isKept && StateOf(ancestor.ToString()) == AnnotationItemState.Deleted)
                                    && !marked.Contains(ancestor.ToString())
                                    && !IsAssumedActive(ancestor.ToString()))
                 .Append(input.Key)

@@ -490,6 +490,37 @@ public class CosmosAnnotationBulkWriterTests(Startup startup)
     }
 
     [Fact]
+    public async Task CreateMissing_ReportsAKeyItCommittedCreatedAlsoWhenItsParentIsDeletedBeforeTheRelationsWave()
+    {
+        const string project = "bulk-retry-parent-deleted";
+        await Annotations.CreateAnnotationsFromStringAsync(Organization, project, View, ["rst.gone"], Creator);
+        var (writer, storage) = CreateWriter();
+        var deletes = 0;
+
+        // someone deletes the stored parent while the unit's wave runs, so the delete does not see the unit; the unit
+        // commits, and the relations wave loses to the delete
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (batch.Operations.Any(operation => operation.Kind == BatchOperationKind.Create) && Interlocked.Increment(ref deletes) == 1)
+            {
+                await Annotations.DeleteAnnotationAsync(Key("rst.gone", project), Creator);
+            }
+
+            return null;
+        };
+
+        var result = await writer.CreateMissingAnnotationsAsync(Organization, project, View, [Read("unt.gone.u1", "{}", project)], Seeder);
+
+        storage.Interceptor.Batches.Should().Contain(batch => batch.StatusCode == HttpStatusCode.PreconditionFailed, "the relations wave lost to the delete");
+        result.Items.Single().Result.Should().Be(new ViewImportResult(ViewImportOutcome.Created), "the call created it, as the create of an import reports it");
+        result.AncestorsCreated.Should().BeEmpty();
+        result.RelationUpdates.Should().Be(0);
+        (await Annotations.ExistAnnotationAsync(Key("unt.gone.u1", project))).Should().BeTrue();
+        (await Annotations.GetAnnotationHistoryAsync(Key("unt.gone.u1", project)))!.Entries.Should().ContainSingle("it was written once");
+        (await Annotations.GetDeletedAnnotationAsync(Key("rst.gone", project))).Should().NotBeNull("the deleted parent stays deleted");
+    }
+
+    [Fact]
     public async Task CreateMissing_WaitsTheRetryAfterOfAThrottleAndRunsAgain()
     {
         const string project = "bulk-throttle";
