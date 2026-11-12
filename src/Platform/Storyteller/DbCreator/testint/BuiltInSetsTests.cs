@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Abstractions;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
+using _42.Platform.Storyteller.Transferring;
 
 namespace _42.Platform.Storyteller.DbCreator.IntegrationTests;
 
@@ -39,9 +40,16 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
 
         var result = await SeedAsync(new DataSetSeedRequest { Sets = ["showcase"], Organization = organization });
 
+        // every file is created, in the summary of its folder's kind; the counts come from the folder, which the admin
+        // UI's test/unit/mock/showcase-set.test.ts writes, so a change of the mock needs none here
+        var files = DataSetFolder.GetEntries(new FileSystem(), result.Set.Folder);
         result.Lines.ShouldBeNull();
-        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = 398 });
-        result.Documents.Summaries.Single(summary => summary.Content == ViewArchiveContent.Annotations).Created.ShouldBe(242);
+        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = files.Count });
+        result.Documents.Summaries.Single(summary => summary.Content == ViewArchiveContent.Annotations).Created.ShouldBeGreaterThan(0);
+        result.Documents.Summaries
+            .Where(summary => summary.Created > 0)
+            .ToDictionary(summary => ViewArchiveNames.GetFolder(summary.Content!.Value), summary => summary.Created)
+            .ShouldBe(files.GroupBy(file => file.Path.Split('/')[0]).ToDictionary(group => group.Key, group => group.Count()), ignoreOrder: true);
         (await Access.GetAccessPointAsync($"{organization}.invoicing-suite"))!.Description.ShouldStartWith("The B2B SaaS of the documentation");
     }
 
