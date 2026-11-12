@@ -1,0 +1,4 @@
+{
+  "cron": "30 23 * * *",
+  "timeZone": "Europe/Dublin"
+}

@@ -1,0 +1,9 @@
+{
+  "Title": "Dunning",
+  "Description": "Reminds and escalates overdue invoices.",
+  "DocumentationLink": "https://docs.fabrikam.example/invoicing-suite/modules/dunning",
+  "Labels": [
+    "add-on"
+  ],
+  "TimeZone": "Europe/Oslo"
+}

@@ -1,0 +1,9 @@
+{
+  "Title": "Pilot",
+  "Description": "Pilot environment, ended after the production go-live.",
+  "Labels": [
+    "test"
+  ],
+  "ExpiresAt": "2026-10-12T00:00:00.000Z",
+  "TimeZone": "Europe/Oslo"
+}

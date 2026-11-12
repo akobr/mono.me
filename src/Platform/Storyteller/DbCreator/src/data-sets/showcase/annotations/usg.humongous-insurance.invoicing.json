@@ -1,0 +1,8 @@
+{
+  "Title": "Invoicing",
+  "Labels": [
+    "notice-given"
+  ],
+  "ExpiresAt": "2026-12-01T00:00:00.000Z",
+  "TimeZone": "Europe/Oslo"
+}

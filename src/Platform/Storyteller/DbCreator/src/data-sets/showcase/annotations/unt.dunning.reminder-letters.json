@@ -1,0 +1,6 @@
+{
+  "Title": "Reminder letters",
+  "TimeZone": "Europe/Oslo",
+  "UnitType": "time",
+  "UnitDefinition": "0 6 * * 1-5"
+}

@@ -1,0 +1,10 @@
+{
+  "theme": "light",
+  "sessionTimeoutMinutes": 30,
+  "languages": [
+    "en",
+    "nb",
+    "de",
+    "fr"
+  ]
+}

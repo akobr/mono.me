@@ -1,0 +1,12 @@
+{
+  "Title": "Southridge Video",
+  "Labels": [
+    "standard",
+    "us"
+  ],
+  "Values": {
+    "crmId": "CRM-1008",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

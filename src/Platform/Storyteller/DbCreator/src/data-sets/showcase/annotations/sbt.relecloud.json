@@ -1,0 +1,12 @@
+{
+  "Title": "Relecloud",
+  "Labels": [
+    "standard",
+    "us"
+  ],
+  "Values": {
+    "crmId": "CRM-1004",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

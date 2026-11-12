@@ -1,0 +1,10 @@
+{
+  "Title": "Payments",
+  "Description": "Collects card and bank payments and settles them against open invoices.",
+  "DocumentationLink": "https://docs.fabrikam.example/invoicing-suite/modules/payments",
+  "Labels": [
+    "core",
+    "pci"
+  ],
+  "TimeZone": "Europe/Oslo"
+}

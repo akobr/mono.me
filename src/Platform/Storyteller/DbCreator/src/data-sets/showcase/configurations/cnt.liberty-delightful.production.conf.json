@@ -1,0 +1,5 @@
+{
+  "region": "southcentralus",
+  "logLevel": "warn",
+  "hostname": "liberty-delightful.production.invoicing.fabrikam.example"
+}

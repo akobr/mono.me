@@ -1,0 +1,12 @@
+{
+  "Title": "Tailwind Traders",
+  "Labels": [
+    "enterprise",
+    "eu"
+  ],
+  "Values": {
+    "crmId": "CRM-1016",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

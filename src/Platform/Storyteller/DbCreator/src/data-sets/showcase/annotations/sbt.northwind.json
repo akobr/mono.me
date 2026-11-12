@@ -1,0 +1,12 @@
+{
+  "Title": "Northwind Traders",
+  "Labels": [
+    "enterprise",
+    "nordics"
+  ],
+  "Values": {
+    "crmId": "CRM-1001",
+    "accountManager": "Grace Hopper"
+  },
+  "TimeZone": "Europe/Oslo"
+}

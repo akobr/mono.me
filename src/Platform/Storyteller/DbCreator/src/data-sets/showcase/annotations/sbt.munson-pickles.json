@@ -1,0 +1,13 @@
+{
+  "Title": "Munson’s Pickles and Preserves Farm",
+  "Labels": [
+    "standard",
+    "us"
+  ],
+  "Values": {
+    "crmId": "CRM-1022",
+    "accountManager": "Alan Turing"
+  },
+  "ValidFrom": "2026-11-15T00:00:00.000Z",
+  "TimeZone": "Europe/Oslo"
+}
