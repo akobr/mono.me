@@ -58,7 +58,12 @@ public class SentryEventThrottleTests
         throttle.ShouldSend(Event(Throw(First), "c")).ShouldBeTrue();
 
         _time.Now += TimeSpan.FromHours(1);
-        throttle.ShouldSend(Event(Throw(First), "a")).ShouldBeTrue();
+        var next = Event(Throw(First), "a");
+        throttle.ShouldSend(next).ShouldBeTrue();
+
+        // the repeat the cap dropped is counted too
+        var context = next.Contexts[SentryEventThrottle.ContextName].ShouldBeOfType<Dictionary<string, object>>();
+        context["suppressed"].ShouldBe(1);
     }
 
     [Fact]
@@ -115,10 +120,43 @@ public class SentryEventThrottleTests
         {
             _time.Now += TimeSpan.FromSeconds(1);
             throttle.ShouldSend(Event(Throw(First), $"route {index}")).ShouldBeTrue();
+            throttle.Count.ShouldBeLessThanOrEqualTo(SentryEventThrottle.MaxSignatures);
         }
 
         // the latest error is still known
         throttle.ShouldSend(Event(Throw(First), $"route {(SentryEventThrottle.MaxSignatures * 3) - 1}")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ShouldSend_ManyRecentErrors_ForgetTheOldestHalf()
+    {
+        var throttle = Create(repeatInterval: TimeSpan.FromHours(1));
+
+        // one more than it remembers, all inside the interval: only the oldest half can go
+        for (var index = 0; index <= SentryEventThrottle.MaxSignatures; index++)
+        {
+            _time.Now += TimeSpan.FromSeconds(1);
+            throttle.ShouldSend(Event(Throw(First), $"route {index}")).ShouldBeTrue();
+        }
+
+        throttle.Count.ShouldBe((SentryEventThrottle.MaxSignatures / 2) + 1);
+        throttle.ShouldSend(Event(Throw(First), $"route {SentryEventThrottle.MaxSignatures - 1}")).ShouldBeFalse();
+        throttle.ShouldSend(Event(Throw(First), "route 0")).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void GetSignature_AnotherLoggerOrTemplate_IsAnotherError()
+    {
+        var exception = Throw(First);
+        var signature = SentryEventThrottle.GetSignature(Event(exception));
+
+        var otherLogger = Event(exception);
+        otherLogger.Logger = "_42.Platform.Storyteller.Api.V1.KeyValuesHttp";
+        var otherTemplate = Event(exception);
+        otherTemplate.Message = new SentryMessage { Message = "Another failure" };
+
+        SentryEventThrottle.GetSignature(otherLogger).ShouldNotBe(signature);
+        SentryEventThrottle.GetSignature(otherTemplate).ShouldNotBe(signature);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 
 using Microsoft.Extensions.Configuration;
@@ -25,31 +26,45 @@ public static class ErrorReportingEntryPoint
         return services.AddErrorReporting(configuration, environment, configure: null);
     }
 
-    // configure: the tests' transport and integrations, applied last.
+    // configure: the tests' transport and integrations, applied last; time: the throttle's clock.
+    // An optional diagnostics setting must not stop the API: a malformed DSN turns Sentry off (the SDK would throw while
+    // the host is built), a malformed volume setting keeps its default; each says so once at start, never with its value.
     internal static IServiceCollection AddErrorReporting(
         this IServiceCollection services,
         IConfiguration configuration,
         IHostEnvironment environment,
-        Action<SentryLoggingOptions>? configure)
+        Action<SentryLoggingOptions>? configure,
+        TimeProvider? time = null)
     {
-        var options = configuration.GetSection(ErrorReportingOptions.SectionName).Get<ErrorReportingOptions>() ?? new ErrorReportingOptions();
+        var section = configuration.GetSection(ErrorReportingOptions.SectionName);
+        var rawDsn = section[nameof(ErrorReportingOptions.Dsn)];
 
-        if (string.IsNullOrWhiteSpace(options.Dsn))
+        if (string.IsNullOrWhiteSpace(rawDsn))
         {
             return services;
         }
 
-        if (!IsValidDsn(options.Dsn))
+        if (!IsValidDsn(rawDsn))
         {
-            // An optional diagnostics setting must not stop the API; the SDK would throw while the host is built.
-            services.AddHostedService<InvalidDsnWarning>();
+            services.AddSingleton<IHostedService>(provider => new ErrorReportingWarnings(
+                provider.GetRequiredService<ILogger<ErrorReportingWarnings>>(),
+                [$"{ErrorReportingOptions.SectionName}:{nameof(ErrorReportingOptions.Dsn)} is not a valid DSN; errors are not reported to Sentry."]));
             return services;
         }
 
-        var dsn = options.Dsn.Trim();
+        var (options, invalid) = ReadOptions(section);
+
+        if (invalid.Count > 0)
+        {
+            services.AddSingleton<IHostedService>(provider => new ErrorReportingWarnings(
+                provider.GetRequiredService<ILogger<ErrorReportingWarnings>>(),
+                invalid.Select(key => $"{ErrorReportingOptions.SectionName}:{key} is not valid; its default is used.").ToList()));
+        }
+
+        var dsn = rawDsn.Trim();
         var environmentName = environment.EnvironmentName.ToLowerInvariant();
         var release = GetRelease();
-        var throttle = new SentryEventThrottle(options, TimeProvider.System);
+        var throttle = new SentryEventThrottle(options, time ?? TimeProvider.System);
 
         services.AddLogging(logging => logging.AddSentry());
         services.PostConfigure<SentryLoggingOptions>(sentry =>
@@ -80,7 +95,11 @@ public static class ErrorReportingEntryPoint
             sentry.AutoSessionTracking = false;
             sentry.EnableLogs = false;
 
-            sentry.SetBeforeBreadcrumb((breadcrumb, _) => SentryScrubber.ScrubBreadcrumb(breadcrumb));
+            // Breadcrumbs only inside an invocation: outside it they would gather in the shared root scope (hosted services,
+            // refresh callbacks, other organizations) and ride along with every later event.
+            sentry.SetBeforeBreadcrumb((breadcrumb, _) => SentryScopeMiddleware.IsInInvocation
+                ? SentryScrubber.ScrubBreadcrumb(breadcrumb)
+                : null);
             sentry.SetBeforeSend((sentryEvent, _) =>
             {
                 SentryScrubber.CompleteFunction(sentryEvent);
@@ -101,7 +120,9 @@ public static class ErrorReportingEntryPoint
         return services;
     }
 
-    // The shape Sentry parses: an absolute http(s) URI with a public key and a project id as its last path segment.
+    // The rule of Sentry's Dsn.Parse (6.12.1), so a DSN accepted here never stops the host: an absolute http(s) URI, the
+    // public key is the user info before ':', the project id everything after the last '/' of the absolute URI (a
+    // trailing '/' or "#/" leaves it empty).
     internal static bool IsValidDsn(string? dsn)
     {
         if (string.IsNullOrWhiteSpace(dsn)
@@ -112,9 +133,60 @@ public static class ErrorReportingEntryPoint
         }
 
         var publicKey = uri.UserInfo.Split(':')[0];
-        var path = uri.AbsolutePath.TrimEnd('/');
-        var projectId = path[(path.LastIndexOf('/') + 1)..];
-        return publicKey.Length > 0 && projectId.Length > 0;
+        var absoluteUri = uri.AbsoluteUri;
+        var projectId = absoluteUri[(absoluteUri.LastIndexOf('/') + 1)..];
+        return !string.IsNullOrWhiteSpace(publicKey) && !string.IsNullOrWhiteSpace(projectId);
+    }
+
+    // The volume settings, each parsed on its own: a missing one keeps its default, a malformed or negative one too, and
+    // its key (never its value) is reported.
+    internal static (ErrorReportingOptions Options, IReadOnlyList<string> Invalid) ReadOptions(IConfigurationSection section)
+    {
+        var options = new ErrorReportingOptions { Dsn = section[nameof(ErrorReportingOptions.Dsn)]?.Trim() };
+        var invalid = new List<string>();
+
+        if (Read<TimeSpan>(nameof(ErrorReportingOptions.RepeatInterval), value =>
+            TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var interval) && interval >= TimeSpan.Zero ? interval : null) is { } repeat)
+        {
+            options.RepeatInterval = repeat;
+        }
+
+        if (Read<int>(nameof(ErrorReportingOptions.MaxEventsPerHour), ParseCount) is { } perHour)
+        {
+            options.MaxEventsPerHour = perHour;
+        }
+
+        if (Read<int>(nameof(ErrorReportingOptions.MaxEventsPerDay), ParseCount) is { } perDay)
+        {
+            options.MaxEventsPerDay = perDay;
+        }
+
+        return (options, invalid);
+
+        T? Read<T>(string key, Func<string, T?> parse)
+            where T : struct
+        {
+            var value = section[key];
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var parsed = parse(value.Trim());
+
+            if (parsed is null)
+            {
+                invalid.Add(key);
+            }
+
+            return parsed;
+        }
+
+        static int? ParseCount(string value)
+        {
+            return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count) && count >= 0 ? count : null;
+        }
     }
 
     // 42.Platform.Storyteller.Api.Functions@0.10.33-alpha+22da6eab60: the version and the commit of the build.

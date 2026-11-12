@@ -38,7 +38,7 @@ internal sealed class ErrorReportingHarness : IAsyncDisposable
 
     public IServiceProvider Services => _services;
 
-    public static ErrorReportingHarness Start(IDictionary<string, string?>? settings = null, string environment = "Production")
+    public static ErrorReportingHarness Start(IDictionary<string, string?>? settings = null, TimeProvider? time = null)
     {
         var values = new Dictionary<string, string?>
         {
@@ -59,7 +59,7 @@ internal sealed class ErrorReportingHarness : IAsyncDisposable
 
             // what the 500 answer of ExceptionHandlingMiddleware is written with
             .AddSingleton(Options.Create(new WorkerOptions { Serializer = new JsonObjectSerializer() }))
-            .AddErrorReporting(configuration, new TestHostEnvironment(environment), ConfigureForTests(transport))
+            .AddErrorReporting(configuration, new TestHostEnvironment("Production"), ConfigureForTests(transport), time)
             .BuildServiceProvider();
 
         return new ErrorReportingHarness(services, transport);
