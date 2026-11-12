@@ -87,7 +87,7 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
             }
             catch (AnnotationConcurrencyException exception)
             {
-                // read and decided again: what this call committed reads active now, and is still reported created
+                // read and decided again: what this call committed and still reads active is still reported created
                 if (attempt >= BulkMaxAttempts)
                 {
                     throw new ConflictException($"The annotations changed concurrently; run the bulk create again. {exception.Message}");
@@ -185,9 +185,11 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
             withAudit: false,
             cancellationToken);
 
-        // the state before this call: a key an earlier attempt committed counts as missing, so it is decided (and
-        // reported) as it was then, and not written again
-        AnnotationItemState StateOf(string keyText) => commits.HasKey(keyText) ? AnnotationItemState.Missing : nodes[keyText].State;
+        // a key an earlier attempt committed that still reads active counts as missing, its state before this call, so
+        // it is decided (and reported) as it was then, and not written again; one deleted or purged since counts as it
+        // reads now, so nothing is created under a deleted ancestor and a purged one is written again
+        bool IsKept(string keyText) => commits.HasKey(keyText) && nodes[keyText].State == AnnotationItemState.Active;
+        AnnotationItemState StateOf(string keyText) => IsKept(keyText) ? AnnotationItemState.Missing : nodes[keyText].State;
 
         var results = new Dictionary<int, ViewImportResult>();
         var creates = new List<BulkCreate>();
@@ -234,7 +236,7 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
 
         var now = _timeProvider.GetUtcNow();
         var stamp = Stamp(actor, now);
-        var toWrite = creates.Where(create => !commits.HasKey(create.Node.KeyText)).ToList();
+        var toWrite = creates.Where(create => !IsKept(create.Node.KeyText)).ToList();
         var entities = toWrite.ToDictionary(
             create => create.Node.KeyText,
             create => ToStoredEntity(create.Model, organization) with { Created = stamp, Modified = stamp },
