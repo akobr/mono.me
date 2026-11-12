@@ -38,6 +38,19 @@ internal static class AnnotationRelations
             : With(entity, array, values.Append(value).ToList());
     }
 
+    // Add of many values at once: the ones the array lacks are appended in their order, without copying the array per
+    // value. The same reference when it lists them all.
+    public static AnnotationEntity AddRange(AnnotationEntity entity, string array, IEnumerable<string> values)
+    {
+        var current = Get(entity, array);
+        var listed = new HashSet<string>(current, StringComparer.Ordinal);
+        var added = values.Where(listed.Add).ToList();
+
+        return added.Count == 0
+            ? entity
+            : With(entity, array, current.Concat(added).ToList());
+    }
+
     public static AnnotationEntity Remove(AnnotationEntity entity, string array, string value)
     {
         var values = Get(entity, array);
