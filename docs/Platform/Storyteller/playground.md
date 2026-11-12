@@ -23,8 +23,19 @@ sform account machine create -a rst.playground -k ApiKey
 dotnet user-secrets set Parameters:storyteller-api-key <the key> --project src/Platform/Storyteller/Playground/DotNet.AspireHost/src
 ```
 
-- **The import** creates the responsibility `rst.playground`, the subjects `northwind` and `contoso` with their usages and plans, their executions in the context `production`, the unit `nightly-export` and its units of execution, the unit `archive` that no execution runs, and the configurations of `data/configurations/`. It creates the ancestors the files do not name, and reports them with the warning `AncestorCreated`.
+- **The import** creates the responsibility `rst.playground`, the subjects `northwind` and `contoso` with their usages and plans, their executions in the context `production`, the unit `nightly-export` and its units of execution, the unit `archive` that no execution runs, and the configurations of `data/configurations/`. It creates the ancestors the files do not name, and reports them with the warning `AncestorCreated`. It counts `data/set.json` as an ignored file.
 - **The machine** is restricted to the responsibility, so it reads the annotation and its descendants. It has `Annotation.Read` and `Configuration.Read`, and no secrets.
+
+**Seeding instead of importing.** `data/` is also the [data set](data-sets.md) `playground`, whose `set.json` targets `42dotnet` / `main` / `default`. DbCreator writes it straight into the database, without the API and without a sign-in, so it can take the place of `sform story import`:
+
+```powershell
+dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed --path src/Platform/Storyteller/Playground/data
+```
+
+- It writes the same annotations and configurations, stamped by the `System` actor, and creates the same ancestors with the warning `AncestorCreated`. It keeps what the view holds already (`Skip`), where `sform story import` overwrites by default.
+- It records the set, so a second run reports it as seeded already and writes nothing.
+- It reaches the database of DbCreator's `app.config.json` (the Windows emulator) or of `ConnectionStrings__cosmos`; for the container of the Aspire host, see [Running it](data-sets.md#running-it).
+- The machine still comes from `sform account machine create`, which needs the API.
 
 ## Run through the AppHost
 

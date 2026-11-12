@@ -525,7 +525,7 @@ az functionapp deployment source config-zip -g "$RG" -n "$FUNC" --src .publish/a
 
 ### 16.2 The database (DbCreator, once per schema change)
 
-DbCreator creates the database `42.Platform.2S` (shared autoscale up to 1000 RU/s), the containers `core` and `organizations`, and seeds the organization `42dotnet` with you as its owner.
+DbCreator creates the database `42.Platform.2S` (shared autoscale up to 1000 RU/s), the containers `core` and `organizations`, and seeds the organization `42dotnet` with you as its owner. It then seeds the built-in data set `core`, the platform's own annotations of `42dotnet`, through the services of the API as the `System` actor; a later run finds it seeded already ([data sets](../Storyteller/data-sets.md)).
 
 ```sh
 export CosmosDb__Connection="$(az keyvault secret show --vault-name "$KV" --name cosmos-connection --query value -o tsv)"

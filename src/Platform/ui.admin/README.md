@@ -76,6 +76,20 @@ The showcase (`app/mock/showcase/`) follows the examples of the [documentation](
 
 To add a showcase project, write `app/mock/showcase/projects/<project>.ts` (a `ShowcaseProject`: its `description` of at most 500 characters, members, settings, views and a `build(builder)` that fills each view through the `ScopeBuilder` of `builder.ts`, like `invoicing-suite.ts`), add it to `showcaseProjects` in `app/mock/showcase/index.ts` (and its organization to `showcaseOrganizations`), and add `test/unit/mock/showcase/<project>.test.ts`. `test/unit/mock/showcase.test.ts` checks the rules every project follows: canonical keys with every ancestor, all statuses and deletions, the history lengths, configurations that satisfy their combined schema, the appearance, the views, the roles and the description.
 
+**The data set `showcase` of DbCreator** is the `fabrikam` / `invoicing-suite` / `default` scope of the showcase, in the folder format of a view export, so a real platform can be seeded with it (`2sInitDb seed showcase`, the Aspire resource `db-seed`; see [Data sets](../../../docs/Platform/Storyteller/data-sets.md#showcase)). Its documents in `src/Platform/Storyteller/DbCreator/src/data-sets/showcase/` are written by `test/unit/mock/showcase-set.test.ts` and are never edited by hand:
+
+- The test builds the scope with `buildShowcaseScope` under a frozen clock (`2026-11-01T00:00:00Z`), and writes what a Git export of the view would hold: an annotation file per active annotation (`annotationDocument`), and the current version of every document at the path `getPath` gives (`app/mock/archive-names.ts`), without the documents of deleted annotations or without content.
+- Each file is a file snapshot (`toMatchFileSnapshot`), so `npm test` fails when the mock and the set part, naming the file, and a last test fails on files the scope no longer gives. With `CI=true` Vitest writes no snapshot, so a missing file fails too; locally Vitest writes it.
+- After a change of the `invoicing-suite` project (`app/mock/showcase/projects/invoicing-suite.ts`, its builder or the archive names), regenerate the set, delete the files the test reports as stale, and commit the set with the change:
+
+  ```bash
+  npx vitest run test/unit/mock/showcase-set.test.ts -u
+  ```
+
+  The path comes first: in Vitest 4, `-u` takes an optional value, so `vitest run -u <path>` would read the path as that value and run every test file.
+- `set.json` of the set is the only file written by hand. The `Platform.UI.Admin` workflow also runs on changes of the set's folder, so a hand edit of a document fails `npm test` there.
+- DbCreator's unit tests check that every binding of the set parses; the binding language takes no hyphen in a path (`@(northwind.adyenMerchant, primaryVault)`).
+
 - `window.storytellerMock.reset(scenario?)` resets the data of the current (or the given) dataset, as a fresh start; `window.storytellerMock.addMachine(projectKey, machine)` adds a machine as the Owner of the project would, for what a lower role may do with it.
 - The mock API keeps deleted annotations restorable and records a change history per key, like the API (`app/mock/annotation-handlers.ts`, `app/mock/audit.ts`). A re-created key starts without its configuration.
 - `POST …/annotations/simple` (bulk create) reads its lines as the API does (`app/mock/simple-lines.ts`): it creates the keys with their missing ancestors, skips existing keys, and answers `400` above 100 lines.

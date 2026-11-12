@@ -113,7 +113,7 @@ dotnet user-secrets set "Mcp:Actor:ClientSecret" "<the secret, not its hash>"
 dotnet run --project src/Platform/Aspire.Host/src --launch-profile https-local-cosmos   # or without the profile for the Cosmos container
 ```
 
-1. Wait for `cosmos`, `storage`, `keyvault` and `api-functions`. Run `db-creator` once for a new database (with `BaseAccount:Id` = your WorkOS `user_…` id in the host's user secrets).
+1. Wait for `cosmos`, `storage`, `keyvault` and `api-functions`. Run `db-creator` once for a new database (with `BaseAccount:Id` = your WorkOS `user_…` id in the host's user secrets). For data to look at, start `db-seed` too: it seeds the `fabrikam` / `invoicing-suite` project of the admin UI's showcase, with you as its Owner (see [Seed data](#seed-data)).
 2. Start `mcp` from the dashboard. Its console log shows `The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: https://localhost:7180/mcp.` and `Now listening on: https://localhost:<random port>`; always use port 7180, the proxy.
 3. Make sure you have an account in the local database: sign in once through the admin UI or `sform` against `http://localhost:7071/api` (sform reads the AuthKit details from `v1/auth/configuration`).
 
@@ -186,6 +186,34 @@ $t = "<access token>"; $p = $t.Split('.')[1].Replace('-','+').Replace('_','/'); 
 ```
 
 Expect `iss` = the AuthKit domain, `aud` = `https://localhost:7180/mcp`, `sub` = `user_…` and `scope` with the MCP scope.
+
+## Seed data
+
+DbCreator (`2sInitDb`) seeds [data sets](Storyteller/data-sets.md), folders in the format of a view export, into an organization, project and view that it creates when they are missing, with your account as their Owner. A seed keeps what exists, creates what is missing, and skips a set it has seeded already.
+
+| Set | Into | Seeded by |
+| --- | --- | --- |
+| `core` | `42dotnet` / `main` / `default` | Every run of `db-creator` (`2sInitDb`) |
+| `showcase` | `fabrikam` / `invoicing-suite` / `default` | `db-seed` (`2sInitDb seed showcase`) |
+| `large` (16,017 annotations) | `acme` / `billing` / `default` | `2sInitDb seed large` |
+| `playground` | `42dotnet` / `main` / `default` | `2sInitDb seed --path src/Platform/Storyteller/Playground/data` |
+
+From the command line, DbCreator reaches the Windows emulator of its `app.config.json`. For the container of the Aspire host, set `ConnectionStrings__cosmos` to the value the dashboard shows in the environment of `db-creator`, and `baseAccount__id` to your account id:
+
+```powershell
+$env:ConnectionStrings__cosmos = "<from the dashboard>"
+$env:baseAccount__id = "user_01…"
+dotnet run --project src/Platform/Storyteller/DbCreator/src -- sets
+dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed large --dry-run
+dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed large
+```
+
+DbCreator has two test projects: `DbCreator/test`, the unit tests (no database), and `DbCreator/testint`, which seeds against a Cosmos DB emulator and deletes its database `42.Platform.2S`, so give it a container (see [1. Tools](#1-tools)):
+
+```sh
+dotnet test --project src/Platform/Storyteller/DbCreator/test
+STORYTELLER_TESTS_USE_CONTAINER=true dotnet test --project src/Platform/Storyteller/DbCreator/testint
+```
 
 ## UI automation tests
 
