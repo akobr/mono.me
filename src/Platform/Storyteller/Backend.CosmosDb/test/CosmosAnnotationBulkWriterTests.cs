@@ -24,8 +24,9 @@ using Xunit;
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 // The bulk create of annotations (IAnnotationBulkWriter): the items of an import, the outcomes of an import with Skip,
-// the relation arrays of active parents, dry runs, orphan audits, retries and the repair of a failed relations wave,
-// and thousands of keys. Every test works in its own project.
+// the relation arrays of active parents, dry runs, orphan audits, retries (after a concurrent change, also of what an
+// earlier attempt committed, and the waits of throttles), cancellation, parallelism, the repair of a failed relations
+// wave, and thousands of keys. Every test works in its own project.
 public class CosmosAnnotationBulkWriterTests(Startup startup)
     : BaseTestsClass(startup)
 {
@@ -478,6 +479,128 @@ public class CosmosAnnotationBulkWriterTests(Startup startup)
         clock.Waits.Should().Equal(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(7), TimeSpan.FromSeconds(3));
         storage.Interceptor.Batches.Select(batch => batch.StatusCode).Should().StartWith(new[] { HttpStatusCode.TooManyRequests, HttpStatusCode.TooManyRequests });
         ((Responsibility)await GetAsync("rst.slow", project)).UnitNames.Should().Equal("u1");
+    }
+
+    [Fact]
+    public async Task CreateMissing_RethrowsAThrottleThatOutlastsTheAttempts()
+    {
+        const string project = "bulk-throttled";
+        var clock = new RecordingTimeProvider();
+        var (writer, storage) = CreateWriter(clock);
+        storage.Interceptor.BeforeBatch = batch =>
+        {
+            batch.RetryAfter = TimeSpan.FromSeconds(1);
+            return Task.FromResult<HttpStatusCode?>(HttpStatusCode.TooManyRequests);
+        };
+
+        var call = () => writer.CreateMissingAnnotationsAsync(Organization, project, View, [Read("sbt.busy", "{}", project)], Seeder);
+
+        (await call.Should().ThrowAsync<CosmosException>()).Which.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        storage.Interceptor.Batches.Should().HaveCount(5, "the call makes five attempts");
+        clock.Waits.Should().Equal(Enumerable.Repeat(TimeSpan.FromSeconds(1), 4), "no wait follows the last attempt");
+        (await Annotations.ExistAnnotationAsync(Key("sbt.busy", project))).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreateMissing_EndsAConflictThatOutlastsTheAttemptsWithAConflictError()
+    {
+        const string project = "bulk-conflict";
+        var (writer, storage) = CreateWriter();
+        storage.Interceptor.BeforeBatch = _ => Task.FromResult<HttpStatusCode?>(HttpStatusCode.PreconditionFailed);
+
+        var call = () => writer.CreateMissingAnnotationsAsync(Organization, project, View, [Read("sbt.busy", "{}", project)], Seeder);
+
+        (await call.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        storage.Interceptor.Batches.Should().HaveCount(5, "the call makes five attempts")
+            .And.OnlyContain(batch => batch.StatusCode == HttpStatusCode.PreconditionFailed);
+        (await Annotations.ExistAnnotationAsync(Key("sbt.busy", project))).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreateMissing_RefusesAKeyThatDoesNotParse()
+    {
+        const string project = "bulk-bad-key";
+
+        var call = () => Writer.CreateMissingAnnotationsAsync(
+            Organization,
+            project,
+            View,
+            [Read("sbt.fine", "{}", project), Model("sbt.fine", project) with { AnnotationKey = "not a key" }],
+            Seeder);
+
+        (await call.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidKey);
+        (await Annotations.ExistAnnotationAsync(Key("sbt.fine", project))).Should().BeFalse("the call refuses the input before it writes anything");
+    }
+
+    [Fact]
+    public async Task CreateMissing_StopsBeforeTheNextWaveWhenCancelledAndARunAgainCompletesIt()
+    {
+        const string project = "bulk-cancel";
+        var (writer, storage) = CreateWriter();
+        using var cancellation = new CancellationTokenSource();
+        IReadOnlyList<Annotation> annotations = [Read("unt.cancel.u1", "{}", project)];
+
+        // cancelled once the wave of the responsibility committed
+        storage.Interceptor.AfterBatch = _ =>
+        {
+            cancellation.Cancel();
+            return Task.CompletedTask;
+        };
+
+        var cancelled = () => writer.CreateMissingAnnotationsAsync(Organization, project, View, annotations, Seeder, cancellationToken: cancellation.Token);
+
+        await cancelled.Should().ThrowAsync<OperationCanceledException>();
+        storage.Interceptor.Batches.Should().ContainSingle("the wave of the unit does not start");
+        (await Annotations.ExistAnnotationAsync(Key("rst.cancel", project))).Should().BeTrue();
+        (await Annotations.ExistAnnotationAsync(Key("unt.cancel.u1", project))).Should().BeFalse();
+
+        storage.Interceptor.Reset();
+        var result = await writer.CreateMissingAnnotationsAsync(Organization, project, View, annotations, Seeder);
+
+        result.Items.Single().Result.Should().Be(new ViewImportResult(ViewImportOutcome.Created));
+        ((Responsibility)await GetAsync("rst.cancel", project)).UnitNames.Should().Equal("u1");
+    }
+
+    [Fact]
+    public async Task CreateMissing_RunsAtMostMaxParallelBatchesAtOnce()
+    {
+        const string project = "bulk-parallel";
+        var (writer, storage) = CreateWriter();
+        var gate = new object();
+        var running = 0;
+        var peak = 0;
+
+        // every batch holds its slot a while, so the batches that may run at once do
+        storage.Interceptor.BeforeBatch = async _ =>
+        {
+            lock (gate)
+            {
+                running++;
+                peak = Math.Max(peak, running);
+            }
+
+            await Task.Delay(100);
+
+            lock (gate)
+            {
+                running--;
+            }
+
+            return null;
+        };
+
+        // twelve subjects, each in its own partition, so one wave of twelve batches
+        var result = await writer.CreateMissingAnnotationsAsync(
+            Organization,
+            project,
+            View,
+            Enumerable.Range(0, 12).Select(index => Read($"sbt.p{index:00}", "{}", project)).ToList(),
+            Seeder,
+            new AnnotationBulkOptions { MaxParallelBatches = 3 });
+
+        result.Items.Should().HaveCount(12).And.OnlyContain(item => item.Result.Outcome == ViewImportOutcome.Created);
+        storage.Interceptor.Batches.Should().HaveCount(12);
+        peak.Should().Be(3);
     }
 
     [Fact]
