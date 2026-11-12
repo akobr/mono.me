@@ -45,6 +45,18 @@ public class Program
                 parsingException.NearestMatches.ToList())));
             return ExitCodes.ERROR_INPUT_PARSING;
         }
+        catch (CommandParsingException parsingException)
+        {
+            // A missing or an invalid option value, or a single value given twice: the input is wrong, not the tool.
+            Console.Write("! ", Color.Magenta);
+            Console.WriteLine(parsingException.Message);
+            Console.WriteLine($"  What happened, {ParsingErrorResponseMessages.GetRandom()}?", Color.DarkGray);
+
+            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
+                "Invalid input at {command}",
+                parsingException.Command.Name)));
+            return ExitCodes.ERROR_INPUT_PARSING;
+        }
         catch (Exception exception)
         {
             Console.WriteWithGradient("# Total mayhem", Color.Yellow, Color.Magenta);
@@ -83,6 +95,9 @@ public class Program
 
     private static IHostBuilder CreateHostBuilder(string[] args)
     {
+        // No validation on build: the Cosmos registration brings services of the API (certificate renewal) whose
+        // dependencies this tool does not register. The commands resolve the structure builder, the review, the data
+        // sets and the services of the seed (the access, views, import and bulk writer), never those.
         return new HostBuilder()
 #if DEBUG
             .UseEnvironment(Environments.Development)
@@ -91,8 +106,6 @@ public class Program
 #endif
             .UseCommandLineApplication<InitDbCommand>(args, ConfigureConsoleApplication)
             .UseStartup<Startup>()
-            // the Cosmos registration brings services of the API (certificate renewal) whose dependencies this tool
-            // does not register; the tool resolves only the container factory and the structure builder
             .UseDefaultServiceProvider(options =>
             {
                 options.ValidateOnBuild = false;
