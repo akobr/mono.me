@@ -383,6 +383,65 @@ public class CosmosAnnotationBulkWriterTests(Startup startup)
     }
 
     [Fact]
+    public async Task CreateMissing_SkipsWhatHangsOnAnAncestorDeletedBetweenAttempts()
+    {
+        const string project = "bulk-retry-deleted";
+        var (writer, storage) = CreateWriter();
+        var batches = 0;
+
+        // the missing subject commits in the first wave; then someone deletes it, and the context's wave loses
+        storage.Interceptor.BeforeBatch = async _ =>
+        {
+            if (Interlocked.Increment(ref batches) != 2)
+            {
+                return null;
+            }
+
+            await Annotations.DeleteAnnotationAsync(Key("sbt.lost", project), Creator);
+            return HttpStatusCode.PreconditionFailed;
+        };
+
+        var result = await writer.CreateMissingAnnotationsAsync(Organization, project, View, [Read("cnt.lost.c1", "{}", project)], Seeder);
+
+        result.Items.Single().Result.Should().BeEquivalentTo(Skipped(ErrorCodes.AnnotationDeleted, "The annotation sbt.lost is deleted, and Skip leaves it deleted."));
+        result.AncestorsCreated.Should().Equal(new[] { "sbt.lost" }, "the call created it before the delete");
+        (await Annotations.ExistAnnotationAsync(Key("cnt.lost.c1", project))).Should().BeFalse("nothing is created under a deleted ancestor");
+        (await Annotations.GetDeletedAnnotationAsync(Key("sbt.lost", project))).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task CreateMissing_WritesAgainAnAncestorPurgedBetweenAttempts()
+    {
+        const string project = "bulk-retry-purged";
+        var (writer, storage) = CreateWriter();
+        var batches = 0;
+
+        // the missing subject commits in the first wave; then someone deletes it permanently, and the context's wave loses
+        storage.Interceptor.BeforeBatch = async _ =>
+        {
+            if (Interlocked.Increment(ref batches) != 2)
+            {
+                return null;
+            }
+
+            await Annotations.DeleteAnnotationAsync(Key("sbt.purged", project), Creator);
+            await Annotations.PurgeAnnotationAsync(Key("sbt.purged", project), Creator);
+            return HttpStatusCode.PreconditionFailed;
+        };
+
+        var result = await writer.CreateMissingAnnotationsAsync(Organization, project, View, [Read("cnt.purged.c1", "{}", project)], Seeder);
+
+        result.Items.Single().Result.Outcome.Should().Be(ViewImportOutcome.Created);
+        result.Items.Single().Result.Warnings!.Single().Message.Should().Be("The missing ancestor sbt.purged is created with defaults.");
+        result.AncestorsCreated.Should().Equal("sbt.purged");
+        ((Subject)await GetAsync("sbt.purged", project)).ContextNames.Should().Equal("c1");
+        (await Annotations.ExistAnnotationAsync(Key("cnt.purged.c1", project))).Should().BeTrue();
+        var history = await Annotations.GetAnnotationHistoryAsync(Key("sbt.purged", project));
+        history!.Entries.Should().ContainSingle("the purge removed the audit of the first write")
+            .Which.Cause.Should().Be(new AnnotationAuditCause { Kind = AnnotationAuditCauseKind.Ancestor, Key = "cnt.purged.c1" });
+    }
+
+    [Fact]
     public async Task CreateMissing_WaitsOutAThrottleAndRunsAgain()
     {
         const string project = "bulk-throttle";
