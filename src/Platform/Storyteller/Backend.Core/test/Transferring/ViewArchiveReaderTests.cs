@@ -425,6 +425,22 @@ public class ViewArchiveReaderTests
     }
 
     [Fact]
+    public void ValidateEntries_AppliesTheLimitsWithoutOpeningAnEntry()
+    {
+        static ViewArchiveEntry Unopened(string path, long length) => new(path, length, () => throw new InvalidOperationException("opened"));
+
+        Should.Throw<InvalidInputException>(() => ViewArchiveReader.Validate([Unopened("a.txt", 1), Unopened("b.txt", 1), Unopened("c.txt", 1)], new ViewTransferOptions { MaxArchiveEntries = 2 }))
+            .ErrorCode.ShouldBe(ErrorCodes.InvalidArchive);
+        Should.Throw<InvalidInputException>(() => ViewArchiveReader.Validate([Unopened("rst.a.json", 80), Unopened("exe.template.json", 80)], new ViewTransferOptions { MaxExtractedBytes = 150, MaxDocumentBytes = 100 }))
+            .ErrorCode.ShouldBe(ErrorCodes.InvalidArchive);
+
+        // only document files count against the extracted size, as in a zip
+        Should.NotThrow(() => ViewArchiveReader.Validate(
+            [Unopened("notes.txt", 8000), Unopened("rst.a.conf.1.json", 8000), Unopened("rst.a.conf.json", 2)],
+            new ViewTransferOptions { MaxExtractedBytes = 100, MaxDocumentBytes = 50 }));
+    }
+
+    [Fact]
     public void Validate_AcceptsAnEmptyZip()
     {
         using var stream = new MemoryStream();

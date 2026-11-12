@@ -17,7 +17,13 @@ public static class ViewArchiveReader
     public static void Validate(Stream archive, ViewTransferOptions options)
     {
         using var zip = Open(archive);
-        _ = Inspect(GetEntries(zip), options, ViewArchiveInclude.All);
+        Validate(GetEntries(zip), options);
+    }
+
+    // The same check for entries of any origin: their count and declared lengths, without opening one.
+    public static void Validate(IReadOnlyCollection<ViewArchiveEntry> entries, ViewTransferOptions options)
+    {
+        _ = Inspect(entries, options, ViewArchiveInclude.All);
     }
 
     // The include filter: null or empty means all four kinds.

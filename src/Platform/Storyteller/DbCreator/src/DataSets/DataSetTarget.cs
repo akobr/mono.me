@@ -24,13 +24,15 @@ public sealed record class DataSetTarget(string Organization, string Project, st
             Pick(sets, view, manifest => manifest.View, "view", "--view") ?? Storyteller.Constants.DefaultViewName);
     }
 
-    // The rules of new names, before anything is written: the organization only when the seed creates it (an existing
-    // one may predate the rules), the project always, the view unless it is "default". DataSetException otherwise.
+    // The rules of new names, before anything is written: the organization when the seed creates it (an existing one
+    // may predate the rules) or when it has a dot, the project always, the view unless it is "default". A dotted name
+    // is never an organization, even when it is the key of an existing project (the access model refuses it too).
+    // DataSetException otherwise.
     public void EnsureNames(bool isNewOrganization)
     {
         try
         {
-            if (isNewOrganization)
+            if (isNewOrganization || Organization.Contains('.'))
             {
                 NameRules.EnsureOrganizationName(Organization);
             }

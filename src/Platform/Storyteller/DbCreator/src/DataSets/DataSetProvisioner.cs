@@ -25,8 +25,9 @@ public sealed class DataSetProvisioner
     }
 
     // DataSetException, before anything is written, for a name that breaks the rules and for a missing project of an
-    // organization the owner does not own (the seed never takes an organization over). A dry run writes nothing and
-    // reports what it would create.
+    // organization the owner does not own (the seed never takes an organization over); also for a name or an access
+    // that the access model or the view registry refuses after all. A dry run writes nothing and reports what it would
+    // create.
     public async Task<DataSetProvisioning> ProvisionAsync(
         DataSetTarget target,
         DataSetOwner owner,
@@ -90,6 +91,11 @@ public sealed class DataSetProvisioner
             {
                 throw new DataSetException(exception.Message, exception);
             }
+            catch (InvalidInputException exception)
+            {
+                // the access model checks the names too; EnsureNames applies its rules first, so this is a safety net
+                throw new DataSetException(exception.Message, exception);
+            }
         }
 
         var isViewRegistered = false;
@@ -113,6 +119,10 @@ public sealed class DataSetProvisioner
                 catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.ViewExists)
                 {
                     isViewRegistered = false;
+                }
+                catch (InvalidInputException exception)
+                {
+                    throw new DataSetException(exception.Message, exception);
                 }
             }
         }

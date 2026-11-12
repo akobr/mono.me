@@ -154,6 +154,24 @@ public class DataSetSeederTests
     }
 
     [Fact]
+    public async Task Seed_RefusesASetBeyondTheLimitsBeforeAnythingIsWritten()
+    {
+        AddSet("first", """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""", ("annotations/sbt.first.json", "{}"));
+        AddSet(
+            "big",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite", "DependsOn": [ "first" ] }""",
+            ("annotations.jsonl", """{"$count":200001,"AnnotationKey":"sbt.g-{n}"}"""));
+
+        var exception = await Should.ThrowAsync<DataSetException>(
+            () => Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["big"], Owner = Owner }, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("more than 200,000 annotations");
+        _access.Invocations.ShouldBeEmpty();
+        _importer.Calls.ShouldBeEmpty();
+        _records.Saves.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Seed_UsesAnExistingProjectAsItIs()
     {
         AddShowcase(withFailures: false);
@@ -242,9 +260,11 @@ public class DataSetSeederTests
         // a named set's descriptions before those of a dependency
         (plan.ProjectDescription, plan.ViewDescription).ShouldBe(("The invoices.", "A preview."));
 
-        // the project and the view are checked here; the organization once the provisioning knows it is new
+        // the project, the view and a dotted organization are checked here; another organization once the provisioning
+        // knows it is new
         Should.Throw<DataSetException>(() => Seeder().Plan(new DataSetSeedRequest { Sets = ["base"], Project = "Not Valid" }));
         Should.Throw<DataSetException>(() => Seeder().Plan(new DataSetSeedRequest { Sets = ["base"], View = "views" }));
+        Should.Throw<DataSetException>(() => Seeder().Plan(new DataSetSeedRequest { Sets = ["base"], Organization = "fabrikam.invoicing-suite" }));
         Seeder().Plan(new DataSetSeedRequest { Sets = ["base"], Organization = "Existing Org" }).Target.Organization.ShouldBe("Existing Org");
         _access.Invocations.ShouldBeEmpty();
         _views.Invocations.ShouldBeEmpty();

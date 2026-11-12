@@ -160,6 +160,23 @@ public class DataSetAnnotationLinesReaderTests
         DataSetAnnotationLinesReader.Read(SetFiles.Create(folder), folder, Target).ShouldBeNull();
     }
 
+    [Fact]
+    public void CountAnnotations_CountsWithoutExpandingAndRefusesWhatReadRefuses()
+    {
+        var folder = SetFiles.Folder("lines");
+
+        DataSetAnnotationLinesReader.CountAnnotations(
+                SetFiles.Create(folder, ("annotations.jsonl", "{\"AnnotationKey\":\"sbt.a\"}\n// a comment\n\nnot json\n{\"$count\":150000,\"AnnotationKey\":\"sbt.b-{n}\"}\n")),
+                folder)
+            .ShouldBe(150_002);
+        DataSetAnnotationLinesReader.CountAnnotations(SetFiles.Create(folder), folder).ShouldBe(0);
+
+        Should.Throw<DataSetException>(() => DataSetAnnotationLinesReader.CountAnnotations(
+                SetFiles.Create(folder, ("annotations.jsonl", "{\"$count\":200001,\"AnnotationKey\":\"sbt.g-{n}\"}")),
+                folder))
+            .Message.ShouldContain("more than 200,000 annotations at line 1");
+    }
+
     private static DataSetAnnotationLines Read(params string[] lines)
     {
         return DataSetAnnotationLinesReader.Read(new StringReader(string.Join("\n", lines)), Target);
