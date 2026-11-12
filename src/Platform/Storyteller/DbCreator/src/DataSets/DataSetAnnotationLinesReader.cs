@@ -25,6 +25,10 @@ public static partial class DataSetAnnotationLinesReader
     // Of one set, every line and every index of a generator counted.
     public const int MaxAnnotations = 200_000;
 
+    // Of one line as written (UTF-8, trimmed): what a document file holds at most (DataSetFolder.ReaderOptions), as an
+    // annotation is one Cosmos DB item.
+    public const int MaxLineBytes = ViewTransferOptions.MaxAllowedDocumentBytes;
+
     public const string CountMember = "$count";
     public const string StartMember = "$start";
 
@@ -45,7 +49,7 @@ public static partial class DataSetAnnotationLinesReader
 
     // How many annotations the annotations.jsonl of the set's folder stands for (a line that cannot be read counts as
     // one), 0 without the file. The generators are not expanded, so a seed checks its sets with it before anything is
-    // written. DataSetException beyond MaxAnnotations, as Read.
+    // written. DataSetException beyond MaxAnnotations or MaxLineBytes, as Read.
     public static long CountAnnotations(IFileSystem fileSystem, string folder)
     {
         var path = fileSystem.Path.Combine(folder, FileName);
@@ -59,8 +63,9 @@ public static partial class DataSetAnnotationLinesReader
         return ParseLines(reader, path).Total;
     }
 
-    // A line that cannot be read is an annotation that failed, with its line number. More than MaxAnnotations throws
-    // DataSetException before any line is expanded; the source names the file in its message.
+    // A line that cannot be read is an annotation that failed, with its line number. More than MaxAnnotations, or a
+    // line beyond MaxLineBytes, throws DataSetException before any line is expanded; the source names the file in its
+    // message.
     public static DataSetAnnotationLines Read(TextReader reader, DataSetTarget target, string source = FileName)
     {
         var (lines, total) = ParseLines(reader, source);
@@ -107,7 +112,7 @@ public static partial class DataSetAnnotationLinesReader
     }
 
     // The lines that hold an annotation or a generator, and the annotations they stand for; DataSetException at the
-    // line that goes beyond MaxAnnotations.
+    // line that goes beyond MaxAnnotations or MaxLineBytes.
     private static (List<ParsedLine> Lines, long Total) ParseLines(TextReader reader, string source)
     {
         var lines = new List<ParsedLine>();
@@ -122,6 +127,14 @@ public static partial class DataSetAnnotationLinesReader
             if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal))
             {
                 continue;
+            }
+
+            // a set beyond the limits, as a document file beyond them: the item would not fit, and the write would
+            // fail halfway through a seed
+            if (Encoding.UTF8.GetByteCount(trimmed) > MaxLineBytes)
+            {
+                throw new DataSetException(
+                    $"'{source}' has a line of more than {MaxLineBytes.ToString("N0", CultureInfo.InvariantCulture)} bytes at line {number}, the most a document holds.");
             }
 
             var line = Parse(number, trimmed);

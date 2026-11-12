@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 
@@ -149,6 +150,28 @@ public class DataSetAnnotationLinesReaderTests
     }
 
     [Fact]
+    public void Read_RefusesALineLargerThanADocument()
+    {
+        const int maxBytes = DataSetAnnotationLinesReader.MaxLineBytes;
+
+        Read(LineOf("sbt.fits", maxBytes, 'x')).Annotations.ShouldHaveSingleItem().Key!.ToString().ShouldBe("sbt.fits");
+        Should.Throw<DataSetException>(() => Read("""{"AnnotationKey":"sbt.a"}""", LineOf("sbt.big", maxBytes + 1, 'x')))
+            .Message.ShouldBe("'annotations.jsonl' has a line of more than 2,097,152 bytes at line 2, the most a document holds.");
+
+        // the bytes count, in UTF-8, not the characters
+        var accents = LineOf("sbt.accents", (maxBytes / 2) + 100, 'é');
+        Encoding.UTF8.GetByteCount(accents).ShouldBeGreaterThan(maxBytes);
+        Should.Throw<DataSetException>(() => Read(accents)).Message.ShouldContain("at line 1");
+
+        // and the plan's count refuses it as well
+        var folder = SetFiles.Folder("lines");
+        Should.Throw<DataSetException>(() => DataSetAnnotationLinesReader.CountAnnotations(
+                SetFiles.Create(folder, ("annotations.jsonl", LineOf("sbt.big", maxBytes + 1, 'x'))),
+                folder))
+            .Message.ShouldContain("a line of more than 2,097,152 bytes at line 1");
+    }
+
+    [Fact]
     public void Read_ReadsTheFileOfTheSetFolder()
     {
         var folder = SetFiles.Folder("lines");
@@ -180,5 +203,13 @@ public class DataSetAnnotationLinesReaderTests
     private static DataSetAnnotationLines Read(params string[] lines)
     {
         return DataSetAnnotationLinesReader.Read(new StringReader(string.Join("\n", lines)), Target);
+    }
+
+    // A line of the key whose value fills it to the length (in characters) with the filler.
+    private static string LineOf(string key, int length, char filler)
+    {
+        var prefix = $"{{\"AnnotationKey\":\"{key}\",\"Values\":{{\"blob\":\"";
+        const string suffix = "\"}}";
+        return prefix + new string(filler, length - prefix.Length - suffix.Length) + suffix;
     }
 }
