@@ -27,6 +27,15 @@ public static class ViewTransferEntryPoint
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IViewTransferService, ViewTransferService>();
+        services.AddViewImporter();
+        return services;
+    }
+
+    // The import of documents without a job, for example by DbCreator; it needs the services of the four kinds
+    // (IAnnotationService, IConfigurationSchemaService, IConfigurationTemplateService, IConfigurationService).
+    public static IServiceCollection AddViewImporter(this IServiceCollection services)
+    {
+        services.TryAddSingleton<IViewImporter, ViewImporter>();
         return services;
     }
 }
