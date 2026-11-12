@@ -55,12 +55,19 @@ var dbSeed = builder.AddProject<Projects.DbCreator>("db-seed")
     .WithExplicitStart();
 
 // The owner account DbCreator seeds (BaseAccount:Id in the user secrets of this host): under Entra ID the owner's
-// lower-case {tid}:{oid}, under AuthKit or Keycloak the sub. Without it DbCreator seeds its legacy Entra ID sub; the
-// seed makes the same owner the Owner of the organization it creates.
+// lower-case {tid}:{oid}, under AuthKit or Keycloak the sub. Without it DbCreator seeds its legacy Entra ID sub, which
+// matches no account; the seed makes the same owner the Owner of the organization it creates, and a later seed keeps
+// the project as it is. So without it, when db-creator seeds the staging accounts, the seed's owner is the default
+// AuthKit staging user (SeedAccounts.AuthKitOwner of DbCreator), the second owner of 42dotnet: one local sign-in opens
+// both.
 if (builder.Configuration["BaseAccount:Id"] is { Length: > 0 } baseAccountId)
 {
     dbCreator.WithEnvironment("baseAccount__id", baseAccountId);
     dbSeed.WithEnvironment("baseAccount__id", baseAccountId);
+}
+else if (seedStagingAccounts)
+{
+    dbSeed.WithArgs("--owner", "user_01M41P6G2TTSXXMM88WNVMRQKG");
 }
 
 // Local Key Vault emulator (Lowkey Vault): the key-encryption keys of the Standard level of key/value secrets.
