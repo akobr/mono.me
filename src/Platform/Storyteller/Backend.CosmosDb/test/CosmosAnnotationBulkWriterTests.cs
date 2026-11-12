@@ -1,7 +1,9 @@
 #nullable enable
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -442,18 +444,39 @@ public class CosmosAnnotationBulkWriterTests(Startup startup)
     }
 
     [Fact]
-    public async Task CreateMissing_WaitsOutAThrottleAndRunsAgain()
+    public async Task CreateMissing_WaitsTheRetryAfterOfAThrottleAndRunsAgain()
     {
         const string project = "bulk-throttle";
-        var (writer, storage) = CreateWriter();
+        var clock = new RecordingTimeProvider();
+        var (writer, storage) = CreateWriter(clock);
+        var reads = 0;
         var throttles = 0;
-        storage.Interceptor.BeforeBatch = _ => Task.FromResult<HttpStatusCode?>(
-            Interlocked.Increment(ref throttles) == 1 ? HttpStatusCode.TooManyRequests : null);
+
+        // a throttled read and a throttled batch that ask for a wait, and a throttled batch that does not
+        storage.Interceptor.BeforeReadMany = _ => Task.FromResult(Interlocked.Increment(ref reads) == 1 ? ThrottledRead(TimeSpan.FromSeconds(2)) : null);
+        storage.Interceptor.BeforeBatch = batch =>
+        {
+            switch (Interlocked.Increment(ref throttles))
+            {
+                case 1:
+                    batch.RetryAfter = TimeSpan.FromSeconds(7);
+                    return Task.FromResult<HttpStatusCode?>(HttpStatusCode.TooManyRequests);
+
+                case 2:
+                    return Task.FromResult<HttpStatusCode?>(HttpStatusCode.TooManyRequests);
+
+                default:
+                    return Task.FromResult<HttpStatusCode?>(null);
+            }
+        };
 
         var result = await writer.CreateMissingAnnotationsAsync(Organization, project, View, [Read("unt.slow.u1", "{}", project)], Seeder);
 
         result.Items.Single().Result.Outcome.Should().Be(ViewImportOutcome.Created);
-        storage.Interceptor.Batches.Select(batch => batch.StatusCode).Should().StartWith(HttpStatusCode.TooManyRequests);
+
+        // the waits the service asked for, and without one as many seconds as the attempts so far
+        clock.Waits.Should().Equal(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(7), TimeSpan.FromSeconds(3));
+        storage.Interceptor.Batches.Select(batch => batch.StatusCode).Should().StartWith(new[] { HttpStatusCode.TooManyRequests, HttpStatusCode.TooManyRequests });
         ((Responsibility)await GetAsync("rst.slow", project)).UnitNames.Should().Equal("u1");
     }
 
@@ -615,12 +638,36 @@ public class CosmosAnnotationBulkWriterTests(Startup startup)
         return annotation!;
     }
 
-    // A writer over storage whose batches the test records and fails.
-    private (IAnnotationBulkWriter Writer, InterceptedRepositoryProvider Storage) CreateWriter()
+    // A read of many items that the service throttled after the retries of the client, with the wait it asks for.
+    private static ResponseMessage ThrottledRead(TimeSpan retryAfter)
+    {
+        var response = new ResponseMessage(HttpStatusCode.TooManyRequests, null, "Throttled by the test.");
+        response.Headers.Add("x-ms-retry-after-ms", retryAfter.TotalMilliseconds.ToString(CultureInfo.InvariantCulture));
+        return response;
+    }
+
+    // A writer over storage whose batches the test records and fails, and with a clock of the test when given.
+    private (IAnnotationBulkWriter Writer, InterceptedRepositoryProvider Storage) CreateWriter(TimeProvider? timeProvider = null)
     {
         var storage = new InterceptedRepositoryProvider(Context.Services.GetRequiredService<IContainerRepositoryProvider>());
-        var writer = ActivatorUtilities.CreateInstance<CosmosAnnotationService>(Context.Services, storage);
+        var writer = timeProvider is null
+            ? ActivatorUtilities.CreateInstance<CosmosAnnotationService>(Context.Services, storage)
+            : ActivatorUtilities.CreateInstance<CosmosAnnotationService>(Context.Services, storage, timeProvider);
         return (writer, storage);
+    }
+
+    // Records the waits of the writer and ends each at once; the time is the system's.
+    private sealed class RecordingTimeProvider : TimeProvider
+    {
+        private readonly ConcurrentQueue<TimeSpan> _waits = new();
+
+        public IReadOnlyList<TimeSpan> Waits => _waits.ToArray();
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            _waits.Enqueue(dueTime);
+            return TimeProvider.System.CreateTimer(callback, state, TimeSpan.Zero, period);
+        }
     }
 
     // Records the reports as they come, unlike Progress<T>, which posts them.
