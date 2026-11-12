@@ -22,6 +22,8 @@ export interface VersionSource {
   restore?: (version: number, force?: boolean) => Promise<VersionRestoreResult>
   /** Refreshes what a restore changed, as after a save of the document (with the versions). */
   afterRestore?: (result: VersionRestoreResult) => Promise<void>
+  /** The host has unsaved edits of the document, which a restore discards (its afterRestore resets the editor). */
+  unsavedChanges?: boolean
 }
 
 /** The query key of the version list of a source; the history and its host share the one query. */

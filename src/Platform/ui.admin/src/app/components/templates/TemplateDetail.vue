@@ -113,7 +113,16 @@ const versionSource = computed<VersionSource>(() => {
     current: template.data.value?.Version,
     // a template has no schema, so no force
     restore: (version) => restoreTemplateVersion(org, project, view, type, version),
-    afterRestore: () => afterSave({ org, project, view }),
+    unsavedChanges: dirty.value,
+    // the editor then holds the stored document, so a later save cannot patch an older draft over the restored one
+    afterRestore: async () => {
+      await afterSave({ org, project, view })
+      const content = template.data.value?.Content
+      if (content !== undefined) {
+        original.value = cloneJson(content)
+        draft.value = cloneJson(content)
+      }
+    },
   }
 })
 
@@ -147,7 +156,11 @@ async function save() {
       conflictOpen.value = true
       theirs.value = (await template.refetch()).data?.Content
     } else {
-      toast.add({ title: writeFailureTitle(error, 'The template was not saved'), description: errorMessage(error), color: 'error' })
+      toast.add({
+        title: writeFailureTitle(error, 'The template was not saved'),
+        description: errorMessage(error),
+        color: 'error',
+      })
     }
   } finally {
     saving.value = false

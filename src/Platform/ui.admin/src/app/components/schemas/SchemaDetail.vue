@@ -99,8 +99,17 @@ const versionSource = computed<VersionSource>(() => {
   return {
     ...api.value.versions,
     current: schema.data.value?.Version,
-    // As after a save: every schema query (the combined schemas too) is read again.
-    afterRestore: () => invalidateSchemas(queryClient, scope),
+    unsavedChanges: dirty.value,
+    // As after a save: every schema query (the combined schemas too) is read again. The editor then holds the
+    // stored document, so a later save cannot write an older draft over the restored one.
+    afterRestore: async () => {
+      await invalidateSchemas(queryClient, scope)
+      const content = schema.data.value?.Content
+      if (content !== undefined) {
+        original.value = cloneJson(content)
+        draft.value = cloneJson(content)
+      }
+    },
   }
 })
 
@@ -119,7 +128,11 @@ async function save(force = false) {
     if (isConflict(error) && error.schemaErrors?.length) {
       nonCompliant.value = error.schemaErrors
     } else {
-      toast.add({ title: writeFailureTitle(error, 'The schema was not saved'), description: errorMessage(error), color: 'error' })
+      toast.add({
+        title: writeFailureTitle(error, 'The schema was not saved'),
+        description: errorMessage(error),
+        color: 'error',
+      })
     }
   } finally {
     saving.value = false
@@ -272,12 +285,7 @@ defineShortcuts({
             :disabled="!dirty || saving"
             @click="draft = cloneJson(original ?? starterSchema)"
           />
-          <UButton
-            :label="missing ? 'Create' : 'Save'"
-            :loading="saving"
-            :disabled="!canSave"
-            @click="save()"
-          />
+          <UButton :label="missing ? 'Create' : 'Save'" :loading="saving" :disabled="!canSave" @click="save()" />
         </div>
       </template>
     </template>

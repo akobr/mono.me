@@ -69,7 +69,7 @@ const empty = computed(() => !!props.emptyTitle && versions.data.value?.length =
 const restorable = computed(() => !!props.source.restore && canEdit.value)
 const restoring = ref<number>()
 /** A restore the schema check refused, with the configurations it names (409 SchemaValidationErrorResponse). */
-const refused = ref<{ version: number; details: SchemaValidationErrorDetail[] }>()
+const refused = ref<{ version: number; details: SchemaValidationErrorDetail[]; source: VersionSource }>()
 const isSchema = computed(() => props.source.document === 'schema')
 
 /** The open version may be restored: not the current one and not expired. */
@@ -98,20 +98,19 @@ function restoredToast(version: number, result: VersionRestoreResult) {
   })
 }
 
-async function run(version: number, force: boolean) {
-  if (!props.source.restore || restoring.value !== undefined) {
+// The source is the one the user confirmed for, also when the page moved on meanwhile.
+async function run(source: VersionSource, version: number, force: boolean) {
+  if (!source.restore || restoring.value !== undefined) {
     return
   }
   restoring.value = version
   refused.value = undefined
+  let result: VersionRestoreResult
   try {
-    const result = await props.source.restore(version, force)
-    restoredToast(version, result)
-    await (props.source.afterRestore?.(result) ??
-      queryClient.invalidateQueries({ queryKey: [...props.source.queryKey] }))
+    result = await source.restore(version, force)
   } catch (error) {
     if (!force && isConflict(error) && error.schemaErrors?.length) {
-      refused.value = { version, details: error.schemaErrors }
+      refused.value = { version, details: error.schemaErrors, source }
     } else {
       toast.add({
         title: writeFailureTitle(error, `v${version} was not restored`),
@@ -119,21 +118,37 @@ async function run(version: number, force: boolean) {
         color: 'error',
       })
     }
+    restoring.value = undefined
+    return
+  }
+  restoredToast(version, result)
+  try {
+    // the version is restored; a failed refresh only leaves the views behind
+    await (source.afterRestore?.(result) ?? queryClient.invalidateQueries({ queryKey: [...source.queryKey] }))
+  } catch (error) {
+    toast.add({
+      title: 'The views were not refreshed',
+      description: `v${version} was restored. ${errorMessage(error)}`,
+      color: 'warning',
+    })
   } finally {
     restoring.value = undefined
   }
 }
 
 async function restore(version: number) {
+  const source = props.source
   const confirmed = await confirm({
     title: `Restore v${version}?`,
     description: `Its content is stored again as the newest version of the ${props.source.document}${
       props.deleted ? ', which brings it back' : ''
-    }. Every version stays in the history.`,
+    }. Every version stays in the history.${
+      source.unsavedChanges ? ' Your unsaved changes in the editor are discarded.' : ''
+    }`,
     confirmLabel: `Restore v${version}`,
   })
   if (confirmed) {
-    await run(version, false)
+    await run(source, version, false)
   }
 }
 
@@ -162,7 +177,7 @@ async function forceRestore() {
         },
   )
   if (confirmed) {
-    await run(target.version, true)
+    await run(target.source, target.version, true)
   }
 }
 </script>
