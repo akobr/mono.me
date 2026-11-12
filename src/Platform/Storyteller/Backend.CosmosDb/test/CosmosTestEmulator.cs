@@ -111,15 +111,15 @@ public sealed class CosmosTestEmulator
             .Build();
     }
 
+    // 10 partitions, the emulator's default, named so nobody lowers it: fewer run out of partitions (503, substatus 1007).
+    // The port opens before the partitions start: wait for the emulator's "Started" line, or the first requests fail
+    // with "The SSL connection could not be established".
     private static IContainer BuildClassic(string reuseLabel)
     {
         return new CosmosDbBuilder(ClassicImage)
             .WithReuse(true)
             .WithLabel("net.42for.tests.cosmos", reuseLabel)
-            // 10 partitions, the emulator's default, named so nobody lowers it: fewer run out of partitions (503, substatus 1007).
             .WithEnvironment("AZURE_COSMOS_EMULATOR_PARTITION_COUNT", "10")
-            // The port opens before the partitions start: wait for the emulator's "Started" line, or the first requests
-            // fail with "The SSL connection could not be established".
             .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged(@"(?m)^Started\s*$"))
             .Build();
     }
