@@ -19,16 +19,20 @@ internal sealed class BatchPlan : IDisposable
 
     // below the 2 MB request limit of a transactional batch, with room for the operation headers and estimates
     private const long MaxPayloadBytesPerBatch = 1_500_000;
-    private const int MaxParallelBatches = 8;
+    private const int DefaultMaxParallelBatches = 8;
 
     // the organization of every unit: a unit keeps the partition key value, the batch gets the full key of both levels
     private readonly OrganizationContainer _repository;
+    private readonly int _maxParallelBatches;
     private readonly List<Unit> _units = [];
     private readonly List<IDisposable> _resources = [];
 
-    public BatchPlan(OrganizationContainer repository)
+    // maxParallelBatches: the batches of a wave that run at once; a bulk write runs fewer, to leave throughput to the API
+    public BatchPlan(OrganizationContainer repository, int maxParallelBatches = DefaultMaxParallelBatches)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxParallelBatches, 1);
         _repository = repository;
+        _maxParallelBatches = maxParallelBatches;
     }
 
     public bool IsEmpty => _units.All(unit => unit.Operations.Count == 0);
@@ -61,12 +65,14 @@ internal sealed class BatchPlan : IDisposable
         return stream;
     }
 
-    public async Task ExecuteAsync()
+    // A cancellation stops the plan before its next batch; the batches that committed stay.
+    public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        using var throttler = new SemaphoreSlim(MaxParallelBatches);
+        using var throttler = new SemaphoreSlim(_maxParallelBatches);
 
         foreach (var wave in _units.Where(unit => unit.Operations.Count > 0).GroupBy(unit => unit.Wave).OrderBy(group => group.Key))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var batches = new List<(string PartitionKey, List<BatchOperation> Operations)>();
 
             foreach (var partition in wave.GroupBy(unit => unit.PartitionKey, StringComparer.Ordinal))
@@ -96,7 +102,7 @@ internal sealed class BatchPlan : IDisposable
                 }
             }
 
-            await Task.WhenAll(batches.Select(batch => ExecuteBatchAsync(batch.PartitionKey, batch.Operations, throttler)));
+            await Task.WhenAll(batches.Select(batch => ExecuteBatchAsync(batch.PartitionKey, batch.Operations, throttler, cancellationToken)));
         }
     }
 
@@ -110,9 +116,9 @@ internal sealed class BatchPlan : IDisposable
         _resources.Clear();
     }
 
-    private async Task ExecuteBatchAsync(string partitionKey, List<BatchOperation> operations, SemaphoreSlim throttler)
+    private async Task ExecuteBatchAsync(string partitionKey, List<BatchOperation> operations, SemaphoreSlim throttler, CancellationToken cancellationToken)
     {
-        await throttler.WaitAsync();
+        await throttler.WaitAsync(cancellationToken);
 
         try
         {
@@ -123,7 +129,7 @@ internal sealed class BatchPlan : IDisposable
                 operation.Apply(batch);
             }
 
-            using var response = await batch.ExecuteAsync();
+            using var response = await batch.ExecuteAsync(cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -157,12 +163,12 @@ internal sealed class BatchPlan : IDisposable
                     $"A concurrent change in partition '{partitionKey}' stopped the write ({(int)response.StatusCode}).");
             }
 
-            throw new CosmosException(
+            throw new BatchFailedException(
                 $"A transactional batch in partition '{partitionKey}' failed: {response.ErrorMessage}",
                 response.StatusCode,
-                0,
                 response.ActivityId,
-                response.RequestCharge);
+                response.RequestCharge,
+                response.StatusCode == HttpStatusCode.TooManyRequests ? response.RetryAfter : null);
         }
         finally
         {
@@ -171,4 +177,12 @@ internal sealed class BatchPlan : IDisposable
     }
 
     private sealed record Unit(int Wave, string PartitionKey, List<BatchOperation> Operations, long PayloadBytes);
+
+    // The CosmosException of a failed batch, with the wait of a throttled one (429 left after the retries of the
+    // client), which an exception made by its public constructor does not carry.
+    private sealed class BatchFailedException(string message, HttpStatusCode statusCode, string activityId, double requestCharge, TimeSpan? retryAfter)
+        : CosmosException(message, statusCode, 0, activityId, requestCharge)
+    {
+        public override TimeSpan? RetryAfter => retryAfter;
+    }
 }

@@ -46,15 +46,50 @@ public partial class CosmosAnnotationService
 
         if (failed.Count > 0)
         {
-            return new ViewImportResult(
-                ViewImportOutcome.Skipped,
-                ErrorCode: ErrorCodes.DependencyFailed,
-                Message: failed.Count == 1
-                    ? $"The ancestor {failed[0]} failed in this import."
-                    : $"The ancestors {string.Join(", ", failed)} failed in this import.");
+            return DependencyFailedResult(failed);
         }
 
         return await RetryAsync(() => ImportCoreAsync(key, annotation, ancestors, options, overlay));
+    }
+
+    // The outcomes and warnings of an annotation import, which the bulk create reports in the same words.
+    private static ViewImportResult DependencyFailedResult(IReadOnlyList<AnnotationKey> failed)
+    {
+        return new ViewImportResult(
+            ViewImportOutcome.Skipped,
+            ErrorCode: ErrorCodes.DependencyFailed,
+            Message: failed.Count == 1
+                ? $"The ancestor {failed[0]} failed in this import."
+                : $"The ancestors {string.Join(", ", failed)} failed in this import.");
+    }
+
+    private static ViewImportResult DeletedSkippedResult(IReadOnlyList<AnnotationKey> deleted)
+    {
+        return new ViewImportResult(
+            ViewImportOutcome.Skipped,
+            ErrorCode: ErrorCodes.AnnotationDeleted,
+            Message: deleted.Count == 1
+                ? $"The annotation {deleted[0]} is deleted, and Skip leaves it deleted."
+                : $"The annotations {string.Join(", ", deleted)} are deleted, and Skip leaves them deleted.");
+    }
+
+    private static ViewImportResult DocumentExistsResult(AnnotationKey key)
+    {
+        return new ViewImportResult(
+            ViewImportOutcome.Skipped,
+            ErrorCode: ErrorCodes.DocumentExists,
+            Message: $"The view has a different annotation {key}, and Skip keeps it.");
+    }
+
+    private static ViewImportWarning AncestorCreatedWarning(IReadOnlyList<AnnotationKey> created)
+    {
+        return new ViewImportWarning
+        {
+            Code = ErrorCodes.AncestorCreated,
+            Message = created.Count == 1
+                ? $"The missing ancestor {created[0]} is created with defaults."
+                : $"The missing ancestors {string.Join(", ", created)} are created with defaults.",
+        };
     }
 
     private async Task<ViewImportResult> ImportCoreAsync(
@@ -85,12 +120,7 @@ public partial class CosmosAnnotationService
 
         if (deleted.Count > 0 && options.Existing == ViewImportExisting.Skip)
         {
-            return new ViewImportResult(
-                ViewImportOutcome.Skipped,
-                ErrorCode: ErrorCodes.AnnotationDeleted,
-                Message: deleted.Count == 1
-                    ? $"The annotation {deleted[0]} is deleted, and Skip leaves it deleted."
-                    : $"The annotations {string.Join(", ", deleted)} are deleted, and Skip leaves them deleted.");
+            return DeletedSkippedResult(deleted);
         }
 
         if (!options.DryRun)
@@ -116,13 +146,7 @@ public partial class CosmosAnnotationService
 
         if (created.Count > 0)
         {
-            warnings.Add(new ViewImportWarning
-            {
-                Code = ErrorCodes.AncestorCreated,
-                Message = created.Count == 1
-                    ? $"The missing ancestor {created[0]} is created with defaults."
-                    : $"The missing ancestors {string.Join(", ", created)} are created with defaults.",
-            });
+            warnings.Add(AncestorCreatedWarning(created));
         }
 
         if (deleted.Count > 0)
@@ -153,10 +177,7 @@ public partial class CosmosAnnotationService
 
         if (options.Existing == ViewImportExisting.Skip)
         {
-            return new ViewImportResult(
-                ViewImportOutcome.Skipped,
-                ErrorCode: ErrorCodes.DocumentExists,
-                Message: $"The view has a different annotation {key}, and Skip keeps it.");
+            return DocumentExistsResult(key);
         }
 
         if (!options.DryRun)

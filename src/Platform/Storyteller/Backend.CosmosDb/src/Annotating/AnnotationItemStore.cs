@@ -17,6 +17,9 @@ namespace _42.Platform.Storyteller.Annotating;
 // Loads the items of annotations of one organization from the container organizations.
 internal sealed class AnnotationItemStore
 {
+    // The most items one read of many items asks for; the client splits a read into queries of this size anyway.
+    private const int ReadManyChunkSize = 1_000;
+
     private readonly OrganizationContainer _repository;
     private readonly AnnotationItemSerializer _serializer;
 
@@ -277,6 +280,31 @@ internal sealed class AnnotationItemStore
         return found;
     }
 
+    // A node per key, by key text, from reads of many items in chunks: the annotation item with its ETag (a node without
+    // one is Missing) and, withAudit, the audit item with its ETag. Every key in any number, unlike ReadManyAsync.
+    public async Task<Dictionary<string, AnnotationNode>> ReadNodesAsync(
+        IEnumerable<FullKey> keys,
+        bool withAudit,
+        CancellationToken cancellationToken = default)
+    {
+        var nodes = new Dictionary<string, AnnotationNode>(StringComparer.Ordinal);
+
+        foreach (var key in keys)
+        {
+            var node = new AnnotationNode(key);
+            nodes.TryAdd(node.KeyText, node);
+        }
+
+        await LoadManyAsync(nodes.Values, withAnnotation: true, withAudit, cancellationToken);
+        return nodes;
+    }
+
+    // Completes nodes read without their audits, once it is clear that the write needs them, in chunks as well.
+    public Task LoadAuditsAsync(IEnumerable<AnnotationNode> nodes, CancellationToken cancellationToken = default)
+    {
+        return LoadManyAsync(nodes, withAnnotation: false, withAudit: true, cancellationToken);
+    }
+
     // One page of annotation items of an organization-wide query, with the continuation of the next page. The text of
     // the query has "c.Organization = @organization" (the isolation); the store adds the parameter and routes the
     // query by the organization's key prefix.
@@ -337,6 +365,60 @@ internal sealed class AnnotationItemStore
                 0,
                 response.Headers.ActivityId,
                 response.Headers.RequestCharge);
+        }
+    }
+
+    // The items of the nodes, by their ids, in reads of at most ReadManyChunkSize items each.
+    private async Task LoadManyAsync(IEnumerable<AnnotationNode> nodes, bool withAnnotation, bool withAudit, CancellationToken cancellationToken)
+    {
+        var requests = new Dictionary<string, (AnnotationNode Node, bool IsAudit)>(StringComparer.Ordinal);
+
+        foreach (var node in nodes)
+        {
+            if (withAnnotation)
+            {
+                requests.TryAdd(node.AnnotationId, (node, false));
+            }
+
+            if (withAudit)
+            {
+                requests.TryAdd(node.AuditId, (node, true));
+            }
+        }
+
+        foreach (var chunk in requests.Chunk(ReadManyChunkSize))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var response = await _repository.Container.ReadManyItemsStreamAsync(
+                chunk.Select(request => (request.Key, _repository.Key(request.Value.Node.PartitionKey))).ToList(),
+                cancellationToken: cancellationToken);
+
+            EnsureSuccess(response);
+            using var page = await JsonDocument.ParseAsync(response.Content, cancellationToken: cancellationToken);
+
+            foreach (var element in page.RootElement.GetProperty("Documents").EnumerateArray())
+            {
+                if (!element.TryGetProperty("id", out var id)
+                    || id.GetString() is not { } idText
+                    || !requests.TryGetValue(idText, out var request))
+                {
+                    continue;
+                }
+
+                var etag = element.TryGetProperty("_etag", out var etagProperty) ? etagProperty.GetString() : null;
+
+                if (request.IsAudit)
+                {
+                    request.Node.Audit = _serializer.ReadAudit(element);
+                    request.Node.AuditETag = etag;
+                }
+                else
+                {
+                    request.Node.Entity = _serializer.ReadAnnotation(element);
+                    request.Node.ETag = etag;
+                }
+            }
         }
     }
 
