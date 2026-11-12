@@ -4,13 +4,14 @@ The documents of a view (its annotations, schemas, templates and configurations)
 
 The code is in:
 
-- `src/Platform/Storyteller/Backend.Core/src/Transferring/`: the jobs, the file names, the archive reader and writer, the git writer, the import passes and the overlay;
+- `src/Platform/Storyteller/Backend.Core/src/Transferring/`: the jobs, the file names, the archive reader (of a zip or of loose files) and writer, the git writer, the importer (`IViewImporter`, `ViewImporter`: the passes of an import, see [Import without a job](#import-without-a-job)), its tally (`ViewImportTally`) and the overlay;
 - `Backend.CosmosDb/src/`: the reads and imports of each kind (`Annotating/CosmosAnnotationService.Import.cs`, `Configuring/CosmosConfigurationSchemaService.Import.cs`, `CosmosConfigurationTemplateService.cs`, `CosmosConfigurationService.cs`) and the jobs (`Transferring/`);
 - `Backend.AzureStorage/src/`: the archives and the queue;
 - `Api.Functions/src/`: the routes (`V1/ViewTransferHttp.cs`, `V1/ViewTransferRequests.cs`), the machine scopes of each kind (`Security/ViewTransferScopes.cs`), the access check with the scope `Configuration.Transfer` of machines (`Security/HttpRequestDataExtensions.cs`), and the queue and timer functions (`Transfers/ViewTransferFunctions.cs`);
 - `Sdk.NSwag/` and `sdk.typescript/`: the clients generated from the OpenAPI document;
 - `src/Platform/Cli/src/`: `sform story export` and `sform story import` (see [CLI](#cli));
-- `src/Platform/ui.admin/src/app/`: the **Export & Import** page of a view, its store and the mock API (see [Administration UI](#administration-ui)).
+- `src/Platform/ui.admin/src/app/`: the **Export & Import** page of a view, its store and the mock API (see [Administration UI](#administration-ui));
+- `src/Platform/Storyteller/DbCreator/src/DataSets/`: the [data sets](data-sets.md) of DbCreator, folders in the folder format that the same importer writes into a view.
 
 The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%20Import%20of%20a%20View.md), which extends [the first spec](specs/2026-10-14%20Export%20and%20Import%20of%20Configurations.md) (configurations only). The Administrator role of every route comes from [Administrator Role for the Export and Import of a View](specs/2026-10-19%20Administrator%20Role%20for%20the%20Export%20and%20Import%20of%20a%20View.md), and the single scopes of machines from [Replace Machine Scope Presets with a Flat Scope Set](specs/2026-10-21%20Replace%20Machine%20Scope%20Presets%20with%20a%20Flat%20Scope%20Set.md).
 
@@ -262,7 +263,7 @@ The repository is written by `GitRepositoryWriter`, without a git library:
 
 ### Reading the archive
 
-`ViewArchiveReader.Read` takes every entry that is not skipped and parses its file name:
+`ViewArchiveReader.Read` takes every entry that is not skipped, of a zip or of loose files ([Import without a job](#import-without-a-job)), and parses its file name:
 
 - A document of an included kind becomes a file of the import: its path, kind, type code and key, with its content or an error code and message.
 - A document of a kind that `include` leaves out counts as **excluded**. It is not decompressed.
@@ -282,7 +283,7 @@ The import writes in four passes, in dependency order:
 | 3. Templates | By type | A template depends on no other kind. Its place before configurations is a convention: rules, then defaults, then data. |
 | 4. Configurations | By key | A configuration needs its annotation, and is validated against its schemas when it is written. |
 
-Before the first pass, the service reads what it must know of the view, with at most one read per kind:
+Before the first pass, the importer reads what it must know of the view, with at most one read per kind:
 
 - which annotations named by the schema and configuration files are active: `FindActiveAnnotationKeysAsync`, one read of many items;
 - with `Skip` only, which schemas the view has with content: `GetSchemaKeysAsync`, one query of the schema partition;
@@ -435,6 +436,28 @@ A written document can carry warnings (`ViewImportItem.Warnings`, each a `Code` 
 - **Timeout.** A job is one invocation of the queue function, bound by the Functions timeout of the hosting plan (`host.json` sets no `functionTimeout`).
 - **Retries.** An import is idempotent. When an invocation is cut off, the queue delivers the message again, and the whole job runs again. The documents the first run wrote are then `Unchanged`. After three deliveries (`maxDequeueCount`), the message goes to the poison queue `configuration-transfers-poison`, where `AbandonViewTransfer` fails the job ("stopped on every attempt, for example because its worker ran out of memory"), so it no longer takes a slot of the project. A job that ended before stays as it is. Resuming where a run stopped is not supported.
 - **Failures of single files.** Concurrent changes that outlast the retries of a write fail that file with `Conflict`, not the whole job. A `$remove` entry that is not a valid JSONPath, or that takes the whole document (`$`), fails its file with `PatchInvalid`.
+
+### Import without a job
+
+The passes of an import are `ViewImporter`, behind `IViewImporter`. The import job runs it on the files of its archive, and DbCreator on the files of a [data set](data-sets.md):
+
+```csharp
+IAsyncEnumerable<ViewImportFileResult> ImportAsync(
+    string organization, string project, string view,
+    IReadOnlyList<ViewArchiveFile> files, ViewImportOptions options,
+    ViewImportOverlay? overlay = null, CancellationToken cancellationToken = default);
+```
+
+- It takes the files in any order and runs the passes of [Order](#order): the pre-reads, the annotations (ancestors first), the overlay, then the schemas, templates and configurations. It yields each file with its `ViewImportResult` (`ViewImportFileResult`) after the overlay has tracked it.
+- Nothing runs before the enumeration starts. Stopping the enumeration, by leaving the loop or through the token, stops the import. One call must not be enumerated twice at once.
+- A file with an `ErrorCode` from the reader is `Failed` without a call. A write conflict fails its file with `Conflict`; any other exception ends the enumeration. The log of a conflict names the path and the view.
+- A given overlay is used and filled, so sequential calls can share one. DbCreator imports the annotation files of a set, writes the lines of its `annotations.jsonl` in bulk, then imports the other kinds, all with one overlay. Without an overlay, each enumeration starts with an empty one.
+- `AddViewImporter()` (`ViewTransferEntryPoint`) registers it as a singleton over the services of the four kinds (`IAnnotationService`, `IConfigurationSchemaService`, `IConfigurationTemplateService`, `IConfigurationService`). `AddViewTransfers` calls it, and so does DbCreator's `AddDbCreator`.
+- The job (`ViewTransferService`) builds its own importer from the same four services. It saves its progress between the outcomes (every 50 files or 2 seconds), and leaves the loop when another worker took the job, which stops the import. The importer is lazy, so its pre-reads come after the job's first progress save.
+
+`ViewImportTally` counts the outcomes by the rules of the job's report ([Jobs](#jobs)): `Add(file, result)`, `Total`, `Processed`, `Summary` (the total, with the reader's excluded and ignored files), `Summaries` (one per included kind, in import order), and `Items` (every outcome except `Unchanged`, up to a limit) with `AreItemsTruncated`. Its constructor takes the included kinds (null for all four) and the total, and optionally the ignored and excluded files and the limit of items. The job writes the tally to its `ViewImport`, and DbCreator prints it.
+
+**Loose files.** `ViewArchiveReader.Read` and `ViewArchiveReader.Validate` take a zip, or a list of `ViewArchiveEntry(string Path, long Length, Func<Stream> Open)`: the path below the root (`/` or `\`), the declared size, and how to open the file. The zip overloads map their entries to that list, so the names, skipped paths, duplicates, limits and parsing are one code path. The reader opens only the documents it reads. A file that cannot be opened or read (`IOException`, `UnauthorizedAccessException`) fails with `InvalidDocument` and `The file cannot be read: …`. Backend.Core has no file system of its own: the caller opens the files, as DbCreator does through its `IFileSystem` (`DataSetFolder.GetEntries`).
 
 ## Jobs
 

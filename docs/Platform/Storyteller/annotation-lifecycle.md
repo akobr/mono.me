@@ -2,7 +2,7 @@
 
 Deleting an annotation is a soft delete. A deleted annotation can be restored, it can be deleted permanently, and it expires after a retention period. Every change of an annotation is recorded in its audit document, with the actor who made it. An annotation that is not deleted can still be out of effect: disabled, scheduled or expired ([Active annotations](#active-annotations)). A read answers the version of an annotation as an `ETag`, a write can be conditioned on it ([Versions and conditional writes](#versions-and-conditional-writes)), and a `PATCH` changes single members, merged on the server ([Merge writes](#merge-writes-patch)).
 
-The code is in `src/Platform/Storyteller/Backend.CosmosDb/src/Annotating/` (`CosmosAnnotationService`, `CosmosAnnotationService.Deletion.cs`, `AnnotationAuditStore`) and `Backend.Core/src/Annotating/` (rules, audit differences, options). The design and its decisions are in [the spec](specs/2026-10-11%20Soft-delete%20and%20audit%20of%20annotations.md).
+The code is in `src/Platform/Storyteller/Backend.CosmosDb/src/Annotating/` (`CosmosAnnotationService`, `CosmosAnnotationService.Deletion.cs`, `CosmosAnnotationService.Bulk.cs`, `AnnotationAuditStore`) and `Backend.Core/src/Annotating/` (rules, audit differences, options, `IAnnotationBulkWriter`). The design and its decisions are in [the spec](specs/2026-10-11%20Soft-delete%20and%20audit%20of%20annotations.md).
 
 ## States
 
@@ -65,7 +65,7 @@ All items of an annotation live in the annotation's partition of its organizatio
 
 `Deletion` holds `DeletionId` (shared by everything one delete removed), `RootKey`, `DeletedAt`, `DeletedBy`, `IsRoot`, and `DescendantCount` on the requested root. `PurgeAt` is computed on read as `_ts + ttl`, which is when Cosmos removes the item.
 
-Every stored annotation also carries the server-owned [audit stamps](audit-stamps.md) `Created` and `Modified` (`{ At, By }`); the annotations DbCreator seeds are stamped by the `System` actor. A write ignores them in its body, and so it ignores `Deletion` and the relation arrays (`UnitNames`, `ResponsibilityNames`, `ContextNames`): the server keeps those. A client can send an annotation back as it read it. `PUT`/`POST …/{key}` still checks the type of a member it sends: a relation array is an array of strings or `null` (as empty), and anything else answers `400`. The bulk create skips the relation arrays. A merge patch ignores the same members ([Merge writes](#merge-writes-patch)).
+Every stored annotation also carries the server-owned [audit stamps](audit-stamps.md) `Created` and `Modified` (`{ At, By }`); the annotations DbCreator seeds are stamped by the `System` actor, and get the audit entries of a create ([Data sets](#data-sets)). A write ignores them in its body, and so it ignores `Deletion` and the relation arrays (`UnitNames`, `ResponsibilityNames`, `ContextNames`): the server keeps those. A client can send an annotation back as it read it. `PUT`/`POST …/{key}` still checks the type of a member it sends: a relation array is an array of strings or `null` (as empty), and anything else answers `400`. The bulk create skips the relation arrays. A merge patch ignores the same members ([Merge writes](#merge-writes-patch)).
 
 ## Delete
 
@@ -107,6 +107,13 @@ An import writes an annotation file the way `SetAnnotation` does, with the usual
 - With `Existing` set to `Overwrite` (the default), a deleted key, or a key below a deleted ancestor, is re-created as [above](#re-create) (`Recreated`). The import reports it with the warning `AnnotationRecreated`. With `Skip`, the file is skipped with `AnnotationDeleted`, and the deleted keys stay deleted.
 
 The archive carries no audit, and the import adds no cause of its own. The rules of the content are in [export-import.md](export-import.md#annotations).
+
+## Data sets
+
+DbCreator seeds its [data sets](data-sets.md) through the same services, as the `System` actor and with `Existing` set to `Skip`. The core annotations of `42dotnet`, which every run of `2sInitDb` writes, are the set `core`, so they have audit entries and maintained relation arrays like any other annotation, and a second run leaves them alone: a deleted one stays deleted.
+
+- **Annotation files** go through the import above, one document at a time.
+- **The lines of `annotations.jsonl`** go through the bulk writer `IAnnotationBulkWriter` (`CosmosAnnotationService.Bulk.cs`). It decides every key as that import does with `Skip`: an active key stays (`Unchanged` or `Skipped` with `DocumentExists`), a deleted key or a key below a deleted ancestor is skipped with `AnnotationDeleted` and never re-created, and a missing key is created with its missing ancestors (cause `Ancestor`). It writes what a create writes, the annotation item with its stamps and its `Created` audit entry in one transactional batch, but for many keys at once: from reads of many items, in waves by depth over many partitions. The names of the new children reach the relation arrays of active parents in a last wave, one ETag-guarded replace per parent, without an audit entry and without a change of `Modified`, as a create adds them. A concurrent change or a throttle runs the whole write again, up to five times, and a run after a failure completes it. Details in [data-sets.md](data-sets.md#bulk-writing).
 
 ## Permanent delete and expiry
 
