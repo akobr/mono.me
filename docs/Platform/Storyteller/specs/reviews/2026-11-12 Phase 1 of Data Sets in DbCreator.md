@@ -2,7 +2,7 @@
 
 ## Overview
 
-Phase 1 of the spec [Data Sets in DbCreator](../2026-11-12%20Data%20Sets%20in%20DbCreator.md) (424-252) covers section 1, the reusable view importer in `Backend.Core/src/Transferring`: the passes of an import move out of the transfer job into a public `IViewImporter` / `ViewImporter`, the job's progress tally becomes the public `ViewImportTally`, `AddViewImporter()` registers the importer, and `ViewArchiveReader` reads loose entries (the files of a folder) besides a zip. The job keeps its constructor, its progress saves and its order of reads, and every existing test stays as it was. It is the commits `refactor(platform): read loose files with the view archive reader (424-252)` and `refactor(platform): extract the view importer from the transfer job (424-252)`. DbCreator does not use the importer yet (phase 3).
+Phase 1 of the spec [Data Sets in DbCreator](../2026-11-12%20Data%20Sets%20in%20DbCreator.md) (424-252) covers section 1, the reusable view importer in `Backend.Core/src/Transferring`: the passes of an import move out of the transfer job into a public `IViewImporter` / `ViewImporter`, the job's progress tally becomes the public `ViewImportTally`, `AddViewImporter()` registers the importer, and `ViewArchiveReader` reads loose entries (the files of a folder) besides a zip. The job keeps its constructor, its progress saves and its order of reads, and every existing test stays as it was. It is the commits `refactor(platform): read loose files with the view archive reader (424-252)` and `refactor(platform): extract the view importer from the transfer job (424-252)`, and `test(platform): cover the stop of an import that another worker took (424-252)` after the review. DbCreator does not use the importer yet (phase 3).
 
 ## What Was Done
 
@@ -52,8 +52,13 @@ Phase 1 of the spec [Data Sets in DbCreator](../2026-11-12%20Data%20Sets%20in%20
   - `Import_PassesTheOptionsToEveryKind`, `AddViewImporter_RegistersOneImporterOverTheServicesOfTheFourKinds` (resolved with `ValidateOnBuild` and `ValidateScopes`), `AddViewTransfers_AddsTheImporter`.
 - `ViewImportTallyTests.cs` (new): the counting rules in total and per kind, the summaries in import order of the included kinds, the items' limit and copy.
 - `ViewArchiveReaderTests.cs`, five tests of the entry overload: the same files, errors, ignored count and annotation parsing as the same zip (with `set.json` and `annotations.jsonl` among the ignored files); backslashes and hidden paths; only the documents read are opened (not the excluded, ignored, skipped, misnamed, duplicate or declared-too-large ones); the limits of a zip, with a length that lies; a file that cannot be opened. `TransferTestData` gets `Entries(...)` and `Entry(...)`.
-- The job tests (`ViewTransferServiceTests`) and the Cosmos tests are unchanged.
-- Results: `dotnet test --project src/Platform/Storyteller/Backend.Core/test` passed 1385 of 1385 (1367 before, 18 new). With `STORYTELLER_TESTS_USE_CONTAINER=true` (vNext), `Backend.CosmosDb/test` with `--filter-class "*CosmosViewTransferTests"` passed 22, `*TransferIsolationTests` 6 and `*CosmosViewImportTests` 32. `Backend.Core`, its tests and `Api.Functions` build without new warnings.
+- The existing job tests (`ViewTransferServiceTests`) and the Cosmos tests are unchanged. One job test was added after the review: `ProcessImport_StopsWhenAnotherWorkerTakesTheJob` (60 configuration files; during the 50th import another worker takes the job, so the progress save after it fails): exactly 50 files are imported, the job stays `Running` with the other worker's record (`ProcessedCount` 0), the upload is kept, and the importer's single existence read comes after the `ProcessedCount = 0` save. For it, the fake `InMemoryTransferStore` gets a `Saved` callback and `TakeOver(id)`, which gives the stored job a new ETag.
+- Results: `dotnet test --project src/Platform/Storyteller/Backend.Core/test` passed 1386 of 1386 (1367 before, 19 new). With `STORYTELLER_TESTS_USE_CONTAINER=true` (vNext), `Backend.CosmosDb/test` with `--filter-class "*CosmosViewTransferTests"` passed 22, `*TransferIsolationTests` 6 and `*CosmosViewImportTests` 32. `Backend.Core`, its tests and `Api.Functions` build without new warnings.
+
+### Review findings
+
+- **Fixed (test coverage):** no job-level test covered the stop of an import whose job another worker took, although the refactor changed how the stop works (a `return` from inside `await foreach`, which disposes the importer's iterator, instead of a `return` from a plain loop), and the order of the first progress save and the pre-reads was checked only through the importer's laziness. The behaviour was right; `ProcessImport_StopsWhenAnotherWorkerTakesTheJob` now pins both. A job that collected the outcomes eagerly before the loop fails it (checked by hand).
+- Nothing was rejected.
 
 ### Not in this phase
 
