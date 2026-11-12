@@ -54,6 +54,13 @@ public sealed class DataSetSeeder
     // anything is written; the containers must exist (CoreDbStructureBuilder.EnsureContainersAsync).
     public async Task<DataSetRunResult> SeedAsync(DataSetSeedRequest request, CancellationToken cancellationToken = default)
     {
+        return await SeedAsync(Plan(request), request.Options, cancellationToken);
+    }
+
+    // The sets, the target and the owner of a request, from the files and the options alone, so wrong input is
+    // refused before the database is touched. DataSetException for wrong input.
+    public DataSetSeedPlan Plan(DataSetSeedRequest request)
+    {
         var catalog = _catalog.GetSets(request.Paths);
         var names = request.Sets.Count > 0
             ? request.Sets.Select(name => name.Trim()).Distinct(StringComparer.Ordinal).ToList()
@@ -69,20 +76,38 @@ public sealed class DataSetSeeder
         var target = DataSetTarget.Resolve(named, request.Organization, request.Project, request.View);
         var owner = DataSetOwner.Resolve(request.Owner, _baseAccount);
 
+        // the project and the view now; the organization when the provisioning knows whether it is new
+        target.EnsureNames(isNewOrganization: false);
+
         // the descriptions of the named sets first: a dependency such as core is not what the project is about
         var described = named.Concat(sets.Except(named)).Select(set => set.Manifest).ToList();
-        var provisioning = await _provisioner.ProvisionAsync(
+
+        return new DataSetSeedPlan(
+            sets,
+            named,
             target,
             owner,
             described.Select(manifest => manifest.ProjectDescription).FirstOrDefault(description => description is not null),
-            described.Select(manifest => manifest.ViewDescription).FirstOrDefault(description => description is not null),
-            request.Options.DryRun,
+            described.Select(manifest => manifest.ViewDescription).FirstOrDefault(description => description is not null));
+    }
+
+    // Makes the plan's target exist, then seeds its sets in order. DataSetException for a name of the target that
+    // breaks the rules or an organization the owner does not own, before anything is written.
+    public async Task<DataSetRunResult> SeedAsync(DataSetSeedPlan plan, DataSetSeedOptions options, CancellationToken cancellationToken = default)
+    {
+        var target = plan.Target;
+        var provisioning = await _provisioner.ProvisionAsync(
+            target,
+            plan.Owner,
+            plan.ProjectDescription,
+            plan.ViewDescription,
+            options.DryRun,
             cancellationToken);
 
-        var results = new List<DataSetSeedResult>(sets.Count);
+        var results = new List<DataSetSeedResult>(plan.Sets.Count);
         var failed = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var set in sets)
+        foreach (var set in plan.Sets)
         {
             var failedDependency = set.Manifest.DependsOn.FirstOrDefault(failed.Contains);
 
@@ -94,7 +119,7 @@ public sealed class DataSetSeeder
                 continue;
             }
 
-            var result = await SeedSetAsync(set, target, request.Options, cancellationToken);
+            var result = await SeedSetAsync(set, target, options, cancellationToken);
             results.Add(result);
 
             if (result.HasFailures)
@@ -103,7 +128,7 @@ public sealed class DataSetSeeder
             }
         }
 
-        return new DataSetRunResult(target, owner, provisioning, results, request.Options.DryRun);
+        return new DataSetRunResult(target, plan.Owner, provisioning, results, options.DryRun);
     }
 
     // One set into a target that exists: the annotation files (ancestors first), the annotations of

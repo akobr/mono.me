@@ -44,9 +44,17 @@ public static class DataSetFolder
             .ToList();
     }
 
+    // DataSetException when the folder is beyond the limits of the reader.
     public static ViewArchiveDocuments ReadDocuments(IFileSystem fileSystem, string folder)
     {
-        return ViewArchiveReader.Read(GetEntries(fileSystem, folder), ReaderOptions);
+        try
+        {
+            return ViewArchiveReader.Read(GetEntries(fileSystem, folder), ReaderOptions);
+        }
+        catch (InvalidInputException exception)
+        {
+            throw new DataSetException($"The set '{folder}' cannot be read: {exception.Message}", exception);
+        }
     }
 
     // SHA-256 (lower-case hex) over the path and the content of every file of the set in path order, so any change of

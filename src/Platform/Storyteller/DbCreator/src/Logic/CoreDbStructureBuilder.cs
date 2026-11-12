@@ -17,6 +17,7 @@ public class CoreDbStructureBuilder(
     public const string CORE_SET = "core";
 
     // The layout check, the containers, the access of the base owner (and the staging accounts), then the set core.
+    // The seed command calls EnsureContainersAsync alone.
     public async Task<DataSetRunResult> BuildAsync()
     {
         var coreContainer = await EnsureContainersAsync();
@@ -48,22 +49,9 @@ public class CoreDbStructureBuilder(
             Console.WriteLine($"Access created in container '{CosmosConstants.CoreContainerName}': {owners.Length} owners, {SeedAccounts.UiTestUsers.Count} UI test users.");
         }
 
-        // After the access, so the project exists and is used as it is. Its target is in its set.json.
-        var result = await seeder.SeedAsync(new DataSetSeedRequest { Sets = [CORE_SET] });
-        var core = result.Sets[^1];
-
-        if (core.IsAlreadySeeded)
-        {
-            Console.WriteLine($"The data set '{CORE_SET}' is seeded in '{result.Target}' already.");
-        }
-        else
-        {
-            var summary = core.Documents!.Summary;
-            Console.WriteLine(
-                $"The data set '{CORE_SET}' is seeded into '{result.Target}': {summary.Created} created, {summary.Unchanged} unchanged, {summary.Skipped} skipped, {summary.Failed} failed.");
-        }
-
-        return result;
+        // After the access, so the project exists and is used as it is. Its target is in its set.json; the command
+        // prints the result.
+        return await seeder.SeedAsync(new DataSetSeedRequest { Sets = [CORE_SET] });
     }
 
     // Checked before anything is written: the data of the layout before the shared container is not migrated, the
