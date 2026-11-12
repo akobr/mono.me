@@ -43,36 +43,27 @@ public static partial class DataSetAnnotationLinesReader
         return Read(reader, target, path);
     }
 
+    // How many annotations the annotations.jsonl of the set's folder stands for (a line that cannot be read counts as
+    // one), 0 without the file. The generators are not expanded, so a seed checks its sets with it before anything is
+    // written. DataSetException beyond MaxAnnotations, as Read.
+    public static long CountAnnotations(IFileSystem fileSystem, string folder)
+    {
+        var path = fileSystem.Path.Combine(folder, FileName);
+
+        if (!fileSystem.File.Exists(path))
+        {
+            return 0;
+        }
+
+        using var reader = fileSystem.File.OpenText(path);
+        return ParseLines(reader, path).Total;
+    }
+
     // A line that cannot be read is an annotation that failed, with its line number. More than MaxAnnotations throws
     // DataSetException before any line is expanded; the source names the file in its message.
     public static DataSetAnnotationLines Read(TextReader reader, DataSetTarget target, string source = FileName)
     {
-        var lines = new List<ParsedLine>();
-        var total = 0L;
-        var number = 0;
-
-        while (reader.ReadLine() is { } text)
-        {
-            number++;
-            var trimmed = text.Trim();
-
-            if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var line = Parse(number, trimmed);
-            total += line.Failure is null ? line.Count : 1;
-
-            if (total > MaxAnnotations)
-            {
-                throw new DataSetException(
-                    $"'{source}' stands for more than {MaxAnnotations.ToString("N0", CultureInfo.InvariantCulture)} annotations at line {number}, the most a set holds.");
-            }
-
-            lines.Add(line);
-        }
-
+        var (lines, total) = ParseLines(reader, source);
         var annotations = new List<DataSetAnnotationLine>((int)total);
 
         foreach (var line in lines)
@@ -113,6 +104,39 @@ public static partial class DataSetAnnotationLinesReader
         }
 
         return generated;
+    }
+
+    // The lines that hold an annotation or a generator, and the annotations they stand for; DataSetException at the
+    // line that goes beyond MaxAnnotations.
+    private static (List<ParsedLine> Lines, long Total) ParseLines(TextReader reader, string source)
+    {
+        var lines = new List<ParsedLine>();
+        var total = 0L;
+        var number = 0;
+
+        while (reader.ReadLine() is { } text)
+        {
+            number++;
+            var trimmed = text.Trim();
+
+            if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var line = Parse(number, trimmed);
+            total += line.Failure is null ? line.Count : 1;
+
+            if (total > MaxAnnotations)
+            {
+                throw new DataSetException(
+                    $"'{source}' stands for more than {MaxAnnotations.ToString("N0", CultureInfo.InvariantCulture)} annotations at line {number}, the most a set holds.");
+            }
+
+            lines.Add(line);
+        }
+
+        return (lines, total);
     }
 
     // The document of a line without $count and $start, how many annotations it stands for, or why it stands for none.

@@ -58,6 +58,7 @@ public class DataSetTargetTests
     [InlineData("fabrikam", "access", "default", false, "project name 'access' is reserved")]
     [InlineData("fabrikam", "main", "views", false, "view name 'views' is reserved")]
     [InlineData("fabrikam", "main", "pre.view", false, "view name 'pre.view' is not valid")]
+    [InlineData("42dotnet.main", "xyz", "default", false, "organization name '42dotnet.main' is not valid")]
     public void EnsureNames_RefusesANameAgainstTheRules(string organization, string project, string view, bool isNewOrganization, string message)
     {
         var target = new DataSetTarget(organization, project, view);
@@ -68,7 +69,8 @@ public class DataSetTargetTests
     [Fact]
     public void EnsureNames_ChecksAnExistingOrganizationNot()
     {
-        // an organization from before the rules can still get a seeded project
+        // an organization from before the rules can still get a seeded project; a dotted name is never an organization
+        // (the case above), even when it is the key of an existing project
         Should.NotThrow(() => new DataSetTarget("Legacy_Org", "main", "default").EnsureNames(isNewOrganization: false));
         Should.NotThrow(() => new DataSetTarget("fabrikam", "invoicing-suite", "preview").EnsureNames(isNewOrganization: true));
     }

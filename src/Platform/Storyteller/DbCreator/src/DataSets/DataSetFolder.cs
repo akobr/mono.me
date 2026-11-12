@@ -53,7 +53,21 @@ public static class DataSetFolder
         }
         catch (InvalidInputException exception)
         {
-            throw new DataSetException($"The set '{folder}' cannot be read: {exception.Message}", exception);
+            throw CannotBeRead(folder, exception);
+        }
+    }
+
+    // The limits of the reader from the number and the lengths of the files, without reading one, so a seed checks its
+    // sets before anything is written. DataSetException as ReadDocuments.
+    public static void Validate(IFileSystem fileSystem, string folder)
+    {
+        try
+        {
+            ViewArchiveReader.Validate(GetEntries(fileSystem, folder), ReaderOptions);
+        }
+        catch (InvalidInputException exception)
+        {
+            throw CannotBeRead(folder, exception);
         }
     }
 
@@ -100,6 +114,11 @@ public static class DataSetFolder
         }
 
         return normalized[..length];
+    }
+
+    private static DataSetException CannotBeRead(string folder, InvalidInputException exception)
+    {
+        return new DataSetException($"The set '{folder}' cannot be read: {exception.Message}", exception);
     }
 
     private static void Collect(IFileSystem fileSystem, string directory, string prefix, List<DataSetFile> files)

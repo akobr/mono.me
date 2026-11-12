@@ -76,8 +76,17 @@ public sealed class DataSetSeeder
         var target = DataSetTarget.Resolve(named, request.Organization, request.Project, request.View);
         var owner = DataSetOwner.Resolve(request.Owner, _baseAccount);
 
-        // the project and the view now; the organization when the provisioning knows whether it is new
+        // the project, the view and a dotted organization now; the organization when the provisioning knows whether it
+        // is new
         target.EnsureNames(isNewOrganization: false);
+
+        // the limits of every set's files and of its annotations.jsonl, without reading the documents or expanding a
+        // generator, so a set beyond them is refused before the target is provisioned and the sets before it are seeded
+        foreach (var set in sets)
+        {
+            DataSetFolder.Validate(_fileSystem, set.Folder);
+            DataSetAnnotationLinesReader.CountAnnotations(_fileSystem, set.Folder);
+        }
 
         // the descriptions of the named sets first: a dependency such as core is not what the project is about
         var described = named.Concat(sets.Except(named)).Select(set => set.Manifest).ToList();
