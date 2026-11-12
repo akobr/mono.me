@@ -1,8 +1,6 @@
-using System.IO.Abstractions;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Storyteller.DbCreator.Configuration;
-using _42.Platform.Storyteller.DbCreator.Logic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -26,15 +24,11 @@ namespace _42.Platform.Storyteller.DbCreator
         public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
         {
             services.AddLogging(builder => ConfigureLogging(builder, configuration));
-            ConfigureOptions(configuration, services);
-
-            services.AddSingleton<IFileSystem, FileSystem>();
+            services.Configure<LoggingOptions>(configuration.GetSection(LoggingOptions.SECTION));
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
 
             services.AddCosmosDbAnnotations(configuration, "cosmos");
-
-            services.AddSingleton<CoreDbStructureBuilder>();
-            services.AddSingleton<GetBaseAnnotationsReview>();
+            services.AddDbCreator(configuration);
         }
 
         public void ConfigureApplication(IConfigurationBuilder builder)
@@ -71,13 +65,6 @@ namespace _42.Platform.Storyteller.DbCreator
                         rollingInterval: RollingInterval.Day,
                         rollOnFileSizeLimit: true)
                     .CreateLogger());
-        }
-
-        private static void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
-        {
-            services.Configure<LoggingOptions>(configuration.GetSection(LoggingOptions.SECTION));
-            services.Configure<BaseAccountOptions>(configuration.GetSection(BaseAccountOptions.SECTION));
-            services.Configure<StagingSeedOptions>(configuration.GetSection(StagingSeedOptions.SECTION));
         }
     }
 }

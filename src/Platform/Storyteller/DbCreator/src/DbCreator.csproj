@@ -34,6 +34,11 @@
     <None Update="app.config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- the built-in data sets, found next to the tool (DataSetCatalog); they reach the tool package and the output of
+         the projects that reference this one -->
+    <None Update="data-sets\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
