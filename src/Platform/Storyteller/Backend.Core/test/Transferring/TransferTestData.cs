@@ -133,6 +133,18 @@ internal static class TransferTestData
         return stream;
     }
 
+    // Text files as loose entries, the way a folder gives them to the reader.
+    public static List<ViewArchiveEntry> Entries(params (string Path, string Content)[] files)
+    {
+        return files.Select(file => Entry(file.Path, file.Content)).ToList();
+    }
+
+    public static ViewArchiveEntry Entry(string path, string content)
+    {
+        var bytes = new UTF8Encoding(false).GetBytes(content);
+        return new ViewArchiveEntry(path, bytes.Length, () => new MemoryStream(bytes, writable: false));
+    }
+
     private static List<ConfigurationDocument> Documents((ulong Version, string Author, int Minutes, string Json)[] versions)
     {
         return versions
