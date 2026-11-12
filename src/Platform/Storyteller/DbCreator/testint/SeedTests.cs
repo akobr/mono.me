@@ -1,6 +1,9 @@
+using System.Text;
+using System.Text.Json.Nodes;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.Transferring;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -231,6 +234,42 @@ public class SeedTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
     }
 
     [Fact]
+    public async Task Seed_AfterARunThatStoppedBeforeTheRelationsOfItsFiles_CompletesTheArrays()
+    {
+        using var set = TestSetFolder.Accounting();
+        var (organization, owner) = (NewOrganization(), NewOwner());
+        var target = new DataSetTarget(organization, Project, Storyteller.Constants.DefaultViewName);
+        (await Seeder.SeedAsync(Request(set, organization, owner), Cancellation)).Sets.Single().RelationsCompleted.ShouldBe(0);
+        var billingHistory = (await Annotations.GetAnnotationHistoryAsync(Key(target, "rst.billing")))!.Entries.Count;
+
+        // a run that stopped after the keys of two files committed and before the last wave of their creates: no
+        // record, and the stored parents without the names of those children
+        var repository = Services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(organization);
+        await repository.Container.DeleteItemAsync<object>(
+            DataSetSeedRecord.GetId(target.View, set.Name),
+            repository.Key(DataSetSeedRecord.GetPartitionKey(Project)),
+            cancellationToken: Cancellation);
+        await RemoveRelationAsync(repository.Container, Key(target, "rst.billing"), "UnitNames", "invoice");
+        await RemoveRelationAsync(repository.Container, Key(target, "sbt.acme"), "ContextNames", "prod");
+
+        var run = await Seeder.SeedAsync(Request(set, organization, owner), Cancellation);
+
+        // every file is unchanged, and the arrays get their names back
+        run.HasFailures.ShouldBeFalse();
+        var result = run.Sets.ShouldHaveSingleItem();
+        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Unchanged = 13 });
+        result.Lines!.Summary.ShouldBe(new ViewImportSummary { Content = ViewArchiveContent.Annotations, Unchanged = 10 });
+        result.RelationsCompleted.ShouldBe(2);
+        result.IsRecorded.ShouldBeTrue();
+        ((Responsibility)(await Annotations.GetAnnotationAsync(Key(target, "rst.billing")))!).UnitNames.ShouldBe(["invoice"]);
+        ((Subject)(await Annotations.GetAnnotationAsync(Key(target, "sbt.acme")))!).ContextNames.ShouldBe(["prod"]);
+        (await Annotations.GetAnnotationHistoryAsync(Key(target, "rst.billing")))!.Entries.Count.ShouldBe(billingHistory, "a relation array is not audited");
+
+        // and the next run finds the set seeded
+        (await Seeder.SeedAsync(Request(set, organization, owner), Cancellation)).Sets.Single().IsAlreadySeeded.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task Seed_AChangedSet_AddsOnlyWhatIsMissing()
     {
         using var set = TestSetFolder.Accounting();
@@ -309,6 +348,26 @@ public class SeedTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
         (await Access.GetAccountAsync(intruder)).ShouldBeNull();
         (await Access.GetAccessPointAsync(organization))!.AccessMap.Keys.ShouldBe([owner]);
         (await StoredItems.ReadAsync(Services, organization, "main", owner)).ShouldBe(stored);
+    }
+
+    // Takes a name out of a relation array of the stored annotation, as the item is when the last wave of a create of
+    // its child failed: no audit entry, no change of Modified.
+    private static async Task RemoveRelationAsync(Container container, FullKey key, string array, string name)
+    {
+        using var read = await container.ReadItemStreamAsync(key.GetCosmosItemId(), key.GetCosmosPartitionKey(), cancellationToken: Cancellation);
+        read.EnsureSuccessStatusCode();
+        var item = JsonNode.Parse(read.Content)!.AsObject();
+        var names = item[array]!.AsArray();
+        names.Remove(names.Single(node => node!.GetValue<string>() == name));
+
+        using var content = new MemoryStream(Encoding.UTF8.GetBytes(item.ToJsonString()));
+        using var replaced = await container.ReplaceItemStreamAsync(
+            content,
+            key.GetCosmosItemId(),
+            key.GetCosmosPartitionKey(),
+            new ItemRequestOptions { IfMatchEtag = read.Headers.ETag },
+            Cancellation);
+        replaced.EnsureSuccessStatusCode();
     }
 
     // The current version of the annotation's own configuration, without what it inherits.

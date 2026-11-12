@@ -191,6 +191,39 @@ public class DataSetSeederTests
     }
 
     [Fact]
+    public async Task Seed_CompletesTheRelationArraysOfTheAnnotationFilesAfterTheAnnotations()
+    {
+        AddMixed();
+        _bulkWriter.AncestorsCreated = [];
+        _bulkWriter.RelationsToComplete = 3;
+        var (importsBefore, bulksBefore) = (-1, -1);
+        _bulkWriter.OnComplete = () => (importsBefore, bulksBefore) = (_importer.Calls.Count, _bulkWriter.Calls.Count);
+        var request = new DataSetSeedRequest { Sets = ["mixed"], Owner = Owner };
+
+        var set = (await Seeder().SeedAsync(request, TestContext.Current.CancellationToken)).Sets.Single();
+
+        // the keys of every annotation file, after both rounds of files and lines and before the other documents
+        var completion = _bulkWriter.Completions.ShouldHaveSingleItem();
+        completion.Keys.ShouldBe(["sbt.other", "unt.payments.ledger"], ignoreOrder: true);
+        completion.Options.DryRun.ShouldBeFalse();
+        (importsBefore, bulksBefore).ShouldBe((2, 2));
+        _importer.Calls.Count.ShouldBe(3);
+        set.RelationsCompleted.ShouldBe(3);
+        set.IsRecorded.ShouldBeTrue();
+
+        // a dry run counts what it would complete
+        var dryRun = (await Seeder().SeedAsync(request with { Options = new DataSetSeedOptions { DryRun = true, Again = true } }, TestContext.Current.CancellationToken)).Sets.Single();
+        _bulkWriter.Completions.ShouldHaveSingleItem().Options.DryRun.ShouldBeTrue();
+        dryRun.RelationsCompleted.ShouldBe(3);
+
+        // a set seeded already is not read, and a set without annotation files has none to complete
+        (await Seeder().SeedAsync(request, TestContext.Current.CancellationToken)).Sets.Single().IsAlreadySeeded.ShouldBeTrue();
+        AddSet("lines", """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""", ("annotations.jsonl", """{"AnnotationKey":"sbt.line"}"""));
+        (await Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["lines"], Owner = Owner }, TestContext.Current.CancellationToken)).Sets.Single().RelationsCompleted.ShouldBe(0);
+        _bulkWriter.Completions.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Seed_DryRunGivesEachStepWhatTheStepsBeforeWouldMakeActive()
     {
         AddMixed();
@@ -396,6 +429,7 @@ public class DataSetSeederTests
     {
         _importer.Calls.Clear();
         _bulkWriter.Calls.Clear();
+        _bulkWriter.Completions.Clear();
 
         return new DataSetSeeder(
             _fileSystem,

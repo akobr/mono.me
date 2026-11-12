@@ -14,7 +14,8 @@ namespace _42.Platform.Storyteller.Annotating;
 // The bulk create of the annotations of a view that are missing (IAnnotationBulkWriter). Every key is decided as a
 // sequential import with Existing = Skip decides it (ImportAnnotationAsync, in the order of an import), and the keys to
 // create are written with the items of a create (CreateCoreAsync: the same entities, stamps, audit entries and relation
-// arrays), but from reads of many items and in waves of transactional batches instead of a dozen requests per key.
+// arrays), but from reads of many items and in waves of transactional batches instead of a dozen requests per key. The
+// completion of the relation arrays is the repair of that last step alone, for keys written before.
 public partial class CosmosAnnotationService : IAnnotationBulkWriter
 {
     // Runs of the whole procedure after a concurrent change or a throttle left after the retries of the client.
@@ -69,28 +70,79 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
         var store = Store(organization);
         var commits = new BulkCommits();
 
+        // read and decided again after a concurrent change: what this call committed and still reads active is still
+        // reported created
+        var outcome = await WithBulkRetriesAsync(
+            () => CreateMissingCoreAsync(store, project, view, candidates, actor, options, commits, cancellationToken),
+            "the bulk create",
+            cancellationToken);
+
+        foreach (var (index, result) in outcome.Results)
+        {
+            results[index] = result;
+        }
+
+        return new AnnotationBulkResult(
+            inputs.Select(input => new AnnotationBulkItem(input.Key, results[input.Index]!)).ToList(),
+            outcome.AncestorsCreated,
+            outcome.RelationUpdates);
+    }
+
+    public async Task<int> CompleteRelationsAsync(
+        string organization,
+        string project,
+        string view,
+        IReadOnlyCollection<AnnotationKey> keys,
+        AnnotationBulkOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        options ??= new AnnotationBulkOptions();
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxParallelBatches, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxUnitsPerPlan, 1);
+
+        var closure = new Dictionary<string, AnnotationKey>(StringComparer.Ordinal);
+
+        foreach (var key in keys)
+        {
+            foreach (var ancestor in key.GetAllAncestorKeys())
+            {
+                closure.TryAdd(ancestor.ToString(), ancestor);
+            }
+
+            closure.TryAdd(key.ToString(), key);
+        }
+
+        if (closure.Count == 0)
+        {
+            return 0;
+        }
+
+        var store = Store(organization);
+        var commits = new BulkCommits();
+
+        // read again after a concurrent change: a parent replaced by an earlier attempt lists its children by then
+        return await WithBulkRetriesAsync(
+            () => CompleteRelationsCoreAsync(store, project, view, closure.Values, options, commits, cancellationToken),
+            "the completion of the relation arrays",
+            cancellationToken);
+    }
+
+    // Runs a bulk procedure again after a concurrent change (409, 412) or a throttle left after the retries of the
+    // client (429, after its RetryAfter or a second per attempt), up to BulkMaxAttempts. After the last, a concurrent
+    // change ends with a ConflictException and a throttle is rethrown.
+    private async Task<T> WithBulkRetriesAsync<T>(Func<Task<T>> procedure, string name, CancellationToken cancellationToken)
+    {
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                var outcome = await CreateMissingCoreAsync(store, project, view, candidates, actor, options, commits, cancellationToken);
-
-                foreach (var (index, result) in outcome.Results)
-                {
-                    results[index] = result;
-                }
-
-                return new AnnotationBulkResult(
-                    inputs.Select(input => new AnnotationBulkItem(input.Key, results[input.Index]!)).ToList(),
-                    outcome.AncestorsCreated,
-                    outcome.RelationUpdates);
+                return await procedure();
             }
             catch (AnnotationConcurrencyException exception)
             {
-                // read and decided again: what this call committed and still reads active is still reported created
                 if (attempt >= BulkMaxAttempts)
                 {
-                    throw new ConflictException($"The annotations changed concurrently; run the bulk create again. {exception.Message}");
+                    throw new ConflictException($"The annotations changed concurrently; run {name} again. {exception.Message}");
                 }
             }
             catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.TooManyRequests && attempt < BulkMaxAttempts)
@@ -297,6 +349,33 @@ public partial class CosmosAnnotationService : IAnnotationBulkWriter
         await WriteBulkRelationsAsync(store, updates, options, commits, cancellationToken);
 
         return new BulkOutcome(results, ancestorsCreated, commits.ParentCount);
+    }
+
+    // One run of the completion: read the closure, and replace the arrays of the active parents that miss an active
+    // child of it (in a dry run: count them).
+    private async Task<int> CompleteRelationsCoreAsync(
+        AnnotationItemStore store,
+        string project,
+        string view,
+        IReadOnlyCollection<AnnotationKey> closure,
+        AnnotationBulkOptions options,
+        BulkCommits commits,
+        CancellationToken cancellationToken)
+    {
+        var organization = store.Repository.Organization;
+        var nodes = await store.ReadNodesAsync(
+            closure.Select(key => FullKey.Create(key, organization, project, view)),
+            withAudit: false,
+            cancellationToken);
+        var updates = AddBulkRelations(closure, nodes, [], new Dictionary<string, AnnotationEntity>(StringComparer.Ordinal));
+
+        if (options.DryRun)
+        {
+            return updates.Count;
+        }
+
+        await WriteBulkRelationsAsync(store, updates, options, commits, cancellationToken);
+        return commits.ParentCount;
     }
 
     // The names the parents gain, set-wise: a created parent lists its created children; an active parent gets the

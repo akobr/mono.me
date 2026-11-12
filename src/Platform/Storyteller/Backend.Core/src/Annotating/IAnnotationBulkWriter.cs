@@ -17,4 +17,19 @@ public interface IAnnotationBulkWriter
         AuditActor actor,
         AnnotationBulkOptions? options = null,
         CancellationToken cancellationToken = default);
+
+    // Adds the keys and their ancestors that are active to the relation arrays of their active parents, where those
+    // miss them: what the last wave of a create leaves out when it stops after the keys committed (a crash, a stop, a
+    // request that failed), and what neither a create nor an import of the existing key repairs. Creates, changes and
+    // audits nothing else: each parent is replaced once under its ETag, without an audit entry and with its Modified
+    // kept. A missing or deleted key, and a parent that is not active, stay as they are. Of the options, DryRun,
+    // MaxParallelBatches and MaxUnitsPerPlan count. Retries as CreateMissingAnnotationsAsync does. Returns the number of
+    // parents it replaced (in a dry run: would replace).
+    Task<int> CompleteRelationsAsync(
+        string organization,
+        string project,
+        string view,
+        IReadOnlyCollection<AnnotationKey> keys,
+        AnnotationBulkOptions? options = null,
+        CancellationToken cancellationToken = default);
 }

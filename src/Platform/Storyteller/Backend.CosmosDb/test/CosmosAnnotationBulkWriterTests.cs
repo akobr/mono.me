@@ -26,7 +26,8 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 // The bulk create of annotations (IAnnotationBulkWriter): the items of an import, the outcomes of an import with Skip,
 // the relation arrays of active parents, dry runs, orphan audits, retries (after a concurrent change, also of what an
 // earlier attempt committed, and the waits of throttles), cancellation, parallelism, the repair of a failed relations
-// wave, and thousands of keys. Every test works in its own project.
+// wave (also of an interrupted import, through the completion of the arrays), and thousands of keys. Every test works in
+// its own project.
 public class CosmosAnnotationBulkWriterTests(Startup startup)
     : BaseTestsClass(startup)
 {
@@ -705,6 +706,64 @@ public class CosmosAnnotationBulkWriterTests(Startup startup)
         ((Responsibility)await GetAsync("rst.repair", project)).UnitNames.Should().Equal("u0", "u1", "u2");
         ((Subject)await GetAsync("sbt.repairs", project)).ContextNames.Should().Equal("c0", "c1");
         (await Annotations.GetAnnotationHistoryAsync(Key("rst.repair", project)))!.Entries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task CompleteRelations_AddsWhatAnInterruptedCreateLeftOutOfTheArraysOfActiveParents()
+    {
+        const string project = "bulk-complete";
+        await Annotations.CreateAnnotationsFromStringAsync(Organization, project, View, ["unt.fix.u0", "sbt.fixes"], Creator);
+        var (writer, storage) = CreateWriter();
+        var service = (IAnnotationService)writer;
+        var options = new ViewImportOptions { Actor = Seeder, Existing = ViewImportExisting.Skip };
+
+        // the last wave of each import's create fails with an error that is not retried: the keys stay, the arrays of
+        // the stored parents miss them
+        storage.Interceptor.BeforeBatch = batch => Task.FromResult<HttpStatusCode?>(
+            batch.Operations.Any(operation => operation.Kind == BatchOperationKind.Replace) ? HttpStatusCode.ServiceUnavailable : null);
+
+        foreach (var key in new[] { "unt.fix.u1", "cnt.fixes.c1" })
+        {
+            var import = () => service.ImportAnnotationAsync(Key(key, project), Document("{}"), options, new ViewImportOverlay());
+            (await import.Should().ThrowAsync<CosmosException>()).Which.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        }
+
+        storage.Interceptor.Reset();
+
+        // an import again finds the key unchanged and does not look at its parents
+        (await service.ImportAnnotationAsync(Key("unt.fix.u1", project), Document("{}"), options, new ViewImportOverlay())).Outcome
+            .Should().Be(ViewImportOutcome.Unchanged);
+        ((Responsibility)await GetAsync("rst.fix", project)).UnitNames.Should().Equal("u0");
+
+        // a missing key and a stored one whose parents list it change nothing
+        var keys = new[] { "unt.fix.u1", "cnt.fixes.c1", "unt.fix.u0", "unt.fix.missing" }.Select(AnnotationKey.Parse).ToList();
+        var modified = (await GetAsync("rst.fix", project)).Modified;
+
+        (await writer.CompleteRelationsAsync(Organization, project, View, keys, new AnnotationBulkOptions { DryRun = true })).Should().Be(2);
+        ((Responsibility)await GetAsync("rst.fix", project)).UnitNames.Should().Equal("u0");
+
+        // the first replace loses to a concurrent change and is read and done again
+        var failures = 0;
+        storage.Interceptor.BeforeBatch = batch => Task.FromResult<HttpStatusCode?>(
+            batch.Operations.Any(operation => operation.Kind == BatchOperationKind.Replace) && Interlocked.Increment(ref failures) == 1
+                ? HttpStatusCode.PreconditionFailed
+                : null);
+
+        (await writer.CompleteRelationsAsync(Organization, project, View, keys)).Should().Be(2);
+
+        failures.Should().BeGreaterThan(1, "a replace ran again");
+        storage.Interceptor.Batches.Should().OnlyContain(batch => batch.Operations.All(operation => operation.Kind == BatchOperationKind.Replace));
+        var responsibility = (Responsibility)await GetAsync("rst.fix", project);
+        responsibility.UnitNames.Should().Equal("u0", "u1");
+        responsibility.Modified.Should().Be(modified, "a relation array is not a change of the annotation");
+        ((Subject)await GetAsync("sbt.fixes", project)).ContextNames.Should().Equal("c1");
+        (await Annotations.GetAnnotationHistoryAsync(Key("rst.fix", project)))!.Entries.Should().ContainSingle();
+        (await Annotations.ExistAnnotationAsync(Key("unt.fix.missing", project))).Should().BeFalse("nothing is created");
+
+        // complete: nothing left to write
+        storage.Interceptor.Reset();
+        (await writer.CompleteRelationsAsync(Organization, project, View, keys)).Should().Be(0);
+        storage.Interceptor.Batches.Should().BeEmpty();
     }
 
     [Fact]

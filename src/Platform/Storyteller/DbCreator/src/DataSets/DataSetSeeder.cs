@@ -145,7 +145,8 @@ public sealed class DataSetSeeder
 
     // One set into a target that exists: the annotation files (ancestors first) and the annotations of
     // annotations.jsonl in bulk, in rounds so that neither creates an annotation of the other with defaults (GetRounds),
-    // then the schemas, templates and configurations, all with one overlay, so each step sees what the earlier ones
+    // the relation arrays of the files completed (what an earlier run that stopped left out), then the schemas,
+    // templates and configurations, all with one overlay, so each step sees what the earlier ones
     // made active or failed (also in a dry run). The record is written after a seed without failures; a set whose
     // record has its version and hash is not read further, unless Again.
     public Task<DataSetSeedResult> SeedSetAsync(DataSet set, DataSetTarget target, DataSetSeedOptions options, CancellationToken cancellationToken = default)
@@ -416,6 +417,7 @@ public sealed class DataSetSeeder
             await WriteLinesAsync(target, annotations, results, roundLines, options, overlay, totals, cancellationToken);
         }
 
+        var relationsCompleted = await CompleteRelationsAsync(target, files, options, cancellationToken);
         var lines = content.Lines is null ? null : CompleteLines(content.Lines, results, totals, items);
         await ImportAsync(target, content.Documents.Files.Where(file => !IsAnnotation(file)).ToList(), importOptions, overlay, documents, items, cancellationToken);
 
@@ -439,6 +441,7 @@ public sealed class DataSetSeeder
             Documents = documents,
             Lines = lines,
             Items = items,
+            RelationsCompleted = relationsCompleted,
             IsRecorded = isRecorded,
             Elapsed = _time.GetElapsedTime(started),
         };
@@ -476,6 +479,40 @@ public sealed class DataSetSeeder
                 items.Add(ToItem(file, result));
             }
         }
+    }
+
+    // The keys of the annotation files, and their ancestors, in the relation arrays of their active parents. An import
+    // finds an annotation it created before Unchanged without a look at its parents, so a run that stopped between the
+    // create of a file and its last wave (a crash, a stop, a request that failed) would otherwise leave a parent without
+    // the name for good, recorded by the next run; the bulk writer repairs the arrays of the lines itself. Returns the
+    // parents completed (in a dry run: to complete), from what is stored.
+    private async Task<int> CompleteRelationsAsync(
+        DataSetTarget target,
+        IReadOnlyList<ViewArchiveFile> files,
+        DataSetSeedOptions options,
+        CancellationToken cancellationToken)
+    {
+        var keys = files.Where(file => file.AnnotationKey is not null).Select(file => file.AnnotationKey!).ToList();
+
+        if (keys.Count == 0)
+        {
+            return 0;
+        }
+
+        var completed = await _bulkWriter.CompleteRelationsAsync(
+            target.Organization,
+            target.Project,
+            target.View,
+            keys,
+            new AnnotationBulkOptions { DryRun = options.DryRun },
+            cancellationToken);
+
+        if (completed > 0)
+        {
+            _logger.LogInformation("Completed the relation arrays of {Count} annotations in {Target}.", completed, target);
+        }
+
+        return completed;
     }
 
     // The lines of one round (indexes in line order) through the bulk writer. One on or below an annotation that
