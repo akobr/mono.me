@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Annotating;
+using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
@@ -83,7 +85,7 @@ public class OrganizationsContainerStructureTests(Startup startup)
         // the fixture ran it once already
         var build = () => Builder.BuildAsync();
 
-        await build.Should().NotThrowAsync();
+        var result = (await build.Should().NotThrowAsync()).Subject;
 
         await ShouldHaveContainersAsync("core", "organizations");
         (await PlatformDatabase.GetContainer("organizations").ReadContainerAsync()).Resource
@@ -92,6 +94,44 @@ public class OrganizationsContainerStructureTests(Startup startup)
 
         var seeded = FullKey.Create(AnnotationKey.CreateResponsibility("storyteller"), TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
         (await Annotations.GetAnnotationAsync(seeded)).Should().NotBeNull();
+
+        // the record of the set core: the second run reads no document and writes nothing
+        result.Sets.Should().ContainSingle().Which.IsAlreadySeeded.Should().BeTrue();
+        (await Annotations.GetAnnotationHistoryAsync(seeded))!.Entries.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task BuildAsync_SeedsTheSetCoreThroughTheServices()
+    {
+        // the fixture ran it: the annotations and the configuration of the set core, with what a create writes
+        var subject = (Subject?)await Annotations.GetAnnotationAsync(Core("sbt.42"));
+        var context = (Storyteller.Context?)await Annotations.GetAnnotationAsync(Core("cnt.42.system"));
+        var usage = (Usage?)await Annotations.GetAnnotationAsync(Core("usg.42.storyteller"));
+
+        subject!.ResponsibilityNames.Should().BeEquivalentTo("storyteller", "supervisor", "scheduler");
+        subject.ContextNames.Should().BeEquivalentTo("system");
+        context!.ResponsibilityNames.Should().BeEquivalentTo("storyteller", "supervisor", "scheduler");
+        usage!.ContextNames.Should().BeEquivalentTo("system");
+
+        foreach (var key in new[] { "rst.supervisor", "rst.scheduler", "exe.42.storyteller.system", "exe.42.supervisor.system", "exe.42.scheduler.system" })
+        {
+            (await Annotations.GetAnnotationAsync(Core(key))).Should().NotBeNull(key);
+        }
+
+        var history = await Annotations.GetAnnotationHistoryAsync(Core("rst.storyteller"));
+        history!.Entries.Should().ContainSingle().Which.Actor.Should().Be(AuditActor.System);
+
+        var configuration = await Context.Services.GetRequiredService<IConfigurationService>().GetRawConfigurationAsync(Core("cnt.42.system"));
+        configuration!.Content.ToString(Newtonsoft.Json.Formatting.None).Should().Be("""{"IsSystem":true,"Number":42,"Text":"system"}""");
+        configuration.Modified.By.Should().Be(AuditActor.System);
+
+        var record = await Context.Services.GetRequiredService<IDataSetSeedRecordStore>().GetAsync(
+            new DataSetTarget(TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName),
+            CoreDbStructureBuilder.CORE_SET,
+            TestContext.Current.CancellationToken);
+        record!.Hash.Should().MatchRegex("^[0-9a-f]{64}$");
+        record.Documents.Should().Be(12);
+        record.Seeded.By.Should().Be(AuditActor.System);
     }
 
     [Fact]
@@ -128,6 +168,8 @@ public class OrganizationsContainerStructureTests(Startup startup)
 
     // valid by the name rules: 2 to 63 lower-case letters, digits or hyphens
     private static string NewOrganizationName() => $"s-{Guid.NewGuid():N}"[..14];
+
+    private static FullKey Core(string key) => FullKey.Create(AnnotationKey.Parse(key), TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
 
     private async Task ShouldHaveContainersAsync(params string[] names)
     {
