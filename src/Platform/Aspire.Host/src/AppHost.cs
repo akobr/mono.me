@@ -46,11 +46,21 @@ var dbCreator = builder.AddProject<Projects.DbCreator>("db-creator")
     .WithEnvironment("stagingSeed__enabled", seedStagingAccounts ? "true" : "false")
     .WithExplicitStart();
 
+// The built-in data set showcase of DbCreator (the fabrikam / invoicing-suite scope of the admin UI's showcase mock),
+// seeded on demand; the seed ensures the containers itself, and a second start reports the set as seeded already.
+var dbSeed = builder.AddProject<Projects.DbCreator>("db-seed")
+    .WithArgs("seed", "showcase")
+    .WithReference(cosmos)
+    .WaitFor(cosmos)
+    .WithExplicitStart();
+
 // The owner account DbCreator seeds (BaseAccount:Id in the user secrets of this host): under Entra ID the owner's
-// lower-case {tid}:{oid}, under AuthKit or Keycloak the sub. Without it DbCreator seeds its legacy Entra ID sub.
+// lower-case {tid}:{oid}, under AuthKit or Keycloak the sub. Without it DbCreator seeds its legacy Entra ID sub; the
+// seed makes the same owner the Owner of the organization it creates.
 if (builder.Configuration["BaseAccount:Id"] is { Length: > 0 } baseAccountId)
 {
     dbCreator.WithEnvironment("baseAccount__id", baseAccountId);
+    dbSeed.WithEnvironment("baseAccount__id", baseAccountId);
 }
 
 // Local Key Vault emulator (Lowkey Vault): the key-encryption keys of the Standard level of key/value secrets.
