@@ -229,6 +229,13 @@ public static class DataSetOutput
             }
         }
 
+        if (result.RelationsCompleted > 0)
+        {
+            Console.WriteLine(
+                $"  The relation arrays of {Count(result.RelationsCompleted, "annotation")} {(isDryRun ? "to complete" : "completed")} with the annotation files an earlier run left out of them",
+                Muted);
+        }
+
         if (documents.Total == 0 && result.Lines is null)
         {
             Console.WriteLine("  No documents.", Muted);
