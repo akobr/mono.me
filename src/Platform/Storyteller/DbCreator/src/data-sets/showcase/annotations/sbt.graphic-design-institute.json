@@ -1,0 +1,12 @@
+{
+  "Title": "Graphic Design Institute",
+  "Labels": [
+    "standard",
+    "eu"
+  ],
+  "Values": {
+    "crmId": "CRM-1011",
+    "accountManager": "Grace Hopper"
+  },
+  "TimeZone": "Europe/Oslo"
+}

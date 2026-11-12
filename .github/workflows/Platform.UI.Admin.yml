@@ -9,6 +9,8 @@ on:
     paths:
       - src/Platform/ui.admin/**
       - src/Platform/Storyteller/sdk.typescript/**
+      # the data set showcase of DbCreator, a snapshot of the showcase mock (test/unit/mock/showcase-set.test.ts)
+      - src/Platform/Storyteller/DbCreator/src/data-sets/showcase/**
       - .github/workflows/Platform.UI.Admin.yml
   pull_request:
     branches:
@@ -16,6 +18,8 @@ on:
     paths:
       - src/Platform/ui.admin/**
       - src/Platform/Storyteller/sdk.typescript/**
+      # the data set showcase of DbCreator, a snapshot of the showcase mock (test/unit/mock/showcase-set.test.ts)
+      - src/Platform/Storyteller/DbCreator/src/data-sets/showcase/**
       - .github/workflows/Platform.UI.Admin.yml
 
 concurrency:

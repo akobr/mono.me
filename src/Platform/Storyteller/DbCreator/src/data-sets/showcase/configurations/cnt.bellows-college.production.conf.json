@@ -1,0 +1,5 @@
+{
+  "region": "eastus",
+  "logLevel": "warn",
+  "hostname": "bellows-college.production.invoicing.fabrikam.example"
+}

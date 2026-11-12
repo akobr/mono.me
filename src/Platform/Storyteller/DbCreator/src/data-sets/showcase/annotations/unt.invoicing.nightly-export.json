@@ -1,0 +1,7 @@
+{
+  "Title": "Nightly ledger export",
+  "Description": "Exports the day’s invoices to the customer’s accounting system.",
+  "TimeZone": "Europe/Oslo",
+  "UnitType": "time",
+  "UnitDefinition": "0 0 * * *"
+}

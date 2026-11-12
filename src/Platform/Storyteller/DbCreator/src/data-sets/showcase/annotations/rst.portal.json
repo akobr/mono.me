@@ -1,0 +1,9 @@
+{
+  "Title": "Customer portal",
+  "Description": "Where the customer’s own clients download invoices and pay them.",
+  "DocumentationLink": "https://docs.fabrikam.example/invoicing-suite/modules/portal",
+  "Labels": [
+    "web"
+  ],
+  "TimeZone": "Europe/Oslo"
+}

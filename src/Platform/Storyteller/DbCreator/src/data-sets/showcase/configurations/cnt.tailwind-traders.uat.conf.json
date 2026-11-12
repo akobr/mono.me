@@ -1,0 +1,5 @@
+{
+  "region": "westeurope",
+  "logLevel": "debug",
+  "hostname": "tailwind-traders.uat.invoicing.fabrikam.example"
+}

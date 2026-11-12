@@ -1,0 +1,5 @@
+{
+  "region": "northeurope",
+  "logLevel": "debug",
+  "hostname": "lamna-healthcare.uat.invoicing.fabrikam.example"
+}

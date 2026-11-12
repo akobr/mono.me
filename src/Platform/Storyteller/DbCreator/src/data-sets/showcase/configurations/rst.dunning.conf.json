@@ -1,0 +1,12 @@
+{
+  "steps": [
+    {
+      "afterDays": 7,
+      "channel": "email"
+    },
+    {
+      "afterDays": 21,
+      "channel": "letter"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "cron": "0 2 * * *",
+  "timeZone": "Europe/Oslo"
+}

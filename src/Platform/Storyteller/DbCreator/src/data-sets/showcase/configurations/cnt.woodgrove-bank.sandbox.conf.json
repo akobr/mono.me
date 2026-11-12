@@ -1,0 +1,5 @@
+{
+  "region": "ukwest",
+  "logLevel": "debug",
+  "hostname": "woodgrove-bank.sandbox.invoicing.fabrikam.example"
+}

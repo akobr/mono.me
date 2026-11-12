@@ -1,0 +1,12 @@
+{
+  "Title": "Humongous Insurance",
+  "Labels": [
+    "enterprise",
+    "eu"
+  ],
+  "Values": {
+    "crmId": "CRM-1009",
+    "accountManager": "Grace Hopper"
+  },
+  "TimeZone": "Europe/Oslo"
+}

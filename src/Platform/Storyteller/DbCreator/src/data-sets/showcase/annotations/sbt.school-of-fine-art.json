@@ -1,0 +1,12 @@
+{
+  "Title": "School of Fine Art",
+  "Labels": [
+    "standard",
+    "eu"
+  ],
+  "Values": {
+    "crmId": "CRM-1012",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

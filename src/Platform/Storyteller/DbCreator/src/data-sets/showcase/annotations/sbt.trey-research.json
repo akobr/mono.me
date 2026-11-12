@@ -1,0 +1,12 @@
+{
+  "Title": "Trey Research",
+  "Labels": [
+    "standard",
+    "uk"
+  ],
+  "Values": {
+    "crmId": "CRM-1005",
+    "accountManager": "Grace Hopper"
+  },
+  "TimeZone": "Europe/Oslo"
+}

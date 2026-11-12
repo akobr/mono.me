@@ -95,6 +95,44 @@ public class BuiltInSetsTests
     }
 
     [Fact]
+    public void Showcase_IsTheInvoicingSuiteOfTheMocksShowcase()
+    {
+        var showcase = new DataSetCatalog(FileSystem).GetSets().Single(set => set.Name == "showcase");
+        var target = DataSetTarget.Resolve([showcase]);
+
+        target.ShouldBe(new DataSetTarget("fabrikam", "invoicing-suite", "default"));
+        showcase.Manifest.DependsOn.ShouldBeEmpty();
+        showcase.Manifest.ProjectDescription.ShouldNotBeNullOrWhiteSpace();
+
+        var content = DataSetContent.Read(FileSystem, showcase.Folder, target);
+
+        // the files a Git export of the scope gives (ui.admin's test/unit/mock/showcase-set.test.ts writes them)
+        content.Lines.ShouldBeNull();
+        content.Documents.IgnoredFiles.ShouldBe(0);
+        content.Documents.Files.ShouldAllBe(file => file.ErrorCode == null);
+        content.Documents.Files
+            .GroupBy(file => file.Kind)
+            .ToDictionary(group => group.Key, group => group.Count())
+            .ShouldBe(new Dictionary<ViewDocumentKind, int>
+            {
+                [ViewDocumentKind.Annotation] = 242,
+                [ViewDocumentKind.Configuration] = 153,
+                [ViewDocumentKind.DescendantTypeSchema] = 2,
+                [ViewDocumentKind.Template] = 1,
+            });
+
+        // every document hangs on an annotation of the set, so the import creates no ancestor with defaults
+        var keys = content.Documents.Files
+            .Where(file => file.Kind == ViewDocumentKind.Annotation)
+            .Select(file => file.AnnotationKey!.ToString())
+            .ToHashSet();
+        content.Documents.Files
+            .Where(file => file.AnnotationKey is not null)
+            .ShouldAllBe(file => keys.Contains(file.AnnotationKey!.ToString())
+                && file.AnnotationKey!.GetAllAncestorKeys().All(ancestor => keys.Contains(ancestor.ToString())));
+    }
+
+    [Fact]
     public void Playground_IsASetOfItsFolder()
     {
         var folder = FileSystem.Path.Combine(RepositoryRoot(), "src", "Platform", "Storyteller", "Playground", "data");

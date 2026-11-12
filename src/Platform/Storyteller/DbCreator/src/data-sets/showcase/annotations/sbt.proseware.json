@@ -1,0 +1,12 @@
+{
+  "Title": "Proseware, Inc.",
+  "Labels": [
+    "standard",
+    "us"
+  ],
+  "Values": {
+    "crmId": "CRM-1020",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

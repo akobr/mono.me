@@ -1,0 +1,8 @@
+{
+  "plan": "enterprise",
+  "seats": 250,
+  "features": [
+    "e-invoice",
+    "custom-tax"
+  ]
+}

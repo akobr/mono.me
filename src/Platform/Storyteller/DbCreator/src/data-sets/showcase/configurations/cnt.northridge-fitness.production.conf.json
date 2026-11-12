@@ -1,0 +1,5 @@
+{
+  "region": "swedencentral",
+  "logLevel": "warn",
+  "hostname": "northridge-fitness.production.invoicing.fabrikam.example"
+}

@@ -1,0 +1,12 @@
+{
+  "Title": "VanArsdel, Ltd.",
+  "Labels": [
+    "standard",
+    "uk"
+  ],
+  "Values": {
+    "crmId": "CRM-1010",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

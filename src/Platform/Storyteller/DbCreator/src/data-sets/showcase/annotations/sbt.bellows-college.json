@@ -1,0 +1,12 @@
+{
+  "Title": "Bellows College",
+  "Labels": [
+    "standard",
+    "us"
+  ],
+  "Values": {
+    "crmId": "CRM-1019",
+    "accountManager": "Grace Hopper"
+  },
+  "TimeZone": "Europe/Oslo"
+}

@@ -1,0 +1,5 @@
+{
+  "region": "ukwest",
+  "logLevel": "warn",
+  "hostname": "vanarsdel.production.invoicing.fabrikam.example"
+}

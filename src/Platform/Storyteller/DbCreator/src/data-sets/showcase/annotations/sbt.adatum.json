@@ -1,0 +1,12 @@
+{
+  "Title": "Adatum Corporation",
+  "Labels": [
+    "enterprise",
+    "eu"
+  ],
+  "Values": {
+    "crmId": "CRM-1003",
+    "accountManager": "Grace Hopper"
+  },
+  "TimeZone": "Europe/Oslo"
+}

@@ -1,0 +1,12 @@
+{
+  "Title": "Fincher Architects",
+  "Labels": [
+    "standard",
+    "uk"
+  ],
+  "Values": {
+    "crmId": "CRM-1018",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

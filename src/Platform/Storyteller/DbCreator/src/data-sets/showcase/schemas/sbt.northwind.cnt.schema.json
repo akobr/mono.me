@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "region": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "region"
+  ]
+}

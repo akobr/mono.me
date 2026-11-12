@@ -1,0 +1,12 @@
+{
+  "Title": "Wingtip Toys",
+  "Labels": [
+    "standard",
+    "us"
+  ],
+  "Values": {
+    "crmId": "CRM-1006",
+    "accountManager": "Alan Turing"
+  },
+  "TimeZone": "Europe/Oslo"
+}

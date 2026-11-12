@@ -1,0 +1,7 @@
+{
+  "retries": 2,
+  "timeoutMinutes": 45,
+  "notifyOnFailure": [
+    "ops@fabrikam.example"
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "region": "westeurope",
+  "logLevel": "warn",
+  "hostname": "contoso.production.invoicing.fabrikam.example"
+}

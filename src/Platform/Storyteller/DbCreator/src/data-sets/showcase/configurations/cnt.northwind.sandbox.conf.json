@@ -1,0 +1,5 @@
+{
+  "region": "norwayeast",
+  "logLevel": "debug",
+  "hostname": "northwind.sandbox.invoicing.fabrikam.example"
+}

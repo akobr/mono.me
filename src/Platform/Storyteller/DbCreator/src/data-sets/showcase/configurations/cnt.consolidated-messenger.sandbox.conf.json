@@ -1,0 +1,5 @@
+{
+  "region": "eastus2",
+  "logLevel": "debug",
+  "hostname": "consolidated-messenger.sandbox.invoicing.fabrikam.example"
+}

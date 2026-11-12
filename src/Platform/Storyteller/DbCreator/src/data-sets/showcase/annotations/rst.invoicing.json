@@ -1,0 +1,9 @@
+{
+  "Title": "Invoicing",
+  "Description": "Issues invoices, credit notes and e-invoices; exports the ledger every night.",
+  "DocumentationLink": "https://docs.fabrikam.example/invoicing-suite/modules/invoicing",
+  "Labels": [
+    "core"
+  ],
+  "TimeZone": "Europe/Oslo"
+}

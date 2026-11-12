@@ -1,0 +1,9 @@
+{
+  "Title": "Reporting",
+  "Description": "Revenue, aging and tax reports.",
+  "DocumentationLink": "https://docs.fabrikam.example/invoicing-suite/modules/reporting",
+  "Labels": [
+    "add-on"
+  ],
+  "TimeZone": "Europe/Oslo"
+}

@@ -1,0 +1,6 @@
+{
+  "Title": "Nightly export",
+  "Description": "Off, so the sandbox never exports real files.",
+  "IsDisabled": true,
+  "TimeZone": "Europe/Oslo"
+}
