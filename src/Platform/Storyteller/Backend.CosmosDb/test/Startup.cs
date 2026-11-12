@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
+using _42.Platform.Storyteller.DbCreator;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using _42.Platform.Storyteller.KeyValues;
 using _42.Platform.Storyteller.KeyValues.Protection;
@@ -107,7 +108,9 @@ public class Startup : IAsyncLifetime, ITestContext
 
         // every organization-wide query of the suite must filter on c.Organization (OrganizationQueryGuard)
         services.AddSingleton<RequestHandler, OrganizationQueryGuard>();
-        services.AddSingleton<CoreDbStructureBuilder>();
+
+        // the structure builder with what it seeds (the set core), as the tool registers it
+        services.AddDbCreator(configuration);
 
         services.AddSingleton<ConfigBindingFunction>();
         services.AddSingleton<AnnotationBindingFunction>(sp =>

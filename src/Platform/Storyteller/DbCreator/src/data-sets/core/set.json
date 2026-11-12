@@ -1,0 +1,8 @@
+{
+  "Name": "core",
+  "Version": 1,
+  "Description": "The platform's own annotations, which every run of 2sInitDb seeds: the subject 42 with its context system, the responsibilities storyteller, supervisor and scheduler with their usages and executions, and the configuration of the context.",
+  "Organization": "42dotnet",
+  "Project": "main",
+  "View": "default"
+}
