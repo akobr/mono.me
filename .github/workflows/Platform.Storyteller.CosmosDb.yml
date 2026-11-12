@@ -74,8 +74,10 @@ jobs:
       - name: DbCreator integration
         run: dotnet test --project "$DBCREATOR_TESTS" --filter-not-trait "Emulator=Classic" --report-trx --results-directory TestResults/dbcreator
 
-      # No emulator: the set files, the catalog, the seeder over fakes and the commands.
+      # No emulator: the set files, the catalog, the seeder over fakes and the commands. It runs also when a suite above
+      # failed, since no other workflow runs these tests. Not first: a failure of its own would skip the suites instead.
       - name: DbCreator unit
+        if: ${{ !cancelled() }}
         run: dotnet test --project "$DBCREATOR_UNIT_TESTS" --report-trx --results-directory TestResults/dbcreator-unit
 
       - name: Test results
