@@ -104,6 +104,10 @@ const versionSource = computed<VersionSource>(() => {
     // stored document, so a later save cannot write an older draft over the restored one.
     afterRestore: async () => {
       await invalidateSchemas(queryClient, scope)
+      // a failed refetch keeps the editor as it was and reports the failure
+      if (schema.isError.value) {
+        throw schema.error.value
+      }
       const content = schema.data.value?.Content
       if (content !== undefined) {
         original.value = cloneJson(content)
