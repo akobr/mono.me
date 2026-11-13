@@ -117,6 +117,10 @@ const versionSource = computed<VersionSource>(() => {
     // the editor then holds the stored document, so a later save cannot patch an older draft over the restored one
     afterRestore: async () => {
       await afterSave({ org, project, view })
+      // a failed refetch keeps the editor as it was and reports the failure
+      if (template.isError.value) {
+        throw template.error.value
+      }
       const content = template.data.value?.Content
       if (content !== undefined) {
         original.value = cloneJson(content)

@@ -584,6 +584,32 @@ describe('the versions of a deleted document', () => {
     screen.host.unmount()
   })
 
+  it('reports a failed refresh of a restored template and keeps its editor as it was', async () => {
+    const screen = await mountScreen(
+      TemplateDetail,
+      { type: 'exe' },
+      { path: '/acme/billing/default/modeling/templates/exe?tab=versions' },
+    )
+    await settle(10)
+    server.use(
+      http.get('*/v1/:org/:project/:view/template/:type', () =>
+        HttpResponse.json({ Message: 'The service is down.' }, { status: 500 }),
+      ),
+    )
+
+    await screen.host.find('button[aria-label="Restore v1"]').trigger('click')
+    await settle()
+    ;[...document.body.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
+      .find((button) => button.textContent?.trim() === 'Restore v1')!
+      .click()
+    await settle(10)
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('The views were not refreshed')
+    expect(text).not.toContain('v1 was not restored')
+    screen.host.unmount()
+  })
+
   it('are listed for a deleted template, and a type without one shows no history', async () => {
     await deleteTemplate(org, project, view, 'exe')
     const deleted = await mountScreen(
