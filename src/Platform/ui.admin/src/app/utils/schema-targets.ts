@@ -14,6 +14,9 @@ import {
   getSchemaVersion,
   getSchemaVersionDiffCustom,
   getSchemaVersions,
+  restoreAnnotationSchemaVersion,
+  restoreDescendantTypeSchemaVersion,
+  restoreSchemaVersion,
   setAnnotationSchema,
   setConfigurationSchema,
   setDescendantTypeSchema,
@@ -42,7 +45,8 @@ export interface SchemaApi {
   get: (signal?: AbortSignal) => Promise<ConfigurationSchema>
   set: (content: Record<string, unknown>, force: boolean) => Promise<ConfigurationSchema>
   remove: () => Promise<void>
-  versions: Omit<VersionSource, 'current'>
+  /** The history; the editor adds the current version and what a restore refreshes. */
+  versions: Omit<VersionSource, 'current' | 'afterRestore'>
   /** Does a configuration of this key fall under the schema? */
   appliesTo: (annotationKey: string, ancestors: readonly string[]) => boolean
 }
@@ -67,6 +71,7 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
           setConfigurationSchema(org, project, view, target.type, content, force ? { force } : undefined),
         remove: () => deleteConfigurationSchema(org, project, view, target.type),
         versions: {
+          document: 'schema',
           queryKey: path.split('/').filter(Boolean),
           list: (signal) => getSchemaVersions(org, project, view, target.type, { signal }),
           content: async (version, signal) =>
@@ -75,6 +80,8 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
             getSchemaVersionDiffCustom(org, project, view, target.type, version, from, undefined, {
               signal,
             }) as Promise<DiffResult>,
+          restore: (version, force) =>
+            restoreSchemaVersion(org, project, view, target.type, version, force ? { force } : undefined),
         },
         appliesTo: (key) => metaOf(key.slice(0, 3))?.code === target.type,
       }
@@ -92,6 +99,7 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
           setAnnotationSchema(org, project, view, target.key, content, force ? { force } : undefined),
         remove: () => deleteAnnotationSchema(org, project, view, target.key),
         versions: {
+          document: 'schema',
           queryKey: [...path.split('/').filter(Boolean), 'own'],
           list: (signal) => getAnnotationSchemaVersions(org, project, view, target.key, { signal }),
           content: async (version, signal) =>
@@ -100,6 +108,8 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
             getAnnotationSchemaVersionDiffCustom(org, project, view, target.key, version, from, undefined, {
               signal,
             }) as Promise<DiffResult>,
+          restore: (version, force) =>
+            restoreAnnotationSchemaVersion(org, project, view, target.key, version, force ? { force } : undefined),
         },
         appliesTo: (key) => key === target.key,
       }
@@ -117,6 +127,7 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
           setDescendantTypeSchema(org, project, view, target.key, target.type, content, force ? { force } : undefined),
         remove: () => deleteDescendantTypeSchema(org, project, view, target.key, target.type),
         versions: {
+          document: 'schema',
           queryKey: path.split('/').filter(Boolean),
           list: (signal) => getDescendantTypeSchemaVersions(org, project, view, target.key, target.type, { signal }),
           content: async (version, signal) =>
@@ -134,6 +145,16 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
               undefined,
               { signal },
             ) as Promise<DiffResult>,
+          restore: (version, force) =>
+            restoreDescendantTypeSchemaVersion(
+              org,
+              project,
+              view,
+              target.key,
+              target.type,
+              version,
+              force ? { force } : undefined,
+            ),
         },
         appliesTo: (key, ancestors) => metaOf(key.slice(0, 3))?.code === target.type && ancestors.includes(target.key),
       }

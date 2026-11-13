@@ -303,7 +303,9 @@ Each also loads its root and ancestors (point reads) and its descendants (one qu
 
 ## Configuration writes
 
-`CreateOrUpdateConfigurationAsync`, `PatchConfigurationAsync`, `ClearConfigurationAsync` and `DeleteAsync` append an audit entry after the write commits, best effort and outside the configuration's batch, and before they invalidate the dependent calculations; a committed change is therefore audited also when its invalidation fails. If the annotation has no configuration item yet, they also read it once to reject a deleted annotation. The write itself, its retries and the pending invalidation are described in [inheritance.md](inheritance.md#cache-and-descendant-freshness).
+`CreateOrUpdateConfigurationAsync`, `PatchConfigurationAsync`, `ClearConfigurationAsync`, `DeleteAsync` and `RestoreConfigurationVersionAsync` append an audit entry after the write commits, best effort and outside the configuration's batch, and before they invalidate the dependent calculations; a committed change is therefore audited also when its invalidation fails. If the annotation has no configuration item yet, they also read it once to reject a deleted annotation. The write itself, its retries and the pending invalidation are described in [inheritance.md](inheritance.md#cache-and-descendant-freshness).
+
+A version restore follows the same flow as a write: the guarded batch of the archive and the new version (or the first insert, after a clear), then the audit append of `ConfigurationRestored` with `ConfigurationVersion` and `FromVersion`, then the invalidation. A restore that changes nothing (the current version, or a version with the current content) writes nothing and appends no entry.
 
 ```mermaid
 sequenceDiagram
@@ -327,6 +329,7 @@ sequenceDiagram
 **Cost:**
 
 - The audit append adds ≈ 13–34 RU per configuration write: 1 + (1…7) + (10.6…25.7).
+- A version restore costs what a write costs, plus a point read of the annotation before anything else (1 RU) and one of the requested archive (1 RU, or more for a large document).
 - The archive check adds a point read of the stored version's `cfv` (1 RU), and the removal of the token a patch (≈ 10 RU). A unit of execution has no descendants and stores no token.
 - A write to a configuration without an item or without content, and a clear that finds nothing to clear, query the key's versions for pending clears (≈ 3 RU).
 - A write that loses to a concurrent change repeats its reads and its batch.

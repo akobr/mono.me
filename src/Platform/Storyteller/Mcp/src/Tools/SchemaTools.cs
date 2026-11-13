@@ -16,6 +16,8 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
         + "descendant-type schemas of its ancestors and its annotation schema, deep-merged in that order, from the same "
         + "view only.";
 
+    private const string Force = "Store the schema even when stored configurations of the view violate it. Default false.";
+
     [McpServerTool(Name = "list_schemas", Title = "List schemas", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(
         "Lists every schema document of a view without its content: Kind (Type, Annotation or DescendantType), "
@@ -77,7 +79,7 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
         [Description(ToolText.View)] string view = ToolText.DefaultView,
         [Description(ManagementText.SchemaType)] string? annotationType = null,
         [Description(ManagementText.SchemaKey)] string? key = null,
-        [Description("Store the schema even when stored configurations of the view violate it. Default false.")] bool force = false,
+        [Description(Force)] bool force = false,
         CancellationToken cancellationToken = default)
     {
         var target = SchemaTarget.Parse(level, annotationType, key);
@@ -96,11 +98,48 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
         return ToolResults.Json(stored);
     }
 
+    [McpServerTool(Name = "revert_schema", Title = "Revert a schema to a version", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [Description(
+        "Restores a previous version of one schema document (list_schema_versions) as a new version, in one step on the "
+        + "server: the version's content is copied as it was stored, and the history is kept. Reverting to the current "
+        + "version, or to one the current schema equals, changes nothing. A schema removed by delete_schema is brought "
+        + "back this way. " + SchemaTarget.Levels + ". The version must still be a usable schema (400 otherwise, also "
+        + "with force). Before it is stored, every configuration of the view it applies to is checked against the "
+        + "combined schema as it will be: a violation answers 409 with the failing annotations and their messages, "
+        + "unless force is true. An annotation or descendant-type schema needs its annotation: a deleted one answers "
+        + "409 AnnotationDeleted, a missing one 404 AnnotationNotFound. An unknown or expired version answers 404 "
+        + "VersionNotFound. Needs the Contributor role. Returns Outcome (Restored or Unchanged), FromVersion, Version "
+        + "(the new version, or the current one when nothing changed), Modified and Changed.")]
+    public async Task<CallToolResult> RevertSchema(
+        [Description(ToolText.Organization)] string organization,
+        [Description(ToolText.Project)] string project,
+        [Description(ManagementText.Level)] string level,
+        [Description(ToolText.Version)] int version,
+        [Description(ToolText.View)] string view = ToolText.DefaultView,
+        [Description(ManagementText.SchemaType)] string? annotationType = null,
+        [Description(ManagementText.SchemaKey)] string? key = null,
+        [Description(Force)] bool force = false,
+        CancellationToken cancellationToken = default)
+    {
+        var target = SchemaTarget.Parse(level, annotationType, key);
+        var (type, annotationKey) = (target.AnnotationType!, target.Key!);
+        bool? forced = force ? true : null;
+
+        var restore = target.Kind switch
+        {
+            SchemaTarget.Level.Type => await schemas.RestoreSchemaVersionAsync(organization, project, view, type, version, forced, cancellationToken),
+            SchemaTarget.Level.Annotation => await schemas.RestoreAnnotationSchemaVersionAsync(organization, project, view, annotationKey, version, forced, cancellationToken),
+            _ => await schemas.RestoreDescendantTypeSchemaVersionAsync(organization, project, view, annotationKey, type, version, forced, cancellationToken),
+        };
+
+        return DocumentWrites.Reverted(restore);
+    }
+
     [McpServerTool(Name = "delete_schema", Title = "Delete a schema", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description(
-        "Deletes one schema document of a view; its versions are kept until they expire, and later writes of the "
-        + "configurations it applied to are no longer checked against it. " + SchemaTarget.Levels + ". Answers 404 when "
-        + "there is no such schema. Needs the Contributor role.")]
+        "Deletes one schema document of a view; its versions are kept until they expire (revert_schema brings one back), "
+        + "and later writes of the configurations it applied to are no longer checked against it. " + SchemaTarget.Levels
+        + ". Answers 404 when there is no such schema. Needs the Contributor role.")]
     public async Task<CallToolResult> DeleteSchema(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
@@ -148,9 +187,9 @@ public sealed class SchemaTools(Sdk.ISchemasApiClient schemas)
 
     [McpServerTool(Name = "list_schema_versions", Title = "List schema versions", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(
-        "Lists the versions of one schema document: Version, Modified (who wrote it and when) and ExpirationTime; "
-        + "versions other than the current one expire 365 days after their write. " + SchemaTarget.Levels + ". Needs "
-        + "the Reader role.")]
+        "Lists the versions of one schema document: Version, Modified (who wrote it and when), ExpirationTime, and "
+        + "RestoredFrom on a version restored from an earlier one (revert_schema); versions other than the current one "
+        + "expire 365 days after their write. " + SchemaTarget.Levels + ". Needs the Reader role.")]
     public async Task<CallToolResult> ListSchemaVersions(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,

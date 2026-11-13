@@ -69,6 +69,12 @@ public class RouteDispatchTests
     [InlineData("GET", Scope + "/configuration-schema/rst.billing/definition", nameof(ConfigurationSchemaHttp.GetCombinedConfigurationSchema))]
     [InlineData("GET", Scope + "/configuration-schema/type/rst/versions", nameof(ConfigurationSchemaHttp.GetSchemaVersions))]
     [InlineData("GET", Scope + "/configuration-schema/sbt.northwind/type/usg", nameof(ConfigurationSchemaHttp.GetDescendantTypeSchema))]
+    [InlineData("POST", Scope + "/configuration/rst.billing/versions/3/restore", nameof(ConfigurationHttp.RestoreConfigurationVersion))]
+    [InlineData("GET", Scope + "/configuration/rst.billing/versions/3/diff", nameof(ConfigurationHttp.GetConfigurationVersionDiff))]
+    [InlineData("POST", Scope + "/template/exe/versions/3/restore", nameof(TemplateHttp.RestoreTemplateVersion))]
+    [InlineData("POST", Scope + "/configuration-schema/type/rst/versions/3/restore", nameof(ConfigurationSchemaHttp.RestoreSchemaVersion))]
+    [InlineData("POST", Scope + "/configuration-schema/rst.billing/versions/3/restore", nameof(ConfigurationSchemaHttp.RestoreAnnotationSchemaVersion))]
+    [InlineData("POST", Scope + "/configuration-schema/sbt.northwind/type/usg/versions/3/restore", nameof(ConfigurationSchemaHttp.RestoreDescendantTypeSchemaVersion))]
     public void Request_MatchesExactlyItsFunction(string method, string path, string function)
     {
         Match(method, path).ShouldBe([function]);

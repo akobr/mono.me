@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.UnitTests.Authentication;
+using _42.Platform.Cli.UnitTests.Commands;
 using _42.Platform.Storyteller.Sdk;
 using Newtonsoft.Json.Linq;
 using Shouldly;
@@ -160,7 +161,34 @@ public class AuditConsoleExtensionsTests
     {
         AuditConsoleExtensions.FormatAction(AnnotationAuditEntryAction.Recreated).ShouldBe("Re-created");
         AuditConsoleExtensions.FormatAction(AnnotationAuditEntryAction.ConfigurationChanged).ShouldBe("Config changed");
+        AuditConsoleExtensions.FormatAction(AnnotationAuditEntryAction.ConfigurationRestored).ShouldBe("Config restored");
         AuditConsoleExtensions.FormatAction(AnnotationAuditEntryAction.Restored).ShouldBe("Restored");
+    }
+
+    // 424-221: the restore of a version of the configuration names the new version and the version it copied.
+    [Fact]
+    public void ConfigurationRestored_NamesTheVersionItCopied()
+    {
+        var restored = Entry(AnnotationAuditEntryAction.ConfigurationRestored);
+        restored.ConfigurationVersion = 5;
+        restored.FromVersion = 2;
+
+        AuditConsoleExtensions.FormatChanges(restored).ShouldBe("config v5 from v2");
+    }
+
+    [Fact]
+    public void History_OfARestore_HasItsActionAndChanges()
+    {
+        var console = new RecordingConsole();
+        var restored = Entry(AnnotationAuditEntryAction.ConfigurationRestored);
+        restored.ConfigurationVersion = 4;
+        restored.FromVersion = 1;
+
+        console.Object.WriteHistory(new AnnotationHistory { AnnotationKey = "rst.billing", Entries = [restored] });
+
+        var row = console.Tables.ShouldHaveSingleItem().Rows.ShouldHaveSingleItem();
+        row[2].ShouldBe("Config restored");
+        row[3].ShouldBe("config v4 from v1");
     }
 
     private static AnnotationAuditEntry Entry(AnnotationAuditEntryAction action)

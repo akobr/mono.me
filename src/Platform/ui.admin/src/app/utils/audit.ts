@@ -14,7 +14,7 @@ export type AuditChange =
   | { kind: 'flag'; field: string }
   | { kind: 'labels'; added: string[]; removed: string[] }
   | { kind: 'value'; key: string; text: string }
-  | { kind: 'configuration'; version: number }
+  | { kind: 'configuration'; version: number; from?: number }
 
 const flaggedFields = new Set(['Description', 'UnitDefinition'])
 
@@ -26,6 +26,7 @@ export const actionLabels: Record<AnnotationAuditEntryAction, string> = {
   Restored: 'Restored',
   ConfigurationChanged: 'Configuration saved',
   ConfigurationDeleted: 'Configuration deleted',
+  ConfigurationRestored: 'Configuration restored',
 }
 
 export const actionColors: Record<AnnotationAuditEntryAction, 'success' | 'neutral' | 'error' | 'info' | 'warning'> = {
@@ -36,6 +37,7 @@ export const actionColors: Record<AnnotationAuditEntryAction, 'success' | 'neutr
   Restored: 'info',
   ConfigurationChanged: 'neutral',
   ConfigurationDeleted: 'neutral',
+  ConfigurationRestored: 'info',
 }
 
 export const actionIcons: Record<AnnotationAuditEntryAction, string> = {
@@ -46,6 +48,7 @@ export const actionIcons: Record<AnnotationAuditEntryAction, string> = {
   Restored: 'i-lucide-archive-restore',
   ConfigurationChanged: 'i-lucide-settings-2',
   ConfigurationDeleted: 'i-lucide-settings-2',
+  ConfigurationRestored: 'i-lucide-history',
 }
 
 /** Name of an account (or its id), `machine:<id>` for a machine, and System. */
@@ -129,7 +132,12 @@ export function auditChanges(entry: AnnotationAuditEntry): AuditChange[] {
   }
 
   if (entry.ConfigurationVersion) {
-    changes.push({ kind: 'configuration', version: entry.ConfigurationVersion })
+    // a restore names the version whose content it stored again
+    changes.push(
+      entry.FromVersion
+        ? { kind: 'configuration', version: entry.ConfigurationVersion, from: entry.FromVersion }
+        : { kind: 'configuration', version: entry.ConfigurationVersion },
+    )
   }
 
   return changes

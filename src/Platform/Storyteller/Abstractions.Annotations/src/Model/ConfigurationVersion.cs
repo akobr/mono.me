@@ -10,4 +10,7 @@ public record class ConfigurationVersion
     public required AuditStamp Modified { get; init; }
 
     public DateTimeOffset ExpirationTime { get; init; }
+
+    // The version whose content a restore copied into this one; null for any other write.
+    public uint? RestoredFrom { get; init; }
 }

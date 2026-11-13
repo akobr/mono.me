@@ -127,6 +127,13 @@ const versionLink = (version: number) => ({
                     class="text-primary hover:underline"
                     >Configuration saved as v{{ change.version }}</RouterLink
                   >
+                  <RouterLink
+                    v-else-if="item.entry.Action === 'ConfigurationRestored'"
+                    :to="versionLink(change.version)"
+                    class="text-primary hover:underline"
+                    >Configuration restored as v{{ change.version
+                    }}{{ change.from ? ` from v${change.from}` : '' }}</RouterLink
+                  >
                   <span v-else class="text-muted">Configuration v{{ change.version }} deleted</span>
                 </template>
               </li>

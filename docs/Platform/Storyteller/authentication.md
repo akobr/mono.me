@@ -1122,15 +1122,15 @@ A machine created with an `AnnotationKey` K is restricted to K. It reaches K and
 
 | Operation | Restricted machine |
 | --- | --- |
-| Annotations (with their history and descendants), configurations (raw, resolved, versions, diffs, the diff to another view), annotation schemas, descendant-type schemas and the combined schema definition of K or a descendant | Allowed |
+| Annotations (with their history and descendants), configurations (raw, resolved, versions, diffs, version restores, the diff to another view), annotation schemas and descendant-type schemas (their version restores included), and the combined schema definition of K or a descendant | Allowed |
 | The same for an ancestor, a sibling or another branch of K | `403` |
 | Bulk create (`POST …/annotations`), lookup and restore of deleted annotations | Allowed when every key of the body is K or a descendant, otherwise `403`; bulk create and restore need `Annotation.Write` and `Annotation.Manage` |
-| Lists of annotations, deleted annotations, configurations and schemas, compact bulk create (`…/annotations/simple`), type-level schemas, templates, export and import of a view, key/values, the key/value policy and recipients | `403`: the operation spans the whole project |
+| Lists of annotations, deleted annotations, configurations and schemas, compact bulk create (`…/annotations/simple`), type-level schemas and templates (their version restores included), export and import of a view, key/values, the key/value policy and recipients | `403`: the operation spans the whole project |
 | The views of the project (`GET …/views`) and the binding catalog | Allowed: they hold no annotation data |
 
 A refusal is `403` with `ErrorCode` `AnnotationRestricted`. It comes before any read, so it does not tell whether the annotation exists. A key that does not parse is outside of the restriction.
 
-Inside K, every operation still needs its scopes: a read of an annotation needs `Annotation.Read`, a bulk create, a soft delete and a restore need `Annotation.Write` and `Annotation.Manage`, and an annotation or descendant-type schema write needs `Configuration.Write` and `Schema.Write`. The restriction is checked before the scopes, so a restricted machine gets `AnnotationRestricted` for an operation of the whole project, such as a transfer or a template write, whatever its scopes.
+Inside K, every operation still needs its scopes: a read of an annotation needs `Annotation.Read`, a bulk create, a soft delete and a restore need `Annotation.Write` and `Annotation.Manage`, and an annotation or descendant-type schema write or version restore needs `Configuration.Write` and `Schema.Write`. The restriction is checked before the scopes, so a restricted machine gets `AnnotationRestricted` for an operation of the whole project, such as a transfer or a template write, whatever its scopes.
 
 The ancestors of K, and the other parents of its descendants (the unit `unt.invoicing.export` of the unit of execution `uxe.northwind.invoicing.prod.export`, for example), still reach the machine through the effective and resolved configurations, and the resolved configuration is the only way a restricted machine gets key/values. Creating or restoring an annotation inside K also creates or restores its missing ancestors, as for every caller; the answers of a bulk create and of a restore leave the annotations outside K out.
 
@@ -1147,12 +1147,12 @@ The scopes come in two groups. The **runtime** scopes are the reads and the per-
 | `Annotation.Read` | `AnnotationRead` | Runtime | The reads of annotations: lists, single annotations, descendants, history, and deleted annotations with their lookup ([annotation-lifecycle.md](annotation-lifecycle.md#api)) |
 | `Annotation.Write` | `AnnotationWrite` | Runtime | The write and the patch of one annotation (`PUT`, `POST` and `PATCH …/annotations/{key}`) |
 | `Configuration.Read` | `ConfigurationRead` | Runtime | The reads of configurations (raw, resolved, versions, diffs, composition), schemas, templates, key/values with their policy and recipients ([key-values.md](key-values.md#who-may-do-what)), and the binding catalog |
-| `Configuration.Write` | `ConfigurationWrite` | Runtime | The writes, patches and deletes of configurations, and the writes and soft deletes of key/values |
+| `Configuration.Write` | `ConfigurationWrite` | Runtime | The writes, patches, deletes and version restores of configurations, and the writes and soft deletes of key/values |
 | `Secrets.Read` | `SecretsRead` | Runtime | The values of key/value secrets: in a resolved configuration, a reveal, a secret version or diff, and an export with secrets ([key-values.md](key-values.md#secret-delivery)) |
 | `Secrets.Write` | `SecretsWrite` | Runtime | The writes of secrets: a secret level on a write, the soft delete of a secret key, a protect, and the restore or import of secret keys |
 | `Configuration.Transfer` | `ConfigurationTransfer` | Management | The export and import of a view, with the reads of their jobs and the archive download ([export-import.md](export-import.md#access)); the export and import of key/values ([key-values.md](key-values.md#who-may-do-what)) |
-| `Schema.Write` | `SchemaWrite` | Management | The writes and deletes of type, annotation and descendant-type schemas ([definitions.md](definitions.md#http)), and the import of schemas into a view |
-| `Template.Write` | `TemplateWrite` | Management | The writes (`POST` and `PUT`), patches and deletes of templates ([templating.md](templating.md)), and the import of templates into a view |
+| `Schema.Write` | `SchemaWrite` | Management | The writes, deletes and version restores of type, annotation and descendant-type schemas ([definitions.md](definitions.md#http)), and the import of schemas into a view |
+| `Template.Write` | `TemplateWrite` | Management | The writes (`POST` and `PUT`), patches, deletes and version restores of templates ([templating.md](templating.md)), and the import of templates into a view |
 | `Annotation.Manage` | `AnnotationManage` | Management | The bulk create of annotations (`POST …/annotations` and `…/annotations/simple`), their soft delete and their restore ([annotation-lifecycle.md](annotation-lifecycle.md#api)), and the import of annotations into a view |
 | `KeyValue.Manage` | `KeyValueManage` | Management | The protect and the bulk restore of key/values ([key-values.md](key-values.md#who-may-do-what)) |
 

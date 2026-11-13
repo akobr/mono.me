@@ -513,9 +513,11 @@ public sealed partial class AnnotationTools(Sdk.IAnnotationsApiClient annotation
     [McpServerTool(Name = "get_annotation_history", Title = "Get the history of an annotation", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(
         "Returns what happened with an active or deleted annotation and who did it, newest first: created, updated (the "
-        + "previous and new values of fields, labels and values; the description is only flagged), deleted, restored, "
-        + "re-created, and configuration changes with their version. IsTrimmed says that the oldest entries were "
-        + "dropped. A purged or unknown key answers 404. Needs the Reader role.")]
+        + "previous and new values of fields, labels and values; the description is only flagged), deleted, restored "
+        + "(undeleted), re-created, and configuration changes with their version, among them ConfigurationRestored, a "
+        + "previous version restored as a new one (revert_configuration), with FromVersion, the version it copied. "
+        + "IsTrimmed says that the oldest entries were dropped. A purged or unknown key answers 404. Needs the Reader "
+        + "role.")]
     public async Task<CallToolResult> GetAnnotationHistory(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,

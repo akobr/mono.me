@@ -32,6 +32,9 @@ public class ConfigurationSchemaAuthorizationTests
         new(nameof(ConfigurationSchemaHttp.DeleteAnnotationSchema), "DELETE", null, nameof(IConfigurationSchemaService.DeleteAnnotationSchemaAsync), (http, request) => http.DeleteAnnotationSchema(request, Org, Project, View, Key)),
         new(nameof(ConfigurationSchemaHttp.SetDescendantTypeSchema), "PUT", "{}", nameof(IConfigurationSchemaService.SetDescendantTypeSchemaAsync), (http, request) => http.SetDescendantTypeSchema(request, Org, Project, View, Key, DescendantType)),
         new(nameof(ConfigurationSchemaHttp.DeleteDescendantTypeSchema), "DELETE", null, nameof(IConfigurationSchemaService.DeleteDescendantTypeSchemaAsync), (http, request) => http.DeleteDescendantTypeSchema(request, Org, Project, View, Key, DescendantType)),
+        new(nameof(ConfigurationSchemaHttp.RestoreSchemaVersion), "POST", null, nameof(IConfigurationSchemaService.RestoreSchemaVersionAsync), (http, request) => http.RestoreSchemaVersion(request, Org, Project, View, Type, 1)),
+        new(nameof(ConfigurationSchemaHttp.RestoreAnnotationSchemaVersion), "POST", null, nameof(IConfigurationSchemaService.RestoreAnnotationSchemaVersionAsync), (http, request) => http.RestoreAnnotationSchemaVersion(request, Org, Project, View, Key, 1)),
+        new(nameof(ConfigurationSchemaHttp.RestoreDescendantTypeSchemaVersion), "POST", null, nameof(IConfigurationSchemaService.RestoreDescendantTypeSchemaVersionAsync), (http, request) => http.RestoreDescendantTypeSchemaVersion(request, Org, Project, View, Key, DescendantType, 1)),
     ];
 
     private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;

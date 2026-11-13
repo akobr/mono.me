@@ -170,11 +170,12 @@ Version routes, on each of the three stored kinds (the combined schema is comput
 | GET | `…/versions/{version}` | Content of one version |
 | GET | `…/versions/{version}/diff` | Diff of the previous version into this one |
 | GET | `…/versions/{version}/diff/{versionFrom}` | Diff of any pair |
+| POST | `…/versions/{version}/restore` | Store that version as the new version (`RestoreSchemaVersion`, `RestoreAnnotationSchemaVersion`, `RestoreDescendantTypeSchemaVersion`), see [Versions](#versions) |
 
-PUT accepts a query parameter `force`. It defaults to false. See [Force](#force).
+PUT and the restore accept a query parameter `force`. It defaults to false. See [Force](#force).
 
 - Reads require the `Reader` role on the project. A machine needs the scope `Configuration.Read` instead.
-- Writes (`PUT` and `DELETE` of the three kinds) require the `Contributor` role on the project. A machine has no role; it needs `Configuration.Write` and the management scope `Schema.Write`, both stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Scopes of machines](authentication.md#scopes-of-machines)).
+- Writes (`PUT`, `DELETE` and the version restore of the three kinds) require the `Contributor` role on the project. A machine has no role; it needs `Configuration.Write` and the management scope `Schema.Write`, both stored on the machine and carried by its credentials, or the write answers `403 AccessDenied` (see [Scopes of machines](authentication.md#scopes-of-machines)).
 - `400` means the body is not JSON or is not a schema NJsonSchema can parse, or the type code or annotation key is unknown. On the descendant-type `PUT` it also means that the type cannot descend from `{key}`; that response carries `ErrorCode` `InvalidKey`. A schema that cannot be used carries one of these codes, also with force (see [References](#references) and [Limits of a check](#limits-of-a-check)):
   - `InvalidSchema`: the body cannot be read or its check cannot start;
   - `ExternalSchemaReference`: a `$ref` points outside the schema;
@@ -186,6 +187,12 @@ PUT accepts a query parameter `force`. It defaults to false. See [Force](#force)
 - `409` with `SchemaValidationErrorResponse` means a compliance check failed and force was not set. Each entry carries `AnnotationKey`, `ViewName`, and the list of messages. A message is the JSON path and the NJsonSchema error kind, for example `#/currency: NotInEnumeration`.
 - `409` with `ErrorResponse` means a concurrent writer won the race after the retries. That body is a different type from the compliance failure.
 - `500` means storage failed.
+
+A version restore answers `200` with `VersionRestoreResult`: `Outcome` `Restored` and the new `Version`, or `Unchanged` and the current `Version` when nothing was written; `FromVersion` is the requested version and `Modified` the write of `Version`. As a `PUT`, it answers `400` for an unknown type code or annotation key, `400` without force when the configurations cannot be checked, and `403` without the access. It also answers:
+
+- `400` when the version is no usable schema (`InvalidSchema`, `ExternalSchemaReference` or `SchemaValidationTimeout`), also with force; on the descendant-type route also `InvalidKey` when the type cannot descend from `{key}`.
+- `404` with `ErrorCode` `VersionNotFound` when the version was never written or has expired; on the annotation and descendant-type routes `404 AnnotationNotFound` when the annotation does not exist or was purged.
+- `409` with `ErrorCode` `AnnotationDeleted` on the annotation and descendant-type routes when the annotation is deleted; `409` with `SchemaValidationErrorResponse` when stored configurations do not comply and force was not set; `409` with `ErrorCode` `Conflict` when a concurrent writer won the race after the retries.
 
 Diff endpoints return a `DiffResult`, or unified diff text with `?format=unified`.
 
@@ -200,24 +207,27 @@ sform story schema type edit exe
 sform story schema type delete exe
 sform story schema type versions exe
 sform story schema type diff exe
+sform story schema type restore exe --version 2
 
 sform story schema annotation get rst.invoicing
 sform story schema annotation set rst.invoicing --import invoicing.schema.json
+sform story schema annotation restore rst.invoicing --version 3 --force
 
 sform story schema descendant get rst.invoicing exe
 sform story schema descendant set rst.invoicing exe --import exe-under-invoicing.schema.json
+sform story schema descendant restore rst.invoicing exe --version 1
 
 sform story schema definition exe.northwind.invoicing.prod
 ```
 
-`set` creates the schema or replaces it. It takes `-i|--import` and sends that file as the body. `edit` opens the current document in the editor and replaces it with the result; there has to be a schema already. `get` takes `--version` to print one stored version. `diff` takes the target version, an optional source version, and `--format`: `json` (the default) prints the coloured diff with line numbers, and `unified` the plain unified diff (`@@ -a,b +c,d @@` hunks, lines prefixed with `+`, `-` or a space) to the standard output, in UTF-8 with LF line ends, to be piped; a diff without changes writes nothing there and "No changes detected." to the standard error. `sform` asks the API for the JSON diff in both cases and writes the unified text itself, the same text the API answers to `?format=unified`. `definition` is read-only. Add `-f` or `--force` to `set` and `edit` when the new schema should be stored even though configurations already in the view do not comply. See [Force](#force).
+`set` creates the schema or replaces it. It takes `-i|--import` and sends that file as the body. `edit` opens the current document in the editor and replaces it with the result; there has to be a schema already. `get` takes `--version` to print one stored version. `diff` takes the target version, an optional source version, and `--format`: `json` (the default) prints the coloured diff with line numbers, and `unified` the plain unified diff (`@@ -a,b +c,d @@` hunks, lines prefixed with `+`, `-` or a space) to the standard output, in UTF-8 with LF line ends, to be piped; a diff without changes writes nothing there and "No changes detected." to the standard error. `sform` asks the API for the JSON diff in both cases and writes the unified text itself, the same text the API answers to `?format=unified`. `definition` is read-only. `restore` stores the version given by `--version` as the new version, also after a delete (see [Versions](#versions)). `--version` is required and has no short form, as `-v` is the view; without it, or with a negative version, the command says so and exits with `2` before any request. A restore prints `Restored v2 of the schema for 'exe' as v5.` and exits with `0`; when nothing changed, it prints `v2 is already the current version of the schema for 'exe'.`, or `v2 equals the current version v5 of the schema for 'exe'; nothing changed.`, and exits with `42`. A descendant-type schema is named `'exe' under 'rst.invoicing'`. `versions` adds a `Restored from` column when a listed version was restored. Add `-f` or `--force` to `set`, `edit` and `restore` when the schema should be stored even though configurations already in the view do not comply. See [Force](#force).
 
 When the API refuses a schema command, `sform` prints the server's message, and its error code on the next line when the response has one (`Error code: InvalidKey`). The exit code follows the status, as in every command of `sform` ([Exit codes](../../42for.net/cli/sform.md#exit-codes)):
 
 - A failed compliance check prints the message, then each configuration that does not comply as `annotationKey (view)` with its messages. The command exits with `2`.
-- A `404` of `get`, `delete`, `versions`, `diff`, `definition` or of the read of `edit` prints a sentence of `sform`, such as "The schema for 'exe' has not been found.", and exits with `2`.
+- A `404` of `get`, `delete`, `versions`, `diff`, `definition` or of the read of `edit` prints a sentence of `sform`, such as "The schema for 'exe' has not been found.", and exits with `2`. A `404` of `restore` prints the server's message and its error code (`VersionNotFound`, `AnnotationNotFound`), and exits with `2`.
 - A `403`, for example for a Reader or a machine without `Schema.Write`, prints the server's message and `Error code: AccessDenied`, and exits with `44`.
-- A `400` (for example `InvalidKey` for a descendant type that cannot descend from the key), the `409` of a concurrent change on `set`, `edit` or `delete`, and any other `4xx` exit with `2`. So do a `501` and a `505`, which no retry changes.
+- A `400` (for example `InvalidKey` for a descendant type that cannot descend from the key), the `409` of a concurrent change on `set`, `edit`, `delete` or `restore`, the `409 AnnotationDeleted` of `restore`, and any other `4xx` exit with `2`. So do a `501` and a `505`, which no retry changes.
 - A `5xx`, `408` or `429` exits with `3`: the service failed, and a retry may help.
 - A `401` prints the general sentence of `sform` that the request was not authorized and exits with `44`. So does a `403` without a message of the server.
 - A status without a message of the server prints "The request failed with N Status." (for example "The request failed with 500 InternalServerError.").
@@ -292,10 +302,14 @@ Force breaks one side of that deadlock for a single call. The caller passes it e
 | --- | --- | --- |
 | PUT a schema | Rejected when any in-scope configuration in the view would fail the combined schema after the write (`409`), or when the configurations cannot be checked (`400`, see below) | The schema is stored. Existing configurations are left as they are |
 | PUT or PATCH a configuration | Rejected when the document about to be stored fails the combined schema (`409`), or when that schema cannot be used (`400`) | The document is stored without a check |
+| Restore a schema version | As a schema `PUT`: rejected when an in-scope configuration would fail the combined schema with the restored version (`409`), or when the configurations cannot be checked (`400`) | The version is restored. Existing configurations are left as they are |
+| Restore a configuration version | As a configuration `PUT`: rejected when the version's content fails the combined schema (`409`), or when that schema cannot be used (`400`) | The content is restored without a check |
 
-On the HTTP API the parameter is the query `force=true`. On the CLI it is `-f` or `--force` on `schema type|annotation|descendant set|edit` and on `config set`, `config edit`, and `config patch`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
+A schema version that is no usable schema answers `400` whatever force is, as a `PUT` of it would: for example a version stored before references outside the schema were refused.
 
-Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, a schema with a reference outside itself or whose check cannot start, an unknown type code or annotation key, a descendant type that cannot descend from its key, a patch of a configuration without a stored version, and a lost concurrency race still fail.
+On the HTTP API the parameter is the query `force=true`. On the CLI it is `-f` or `--force` on `schema type|annotation|descendant set|edit|restore` and on `config set`, `config edit`, `config patch`, and `config restore`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
+
+Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, a schema with a reference outside itself or whose check cannot start, an unknown type code or annotation key, a descendant type that cannot descend from its key, a patch of a configuration without a stored version, a restore of a version that does not exist or of a deleted or missing annotation, and a lost concurrency race still fail.
 
 Force covers the check of the other side, whatever stops it. On a schema `PUT`, the compliance step can fail without a violation:
 
@@ -330,14 +344,27 @@ Versioning follows configuration and template versioning.
 
 - A delete writes the history item of the deleted version. A schema created again later continues after the highest version ever allocated for that id, including after history has expired. The counter is kept on a state item (`{view}.css.…` in the same partition) that survives deletion.
 - History items expire after 365 days. The current version does not expire. The expiry is enforced since the containers got item-level TTL with the [key/value pairs](key-values.md#lifecycle) (`DefaultTimeToLive = -1`, set by `ContainerFactory` on the container `organizations`, see the [container settings](annotation-lifecycle.md#containers)); before that, the `ttl` was stored but ignored.
-- `ConfigurationVersion` describes a version: `Version`, `Modified` (who wrote the version and when, see [audit stamps](audit-stamps.md)), `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
+- `ConfigurationVersion` describes a version: `Version`, `Modified` (who wrote the version and when, see [audit stamps](audit-stamps.md)), `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version), and `RestoredFrom` (the version a restore copied into this one, null for any other write; the next write drops it).
 - Diffs compare stored schema documents. Version `0` is an empty object. The diff of version `N` is `N-1 → N`. Any pair can be requested.
 
 The kind segment (`t`, `a`, `d`) keeps a type-schema history prefix from matching an annotation key that starts with the same characters.
 
 Every write uses the ETag of the item it read. The history item, the new schema, and the state record are written in one transactional batch. When another writer changed the schema in the meantime, the write is retried on fresh data, up to three times. After that the call returns `409` with `ErrorResponse`.
 
-Schema changes do not clear calculated configuration caches. A schema is consulted when content is written. It is not merged into the calculated document.
+Schema changes, restores included, do not clear calculated configuration caches. A schema is consulted when content is written. It is not merged into the calculated document.
+
+### Restoring a version
+
+`POST …/versions/{version}/restore` stores the content of version N as the next version, stamped with the caller (`RestoreSchemaVersionAsync`, `RestoreAnnotationSchemaVersionAsync` and `RestoreDescendantTypeSchemaVersionAsync` of `IConfigurationSchemaService`, in `CosmosConfigurationSchemaService.Restore.cs`). History stays append-only, and the new version records `RestoredFrom = N`. Schemas have no audit, so that mark is the record of the restore.
+
+- **The annotation.** An annotation schema and a descendant-type schema are restored only while their annotation exists and is not deleted: a soft-deleted annotation answers `409 AnnotationDeleted` (restore it first), a missing, purged or expired one `404 AnnotationNotFound`. Their `PUT` and `DELETE` do not check the annotation. A descendant-type restore checks the pair first: a type that cannot descend from `{key}` answers `400 InvalidKey`, whatever force is. A type schema belongs to no annotation.
+- **The version.** A version that was never written or has expired answers `404 VersionNotFound`.
+- **No change.** When N is the current version, or the current schema has N's content, nothing is written and the result is `Unchanged` with the current version.
+- **The checks of a `PUT`.** N's content must be a usable schema (`400` whatever force is, see [Force](#force)), and the configurations it applies to must comply with the combined schema it makes, unless force (`409` with `SchemaValidationErrorResponse`).
+- **After a delete.** A deleted schema is brought back this way. The restored version continues after the highest version ever allocated, as a schema created again does.
+- **Concurrency.** As a write: retried up to three times, then `409` with `ErrorCode` `Conflict`.
+
+The answer is a `VersionRestoreResult`: `Outcome` (`Restored` or `Unchanged`), `FromVersion` (N), `Version` (the new version, or the current one when nothing changed) and `Modified` (the write of `Version`).
 
 ## Worked change
 

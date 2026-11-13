@@ -50,8 +50,11 @@ export interface MockDb {
   views: Record<string, View[]>
   /** Changed annotations per scope ("org/project/view"). */
   annotations: Record<string, AnnotationOverrides>
-  /** Changed versioned documents (configurations, templates, schemas) per scope; null marks a deletion. */
-  documents?: Record<string, Record<string, { versions: unknown[] } | null>>
+  /**
+   * Changed versioned documents (configurations, templates, schemas) per scope; a deleted one keeps its versions with
+   * `deleted`, and null marks a deletion stored before that.
+   */
+  documents?: Record<string, Record<string, { versions: unknown[]; deleted?: boolean } | null>>
   invitations?: Invitation[]
   /** Machines per project key. */
   machines?: Record<string, MachineAccess[]>

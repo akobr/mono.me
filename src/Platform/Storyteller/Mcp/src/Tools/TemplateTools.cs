@@ -108,6 +108,26 @@ public sealed class TemplateTools(Sdk.ITemplatesApiClient templates)
             : DocumentWrites.Written(await templates.PatchTemplateAsync(organization, project, view, type, patch, cancellationToken));
     }
 
+    [McpServerTool(Name = "revert_template", Title = "Revert a template to a version", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [Description(
+        "Restores a previous version of the template of an annotation type (list_template_versions) as a new version, in "
+        + "one step on the server: the version's content is copied as it was stored, and the history is kept. Reverting "
+        + "to the current version, or to one the current template equals, changes nothing. A template removed by "
+        + "delete_template is brought back this way. An unknown or expired version answers 404 VersionNotFound. "
+        + ManagementText.TemplatePosition + " Needs the Contributor role. Returns Outcome (Restored or Unchanged), "
+        + "FromVersion, Version (the new version, or the current one when nothing changed), Modified and Changed.")]
+    public async Task<CallToolResult> RevertTemplate(
+        [Description(ToolText.Organization)] string organization,
+        [Description(ToolText.Project)] string project,
+        [Description(ManagementText.TemplateType)] string annotationType,
+        [Description(ToolText.Version)] int version,
+        [Description(ToolText.View)] string view = ToolText.DefaultView,
+        CancellationToken cancellationToken = default)
+    {
+        var type = TypeCodes.Parse(annotationType);
+        return DocumentWrites.Reverted(await templates.RestoreTemplateVersionAsync(organization, project, view, type, version, cancellationToken));
+    }
+
     [McpServerTool(Name = "patch_template", Title = "Patch a template", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
     [Description(
         "Applies RFC 6902 operations to the template of an annotation type (the paths address its Content). A test "
@@ -130,8 +150,9 @@ public sealed class TemplateTools(Sdk.ITemplatesApiClient templates)
     [McpServerTool(Name = "delete_template", Title = "Delete a template", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description(
         "Deletes the template of an annotation type in a view: its values leave the effective configuration of every "
-        + "annotation of the type. Its versions are kept until they expire, and a template created later continues the "
-        + "numbering. Answers 404 when the type has no template. Needs the Contributor role.")]
+        + "annotation of the type. Its versions are kept until they expire (revert_template brings one back), and a "
+        + "template created later continues the numbering. Answers 404 when the type has no template. Needs the "
+        + "Contributor role.")]
     public async Task<CallToolResult> DeleteTemplate(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
@@ -146,8 +167,9 @@ public sealed class TemplateTools(Sdk.ITemplatesApiClient templates)
 
     [McpServerTool(Name = "list_template_versions", Title = "List template versions", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(
-        "Lists the versions of the template of an annotation type: Version, Modified (who wrote it and when) and "
-        + "ExpirationTime; versions other than the current one expire 365 days after their write. Needs the Reader role.")]
+        "Lists the versions of the template of an annotation type: Version, Modified (who wrote it and when), "
+        + "ExpirationTime, and RestoredFrom on a version restored from an earlier one (revert_template); versions other "
+        + "than the current one expire 365 days after their write. Needs the Reader role.")]
     public async Task<CallToolResult> ListTemplateVersions(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,

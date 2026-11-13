@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Mcp.Tools;
 
-// Shared by the configuration and template writes: the arguments of replace and patch, and their results.
+// Shared by the configuration, template and schema writes: the arguments of replace and patch, and their results.
 public static class DocumentWrites
 {
     private static readonly HashSet<string> PatchOps = new(StringComparer.Ordinal) { "add", "remove", "replace", "move", "copy", "test" };
@@ -81,6 +81,15 @@ public static class DocumentWrites
     public static CallToolResult Unchanged(JObject result)
     {
         result["Changed"] = false;
+        return ToolResults.Json(result);
+    }
+
+    // The result of a revert: the API's restore of a version, with Changed as the other writes return it. Unchanged means
+    // that the version is the current one, or that the current version has its content; nothing was written then.
+    public static CallToolResult Reverted(Sdk.VersionRestoreResult restore)
+    {
+        var result = (JObject)ToolResults.ToToken(restore).DeepClone();
+        result["Changed"] = restore.Outcome == Sdk.VersionRestoreResultOutcome.Restored;
         return ToolResults.Json(result);
     }
 

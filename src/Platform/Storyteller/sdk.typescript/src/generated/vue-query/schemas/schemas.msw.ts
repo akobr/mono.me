@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import { faker } from "@faker-js/faker";
 
@@ -16,6 +16,7 @@ import type {
   ConfigurationSchemaSummary,
   ConfigurationVersion,
   DiffResult,
+  VersionRestoreResult,
 } from "../../model";
 
 export const getGetConfigurationSchemaResponseMock = (
@@ -445,6 +446,126 @@ export const getGetConfigurationSchemasResponseMock =
       ]),
     }));
 
+export const getRestoreSchemaVersionResponseMock = (
+  overrideResponse: Partial<Extract<VersionRestoreResult, object>> = {},
+): VersionRestoreResult => ({
+  Outcome: faker.helpers.arrayElement(["Restored", "Unchanged"] as const),
+  FromVersion: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getRestoreAnnotationSchemaVersionResponseMock = (
+  overrideResponse: Partial<Extract<VersionRestoreResult, object>> = {},
+): VersionRestoreResult => ({
+  Outcome: faker.helpers.arrayElement(["Restored", "Unchanged"] as const),
+  FromVersion: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getRestoreDescendantTypeSchemaVersionResponseMock = (
+  overrideResponse: Partial<Extract<VersionRestoreResult, object>> = {},
+): VersionRestoreResult => ({
+  Outcome: faker.helpers.arrayElement(["Restored", "Unchanged"] as const),
+  FromVersion: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Via: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
 export const getGetSchemaVersionsResponseMock = (): ConfigurationVersion[] =>
   Array.from(
     { length: faker.number.int({ min: 1, max: 10 }) },
@@ -486,6 +607,7 @@ export const getGetSchemaVersionsResponseMock = (): ConfigurationVersion[] =>
       faker.date.past().toISOString().slice(0, 19) + "Z",
       undefined,
     ]),
+    RestoredFrom: faker.helpers.arrayElement([faker.number.int(), null]),
   }));
 
 export const getGetSchemaVersionResponseMock = (
@@ -741,6 +863,7 @@ export const getGetAnnotationSchemaVersionsResponseMock =
         faker.date.past().toISOString().slice(0, 19) + "Z",
         undefined,
       ]),
+      RestoredFrom: faker.helpers.arrayElement([faker.number.int(), null]),
     }));
 
 export const getGetAnnotationSchemaVersionResponseMock = (
@@ -996,6 +1119,7 @@ export const getGetDescendantTypeSchemaVersionsResponseMock =
         faker.date.past().toISOString().slice(0, 19) + "Z",
         undefined,
       ]),
+      RestoredFrom: faker.helpers.arrayElement([faker.number.int(), null]),
     }));
 
 export const getGetDescendantTypeSchemaVersionResponseMock = (
@@ -1465,6 +1589,78 @@ export const getGetConfigurationSchemasMockHandler = (
   );
 };
 
+export const getRestoreSchemaVersionMockHandler = (
+  overrideResponse?:
+    | VersionRestoreResult
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<VersionRestoreResult> | VersionRestoreResult),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/:organization/:project/:view/configuration-schema/type/:annotationType/versions/:version/restore",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getRestoreSchemaVersionResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getRestoreAnnotationSchemaVersionMockHandler = (
+  overrideResponse?:
+    | VersionRestoreResult
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<VersionRestoreResult> | VersionRestoreResult),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/:organization/:project/:view/configuration-schema/:key/versions/:version/restore",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getRestoreAnnotationSchemaVersionResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getRestoreDescendantTypeSchemaVersionMockHandler = (
+  overrideResponse?:
+    | VersionRestoreResult
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<VersionRestoreResult> | VersionRestoreResult),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/:organization/:project/:view/configuration-schema/:key/type/:annotationType/versions/:version/restore",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getRestoreDescendantTypeSchemaVersionResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetSchemaVersionsMockHandler = (
   overrideResponse?:
     | ConfigurationVersion[]
@@ -1776,6 +1972,9 @@ export const getSchemasMock = () => [
   getDeleteDescendantTypeSchemaMockHandler(),
   getGetCombinedConfigurationSchemaMockHandler(),
   getGetConfigurationSchemasMockHandler(),
+  getRestoreSchemaVersionMockHandler(),
+  getRestoreAnnotationSchemaVersionMockHandler(),
+  getRestoreDescendantTypeSchemaVersionMockHandler(),
   getGetSchemaVersionsMockHandler(),
   getGetSchemaVersionMockHandler(),
   getGetSchemaVersionDiffMockHandler(),

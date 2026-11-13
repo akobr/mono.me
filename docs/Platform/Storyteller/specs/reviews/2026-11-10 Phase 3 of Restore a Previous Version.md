@@ -1,0 +1,25 @@
+# Phase 3 of Restore a Previous Version
+
+## Overview
+
+Phase 3 of [Restore a Previous Version of a Configuration, Template or Schema](../2026-11-10%20Restore%20a%20Previous%20Version%20of%20a%20Configuration,%20Template%20or%20Schema.md) (Linear 424-221): the five `sform` restore commands, the history and versions tables, their unit tests, and the automation cases of the CLI in Testiny project `2SC` and the catalogue. The spec's section 7 and the CLI part of section 11.
+
+## What Was Done
+
+### 7. sform
+
+- **Commands:** `ConfigRestoreCommand` (`story config restore <key> --version N [-f|--force]`), `TemplateRestoreCommand` (`story template restore <type> --version N`), and `SchemaTypeRestoreCommand`, `SchemaAnnotationRestoreCommand` and `SchemaDescendantRestoreCommand` (`story schema type|annotation|descendant restore … --version N [-f|--force]`), each `[Command(CommandNames.RESTORE)]` after `versions` in the `[Subcommand]` list of its group. Their descriptions say that they restore a version, as `story restore` and `story kv restore` undelete. The schema layers go through `SchemaOperations.RestoreAsync` and a private layer switch, as the other schema operations do.
+- **Shared code:**
+  - `Output/VersionRestoreConsole.cs`: `ValidateVersionToRestore` (a missing `--version` prints "Please specify the version to restore with --version.", a negative one says so; both exit `2` before any request) and `RestoreVersionAsync` (the call; an `ApiException` other than `401` goes to `SchemaValidationConsole.WriteWriteError`, so a schema violation lists the configurations with exit `2` and any other refusal prints the server's message and error code with the exit code of its status).
+  - `Output/VersionRestoreReport.cs`: the line and the exit code from the response: "Restored vN of … as vM." (`0`), "vN is already the current version of …." or "vN equals the current version vM of …; nothing changed." (`42`).
+- **Version 0** goes to the API: a configuration written before versions were counted can list a version 0, which the API restores. The first cut refused every version below 1; the branch's review found it, and only a negative version is refused now (`fix(platform): let sform restore a version 0 of a configuration`).
+- **History and versions:** `AuditConsoleExtensions` names `ConfigurationRestored` "Config restored" and its change "config vM from vN". `VersionsConsoleExtensions.WriteVersions` adds a last column `Restored from` (`vN` or `—`) only when a listed version was restored, so the usual table stays as it was and the automation tests' parsers (`SformResult.VersionRows`, `ConfigOutput.VersionAuthors`) read both.
+- **Unit tests** (`Cli/test`, 1993 pass): `ConfigRestoreCommandTests`, `TemplateRestoreCommandTests`, `VersionRestoreReportTests`, `VersionsConsoleExtensionsTests`, the restore theories of `SchemaOperationsTests` over the three layers, rows of `ApiRefusalExitCodeTests`, and `AuditConsoleExtensionsTests`. They cover the three outcomes and their exit codes, version 0, a missing or negative version, an invalid key or type, `force`, a schema violation, `VersionNotFound` and `AnnotationDeleted`, the rethrown `401`, and the parsing through the groups (`-f`, `--force`, `--version=4`; `-v` stays the view; a template restore takes no `-f`).
+- **Automation cases** (`Cli.AutomationTests`, Testiny project `2SC`):
+  - new cases CFG-HIS-07 (485), CFG-HIS-08 (486) and CFG-HIS-09 (487) in `ConfigHistoryTests`, TPL-TPL-10 (488) in `TemplateTests`, SCH-TYP-06 (491) in `SchemaTypeTests`, SCH-ANN-06 (489) in `SchemaAnnotationTests` and SCH-DSC-06 (490) in `SchemaDescendantTests`;
+  - the context cases CFG-CTX-01, TPL-TPL-09 and SCH-CTX-01 run the restores with `--projectKey`, `-v` and `--view`, after the reads and before the deletes, and check the "Restored v1 … as v…" line;
+  - At first the Testiny case of `schema type restore` could not be created (the session's permission check refused it), and SCH-CTX-01 covered its items for a while. With the owner's approval it was created as SCH-TYP-06 (491), and SCH-CTX-01 is back to the context options; its type restores still use `-f` and `--force`, which change nothing in its view.
+  - Testiny: cases 485 to 491 were created, and the steps of 441 (CFG-CTX-01), 425 (TPL-TPL-09) and 336 (SCH-CTX-01) were updated (the update of 425, refused by the permission check at first, after the owner's approval).
+  - The catalogue (`test-cases.md`) has the rows, the bullets and the counts (Configurations 36, Templates 10, Schemas 24, total 258); `automation-tests.md`, the project's README and `CLAUDE.md` follow, and the coverage numbers were recounted from the test's output (110 commands, 35 aliases, 651 option forms, 93 arguments, 147 fixed values: 1036 items).
+  - The coverage and catalogue checks and the self tests pass without a target (88 tests); the functional cases have not run against a deployed API yet.
+- **Docs:** `docs/42for.net/cli/sform.md` (a "Restore a version" paragraph, the exit codes, the scope table); the CLI sections of `templating.md` and `definitions.md` came with the docs commit.

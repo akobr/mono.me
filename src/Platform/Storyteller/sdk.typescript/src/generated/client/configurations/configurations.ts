@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.31.6881
+ * OpenAPI spec version: 0.10.34.56348
  */
 import type {
   BindingCatalog,
@@ -18,8 +18,10 @@ import type {
   GetConfigurationsParams,
   JsonPatchOperation,
   PatchConfigurationParams,
+  RestoreConfigurationVersionParams,
   SetConfigurationBody,
   SetConfigurationParams,
+  VersionRestoreResult,
 } from "../../model";
 
 import { storytellerFetch } from "../../../lib/fetcher";
@@ -377,6 +379,57 @@ export const getConfigurationVersion = async (
     {
       ...options,
       method: "GET",
+    },
+  );
+};
+
+export const getRestoreConfigurationVersionUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  version: number,
+  params?: RestoreConfigurationVersionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/restore?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/restore`;
+};
+
+/**
+ * Stores the content of a version of the annotation's own document as its new version, whole and as stored (no merge), also after the configuration was deleted. The version's content is checked against the schema unless force is true. The restore is in the annotation's history as ConfigurationRestored, and the new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.
+ */
+export const restoreConfigurationVersion = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  version: number,
+  params?: RestoreConfigurationVersionParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<VersionRestoreResult> => {
+  return storytellerFetch<VersionRestoreResult>(
+    getRestoreConfigurationVersionUrl(
+      organization,
+      project,
+      view,
+      key,
+      version,
+      params,
+    ),
+    {
+      ...options,
+      method: "POST",
     },
   );
 };

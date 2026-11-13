@@ -565,6 +565,57 @@ public partial class ConfigurationHttp
         return new OkObjectResult(configurationModel);
     }
 
+    [Function(nameof(RestoreConfigurationVersion))]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.RestoreConfigurationVersion, Definitions.Tags.Configurations, Description = "Stores the content of a version of the annotation's own document as its new version, whole and as stored (no merge), also after the configuration was deleted. The version's content is checked against the schema unless force is true. The restore is in the annotation's history as ConfigurationRestored, and the new version records RestoredFrom. A deleted annotation answers 409 (restore it first), a missing or purged one 404.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiParameter(Definitions.Parameters.Version, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = Definitions.Descriptions.RestoreVersion)]
+    [OpenApiParameter(Definitions.Parameters.Force, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.ForceConfigurationRestore)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(VersionRestoreResult), Description = Definitions.Descriptions.ResponseVersionRestored)]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseAnnotationVersionRestoreNotFound)]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationVersionRestoreConflict)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationWrite)]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> RestoreConfigurationVersion(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Configuration.V1.VersionRestore)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view,
+        string key,
+        uint version)
+    {
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor, MachineScope.ConfigurationWrite);
+
+        if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
+        var fullKey = FullKey.Create(annotationKey, organization, project, view);
+
+        try
+        {
+            var result = await _configuration.RestoreConfigurationVersionAsync(fullKey, version, request.GetAuditActor(), IsForce(request));
+            return new OkObjectResult(result);
+        }
+        catch (StorytellerException ex)
+        {
+            // a deleted annotation answers 409 AnnotationDeleted, a missing one or a missing version 404
+            return ErrorResponseMapping.ToActionResult(ex);
+        }
+        catch (SchemaValidationException ex)
+        {
+            return ToSchemaConflict(ex);
+        }
+    }
+
     [Function(nameof(GetConfigurationVersionDiff))]
     [OpenApiOperation(Definitions.RouteIds.Configuration.GetConfigurationVersionDiff, Definitions.Tags.Configurations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
@@ -828,6 +879,21 @@ public partial class ConfigurationHttp
         {
             request.MarkNoCache();
         }
+    }
+
+    // A schema violation of a configuration write: 409 with the violations.
+    private static ConflictObjectResult ToSchemaConflict(SchemaValidationException exception)
+    {
+        var errorDetails = exception.ValidationErrors
+            .Select(e => new SchemaValidationErrorDetail
+            {
+                AnnotationKey = e.AnnotationKey,
+                ViewName = e.ViewName,
+                Errors = e.Errors,
+            })
+            .ToList();
+
+        return new ConflictObjectResult(new SchemaValidationErrorResponse(exception.Message, errorDetails));
     }
 
     private static bool IsForce(HttpRequestData request)

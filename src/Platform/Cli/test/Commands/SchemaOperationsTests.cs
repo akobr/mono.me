@@ -2,12 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.Schemas;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Moq.Language.Flow;
 using Newtonsoft.Json.Linq;
@@ -294,6 +299,193 @@ public class SchemaOperationsTests
         Lines.ShouldBe(["! The schema was changed by another writer."]);
     }
 
+    // 424-221: schema type|annotation|descendant restore … --version N [-f|--force], through each command. Restored is 0,
+    // nothing changed 42, and the subject is named as the other schema commands name it.
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type), "'exe'")]
+    [InlineData(nameof(SchemaLayer.Annotation), "'rst.invoicing'")]
+    [InlineData(nameof(SchemaLayer.Descendant), "'exe' under 'rst.invoicing'")]
+    public async Task Restore_Restored_NamesTheNewVersion(string layerName, string subject)
+    {
+        var layer = Enum.Parse<SchemaLayer>(layerName);
+        SetupRestore(layer, 2, false).ReturnsAsync(ConfigRestoreCommandTests.Result(VersionRestoreResultOutcome.Restored, 2, 4));
+
+        var exitCode = await RestoreCommand(layer, 2, false).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        Lines.ShouldBe([$"! Restored v2 of the schema for {subject} as v4."]);
+    }
+
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type), "'exe'")]
+    [InlineData(nameof(SchemaLayer.Annotation), "'rst.invoicing'")]
+    [InlineData(nameof(SchemaLayer.Descendant), "'exe' under 'rst.invoicing'")]
+    public async Task Restore_CurrentVersion_IsAlreadyCurrent(string layerName, string subject)
+    {
+        var layer = Enum.Parse<SchemaLayer>(layerName);
+        SetupRestore(layer, 4, false).ReturnsAsync(ConfigRestoreCommandTests.Result(VersionRestoreResultOutcome.Unchanged, 4, 4));
+
+        var exitCode = await RestoreCommand(layer, 4, false).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_NO_WORK_NEEDED);
+        Lines.ShouldBe([$"! v4 is already the current version of the schema for {subject}."]);
+    }
+
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type), "'exe'")]
+    [InlineData(nameof(SchemaLayer.Annotation), "'rst.invoicing'")]
+    [InlineData(nameof(SchemaLayer.Descendant), "'exe' under 'rst.invoicing'")]
+    public async Task Restore_VersionWithTheCurrentContent_ChangesNothing(string layerName, string subject)
+    {
+        var layer = Enum.Parse<SchemaLayer>(layerName);
+        SetupRestore(layer, 1, false).ReturnsAsync(ConfigRestoreCommandTests.Result(VersionRestoreResultOutcome.Unchanged, 1, 4));
+
+        var exitCode = await RestoreCommand(layer, 1, false).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_NO_WORK_NEEDED);
+        Lines.ShouldBe([$"! v1 equals the current version v4 of the schema for {subject}; nothing changed."]);
+    }
+
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type))]
+    [InlineData(nameof(SchemaLayer.Annotation))]
+    [InlineData(nameof(SchemaLayer.Descendant))]
+    public async Task Restore_Force_IsPassedThrough(string layerName)
+    {
+        var layer = Enum.Parse<SchemaLayer>(layerName);
+        SetupRestore(layer, 1, true).ReturnsAsync(ConfigRestoreCommandTests.Result(VersionRestoreResultOutcome.Restored, 1, 5));
+
+        var exitCode = await RestoreCommand(layer, 1, true).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        Lines.ShouldBe([$"! Restored v1 of the schema for {SchemaOperations.Describe(layer, Target(layer).Type, Target(layer).Key)} as v5."]);
+    }
+
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type))]
+    [InlineData(nameof(SchemaLayer.Annotation))]
+    [InlineData(nameof(SchemaLayer.Descendant))]
+    public async Task Restore_WithoutVersion_SaysSoBeforeAnyCall(string layerName)
+    {
+        var exitCode = await RestoreCommand(Enum.Parse<SchemaLayer>(layerName), null, false).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        Lines.ShouldBe([$"! {VersionRestoreConsole.MissingVersionMessage}"]);
+        _api.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type))]
+    [InlineData(nameof(SchemaLayer.Annotation))]
+    [InlineData(nameof(SchemaLayer.Descendant))]
+    public async Task Restore_NegativeVersion_SaysSoBeforeAnyCall(string layerName)
+    {
+        var exitCode = await RestoreCommand(Enum.Parse<SchemaLayer>(layerName), -3, false).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        Lines.ShouldBe(["! The version to restore cannot be negative, not -3; 'versions' lists them."]);
+        _api.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type))]
+    [InlineData(nameof(SchemaLayer.Annotation))]
+    [InlineData(nameof(SchemaLayer.Descendant))]
+    public async Task Restore_FailedComplianceCheck_ListsTheConfigurations(string layerName)
+    {
+        var layer = Enum.Parse<SchemaLayer>(layerName);
+        SetupRestore(layer, 1, false).ThrowsAsync(new ApiException<SchemaValidationErrorResponse>(
+            "Configurations do not comply with the version.",
+            409,
+            string.Empty,
+            new Dictionary<string, IEnumerable<string>>(),
+            new SchemaValidationErrorResponse
+            {
+                Message = "One or more existing configurations are not compliant with the provided schema.",
+                Errors = [new SchemaValidationErrorDetail { AnnotationKey = "exe.northwind.invoicing.prod", ViewName = "default", Errors = ["#/req: PropertyRequired"] }],
+            },
+            null));
+
+        var exitCode = await RestoreCommand(layer, 1, false).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        Lines.ShouldBe(
+        [
+            "! One or more existing configurations are not compliant with the provided schema.",
+            "exe.northwind.invoicing.prod (default)",
+            "  #/req: PropertyRequired",
+        ]);
+    }
+
+    [Theory]
+    [InlineData(nameof(SchemaLayer.Type))]
+    [InlineData(nameof(SchemaLayer.Annotation))]
+    [InlineData(nameof(SchemaLayer.Descendant))]
+    public async Task Restore_UnknownVersion_PrintsTheMessageAndTheCode(string layerName)
+    {
+        var layer = Enum.Parse<SchemaLayer>(layerName);
+        SetupRestore(layer, 9, false).ThrowsAsync(Error(404, "The version was never written or has expired (ErrorCode VersionNotFound).", "The version 9 does not exist or has expired.", "VersionNotFound"));
+
+        var exitCode = await RestoreCommand(layer, 9, false).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        Lines.ShouldBe(["! The version 9 does not exist or has expired.", "Error code: VersionNotFound"]);
+        ShouldNotDumpTheException();
+    }
+
+    [Fact]
+    public async Task DescendantRestore_TypeThatCannotDescend_PrintsTheMessageAndTheCode()
+    {
+        _api
+            .Setup(api => api.RestoreDescendantTypeSchemaVersionAsync("org1", "proj1", "default", "exe.s.r.c", "rst", 1, true, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(Error(400, BadRequestDescendantType, CannotDescend, "InvalidKey"));
+        var command = new SchemaDescendantRestoreCommand(_fixture.Console.Object, _fixture.Context.Object, _api.Object)
+        {
+            AnnotationKey = "exe.s.r.c",
+            AnnotationType = "rst",
+            Version = 1,
+            Force = true,
+        };
+
+        var exitCode = await command.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        Lines.ShouldBe([$"! {CannotDescend}", "Error code: InvalidKey"]);
+        ShouldNotDumpTheException();
+    }
+
+    [Fact]
+    public async Task Restore_Unauthorized_LeavesTheOperation()
+    {
+        SetupRestore(SchemaLayer.Type, 1, false).ThrowsAsync(AnnotationCommandFixture.Error(401));
+
+        var exception = await Should.ThrowAsync<ApiException>(() => RestoreCommand(SchemaLayer.Type, 1, false).OnExecuteAsync());
+
+        exception.StatusCode.ShouldBe(401);
+        Lines.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Restore_OptionsAreParsed()
+    {
+        var type = ParseRestore<SchemaTypeCommand, SchemaTypeRestoreCommand>("restore", "exe", "--version", "2", "-f");
+        type.AnnotationType.ShouldBe("exe");
+        type.Version.ShouldBe(2);
+        type.Force.ShouldBeTrue();
+
+        var annotation = ParseRestore<SchemaAnnotationCommand, SchemaAnnotationRestoreCommand>("restore", "rst.invoicing", "--version", "3", "--force", "-v", "staging");
+        annotation.AnnotationKey.ShouldBe("rst.invoicing");
+        annotation.Version.ShouldBe(3);
+        annotation.Force.ShouldBeTrue();
+        annotation.ViewName.ShouldBe("staging");
+
+        var descendant = ParseRestore<SchemaDescendantCommand, SchemaDescendantRestoreCommand>("restore", "rst.invoicing", "unt", "--version", "1");
+        descendant.AnnotationKey.ShouldBe("rst.invoicing");
+        descendant.AnnotationType.ShouldBe("unt");
+        descendant.Version.ShouldBe(1);
+        descendant.Force.ShouldBeFalse();
+    }
+
     // An ErrorResponse as the SDK throws it: the message of the exception is the OpenAPI description of the status.
     private static ApiException<ErrorResponse> Error(int statusCode, string description, string message, string? errorCode = null)
     {
@@ -321,6 +513,63 @@ public class SchemaOperationsTests
         Lines.ShouldNotContain(line => line.Contains("Error occurred:"));
         Lines.ShouldNotContain(line => line.Contains("Status: 400"));
         Lines.ShouldNotContain(line => line.Contains(BadRequest));
+    }
+
+    private ISetup<ISchemasApiClient, Task<VersionRestoreResult>> SetupRestore(SchemaLayer layer, int version, bool force)
+    {
+        var (type, key) = Target(layer);
+
+        return layer switch
+        {
+            SchemaLayer.Type => _api.Setup(api => api.RestoreSchemaVersionAsync("org1", "proj1", "default", type!, version, force, It.IsAny<CancellationToken>())),
+            SchemaLayer.Annotation => _api.Setup(api => api.RestoreAnnotationSchemaVersionAsync("org1", "proj1", "default", key!, version, force, It.IsAny<CancellationToken>())),
+            _ => _api.Setup(api => api.RestoreDescendantTypeSchemaVersionAsync("org1", "proj1", "default", key!, type!, version, force, It.IsAny<CancellationToken>())),
+        };
+    }
+
+    // The restore command of the layer, as the user types it: schema type|annotation|descendant restore.
+    private BaseContextCommand RestoreCommand(SchemaLayer layer, int? version, bool force)
+    {
+        var (type, key) = Target(layer);
+
+        return layer switch
+        {
+            SchemaLayer.Type => new SchemaTypeRestoreCommand(_fixture.Console.Object, _fixture.Context.Object, _api.Object)
+            {
+                AnnotationType = type!,
+                Version = version,
+                Force = force,
+            },
+            SchemaLayer.Annotation => new SchemaAnnotationRestoreCommand(_fixture.Console.Object, _fixture.Context.Object, _api.Object)
+            {
+                AnnotationKey = key!,
+                Version = version,
+                Force = force,
+            },
+            _ => new SchemaDescendantRestoreCommand(_fixture.Console.Object, _fixture.Context.Object, _api.Object)
+            {
+                AnnotationKey = key!,
+                AnnotationType = type!,
+                Version = version,
+                Force = force,
+            },
+        };
+    }
+
+    // The restore command that the group selects, as the host builds it.
+    private TRestore ParseRestore<TGroup, TRestore>(params string[] args)
+        where TGroup : class
+        where TRestore : class
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(_fixture.Console.Object)
+            .AddSingleton(_fixture.Context.Object)
+            .AddSingleton(_api.Object)
+            .BuildServiceProvider();
+        var app = new CommandLineApplication<TGroup>(NullConsole.Singleton);
+        app.Conventions.UseDefaultConventions().UseConstructorInjection(services);
+
+        return app.Parse(args).SelectedCommand.ShouldBeOfType<CommandLineApplication<TRestore>>().Model;
     }
 
     private ISetup<ISchemasApiClient, Task<ConfigurationSchema>> SetupSet(SchemaLayer layer)

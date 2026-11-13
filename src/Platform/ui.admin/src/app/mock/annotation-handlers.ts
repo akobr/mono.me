@@ -115,7 +115,7 @@ export const byDepthTypeKey = (a: string, b: string) =>
   depthOf(a) - depthOf(b) || mergeOrderOf(a) - mergeOrderOf(b) || (a < b ? -1 : a > b ? 1 : 0)
 
 /** Audit actions that leave the annotation's Created stamp as it was seeded; a re-create replaces it. */
-const updates = new Set(['Updated', 'ConfigurationChanged', 'ConfigurationDeleted', 'Deleted', 'Restored'])
+const updates = new Set(['Updated', 'ConfigurationChanged', 'ConfigurationDeleted', 'ConfigurationRestored', 'Deleted', 'Restored'])
 
 const isDescendant = (candidate: string, key: string) => candidate !== key && getAllAncestors(candidate).includes(key)
 

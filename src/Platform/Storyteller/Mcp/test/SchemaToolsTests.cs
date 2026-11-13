@@ -94,6 +94,55 @@ public class SchemaToolsTests
         (await Tools.GetSchema(Organization, Project, "annotation", key: "sbt.northwind")).Structured().Value<long>("Version").ShouldBe(1);
     }
 
+    [Theory]
+    [InlineData("type", "exe", null, false)]
+    [InlineData("annotation", null, "sbt.northwind", true)]
+    [InlineData("descendantType", "cnt", "sbt.northwind", true)]
+    public async Task RevertSchema_UsesTheRestoreOfTheLevel(string level, string? annotationType, string? key, bool force)
+    {
+        bool? forced = force ? true : null;
+        var restore = Restore(Sdk.VersionRestoreResultOutcome.Restored, 2, 5);
+        _api.Setup(api => api.RestoreSchemaVersionAsync(Organization, Project, ViewName, "exe", 2, forced, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(restore);
+        _api.Setup(api => api.RestoreAnnotationSchemaVersionAsync(Organization, Project, ViewName, "sbt.northwind", 2, forced, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(restore);
+        _api.Setup(api => api.RestoreDescendantTypeSchemaVersionAsync(Organization, Project, ViewName, "sbt.northwind", "cnt", 2, forced, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(restore);
+
+        var result = (await Tools.RevertSchema(Organization, Project, level, 2, annotationType: annotationType, key: key, force: force)).Structured();
+
+        result.Value<string>("Outcome").ShouldBe("Restored");
+        result.Value<long>("Version").ShouldBe(5);
+        result.Value<bool>("Changed").ShouldBeTrue();
+        _api.Invocations.Count.ShouldBe(1);
+        _api.Invocations[0].Method.Name.ShouldBe(level switch
+        {
+            "type" => nameof(Sdk.ISchemasApiClient.RestoreSchemaVersionAsync),
+            "annotation" => nameof(Sdk.ISchemasApiClient.RestoreAnnotationSchemaVersionAsync),
+            _ => nameof(Sdk.ISchemasApiClient.RestoreDescendantTypeSchemaVersionAsync),
+        });
+    }
+
+    [Fact]
+    public async Task RevertSchema_Unchanged_SaysNothingChanged()
+    {
+        _api.Setup(api => api.RestoreSchemaVersionAsync(Organization, Project, ViewName, "exe", 3, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Restore(Sdk.VersionRestoreResultOutcome.Unchanged, 3, 3));
+
+        var result = (await Tools.RevertSchema(Organization, Project, "type", 3, annotationType: "EXE")).Structured();
+
+        result.Value<string>("Outcome").ShouldBe("Unchanged");
+        result.Value<bool>("Changed").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task RevertSchema_TargetWithoutWhatItsLevelNeeds_IsRefused_AndNothingIsSent()
+    {
+        await Should.ThrowAsync<ToolInputException>(() => Tools.RevertSchema(Organization, Project, "descendantType", 2, key: "sbt.northwind"));
+
+        _api.Invocations.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task DeleteAndDiff_UseTheMethodsOfTheLevel()
     {

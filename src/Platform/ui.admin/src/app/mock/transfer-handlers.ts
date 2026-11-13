@@ -53,8 +53,8 @@ import { createZip, readZip, textFile, type ZipFile } from './zip'
 // An archive holds the four kinds of the mock database: annotations, the template: and schema: documents, and
 // configurations. The files are named like the API names them (archive-names.ts), one folder per kind, with
 // export.json (manifest version 2) and the earlier versions as version files. A git export is the same folders with the
-// current documents and .git/HEAD; the mock writes no repository. The mock keeps no versions of a deleted document, so
-// its exports never list one.
+// current documents and .git/HEAD; the mock writes no repository. A deleted document keeps its versions, but its
+// exports never list one.
 //
 // An import reads the files by their names in any folder and runs the passes of the API: annotations (ancestors
 // first), schemas, templates, configurations, with Include, Existing, Force and DryRun. An overlay holds what the
