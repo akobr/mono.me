@@ -181,6 +181,43 @@ public class CosmosSchemaRestoreTests(Startup startup)
         (await missing.Should().ThrowAsync<NotFoundException>()).Which.ErrorCode.Should().Be(ErrorCodes.AnnotationNotFound);
     }
 
+    // The first attempt passes the compliance check; before its batch, a configuration changes so that it breaks the
+    // restored version, and the batch loses to a concurrent change of the schema. The retry checks again and refuses.
+    [Fact]
+    public async Task TypeSchema_Restore_ChecksTheConfigurationsAgainOnARetry()
+    {
+        var project = $"{ProjectPrefix}-recheck";
+        var key = await CreateAsync(project, "rst.recheck");
+        await SetTypeAsync(project, NameSchema);
+        await SetTypeAsync(project, CountSchema);
+        await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "ok" }"""), AuditActor.System);
+        var storage = new InterceptedRepositoryProvider(Context.Services.GetRequiredService<IContainerRepositoryProvider>());
+        var schemas = ActivatorUtilities.CreateInstance<CosmosConfigurationSchemaService>(Context.Services, storage);
+        var id = $"{View}.cfs.t.{Type}";
+        var changed = false;
+
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (batch.Contains(BatchOperationKind.Replace, id) && !changed)
+            {
+                changed = true;
+
+                // the current schema (count) allows it, version 1 (name as a string) does not
+                await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": 5 }"""), AuditActor.System);
+                await TouchAsync(project, id);
+            }
+
+            return null;
+        };
+
+        var act = () => schemas.RestoreSchemaVersionAsync(TestConstants.Organization, project, View, Type, 1, Editor, false);
+
+        var failure = await act.Should().ThrowAsync<SchemaValidationException>();
+        changed.Should().BeTrue();
+        failure.Which.ValidationErrors.Select(error => error.AnnotationKey).Should().Equal("rst.recheck");
+        (await Schemas.GetSchemaVersionsAsync(TestConstants.Organization, project, View, Type)).Select(version => version.Version).Should().Equal(new[] { 1u, 2u }, "the refused retry stores no version");
+    }
+
     [Fact]
     public async Task TypeSchema_Restore_RetriesAConcurrentChange_AndGivesUpAfterThreeMore()
     {
