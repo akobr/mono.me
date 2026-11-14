@@ -128,6 +128,12 @@ public static class ErrorReportingEntryPoint
             return false;
         }
 
+        // A query or a fragment would end up in the project id.
+        if (uri.Query.Length > 0 || uri.Fragment.Length > 0)
+        {
+            return false;
+        }
+
         var publicKey = uri.UserInfo.Split(':')[0];
         var absoluteUri = uri.AbsoluteUri;
         var projectId = absoluteUri[(absoluteUri.LastIndexOf('/') + 1)..];

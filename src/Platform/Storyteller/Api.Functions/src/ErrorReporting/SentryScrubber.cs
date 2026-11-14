@@ -37,6 +37,10 @@ internal static class SentryScrubber
         + "|access_token|refresh_token|id_token|subject_token|actor_token|client_assertion|code_verifier|ApiKey|api_key|sig"
         + "|InstrumentationKey";
 
+    // An object or array value with nested ones, whole (balancing groups count the brackets).
+    private const string NestedObject = @"\{(?>[^{}]+|\{(?<o>)|\}(?<-o>))*(?(o)(?!))\}";
+    private const string NestedArray = @"\[(?>[^\[\]]+|\[(?<a>)|\](?<-a>))*(?(a)(?!))\]";
+
     private static readonly TimeSpan MatchTimeout = TimeSpan.FromMilliseconds(250);
 
     private static readonly HashSet<string> AllowedTags = new(StringComparer.Ordinal) { FunctionTag };
@@ -69,15 +73,19 @@ internal static class SentryScrubber
         // 3. an authorization scheme and a credential (a word without a digit or a symbol is prose: "Bearer token")
         (Create(@"\b(Bearer|ApiKey|Basic|Digest|Negotiate|NTLM)(\s+)(?=[^\s""',;]*[0-9._~+/=-])[^\s""',;]{8,}", RegexOptions.IgnoreCase), $"$1$2{Filtered}"),
 
+        // 3b. Basic with any base64 of user:password, letters only too: groups of four, so prose ("Basic information")
+        // stays
+        (Create(@"\b(Basic)(\s+)(?:[A-Za-z0-9+/]{4}){2,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?(?![A-Za-z0-9+/=])", RegexOptions.IgnoreCase), $"$1$2{Filtered}"),
+
         // 4. a Storyteller API key: 2s.<base64url(organization:project:machine)>.<secret>
         (Create(@"\b2s\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{16,}"), Filtered),
 
         // 5. name=value secrets of connection strings, query strings and form bodies
-        (Create($@"(?<![A-Za-z0-9_])({SecretAssignmentNames})(\s*=\s*)[^;\s""'&<>]+", RegexOptions.IgnoreCase), $"$1$2{Filtered}"),
+        (Create($@"(?<![A-Za-z0-9_])({SecretAssignmentNames})(\s*=\s*)(?:""(?:[^""\\]|\\.)*""|'(?:[^'\\]|\\.)*'|[^;\s""'&<>]+)", RegexOptions.IgnoreCase), $"$1$2{Filtered}"),
 
         // 6. secret JSON members, plain and JSON-escaped inside a string, with any value
-        (Create($@"""({SecretJsonNames})""(\s*:\s*)(?:""(?:[^""\\]|\\.)*""|\{{[^{{}}]*\}}|\[[^\[\]]*\]|[^,}}\]\s]+)", RegexOptions.IgnoreCase), $"\"$1\"$2\"{Filtered}\""),
-        (Create($@"\\""({SecretJsonNames})\\""(\s*:\s*)(?:\\""(?:(?!\\"").)*\\""|\{{[^{{}}]*\}}|\[[^\[\]]*\]|[^,}}\]\s\\]+)", RegexOptions.IgnoreCase), $"\\\"$1\\\"$2\\\"{Filtered}\\\""),
+        (Create($@"""({SecretJsonNames})""(\s*:\s*)(?:""(?:[^""\\]|\\.)*""|{NestedObject}|{NestedArray}|[^,}}\]\s]+)", RegexOptions.IgnoreCase), $"\"$1\"$2\"{Filtered}\""),
+        (Create($@"\\""({SecretJsonNames})\\""(\s*:\s*)(?:\\""(?:(?!\\"").)*\\""|{NestedObject}|{NestedArray}|[^,}}\]\s\\]+)", RegexOptions.IgnoreCase), $"\\\"$1\\\"$2\\\"{Filtered}\\\""),
 
         // 7. query strings
         (Create(@"\?[^\s""'<>#?=&]+=[^\s""'<>#]*"), $"?{Filtered}"),

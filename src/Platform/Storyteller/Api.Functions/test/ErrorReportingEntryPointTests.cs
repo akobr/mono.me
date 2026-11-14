@@ -22,6 +22,8 @@ public class ErrorReportingEntryPointTests
         "https://public@o1.ingest.de.sentry.io/",    // no project id
         "https://public@o1.ingest.de.sentry.io/1/",  // Sentry reads an empty project id after the last '/'
         "https://public@o1.ingest.de.sentry.io/1#/",
+        "https://public@o1.ingest.de.sentry.io/1?x=y",   // a query would end up in the project id
+        "https://public@o1.ingest.de.sentry.io/1#x",
         "ftp://public@o1.ingest.de.sentry.io/1",
     };
 
