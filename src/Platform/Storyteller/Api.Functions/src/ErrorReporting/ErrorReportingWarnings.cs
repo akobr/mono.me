@@ -16,7 +16,7 @@ internal sealed class ErrorReportingWarnings : IHostedService
         _messages = messages;
     }
 
-    public IReadOnlyList<string> Messages => _messages;
+    internal IReadOnlyList<string> Messages => _messages;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {

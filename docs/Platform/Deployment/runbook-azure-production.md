@@ -517,7 +517,7 @@ Tracked in [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-auth
 
 Tracked in [424-248](https://linear.app/424fun/issue/424-248/report-the-apis-errors-to-sentry). The API reports its errors to Sentry only with the app setting `Sentry__Dsn`; until then it sends nothing ([error reporting](../Storyteller/error-reporting.md)).
 
-1. Sentry (EU, `de.sentry.io`): **Projects → Create project**, platform .NET, name `2s-api`; copy its DSN (`https://<key>@o<org>.ingest.de.sentry.io/<project>`). Spike protection of the organization is on (phase 9).
+1. Sentry (EU, `de.sentry.io`): **Projects → Create project**, platform .NET, name `2s-api`; copy its DSN (`https://<key>@o<org>.ingest.de.sentry.io/<project>`). Spike protection of the organization is on (phase 9). Give the client key a rate limit (**Project settings → Client Keys → Configure → Rate limit**, e.g. 100 events an hour): the API's own throttle is per instance and restarts with it.
 2. `parameters/prod.bicepparam`: `sentryDsn = '<dsn>'`; commit through a pull request; what-if (expect only a `Modify` of `prod-2s-api-fa/appsettings`: `+ Sentry__Dsn`, nothing removed), then create. Changing the app settings restarts the Function App.
 3. If the running build of the API predates the Sentry SDK (424-248), publish the API from an up-to-date `main` as in phase 11.1. The order of 2 and 3 doesn't matter: an older build ignores the setting, a newer one without it sends nothing.
 4. Check as in [error reporting](../Storyteller/error-reporting.md#check-it-in-production): one event in `2s-api` with the transaction `queue ProcessViewTransfer`, the environment `production` and the release `42.Platform.Storyteller.Api.Functions@<version>`.

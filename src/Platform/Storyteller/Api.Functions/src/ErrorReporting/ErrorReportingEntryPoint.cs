@@ -102,15 +102,11 @@ public static class ErrorReportingEntryPoint
                 : null);
             sentry.SetBeforeSend((sentryEvent, _) =>
             {
+                // Scrubbed before the throttle counts it: a scrubbing that fails drops this event only, it doesn't silence
+                // the error for the repeat interval.
                 SentryScrubber.CompleteFunction(sentryEvent);
-
-                if (!throttle.ShouldSend(sentryEvent))
-                {
-                    return null;
-                }
-
                 SentryScrubber.ScrubEvent(sentryEvent);
-                return sentryEvent;
+                return throttle.ShouldSend(sentryEvent) ? sentryEvent : null;
             });
             sentry.SetBeforeSendTransaction((_, _) => null);
 
