@@ -330,7 +330,7 @@ public class DataSetSeederTests
     {
         AddShowcase(withFailures: false);
         _access.Setup(access => access.GetAccessPointAsync(Organization)).ReturnsAsync(Point(Organization, "someone-else"));
-        _access.Setup(access => access.GetAccessPointAsync($"{Organization}.{Project}")).ReturnsAsync(Point($"{Organization}.{Project}", "someone-else"));
+        _access.Setup(access => access.GetAccessPointAsync($"{Organization}.{Project}")).ReturnsAsync(Point($"{Organization}.{Project}", "someone-else", AccountRole.Administrator, Owner));
         _access.Setup(access => access.GetAccountAsync(Owner)).ReturnsAsync(new Account { Id = Owner, UserName = "u", Name = "n", AccessMap = new Dictionary<string, AccountRole>() });
         _views.Setup(views => views.GetViewsAsync(Organization, Project, false))
             .ReturnsAsync([new View { Name = "default", IsDefault = true }, new View { Name = "preview", IsRegistered = true }]);
@@ -340,6 +340,20 @@ public class DataSetSeederTests
         run.Provisioning.ShouldBe(new DataSetProvisioning(false, false, false, false));
         _writes.ShouldBeEmpty();
         run.Sets.Single().IsRecorded.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Seed_RefusesAnExistingProjectTheOwnerDoesNotAdminister()
+    {
+        AddShowcase(withFailures: false);
+        _access.Setup(access => access.GetAccessPointAsync(Organization)).ReturnsAsync(Point(Organization, "someone-else"));
+        _access.Setup(access => access.GetAccessPointAsync($"{Organization}.{Project}")).ReturnsAsync(Point($"{Organization}.{Project}", "someone-else"));
+
+        var exception = await Should.ThrowAsync<DataSetException>(
+            () => Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["showcase"], Owner = Owner }, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("is not its Administrator or Owner");
+        _writes.ShouldBeEmpty();
     }
 
     [Fact]
