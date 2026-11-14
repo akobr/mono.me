@@ -36,6 +36,8 @@ reviews:
   path_filters:
     # Ignore all specification and review documents, wherever "specs" sits under "docs"
     - "!docs/**/specs/**"
+    # Ignore the data sets of DbCreator (seed data, the showcase set is generated)
+    - "!src/Platform/Storyteller/DbCreator/src/data-sets/**"
 
 issue_enrichment:
   auto_enrich:
