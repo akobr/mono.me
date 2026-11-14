@@ -37,9 +37,9 @@ param byokClientId = 'cb2da9e3-9316-4fd8-b428-7c7161bdd685'
 // Step 11.2: the object id of the service principal of "2S Platform Deployment" (New-DeploymentApplication.ps1).
 param deploymentPrincipalId = '2a9df1b7-89a4-42e5-b007-5fe1763b8898'
 
-// Step 14: the DSN of the API's Sentry project 2s-api (https://<key>@o<org>.ingest.de.sentry.io/<project>); empty until
-// the project exists, and the API reports nothing to Sentry. Not a secret: it only lets a sender add events to the project.
-param sentryDsn = ''
+// Step 14: the DSN of the API's Sentry project 2s-api; empty would leave Sentry__Dsn out
+// and the API would report nothing. Not a secret: it only lets a sender add events to the project.
+param sentryDsn = 'https://d5046cb672ec2f66209c56807d4611e8@o4512431543549952.ingest.de.sentry.io/4512431550890064'
 
 param ownerObjectId = readEnvironmentVariable('PLATFORM_OWNER_OBJECT_ID')
 param ownerEmail = readEnvironmentVariable('PLATFORM_OWNER_EMAIL')
