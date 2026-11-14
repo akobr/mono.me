@@ -17,7 +17,7 @@ The code is in `src/Platform/Storyteller/Api.Functions/src/ErrorReporting/`; the
 - A malformed DSN doesn't stop the API: Sentry stays off, and the API logs one Warning at start, *"Sentry:Dsn is not a valid DSN; errors are not reported to Sentry."*, without the value. The check is Sentry's own (a public key, and a project id after the last `/`: a trailing `/` is malformed).
 - A malformed or negative volume setting doesn't stop the API either: it keeps its default, and the API warns at start, e.g. *"Sentry:RepeatInterval is not valid; its default is used."* Without a DSN the volume settings aren't read at all.
 - `SENTRY_DSN`, `SENTRY_ENVIRONMENT` and `SENTRY_RELEASE` are ignored, and so is a `Logging:Sentry` section: everything else is fixed in code.
-- Locally, under Aspire and in the tests there is no DSN, so nothing is sent. To try it, set the DSN of a test project as a user secret of the API (`dotnet user-secrets set "Sentry:Dsn" "<dsn>"`); the environment is then `development`.
+- Locally and under Aspire, `local.settings.json` sets the DSN of `2s-api`: errors are reported under the environment `development`. To turn it off, set the user secret `Sentry:Dsn` to an empty value. The unit tests never read it, so they send nothing.
 
 ## What becomes an event
 

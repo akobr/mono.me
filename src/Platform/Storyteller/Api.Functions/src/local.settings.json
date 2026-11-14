@@ -3,6 +3,7 @@
   "Values": {
     "DOTNET_ENVIRONMENT": "Development",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "Sentry:Dsn": "https://d5046cb672ec2f66209c56807d4611e8@o4512431543549952.ingest.de.sentry.io/4512431550890064",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "Auth:Provider": "AuthKit",
     "Auth:AuthKit:ClientId": "client_01M3MMV9SP2W3D7VDZ3242KJNR",
