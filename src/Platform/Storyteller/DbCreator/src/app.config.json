@@ -5,6 +5,6 @@
   },
   "logging": {
     "logFilePath": "logs/cli.log",
-    "sentryDsn": "https://13bdb1ba065aff3950e40bd487d3f05f@o383062.ingest.us.sentry.io/4507046419038208"
+    "sentryDsn": "https://8dadbe60392e5e75a542748947970a81@o4512431543549952.ingest.de.sentry.io/4512431763423312"
   }
 }
