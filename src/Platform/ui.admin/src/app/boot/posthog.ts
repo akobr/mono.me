@@ -15,7 +15,7 @@ export interface PostHogTelemetry {
  * here, so the project cannot turn on replay, exception capture, web vitals, dead clicks, heatmaps or surveys.
  * Loaded on demand by boot/telemetry.ts.
  */
-export function startPostHog(router: Router, token: string, host: string): PostHogTelemetry {
+export function startPostHog(router: Router, token: string, host: string, environment: string): PostHogTelemetry {
   posthog.init(token, {
     api_host: host,
     defaults: '2026-05-30',
@@ -46,6 +46,9 @@ export function startPostHog(router: Router, token: string, host: string): PostH
     respect_dnt: true,
     before_send: scrubPostHogEvent(router),
   })
+
+  // A super property: every event carries the environment (production, local, …), like Sentry's environment.
+  posthog.register({ environment })
 
   return {
     // The AuthKit user id only: no e-mail, name or picture.

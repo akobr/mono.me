@@ -38,7 +38,7 @@ export async function startTelemetry(app: App, router: Router, config: AppConfig
     )
   }
   if (posthogModule && token && host) {
-    posthog = start('PostHog', () => posthogModule.startPostHog(router, token, host))
+    posthog = start('PostHog', () => posthogModule.startPostHog(router, token, host, config.environmentName))
   }
 
   if (sentry || posthog) {

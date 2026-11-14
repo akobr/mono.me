@@ -18,6 +18,7 @@ const sdk = vi.hoisted(() => ({
   },
   posthog: {
     init: vi.fn(),
+    register: vi.fn(),
     identify: vi.fn(),
     reset: vi.fn(),
     capture: vi.fn(),
@@ -164,6 +165,8 @@ describe('starting telemetry', () => {
     expect(sdk.sentry.init).not.toHaveBeenCalled()
     expect(sdk.posthog.init).toHaveBeenCalledOnce()
     expect(sdk.posthog.init.mock.lastCall![0]).toBe(token)
+    // every event carries the environment, as Sentry's events do
+    expect(sdk.posthog.register).toHaveBeenCalledWith({ environment: 'staging' })
     expect(posthogOptions()).toMatchObject({
       api_host: 'https://eu.i.posthog.com',
       defaults: '2026-05-30',
