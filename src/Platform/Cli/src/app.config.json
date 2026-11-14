@@ -9,7 +9,7 @@
   },
   "logging": {
     "logFilePath": "logs/cli.log",
-    "sentryDsn": ""
+    "sentryDsn": "https://41e953f0a51b83e8ff7eecb59727adac@o4512431543549952.ingest.de.sentry.io/4512431614656592"
   },
   "telemetry": {
     "postHogProjectToken": "",
