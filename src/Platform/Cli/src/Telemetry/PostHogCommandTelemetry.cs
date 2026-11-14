@@ -43,7 +43,8 @@ internal sealed class PostHogCommandTelemetry : ICommandTelemetry
     {
         _client = client;
         _installationId = installationId;
-        _environmentName = environmentName;
+        // lower case, like the admin UI's environment (production, development)
+        _environmentName = environmentName.ToLowerInvariant();
         _isContinuousIntegration = isContinuousIntegration;
         _isMachineSignIn = isMachineSignIn;
         _logger = logger;

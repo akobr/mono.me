@@ -67,7 +67,7 @@ public class PostHogCommandTelemetryTests
         properties["exit_code"].ShouldBe(ExitCodes.SUCCESS);
         properties["os"].ShouldBeOneOf("windows", "linux", "macos", "other");
         properties["runtime"].ShouldBe(Environment.Version.ToString());
-        properties["environment"].ShouldBe("Production");
+        properties["environment"].ShouldBe("production");
         properties["ci"].ShouldBe(true);
         properties["machine_sign_in"].ShouldBe(false);
         properties["$process_person_profile"].ShouldBe(false);
