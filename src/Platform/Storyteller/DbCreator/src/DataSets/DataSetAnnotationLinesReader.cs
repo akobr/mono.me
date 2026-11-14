@@ -83,9 +83,10 @@ public static partial class DataSetAnnotationLinesReader
             }
             else
             {
-                for (var index = line.First; index < line.First + line.Count; index++)
+                // by offset: First + Count may lie beyond long.MaxValue when the last index is long.MaxValue
+                for (var offset = 0L; offset < line.Count; offset++)
                 {
-                    annotations.Add(ReadAnnotation(line.Number, Generate(line.Document!, index), target));
+                    annotations.Add(ReadAnnotation(line.Number, Generate(line.Document!, line.First + offset), target));
                 }
             }
         }
@@ -186,6 +187,21 @@ public static partial class DataSetAnnotationLinesReader
         if (start is not null && !TryGetWholeNumber(start, out first))
         {
             return ParsedLine.Failed(number, true, $"{StartMember} must be a whole number of 0 or more, not {start}.");
+        }
+
+        // the last index must fit, or the line would generate nothing (or wrap around)
+        if (first > long.MaxValue - (total - 1))
+        {
+            return ParsedLine.Failed(number, true, $"{StartMember} {first} with {CountMember} {total} goes beyond the largest index.");
+        }
+
+        // without a placeholder in the key every generated annotation would have the same key
+        var keyMember = document.Properties()
+            .FirstOrDefault(property => property.Name.Equals(nameof(Annotation.AnnotationKey), StringComparison.OrdinalIgnoreCase));
+
+        if (total > 1 && keyMember?.Value.Type == JTokenType.String && !Placeholder().IsMatch(keyMember.Value.Value<string>()!))
+        {
+            return ParsedLine.Failed(number, true, $"The {nameof(Annotation.AnnotationKey)} of a generator line needs {{n}} or {{0…0}}, or every annotation gets the same key.");
         }
 
         return new ParsedLine(number, document, true, first, total, null);
