@@ -148,10 +148,10 @@ public class Program
             CurrentRun.Command = CommandPath.Of(parsingException.Command);
             parsingException.WriteOutput();
 
+            // Never the arguments: one may be a value of a key/value pair.
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
-                "Unrecognized input at {command}; Arguments: {args}; NearestMatches: {nearestMatches}",
+                "Unrecognized input at {command}; NearestMatches: {nearestMatches}",
                 parsingException.Command.Name,
-                args,
                 parsingException.NearestMatches.ToList())));
             return ExitCodes.ERROR_INPUT_PARSING;
         }
@@ -176,8 +176,8 @@ public class Program
             var reportedException = exception.InnerException ?? exception;
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
                 reportedException,
-                "Unauthorized access; Arguments: {args}",
-                [args])));
+                "Unauthorized access at {command}",
+                CurrentRun.Command)));
 
             Console.Write("! ", Color.Magenta);
             Console.WriteLine(ApiRefusal.GeneralMessage);
@@ -188,9 +188,9 @@ public class Program
             CurrentRun.Exception = exception;
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
                 exception,
-                "Sign-in failed ({reason}); Arguments: {args}",
+                "Sign-in failed ({reason}) at {command}",
                 exception.Reason,
-                args)));
+                CurrentRun.Command)));
 
             Console.Write("! ", Color.Magenta);
             Console.WriteLine(exception.Message);
@@ -205,9 +205,9 @@ public class Program
         {
             CurrentRun.Exception = exception;
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
-                "The API refused the request with {statusCode}; Arguments: {args}",
+                "The API refused the request with {statusCode} at {command}",
                 exception.StatusCode,
-                args)));
+                CurrentRun.Command)));
 
             var refusal = ApiRefusal.Of(exception);
             Console.Write("! ", Color.Magenta);
@@ -288,7 +288,7 @@ public class Program
                 Console.WriteLine($"    {_paths.GetDailyLogFilePath(_loggingOptions.LogFilePath, DateTime.Now)}", Color.DarkGray);
             }
 
-            await Task.Run(() => LogWithSentry(() => _logger?.LogError(exception, "Unhandled exception occurred at input: {args}", new object[] { args })));
+            await Task.Run(() => LogWithSentry(() => _logger?.LogError(exception, "Unhandled exception occurred at {command}", CurrentRun.Command)));
             return ExitCodes.ERROR_CRASH;
         }
     }
