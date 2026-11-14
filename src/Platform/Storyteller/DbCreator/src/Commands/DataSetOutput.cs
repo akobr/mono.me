@@ -137,6 +137,12 @@ public static class DataSetOutput
         Console.WriteLine(exception.Message);
     }
 
+    public static void WriteAborted()
+    {
+        Console.Write("! ", Problem);
+        Console.WriteLine("The seed was stopped. The set that was running is not recorded: a run again seeds what is missing.");
+    }
+
     public static void WriteLayoutProblems(DatabaseLayoutException exception)
     {
         Console.Write("! ", Problem);
