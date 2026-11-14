@@ -1,6 +1,7 @@
+using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
-using _42.CLI.Toolkit;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using McMaster.Extensions.CommandLineUtils;
@@ -8,7 +9,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Platform.Storyteller.DbCreator.Commands;
 
 [Command(Name, Description = "Seed data sets into an organization, project and view, created when missing. A set seeded already in its version and with its files is skipped; otherwise what exists stays and what is missing is created.")]
-public class SeedCommand : IAsyncCommand
+public class SeedCommand
 {
     public const string Name = "seed";
 
@@ -67,7 +68,8 @@ public class SeedCommand : IAsyncCommand
         };
     }
 
-    public async Task<int> OnExecuteAsync()
+    // McMaster passes the token of the host, cancelled by Ctrl+C; a stopped seed leaves no record of the running set
+    public async Task<int> OnExecuteAsync(CancellationToken cancellationToken = default)
     {
         var started = Stopwatch.GetTimestamp();
         var request = CreateRequest();
@@ -80,10 +82,15 @@ public class SeedCommand : IAsyncCommand
             DataSetOutput.WritePlan(plan, options);
 
             await _structure.EnsureContainersAsync();
-            var run = await _seeder.SeedAsync(plan, options);
+            var run = await _seeder.SeedAsync(plan, options, cancellationToken);
 
             DataSetOutput.WriteRun(run, Stopwatch.GetElapsedTime(started));
             return ExitCodes.Of(run);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            DataSetOutput.WriteAborted();
+            return ExitCodes.WARNING_ABORTED;
         }
         catch (DataSetException exception)
         {

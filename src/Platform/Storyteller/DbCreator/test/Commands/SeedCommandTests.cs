@@ -31,6 +31,17 @@ public class SeedCommandTests
     }
 
     [Fact]
+    public async Task Seed_Stopped_ExitsWithAbortedAndRecordsNothing()
+    {
+        _fixture.AddSet("base", Manifest, ("annotations/sbt.base.json", "{}"));
+        using var stopped = new CancellationTokenSource();
+        await stopped.CancelAsync();
+
+        (await Command(sets: ["base"], organization: "fabrikam", project: "invoicing-suite").OnExecuteAsync(stopped.Token)).ShouldBe(ExitCodes.WARNING_ABORTED);
+        _fixture.Records.Saves.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Seed_WrongInput_ExitsWithTwoBeforeTheDatabaseIsTouched()
     {
         _fixture.AddSet("base", Manifest, ("annotations/sbt.base.json", "{}"));
