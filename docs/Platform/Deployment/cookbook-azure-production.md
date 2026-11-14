@@ -490,7 +490,7 @@ The checklist of the admin UI ([README](../../../src/Platform/ui.admin/README.md
   - `2s-admin-ui` (platform Vue): its DSN goes to `VITE_SENTRY_DSN`;
   - `2s-api` (platform .NET): its DSN goes to `sentryDsn` of `parameters/prod.bicepparam`, which `main.bicep` writes to the app setting `Sentry__Dsn` (step 8.3 by hand); commit it and run `main.bicep` again.
 
-  Add an **uptime monitor** on `https://api.2s.42for.net/api/v1/auth/configuration` (expects 200). Turn on **spike protection** for the organization: both projects share the plan's errors, and a storm of one must not use them up.
+  Add an **uptime monitor** on `https://api.2s.42for.net/api/v1/auth/configuration` (expects 200). Turn on **spike protection** for the organization: both projects share the plan's errors, and a storm of one must not use them up. Give the client key of `2s-api` a **rate limit** (e.g. 100 events an hour): the API's own throttle is per instance and restarts with it.
 - **PostHog** (EU cloud): the production project's token goes to `VITE_POSTHOG_PROJECT_TOKEN`, the host is `https://eu.i.posthog.com`.
 
 The API reports its errors to `2s-api` and keeps them in Application Insights. Its events carry the route template, the environment and the release, never a request, a token or a value ([error reporting](../Storyteller/error-reporting.md)).

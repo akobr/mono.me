@@ -25,7 +25,7 @@ The code is in `src/Platform/Storyteller/Api.Functions/src/ErrorReporting/`; the
 - **Information** and **Warning** become breadcrumbs of the invocation: the trail an event of the same invocation shows. Only the platform's own categories (`_42.…`) leave breadcrumbs below Warning; the Information of ASP.NET Core, `HttpClient`, the Azure SDK, Cosmos DB and the Functions worker quote URLs and stay out.
 - Breadcrumbs are kept only while an invocation runs. What is logged outside one (the key/value usage flush, refresh callbacks, the worker before and after the API's middlewares) leaves none, so another invocation's or another organization's trail never rides along; an error outside an invocation is an event without breadcrumbs.
 - **Debug** and **Trace** never reach Sentry.
-- Client errors are Warnings, not errors: a rejected request (`4xx` of a domain rule), a body that isn't valid JSON, a binding that can't be evaluated. So is a cancelled invocation (the caller went away, or the host drains the instance).
+- Client errors are Warnings, not errors: a rejected request (`4xx` of a domain rule), a body that isn't valid JSON, a binding that can't be evaluated. So is a cancelled invocation (the caller went away, the host drains the instance, or the host's `functionTimeout` ran out; Application Insights keeps it).
 - Sentry doesn't see: errors while the host starts (before Sentry exists), the Functions host's own failures (timeouts, restarts), and what the front end answers. Application Insights and Sentry's uptime monitor on `GET /api/v1/auth/configuration` cover them.
 
 ## What an event carries
@@ -53,9 +53,9 @@ Texts (messages, exception values, breadcrumbs) are scrubbed before they are sen
 - PEM blocks, JWTs, an authorization scheme with its credential (`Bearer …`, `ApiKey …`, `Basic …`) and Storyteller API keys (`2s.<…>.<secret>`);
 - the values of `name=value` secrets in connection strings, query strings and form bodies (`AccountKey`, `SharedAccessKey`, `SharedAccessSignature`, `Password`, `client_secret`, `subject_token`, …);
 - the values of JSON members with a secret's name, also escaped inside a string: `Value` (a key/value write), `password`, `secret`, `token`, `privateKey`, `connectionString`, and the members of a client-encrypted value;
-- query strings, e-mail addresses, and long opaque tokens (base64 keys, secrets and certificates, recognised by their entropy).
+- query strings, e-mail addresses, and long opaque tokens (base64 keys, secrets and certificates, recognised by their entropy; a hex secret isn't, as hex thumbprints and commit ids must stay).
 
-**Names stay readable, values never leave.** Organization, project and view names, annotation keys and key/value names are kept where the code writes them in a message: a failed write of `acme.billing` is reproduced only with that key, and the admin UI sends the same names in its API paths. They are identifiers, not values, and they are never tags, so Sentry neither indexes nor aggregates them; the transaction is the route template. Key/value values, configuration documents, secrets and tokens are never in a message (the rule of [key-values](key-values.md) and [binding](binding.md)), and the scrubbing is the second line. Account ids are pseudonymous and stay where a message has them; e-mail addresses are filtered.
+**Names stay readable, values are kept out.** Organization, project and view names, annotation keys and key/value names are kept where the code writes them in a message: a failed write of `acme.billing` is reproduced only with that key, and the admin UI sends the same names in its API paths. They are identifiers, not values, and they are never tags, so Sentry neither indexes nor aggregates them; the transaction is the route template. Key/value values, configuration documents, secrets and tokens are not written to messages by the API (the rule of [key-values](key-values.md) and [binding](binding.md)), and the scrubbing is the second line. That second line is best effort: an exception message of a library (e.g. a JSON or JSON Patch parser quoting a piece of the input) reaches a breadcrumb or an event, and the scrubbing removes only what looks like a secret. Account ids are pseudonymous and stay where a message has them; e-mail addresses are filtered.
 
 A failure of the scrubbing (for example a regular expression that times out) drops the event; it is never sent unfiltered.
 
@@ -67,7 +67,7 @@ The organization's Developer plan has 5k errors a month for both projects, and t
 - at most `MaxEventsPerHour` events per clock hour, which an error the instance hasn't sent before passes, so a root cause isn't hidden behind its symptoms;
 - at most `MaxEventsPerDay` events per UTC day.
 
-A whole day of a storm on all 10 instances costs at most 400 events, 8% of the month; on the usual one or two instances, 40 to 80. Sentry's spike protection is on for the organization. Application Insights keeps the occurrences (sampled, until its daily cap).
+A whole day of a storm on all 10 instances costs at most 400 events, 8% of the month; on the usual one or two instances, 40 to 80. These caps are per instance and start from zero on every new or recycled instance, so they are no hard ceiling: Sentry's spike protection is on for the organization, and the client key of `2s-api` has a rate limit (**Project settings → Client Keys → Rate limit**, e.g. 100 events an hour). Application Insights keeps the occurrences (sampled, until its daily cap).
 
 ## Check it in production
 

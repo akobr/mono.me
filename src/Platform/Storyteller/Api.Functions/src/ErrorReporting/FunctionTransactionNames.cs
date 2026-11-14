@@ -23,7 +23,18 @@ internal static class FunctionTransactionNames
     // of another assembly (the OpenAPI extension's). Without the request's method, the declared methods joined by '|'.
     public static string Get(string functionName, string? method)
     {
-        if (!Functions.Value.TryGetValue(functionName, out var trigger))
+        // Runs before ExceptionHandlingMiddleware: a map that cannot be built (Lazy keeps the exception) must never fail
+        // an invocation, so the function's name stands in.
+        FunctionTrigger? trigger;
+
+        try
+        {
+            if (!Functions.Value.TryGetValue(functionName, out trigger))
+            {
+                return functionName;
+            }
+        }
+        catch (Exception)
         {
             return functionName;
         }
