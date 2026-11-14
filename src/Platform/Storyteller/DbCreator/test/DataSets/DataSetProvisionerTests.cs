@@ -83,6 +83,41 @@ public class DataSetProvisionerTests
         _views.Verify(views => views.CreateViewAsync(Target.Organization, Target.Project, It.IsAny<ViewCreate>(), AuditActor.System), Times.Once);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(AccountRole.Contributor)]
+    public async Task Provision_AnExistingProjectTheOwnerDoesNotAdminister_IsRefusedBeforeAnythingIsWritten(AccountRole? role)
+    {
+        var map = new Dictionary<string, AccountRole> { ["user_01other"] = AccountRole.Owner };
+        if (role is { } given)
+        {
+            map[OwnerId] = given;
+        }
+
+        _access.Setup(access => access.GetAccessPointAsync(Target.ProjectKey)).ReturnsAsync(new AccessPoint { Key = Target.ProjectKey, AccessMap = map });
+
+        (await Should.ThrowAsync<DataSetException>(() => Provision())).Message.ShouldContain("is not its Administrator or Owner");
+
+        _access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>()), Times.Never);
+        _views.Verify(views => views.CreateViewAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ViewCreate>(), It.IsAny<AuditActor>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(AccountRole.Administrator)]
+    [InlineData(AccountRole.Owner)]
+    public async Task Provision_AnExistingProjectTheOwnerAdministers_IsUsedAsItIs(AccountRole role)
+    {
+        _access.Setup(access => access.GetAccessPointAsync(Target.ProjectKey)).ReturnsAsync(new AccessPoint
+        {
+            Key = Target.ProjectKey,
+            AccessMap = new Dictionary<string, AccountRole> { [OwnerId] = role },
+        });
+
+        (await Provision()).IsProjectCreated.ShouldBeFalse();
+
+        _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()), Times.Never);
+    }
+
     private DataSetProvisioner Provisioner()
     {
         return new DataSetProvisioner(_access.Object, _views.Object, NullLogger<DataSetProvisioner>.Instance);

@@ -10,7 +10,7 @@ namespace _42.Platform.Storyteller.DbCreator.DataSets;
 
 // Makes the target of a seed exist, through the access model and the view registry as the API does: the owner's
 // account, a missing organization and project with the owner as Owner, and a view other than "default". An existing
-// project is used as it is: its access is not changed. The data services check none of this, so it runs first.
+// project is used as it is (its access is not changed), and only when the owner administers it. The data services check none of this, so it runs first.
 public sealed class DataSetProvisioner
 {
     private readonly IAccessService _access;
@@ -47,6 +47,15 @@ public sealed class DataSetProvisioner
         {
             throw new DataSetException(
                 $"The organization '{target.Organization}' exists, and the owner '{owner.Id}' is not its Owner, so the project '{target.Project}' is not created there: give an Owner of the organization as the owner, or another organization.");
+        }
+
+        // an existing project is seeded only for someone who may import into it (Administrator or Owner, as the API's
+        // import requires), so a typo in the target never writes into a project of someone else
+        if (projectPoint is not null
+            && (!projectPoint.AccessMap.TryGetValue(owner.Id, out var projectRole) || projectRole < AccountRole.Administrator))
+        {
+            throw new DataSetException(
+                $"The project '{target.ProjectKey}' exists, and the owner '{owner.Id}' is not its Administrator or Owner, so nothing is seeded there: give an Administrator or Owner of the project as the owner, or another project.");
         }
 
         cancellationToken.ThrowIfCancellationRequested();
