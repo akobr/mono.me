@@ -113,7 +113,7 @@ One JSON object per line: the members of an annotation file ([Annotations](expor
   | `{n}` | The index | `7` |
   | `{0…0}` | The index padded with zeros to as many digits (wider when the index is) | `{000}` gives `007` |
 
-  Member names are not changed. `$count` must be a whole number of 1 or more and `$start` one of 0 or more, as JSON numbers (`5`, not `5.0` or `"5"`). Both member names match in any case. A line without `$count` is taken literally.
+  Member names are not changed. `$count` must be a whole number of 1 or more and `$start` one of 0 or more, as JSON numbers (`5`, not `5.0` or `"5"`). Both member names match in any case. The last index must not go beyond the largest whole number (9,223,372,036,854,775,807). With a `$count` of 2 or more, the key needs a placeholder, or every annotation of the line would get the same key. A line without `$count` is taken literally.
 - **At most 200,000 annotations** per set, every line and every index counted (a line that cannot be read counts as one). The count runs before any line is expanded, and a set above it is wrong input (exit `2`), with the line where it goes over, before anything is written.
 - **At most 2 MB per line**, the limit of a document file, counted in UTF-8 bytes of the line as written (a generator's annotations are a few bytes longer once their placeholders are replaced). A longer line makes the set wrong input (exit `2`), with its line number (`'annotations.jsonl' has a line of more than 2,097,152 bytes at line 7, the most a document holds.`), before anything is written.
 - **Duplicates.** A key that an annotation file holds fails its line with `DuplicateFile` (`The file 'annotations/rst.payments.json' already holds the annotation rst.payments.`), and so does a key of an earlier line (`Line 3 of annotations.jsonl already holds the annotation …`).
@@ -122,7 +122,7 @@ A line that cannot be read fails with its line number:
 
 | Code | When |
 | --- | --- |
-| `InvalidDocument` | The line is not a JSON object, has no `AnnotationKey`, has a `$count` or `$start` that is not a whole number in range, or `$start` without `$count` |
+| `InvalidDocument` | The line is not a JSON object, has no `AnnotationKey`, has a `$count` or `$start` that is not a whole number in range, a generator key without a placeholder, or `$start` without `$count` |
 | `InvalidKey` | `AnnotationKey` is not a string or not a key |
 | `InvalidDocument`, `InvalidAnnotation` | The content breaks the rules of an annotation file; for a generator, per generated annotation |
 | `DuplicateFile` | See above |
@@ -159,9 +159,9 @@ The **owner** is `--owner <account-id>`, or `baseAccount:id` without it (the env
 The seed makes the target exist through `IAccessService` and `IViewService`, as the API does (`DataSetProvisioner`):
 
 1. It reads the access points of the organization (`apt.{organization}`) and the project (`apt.{organization}.{project}`) in `core`.
-2. A project that is missing in an organization that exists, and whose Owner is not the owner, is refused (exit `2`) before anything is written. A seed never takes over an organization.
+2. A project that is missing in an organization that exists, and whose Owner is not the owner, is refused (exit `2`) before anything is written. A seed never takes over an organization. An existing project whose Administrator or Owner is not the owner is refused the same way, so a typo in the target never writes into a project of someone else.
 3. The owner's account is created when it is missing, first, so that creating the project mirrors the membership into it. This also happens when the project exists.
-4. A missing project is created with `CreateAccessPointAsync`, with the organization when that is missing too: the owner is their Owner, and the project gets the `ProjectDescription` of the first named set that has one, then of the dependencies. An existing project is used as it is, whoever owns it: its access is not changed.
+4. A missing project is created with `CreateAccessPointAsync`, with the organization when that is missing too: the owner is their Owner, and the project gets the `ProjectDescription` of the first named set that has one, then of the dependencies. An existing project that the owner administers is used as it is: its access is not changed.
 5. A view other than `default` is registered when it is missing (`CreateViewAsync`, with the `ViewDescription` and the `System` actor).
 
 What another writer created in the meantime is used as it is. A dry run reads, reports what it would create, and writes nothing. Sets define no users: the owner is the only member a seed adds.
@@ -264,7 +264,7 @@ The build of the database (see [What DbCreator does](#what-dbcreator-does)). Aft
 | `<set>…` | The sets of the `--path` folders | The sets to seed, built-in or of the `--path` folders; their dependencies are seeded first. Without names and without `--path`, nothing is seeded (exit `2`) |
 | `--path <folder>` | | A folder with `set.json`, or a folder of such folders. Repeatable |
 | `--organization` | The `Organization` of the named sets | The organization to seed into, created with the owner when missing |
-| `--project` | The `Project` of the named sets | The project to seed into, created when missing; an existing one is used as it is |
+| `--project` | The `Project` of the named sets | The project to seed into, created when missing; an existing one is used as it is when the owner is its Administrator or Owner |
 | `--view` | The `View` of the named sets, otherwise `default` | The view to seed into, registered when missing |
 | `--owner` | `baseAccount:id` | The account that owns a created organization and project |
 | `--dry-run` | Off | Decide every outcome and write nothing of the target and the sets. The database and the containers are still ensured |
@@ -312,9 +312,10 @@ Lists the built-in sets and those of the `--path` folders: the name, the version
 | `0` | Success, also for a set seeded already, and with warnings or skipped documents |
 | `-1` (`255` on Linux and macOS) | The command line cannot be parsed: an unknown command, option or argument, a missing value, a single value given twice |
 | `1` | The tool crashed, for example when the database cannot be reached or the bulk writer runs out of retries; the log file has the details |
-| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner (an existing project is used whoever owns it), an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the missing project are known only after the database and its containers are ensured |
+| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner, an existing project whose Administrator or Owner is not the owner, an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the ownership of the organization and the project are known only after the database and its containers are ensured |
 | `3` | The database has the containers of the earlier layout (one per organization); nothing was written |
 | `4` | A document or an annotation of a set failed (also in a dry run that would fail), or a set was not seeded because a set it depends on failed |
+| `40` | The seed was stopped (Ctrl+C, or the host shut down). The set that was running is not recorded, so a run again seeds what is missing |
 
 ## The built-in sets
 

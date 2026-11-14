@@ -26,10 +26,14 @@ public static class StoredItems
         {
             using var response = await core.ReadItemStreamAsync(id, new PartitionKey(AccessPartition));
 
-            if (response.IsSuccessStatusCode)
+            // only a missing item is absent; any other failure fails the test
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                items[$"core/{id}"] = response.Headers.ETag;
+                continue;
             }
+
+            response.EnsureSuccessStatusCode();
+            items[$"core/{id}"] = response.Headers.ETag;
         }
 
         return items;
