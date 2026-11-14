@@ -24,6 +24,7 @@ public class SentryScrubberTests
         { "Authorization: Bearer opaque-token-123", $"Authorization: Bearer {Filtered}" },
         { "ApiKey 2s.YWNtZTpiaWxsaW5n.abc", $"ApiKey {Filtered}" },
         { "Basic dXNlcjpwYXNzd29yZA==", $"Basic {Filtered}" },
+        { "Authorization: Basic dXNlcjpwYXNz", $"Authorization: Basic {Filtered}" },
 
         // 4. Storyteller API keys
         { "key 2s.YWNtZTpiaWxsaW5nOmNp.q8Zr3vT1pK0sW9yX2mN5bH7cJ4dF6gL0aE1uI3oP5sY used", $"key {Filtered} used" },
@@ -34,12 +35,17 @@ public class SentryScrubberTests
         { "Endpoint=sb://acme.servicebus.windows.net/;SharedAccessKeyName=root;SharedAccessKey=xyz=", $"Endpoint=sb://acme.servicebus.windows.net/;SharedAccessKeyName=root;SharedAccessKey={Filtered}" },
         { "grant_type=token-exchange&subject_token=abc.def&client_secret=s3cret", $"grant_type=token-exchange&subject_token={Filtered}&client_secret={Filtered}" },
         { "Server=db;User Id=sa;Password=Pa55word!", $"Server=db;User Id=sa;Password={Filtered}" },
+        { "login password='p@ss word' failed", $"login password={Filtered} failed" },
+        { "Server=db;Password=\"a \\\"quoted\\\" secret\";Database=x", $"Server=db;Password={Filtered};Database=x" },
 
         // 6. secret JSON members
         { "{\"Value\":\"s3cret\",\"Protection\":\"Standard\"}", $"{{\"Value\":\"{Filtered}\",\"Protection\":\"Standard\"}}" },
         { "{\"value\": \"a \\\"quoted\\\" secret\"}", $"{{\"value\": \"{Filtered}\"}}" },
         { "{\"password\": 1234, \"user\": \"ada\"}", $"{{\"password\": \"{Filtered}\", \"user\": \"ada\"}}" },
         { "{\"credentials\": {\"key\": \"k\"}}", $"{{\"credentials\": \"{Filtered}\"}}" },
+        { "{\"credentials\": {\"key\": {\"inner\": \"k\"}}, \"user\": \"ada\"}", $"{{\"credentials\": \"{Filtered}\", \"user\": \"ada\"}}" },
+        { "{\"secret\": [[\"a\"], [\"b\"]]}", $"{{\"secret\": \"{Filtered}\"}}" },
+        { "body {\\\"credentials\\\":{\\\"key\\\":{\\\"k\\\":1}}} end", $"body {{\\\"credentials\\\":\\\"{Filtered}\\\"}} end" },
         { "body {\\\"Value\\\":\\\"s3cret\\\"} end", $"body {{\\\"Value\\\":\\\"{Filtered}\\\"}} end" },
         { "{\"protected\":\"eyJhbGciOiJSU0EtT0FFUCJ9\",\"encrypted_key\":\"abc\",\"iv\":\"def\",\"ciphertext\":\"ghi\",\"tag\":\"jkl\"}", $"{{\"protected\":\"{Filtered}\",\"encrypted_key\":\"{Filtered}\",\"iv\":\"{Filtered}\",\"ciphertext\":\"{Filtered}\",\"tag\":\"{Filtered}\"}}" },
 
@@ -66,6 +72,7 @@ public class SentryScrubberTests
         "Thumbprint 9F8E7D6C5B4A39281706F5E4D3C2B1A09F8E7D6C failed.",
         "Signing keys could not be retrieved for /api/v1/acme/billing/default/key-values/db.password (HttpRequestException)",
         "The Bearer token was rejected; ApiKey authentication is off.",
+        "Basic information is missing.",
         "Function 'SetKeyValue', Invocation id 'invocation': An exception was thrown by the invocation.",
         "The view transfer 7d4b0b6a is not valid: {\"Organization\":\"acme\",\"Project\":\"billing\"}",
     };

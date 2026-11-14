@@ -56,6 +56,9 @@ public class ErrorReportingLeakTests
         "EnvSecret3116",
         "ada@example.com",
         "background-org",
+        "dXNlcjpwYXNz",
+        "NestedSecret3117",
+        "QuotedSecret3118",
     ];
 
     [Fact]
@@ -316,7 +319,8 @@ public class ErrorReportingLeakTests
             new InvalidOperationException("client_secret=InnerSecret3108"),
             new InvalidOperationException("Password=AggregateSecret3109"));
         var exception = new InvalidOperationException(
-            $"Failed to write {{\"Value\":\"KeyValueSecret3102\"}} with {ConnectionString}",
+            $"Failed to write {{\"Value\":\"KeyValueSecret3102\"}} with {ConnectionString}; Basic dXNlcjpwYXNz; "
+                + "{\"credentials\":{\"key\":{\"value\":\"NestedSecret3117\"}}}; password='a \\'QuotedSecret3118\\''",
             inner)
         {
             HelpLink = "https://help.example/kv?token=HelpSecret3114",
