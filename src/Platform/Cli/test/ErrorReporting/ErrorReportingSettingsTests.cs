@@ -28,6 +28,9 @@ public class ErrorReportingSettingsTests
             ["STORYTELLER_SUBJECT_TOKEN_TYPE"] = "access_token",
             ["STORYTELLER_API_KEY"] = TestApiKeys.Create("globex", "payroll", "m7"),
             ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] = "github-request-token-value",
+            ["STORYTELLER_TOKEN_SCOPE"] = "api://contoso-storyteller/.default",
+            ["http_proxy"] = "http://proxy.example:3128",
+            ["HTTP_PROXY"] = "http://proxy.example:3128",
             ["PATH"] = @"C:\Windows",
         };
         var machine = MachineSignInSettings.FromEnvironment(name => variables[name] as string);
@@ -46,6 +49,7 @@ public class ErrorReportingSettingsTests
         settings.ContextValues.ShouldContain("globex");
         settings.ContextValues.ShouldContain("payroll");
         settings.ContextValues.ShouldContain("m7");
+        settings.ContextValues.ShouldContain("api://contoso-storyteller/.default");
 
         // The switches would cut every message: "file", "true", "access_token".
         settings.ContextValues.ShouldNotContain("file");

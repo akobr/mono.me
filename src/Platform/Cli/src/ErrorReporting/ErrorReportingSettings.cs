@@ -19,6 +19,8 @@ internal sealed record ErrorReportingSettings
         StorytellerVariables.API_URL,
         StorytellerVariables.CLIENT_ID,
         StorytellerVariables.TOKEN_URL,
+        StorytellerVariables.TOKEN_SCOPE,
+        StorytellerVariables.KEY,
         StorytellerVariables.CLIENT_CERTIFICATE,
         StorytellerVariables.CERTIFICATE_FILE,
         StorytellerVariables.TOKEN_FILE,
@@ -91,10 +93,17 @@ internal sealed record ErrorReportingSettings
                 context.AddRange([key.OrganizationName, key.ProjectName, key.ViewName, key.Annotation.ToString()]);
             }
 
-            var variables = (environmentVariables ?? new Hashtable())
-                .Cast<DictionaryEntry>()
-                .Where(variable => variable.Key is string && variable.Value is string)
-                .ToDictionary(variable => (string)variable.Key, variable => (string)variable.Value!, StringComparer.OrdinalIgnoreCase);
+            // Without regard to case, as Windows reads them; of two that differ only in case (http_proxy and HTTP_PROXY on
+            // Linux) the first is kept.
+            var variables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (DictionaryEntry variable in environmentVariables ?? new Hashtable())
+            {
+                if (variable is { Key: string name, Value: string value })
+                {
+                    variables.TryAdd(name, value);
+                }
+            }
 
             context.AddRange(ContextVariables.Select(name => variables.GetValueOrDefault(name)));
             secrets.AddRange(SecretVariables.Select(name => variables.GetValueOrDefault(name)));
@@ -110,12 +119,19 @@ internal sealed record ErrorReportingSettings
                     && variable.Key.Contains("__", StringComparison.Ordinal))
                 .Select(variable => variable.Value.Trim())
                 .Where(value => value.Length >= 4 && !SwitchValues.Contains(value) && !double.TryParse(value, out _)));
-
-            context.AddRange(person);
         }
         catch (Exception)
         {
             // What was read so far is kept.
+        }
+
+        try
+        {
+            context.AddRange(person);
+        }
+        catch (Exception)
+        {
+            // The person is optional too.
         }
 
         return new ErrorReportingSettings

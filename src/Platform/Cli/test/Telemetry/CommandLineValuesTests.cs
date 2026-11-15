@@ -76,7 +76,7 @@ public class CommandLineValuesTests
         values.Hidden.ShouldContain("prod");
         values.Hidden.ShouldContain("acme.billing");
         values.Hidden.ShouldContain("C:\\in\\args.rsp");
-        values.Hidden.ShouldNotContain("args");
+        values.Hidden.ShouldContain("args");
         values.Hidden.ShouldContain("after");
         values.Hidden.ShouldNotContain("--secret");
         values.Hidden.ShouldNotContain("secret");
@@ -164,6 +164,17 @@ public class CommandLineValuesTests
         CommandLineValues.WithParts("https://keys.example.org/jwks").ShouldNotContain("https:");
         CommandLineValues.WithParts("@acme.billing.prod.sbt.app").ShouldContain("acme");
         CommandLineValues.WithParts("@acme.billing.prod.sbt.app").ShouldContain("billing");
+    }
+
+    // A file path gives its segments, its file name and its stem, not the common folders of a profile.
+    [Fact]
+    public void WithParts_OfAFilePath_GivesItsSegmentsButNotTheCommonFolders()
+    {
+        CommandLineValues.WithParts("out/acme-billing.env").ShouldContain("acme-billing");
+        CommandLineValues.WithParts("contoso.example/api").ShouldContain("contoso");
+        CommandLineValues.WithParts(@"C:\Users\ada\plans\out.zip").ShouldContain("plans");
+        CommandLineValues.WithParts(@"C:\Users\ada\plans\out.zip").ShouldNotContain("Users");
+        CommandLineValues.WithParts("api://contoso-storyteller/.default").ShouldNotContain("default");
     }
 
     [Fact]

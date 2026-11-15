@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using _42.Platform.Cli.ErrorReporting;
@@ -91,6 +92,8 @@ public class ReportScrubberTests
     [InlineData("The input string 'first-line-secret\nsecond line' was not in a correct format.", "The input string '***")]
     [InlineData("{\"name\":\"b\nc\"}", "{\"***\":\"***")]
     [InlineData("C:\\Users\\ada\\OneDrive - Contoso Ltd\\certs\\machine.pfx is denied.", "*** is denied.")]
+    [InlineData("Could not find file 'C:\\Shares\\Chris' Projects\\acme-billing\\cert.pfx'.", "Could not find file '***'.")]
+    [InlineData("Could not find file '/home/ada/Rock 'n' Roll/acme-billing/cert.pfx'.", "Could not find file '***'.")]
     [InlineData("Unterminated string. Expected delimiter: \". Path 'name', line 1, position 15.", "Unterminated string. Expected delimiter: \". Path '***', line 1, position 15.")]
     [InlineData("Cannot start process 'C:\\tools\\code.cmd' with working directory 'C:\\work'. The system cannot find the file.", "Cannot start process '***' with working directory '***'. The system cannot find the file.")]
     public void ScrubForSentry_RemovesAPathOrAQuoteWhole(string text, string expected)
@@ -129,6 +132,15 @@ public class ReportScrubberTests
             .ShouldBe("GET *** failed");
         ReportScrubber.ScrubForSentry("Machine build-agent-7c9e6679-7425-40de-944b-e07fc1f90ae7 not found", ["build-agent-7c9e6679-7425-40de-944b-e07fc1f90ae7"])
             .ShouldBe("Machine *** not found");
+    }
+
+    // A value of mask characters, or one next to the mask a longer value left, ends.
+    [Theory]
+    [InlineData("Value ***** rejected", "*****")]
+    [InlineData("acme-billing-2026.json does not match **/*.json", "**/*.json")]
+    public void ARemnantNextToAMaskOfItsOwn_Ends(string text, string value)
+    {
+        Should.CompleteIn(() => ReportScrubber.ScrubSecrets(text, [value, "acme-billing-2026"]), TimeSpan.FromSeconds(5));
     }
 
     [Theory]

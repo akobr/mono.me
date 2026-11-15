@@ -27,6 +27,9 @@ internal static class ReportScrubber
 
     public const int MaxSentryMessageLength = 300;
 
+    // What a shape left of a value is looked for up to this length.
+    private const int MaxRemnantLength = 512;
+
     // A shorter value is replaced as a whole word only: "v1", "dev" or "a" would cut every other word.
     private const int MinimumSubstringLength = 4;
 
@@ -109,8 +112,9 @@ internal static class ReportScrubber
     // valid number"); an apostrophe inside a word ("can't") opens no quote.
     private static readonly (Regex Pattern, string Replacement)[] QuoteRules =
     [
-        // a quoted file path up to the first closing quote, so an apostrophe in a word (O'Brien) does not end it
-        (Create($@"(?<![\p{{L}}\p{{N}}])'(?={PathStart})[^\r\n]*?'(?![\p{{L}}\p{{N}}])"), $"'{Mask}'"),
+        // a quoted file path whole: a quote in it (O'Brien, Chris' Projects\x) goes on when a letter, or a separator
+        // before the next quote, follows it
+        (Create($@"(?<![\p{{L}}\p{{N}}])'(?={PathStart})(?:[^'\r\n]|'(?=[\p{{L}}\p{{N}}]|[^'\r\n]*[\\/][^'\r\n]*'))*'(?![\p{{L}}\p{{N}}])"), $"'{Mask}'"),
 
         (Create(@"(?<![\p{L}\p{N}])'[^'\r\n]*'(?![\p{L}\p{N}])"), $"'{Mask}'"),
         (Create(@"""[^""\r\n]*"""), $"\"{Mask}\""),
@@ -303,7 +307,9 @@ internal static class ReportScrubber
                 }
 
                 text = $"{text[..(at - before)]}{Mask}{mask}{Mask}{text[(afterStart + after)..]}";
-                at = at - before + Mask.Length;
+
+                // The next search starts after the trailing mask just written, never on it.
+                at = at - before + (2 * Mask.Length);
             }
         }
 
@@ -311,15 +317,15 @@ internal static class ReportScrubber
     }
 
     // The length of the longest start (or end) of value, of two characters or more and shorter than value, that text ends
-    // with (or starts with).
+    // with (or starts with). An edge with a character of a mask is none: it would match the masks written before.
     private static int LongestEnd(string text, string value, bool isStart)
     {
-        for (var length = Math.Min(value.Length - 1, text.Length); length >= 2; length--)
+        for (var length = Math.Min(Math.Min(value.Length - 1, text.Length), MaxRemnantLength); length >= 2; length--)
         {
-            var piece = isStart ? value[..length] : value[^length..];
-            var edge = isStart ? text[^length..] : text[..length];
+            var piece = isStart ? value.AsSpan(0, length) : value.AsSpan(value.Length - length);
+            var edge = isStart ? text.AsSpan(text.Length - length) : text.AsSpan(0, length);
 
-            if (string.Equals(piece, edge, StringComparison.OrdinalIgnoreCase))
+            if (edge.IndexOfAny('*', '[', ']') < 0 && piece.Equals(edge, StringComparison.OrdinalIgnoreCase))
             {
                 return length;
             }
