@@ -40,12 +40,20 @@ export interface AnnotationOverrides {
   audit?: Record<string, AnnotationAuditEntry[]>
 }
 
+/** The exhibition of a deployment: the demo project that a newcomer may join as a Reader (424-267). */
+export interface MockExhibition {
+  Organization: string
+  Project: string
+}
+
 export interface MockDb {
   scenario: MockScenario
   user: MockUser
   /** null: the user has no Storyteller account yet (onboarding). */
   account: Account | null
   accessPoints: Record<string, AccessPoint>
+  /** The exhibition of the deployment; the showcase has none, and null turns it off. */
+  exhibition?: MockExhibition | null
   /** Registered views per project key ("org.project"). */
   views: Record<string, View[]>
   /** Changed annotations per scope ("org/project/view"). */
@@ -75,8 +83,8 @@ export type MockScenario = 'default' | 'new-user' | 'invited' | 'large' | 'showc
 /** The datasets; build/mock-dataset.ts repeats the list for `npm run dev:mock` (a unit test keeps them equal). */
 export const scenarios: MockScenario[] = ['default', 'new-user', 'invited', 'large', 'showcase']
 // Versioned with the shape of the data, so a tab opened before a change starts from the new seed (2: the Scopes of
-// machines, 424-79).
-const storageKey = '2s-admin:mock-db:2'
+// machines, 424-79; 3: the exhibition, 424-267).
+export const storageKey = '2s-admin:mock-db:3'
 const scenarioKey = '2s-admin:mock-scenario'
 /** The dataset the build was started with when the session last started (VITE_MOCK_DATASET). */
 const launchKey = '2s-admin:mock-launch'
@@ -129,6 +137,7 @@ export function scopeSeed(scenario: MockScenario, org: string, project: string, 
     'acme/billing/staging': 4,
     'acme/shipping/default': 6,
     'northwind/portal/default': 3,
+    'exhibition/exhibition/default': 3,
   }
   const subjects = seeds[`${org}/${project}/${view}`]
   return subjects ? { project, view, subjects } : undefined
@@ -208,7 +217,17 @@ export function createSeed(scenario: MockScenario): MockDb {
         ['ApiKey'],
         "Northwind's customer portal. A small catalog of customers and their responsibilities per context.",
       ),
+      // The exhibition (424-267), under the names production will use. The user is no member of it in any scenario:
+      // they join it as a Reader, in onboarding.
+      exhibition: accessPoint('exhibition', { user_01MOCKGRACE: 'Owner' }),
+      'exhibition.exhibition': accessPoint(
+        'exhibition.exhibition',
+        { user_01MOCKGRACE: 'Owner' },
+        ['ApiKey'],
+        'The exhibition of the 2S Platform. A small catalog of customers and their responsibilities per context.',
+      ),
     },
+    exhibition: { Organization: 'exhibition', Project: 'exhibition' },
     views: {
       'acme.billing': [
         {

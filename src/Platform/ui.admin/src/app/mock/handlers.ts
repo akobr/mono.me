@@ -106,6 +106,11 @@ export const accessHandlers: HttpHandler[] = [
       if (!namePattern.test(body.Organization ?? '') || !namePattern.test(body.Project ?? '')) {
         return errorResponse(400, 'The organization or project name is not valid.', 'InvalidName')
       }
+      // A user without an account owns no organization: an existing one is somebody else's, refused as in POST
+      // /access/points. Creating it again would take it over, the exhibition included.
+      if (db.accessPoints[body.Organization!]) {
+        return errorResponse(409, `The organization ${body.Organization} already exists.`, 'AccessPointExists')
+      }
 
       const projectKey = `${body.Organization}.${body.Project}`
       db.account = {

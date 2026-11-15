@@ -1,7 +1,10 @@
 import { http, HttpResponse, type HttpHandler } from 'msw'
 import type {
+  AccessPoint,
   AccessPointMember,
+  Account,
   AccountRole,
+  Exhibition,
   FederatedIssuer,
   FederationRule,
   Invitation,
@@ -15,7 +18,7 @@ import type {
   SharedCertificateCreate,
 } from '@42for.net/2splatform.sdk'
 import { MachineScope, roleRank } from '@42for.net/2splatform.sdk'
-import { mockDirectory, type MockDb } from './db'
+import { mockDirectory, type MockDb, type MockExhibition } from './db'
 import {
   certificateResetNotSupportedMessage,
   machineAccessNotSupported,
@@ -29,9 +32,9 @@ import {
 } from './federation'
 import { errorResponse, requireRole, roleOf, withDb } from './handlers'
 
-// Members, invitations, machines, shared certificates, the machine policy, the trusted issuers and federation rules
-// (424-46) and the CA of the mock API, with the rules of companion spec E2/E3 (last owner, elevated roles, self
-// changes, pending invitations).
+// Members, invitations, the exhibition (424-267), machines, shared certificates, the machine policy, the trusted
+// issuers and federation rules (424-46) and the CA of the mock API, with the rules of companion spec E2/E3 (last
+// owner, elevated roles, self changes, pending invitations).
 
 const api = '*/api/v1'
 const random = (length: number) =>
@@ -60,6 +63,27 @@ function syncAccount(db: MockDb) {
       .map(([key, point]) => [key, point.AccessMap?.[db.user.id]] as const)
       .filter((entry): entry is [string, AccountRole] => !!entry[1]),
   )
+}
+
+/**
+ * Makes the user a member of the access point with at least the role, never with a lower one, and gives them an account
+ * when they have none: what accepting an invitation and joining the exhibition do.
+ */
+function joinAccessPoint(db: MockDb, point: AccessPoint, role: AccountRole): Account {
+  const current = point.AccessMap?.[db.user.id]
+  if (!current || roleRank(current) < roleRank(role)) {
+    point.AccessMap = { ...point.AccessMap, [db.user.id]: role }
+  }
+  db.account ??= { Id: db.user.id, UserName: db.user.email, Name: db.user.name, AccessMap: {} }
+  syncAccount(db)
+  return db.account
+}
+
+/** The exhibition and its project, as both of its routes resolve them: none without the setting or the project. */
+function exhibitionOf(db: MockDb): { exhibition: MockExhibition; point: AccessPoint } | undefined {
+  const exhibition = db.exhibition
+  const point = exhibition ? db.accessPoints[`${exhibition.Organization}.${exhibition.Project}`] : undefined
+  return exhibition && point ? { exhibition, point } : undefined
 }
 
 const ownerCount = (db: MockDb, key: string) =>
@@ -402,13 +426,7 @@ export const accessManagementHandlers: HttpHandler[] = [
       invitation.AcceptedById = db.user.id
       invitation.RespondedAt = new Date().toISOString()
       const point = (db.accessPoints[invitation.AccessPointKey!] ??= { Key: invitation.AccessPointKey, AccessMap: {} })
-      const current = point.AccessMap?.[db.user.id]
-      if (!current || roleRank(current) < roleRank(invitation.Role!)) {
-        point.AccessMap = { ...point.AccessMap, [db.user.id]: invitation.Role! }
-      }
-      db.account ??= { Id: db.user.id, UserName: db.user.email, Name: db.user.name, AccessMap: {} }
-      syncAccount(db)
-      return HttpResponse.json(db.account)
+      return HttpResponse.json(joinAccessPoint(db, point, invitation.Role!))
     }),
   ),
 
@@ -422,6 +440,34 @@ export const accessManagementHandlers: HttpHandler[] = [
       invitation.Status = 'Declined'
       invitation.RespondedAt = new Date().toISOString()
       return HttpResponse.json(invitation)
+    }),
+  ),
+
+  // The exhibition (424-267). A deployment without one, or without its project, answers 404 without a body, as the
+  // API does.
+  http.get(
+    `${api}/access/exhibition`,
+    withDb((db) => {
+      const found = exhibitionOf(db)
+      return found
+        ? HttpResponse.json<Exhibition>({
+            Organization: found.exhibition.Organization,
+            Project: found.exhibition.Project,
+            Description: found.point.Description,
+          })
+        : new HttpResponse(null, { status: 404 })
+    }),
+  ),
+
+  // The role and the project never come from the request: the user becomes a Reader of the exhibition project, with no
+  // role in its organization.
+  http.post(
+    `${api}/access/exhibition/join`,
+    withDb((db) => {
+      const found = exhibitionOf(db)
+      return found
+        ? HttpResponse.json(joinAccessPoint(db, found.point, 'Reader'))
+        : new HttpResponse(null, { status: 404 })
     }),
   ),
 
