@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.KeyValues;
 
 using Azure.Core.Serialization;
@@ -52,6 +53,44 @@ public class KeyValueErrorMappingTests
         status.ShouldBe(HttpStatusCode.BadRequest);
         response!.ErrorCode.ShouldBe(ErrorCodes.ImportInvalid);
         response.Details.ShouldBeSameAs(items);
+    }
+
+    // The step-up (Auth:StepUp, RFC 9470): 401 with the code and the max age in seconds, which browsers cannot read from
+    // the header (424-264).
+    [Fact]
+    public void TryMap_StepUpRequired_Is401WithTheMaxAge()
+    {
+        ErrorResponseMapping.TryMap(new StepUpRequiredException(TimeSpan.FromMinutes(10)), out var status, out var response).ShouldBeTrue();
+
+        status.ShouldBe(HttpStatusCode.Unauthorized);
+        response!.ErrorCode.ShouldBe(ErrorCodes.StepUpRequired);
+        response.Message.ShouldBe("This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.");
+        response.Details.ShouldBe(new StepUpDetails(600));
+        response.Error.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Middleware_StepUpRequired_SendsTheChallenge()
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(Options.Create(new WorkerOptions { Serializer = new JsonObjectSerializer() }))
+            .BuildServiceProvider();
+        var (context, _) = FunctionTestDoubles.CreateRequest(services);
+        context.Definition = new ExceptionHandlingMiddlewareTests.HttpFunctionDefinition();
+        var bindings = ExceptionHandlingMiddlewareTests.BindingsFeature.Create();
+        ((TestInvocationFeatures)context.Features).Set(ExceptionHandlingMiddlewareTests.BindingsFeature.FeatureType, bindings);
+        var middleware = new ExceptionHandlingMiddleware(NullLogger<ExceptionHandlingMiddleware>.Instance);
+
+        await middleware.Invoke(context, _ => throw new StepUpRequiredException(TimeSpan.FromMinutes(5)));
+
+        var response = ((ExceptionHandlingMiddlewareTests.BindingsFeature)bindings).InvocationResult.ShouldBeOfType<TestHttpResponseData>();
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        response.Headers.TryGetValues("WWW-Authenticate", out var values).ShouldBeTrue();
+        values!.Single().ShouldBe("Bearer error=\"insufficient_user_authentication\", error_description=\"A recent sign-in is required\", max_age=\"300\"");
+        response.Body.Position = 0;
+        using var body = JsonDocument.Parse(response.Body);
+        body.RootElement.GetProperty("ErrorCode").GetString().ShouldBe(ErrorCodes.StepUpRequired);
+        body.RootElement.GetProperty("Details").GetProperty("MaxAge").GetInt64().ShouldBe(300);
     }
 
     [Fact]

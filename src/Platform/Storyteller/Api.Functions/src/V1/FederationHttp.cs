@@ -144,7 +144,7 @@ public class FederationHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(FederatedIssuer), Description = "The stored trusted issuer.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The issuer is not valid, its Issuer would change, or the project already has 20 trusted issuers (ErrorCode InvalidFederation).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "Federation rules of machines still reference the name of a deleted issuer (ErrorCode FederatedIssuerInUse); the message names up to 10 machines.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenFederatedIssuerReplace)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutFederatedIssuer(
@@ -180,6 +180,12 @@ public class FederationHttp
         if (existing is not null && request.HasActorRestriction(ActorRestrictions.NoSecretReveal))
         {
             throw KeyValueErrors.ActorRestricted();
+        }
+
+        // For the same reason the replace needs a recent sign-in (Auth:StepUp), in every build too.
+        if (existing is not null)
+        {
+            request.EnsureRecentSignIn();
         }
 
         if (existing is null)
@@ -252,7 +258,7 @@ public class FederationHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A rule is not valid (ErrorCode InvalidFederation), or the machine is not Federated (ErrorCode MachineNotFederated).")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine access doesn't exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine was changed concurrently while its rules were replaced (ErrorCode Conflict); reload it and retry.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Unauthorized, Definitions.ContentTypes.Json, typeof(ErrorResponse), CustomHeaderType = typeof(StepUpChallengeHeaders), Description = Definitions.Descriptions.ResponseUnauthorizedStepUpUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutMachineFederationRules(
@@ -289,6 +295,10 @@ public class FederationHttp
         {
             return InvalidFederation(invalid);
         }
+
+        // New rules give the machine's tokens to another workload, a reset of a federated machine (Auth:StepUp); after the
+        // validation, so a bad body is refused first, and before the try, whose mapping would drop the challenge header.
+        request.EnsureRecentSignIn();
 
         try
         {

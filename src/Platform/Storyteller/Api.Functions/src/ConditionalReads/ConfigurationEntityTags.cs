@@ -106,13 +106,16 @@ public static class ConfigurationEntityTags
     }
 
     // s: the caller may read secrets; w: the read right is withheld from a machine without mTLS; a: the read right is
-    // withheld from a user by the actor it acts through (NoSecretReveal); p: none of them. w, a and p get the same body,
-    // but w and a get the withheld header, each with its own value, so none of them shares a tag either.
+    // withheld from a user by the actor it acts through (NoSecretReveal); u: the read right is withheld from a user whose
+    // sign-in is not recent (Auth:StepUp); p: none of them. w, a, u and p get the same body, but w, a and u get the
+    // withheld header, each with its own value, so none of them shares a tag either; after a new sign-in, s never matches
+    // the tag of u.
     private static string RightsCode(SecretRights rights)
     {
         return rights.CanReadSecrets ? "s"
             : rights.IsReadWithheldByMtls ? "w"
             : rights.IsReadWithheldByActor ? "a"
+            : rights.IsReadWithheldByStepUp ? "u"
             : "p";
     }
 

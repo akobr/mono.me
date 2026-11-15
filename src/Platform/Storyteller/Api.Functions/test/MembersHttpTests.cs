@@ -125,6 +125,23 @@ public class MembersHttpTests
         access.Calls.ShouldBe([$"set:acme.billing:user-2:{role}:user-1"]);
     }
 
+    // A role change and the removal of another member need a recent sign-in (Auth:StepUp), in every build, before the
+    // service is asked; leaving (removing oneself) does not (424-264).
+    [Fact]
+    public async Task SetRoleAndRemoveOther_WithAStaleSignIn_RequireAStepUp_LeavingDoesNot()
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+        var body = FunctionTestDoubles.ToJsonBody(new MemberRoleUpdate { Role = AccountRole.Reader });
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.SetMemberRole(UserRequest(body).WithSignIn(TestRequests.StaleSignIn), "acme.billing", "user-2"));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.RemoveMember(UserRequest().WithSignIn(TestRequests.StaleSignIn), "acme.billing", "user-2"));
+        access.Calls.ShouldBeEmpty();
+
+        (await http.RemoveMember(UserRequest().WithSignIn(TestRequests.StaleSignIn), "acme.billing", "user-1")).ShouldBeOfType<NoContentResult>();
+        access.Calls.ShouldBe(["remove:acme.billing:user-1:user-1"]);
+    }
+
     [Fact]
     public async Task RemoveMember_ReturnsNoContent()
     {
@@ -358,6 +375,7 @@ public class MembersHttpTests
             new("name", "Ada"),
             new("scp", Scopes.User.Impersonation),
         };
+        context.Items[FunctionContextItemKeys.SignInRecency] = TestRequests.RecentSignIn;
 
         if (restricted)
         {

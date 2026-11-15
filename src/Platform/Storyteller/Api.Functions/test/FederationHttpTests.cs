@@ -603,6 +603,24 @@ public class FederationHttpTests
         ShouldBeIssuer(await _issuers.GetAsync(Org, Project, "github"), GitHub());
     }
 
+    // Replacing an issuer and new federation rules hand machine tokens to other workloads: they need a recent sign-in
+    // (Auth:StepUp), in every build; creating a new issuer does not (424-264).
+    [Fact]
+    public async Task ReplaceIssuerAndRules_WithAStaleSignIn_RequireAStepUp_NewIssuerDoesNot()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub());
+        _access.Add(Org, Project, FederatedMachine(Rule()));
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => Http.PutFederatedIssuer(IssuerRequest(Rekeyed()).WithSignIn(TestRequests.StaleSignIn), Org, Project, "github"));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => Http.PutMachineFederationRules(RulesRequest([Rule("repo:acme/app:ref:refs/heads/*")]).WithSignIn(TestRequests.StaleSignIn), Org, Project, MachineId));
+
+        ShouldBeIssuer(await _issuers.GetAsync(Org, Project, "github"), GitHub());
+        _access.Calls.ShouldNotContain(call => call.StartsWith("rules:", StringComparison.Ordinal));
+
+        var created = await Http.PutFederatedIssuer(IssuerRequest(GitHub("gitlab")).WithSignIn(TestRequests.StaleSignIn), Org, Project, "gitlab");
+        created.ShouldBeOfType<OkObjectResult>();
+    }
+
     [Fact]
     public async Task PutIssuer_NewIssuer_ThroughARestrictedActor_IsStored()
     {
@@ -965,6 +983,7 @@ public class FederationHttpTests
             new("sub", "user-1"),
             new("scp", Scopes.User.Impersonation),
         };
+        request.FunctionContext.Items[FunctionContextItemKeys.SignInRecency] = TestRequests.RecentSignIn;
         return request;
     }
 

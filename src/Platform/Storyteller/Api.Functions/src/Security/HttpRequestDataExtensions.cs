@@ -15,7 +15,10 @@ namespace _42.Platform.Storyteller.Api.Security;
 // The outcome of GetSecretRightsAsync: the caller, and per direction whether a right of the machine was withheld
 // because the request has no mTLS. A refusal names mTLS only for a right the machine has, where mTLS would help.
 // IsReadWithheldByActor is the same for a user acting through an actor under NoSecretReveal: the role gives the read
-// right and the actor withholds it. Writes are never withheld by an actor.
+// right and the actor withholds it. Writes are never withheld by an actor. IsReadWithheldByStepUp and
+// IsWriteWithheldByStepUp are the rights the role gives a user whose sign-in is not recent (Auth:StepUp); the actor wins
+// for reads, because a new sign-in does not lift NoSecretReveal. A user is never withheld for mTLS, a machine never by
+// an actor or the step-up.
 public sealed record SecretRights(KeyValueCaller Caller, bool IsReadWithheldByMtls, bool IsWriteWithheldByMtls)
 {
     public const string WithheldHeader = "X-2S-Secrets-Withheld";
@@ -24,7 +27,28 @@ public sealed record SecretRights(KeyValueCaller Caller, bool IsReadWithheldByMt
 
     public const string WithheldByActor = "actor-restricted";
 
+    public const string WithheldByStepUp = "step-up-required";
+
     public bool IsReadWithheldByActor { get; init; }
+
+    public bool IsReadWithheldByStepUp { get; init; }
+
+    public bool IsWriteWithheldByStepUp { get; init; }
+
+    // The window of the step-up, for its refusal.
+    public TimeSpan StepUpMaxAge { get; init; } = StepUpOptions.DefaultMaxAge;
+
+    // The one reason a resolved read reports in WithheldHeader, or null when the read right is not withheld.
+    public string? ReadWithheldReason
+    {
+        get
+        {
+            return IsReadWithheldByMtls ? WithheldByMtls
+                : IsReadWithheldByActor ? WithheldByActor
+                : IsReadWithheldByStepUp ? WithheldByStepUp
+                : null;
+        }
+    }
 
     public bool CanReadSecrets => Caller.CanReadSecrets;
 
@@ -125,7 +149,8 @@ public static class HttpRequestDataExtensions
     // each is reported withheld only when the machine has it. A user needs ContributorWithSecrets for both, and no scope
     // gives them; Debug builds (DEV_AUTH) skip that role check. An actor under NoSecretReveal withholds the read right
     // of the user it acts for, in every build, and it is reported withheld only when the role gives it; the write right
-    // stays. Handlers call AsAmbient() on the result before they resolve bindings.
+    // stays. A sign-in that is not recent (Auth:StepUp) withholds both rights, in every build, reported the same way; the
+    // actor wins for the read. Handlers call AsAmbient() on the result before they resolve bindings.
     public static async Task<SecretRights> GetSecretRightsAsync(
         this HttpRequestData @this,
         IAccessService accessService,
@@ -168,10 +193,61 @@ public static class HttpRequestDataExtensions
         }
 #endif
 
-        // After the DEV_AUTH block, so the restriction of the actor holds in every build.
+        // After the DEV_AUTH block, so the restriction of the actor and the step-up hold in every build.
         var withheldByActor = canReadSecrets && @this.HasActorRestriction(ActorRestrictions.NoSecretReveal);
-        var user = new KeyValueCaller(actor, canReadSecrets && !withheldByActor, canWriteSecrets, KeyValueChannel.User) { CorrelationId = correlationId };
-        return new SecretRights(user, IsReadWithheldByMtls: false, IsWriteWithheldByMtls: false) { IsReadWithheldByActor = withheldByActor };
+        var recency = @this.GetSignInRecency();
+        var readWithheldByStepUp = canReadSecrets && !withheldByActor && !recency.IsRecent;
+        var writeWithheldByStepUp = canWriteSecrets && !recency.IsRecent;
+        var user = new KeyValueCaller(
+            actor,
+            canReadSecrets && !withheldByActor && !readWithheldByStepUp,
+            canWriteSecrets && !writeWithheldByStepUp,
+            KeyValueChannel.User) { CorrelationId = correlationId };
+        return new SecretRights(user, IsReadWithheldByMtls: false, IsWriteWithheldByMtls: false)
+        {
+            IsReadWithheldByActor = withheldByActor,
+            IsReadWithheldByStepUp = readWithheldByStepUp,
+            IsWriteWithheldByStepUp = writeWithheldByStepUp,
+            StepUpMaxAge = recency.MaxAge,
+        };
+    }
+
+    // How recent the sign-in of the user is (Auth:StepUp), as the bearer middleware judged it. Machines never need a
+    // step-up. A user request without the judgement never passed the bearer middleware: in Debug builds (DEV_AUTH, which
+    // serve requests without an identity) it needs none, in Release builds it is not recent.
+    public static SignInRecency GetSignInRecency(this HttpRequestData @this)
+    {
+        if (@this.IsApplicationIdentity())
+        {
+            return SignInRecency.NotRequired(StepUpOptions.DefaultMaxAge);
+        }
+
+        if (@this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.SignInRecency, out var value) && value is SignInRecency recency)
+        {
+            return recency;
+        }
+
+        return IsDevelopmentAuthentication
+            ? SignInRecency.NotRequired(StepUpOptions.DefaultMaxAge)
+            : SignInRecency.Stale(StepUpOptions.DefaultMaxAge);
+    }
+
+    public static bool HasRecentSignIn(this HttpRequestData @this)
+    {
+        return @this.GetSignInRecency().IsRecent;
+    }
+
+    // The guard of an operation that changes roles or members or gives out a machine credential: 401 StepUpRequired with
+    // the RFC 9470 challenge when the sign-in of the user is not recent. Called after the refusals a new sign-in cannot
+    // fix, and outside any try that maps exceptions to results, so the challenge header is kept. Machines pass.
+    public static void EnsureRecentSignIn(this HttpRequestData @this)
+    {
+        var recency = @this.GetSignInRecency();
+
+        if (!recency.IsRecent)
+        {
+            throw new StepUpRequiredException(recency.MaxAge);
+        }
     }
 
     // The scopes a machine may use in this request: stored on the machine and carried by its credentials. It reads the

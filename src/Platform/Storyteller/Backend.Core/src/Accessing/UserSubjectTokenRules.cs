@@ -9,6 +9,8 @@ public static class UserSubjectTokenRules
 {
     public const string ActorClaimType = "act";
 
+    public const string AuthTimeClaimType = "auth_time";
+
     private static readonly long MaxUnixSeconds = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
 
     // A refusal for a request no token can pass, or null.
@@ -59,10 +61,12 @@ public static class UserSubjectTokenRules
         return FirstValue(claims, "jti") ?? FirstValue(claims, "uti");
     }
 
-    // auth_time, in Unix seconds; null when absent or not a number.
+    // auth_time, in Unix seconds; null when absent or not a number. The API's step-up reads the claims of a request with it
+    // too: every bearer validator keeps auth_time under its own name (the inbound mapping of JwtSecurityTokenHandler,
+    // used for Entra ID, does not rename it).
     public static DateTimeOffset? GetAuthTime(IReadOnlyList<Claim> claims)
     {
-        return long.TryParse(FirstValue(claims, "auth_time"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
+        return long.TryParse(FirstValue(claims, AuthTimeClaimType), NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
             && seconds >= 0
             && seconds <= MaxUnixSeconds
             ? DateTimeOffset.FromUnixTimeSeconds(seconds)

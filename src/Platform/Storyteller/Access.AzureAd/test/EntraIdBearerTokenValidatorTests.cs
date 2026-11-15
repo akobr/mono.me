@@ -152,6 +152,21 @@ public class EntraIdBearerTokenValidatorTests
         FindClaim(result, MappedObjectId).ShouldBe(ObjectId);
     }
 
+    // An Entra ID access token rarely carries auth_time (an ID token claim); when one does, the inbound mapping keeps its
+    // name, so the step-up of the API (424-264) reads it as for the other providers.
+    [Fact]
+    public async Task Validate_UserTokenWithAnAuthTime_KeepsItReadable()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(fixture.V2Issuer, fixture.ApiAudience, UserClaims(new Claim("auth_time", "1793000000", ClaimValueTypes.Integer64)));
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        result.Claims.ShouldContain(claim => claim.Type == "auth_time");
+        UserSubjectTokenRules.GetAuthTime(result.Claims).ShouldBe(DateTimeOffset.FromUnixTimeSeconds(1793000000));
+    }
+
     [Fact]
     public async Task Validate_UpperCaseTenantAndObjectId_AreKeyedInLowerCase()
     {
