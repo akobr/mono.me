@@ -1,18 +1,36 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { isNotFound, isStorytellerError } from '@42for.net/2splatform.sdk'
 import { useGetResolvedConfiguration } from '@42for.net/2splatform.sdk/vue-query'
+import { isSignInStale, useStepUpStore } from '@/composables/useStepUp'
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 
 /**
  * The Resolved tab (spec section 11.2): bindings evaluated by the server. It may contain secrets, so it is blurred
- * until "Reveal", never cached (gcTime 0) and refetched on every visit. A 422 shows the binding error.
+ * until "Reveal", never cached (gcTime 0) and refetched on every visit. A 422 shows the binding error. With a sign-in
+ * older than the API's window (424-264) the API leaves the secret bindings unresolved and says so only in a header
+ * the browser cannot read cross-origin, so the client hint tells it: the alert offers to confirm it is you instead of
+ * claiming the secrets are included. The page loads again after the return, and so does this read.
  */
 const props = defineProps<{ annotationKey: string }>()
 
 const scope = useScope()
 const preferences = usePreferencesStore()
 const canSeeSecrets = useCan('secrets')
+const stepUp = useStepUpStore()
+// Whether the sign-in is too old for the secrets, by the token's auth_time; asked again with every visit of the tab.
+const staleSignIn = ref(false)
+watch(
+  canSeeSecrets,
+  async (can) => {
+    staleSignIn.value = can && (await isSignInStale())
+  },
+  { immediate: true },
+)
+const secretsWithheld = computed(() => canSeeSecrets.value && staleSignIn.value)
+const confirmActions = [
+  { label: "Confirm it's you", icon: 'i-lucide-log-in', color: 'warning' as const, onClick: () => void stepUp.ask() },
+]
 const revealed = ref(false)
 const format = ref<DocumentFormat>(preferences.state.editorFormat)
 
@@ -29,6 +47,16 @@ const bindingError = computed(() => {
 <template>
   <div class="space-y-3 p-4">
     <UAlert
+      v-if="secretsWithheld"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-shield-alert"
+      title="Secret values are hidden"
+      description="Your sign-in is too old for secrets: they stay as their bindings until you confirm it's you. The response is never cached."
+      :actions="confirmActions"
+    />
+    <UAlert
+      v-else
       color="warning"
       variant="subtle"
       icon="i-lucide-key-round"

@@ -54,6 +54,8 @@ function fakeAuth(): AuthService {
     signIn: vi.fn(async () => {}),
     signOut: vi.fn(async () => {}),
     consumeReturnTo: () => undefined,
+    getAuthTime: async () => Date.now(),
+    getStepUpReturn: () => undefined,
   }
 }
 

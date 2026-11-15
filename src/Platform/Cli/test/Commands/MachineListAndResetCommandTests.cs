@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.MachineAccess;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using Alba.CsConsoleFormat;
 using Moq;
@@ -152,6 +153,38 @@ public class MachineListAndResetCommandTests
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
         _console.Lines.ShouldContain("! Make sure to copy the access key (secret), it is not stored anywhere.");
+    }
+
+    // 424-264: a reset needs a recent sign-in; the command names the window and the way to a new sign-in, exit code 44.
+    [Fact]
+    public async Task Reset_WithAStaleSignIn_NamesTheStepUp()
+    {
+        _accessApi
+            .Setup(api => api.ResetMachineAccessAsync("org1", "proj1", MachineId))
+            .ThrowsAsync(AnnotationCommandFixture.StepUpRequired());
+
+        var exitCode = await Reset();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _console.Lines.ShouldBe([
+            "! This needs a recent sign-in: a sign-in counts for 10 minutes.",
+            "Error code: StepUpRequired",
+            StepUpRefusal.Hint,
+        ]);
+    }
+
+    // Any other 401 of the reset keeps its general sentence.
+    [Fact]
+    public async Task Reset_Unauthorized_KeepsTheGeneralSentence()
+    {
+        _accessApi
+            .Setup(api => api.ResetMachineAccessAsync("org1", "proj1", MachineId))
+            .ThrowsAsync(AnnotationCommandFixture.Error(401));
+
+        var exitCode = await Reset();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _console.Lines.ShouldBe([$"! {ApiRefusal.GeneralMessage}"]);
     }
 
     private Task<int> Reset()

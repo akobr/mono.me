@@ -60,10 +60,12 @@ public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigur
     [McpServerTool(Name = SecretToolNames.GetResolvedConfiguration, Title = "Get a configuration with its bindings evaluated", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description(
         "Returns the effective configuration of an annotation with its bindings evaluated: @key references and $binding "
-        + "objects replaced by their values. With ContributorWithSecrets the secret bindings are filled in with the secret "
-        + "values; without it they stay as stored. " + AskFirst + " The API audits secret reads: each secret of the values "
-        + "store that a resolved read uses is counted per hour as a BindingRead event in the project's audit trail "
-        + "(get_key_value_audit). A binding that cannot be evaluated is 422. Needs Reader on the project.")]
+        + "objects replaced by their values. With ContributorWithSecrets, and a recent sign-in where the API requires one, "
+        + "the secret bindings are filled in with the secret values; otherwise they stay as stored, and when the role gives "
+        + "secrets SecretsWithheld and SecretsWithheldNotice say why. " + AskFirst + " The API audits secret reads: each "
+        + "secret of the values store that a resolved read uses is counted per hour as a BindingRead event in the "
+        + "project's audit trail (get_key_value_audit). A binding that cannot be evaluated is 422. Needs Reader on the "
+        + "project.")]
     public async Task<CallToolResult> GetResolvedConfiguration(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
@@ -72,6 +74,12 @@ public sealed class SecretTools(Sdk.IKeyValuesApiClient keyValues, Sdk.IConfigur
         CancellationToken cancellationToken = default)
     {
         var annotationKey = AnnotationKeys.Parse(key).ToString();
-        return ToolResults.Json(await configurations.GetResolvedConfigurationAsync(organization, project, view, annotationKey, cancellationToken: cancellationToken));
+
+        // The conditional read keeps the headers, X-2S-Secrets-Withheld among them; without If-None-Match it is a 200.
+        var response = await configurations.GetResolvedConfigurationConditionalAsync(organization, project, view, annotationKey, cancellationToken: cancellationToken);
+        var configuration = response.Result
+            ?? throw new Sdk.ApiException($"The API answered {response.StatusCode} without a configuration.", response.StatusCode, string.Empty, response.Headers, null);
+
+        return SecretsWithheldNotice.Result(configuration, response.SecretsWithheld);
     }
 }

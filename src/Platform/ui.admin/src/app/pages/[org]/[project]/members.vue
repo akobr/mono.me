@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGetMembers } from '@42for.net/2splatform.sdk/vue-query'
+import { useStepUpStore } from '@/composables/useStepUp'
 import { useContextStore } from '@/stores/context'
 
 // Members and invitations of the project, like the organization's Members page (424-35).
@@ -12,6 +13,14 @@ const highlight = computed(() => (typeof route.query.highlight === 'string' ? ro
 // Invite is the page's main action, in the top bar (424-41); an organization role does not grant it.
 const canInvite = useCan('manageAccess')
 const inviting = ref(false)
+const stepUp = useStepUpStore()
+
+// An invitation is a deferred grant: it needs a recent sign-in (424-264), asked for before the dialog is filled in.
+async function invite() {
+  if (await stepUp.ensureRecentSignIn()) {
+    inviting.value = true
+  }
+}
 
 // #invitations (the old Invitations page redirects here) scrolls once the members above it are listed; the query is
 // the one MembersTable reads.
@@ -34,7 +43,7 @@ useHashScroll(() => !members.isPending.value)
             aria-label="Invite"
             icon="i-lucide-user-plus"
             :ui="{ label: 'hidden sm:inline' }"
-            @click="inviting = true"
+            @click="invite()"
           />
         </template>
       </AppNavbar>

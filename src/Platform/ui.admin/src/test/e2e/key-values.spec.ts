@@ -125,6 +125,25 @@ test('changes the protection of a secret to HSM and keeps the old version at Sta
   await expect(rows.filter({ hasText: 'v2' })).toContainText('Standard')
 })
 
+// 424-264: with a stale sign-in the mock API answers the step-up 401; the confirmation signs in again with maxAge, the
+// mock sign-in comes back to the key through /callback, and the Reveal that asked for it runs once more.
+test('reveals a secret after confirming a stale sign-in', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await page.evaluate(() => window.storytellerMock?.staleSignIn())
+  await openKey(page, 'db.password', testInfo)
+
+  await page.getByRole('button', { name: 'Reveal' }).click()
+  const dialog = page.getByRole('dialog', { name: "Confirm it's you" })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toContainText('you come back to this page')
+  await dialog.getByRole('button', { name: 'Sign in again' }).click()
+
+  await expect(page.getByText('s3cret-billing-2')).toBeVisible()
+  await expect(page.getByText('You signed in again').first()).toBeVisible()
+  await expect(page).toHaveURL(/\/acme\/billing\/default\/key-values/)
+  await expect(page.getByRole('dialog', { name: "Confirm it's you" })).toHaveCount(0)
+})
+
 test('deletes, restores and purges a key', async ({ page }, testInfo) => {
   await openApp(page, '/acme/billing/default/key-values')
   await openKey(page, 'app.name', testInfo)

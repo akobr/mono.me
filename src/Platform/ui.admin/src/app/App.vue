@@ -29,6 +29,7 @@ const QueryDevtools =
 <template>
   <UApp :toaster="{ position: 'bottom-right' }" :tooltip="{ delayDuration: 300 }">
     <ApiErrorToaster />
+    <StepUpDialog />
     <component :is="layout" v-if="ready" v-bind="layoutProps">
       <RouterView />
     </component>

@@ -9,6 +9,16 @@ export function hasUnsavedChanges(): boolean {
   return [...dirtySources].some((isDirty) => isDirty())
 }
 
+let leaving = false
+
+/**
+ * The page is left on purpose, after the person was told the unsaved changes are lost (the step-up's sign-in,
+ * 424-264): the browser's own prompt does not ask again. False asks again, for a sign-in that did not leave the page.
+ */
+export function leaveWithoutPrompt(value = true): void {
+  leaving = value
+}
+
 /**
  * Guards unsaved edits (spec section 11.1): leaving the route or changing its params (another row) asks
  * "Discard changes?", and closing the browser tab triggers the native beforeunload prompt.
@@ -52,7 +62,7 @@ export function useUnsavedChanges(
   onBeforeRouteUpdate(guard)
 
   useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
-    if (isDirty()) {
+    if (isDirty() && !leaving) {
       event.preventDefault()
     }
   })

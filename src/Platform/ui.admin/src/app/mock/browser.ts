@@ -16,6 +16,7 @@ import {
 import { getDocument, latest, putVersion, type ScopeRef } from './documents'
 import { mockHandlers } from './all-handlers'
 import { writeShowcaseSettings } from './showcase/settings'
+import { setStaleSignIn } from './step-up'
 
 declare global {
   interface Window {
@@ -27,6 +28,11 @@ declare global {
       addMachine: (projectKey: string, machine: MachineAccess) => void
       /** Sets the exhibition, or none with null; onboarding asks for it once per page load (E2E onboarding flows). */
       setExhibition: (value: MockExhibition | null) => void
+      /**
+       * Makes the sign-in of the tab stale (false: recent again): the guarded operations answer the step-up 401 until
+       * the mock sign-in with maxAge (424-264).
+       */
+      staleSignIn: (stale?: boolean) => void
     }
   }
 }
@@ -73,5 +79,6 @@ export async function startMockApi(): Promise<void> {
       db.exhibition = value
       saveDb(db)
     },
+    staleSignIn: (stale = true) => setStaleSignIn(stale),
   }
 }

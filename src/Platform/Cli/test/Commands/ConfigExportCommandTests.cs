@@ -229,6 +229,34 @@ public class ConfigExportCommandTests
         _api.Verify(api => api.GetConfigurationConditionalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // 424-264: a user whose sign-in is not recent gets the remedy of a new sign-in; the export still stops with 2.
+    [Fact]
+    public async Task WithheldSecretsForAStaleSignIn_StopAnExport_NamingANewSignIn()
+    {
+        SetupResolved(Envelope(Resolved), withheld: "step-up-required");
+
+        var exitCode = await Execute(Key, "--mask", "all", "-e", "app.env");
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _error.ToString().ShouldBe("The API withheld the secrets of the configuration (step-up-required): the values of secret bindings are their expressions. Nothing was exported. Secrets need a recent sign-in: sign out in the browser first (the admin UI's Sign out ends the browser's session) or approve the code in a private window, then run 'sform account logout' and 'sform account', and repeat the command.\n");
+        _out.ToString().ShouldBeEmpty();
+        _fileSystem.File.Exists(P(@"C:\work\app.env")).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("actor-restricted", " The sign-in acts through an actor that may not reveal secrets (NoSecretReveal), and a new sign-in does not change that: read it with a sign-in of your own.")]
+    [InlineData("something-new", "")]
+    public async Task WithheldSecrets_StopAnExport_WithTheRemedyOfTheReason(string reason, string hint)
+    {
+        SetupResolved(Envelope(Resolved), withheld: reason);
+
+        var exitCode = await Execute(Key, "--github-env", "--prefix", "APP_");
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _error.ToString().ShouldBe($"The API withheld the secrets of the configuration ({reason}): the values of secret bindings are their expressions. Nothing was exported.{hint}\n");
+        _fileSystem.File.ReadAllText(GitHubEnv).ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("--github-env", "--prefix", "APP_")]
     [InlineData("--mask", "bound")]

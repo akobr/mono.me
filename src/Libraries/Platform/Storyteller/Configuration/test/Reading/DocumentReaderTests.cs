@@ -115,6 +115,37 @@ public sealed class DocumentReaderTests : IDisposable
         exception.Key.ShouldBe(TestDocuments.Key);
     }
 
+    // 424-264: every reason names its own remedy, and each fails the read for good, as mTLS does.
+    [Theory]
+    [InlineData("mtls-required", "STORYTELLER_CLIENT_CERTIFICATE", "Secrets.Read")]
+    [InlineData("actor-restricted", "actor", "NoSecretReveal")]
+    [InlineData("step-up-required", "signed in longer ago", "Sign the user in again")]
+    [InlineData("something-new", "did not deliver them", "may read secrets")]
+    public async Task WithheldSecrets_NameTheRemedyOfTheReason(string reason, string remedy, string detail)
+    {
+        _http.Respond(HttpStatusCode.OK, TestDocuments.Json(), ("ETag", TestDocuments.WeakTag), ("X-2S-Secrets-Withheld", reason));
+
+        var outcome = await CreateReader().ReadAsync(Identity(), null, CancellationToken.None);
+
+        var withheld = outcome.ShouldBeOfType<ReadOutcome.Withheld>();
+        withheld.Reason.ShouldBe(reason);
+        withheld.IsTransient.ShouldBeFalse();
+        withheld.ErrorCode.ShouldBeNull();
+        withheld.Message.ShouldStartWith($"The platform withheld the secrets of {TestDocuments.Key} ({reason}): ");
+        withheld.Message.ShouldContain(remedy);
+        withheld.Message.ShouldContain(detail);
+        withheld.Message.ShouldBe(DocumentReader.WithheldMessage(TestDocuments.Key, reason));
+    }
+
+    // Only mTLS is about the machine's certificate.
+    [Theory]
+    [InlineData("actor-restricted")]
+    [InlineData("step-up-required")]
+    public void WithheldMessage_OfAUserReason_DoesNotAskForACertificate(string reason)
+    {
+        DocumentReader.WithheldMessage(TestDocuments.Key, reason).ShouldNotContain("STORYTELLER_CLIENT_CERTIFICATE");
+    }
+
     [Fact]
     public async Task AnEffectiveRead_UsesItsRoute_AndIgnoresTheWithheldHeader()
     {

@@ -15,6 +15,10 @@ internal sealed class AnnotationCommandFixture
     public const string Project = "proj1";
     public const string View = "default";
 
+    public const string StepUpMessage = "This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.";
+
+    public const string StepUpChallenge = "Bearer error=\"insufficient_user_authentication\", error_description=\"A recent sign-in is required\", max_age=\"600\"";
+
     public AnnotationCommandFixture()
     {
         Context.SetupGet(context => context.OrganizationName).Returns(Organization);
@@ -43,6 +47,33 @@ internal sealed class AnnotationCommandFixture
                 string.Empty,
                 headers,
                 new ErrorResponse { ErrorCode = errorCode, Message = message },
+                null);
+    }
+
+    // The step-up 401 of the API (424-264): the body with Details.MaxAge and the challenge of RFC 9470. typed is the
+    // shape of a route that declares the body (ApiException<ErrorResponse>, without the text), else the text alone.
+    public static ApiException StepUpRequired(bool typed = true, bool challenge = true, string? body = null)
+    {
+        var headers = new Dictionary<string, IEnumerable<string>>(StringComparer.OrdinalIgnoreCase);
+
+        if (challenge)
+        {
+            headers["WWW-Authenticate"] = [StepUpChallenge];
+        }
+
+        return typed
+            ? new ApiException<ErrorResponse>(
+                "HTTP 401",
+                401,
+                string.Empty,
+                headers,
+                new ErrorResponse { ErrorCode = "StepUpRequired", Message = StepUpMessage },
+                null)
+            : new ApiException(
+                "HTTP 401",
+                401,
+                body ?? $$$"""{"Message":"{{{StepUpMessage}}}","ErrorCode":"StepUpRequired","Details":{"MaxAge":600}}""",
+                headers,
                 null);
     }
 

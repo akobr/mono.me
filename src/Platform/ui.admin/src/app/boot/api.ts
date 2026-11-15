@@ -1,4 +1,4 @@
-import { configureStoryteller } from '@42for.net/2splatform.sdk'
+import { configureStoryteller, type StorytellerError } from '@42for.net/2splatform.sdk'
 import type { AppConfig } from './app-config'
 import { getAuthService } from './state'
 
@@ -21,14 +21,20 @@ export function apiTimeoutMs({ method }: { method: string }): number {
 
 /**
  * Configures the SDK fetcher (companion spec 1.4). The token is read from AuthKit for every request;
- * a 401 that survives one forced refresh calls onUnauthorized, which signs in again. Every request ends: one the API
- * does not answer in time fails with a timeout, which the screens show with Retry.
+ * a 401 that survives one forced refresh calls onUnauthorized, which signs in again. A 401 StepUpRequired is neither
+ * refreshed nor retried: it calls onStepUpRequired, which asks the person to confirm it is them (424-264). Every
+ * request ends: one the API does not answer in time fails with a timeout, which the screens show with Retry.
  */
-export function configureApi(config: AppConfig, onUnauthorized: () => void): void {
+export function configureApi(
+  config: AppConfig,
+  onUnauthorized: () => void,
+  onStepUpRequired?: (error: StorytellerError) => void,
+): void {
   configureStoryteller({
     baseUrl: config.apiBaseUrl,
     getAccessToken: (options) => getAuthService()?.getAccessToken(options),
     onUnauthorized,
+    onStepUpRequired,
     timeoutMs: apiTimeoutMs,
   })
 }

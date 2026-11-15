@@ -10,6 +10,7 @@ import {
 } from '@42for.net/2splatform.sdk/vue-query'
 import { useBootState } from '@/boot/state'
 import { capabilityRoles } from '@/composables/useRole'
+import { useStepUpStore } from '@/composables/useStepUp'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { useSessionStore } from '@/stores/session'
@@ -39,7 +40,8 @@ import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 // machines and shows the API's refusal itself (No access, Retry): a Debug API (DEV_AUTH) skips its role checks of users
 // and would list them (424-164). Retry reloads the account, so a role granted since the sign-in shows the list. The
 // role is read only while the context has the project: the context guard clears it before the next page loads, and
-// the page must not flash No access on the way out.
+// the page must not flash No access on the way out. New machine credentials need a recent sign-in (424-264): New machine
+// asks the person to confirm it is them first when the sign-in is about to be too old, before the dialog is filled in.
 const context = useContextStore()
 const session = useSessionStore()
 const queryClient = useQueryClient()
@@ -49,6 +51,7 @@ const canManage = useCan('machines')
 const canAdmin = useCan('manageAccess')
 const boot = useBootState()
 const detail = useDetailPanel()
+const stepUp = useStepUpStore()
 
 const machines = useGetMachineAccesses(
   () => context.org ?? '',
@@ -66,6 +69,12 @@ const deleting = ref<MachineAccess>()
 const secret = ref<OneTimeSecret>()
 const setup = ref<MachineAccess>()
 const busy = ref(false)
+
+async function create() {
+  if (await stepUp.ensureRecentSignIn()) {
+    creating.value = true
+  }
+}
 
 async function refresh() {
   await invalidateAccess(queryClient, context.projectKey!, context.org, context.project)
@@ -137,7 +146,7 @@ useHashScroll(
     <template #header>
       <AppNavbar title="Machines">
         <template #right>
-          <UButton v-if="canManage" label="New machine" icon="i-lucide-plus" @click="creating = true" />
+          <UButton v-if="canManage" label="New machine" icon="i-lucide-plus" @click="create()" />
         </template>
       </AppNavbar>
     </template>
@@ -154,7 +163,7 @@ useHashScroll(
             title="No machine access"
             description="Machines (services, pipelines) read and write the project's annotations and configurations with their own credentials."
           >
-            <UButton v-if="canManage" label="New machine" icon="i-lucide-plus" @click="creating = true" />
+            <UButton v-if="canManage" label="New machine" icon="i-lucide-plus" @click="create()" />
           </EmptyState>
           <div v-else class="overflow-x-auto rounded-md border border-default">
             <table class="w-full text-sm">

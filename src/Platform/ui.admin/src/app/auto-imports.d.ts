@@ -18,9 +18,12 @@ declare global {
   const defineShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').defineShortcuts
   const extendLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').extendLocale
   const extractShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').extractShortcuts
+  const hasStepUpItems: typeof import('./composables/useStepUp').hasStepUpItems
   const hasUnsavedChanges: typeof import('./composables/useUnsavedChanges').hasUnsavedChanges
   const injectBindingAssist: typeof import('./composables/useBindingAssist').injectBindingAssist
   const isRememberedSection: typeof import('./stores/page-memory').isRememberedSection
+  const isSignInStale: typeof import('./composables/useStepUp').isSignInStale
+  const leaveWithoutPrompt: typeof import('./composables/useUnsavedChanges').leaveWithoutPrompt
   const markSidebarStarted: typeof import('./composables/useSidebar').markSidebarStarted
   const onSignOut: typeof import('./stores/session').onSignOut
   const pollDelays: typeof import('./stores/transfers').pollDelays
@@ -30,6 +33,7 @@ declare global {
   const runLimited: typeof import('./composables/useAnnotationActions').runLimited
   const shortcutGroups: typeof import('./composables/useShortcutsHelp').shortcutGroups
   const sidebarStorage: typeof import('./composables/useSidebar').sidebarStorage
+  const signedInSince: typeof import('./composables/useStepUp').signedInSince
   const staticBindingAssist: typeof import('./composables/useBindingAssist').staticBindingAssist
   const typeColorsStyleId: typeof import('./stores/type-appearance').typeColorsStyleId
   const undoKeys: typeof import('./composables/useAnnotationActions').undoKeys
@@ -73,6 +77,7 @@ declare global {
   const useSessionStore: typeof import('./stores/session').useSessionStore
   const useShortcutsHelp: typeof import('./composables/useShortcutsHelp').useShortcutsHelp
   const useSidebar: typeof import('./composables/useSidebar').useSidebar
+  const useStepUpStore: typeof import('./composables/useStepUp').useStepUpStore
   const useToast: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useToast').useToast
   const useTour: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useTour').useTour
   const useTransfersStore: typeof import('./stores/transfers').useTransfersStore
@@ -105,6 +110,9 @@ declare global {
   // @ts-ignore
   export type { ShortcutGroup } from './composables/useShortcutsHelp'
   import('./composables/useShortcutsHelp')
+  // @ts-ignore
+  export type { StepUpMode, RevealTarget } from './composables/useStepUp'
+  import('./composables/useStepUp')
   // @ts-ignore
   export type { CatalogStatus, CatalogProgress } from './stores/catalog'
   import('./stores/catalog')

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.UnitTests.Commands;
@@ -59,5 +60,83 @@ public class ApiRefusalTests
         refusal.Message.ShouldBe(ApiRefusal.GeneralMessage);
         refusal.ErrorCode.ShouldBeNull();
         refusal.MayBeTheCredentials.ShouldBeTrue();
+        refusal.Hint.ShouldBeNull();
+    }
+
+    // 424-264: the step-up names the window and how to sign in again, never the machine hint.
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void StepUp_NamesTheWindowAndANewSignIn(bool typed, bool challenge)
+    {
+        var exception = AnnotationCommandFixture.StepUpRequired(typed, challenge);
+
+        var refusal = ApiRefusal.Of(exception);
+
+        // A typed exception keeps no text, so without the challenge the window is unknown: the server's message.
+        refusal.Message.ShouldBe(typed && !challenge
+            ? AnnotationCommandFixture.StepUpMessage
+            : "This needs a recent sign-in: a sign-in counts for 10 minutes.");
+        refusal.ErrorCode.ShouldBe("StepUpRequired");
+        refusal.MayBeTheCredentials.ShouldBeFalse();
+        var hint = refusal.Hint.ShouldNotBeNull();
+        hint.ShouldBe(StepUpRefusal.Hint);
+        hint.ShouldContain("sign out in the browser first");
+        hint.ShouldContain("private window");
+        hint.ShouldContain("'sform account logout' and 'sform account'");
+        hint.ShouldContain("repeat the command");
+    }
+
+    [Fact]
+    public void StepUp_ByTheChallengeAlone_WithoutABody_IsTheSentenceWithTheWindow()
+    {
+        var exception = new ApiException(
+            "Unauthorized",
+            401,
+            string.Empty,
+            new Dictionary<string, IEnumerable<string>> { ["WWW-Authenticate"] = ["Bearer error=\"insufficient_user_authentication\", max_age=3600"] },
+            null);
+
+        var refusal = ApiRefusal.Of(exception);
+
+        refusal.Message.ShouldBe("This needs a recent sign-in: a sign-in counts for 1 hour.");
+        refusal.ErrorCode.ShouldBe("StepUpRequired");
+    }
+
+    [Fact]
+    public void StepUp_WithoutAWindowOrAMessage_IsTheSentenceAlone()
+    {
+        var exception = new ApiException(
+            "Unauthorized",
+            401,
+            string.Empty,
+            new Dictionary<string, IEnumerable<string>> { ["WWW-Authenticate"] = ["Bearer error=\"insufficient_user_authentication\""] },
+            null);
+
+        ApiRefusal.Of(exception).Message.ShouldBe(StepUpRefusal.GeneralMessage);
+    }
+
+    // The same code on a 403 is no step-up: the server's message, as for any 403.
+    [Fact]
+    public void StepUpCode_OnAForbidden_IsAnyOtherRefusal()
+    {
+        var refusal = ApiRefusal.Of(AnnotationCommandFixture.Error(403, "StepUpRequired", "No."));
+
+        refusal.Message.ShouldBe("No.");
+        refusal.Hint.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(600, "10 minutes")]
+    [InlineData(60, "1 minute")]
+    [InlineData(3600, "1 hour")]
+    [InlineData(7200, "2 hours")]
+    [InlineData(90, "90 seconds")]
+    [InlineData(1, "1 second")]
+    public void StepUpWindow_IsWrittenOutAsTheApiWritesIt(int seconds, string expected)
+    {
+        StepUpRefusal.Describe(TimeSpan.FromSeconds(seconds)).ShouldBe(expected);
     }
 }

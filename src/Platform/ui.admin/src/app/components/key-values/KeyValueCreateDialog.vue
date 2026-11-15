@@ -5,6 +5,7 @@ import { hasErrorCode, isConflict, setKeyValue, type KeyValue, type KeyValueProt
 import { encryptForRecipients, getHyokPlace } from '@42for.net/2splatform.sdk/hyok'
 import { keyValueFormSchema, type KeyValueForm } from '@/forms/key-value.schema'
 import { toTypedSchema } from '@/forms/typed-schema'
+import { useStepUpStore } from '@/composables/useStepUp'
 import { useKeyValuePolicy, useRecipients } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
@@ -12,7 +13,8 @@ import { contentTypes, isClientEncrypted, isSecretLevel, levelMeta, levels, secr
 
 /**
  * New pair (spec 29.3): key, level (from the policy's allowed levels), value and content type. A HYOK value is
- * encrypted in the browser for the enabled recipients before it leaves; the plaintext is never sent.
+ * encrypted in the browser for the enabled recipients before it leaves; the plaintext is never sent. A secret level
+ * asks the person to confirm it is them first when the sign-in is about to be too old to save it (424-264).
  */
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ created: [pair: KeyValue] }>()
@@ -21,6 +23,7 @@ const context = useContextStore()
 const policy = useKeyValuePolicy()
 const recipients = useRecipients()
 const canSecrets = useCan('secrets')
+const stepUp = useStepUpStore()
 
 const allowed = computed<KeyValueProtection[]>(() => {
   const fromPolicy = (policy.data.value?.AllowedProtections ?? ['Public', 'Standard']) as KeyValueProtection[]
@@ -53,6 +56,13 @@ watch(open, (isOpen) => {
 watch(secretDefault, (secret) => {
   const fallback = (policy.data.value?.DefaultSecretProtection ?? 'Standard') as KeyValueProtection
   protection.value = secret ? (allowed.value.includes(fallback) ? fallback : (allowed.value.find(isSecretLevel) ?? 'Public')) : 'Public'
+})
+
+// Before the secret is typed: the redirect of the step-up would lose it.
+watch(protection, (level) => {
+  if (open.value && isSecretLevel(level)) {
+    void stepUp.ensureRecentSignIn()
+  }
 })
 
 const isReference = computed(() => values.contentType === secretReferenceContentType)

@@ -4,6 +4,8 @@ using System.Globalization;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
+using Newtonsoft.Json.Linq;
+
 namespace _42.Platform.Storyteller.Mcp.Tools;
 
 // The values store (key/value pairs). None of these tools returns a secret value: reads never reveal, and the diff of
@@ -13,6 +15,8 @@ namespace _42.Platform.Storyteller.Mcp.Tools;
 public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
 {
     public const int MaxBulkKeys = 100;
+
+    public const string StepUpNoticeProperty = "StepUpNotice";
 
     private static readonly string[] States = ["Active", "Deleted", "All"];
 
@@ -159,7 +163,7 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
         [Description(KeyValueText.KeyPrefix)] string? keyPrefix = null,
         CancellationToken cancellationToken = default)
     {
-        return ToolResults.Json(await keyValues.RestoreKeyValuesAsync(organization, project, view, Bulk(keys, keyPrefix), cancellationToken));
+        return BulkResult(await keyValues.RestoreKeyValuesAsync(organization, project, view, Bulk(keys, keyPrefix), cancellationToken));
     }
 
     [McpServerTool(Name = "purge_key_values", Title = "Purge deleted key/value pairs", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
@@ -175,7 +179,7 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
         [Description(KeyValueText.KeyPrefix)] string? keyPrefix = null,
         CancellationToken cancellationToken = default)
     {
-        return ToolResults.Json(await keyValues.PurgeKeyValuesAsync(organization, project, view, Bulk(keys, keyPrefix), cancellationToken));
+        return BulkResult(await keyValues.PurgeKeyValuesAsync(organization, project, view, Bulk(keys, keyPrefix), cancellationToken));
     }
 
     [McpServerTool(Name = "protect_key_values", Title = "Change the protection of secrets", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
@@ -381,6 +385,20 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
         CancellationToken cancellationToken = default)
     {
         return ToolResults.Json(await keyValues.GetKeyValueUsageAsync(organization, project, ParseDay(from, nameof(from)), ParseDay(to, nameof(to)), cancellationToken));
+    }
+
+    // The items as the API answers them, their ErrorCode and Message included; when it refused any for a stale sign-in
+    // (StepUpRequired), the notice of what helps is the first line of the text and the first property of the content.
+    internal static CallToolResult BulkResult(Sdk.KeyValueBulkResult result)
+    {
+        if (result.Items?.Any(item => string.Equals(item.ErrorCode, ApiErrors.StepUpRequiredCode, StringComparison.Ordinal)) is not true)
+        {
+            return ToolResults.Json(result);
+        }
+
+        var content = (JObject)ToolResults.ToToken(result);
+        content.AddFirst(new JProperty(StepUpNoticeProperty, ApiErrors.StepUpItemsNotice));
+        return ToolResults.Json(content, ApiErrors.StepUpItemsNotice);
     }
 
     private static Sdk.KeyValueBulkRequest Bulk(string[]? keys, string? keyPrefix)
