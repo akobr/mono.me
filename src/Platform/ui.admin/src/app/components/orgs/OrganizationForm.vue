@@ -18,10 +18,16 @@ const props = withDefaults(
     autofocus?: boolean
     /** No submit, while the page has another request in flight. */
     disabled?: boolean
+    /**
+     * A field is checked when the user leaves it. The onboarding wizard turns this off: it has other ways out below
+     * the form, and the error of an untouched field would move them under the pointer of whoever takes one.
+     */
+    validateOnBlur?: boolean
   }>(),
   {
     submitLabel: 'Create',
     autofocus: true,
+    validateOnBlur: true,
   },
 )
 
@@ -30,9 +36,11 @@ const { defineField, errors, handleSubmit, isSubmitting, setFieldError } = useFo
   initialValues: { organization: '', project: '', description: '' },
 })
 
-const [organization, organizationAttrs] = defineField('organization')
-const [project, projectAttrs] = defineField('project')
-const [description, descriptionAttrs] = defineField('description')
+// A change and the submit still check the fields without the check on blur.
+const fieldConfig = () => ({ validateOnBlur: props.validateOnBlur })
+const [organization, organizationAttrs] = defineField('organization', fieldConfig)
+const [project, projectAttrs] = defineField('project', fieldConfig)
+const [description, descriptionAttrs] = defineField('description', fieldConfig)
 const formError = ref<string>()
 
 const submitValues = handleSubmit(async (values) => {
