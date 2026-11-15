@@ -118,6 +118,24 @@ public class DataSetProvisionerTests
         _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Provision_AProjectSomeoneElseCreatedInTheMeantime_IsRefusedWhenTheOwnerDoesNotAdministerIt()
+    {
+        _access.SetupSequence(access => access.GetAccessPointAsync(Target.ProjectKey))
+            .ReturnsAsync((AccessPoint?)null)
+            .ReturnsAsync(new AccessPoint
+            {
+                Key = Target.ProjectKey,
+                AccessMap = new Dictionary<string, AccountRole> { ["user_01other"] = AccountRole.Owner },
+            });
+        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()))
+            .ThrowsAsync(new ConflictException("The access point exists.", ErrorCodes.AccessPointExists));
+
+        (await Should.ThrowAsync<DataSetException>(() => Provision())).Message.ShouldContain("is not its Administrator or Owner");
+
+        _views.Verify(views => views.CreateViewAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ViewCreate>(), It.IsAny<AuditActor>()), Times.Never);
+    }
+
     private DataSetProvisioner Provisioner()
     {
         return new DataSetProvisioner(_access.Object, _views.Object, NullLogger<DataSetProvisioner>.Instance);

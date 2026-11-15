@@ -78,6 +78,15 @@ public class DataSetAnnotationLinesReaderTests
     }
 
     [Fact]
+    public void Read_RefusesACountThatWouldOverflowTheTotal()
+    {
+        Should.Throw<DataSetException>(() => Read(
+            """{"$count":3,"AnnotationKey":"sbt.a-{n}"}""",
+            """{"$count":9223372036854775807,"$start":0,"AnnotationKey":"sbt.b-{n}"}"""))
+            .Message.ShouldContain("stands for more than");
+    }
+
+    [Fact]
     public void Read_GeneratesTheLargestIndex()
     {
         var lines = Read("""{"$count":1,"$start":9223372036854775807,"AnnotationKey":"sbt.a-{n}"}""");
@@ -118,7 +127,7 @@ public class DataSetAnnotationLinesReaderTests
     [InlineData("""{"$count":2,"$start":-1,"AnnotationKey":"sbt.a-{n}"}""", ErrorCodes.InvalidDocument, "$start must be a whole number of 0 or more", false)]
     [InlineData("""{"$start":1,"AnnotationKey":"sbt.a"}""", ErrorCodes.InvalidDocument, "$start without $count", false)]
     [InlineData("""{"$count":2,"$start":9223372036854775807,"AnnotationKey":"sbt.a-{n}"}""", ErrorCodes.InvalidDocument, "goes beyond the largest index", false)]
-    [InlineData("""{"$count":2,"AnnotationKey":"sbt.same"}""", ErrorCodes.InvalidDocument, "needs {n} or {0…0}", false)]
+    [InlineData("""{"$count":2,"AnnotationKey":"sbt.same"}""", ErrorCodes.InvalidDocument, "needs {n} or {0…0}", true)]
     public void Read_FailsALineThatCannotBeReadWithItsNumber(string line, string errorCode, string message, bool hasKey)
     {
         var lines = Read("""{"AnnotationKey":"rst.first"}""", "// between", line);

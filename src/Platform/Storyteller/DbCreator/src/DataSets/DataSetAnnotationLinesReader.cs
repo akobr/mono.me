@@ -139,14 +139,16 @@ public static partial class DataSetAnnotationLinesReader
             }
 
             var line = Parse(number, trimmed);
-            total += line.Failure is null ? line.Count : 1;
+            var contribution = line.Failure is null ? line.Count : 1;
 
-            if (total > MaxAnnotations)
+            // checked against what is left, so a huge $count cannot overflow the total
+            if (contribution > MaxAnnotations - total)
             {
                 throw new DataSetException(
                     $"'{source}' stands for more than {MaxAnnotations.ToString("N0", CultureInfo.InvariantCulture)} annotations at line {number}, the most a set holds.");
             }
 
+            total += contribution;
             lines.Add(line);
         }
 
@@ -201,7 +203,12 @@ public static partial class DataSetAnnotationLinesReader
 
         if (total > 1 && keyMember?.Value.Type == JTokenType.String && !Placeholder().IsMatch(keyMember.Value.Value<string>()!))
         {
-            return ParsedLine.Failed(number, true, $"The {nameof(Annotation.AnnotationKey)} of a generator line needs {{n}} or {{0…0}}, or every annotation gets the same key.");
+            // with the key, so what hangs on it is DependencyFailed instead of creating it with defaults
+            return ParsedLine.Failed(
+                number,
+                true,
+                $"The {nameof(Annotation.AnnotationKey)} of a generator line needs {{n}} or {{0…0}}, or every annotation gets the same key.",
+                ParseKey(keyMember.Value.Value<string>()!));
         }
 
         return new ParsedLine(number, document, true, first, total, null);
@@ -273,9 +280,9 @@ public static partial class DataSetAnnotationLinesReader
 
     private sealed record class ParsedLine(int Number, JObject? Document, bool IsGenerator, long First, long Count, DataSetAnnotationLine? Failure)
     {
-        public static ParsedLine Failed(int number, bool isGenerator, string message)
+        public static ParsedLine Failed(int number, bool isGenerator, string message, AnnotationKey? key = null)
         {
-            return new ParsedLine(number, null, isGenerator, 0, 0, DataSetAnnotationLinesReader.Failed(number, null, ErrorCodes.InvalidDocument, message));
+            return new ParsedLine(number, null, isGenerator, 0, 0, DataSetAnnotationLinesReader.Failed(number, key, ErrorCodes.InvalidDocument, message));
         }
     }
 }
