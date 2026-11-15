@@ -10,6 +10,8 @@ export const capabilityRoles = {
   machines: 'Contributor',
   secrets: 'ContributorWithSecrets',
   manageAccess: 'Administrator',
+  // the project settings shared by everyone in the project: type names, colors and icons, time zone, date format (424-266)
+  manageProject: 'Administrator',
   // the export and the import of a view (424-66)
   transfer: 'Administrator',
   owner: 'Owner',

@@ -11,6 +11,8 @@ on:
       - src/Platform/Storyteller/sdk.typescript/**
       # the data set showcase of DbCreator, a snapshot of the showcase mock (test/unit/mock/showcase-set.test.ts)
       - src/Platform/Storyteller/DbCreator/src/data-sets/showcase/**
+      # the catalog of project settings, which the UI's colors, icons and date formats must equal (test/unit/utils/project-settings-catalog.test.ts)
+      - src/Platform/Storyteller/conformance/project-settings.json
       - .github/workflows/Platform.UI.Admin.yml
   pull_request:
     branches:
@@ -20,6 +22,8 @@ on:
       - src/Platform/Storyteller/sdk.typescript/**
       # the data set showcase of DbCreator, a snapshot of the showcase mock (test/unit/mock/showcase-set.test.ts)
       - src/Platform/Storyteller/DbCreator/src/data-sets/showcase/**
+      # the catalog of project settings, which the UI's colors, icons and date formats must equal (test/unit/utils/project-settings-catalog.test.ts)
+      - src/Platform/Storyteller/conformance/project-settings.json
       - .github/workflows/Platform.UI.Admin.yml
 
 concurrency:

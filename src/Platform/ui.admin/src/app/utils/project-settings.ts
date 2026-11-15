@@ -1,4 +1,9 @@
-import type { AuditStamp, ProjectSettings, ProjectTypeAppearance } from '@42for.net/2splatform.sdk'
+import {
+  isCatalogTimeZone,
+  type AuditStamp,
+  type ProjectSettings,
+  type ProjectTypeAppearance,
+} from '@42for.net/2splatform.sdk'
 import { isValidTimeZone } from '@/forms/annotation.schema'
 import { typeCodes } from './annotation-key'
 import { defaultDateFormat, isDateFormat, type DateFormat } from './dates'
@@ -33,6 +38,14 @@ export interface ProjectSettingsState extends ProjectSettingsDraft {
 
 export const defaultTimeZone = 'UTC'
 
+/**
+ * A time zone a project can start new annotations in: one of the catalog of project settings, which the API accepts, in
+ * its spelling, that Intl knows too, so the UI can show times in it (Intl also takes offsets such as +01:00, the API not).
+ */
+export function isProjectTimeZone(value: unknown): value is string {
+  return isCatalogTimeZone(value) && isValidTimeZone(value)
+}
+
 /** The settings of a project that has none: every type built-in, UTC and yyyy-mm-dd, version 0. */
 export const defaultProjectSettings: Readonly<ProjectSettingsState> = Object.freeze({
   types: Object.freeze({}),
@@ -43,7 +56,7 @@ export const defaultProjectSettings: Readonly<ProjectSettingsState> = Object.fre
 
 /**
  * The UI's settings of an answer of the API: the defaults for what it leaves out, and, as defense in depth, only what
- * the UI can show (sanitized types, a zone Intl knows, a known date format).
+ * the UI can show (sanitized types, a zone of the catalog that Intl knows, a known date format).
  */
 export function fromApi(settings: ProjectSettings | undefined): ProjectSettingsState {
   const types: Record<string, unknown> = {}
@@ -63,7 +76,7 @@ export function fromApi(settings: ProjectSettings | undefined): ProjectSettingsS
   const version = settings?.Version
   return {
     types: sanitizeTypeAppearances(types),
-    defaultTimeZone: zone && isValidTimeZone(zone) ? zone : defaultTimeZone,
+    defaultTimeZone: isProjectTimeZone(zone) ? zone : defaultTimeZone,
     dateFormat: isDateFormat(format) ? format : defaultDateFormat,
     version: typeof version === 'number' && Number.isSafeInteger(version) && version >= 0 ? version : 0,
     ...(settings?.Modified ? { modified: settings.Modified } : {}),

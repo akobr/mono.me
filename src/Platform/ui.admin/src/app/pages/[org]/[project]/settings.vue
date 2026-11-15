@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
   getCertificateAuthority,
+  hasErrorCode,
+  isPreconditionFailed,
+  isStorytellerError,
   projectSettingsEntityTag,
   setMachineAuthentication,
   setProjectSettings,
@@ -16,15 +19,21 @@ import {
 } from '@42for.net/2splatform.sdk/vue-query'
 import { descriptionSchema } from '@/forms/names.schema'
 import { invalidateAccess, invalidateProject } from '@/queries/invalidation'
+import { useProjectSettingsQuery } from '@/queries/project-settings'
 import { useProjectSummaries } from '@/queries/projects'
 import { useKeyValuePolicy } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore } from '@/stores/preferences'
-import { useProjectSettingsStore } from '@/stores/project-settings'
-import { dateFormatItems, type DateFormat } from '@/utils/dates'
-import { errorMessage } from '@/utils/errors'
+import { dateFormatItems, defaultDateFormat, type DateFormat } from '@/utils/dates'
+import { errorMessage, writeFailureTitle } from '@/utils/errors'
 import { credentialKindDescriptions, credentialKinds, issuesCertificates } from '@/utils/machines'
-import { toApi, type ProjectSettingsDraft } from '@/utils/project-settings'
+import {
+  defaultTimeZone as builtInTimeZone,
+  fromApi,
+  toApi,
+  type ProjectSettingsDraft,
+  type ProjectSettingsState,
+} from '@/utils/project-settings'
 import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 
 // Project settings (spec section 13): the machine authentication policy (Administrator: the enabled credential
@@ -32,57 +41,141 @@ import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appea
 // SDK fetcher returns non-JSON bodies as text) and project information with the description of the project (every
 // member reads it, Administrators change it, 424-78). The default time zone of new annotations (424-12), the date
 // format (424-23) and the names, colors and icons of the annotation types (424-13) are the project's settings on the
-// server (424-266), shown from the project settings store. The secrets settings of the old Secrets page (spec 29.6:
-// allowed levels, the keys, the customer key and the recipients) are the last section since 424-35; every reader sees
-// them, Administrators change them.
+// server, for everyone in the project (424-266): every member reads them, Administrators change them in one draft with
+// one Save. The secrets settings of the old Secrets page (spec 29.6: allowed levels, the keys, the customer key and the
+// recipients) are the last section since 424-35; every reader sees them, Administrators change them.
 const context = useContextStore()
-const projectSettings = useProjectSettingsStore()
 const preferences = usePreferencesStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const role = useRole()
 const canAdmin = useCan('manageAccess')
-const canEdit = useCan('edit')
+const canManageSettings = useCan('manageProject')
 
-// A bridge until the page has its draft and Save: each change is a PUT of the saved settings with the change, under
-// If-Match of their version, one after the other; the answer goes into the query and the store.
-let writing = Promise.resolve()
-function writeSettings(change: Partial<ProjectSettingsDraft>): void {
-  const { org, project, projectKey } = context
-  if (!org || !project || !projectKey) {
-    return
-  }
-  writing = writing.then(async () => {
-    const saved = projectSettings.settingsOf(projectKey)
-    try {
-      const answer = await setProjectSettings(org, project, toApi({ ...saved, ...change }, saved), {
-        headers: { 'If-Match': projectSettingsEntityTag(saved.version) },
-      })
-      projectSettings.receive(projectKey, answer)
-      queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
-    } catch (error) {
-      toast.add({ title: 'The project settings were not saved', description: errorMessage(error), color: 'error' })
+// The saved settings, as the API answered them (the defaults until the first answer), and the draft of the three
+// settings: it follows the saved ones until it is changed, and starts again from them in another project. The rest of
+// the app keeps the saved settings until Save; only the previews of the type editor show the draft.
+const settingsQuery = useProjectSettingsQuery()
+const settingsLoaded = computed(() => !!settingsQuery.data.value)
+const savedSettings = computed(() => fromApi(settingsQuery.data.value))
+
+const draftOf = (settings: ProjectSettingsDraft): ProjectSettingsDraft => ({
+  types: structuredClone({ ...settings.types }),
+  defaultTimeZone: settings.defaultTimeZone,
+  dateFormat: settings.dateFormat,
+})
+/** Whether a draft holds the same settings as saved ones: the same body of a PUT. */
+const sameSettings = (value: ProjectSettingsDraft, saved: ProjectSettingsState) =>
+  JSON.stringify(toApi(value, saved)) === JSON.stringify(toApi(saved, saved))
+
+const savingSettings = ref(false)
+// A 412: someone saved the settings since they were read; they are read again, the draft stays.
+const settingsConflict = ref(false)
+// A 400 InvalidSettings: the problems the API found, each with its JSON path.
+const settingsProblems = ref<{ path?: string; message: string }[]>()
+
+const draft = shallowRef<ProjectSettingsDraft>(draftOf(savedSettings.value))
+watch(
+  [() => context.projectKey, savedSettings] as const,
+  ([key, saved], [previousKey, previous]) => {
+    if (key !== previousKey || !previous || sameSettings(draft.value, previous)) {
+      draft.value = draftOf(saved)
     }
-  })
-}
+    if (key !== previousKey) {
+      settingsConflict.value = false
+      settingsProblems.value = undefined
+    }
+  },
+  { immediate: true },
+)
+const settingsDirty = computed(() => settingsLoaded.value && !sameSettings(draft.value, savedSettings.value))
+const settingsEditable = computed(() => canManageSettings.value && settingsLoaded.value)
+useUnsavedChanges(settingsDirty, { message: 'Your changes of the project settings have not been saved.' })
 
 const defaultTimeZone = computed({
-  get: () => projectSettings.defaultTimeZone,
-  set: (value: string) => writeSettings({ defaultTimeZone: value }),
+  get: () => draft.value.defaultTimeZone,
+  set: (value: string) => {
+    if (value) {
+      draft.value = { ...draft.value, defaultTimeZone: value }
+    }
+  },
 })
 
 const dateFormat = computed({
-  get: () => projectSettings.dateFormat,
-  set: (value: DateFormat) => writeSettings({ dateFormat: value }),
+  get: () => draft.value.dateFormat,
+  set: (value: DateFormat) => (draft.value = { ...draft.value, dateFormat: value }),
 })
 const dateFormatOptions = dateFormatItems()
 
 const types = computed({
-  get: () => projectSettings.current.types,
-  set: (value: TypeAppearances) => writeSettings({ types: value }),
+  get: () => draft.value.types,
+  set: (value: TypeAppearances) => (draft.value = { ...draft.value, types: value }),
 })
 const builtInTypes = resolveTypeAppearances()
 const hasPersonalTypes = computed(() => Object.keys(preferences.types).length > 0)
+
+/** The problems of a 400 InvalidSettings (Details: Path, Rule, Message), or its message when it lists none. */
+function problemsOf(error: unknown): { path?: string; message: string }[] {
+  const details = isStorytellerError(error) ? (error.body as { Details?: unknown } | undefined)?.Details : undefined
+  const problems = Array.isArray(details)
+    ? details
+        .filter((detail): detail is { Path?: unknown; Message?: unknown } => !!detail && typeof detail === 'object')
+        .map((detail) => ({
+          path: typeof detail.Path === 'string' ? detail.Path : undefined,
+          message: typeof detail.Message === 'string' ? detail.Message : '',
+        }))
+        .filter((problem) => problem.message)
+    : []
+  return problems.length > 0 ? problems : [{ message: errorMessage(error) }]
+}
+
+async function saveSettings() {
+  const { org, project, projectKey } = context
+  if (!org || !project || !projectKey || !settingsDirty.value || savingSettings.value) {
+    return
+  }
+  const saved = savedSettings.value
+  const sent = draft.value
+  savingSettings.value = true
+  settingsConflict.value = false
+  settingsProblems.value = undefined
+  try {
+    // A browser cannot read the ETag of another origin; the Version of the body makes the same tag.
+    const answer = await setProjectSettings(org, project, toApi(sent, saved), {
+      headers: { 'If-Match': projectSettingsEntityTag(saved.version) },
+    })
+    queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
+    // The fields show what is stored, unless the user went on editing.
+    if (context.projectKey === projectKey && draft.value === sent) {
+      draft.value = draftOf(fromApi(answer))
+    }
+    toast.add({ title: 'Project settings saved', color: 'success', icon: 'i-lucide-check' })
+    // The list of the caller's projects and the access point carry the settings too.
+    await invalidateProject(queryClient, projectKey)
+  } catch (error) {
+    if (hasErrorCode(error, 'SettingsPreconditionFailed') || isPreconditionFailed(error)) {
+      settingsConflict.value = true
+      await settingsQuery.refetch()
+    } else if (hasErrorCode(error, 'InvalidSettings')) {
+      settingsProblems.value = problemsOf(error)
+    } else {
+      toast.add({
+        title: writeFailureTitle(error, 'The project settings were not saved'),
+        description: errorMessage(error),
+        color: 'error',
+      })
+    }
+  } finally {
+    savingSettings.value = false
+  }
+}
+
+/** After a 412: the draft starts again from the settings saved meanwhile. */
+function loadSavedSettings() {
+  draft.value = draftOf(savedSettings.value)
+  settingsConflict.value = false
+  settingsProblems.value = undefined
+}
 
 const accessPoint = useGetAccessPoint(() => context.projectKey ?? '', {
   query: { enabled: () => !!context.projectKey && canAdmin.value, meta: { silent: true } },
@@ -103,6 +196,7 @@ const recipients = computed(() => secretsPolicy.data.value?.Recipients ?? [])
 useHashScroll(
   () =>
     !projects.isPending.value &&
+    !settingsQuery.isPending.value &&
     !secretsPolicy.isPending.value &&
     !(canAdmin.value && (machinePolicy.isPending.value || accessPoint.isPending.value)),
 )
@@ -258,15 +352,49 @@ async function downloadCa() {
           </dl>
         </UCard>
 
+        <ErrorState
+          v-if="settingsQuery.isError.value && !settingsLoaded"
+          :error="settingsQuery.error.value"
+          title="The project settings could not be loaded"
+          compact
+          @retry="settingsQuery.refetch()"
+        />
+
         <UCard>
-          <template #header><h2 class="font-semibold">Annotations</h2></template>
+          <template #header>
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="font-semibold">Annotations</h2>
+              <UBadge
+                v-if="!canManageSettings"
+                label="Administrator"
+                icon="i-lucide-lock"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              />
+            </div>
+            <p v-if="!canManageSettings" class="mt-1 text-sm text-muted">
+              Only Administrators change the project settings.
+            </p>
+          </template>
           <UFormField
             label="Default time zone"
-            help="New annotations in this project start in this time zone. Saved in this browser."
+            help="New annotations start in this time zone, for everyone in this project."
           >
+            <template v-if="canManageSettings" #hint>
+              <UButton
+                label="Use the default"
+                aria-label="Use the default: UTC"
+                color="neutral"
+                variant="link"
+                size="xs"
+                :disabled="!settingsEditable || defaultTimeZone === builtInTimeZone"
+                @click="defaultTimeZone = builtInTimeZone"
+              />
+            </template>
             <TimeZoneSelect
               v-model="defaultTimeZone"
-              :disabled="!canEdit"
+              :disabled="!settingsEditable"
               aria-label="Default time zone"
               class="max-w-sm"
             />
@@ -274,12 +402,43 @@ async function downloadCa() {
         </UCard>
 
         <UCard>
-          <template #header><h2 class="font-semibold">Dates</h2></template>
+          <template #header>
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="font-semibold">Dates</h2>
+              <UBadge
+                v-if="!canManageSettings"
+                label="Administrator"
+                icon="i-lucide-lock"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              />
+            </div>
+            <p v-if="!canManageSettings" class="mt-1 text-sm text-muted">
+              Only Administrators change the project settings.
+            </p>
+          </template>
           <UFormField
             label="Date format"
-            help="How dates are shown on every page of this project, for everyone who opens it in this browser. Each person can pick their own format in Preferences."
+            help="How dates are shown on every page, for everyone in this project. Each person can pick their own format in Preferences."
           >
-            <USelect v-model="dateFormat" :items="dateFormatOptions" :disabled="!canEdit" class="w-full max-w-sm" />
+            <template v-if="canManageSettings" #hint>
+              <UButton
+                label="Use the default"
+                aria-label="Use the default: yyyy-mm-dd"
+                color="neutral"
+                variant="link"
+                size="xs"
+                :disabled="!settingsEditable || dateFormat === defaultDateFormat"
+                @click="dateFormat = defaultDateFormat"
+              />
+            </template>
+            <USelect
+              v-model="dateFormat"
+              :items="dateFormatOptions"
+              :disabled="!settingsEditable"
+              class="w-full max-w-sm"
+            />
           </UFormField>
           <UAlert
             v-if="preferences.dateFormat"
@@ -294,10 +453,23 @@ async function downloadCa() {
 
         <UCard>
           <template #header>
-            <h2 class="font-semibold">Annotation types</h2>
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="font-semibold">Annotation types</h2>
+              <UBadge
+                v-if="!canManageSettings"
+                label="Administrator"
+                icon="i-lucide-lock"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              />
+            </div>
             <p class="mt-1 text-sm text-muted">
-              Names, colors and icons of the annotation types on every page, for everyone who opens this project in this
-              browser. Each person can override them in Preferences on the account page.
+              Names, colors and icons of the annotation types on every page, for everyone in this project. Each person
+              can override them in Preferences on the account page.
+            </p>
+            <p v-if="!canManageSettings" class="mt-1 text-sm text-muted">
+              Only Administrators change the project settings.
             </p>
           </template>
           <UAlert
@@ -309,20 +481,59 @@ async function downloadCa() {
             description="Your own Preferences override some of these for you."
             :actions="[{ label: 'Open Preferences', to: '/account', color: 'neutral', variant: 'outline' }]"
           />
-          <TypeAppearanceEditor v-model="types" :inherited="builtInTypes" :disabled="!canEdit" />
-          <template v-if="canEdit" #footer>
+          <TypeAppearanceEditor v-model="types" :inherited="builtInTypes" :disabled="!settingsEditable" />
+          <template v-if="canManageSettings" #footer>
             <div class="flex justify-end">
               <UButton
                 label="Reset to built-in"
                 color="neutral"
                 variant="ghost"
                 size="sm"
-                :disabled="Object.keys(types).length === 0"
+                :disabled="!settingsEditable || Object.keys(types).length === 0"
                 @click="types = {}"
               />
             </div>
           </template>
         </UCard>
+
+        <div v-if="canManageSettings" class="space-y-3">
+          <UAlert
+            v-if="settingsConflict"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-git-compare"
+            title="Someone changed the project settings meanwhile; your changes were not saved"
+            description="Load the new settings, or save yours over them."
+            :actions="[
+              { label: 'Load the new settings', color: 'neutral', variant: 'outline', onClick: loadSavedSettings },
+            ]"
+          />
+          <UAlert
+            v-if="settingsProblems"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-circle-alert"
+            title="The project settings were not saved"
+          >
+            <template #description>
+              <ul class="list-disc space-y-1 ps-4">
+                <li v-for="(problem, index) in settingsProblems" :key="index">
+                  <code v-if="problem.path" class="font-mono text-xs">{{ problem.path }}</code>
+                  {{ problem.message }}
+                </li>
+              </ul>
+            </template>
+          </UAlert>
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <span v-if="settingsDirty" class="text-xs text-muted">Unsaved changes</span>
+            <UButton
+              label="Save project settings"
+              :loading="savingSettings"
+              :disabled="!settingsDirty"
+              @click="saveSettings"
+            />
+          </div>
+        </div>
 
         <UCard>
           <template #header>
