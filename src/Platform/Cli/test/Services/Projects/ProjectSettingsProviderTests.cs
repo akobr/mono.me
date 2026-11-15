@@ -54,6 +54,17 @@ public class ProjectSettingsProviderTests
         _context.SetupGet(context => context.IsProjectKnown).Returns(true);
     }
 
+    public static TheoryData<Exception> Failures => new()
+    {
+        AnnotationCommandFixture.Error(401),
+        AnnotationCommandFixture.MissingScope("Annotation.Read"),
+        AnnotationCommandFixture.Error(404),
+        AnnotationCommandFixture.Error(500),
+        new HttpRequestException("No such host is known."),
+        new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout."),
+        new AuthenticationException(AuthenticationFailureReason.Configuration, "Sign in first."),
+    };
+
     [Fact]
     public async Task TheFirstRead_AsksTheApi_AndKeepsTheAnswer()
     {
@@ -203,17 +214,6 @@ public class ProjectSettingsProviderTests
         display.LabelOf("sbt").ShouldBe("Company");
         _logger.Entries.ShouldContain(entry => entry.Level == LogLevel.Debug);
     }
-
-    public static TheoryData<Exception> Failures => new()
-    {
-        AnnotationCommandFixture.Error(401),
-        AnnotationCommandFixture.MissingScope("Annotation.Read"),
-        AnnotationCommandFixture.Error(404),
-        AnnotationCommandFixture.Error(500),
-        new HttpRequestException("No such host is known."),
-        new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout."),
-        new AuthenticationException(AuthenticationFailureReason.Configuration, "Sign in first."),
-    };
 
     // Offline, signed out, a machine without a read scope, an older API: the built-in names and one debug line.
     [Theory]

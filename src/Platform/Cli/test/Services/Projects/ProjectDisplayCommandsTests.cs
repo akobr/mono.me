@@ -84,14 +84,15 @@ public class ProjectDisplayCommandsTests
     {
         var console = await Tree(ProjectDisplay.BuiltIn, root: null);
 
-        console.Text.ShouldBe(string.Join(Environment.NewLine,
-        [
-            "  Tree of subjects",
-            "  └ northwind [subject]",
-            "    └ prod [context]",
-            "      └ invoicing [responsibility] [disabled]",
-            string.Empty,
-        ]));
+        console.Text.ShouldBe(string.Join(
+            Environment.NewLine,
+            [
+                "  Tree of subjects",
+                "  └ northwind [subject]",
+                "    └ prod [context]",
+                "      └ invoicing [responsibility] [disabled]",
+                string.Empty,
+            ]));
         console.ColorOf("[subject]").ShouldBe(ConsoleColor.DarkGray);
         console.ColorOf("[context]").ShouldBe(ConsoleColor.DarkGray);
         console.ColorOf(" [responsibility] [disabled]").ShouldBe(ConsoleColor.DarkGray);
