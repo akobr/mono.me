@@ -138,6 +138,7 @@ The allowed values are the **catalog of project settings**, `src/Platform/Storyt
 
 - A member left out keeps its value, and `null` removes it: a type goes back to its built-in appearance, `DefaultTimeZone` to `UTC`, `DateFormat` to `yyyy-mm-dd`, and `"Types": null` resets every type.
 - `Types` merge type by type, and the members of a type one by one. Member names and type codes match in any case.
+- The names of the patch are checked as PUT checks those of a body, at the root, under `Types` and in a type: two names that differ only in case (`DateFormat` and `dateFormat`, `sbt` and `SBT`) are refused by `case-collision` (by `type-code` under `Types`), so a later one never overrides an earlier one and a `null` never removes what the same patch sets. A name that is not a member or a type code is refused also with `null`, which RFC 7396 alone would apply as nothing.
 - The body is `application/merge-patch+json` (as documented), `application/json`, or has no `Content-Type`. Another media type answers `415 InvalidContentType` with `Accept-Patch: application/merge-patch+json`. A body that is empty, not JSON, or not a JSON object answers `400 PatchInvalid`.
 
 ```json

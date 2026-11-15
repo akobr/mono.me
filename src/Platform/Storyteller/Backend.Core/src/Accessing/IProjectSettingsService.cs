@@ -23,8 +23,9 @@ public interface IProjectSettingsService
         KeyValueCaller caller,
         CancellationToken cancellationToken = default);
 
-    // Applies an RFC 7396 merge patch to the stored settings (in their Api JSON shape, ProjectSettingsJson.ApplyMergePatch)
-    // and validates the result as SetAsync does, with the same exceptions.
+    // Applies an RFC 7396 merge patch to the stored settings (in their Api JSON shape, ProjectSettingsJson.ReadMergePatch)
+    // and validates the result as SetAsync does, with the same exceptions; a name of the patch that is no member or no
+    // type code, or that differs from another one only in case, is a problem too.
     Task<ProjectSettingsWrite> PatchAsync(
         string organization,
         string project,

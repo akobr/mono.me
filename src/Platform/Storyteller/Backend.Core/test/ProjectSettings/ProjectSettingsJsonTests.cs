@@ -172,6 +172,84 @@ public class ProjectSettingsJsonTests
     }
 
     [Fact]
+    public void ReadMergePatch_MergesIntoTheSettings()
+    {
+        var check = ProjectSettingsJson.ReadMergePatch(Settings, JsonNode.Parse("""
+            { "types": { "SBT": { "color": "blue", "Plural": null }, "uxe": null, "cnt": { "Label": "Department" } }, "dateFormat": null, "Version": 3, "Modified": null }
+            """)!.AsObject());
+
+        check.Problems.ShouldBeEmpty();
+        check.Settings!.Types.Keys.ShouldBe(["sbt", "cnt"], ignoreOrder: true);
+        check.Settings.Types["sbt"].ShouldBe(new ProjectTypeAppearance { Label = "Company", Color = "blue", Icon = "i-lucide-building-2" });
+        check.Settings.Types["cnt"].ShouldBe(new ProjectTypeAppearance { Label = "Department" });
+        check.Settings.DefaultTimeZone.ShouldBe("Europe/Prague");
+        check.Settings.DateFormat.ShouldBeNull();
+        check.Settings.Version.ShouldBe(0);
+        check.Settings.Modified.ShouldBeNull();
+    }
+
+    // Two names of the patch that differ only in case are refused as in a document, so neither the later one wins nor
+    // a null one removes what the patch has just set; PUT refuses the same body by the same rule.
+    [Theory]
+    [InlineData("""{ "DateFormat": "dd.mm.yyyy", "dateFormat": "mm/dd/yyyy" }""", "$.DateFormat", ProjectSettingsRules.CaseCollision)]
+    [InlineData("""{ "types": { "sbt": { "Color": "pink" } }, "Types": null }""", "$.Types", ProjectSettingsRules.CaseCollision)]
+    [InlineData("""{ "Types": { "sbt": { "Color": "pink" }, "SBT": null } }""", "$.Types.sbt", ProjectSettingsRules.TypeCode)]
+    [InlineData("""{ "Types": { "sbt": { "Color": "pink", "color": "blue" } } }""", "$.Types.sbt.Color", ProjectSettingsRules.CaseCollision)]
+    public void ReadMergePatch_NamesThatDifferOnlyInCase_AreProblems(string patch, string path, string rule)
+    {
+        var parsed = JsonNode.Parse(patch)!.AsObject();
+        var check = ProjectSettingsJson.ReadMergePatch(Settings, parsed);
+
+        check.Settings.ShouldBeNull();
+        check.Problems.Select(problem => (problem.Path, problem.Rule)).ShouldBe([(path, rule)]);
+        ProjectSettingsJson.Read(parsed).Problems.Select(problem => (problem.Path, problem.Rule)).ShouldContain((path, rule));
+    }
+
+    // A name that is no member or no type code is refused also with null, which RFC 7396 alone would apply as nothing.
+    [Theory]
+    [InlineData("""{ "Theme": null }""", "$.Theme", ProjectSettingsRules.UnknownMember)]
+    [InlineData("""{ "Types": { "xyz": null } }""", "$.Types.xyz", ProjectSettingsRules.TypeCode)]
+    [InlineData("""{ "Types": { "sbt": { "Emoji": null } } }""", "$.Types.sbt.Emoji", ProjectSettingsRules.UnknownMember)]
+    [InlineData("""{ "Types": { "rst": { "Emoji": "x" } } }""", "$.Types.rst.Emoji", ProjectSettingsRules.UnknownMember)]
+    public void ReadMergePatch_NamesThatAreNoMembers_AreProblems(string patch, string path, string rule)
+    {
+        var check = ProjectSettingsJson.ReadMergePatch(Settings, JsonNode.Parse(patch)!.AsObject());
+
+        check.Settings.ShouldBeNull();
+        check.Problems.Select(problem => (problem.Path, problem.Rule)).ShouldBe([(path, rule)]);
+    }
+
+    [Fact]
+    public void ReadMergePatch_ProblemsOfTheNamesAndOfTheResult_AreReportedTogether()
+    {
+        var check = ProjectSettingsJson.ReadMergePatch(Settings, JsonNode.Parse("""
+            { "Types": { "sbt": { "Color": "pink" }, "SBT": null, "uxe": { "Icon": "i-lucide-banana" } }, "Theme": "dark", "DateFormat": "iso" }
+            """)!.AsObject());
+
+        check.Settings.ShouldBeNull();
+        check.Problems.Select(problem => (problem.Path, problem.Rule)).ShouldBe(
+            [
+                ("$.Types.sbt", ProjectSettingsRules.TypeCode),
+                ("$.Theme", ProjectSettingsRules.UnknownMember),
+                ("$.Types.uxe.Icon", ProjectSettingsRules.Icon),
+                ("$.DateFormat", ProjectSettingsRules.DateFormat),
+            ],
+            ignoreOrder: true);
+    }
+
+    [Theory]
+    [InlineData("""{ "Types": { "sbt": { "Color": "blue" }, "SBT": null, "uxe": { "Color": "rose", "color": null } }, "Theme": null }""")]
+    [InlineData("""{ "Types": { "sbt": { "Color": "blue", "Icon": null } }, "DefaultTimeZone": null }""")]
+    public void ReadMergePatch_ChangesNoPatch(string text)
+    {
+        var patch = JsonNode.Parse(text)!.AsObject();
+
+        ProjectSettingsJson.ReadMergePatch(Settings, patch);
+
+        patch.ToJsonString().ShouldBe(JsonNode.Parse(text)!.ToJsonString());
+    }
+
+    [Fact]
     public void ApplyMergePatch_ThatRemovesEverything_IsTheDefaults()
     {
         var merged = ProjectSettingsJson.ApplyMergePatch(

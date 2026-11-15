@@ -241,6 +241,37 @@ public class ProjectSettingsServiceTests(Startup startup)
         (await AuditEventsAsync(project)).Should().BeEmpty();
     }
 
+    // Names of a patch that differ only in case are refused, so neither the later one wins nor a null one removes what
+    // the patch has just set; a name that is no member is refused also with null.
+    [Fact]
+    public async Task Patch_WithNamesThatCollideOrAreNoMembers_ThrowsAndWritesNothing()
+    {
+        var project = await CreateProjectAsync();
+        var written = (await Settings.SetAsync(Organization, project, Company(), ProjectSettingsCondition.None, Admin, Cancellation)).Settings;
+
+        var patch = () => Settings.PatchAsync(
+            Organization,
+            project,
+            Patch("""{ "Types": { "rst": { "Color": "rose" }, "RST": null, "sbt": { "Color": "blue", "color": "rose" } }, "DateFormat": "dd.mm.yyyy", "dateFormat": "mm/dd/yyyy", "Theme": null }"""),
+            ProjectSettingsCondition.None,
+            Admin,
+            Cancellation);
+        var exception = (await patch.Should().ThrowAsync<ProjectSettingsInvalidException>()).Which;
+
+        exception.Problems.Select(problem => (problem.Path, problem.Rule)).Should().BeEquivalentTo(new[]
+        {
+            ("$.Theme", ProjectSettingsRules.UnknownMember),
+            ("$.DateFormat", ProjectSettingsRules.CaseCollision),
+            ("$.Types.rst", ProjectSettingsRules.TypeCode),
+            ("$.Types.sbt.Color", ProjectSettingsRules.CaseCollision),
+        });
+
+        var read = await Settings.GetAsync(Organization, project, Cancellation);
+        read.Version.Should().Be(written.Version);
+        ProjectSettingsRules.SameValues(read, written).Should().BeTrue();
+        (await AuditEventsAsync(project)).Should().ContainSingle();
+    }
+
     [Fact]
     public async Task UnknownProject_ThrowsNotFound()
     {
