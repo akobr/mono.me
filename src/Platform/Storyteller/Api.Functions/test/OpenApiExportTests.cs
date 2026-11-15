@@ -48,6 +48,8 @@ public class OpenApiExportTests
         Definitions.RouteIds.Access.GetMyInvitations,
         Definitions.RouteIds.Access.AcceptInvitation,
         Definitions.RouteIds.Access.DeclineInvitation,
+        Definitions.RouteIds.Access.GetExhibition,
+        Definitions.RouteIds.Access.JoinExhibition,
         Definitions.RouteIds.Access.GetMachineAccesses,
         Definitions.RouteIds.Access.GetMachineAccess,
         Definitions.RouteIds.Access.CreateMachineAccess,
@@ -740,6 +742,52 @@ public class OpenApiExportTests
         PropertyNames(schemas, "AccessPoint").ShouldContain("Description");
         PropertyNames(schemas, "AccessPointCreate").ShouldContain("ProjectDescription");
         PropertyNames(schemas, "AccountCreate").ShouldContain("ProjectDescription");
+    }
+
+    // The exhibition (424-267): what it is and the caller's join of it, under the Access tag, for users only and without a
+    // request body. Both answer 404 without a body in a deployment without an exhibition, and the join 409 when the
+    // project kept changing. Organization and Project are required, so the generated types have them without "?".
+    [Fact]
+    public async Task Document_ExhibitionOperations_ArePublished()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var operations = document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject().Select(operation => (Path: path.Name, Method: operation.Name, Operation: operation.Value)))
+            .Where(operation => operation.Operation.GetProperty("operationId").GetString() is Definitions.RouteIds.Access.GetExhibition or Definitions.RouteIds.Access.JoinExhibition)
+            .ToList();
+
+        operations.Select(operation => $"{operation.Method.ToUpperInvariant()} {operation.Path} {operation.Operation.GetProperty("operationId").GetString()}").ShouldBe(
+            [
+                "GET /v1/access/exhibition GetExhibition",
+                "POST /v1/access/exhibition/join JoinExhibition",
+            ],
+            ignoreOrder: true);
+
+        foreach (var (_, _, operation) in operations)
+        {
+            operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access]);
+            operation.GetProperty("security").GetArrayLength().ShouldBeGreaterThan(0);
+            operation.TryGetProperty("requestBody", out _).ShouldBeFalse();
+            operation.TryGetProperty("parameters", out _).ShouldBeFalse();
+            operation.GetProperty("responses").GetProperty("401").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseUnauthorizedUserOnly);
+            operation.GetProperty("responses").GetProperty("403").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseForbiddenUserOnly);
+            operation.GetProperty("responses").GetProperty("404").TryGetProperty("content", out _).ShouldBeFalse("the 404 has no body");
+        }
+
+        var exhibition = Operation(document, Definitions.RouteIds.Access.GetExhibition);
+        exhibition.GetProperty("responses").EnumerateObject().Select(response => response.Name).ShouldBe(["200", "401", "403", "404", "500"], ignoreOrder: true);
+        Reference(exhibition, "200").ShouldBe("#/components/schemas/Exhibition");
+
+        var join = Operation(document, Definitions.RouteIds.Access.JoinExhibition);
+        join.GetProperty("responses").EnumerateObject().Select(response => response.Name).ShouldBe(["200", "401", "403", "404", "409", "500"], ignoreOrder: true);
+        Reference(join, "200").ShouldBe("#/components/schemas/Account");
+        Reference(join, "409").ShouldBe("#/components/schemas/ErrorResponse");
+
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        PropertyNames(schemas, "Exhibition").ShouldBe(["Organization", "Project", "Description"], ignoreOrder: true);
+        RequiredNames(schemas, "Exhibition").ShouldBe(["Organization", "Project"], ignoreOrder: true);
     }
 
     // These handlers read their JSON bodies themselves, not through [FromBody], so [OpenApiRequestBody] alone documents

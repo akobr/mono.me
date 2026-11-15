@@ -528,6 +528,35 @@ public class CosmosAccessServiceTests(Startup startup)
         (await Access.GetAccountAsync(memberId))!.AccessMap.Should().Contain(pointKey, AccountRole.Administrator);
     }
 
+    // The state a join of the exhibition creates (POST v1/access/exhibition/join): an account without an organization
+    // that reads one project. The membership is the project's only, and a second join writes nothing.
+    [Fact]
+    public async Task JoinAccessPoint_BareAccountAsReader_ListsTheProjectAndNoAccessPoint()
+    {
+        var pointKey = await CreateProjectAsync("The exhibition.");
+        var memberId = $"acc-{Guid.NewGuid():N}";
+        await Access.CreateAccountAsync(new AccountCreate { IdentityId = memberId, UserName = $"{memberId}@example.com", Name = "Visitor" });
+
+        var joined = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader);
+
+        joined.Should().Be(AccountRole.Reader);
+        var account = await Access.GetAccountAsync(memberId);
+        account!.AccessMap.Should().HaveCount(1).And.Contain(pointKey, AccountRole.Reader);
+        (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().HaveCount(2).And.Contain(OwnerId, AccountRole.Owner).And.Contain(memberId, AccountRole.Reader);
+        (await Access.GetProjectsAsync(memberId)).Should().Equal(new ProjectSummary { Key = pointKey, Role = AccountRole.Reader, Description = "The exhibition." });
+        (await Access.GetAccessPointsAsync(memberId)).Should().BeEmpty();
+
+        var pointETag = await ReadETagAsync($"apt.{pointKey}");
+        var accountETag = await ReadETagAsync(memberId);
+
+        var again = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader);
+
+        again.Should().Be(AccountRole.Reader);
+        (await ReadETagAsync($"apt.{pointKey}")).Should().Be(pointETag);
+        (await ReadETagAsync(memberId)).Should().Be(accountETag);
+        (await Access.GetAccountAsync(memberId)).Should().BeEquivalentTo(account);
+    }
+
     [Fact]
     public async Task ConcurrentGrants_BothLandInBothDocuments()
     {
@@ -876,6 +905,15 @@ public class CosmosAccessServiceTests(Startup startup)
         response.EnsureSuccessStatusCode();
         using var document = await JsonDocument.ParseAsync(response.Content);
         return document.RootElement.Clone();
+    }
+
+    // The ETag of a stored document: the same ETag after an operation means nothing wrote the document meanwhile.
+    private async Task<string> ReadETagAsync(string id)
+    {
+        var repository = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetCore();
+        using var response = await repository.Container.ReadItemStreamAsync(id, new PartitionKey("access"));
+        response.EnsureSuccessStatusCode();
+        return response.Headers.ETag;
     }
 
     private async Task<bool> IsDescriptionStoredAsync(string pointKey)

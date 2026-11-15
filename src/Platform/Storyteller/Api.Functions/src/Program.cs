@@ -5,6 +5,7 @@ using _42.Platform.Storyteller.Api;
 using _42.Platform.Storyteller.Api.ConditionalReads;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.ErrorReporting;
+using _42.Platform.Storyteller.Api.Exhibitions;
 using _42.Platform.Storyteller.Api.Json;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
@@ -113,6 +114,10 @@ var host = new HostBuilder()
         // ETag and If-None-Match on the configuration reads, and the dependency manifests that answer a resolved read with bindings without
         // evaluating it; ConditionalReads:EntityTagKey shares the tags over volatile bindings between instances.
         services.AddConditionalReads(context.Configuration);
+
+        // The exhibition, the demo project a newcomer may join as a Reader (v1/access/exhibition): Exhibition:Organization,
+        // Exhibition:Project and Exhibition:Owner, all three or none.
+        services.AddExhibition(context.Configuration);
 
         // Key/value secrets: the Standard level wraps its data keys in the vault AzureKeyVaults:{KeyValues:Protection:Standard:VaultName};
         // without that vault only public pairs can be written.
