@@ -61,6 +61,15 @@ param byokClientId string = ''
 @description('The DSN of the Sentry project of the API (2s-api), known after step 14; the setting is left out while it is empty.')
 param sentryDsn string = ''
 
+@description('The organization of the exhibition, the demo project that the admin UI offers to a new user; set with exhibitionProject and exhibitionOwner, after its seed (runbook, "Turning the exhibition on"). The three Exhibition__ settings are left out unless all three are set.')
+param exhibitionOrganization string = ''
+
+@description('The exhibition project.')
+param exhibitionProject string = ''
+
+@description('The id of the account that owns the exhibition project: the --owner of its seed.')
+param exhibitionOwner string = ''
+
 @description('The object id of the owner: Key Vault Administrator, Storage Blob Data Contributor.')
 @minLength(36)
 @maxLength(36)
@@ -258,6 +267,9 @@ module functions 'modules/functions.bicep' = {
     authKitApiKeyEnabled: authKitApiKeyEnabled
     byokClientId: byokClientId
     sentryDsn: sentryDsn
+    exhibitionOrganization: exhibitionOrganization
+    exhibitionProject: exhibitionProject
+    exhibitionOwner: exhibitionOwner
     disabledCredentialKinds: disabledCredentialKinds
     runtimeEnvironment: runtimeEnvironment
     maximumInstanceCount: functionMaximumInstanceCount

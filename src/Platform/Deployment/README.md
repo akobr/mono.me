@@ -47,6 +47,7 @@ Steps 16–17 (the code, DbCreator, the checks) stay in the cookbook.
 | `authKitApiKeyEnabled` | `Auth__AuthKit__ApiKey` as a Key Vault reference | `true` once the secret `authkit-api-key` is in the vault |
 | `authKitDomain`, `authKitCustomDomain` | the AuthKit domain; `false` until the custom domain `auth.42for.net` exists (the admin UI keeps its session in `localStorage`; [424-247](https://linear.app/424fun/issue/424-247/add-the-custom-authkit-domain-auth42fornet-before-the-first-customer)) | the environment's `….authkit.app` domain: step 13 |
 | `budgetStartDate` | the budget's first month, never moved afterwards | the month of the first run |
+| `exhibitionOrganization`, `exhibitionProject`, `exhibitionOwner` | `Exhibition__Organization`, `Exhibition__Project` and `Exhibition__Owner`: the exhibition, the demo project that the admin UI offers to a new user, and the id of the account that owns it ([access](../../../docs/Platform/Storyteller/access.md#exhibition)). All three or none: the template leaves the three settings out unless all three are set, and the API then has no exhibition | the seed of the exhibition ([runbook](../../../docs/Platform/Deployment/runbook-azure-production.md#turning-the-exhibition-on)); `prod.bicepparam` does not set them yet |
 
 Only the owner's personal values come from environment variables, so the repository doesn't hold them:
 
