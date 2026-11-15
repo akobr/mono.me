@@ -27,6 +27,15 @@ internal sealed class CommandLineValues
 
     private static readonly char[] PartSeparators = ['=', ',', ';', '.', '/', '\\'];
 
+    // Pieces that name no customer, common words of paths and URLs: a piece is replaced in every message, so these would
+    // cut it everywhere. The whole value still goes.
+    private static readonly HashSet<string> CommonPieces = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Users", "home", "runner", "work", "AppData", "Local", "LocalLow", "Roaming", "Temp", "Documents", "Desktop",
+        "Downloads", "source", "repos", "Program Files", "private", "Volumes", "default", "https", "http", "json", "yaml",
+        "true", "false", "null", "file", "files",
+    };
+
     private readonly IReadOnlyList<string> _values;
     private readonly IReadOnlySet<string> _commandNames;
 
@@ -162,8 +171,10 @@ internal sealed class CommandLineValues
     // - both sides of the first '=' (the path and the value of -x path=value), whatever their length: a short one is
     //   replaced as a whole word only;
     // - the pieces between = , ; . / \ of four characters or more, without a leading '@' (of a full key), and none that
-    //   ends with ':' (the scheme of a URL, which would hide the shape of every other URL from its rule). A file path is
-    //   not cut in pieces: Users or home would go from every message; ErrorReporter adds its full form instead.
+    //   ends with ':' (the scheme of a URL, which would hide the shape of every other URL from its rule);
+    // - of a file path its segments (the file name, and its stem before the first '.') instead, of four characters or
+    //   more; ErrorReporter adds its full form.
+    // No piece is a common word of paths and URLs (Users, home, default, https, …), which would go from every message.
     internal static IEnumerable<string> WithParts(string value)
     {
         var parts = new List<string> { value };
@@ -184,13 +195,18 @@ internal sealed class CommandLineValues
                 parts.AddRange(sides);
             }
 
-            foreach (var side in sides.Where(side => !IsFilePath(side)))
+            foreach (var side in sides)
             {
-                foreach (var piece in side.Split(PartSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                var pieces = IsFilePath(side)
+                    ? side.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .SelectMany(segment => new[] { segment, segment.TrimStart('.').Split('.')[0] })
+                    : side.Split(PartSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                foreach (var piece in pieces)
                 {
                     var part = piece.TrimStart('@');
 
-                    if (part.Length >= MinimumPartLength && !part.EndsWith(':'))
+                    if (part.Length >= MinimumPartLength && !part.EndsWith(':') && !CommonPieces.Contains(part))
                     {
                         parts.Add(part);
                     }
