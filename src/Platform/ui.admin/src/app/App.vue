@@ -3,10 +3,13 @@ import { computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import BareLayout from '@/layouts/BareLayout.vue'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
+import { useCurrentProjectSettings } from '@/queries/project-settings'
 import { useDateFormatStore } from '@/stores/date-format'
 import { useTypeAppearanceStore } from '@/stores/type-appearance'
 
 const route = useRoute()
+// Reads the settings of the current project from the API into the project settings store (424-266).
+useCurrentProjectSettings()
 // Applies the type names, colors and icons of the project settings and Preferences on every page (424-13).
 useTypeAppearanceStore()
 // Applies the date format of the project settings and Preferences on every page (424-23).

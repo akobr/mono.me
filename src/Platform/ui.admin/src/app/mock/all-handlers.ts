@@ -4,6 +4,7 @@ import { annotationHandlers } from './annotation-handlers'
 import { configurationHandlers } from './configuration-handlers'
 import { keyValueHandlers } from './key-value-handlers'
 import { accessHandlers, bindingHandlers, viewHandlers } from './handlers'
+import { projectSettingsHandlers } from './project-settings-handlers'
 import { transferHandlers } from './transfer-handlers'
 import { templateSchemaHandlers } from './template-schema-handlers'
 
@@ -11,6 +12,7 @@ import { templateSchemaHandlers } from './template-schema-handlers'
 export const mockHandlers: HttpHandler[] = [
   ...accessHandlers,
   ...accessManagementHandlers,
+  ...projectSettingsHandlers,
   ...viewHandlers,
   ...bindingHandlers,
   ...annotationHandlers,

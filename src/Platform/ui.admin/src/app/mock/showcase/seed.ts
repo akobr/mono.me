@@ -7,15 +7,16 @@ import type {
   MachineCredentialKind,
   View,
 } from '@42for.net/2splatform.sdk'
+import { toApi } from '@/utils/project-settings'
 import type { AnnotationOverrides, MockDb, MockUser } from '../db'
 import { personActor } from './history'
 import { people, type PersonaId } from './people'
 import { showcaseOrganizations, showcaseProjects, showcaseScope } from './index'
 import type { Members, ShowcaseProject } from './types'
 
-// The MockDb of the showcase dataset: access points and the account from one table of roles, the registered views,
-// the deletions the default views start with, and two pending invitations. Machines, issuers, certificates and the
-// values store start empty, as in a new project.
+// The MockDb of the showcase dataset: access points with the settings of each project (424-266) and the account from
+// one table of roles, the registered views, the deletions the default views start with, and two pending invitations.
+// Machines, issuers, certificates and the values store start empty, as in a new project.
 
 const day = 86_400_000
 /** Days a deleted annotation stays restorable (retentionDays of audit.ts, which this module must not import). */
@@ -135,8 +136,16 @@ export function createShowcaseSeed(user: MockUser): MockDb {
     const kinds: MachineCredentialKind[] = ['fitness-cloud', 'streaming-platform'].includes(project.project)
       ? ['ApiKey', 'Certificate', 'Federated']
       : ['ApiKey', 'Federated']
-    // Only a project has a description.
-    accessPoints[key] = { ...accessPoint(key, project.members, kinds), Description: project.description }
+    // Only a project has a description and settings; the first owner set them when the default view was created.
+    accessPoints[key] = {
+      ...accessPoint(key, project.members, kinds),
+      Description: project.description,
+      Settings: {
+        ...toApi(project.settings),
+        Version: 1,
+        Modified: { At: ago(viewAges.default!, now), By: personActor(firstOwner(project)) },
+      },
+    }
   }
 
   // The account's map is derived from the access points, as syncAccount keeps it (access-handlers.ts).

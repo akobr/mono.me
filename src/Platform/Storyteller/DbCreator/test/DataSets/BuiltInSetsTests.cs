@@ -110,11 +110,12 @@ public class BuiltInSetsTests
         var content = DataSetContent.Read(FileSystem, showcase.Folder, target);
 
         // the files a Git export of the scope gives (ui.admin's test/unit/mock/showcase-set.test.ts writes them): every
-        // file of the folder is a document in the folder of its kind. The counts come from the folder, so a change of
-        // the mock needs no change here.
+        // file of the folder is a document in the folder of its kind, except project-settings.json, the settings of the
+        // project (424-266), which is no document of the view and which the seed does not read yet. The counts come from
+        // the folder, so a change of the mock needs no change here.
         content.Lines.ShouldBeNull();
-        content.Documents.IgnoredFiles.ShouldBe(0);
-        content.Documents.Files.Count.ShouldBe(DataSetFolder.GetEntries(FileSystem, showcase.Folder).Count);
+        content.Documents.IgnoredFiles.ShouldBe(1);
+        content.Documents.Files.Count.ShouldBe(DataSetFolder.GetEntries(FileSystem, showcase.Folder).Count - 1);
         content.Documents.Files.ShouldAllBe(file => file.ErrorCode == null);
         content.Documents.Files.ShouldAllBe(file => file.Path.StartsWith(ViewArchiveNames.GetFolder(ViewArchiveNames.GetContent(file.Kind)) + "/"));
         content.Documents.Files.ShouldContain(file => file.Kind == ViewDocumentKind.Annotation);

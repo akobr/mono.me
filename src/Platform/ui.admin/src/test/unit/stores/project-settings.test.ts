@@ -1,133 +1,122 @@
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
+import type { AuthService } from '@/boot/auth'
+import { setBootState } from '@/boot/state'
 import { useContextStore } from '@/stores/context'
 import { useProjectSettingsStore } from '@/stores/project-settings'
+import { useSessionStore } from '@/stores/session'
 
-const storageKey = '2s-admin:project-settings'
+// The settings of the projects as the API serves them (424-266): received from the settings query, per project.
+
+const defaults = { types: {}, defaultTimeZone: 'UTC', dateFormat: 'yyyy-mm-dd', version: 0 }
 
 describe('project settings store', () => {
-  it('starts every project in UTC', () => {
+  it('shows the defaults until the answer of a project arrives', () => {
     const settings = useProjectSettingsStore()
 
-    const defaults = { defaultTimeZone: 'UTC', dateFormat: 'yyyy-mm-dd', types: {} }
     expect(settings.settingsOf('acme.billing')).toEqual(defaults)
     expect(settings.settingsOf(undefined)).toEqual(defaults)
+    expect(settings.loaded('acme.billing')).toBe(false)
+    expect(settings.version('acme.billing')).toBe(0)
     expect(settings.defaultTimeZone).toBe('UTC')
     expect(settings.dateFormat).toBe('yyyy-mm-dd')
   })
 
-  it('keeps the default time zone per project in localStorage', async () => {
+  it('keeps the answer of each project, with its version, and nothing in localStorage', async () => {
     const settings = useProjectSettingsStore()
+    const modified = { At: '2026-11-15T10:00:00Z', By: { Kind: 'Account' as const, Id: 'user_1', Name: 'Ada' } }
 
-    settings.update('acme.billing', { defaultTimeZone: 'Europe/Prague' })
+    settings.receive('acme.billing', {
+      Types: { sbt: { Label: 'Company', Plural: 'Companies', Color: 'pink', Icon: 'i-lucide-building-2' } },
+      DefaultTimeZone: 'Europe/Prague',
+      DateFormat: 'dd.mm.yyyy',
+      Version: 3,
+      Modified: modified,
+    })
+    settings.receive('acme.shipping', { Types: {}, Version: 0 })
     await nextTick()
 
-    expect(settings.settingsOf('acme.billing').defaultTimeZone).toBe('Europe/Prague')
-    expect(settings.settingsOf('acme.shipping').defaultTimeZone).toBe('UTC')
-    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual({
-      'acme.billing': { defaultTimeZone: 'Europe/Prague' },
+    expect(settings.settingsOf('acme.billing')).toEqual({
+      types: { sbt: { label: 'Company', plural: 'Companies', color: 'pink', icon: 'i-lucide-building-2' } },
+      defaultTimeZone: 'Europe/Prague',
+      dateFormat: 'dd.mm.yyyy',
+      version: 3,
+      modified,
+      storedTimeZone: 'Europe/Prague',
+      storedDateFormat: 'dd.mm.yyyy',
     })
+    expect(settings.version('acme.billing')).toBe(3)
+    expect(settings.loaded('acme.shipping')).toBe(true)
+    expect(settings.settingsOf('acme.shipping')).toEqual(defaults)
+    expect(settings.loaded('northwind.portal')).toBe(false)
+    expect(localStorage.length).toBe(0)
   })
 
   it('follows the project of the context', () => {
     const context = useContextStore()
     const settings = useProjectSettingsStore()
-    settings.update('acme.billing', { defaultTimeZone: 'Asia/Tokyo' })
+    settings.receive('acme.billing', { Types: {}, DefaultTimeZone: 'Asia/Tokyo', DateFormat: 'd mmm yyyy', Version: 1 })
 
     context.set({ org: 'acme', project: 'billing', view: 'default' })
     expect(settings.defaultTimeZone).toBe('Asia/Tokyo')
+    expect(settings.dateFormat).toBe('d mmm yyyy')
 
     context.set({ org: 'acme', project: 'shipping', view: 'default' })
     expect(settings.defaultTimeZone).toBe('UTC')
+    expect(settings.dateFormat).toBe('yyyy-mm-dd')
+    expect(settings.current).toEqual(defaults)
   })
 
-  it('ignores time zones Intl does not know', () => {
-    localStorage.setItem(storageKey, JSON.stringify({ 'acme.billing': { defaultTimeZone: 'Mars/Olympus' } }))
+  it('takes a newer answer of a project, and keeps its entry for the same answer', () => {
+    const settings = useProjectSettingsStore()
+    settings.receive('acme.billing', { Types: {}, DateFormat: 'dd/mm/yyyy', Version: 1 })
+    const first = settings.settingsOf('acme.billing')
+
+    settings.receive('acme.billing', { Types: {}, DateFormat: 'dd/mm/yyyy', Version: 1 })
+    expect(settings.settingsOf('acme.billing')).toBe(first)
+
+    settings.receive('acme.billing', { Types: {}, Version: 2 })
+    expect(settings.settingsOf('acme.billing')).toMatchObject({ dateFormat: 'yyyy-mm-dd', version: 2 })
+  })
+
+  it('shows only what the UI can: unknown zones, formats, codes, colors and icons fall back', () => {
     const settings = useProjectSettingsStore()
 
-    expect(settings.settingsOf('acme.billing').defaultTimeZone).toBe('UTC')
-
-    settings.update('acme.shipping', { defaultTimeZone: 'America/New_York' })
-    settings.update('acme.shipping', { defaultTimeZone: 'Nowhere/City' })
-    expect(settings.settingsOf('acme.shipping').defaultTimeZone).toBe('America/New_York')
-  })
-
-  it('keeps the date format per project and ignores unknown formats', async () => {
-    const context = useContextStore()
-    const settings = useProjectSettingsStore()
-
-    settings.update('acme.billing', { dateFormat: 'dd.mm.yyyy' })
-    settings.update('acme.billing', { dateFormat: 'yyyy/mm/dd' as never })
-    await nextTick()
-
-    expect(settings.settingsOf('acme.billing').dateFormat).toBe('dd.mm.yyyy')
-    expect(settings.settingsOf('acme.shipping').dateFormat).toBe('yyyy-mm-dd')
-    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual({ 'acme.billing': { dateFormat: 'dd.mm.yyyy' } })
-
-    context.set({ org: 'acme', project: 'billing', view: 'default' })
-    expect(settings.dateFormat).toBe('dd.mm.yyyy')
-  })
-
-  it('falls back to yyyy-mm-dd for a stored format it does not know', () => {
-    localStorage.setItem(storageKey, JSON.stringify({ 'acme.billing': { dateFormat: 'dd-mm-yy' } }))
-
-    expect(useProjectSettingsStore().settingsOf('acme.billing').dateFormat).toBe('yyyy-mm-dd')
-  })
-
-  it('keeps the type names, colors and icons per project, sanitized', async () => {
-    const settings = useProjectSettingsStore()
-
-    settings.update('acme.billing', { types: { exe: { label: ' Job ', color: 'red', icon: 'i-lucide-unknown' } } })
-    settings.update('acme.billing', { defaultTimeZone: 'Europe/Prague' })
-    await nextTick()
-
-    expect(settings.settingsOf('acme.billing').types).toEqual({ exe: { label: 'Job', color: 'red' } })
-    expect(settings.settingsOf('acme.shipping').types).toEqual({})
-    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual({
-      'acme.billing': { defaultTimeZone: 'Europe/Prague', types: { exe: { label: 'Job', color: 'red' } } },
+    settings.receive('acme.billing', {
+      Types: {
+        EXE: { Label: ' Job ', Color: 'red', Icon: 'i-lucide-unknown' },
+        sbt: { Plural: 'Companies', Color: 'chartreuse' },
+        xyz: { Label: 'Nothing' },
+      },
+      DefaultTimeZone: 'Mars/Olympus',
+      DateFormat: 'yy.m.d',
+      Version: -1,
     })
 
-    settings.update('acme.billing', { types: {} })
-    await nextTick()
-
-    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual({
-      'acme.billing': { defaultTimeZone: 'Europe/Prague' },
+    expect(settings.settingsOf('acme.billing')).toMatchObject({
+      types: { exe: { label: 'Job', color: 'red' } },
+      defaultTimeZone: 'UTC',
+      dateFormat: 'yyyy-mm-dd',
+      version: 0,
     })
   })
 
-  it('ignores stored types it cannot show', () => {
-    localStorage.setItem(storageKey, JSON.stringify({ 'acme.billing': { types: { exe: { color: 'chartreuse' } } } }))
-
-    expect(useProjectSettingsStore().settingsOf('acme.billing').types).toEqual({})
-  })
-
-  it('resets a project to the defaults', () => {
-    const settings = useProjectSettingsStore()
-    settings.update('acme.billing', { defaultTimeZone: 'Europe/London' })
-    settings.update('acme.shipping', { defaultTimeZone: 'Europe/Prague' })
-
-    settings.reset('acme.billing')
-
-    expect(settings.settingsOf('acme.billing').defaultTimeZone).toBe('UTC')
-    expect(settings.settingsOf('acme.shipping').defaultTimeZone).toBe('Europe/Prague')
-  })
-
-  it('keeps the defaults when localStorage is blocked', () => {
-    const blocked = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
-      throw new DOMException('Storage is disabled', 'SecurityError')
-    })
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    try {
-      const settings = useProjectSettingsStore()
-      settings.update('acme.billing', { defaultTimeZone: 'Europe/Prague' })
-
-      expect(warn).toHaveBeenCalled()
-      expect(settings.settingsOf('acme.billing').defaultTimeZone).toBe('Europe/Prague')
-      expect(settings.settingsOf('acme.shipping').defaultTimeZone).toBe('UTC')
-    } finally {
-      // Before the shared afterEach clears localStorage; restoreMocks would only run after it.
-      blocked.mockRestore()
+  it('forgets every project on sign-out', async () => {
+    const service: AuthService = {
+      kind: 'mock',
+      getUser: () => ({ id: 'user_1', email: 'ada@example.com', name: 'Ada' }),
+      getAccessToken: async () => 'token',
+      signIn: vi.fn(async () => {}),
+      signOut: vi.fn(async () => {}),
+      consumeReturnTo: () => undefined,
     }
+    setBootState({ status: 'ready', auth: service })
+    const settings = useProjectSettingsStore()
+    settings.receive('acme.billing', { Types: { exe: { Label: 'Job' } }, Version: 4 })
+
+    await useSessionStore().signOut()
+
+    expect(settings.loaded('acme.billing')).toBe(false)
+    expect(settings.settingsOf('acme.billing')).toEqual(defaults)
   })
 })

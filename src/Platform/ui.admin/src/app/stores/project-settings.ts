@@ -1,80 +1,57 @@
-import { computed } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { useStorage } from '@vueuse/core'
-import { isValidTimeZone } from '@/forms/annotation.schema'
-import { defaultDateFormat, isDateFormat, type DateFormat } from '@/utils/dates'
-import { sanitizeTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
+import type { ProjectSettings } from '@42for.net/2splatform.sdk'
+import { defaultProjectSettings, fromApi, type ProjectSettingsState } from '@/utils/project-settings'
 import { useContextStore } from './context'
-
-export interface ProjectSettings {
-  /** IANA time zone that new annotations of the project start in. */
-  defaultTimeZone: string
-  /** How dates are shown in this project; Preferences can override it (424-23). */
-  dateFormat: DateFormat
-  /** Names, colors and icons of the annotation types in this project; Preferences can override them (424-13). */
-  types: TypeAppearances
-}
-
-/** The localStorage key of every project's settings; the showcase mock dataset writes its projects' entries (424-77). */
-export const projectSettingsKey = '2s-admin:project-settings'
-
-export const defaultProjectSettings: ProjectSettings = {
-  defaultTimeZone: 'UTC',
-  dateFormat: defaultDateFormat,
-  types: {},
-}
+import { onSignOut } from './session'
 
 /**
- * Settings of a project, per access point key (`org.project`). The API has no project document to keep them in, so
- * they live in this browser's localStorage; each entry holds only what was changed, the rest comes from the defaults.
+ * The settings of every project the app has read, per access point key (`org.project`), as the API stores them for
+ * everyone in the project (424-266). The query of the current project (useCurrentProjectSettings, mounted once in
+ * App.vue) feeds every answer in with `receive`; a project whose answer has not arrived shows the defaults. Writes
+ * are calls of the API, whose answers come back through the query.
  */
 export const useProjectSettingsStore = defineStore('project-settings', () => {
   const context = useContextStore()
-  // No storage argument: VueUse resolves localStorage itself and reports a blocked one to onError, keeping the defaults.
-  const state = useStorage<Record<string, Partial<ProjectSettings>>>(projectSettingsKey, {}, undefined, {
-    onError: (error) => console.warn('Project settings: localStorage access failed.', error),
-  })
+  const state = shallowRef<Record<string, ProjectSettingsState>>({})
+  // The answer each entry was made from, so a refetch with the same settings changes nothing downstream.
+  const sources = new Map<string, string>()
 
-  function settingsOf(projectKey: string | undefined): ProjectSettings {
-    const stored = projectKey ? state.value[projectKey] : undefined
-    return {
-      defaultTimeZone:
-        stored?.defaultTimeZone && isValidTimeZone(stored.defaultTimeZone)
-          ? stored.defaultTimeZone
-          : defaultProjectSettings.defaultTimeZone,
-      dateFormat: isDateFormat(stored?.dateFormat) ? stored?.dateFormat : defaultProjectSettings.dateFormat,
-      types: sanitizeTypeAppearances(stored?.types),
+  /** Takes an answer of the API for a project: sanitized, with the defaults for what it leaves out. */
+  function receive(projectKey: string, settings: ProjectSettings): void {
+    const source = JSON.stringify(settings)
+    if (sources.get(projectKey) === source && projectKey in state.value) {
+      return
     }
+    sources.set(projectKey, source)
+    state.value = { ...state.value, [projectKey]: fromApi(settings) }
+  }
+
+  function settingsOf(projectKey: string | undefined): ProjectSettingsState {
+    return (projectKey ? state.value[projectKey] : undefined) ?? defaultProjectSettings
+  }
+
+  /** Whether an answer for the project has arrived (until then it shows the defaults). */
+  function loaded(projectKey: string | undefined): boolean {
+    return !!projectKey && projectKey in state.value
+  }
+
+  /** The version of the settings the app has, for If-Match; 0 before the first answer and before the first change. */
+  function version(projectKey: string | undefined): number {
+    return settingsOf(projectKey).version
+  }
+
+  function clear(): void {
+    sources.clear()
+    state.value = {}
   }
 
   const current = computed(() => settingsOf(context.projectKey))
   const defaultTimeZone = computed(() => current.value.defaultTimeZone)
   const dateFormat = computed(() => current.value.dateFormat)
 
-  /**
-   * Merges the change into the project's entry; a change to a time zone Intl does not know, or to an unknown date
-   * format, is ignored. Types are stored sanitized, and empty types leave the entry, so it keeps only what was changed.
-   */
-  function update(projectKey: string, patch: Partial<ProjectSettings>): void {
-    if (patch.defaultTimeZone !== undefined && !isValidTimeZone(patch.defaultTimeZone)) {
-      return
-    }
-    if (patch.dateFormat !== undefined && !isDateFormat(patch.dateFormat)) {
-      return
-    }
-
-    const { types, ...rest } = { ...state.value[projectKey], ...patch }
-    const cleanTypes = sanitizeTypeAppearances(types)
-    state.value = {
-      ...state.value,
-      [projectKey]: Object.keys(cleanTypes).length > 0 ? { ...rest, types: cleanTypes } : rest,
-    }
-  }
-
-  function reset(projectKey: string): void {
-    const { [projectKey]: _removed, ...others } = state.value
-    state.value = others
-  }
-
-  return { state, settingsOf, current, defaultTimeZone, dateFormat, update, reset }
+  return { state, receive, settingsOf, loaded, version, clear, current, defaultTimeZone, dateFormat }
 })
+
+// The next user never sees the settings of the previous one's projects.
+onSignOut(() => useProjectSettingsStore().clear())

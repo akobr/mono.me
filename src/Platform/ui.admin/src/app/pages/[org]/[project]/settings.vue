@@ -3,11 +3,17 @@ import { computed, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
   getCertificateAuthority,
+  projectSettingsEntityTag,
   setMachineAuthentication,
+  setProjectSettings,
   updateAccessPoint,
   type MachineCredentialKind,
 } from '@42for.net/2splatform.sdk'
-import { useGetAccessPoint, useGetMachineAuthentication } from '@42for.net/2splatform.sdk/vue-query'
+import {
+  getGetProjectSettingsQueryKey,
+  useGetAccessPoint,
+  useGetMachineAuthentication,
+} from '@42for.net/2splatform.sdk/vue-query'
 import { descriptionSchema } from '@/forms/names.schema'
 import { invalidateAccess, invalidateProject } from '@/queries/invalidation'
 import { useProjectSummaries } from '@/queries/projects'
@@ -18,16 +24,17 @@ import { useProjectSettingsStore } from '@/stores/project-settings'
 import { dateFormatItems, type DateFormat } from '@/utils/dates'
 import { errorMessage } from '@/utils/errors'
 import { credentialKindDescriptions, credentialKinds, issuesCertificates } from '@/utils/machines'
+import { toApi, type ProjectSettingsDraft } from '@/utils/project-settings'
 import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 
 // Project settings (spec section 13): the machine authentication policy (Administrator: the enabled credential
 // kinds, the default kind and certificate lifetime of new machines, 424-14), the CA certificate download (PEM; the
 // SDK fetcher returns non-JSON bodies as text) and project information with the description of the project (every
 // member reads it, Administrators change it, 424-78). The default time zone of new annotations (424-12), the date
-// format (424-23) and the names, colors and icons of the annotation types (424-13) are kept in this browser, so they
-// apply at once, like Preferences. The secrets settings of the old Secrets page (spec 29.6: allowed levels, the keys,
-// the customer key and the recipients) are the last section since 424-35; every reader sees them, Administrators
-// change them.
+// format (424-23) and the names, colors and icons of the annotation types (424-13) are the project's settings on the
+// server (424-266), shown from the project settings store. The secrets settings of the old Secrets page (spec 29.6:
+// allowed levels, the keys, the customer key and the recipients) are the last section since 424-35; every reader sees
+// them, Administrators change them.
 const context = useContextStore()
 const projectSettings = useProjectSettingsStore()
 const preferences = usePreferencesStore()
@@ -37,32 +44,42 @@ const role = useRole()
 const canAdmin = useCan('manageAccess')
 const canEdit = useCan('edit')
 
+// A bridge until the page has its draft and Save: each change is a PUT of the saved settings with the change, under
+// If-Match of their version, one after the other; the answer goes into the query and the store.
+let writing = Promise.resolve()
+function writeSettings(change: Partial<ProjectSettingsDraft>): void {
+  const { org, project, projectKey } = context
+  if (!org || !project || !projectKey) {
+    return
+  }
+  writing = writing.then(async () => {
+    const saved = projectSettings.settingsOf(projectKey)
+    try {
+      const answer = await setProjectSettings(org, project, toApi({ ...saved, ...change }, saved), {
+        headers: { 'If-Match': projectSettingsEntityTag(saved.version) },
+      })
+      projectSettings.receive(projectKey, answer)
+      queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
+    } catch (error) {
+      toast.add({ title: 'The project settings were not saved', description: errorMessage(error), color: 'error' })
+    }
+  })
+}
+
 const defaultTimeZone = computed({
   get: () => projectSettings.defaultTimeZone,
-  set: (value: string) => {
-    if (context.projectKey) {
-      projectSettings.update(context.projectKey, { defaultTimeZone: value })
-    }
-  },
+  set: (value: string) => writeSettings({ defaultTimeZone: value }),
 })
 
 const dateFormat = computed({
   get: () => projectSettings.dateFormat,
-  set: (value: DateFormat) => {
-    if (context.projectKey) {
-      projectSettings.update(context.projectKey, { dateFormat: value })
-    }
-  },
+  set: (value: DateFormat) => writeSettings({ dateFormat: value }),
 })
 const dateFormatOptions = dateFormatItems()
 
 const types = computed({
   get: () => projectSettings.current.types,
-  set: (value: TypeAppearances) => {
-    if (context.projectKey) {
-      projectSettings.update(context.projectKey, { types: value })
-    }
-  },
+  set: (value: TypeAppearances) => writeSettings({ types: value }),
 })
 const builtInTypes = resolveTypeAppearances()
 const hasPersonalTypes = computed(() => Object.keys(preferences.types).length > 0)

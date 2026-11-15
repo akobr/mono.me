@@ -23,9 +23,9 @@ describe('date format store (424-23)', () => {
     expect(formatDate(instant, 'UTC')).toBe('2026-10-03')
   })
 
-  it('applies the format of the project of the context', async () => {
+  it('applies the format of the project of the context, as the server sends it', async () => {
     const context = useContextStore()
-    useProjectSettingsStore().update('acme.billing', { dateFormat: 'dd.mm.yyyy' })
+    useProjectSettingsStore().receive('acme.billing', { Types: {}, DateFormat: 'dd.mm.yyyy', Version: 1 })
     useDateFormatStore()
 
     context.set({ org: 'acme', project: 'billing', view: 'default' })
@@ -39,7 +39,7 @@ describe('date format store (424-23)', () => {
 
   it('lets the personal format win until Preferences are reset', async () => {
     const context = useContextStore()
-    useProjectSettingsStore().update('acme.billing', { dateFormat: 'dd.mm.yyyy' })
+    useProjectSettingsStore().receive('acme.billing', { Types: {}, DateFormat: 'dd.mm.yyyy', Version: 1 })
     const preferences = usePreferencesStore()
     preferences.setDateFormat('mm/dd/yyyy')
     const store = useDateFormatStore()

@@ -3,19 +3,23 @@ import { readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
+import { projectSettingsFormat, validateProjectSettings } from '@42for.net/2splatform.sdk'
 import { getPath } from '@/mock/archive-names'
 import type { DocumentId } from '@/mock/documents'
 import { keyPattern } from '@/mock/key-values'
-import { buildShowcaseScope } from '@/mock/showcase'
+import { buildShowcaseScope, showcaseProjects } from '@/mock/showcase'
 import { showcaseKeyValues } from '@/mock/showcase/key-values'
 import { annotationDocument } from '@/mock/transfer-handlers'
+import { toApi } from '@/utils/project-settings'
 
 // The built-in data set showcase of DbCreator (424-252) is the fabrikam / invoicing-suite / default scope of the
 // showcase, written in the export's folder format: an annotation file per active annotation and the current version of
-// every document, as a Git export of the view gives them, and the current value of every pair that is not deleted in
-// key-values.json, as the key/value export gives them (424-265). The files are snapshots, so `npm test` fails when the
-// mock and the set part (CI writes no snapshot); regenerate them with `npx vitest run test/unit/mock/showcase-set.test.ts -u`
-// (the path first: -u takes a value) and delete the files the test reports as stale. Only set.json is written by hand.
+// every document, as a Git export of the view gives them, the current value of every pair that is not deleted in
+// key-values.json, as the key/value export gives them (424-265), and the project's settings (424-266) in
+// project-settings.json in their file shape (the Format marker, then PascalCase as the API stores them). The files are
+// snapshots, so `npm test` fails when the mock and the set part (CI writes no snapshot); regenerate them with
+// `npx vitest run test/unit/mock/showcase-set.test.ts -u` (the path first: -u takes a value) and delete the files the
+// test reports as stale. Only set.json is written by hand.
 
 const [org, project, view] = ['fabrikam', 'invoicing-suite', 'default']
 const setFolder = fileURLToPath(
@@ -67,13 +71,24 @@ function keyValuesDocument() {
 }
 
 /** The files of the set by path, as an export of the view writes them. */
+/** The settings of the project in the file shape: the Format marker, then the settings as the API stores them. */
+function settingsFile(): string {
+  const definition = showcaseProjects.find((candidate) => candidate.org === org && candidate.project === project)!
+  const check = validateProjectSettings(toApi(definition.settings))
+  if (!check.valid) {
+    throw new Error(`The settings of ${org}.${project} are not valid: ${check.problems[0]?.message}`)
+  }
+  return json({ Format: projectSettingsFormat, ...check.settings })
+}
+
+/** The files of the set by path, as an export of the view writes them, and the project's settings. */
 function setFiles(): Map<string, string> {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(clock)
   try {
     const scope = buildShowcaseScope(org, project, view)!
     const active = new Set(scope.annotations.map((annotation) => annotation.AnnotationKey))
-    const files = new Map<string, string>()
+    const files = new Map<string, string>([['project-settings.json', settingsFile()]])
     for (const annotation of scope.annotations) {
       files.set(getPath('Annotation', undefined, annotation.AnnotationKey), json(annotationDocument(annotation)))
     }

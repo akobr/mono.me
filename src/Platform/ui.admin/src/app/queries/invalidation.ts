@@ -139,6 +139,14 @@ export async function invalidateProject(client: QueryClient, key: string): Promi
   ])
 }
 
+/** The settings of a project (424-266), and the caller's projects, whose summaries carry them. */
+export async function invalidateProjectSettings(client: QueryClient, org: string, project: string): Promise<void> {
+  await Promise.all([
+    invalidateByPath(client, `/v1/${org}/${project}/settings`),
+    invalidateByPath(client, '/v1/access/projects'),
+  ])
+}
+
 /**
  * Every pair of the view, their versions and diffs; and the project's policy while the cached one has no Standard key:
  * the API records the key with the project's first Standard secret (424-167), and Settings shows it then.

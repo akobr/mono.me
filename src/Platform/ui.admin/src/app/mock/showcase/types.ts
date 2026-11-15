@@ -16,7 +16,7 @@ export interface ShowcaseOrganization {
   members: Members
 }
 
-/** The project settings the showcase writes into this browser when the dataset starts (settings.ts). */
+/** The project settings of a showcase project, which the seed stores on its access point (seed.ts, 424-266). */
 export interface ShowcaseSettings {
   types: TypeAppearances
   defaultTimeZone: string

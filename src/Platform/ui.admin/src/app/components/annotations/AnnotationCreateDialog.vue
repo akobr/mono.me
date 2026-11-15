@@ -40,6 +40,9 @@ const type = ref<AnnotationTypeCode>('exe')
 const parts = reactive<Record<Part, string>>({ subject: '', responsibility: '', context: '', unit: '', name: '' })
 const title = ref('')
 const timeZone = ref(projectSettings.defaultTimeZone)
+// Whether the zone was picked in this opening of the dialog: until then it follows the project's default, so a dialog
+// opened before the project settings arrive from the API moves to their zone (424-266).
+let timeZoneTouched = false
 const saving = ref(false)
 const failure = ref<string>()
 
@@ -47,8 +50,23 @@ watch(open, (value) => {
   if (value) {
     failure.value = undefined
     timeZone.value = projectSettings.defaultTimeZone
+    timeZoneTouched = false
   }
 })
+
+watch(
+  () => projectSettings.defaultTimeZone,
+  (zone) => {
+    if (open.value && !timeZoneTouched) {
+      timeZone.value = zone
+    }
+  },
+)
+
+function pickTimeZone(zone: string) {
+  timeZone.value = zone
+  timeZoneTouched = true
+}
 
 // Computed: the type names and icons follow the project settings and Preferences (424-13).
 const typeItems = computed(() =>
@@ -212,7 +230,7 @@ async function create() {
         </UFormField>
 
         <UFormField label="Time zone" help="Default from the project settings.">
-          <TimeZoneSelect v-model="timeZone" />
+          <TimeZoneSelect :model-value="timeZone" @update:model-value="pickTimeZone" />
         </UFormField>
 
         <div class="rounded-md border border-default bg-muted p-3 text-sm">
