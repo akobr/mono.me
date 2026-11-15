@@ -150,6 +150,21 @@ public partial class RouteTableTests
         routes.ShouldContain(expected);
     }
 
+    // The access audit trail of an organization or a project, beside its members and machine authentication; only a read.
+    [Fact]
+    public void AccessAuditRoute_IsRegistered_ForGetOnly()
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"))
+            .Where(route => route.EndsWith(" v1/access/points/{}/audit", StringComparison.Ordinal));
+
+        routes.ShouldBe(["GET v1/access/points/{}/audit"]);
+    }
+
     // "projects" is a literal segment under v1/access/; "access" is a reserved organization name.
     [Theory]
     [InlineData("PUT v1/access/points/{}")]

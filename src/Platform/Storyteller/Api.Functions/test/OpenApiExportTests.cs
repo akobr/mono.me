@@ -41,6 +41,7 @@ public class OpenApiExportTests
         Definitions.RouteIds.Access.GetMembers,
         Definitions.RouteIds.Access.SetMemberRole,
         Definitions.RouteIds.Access.RemoveMember,
+        Definitions.RouteIds.Access.GetAccessAudit,
         Definitions.RouteIds.Access.GetInvitations,
         Definitions.RouteIds.Access.CreateInvitation,
         Definitions.RouteIds.Access.ResendInvitation,

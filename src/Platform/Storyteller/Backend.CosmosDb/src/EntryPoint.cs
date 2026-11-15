@@ -144,6 +144,7 @@ public static class EntryPoint
                 $"{AccessAuditOptions.SectionName}:{nameof(AccessAuditOptions.RetentionDays)} must be between {AccessAuditOptions.MinRetentionDays} and {AccessAuditOptions.MaxRetentionDays}.")
             .ValidateOnStart();
         services.AddSingleton<AccessAuditRecords>();
+        services.AddSingleton<IAccessAuditLog, CosmosAccessAuditLog>();
 
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
