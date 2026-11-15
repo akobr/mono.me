@@ -633,8 +633,9 @@ public class MachineCreateCommandTests
         option.Template.ShouldBe("-m|--manage");
         option.OptionType.ShouldBe(CommandOptionType.MultipleValue);
         option.Description.ShouldBe(
-            "A management scope to grant: ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage."
-            + " Repeat it or separate the values with commas. Needs the Administrator role; never part of -r or -w.");
+            "A management scope to grant (for administrators)."
+            + " One of ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage;"
+            + " repeat it or separate the values with commas. Never part of -r or -w.");
     }
 
     [Fact]

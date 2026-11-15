@@ -12,7 +12,7 @@ using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.AccessPoints;
 
-[Command(CommandNames.GET, Description = "Get an access point with list of users and role. You need to be administrator or owner.")]
+[Command(CommandNames.GET, Description = "Get an access point with its users (for administrators).")]
 public class AccessPointGetCommand : BaseCommand
 {
     private readonly IAccessApiClient _accessApi;
