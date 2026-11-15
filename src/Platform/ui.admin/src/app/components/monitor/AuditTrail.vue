@@ -32,6 +32,7 @@ const operations = [
   'RecipientAdded',
   'RecipientChanged',
   'RecipientRemoved',
+  'ProjectSettingsChange',
 ]
 
 const view = ref('')

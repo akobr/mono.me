@@ -24,6 +24,8 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 const seeded = createSeed('default').accessPoints
+/** The settings of a project that has none (424-266), which every project summary carries. */
+const noSettings = { Types: {}, Version: 0 }
 
 /** A PUT with a body the SDK does not send. */
 const putBody = (key: string, body: string) =>
@@ -155,9 +157,19 @@ describe('PUT /access/points/{key}', () => {
 describe('GET /access/projects', () => {
   it('lists the projects of every role with their descriptions, ordered by key, without organizations', async () => {
     expect(await getProjects()).toEqual([
-      { Key: 'acme.billing', Role: 'Owner', Description: seeded['acme.billing']?.Description },
-      { Key: 'acme.shipping', Role: 'Contributor', Description: seeded['acme.shipping']?.Description },
-      { Key: 'northwind.portal', Role: 'Reader', Description: seeded['northwind.portal']?.Description },
+      { Key: 'acme.billing', Role: 'Owner', Description: seeded['acme.billing']?.Description, Settings: noSettings },
+      {
+        Key: 'acme.shipping',
+        Role: 'Contributor',
+        Description: seeded['acme.shipping']?.Description,
+        Settings: noSettings,
+      },
+      {
+        Key: 'northwind.portal',
+        Role: 'Reader',
+        Description: seeded['northwind.portal']?.Description,
+        Settings: noSettings,
+      },
     ])
   })
 
@@ -167,7 +179,11 @@ describe('GET /access/projects', () => {
 
     const projects = await getProjects()
     expect(projects.find((project) => project.Key === 'acme.billing')?.Description).toBe('Invoices of Acme.')
-    expect(projects.find((project) => project.Key === 'acme.returns')).toEqual({ Key: 'acme.returns', Role: 'Owner' })
+    expect(projects.find((project) => project.Key === 'acme.returns')).toEqual({
+      Key: 'acme.returns',
+      Role: 'Owner',
+      Settings: noSettings,
+    })
   })
 
   it('lists every showcase project with its description, in each of Ada’s roles', async () => {
@@ -192,6 +208,8 @@ describe('GET /access/projects', () => {
     await expect(getProjects()).rejects.toMatchObject({ status: 404, errorCode: 'NotFound' })
 
     await createAccount({ Organization: 'globex', Project: 'portal', ProjectDescription: 'The customer portal.' })
-    expect(await getProjects()).toEqual([{ Key: 'globex.portal', Role: 'Owner', Description: 'The customer portal.' }])
+    expect(await getProjects()).toEqual([
+      { Key: 'globex.portal', Role: 'Owner', Description: 'The customer portal.', Settings: noSettings },
+    ])
   })
 })

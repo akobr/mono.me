@@ -5,10 +5,13 @@ import {
   getConfigurationSchemas,
   getConfigurations,
   getDeletedAnnotations,
+  getProjectSettings,
+  getProjects,
   getTemplates,
   getViews,
   restoreAnnotations,
   roleRank,
+  validateProjectSettings,
   type AccountRole,
   type Annotation,
 } from '@42for.net/2splatform.sdk'
@@ -20,14 +23,13 @@ import { documentIds, getDocument } from '@/mock/documents'
 import { buildShowcaseScope, showcaseOrganizations, showcaseProjects, showcaseScope } from '@/mock/showcase'
 import type { ScopeBuild } from '@/mock/showcase/builder'
 import { people, type PersonaId } from '@/mock/showcase/people'
-import { writeShowcaseSettings } from '@/mock/showcase/settings'
 import type { ShowcaseProject } from '@/mock/showcase/types'
 import { environmentViewNames } from '@/mock/showcase/views'
 import { codeOfKey, getAllAncestors, isValidAnnotationKey, typeCodes } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
 import { annotationStatus, type AnnotationStatus } from '@/utils/annotation-status'
 import { isDateFormat } from '@/utils/dates'
-import { useProjectSettingsStore } from '@/stores/project-settings'
+import { fromApi, toApi } from '@/utils/project-settings'
 import { sanitizeTypeAppearances } from '@/utils/type-appearance'
 import { mockDatasets } from '../../../build/mock-dataset.ts'
 import { unseededShowcaseDb } from './showcase/support'
@@ -201,16 +203,18 @@ describe('the showcase dataset', () => {
     })
   })
 
-  it('writes the settings of the showcase projects, keeps the others, and updates an open page', () => {
-    localStorage.setItem(
-      '2s-admin:project-settings',
-      JSON.stringify({ 'acme.billing': { defaultTimeZone: 'Asia/Tokyo' } }),
-    )
-    const settings = useProjectSettingsStore()
-    writeShowcaseSettings()
+  it('keeps the settings of every project on its access point and serves them through the mock API', async () => {
+    for (const project of showcaseProjects) {
+      const settings = db.accessPoints[projectKeyOf(project)]?.Settings
+      expect(settings?.Version, project.project).toBe(1)
+      expect(fromApi(settings), project.project).toMatchObject(project.settings)
+    }
 
-    expect(settings.settingsOf('fabrikam.invoicing-suite').types.sbt?.label).toBe('Customer')
-    expect(settings.settingsOf('acme.billing').defaultTimeZone).toBe('Asia/Tokyo')
+    const served = await getProjectSettings('fabrikam', 'invoicing-suite')
+    expect(served).toMatchObject({ DefaultTimeZone: 'Europe/Oslo', DateFormat: 'dd.mm.yyyy', Version: 1 })
+    expect(served.Types?.sbt).toEqual({ Label: 'Customer', Color: 'blue', Icon: 'i-lucide-building-2' })
+    const listed = (await getProjects()).find((summary) => summary.Key === 'fabrikam.invoicing-suite')
+    expect(listed?.Settings).toEqual(served)
   })
 })
 
@@ -357,5 +361,7 @@ describe.each(showcaseProjects.map((project) => [project.project, project] as co
     expect(Object.keys(project.settings.types).length).toBeGreaterThanOrEqual(5)
     expect(isValidTimeZone(project.settings.defaultTimeZone)).toBe(true)
     expect(isDateFormat(project.settings.dateFormat)).toBe(true)
+    // and the API takes them as they are
+    expect(validateProjectSettings(toApi(project.settings)).problems).toEqual([])
   })
 })

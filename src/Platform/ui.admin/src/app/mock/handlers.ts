@@ -7,6 +7,7 @@ import {
   type PathParams,
 } from 'msw'
 import type {
+  AccessPoint,
   AccessPointCreate,
   AccessPointUpdate,
   AccountCreate,
@@ -23,6 +24,7 @@ import { accountTarget, recordAccessAudit } from './access-audit'
 import { stamp } from './audit'
 import { loadDb, saveDb, type MockDb } from './db'
 import { mockStepUpConfiguration } from './step-up'
+import { projectSettingsOf } from './project-settings'
 
 // Hand-written handlers for the operations the mock scenarios need to be coherent (accounts, access points,
 // views, …). Every other operation falls through to the Orval-generated Faker handlers.
@@ -61,6 +63,10 @@ export const withDb =
   }
 
 const namePattern = /^[a-z0-9][a-z0-9-]{1,62}$/
+
+/** An access point as the API answers it: a project with its settings, the defaults when they were never set (424-266). */
+const pointOf = (db: MockDb, point: AccessPoint): AccessPoint =>
+  point.Key?.includes('.') ? { ...point, Settings: projectSettingsOf(db, point.Key) } : point
 
 /** The description of a project as the API stores it: trimmed, and a blank one is none. */
 const normalizeDescription = (description: string | undefined | null) => description?.trim() || undefined
@@ -189,7 +195,7 @@ export const accessHandlers: HttpHandler[] = [
         [org]: db.account!.AccessMap?.[org] ?? 'Owner',
         [projectKey]: 'Owner',
       }
-      return HttpResponse.json(db.accessPoints[projectKey], { status: 201 })
+      return HttpResponse.json(pointOf(db, db.accessPoints[projectKey]!), { status: 201 })
     }),
   ),
 
@@ -198,7 +204,8 @@ export const accessHandlers: HttpHandler[] = [
     withDb((db, { params }) => {
       const key = String(params.key)
       return (
-        requireRole(db, key, 'Administrator') ?? HttpResponse.json(db.accessPoints[key] ?? { Key: key, AccessMap: {} })
+        requireRole(db, key, 'Administrator') ??
+        HttpResponse.json(pointOf(db, db.accessPoints[key] ?? { Key: key, AccessMap: {} }))
       )
     }),
   ),
@@ -229,7 +236,7 @@ export const accessHandlers: HttpHandler[] = [
       if (before !== point.Description) {
         recordAccessAudit(db, key, { Action: 'AccessPointUpdated', OldValue: before, NewValue: point.Description })
       }
-      return HttpResponse.json(point)
+      return HttpResponse.json(pointOf(db, point))
     }),
   ),
 
@@ -244,7 +251,12 @@ export const accessHandlers: HttpHandler[] = [
       const projects: ProjectSummary[] = Object.entries(db.account.AccessMap ?? {})
         .filter(([key, role]) => key.includes('.') && roleRank(role) > roleRank('None') && db.accessPoints[key])
         .toSorted(([left], [right]) => (left < right ? -1 : 1))
-        .map(([key, role]) => ({ Key: key, Role: role, Description: db.accessPoints[key]?.Description }))
+        .map(([key, role]) => ({
+          Key: key,
+          Role: role,
+          Description: db.accessPoints[key]?.Description,
+          Settings: projectSettingsOf(db, key),
+        }))
       return HttpResponse.json(projects)
     }),
   ),

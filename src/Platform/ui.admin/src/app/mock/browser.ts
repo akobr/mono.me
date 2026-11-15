@@ -1,5 +1,5 @@
 import { setupWorker } from 'msw/browser'
-import type { MachineAccess } from '@42for.net/2splatform.sdk'
+import type { MachineAccess, ProjectSettingsMergePatch } from '@42for.net/2splatform.sdk'
 import { getStorytellerMock } from '@42for.net/2splatform.sdk/msw'
 import { clearCatalogSnapshots } from '@/stores/catalog'
 import { accountActor } from './audit'
@@ -17,6 +17,12 @@ import { getDocument, latest, putVersion, type ScopeRef } from './documents'
 import { mockHandlers } from './all-handlers'
 import { writeShowcaseSettings } from './showcase/settings'
 import { setStaleSignIn } from './step-up'
+import {
+  invalidSettingsMessage,
+  patchProjectSettings,
+  projectSettingsOf,
+  storeProjectSettings,
+} from './project-settings'
 
 declare global {
   interface Window {
@@ -33,6 +39,8 @@ declare global {
        * the mock sign-in with maxAge (424-264).
        */
       staleSignIn: (stale?: boolean) => void
+      /** Merges a patch into a project's settings as another user, like a concurrent change (E2E 412 flow, 424-266). */
+      changeProjectSettings: (projectKey: string, patch: ProjectSettingsMergePatch) => void
     }
   }
 }
@@ -40,13 +48,11 @@ declare global {
 const defaultScope: ScopeRef = { org: 'acme', project: 'billing', view: 'default' }
 
 /**
- * A dataset starts: no catalog snapshot of another dataset shows for a scope of the same name, and the showcase brings
- * the names, colors and icons of its projects' types.
+ * A dataset starts: no catalog snapshot of another dataset shows for a scope of the same name. The settings of the
+ * projects (the showcase's type names, colors and icons) are part of its seed, on the access points (424-266).
  */
-async function startDataset(db: MockDb): Promise<void> {
-  if (db.scenario === 'showcase') {
-    writeShowcaseSettings()
-  }
+async function startDataset(scenario?: MockScenario): Promise<void> {
+  resetDb(scenario)
   await clearCatalogSnapshots()
 }
 
@@ -54,14 +60,14 @@ async function startDataset(db: MockDb): Promise<void> {
 export async function startMockApi(): Promise<void> {
   // The seed is stored at once, so a reload keeps the dataset (and its timestamps) until it is reset.
   if (applyStartScenario(launchScenario(import.meta.env.VITE_MOCK_DATASET))) {
-    await startDataset(resetDb())
+    await startDataset()
   }
   const worker = setupWorker(...mockHandlers, ...getStorytellerMock())
 
   await worker.start({ onUnhandledRequest: 'bypass', quiet: true, serviceWorker: { url: '/mockServiceWorker.js' } })
 
   window.storytellerMock = {
-    reset: (scenario) => void startDataset(resetDb(scenario)),
+    reset: (scenario) => void startDataset(scenario),
     changeConfiguration: (key, changes, scope = defaultScope) => {
       const db = loadDb()
       const id = `configuration:${key}` as const
@@ -80,5 +86,14 @@ export async function startMockApi(): Promise<void> {
       saveDb(db)
     },
     staleSignIn: (stale = true) => setStaleSignIn(stale),
+    changeProjectSettings: (projectKey, patch) => {
+      const db = loadDb()
+      const result = patchProjectSettings(projectSettingsOf(db, projectKey), patch as Record<string, unknown>)
+      if (!result.valid) {
+        throw new Error(invalidSettingsMessage(result.problems))
+      }
+      storeProjectSettings(db, projectKey, result.settings, accountActor('user_01MOCKGRACE'))
+      saveDb(db)
+    },
   }
 }

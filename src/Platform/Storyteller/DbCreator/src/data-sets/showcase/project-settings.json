@@ -1,0 +1,42 @@
+{
+  "Format": "2s.project-settings.v1",
+  "Types": {
+    "rst": {
+      "Label": "Module",
+      "Color": "violet",
+      "Icon": "i-lucide-puzzle"
+    },
+    "unt": {
+      "Label": "Job",
+      "Color": "fuchsia",
+      "Icon": "i-lucide-clock"
+    },
+    "sbt": {
+      "Label": "Customer",
+      "Color": "blue",
+      "Icon": "i-lucide-building-2"
+    },
+    "usg": {
+      "Label": "Contract",
+      "Color": "amber",
+      "Icon": "i-lucide-file"
+    },
+    "cnt": {
+      "Label": "Environment",
+      "Color": "teal",
+      "Icon": "i-lucide-server"
+    },
+    "exe": {
+      "Label": "Deployment",
+      "Color": "emerald",
+      "Icon": "i-lucide-rocket"
+    },
+    "uxe": {
+      "Label": "JobRun",
+      "Color": "orange",
+      "Icon": "i-lucide-workflow"
+    }
+  },
+  "DefaultTimeZone": "Europe/Oslo",
+  "DateFormat": "dd.mm.yyyy"
+}

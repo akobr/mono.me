@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { AxeBuilder } from '@axe-core/playwright'
-import type { MachineAccess } from '@42for.net/2splatform.sdk'
+import type { MachineAccess, ProjectSettingsMergePatch } from '@42for.net/2splatform.sdk'
 
 export type MockScenario = 'default' | 'new-user' | 'invited' | 'large' | 'showcase'
 
@@ -15,6 +15,8 @@ declare global {
       setExhibition: (value: { Organization: string; Project: string } | null) => void
       /** Makes the sign-in stale (false: recent): the guarded operations answer the step-up 401 until the step-up. */
       staleSignIn: (stale?: boolean) => void
+      /** Merges a patch into a project's settings as another user, like a concurrent change (424-266). */
+      changeProjectSettings: (projectKey: string, patch: ProjectSettingsMergePatch) => void
     }
   }
 }

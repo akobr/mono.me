@@ -44,11 +44,14 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
 
         var result = await SeedAsync(new DataSetSeedRequest { Sets = ["showcase"], Organization = organization }, services);
 
-        // every file is created, in the summary of its folder's kind; the counts come from the folder, which the admin
-        // UI's test/unit/mock/showcase-set.test.ts writes, so a change of the mock needs none here
-        var files = DataSetFolder.GetEntries(new FileSystem(), result.Set.Folder);
+        // every file is created, in the summary of its folder's kind, except project-settings.json, the settings of the
+        // project (424-266), which is no document and which the seed does not read yet; the counts come from the folder,
+        // which the admin UI's test/unit/mock/showcase-set.test.ts writes, so a change of the mock needs none here
+        var files = DataSetFolder.GetEntries(new FileSystem(), result.Set.Folder)
+            .Where(file => file.Path != "project-settings.json")
+            .ToList();
         result.Lines.ShouldBeNull();
-        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = files.Count });
+        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = files.Count, IgnoredFiles = 1 });
         result.Documents.Summaries.Single(summary => summary.Content == ViewArchiveContent.Annotations).Created.ShouldBeGreaterThan(0);
         result.Documents.Summaries
             .Where(summary => summary.Created > 0)
