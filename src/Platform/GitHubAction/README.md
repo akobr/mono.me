@@ -61,6 +61,8 @@ Inputs never reach a script through `${{ inputs.* }}`: every step gets them in `
 
 Credentials are not inputs. `sform` reads them from the environment of the job or of the step, as described in [Sign in from a pipeline](https://42for.net/cli/sform#sign-in-from-a-pipeline): a certificate (`STORYTELLER_CLIENT_CERTIFICATE` and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD`), a federated machine (`client-id` with `permissions: id-token: write`), `STORYTELLER_API_KEY` or client credentials.
 
+The job signs in as a machine, so the API's step-up never stops it. The person who creates the machine, resets its key or replaces its federation rules needs a recent sign-in (the last 10 minutes by default): an older session ends `sform` with exit code `44` and `StepUpRequired`, and [Sign in](https://42for.net/cli/sform#sign-in) says how to sign in again ([Recent sign-in](../../../docs/Platform/Storyteller/authentication.md#recent-sign-in-step-up)).
+
 For a configuration with secrets, a certificate machine over mTLS is the recommendation (see [Secrets need more than a credential](#secrets-need-more-than-a-credential)). The workflow writes its `.pfx` file from a secret under `$RUNNER_TEMP`:
 
 ```yaml
@@ -116,7 +118,7 @@ Without `Secrets.Read` or such a sign-in, the API withholds the secrets (`X-2S-S
 `sform account machine create` without `-k` creates the default kind of the project, which is `ApiKey` unless an Administrator changed it (`MachineAuth:DefaultCredentialKind` for a project without a stored policy). So a certificate machine takes `-k certificate`, and the project enables the kind first. Once:
 
 1. An Administrator enables `Certificate` for the project. `sform account machine machine-auth` prints the policy. With `-k` it sets the whole policy, so name the kinds it printed, the default kind first, add `-k certificate`, and add `-l` when the project has a certificate lifetime of its own.
-2. A user with the `ContributorWithSecrets` role creates the machine with `Secrets.Read` and writes its certificate to a file. `machine create` prints the password of the certificate once.
+2. A user with the `ContributorWithSecrets` role creates the machine with `Secrets.Read` and writes its certificate to a file. `machine create` prints the password of the certificate once. Creating the machine needs a recent sign-in of that user (the last 10 minutes by default): an older session ends with exit code `44` and `StepUpRequired`, and [Sign in](https://42for.net/cli/sform#sign-in) says how to sign in again.
 3. The repository gets two secrets: `STORYTELLER_CERTIFICATE_BASE64`, the file in base64 on one line, and `STORYTELLER_CERTIFICATE_PASSWORD`, the password. Then delete the file.
 
 ```bash

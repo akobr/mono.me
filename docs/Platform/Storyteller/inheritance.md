@@ -337,13 +337,14 @@ A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, ov
   With `Version`, `Hash` and `Content` hashed together, the tag follows every field of the body that can change.
 - **`Modified`.** Not hashed in `e`, `r`, `b` and `d`. Past version 0 it changes only with `Version`. A configuration without an item gets `Modified` set to the time of the read, which would defeat every revalidation. The `c` tag hashes the stamps of the merged documents: a stored document's stamp changes only with its version, and a `Missing` one has none.
 - **The full key.** The same document under another key gets another tag, so nobody can make the server compute someone else's tag in their own configuration.
-- **The secret rights.** There are four values:
+- **The secret rights.** There are five values:
   - the caller may read secrets;
   - secrets are withheld from a machine with `Secrets.Read` that has no mTLS, which also gets `X-2S-Secrets-Withheld: mtls-required`;
   - secrets that the role gives are withheld from a user by the [actor](access.md#actors) the token acts through (`NoSecretReveal`); the user also gets `X-2S-Secrets-Withheld: actor-restricted`;
+  - secrets that the role gives are withheld from a user whose sign-in is not recent ([step-up](authentication.md#recent-sign-in-step-up), `Auth:StepUp`); the user also gets `X-2S-Secrets-Withheld: step-up-required`;
   - none of these.
 
-  Callers with different rights never share a resolved tag.
+  Callers with different rights never share a resolved tag, so the first read after a new sign-in answers `200` with the secrets, never a `304` of the tag without them.
 - **The representation.** A read with `?format=flat`, `properties`, `env` or `yaml` ([configuration-formats.md](configuration-formats.md#the-api)) hashes one more input after `Content`: the canonical name of the format and `ConfigurationFormatter.Version`, for example `env/1`. Never the raw query value, so `?format=ENV` and `?format=env` share a tag. Each format therefore has its own `e`, `r` and `b` tags, and through the `r` tag its own `d` tags; a tag of one format never answers another, or the envelope, with 304. A release that changes the bytes of a format bumps `Version` and changes every tag of the formatted reads, so a poller never gets a stale 304 after a deploy. The envelope (no `format`, an empty one or `json`) hashes no representation, so its tags are the ones it had before the formats.
 
 ### The resolved read
@@ -393,7 +394,7 @@ The headers are the same on a 200 and a 304, and are never sent on a 400, 404 or
 | --- | --- |
 | `ETag` | The tag; a 304 from a manifest sends its weak tag also when the client sent the strong form |
 | `Cache-Control` | `no-store` when the caller may read secrets (resolved read). Otherwise `private, no-cache`: shared caches do not store the response, and a browser revalidates its copy before each use. |
-| `X-2S-Secrets-Withheld` | When secrets were withheld (resolved read): `mtls-required` from a machine without mTLS, `actor-restricted` from a user by the actor the token acts through (`NoSecretReveal`, see [Actors](access.md#actors)) |
+| `X-2S-Secrets-Withheld` | When secrets were withheld (resolved read), one value: `mtls-required` from a machine without mTLS, `actor-restricted` from a user by the actor the token acts through (`NoSecretReveal`, see [Actors](access.md#actors)), `step-up-required` from a user whose sign-in is older than `Auth:StepUp:MaxAge` (sign in again, see [Recent sign-in](authentication.md#recent-sign-in-step-up)). The actor comes before the step-up, because a new sign-in does not lift its restriction |
 
 The admin UI calls the API cross-origin. It cannot read the `ETag`, but the browser revalidates on its own and turns a 304 back into the stored 200.
 

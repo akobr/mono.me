@@ -61,6 +61,17 @@ param exhibitionProject string
 @description('The id of the account that owns the exhibition project: the --owner of its seed.')
 param exhibitionOwner string
 
+@description('Auth__StepUp__Enabled, \'true\' or \'false\'; the setting is left out while it is empty, and the API decides (on under AuthKit).')
+@allowed([
+  ''
+  'true'
+  'false'
+])
+param stepUpEnabled string
+
+@description('Auth__StepUp__MaxAge as a TimeSpan (hh:mm:ss, 1.00:00:00 for 24 hours); the setting is left out while it is empty (00:10:00).')
+param stepUpMaxAge string
+
 @description('The machine credential kinds turned off until mTLS exists.')
 param disabledCredentialKinds string[]
 
@@ -152,6 +163,11 @@ var exhibitionSettings = empty(exhibitionOrganization) || empty(exhibitionProjec
       Exhibition__Owner: exhibitionOwner
     }
 
+// The step-up of users (Auth:StepUp): only what is set, so the API's defaults apply otherwise.
+var stepUpEnabledSetting = empty(stepUpEnabled) ? {} : { Auth__StepUp__Enabled: stepUpEnabled }
+
+var stepUpMaxAgeSetting = empty(stepUpMaxAge) ? {} : { Auth__StepUp__MaxAge: stepUpMaxAge }
+
 resource plan 'Microsoft.Web/serverfarms@2025-03-01' = {
   name: planName
   location: location
@@ -235,7 +251,7 @@ resource site 'Microsoft.Web/sites@2025-03-01' = {
 resource appSettings 'Microsoft.Web/sites/config@2025-03-01' = {
   parent: site
   name: 'appsettings'
-  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting, sentryDsnSetting, exhibitionSettings)
+  properties: union(baseSettings, disabledKindSettings, authKitClientIdSetting, authKitDomainSetting, authKitApiKeySetting, byokSetting, sentryDsnSetting, exhibitionSettings, stepUpEnabledSetting, stepUpMaxAgeSetting)
 }
 
 resource scmCredentials 'Microsoft.Web/sites/basicPublishingCredentialsPolicies@2025-03-01' = {

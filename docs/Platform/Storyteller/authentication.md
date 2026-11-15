@@ -93,7 +93,7 @@ An invalid token gets **401**. If the JWKS cannot be fetched, the response is **
 
 Supporting impersonation would be a decision of its own. It would need `act.sub` as the `Via` of the [audit stamps](audit-stamps.md#the-actor), no secret read or write for the session (as the [restrictions of actors](#restrictions-of-actors) withhold them), and a log of every request. Until then, keep impersonation off in the WorkOS dashboard (see [AuthKit dashboard setup](#authkit-dashboard-setup)).
 
-Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens), of federated machines and of the [user token exchange](#user-token-exchange), are the exception: their signature, issuer, audience and lifetime are always checked, and so are the actor and the restrictions of a user token. A provider token issued to an actor of the exchange is refused in every build too (see [Storyteller user tokens](#storyteller-user-tokens)). The refusal of an AuthKit token with `act` is part of the validator, so Debug builds do not apply it. For users, Debug builds also skip the `User.Impersonation` check and the project role check, so they also serve requests without an identity, which become `System`. The view transfer routes are the exception: they answer `401` to a request without credentials in every build. The checks of machines (the machine document, the credential policy, the annotation restriction and the [scopes](#scopes-of-machines), stored and carried), including the per-call checks of federated machines, run in every build, and so do the refusal of machines on the routes for users only and the [restrictions of actors](#restrictions-of-actors).
+Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens), of federated machines and of the [user token exchange](#user-token-exchange), are the exception: their signature, issuer, audience and lifetime are always checked, and so are the actor and the restrictions of a user token. A provider token issued to an actor of the exchange is refused in every build too (see [Storyteller user tokens](#storyteller-user-tokens)). For users, Debug builds also skip the `User.Impersonation` check and the project role check, so they also serve requests without an identity, which become `System`. The view transfer routes are the exception: they answer `401` to a request without credentials in every build. The checks of machines (the machine document, the credential policy, the annotation restriction and the [scopes](#scopes-of-machines), stored and carried), including the per-call checks of federated machines, run in every build, and so do the refusal of machines on the routes for users only and the [restrictions of actors](#restrictions-of-actors). The [step-up](#recent-sign-in-step-up) is off in Debug builds unless `Auth:StepUp:Enabled` is set; set, it decides in every build.
 
 ## How Keycloak tokens are checked
 
@@ -135,7 +135,7 @@ AuthKit claims are mapped to the Entra-style claims the endpoints already read.
 | `name` | `name`, else `first_name` + `last_name`, else `given_name` + `family_name`, else `email`. Blank values are skipped. |
 | `preferred_username` | `preferred_username`, else `email`. |
 | `scp` | `DefaultUserScopes` plus each `permissions` entry mapped through `PermissionMap`, as one space-separated value. For a user only `User.Impersonation` counts. |
-| `org_id`, `sid`, `permissions`, `role`, … | Passed through unchanged. |
+| `auth_time`, `org_id`, `sid`, `permissions`, `role`, … | Passed through unchanged. `auth_time` is the time of the person's last active sign-in, which the [step-up](#recent-sign-in-step-up) judges. |
 | `act` | None: a user token with `act` is refused ([How AuthKit tokens are checked](#how-authkit-tokens-are-checked)). |
 
 Any `scp`, `roles` or `azp` claim in the token itself is dropped, so a JWT template cannot grant scopes directly. Permissions without a `PermissionMap` entry grant nothing, and slug lookup is case-sensitive.
@@ -152,7 +152,7 @@ Keycloak claims are mapped the same way, from the token alone:
 | `name` | `name`, else `given_name` + `family_name`, else `preferred_username`, else `email`. Blank values are skipped. |
 | `preferred_username` | `preferred_username`, else `email`. |
 | `scp` | `DefaultUserScopes` plus the `RoleMap` entries of the token's realm roles (`realm_access.roles`, by name) and client roles (`resource_access.{client}.roles`, as `{client}:{role}`), as one space-separated value. For a user only `User.Impersonation` counts. |
-| `azp`, `email`, `email_verified`, … | Passed through unchanged. |
+| `azp`, `auth_time`, `email`, `email_verified`, … | Passed through unchanged. Keycloak puts `auth_time` into access tokens through the `basic` client scope. |
 
 Any `scp`, `roles` or `…/scope` claim in the token itself is dropped, so a token mapper cannot grant scopes directly. Roles without a `RoleMap` entry (`default-roles-{realm}`, `offline_access`, `account:manage-account`, …) grant nothing, and role lookup is case-sensitive. Keycloak has no profile lookup, so registration needs `preferred_username` or `email` in the token (see [Registering a Keycloak user](#registering-a-keycloak-user)).
 
@@ -178,6 +178,19 @@ Whoever can change a person's email at the identity provider can then sign in as
   ```
 
 * **Known false positives.** A rename at the provider is logged too, until the stored name matches again: an Entra ID UPN change, a Keycloak user name the realm lets its users choose, a new email of a WorkOS user. So is the base account that DbCreator seeds with its built-in user name, when the owner signs in under another email. Nothing updates `UserName` today, so such a log repeats at each check.
+
+### The time of the sign-in
+
+`auth_time` is when the person last signed in actively, in Unix seconds. A refresh of the token does not move it. Every user validator keeps it under its own name, and the [step-up](#recent-sign-in-step-up) reads it from the claims of the request:
+
+| Token | `auth_time` |
+| --- | --- |
+| AuthKit | In every access token. Only an active authentication moves it. |
+| Keycloak | In access tokens through the `basic` client scope, which also gives `sub`. |
+| Entra ID | Not in access tokens by default: it is a claim of ID tokens. A token that carries it keeps the name, because the inbound claim mapping of the validator has no entry for it. |
+| [Storyteller user token](#storyteller-user-tokens) | Copied from the subject token at the exchange, when it has one. The validator of the API turns it into the claim `auth_time`. |
+
+A value that is not a non-negative integer counts as none.
 
 ## Scopes for users
 
@@ -221,6 +234,7 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
 7. For the admin UI, register its Redirect URI (`/callback`), its default Sign-out URI (`/login`) and its CORS origin in the same environment, as the [WorkOS dashboard checklist](../../../src/Platform/ui.admin/README.md#workos-dashboard-checklist) of the admin UI lists them. Without the Sign-out URI, a sign-out ends on WorkOS' error page `app-homepage-url-not-found`.
 8. Keep **user impersonation** off in every environment: Authentication → Features, the "User impersonation" card. It is off by default, it is set per environment, and only a dashboard Admin can turn it on. The API refuses impersonation tokens anyway ([How AuthKit tokens are checked](#how-authkit-tokens-are-checked)), but other applications of the environment may not.
 9. Keep the dashboard team small. Name one or two members, give each the least role, and require MFA for each, or SSO whose identity provider enforces MFA. A member can change a user's email or delete their MFA factors and then sign in as that user. The [user name check](#changed-user-names) logs such a change, and [Who can sign in as a user](../Deployment/decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary) describes the trust boundary.
+10. Set **multi-factor authentication** to **Required** in the production environment, as the [MFA policy](#mfa-policy) asks. Leave it off in an environment whose automation pools sign in with passwords, such as staging.
 
 ## Discovery endpoint
 
@@ -228,16 +242,17 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
 
 ```json
 { "Provider": "EntraId", "ClientId": "303a7632-…", "TenantId": "common",
-  "Scopes": [ "api://303a7632-…/User.Impersonation" ], "TokenExchange": { "Enabled": false } }
+  "Scopes": [ "api://303a7632-…/User.Impersonation" ], "TokenExchange": { "Enabled": false },
+  "StepUp": { "Enabled": false, "MaxAge": 600 } }
 
 { "Provider": "AuthKit", "ClientId": "client_01H…", "AuthKitDomain": "https://example.authkit.app",
-  "TokenExchange": { "Enabled": true } }
+  "TokenExchange": { "Enabled": true }, "StepUp": { "Enabled": true, "MaxAge": 600 } }
 
 { "Provider": "Keycloak", "ClientId": "storyteller-ui", "Issuer": "https://keycloak.example.com/realms/storyteller",
-  "TokenExchange": { "Enabled": true } }
+  "TokenExchange": { "Enabled": true }, "StepUp": { "Enabled": false, "MaxAge": 600 } }
 ```
 
-`AuthKitDomain` is left out when it is not configured. Under Keycloak, `ClientId` is `Auth:Keycloak:ClientId`, or an empty string when it is not set, and `Issuer` is the realm, whose OpenID metadata names the sign-in endpoints. `TokenExchange.Enabled` tells whether the [user token exchange](#user-token-exchange) is on; which actors may use it is not published. Send the request without an `Authorization` header: an invalid bearer token is rejected with 401 before any endpoint runs.
+`AuthKitDomain` is left out when it is not configured. Under Keycloak, `ClientId` is `Auth:Keycloak:ClientId`, or an empty string when it is not set, and `Issuer` is the realm, whose OpenID metadata names the sign-in endpoints. `TokenExchange.Enabled` tells whether the [user token exchange](#user-token-exchange) is on; which actors may use it is not published. `StepUp` is the [step-up](#recent-sign-in-step-up) of this build and provider: `Enabled`, and `MaxAge`, the seconds a sign-in counts. Clients show the window with it and can tell a stale session before they call; the API still decides each request. Send the request without an `Authorization` header: an invalid bearer token is rejected with 401 before any endpoint runs.
 
 ## OpenAPI and Swagger UI
 
@@ -327,6 +342,7 @@ curl -X POST "$API/v1/access/account" -H "Authorization: Bearer $TOKEN" -H "Cont
 * If the user belongs to several WorkOS organizations, `sform` lists them and continues with the chosen one.
 * The session (access token, refresh token, user, organization) is stored in `~/.42for.net/authkit.cache`, encrypted with DPAPI on Windows, the Keychain on macOS and libsecret on Linux.
 * An access token is reused until 60 seconds before it expires. Then the refresh token is exchanged and the stored one replaced, because WorkOS rotates refresh tokens. A file lock (`authkit.cache.lockfile`) keeps two `sform` processes from using the same refresh token. If WorkOS rejects the refresh token, the session is deleted and `sform account` asks for a new sign-in.
+* A refresh keeps the time of the sign-in (`auth_time`), so the operations that need a [recent sign-in](#recent-sign-in-step-up) refuse a session older than the window, however fresh its token. The device flow takes no `max_age`, and `sform account logout` clears only the local session; see [The clients](#the-clients) for the way to sign in again.
 
 Entra ID sign-in still uses MSAL with the cache in `~/.42for.net/msal.cache`. The same directory keeps `telemetry.json`, the random installation id of the anonymous usage data `sform` sends to PostHog. It is not a secret and is not protected; [the telemetry section of the sform page](https://42for.net/cli/sform#telemetry) lists what is sent and how to turn it off.
 
@@ -589,6 +605,7 @@ The [MCP server](mcp.md) acts for the person signed in to an AI assistant, under
 - The person needs a Storyteller account first: a sign-in without an account is refused with "No Storyteller account exists for this sign-in. Register once with sform or the admin UI."
 - The API trusts the MCP server only as an actor of `Auth:TokenExchange:Actors`, and only with tokens issued to it: their `aud` must be one of the actor's `SubjectAudiences`. The MCP server logs the values to list once at start: "The API's Auth:TokenExchange:Actors entry 'mcp' must list these SubjectAudiences: …".
 - An actor gets `NoSecretReveal` unless it sets `AllowSecrets`, so by default the API refuses every secret read through the MCP server, whatever the person's role, and the MCP server hides its secret tools (see [Restrictions of actors](#restrictions-of-actors)).
+- The Storyteller user token carries the time of the person's sign-in at the MCP client, so the [step-up](#recent-sign-in-step-up) judges it as for a direct call: once the window has passed, secret writes and machine credentials through the MCP server answer `401 StepUpRequired`.
 - `Mcp:Provider` names the same provider as `Auth:Provider`.
 
 | Provider | The person signs in to the MCP server at | What the API needs |
@@ -604,6 +621,107 @@ Under Entra ID:
 - The MCP server serves one tenant, so a B2B guest of that tenant reaches the account of its guest object there, `{tid}:{oid}` of that tenant (see [MCP Server](mcp.md#entra-id)).
 
 The settings of the MCP server, its sign-in per provider and its actor credential are described in [MCP Server](mcp.md).
+
+## Recent sign-in (step-up)
+
+A valid session is not enough for what an attacker wants most: secret values, roles and machine credentials. For these operations the API also needs a recent sign-in of the user ([RFC 9470](https://www.rfc-editor.org/rfc/rfc9470)): the [`auth_time`](#the-time-of-the-sign-in) of the token must be at most `Auth:StepUp:MaxAge` old, 10 minutes by default. A refresh of the token keeps `auth_time`, so a refresh token taken from a browser, or a long-lived session of `sform` or the MCP server, no longer reaches them once the window has passed. Everything else keeps working with the session. Machines are never affected.
+
+### Settings of the step-up
+
+| Key | Default | Notes |
+| --- | --- | --- |
+| `Auth:StepUp:Enabled` (`Auth__StepUp__Enabled`) | on under AuthKit; off under Entra ID and Keycloak; off in Debug builds | `true` turns the step-up on for any provider and build, `false` turns it off. On, a user token without `auth_time` never counts as a recent sign-in: under Entra ID that is every user, unless their access tokens carry it. |
+| `Auth:StepUp:MaxAge` (`Auth__StepUp__MaxAge`) | `00:10:00` | The oldest sign-in that still counts, as a `TimeSpan` from `00:01:00` to 24 hours (`1.00:00:00`), in whole seconds. It binds as `[d.]hh:mm:ss`, so a bare `600` is 600 days and `24:00:00` is 24 days; the host then does not start, and the message names the format. |
+
+Both are bound and checked at start. The defaults follow what the provider's tokens carry and what its clients can do:
+
+- **AuthKit** is on: every access token carries `auth_time`, and the admin UI asks AuthKit for a new sign-in with `max_age`.
+- **Entra ID** is off: its access tokens carry no `auth_time`. Its own step-up is Conditional Access with authentication contexts, which the API does not use.
+- **Keycloak** is off: its access tokens carry `auth_time`, but no client of the platform signs in with Keycloak yet, so none could ask for a new sign-in.
+- **Debug builds** (`DEV_AUTH`) leave it off whatever the provider, as they skip the other checks of users. A set `Enabled` decides in every build, so a local API can try the step-up against AuthKit staging.
+
+The [discovery endpoint](#discovery-endpoint) publishes the outcome for this build and provider as `"StepUp": { "Enabled": true, "MaxAge": 600 }`, the window in seconds, so clients can show it and tell a stale session before they call.
+
+The deployment sets both through optional Bicep parameters, `stepUpEnabled` and `stepUpMaxAge` ([`src/Platform/Deployment`](../../../src/Platform/Deployment/README.md#parameters)), so a changed window, or the escape hatch `false`, survives the next run of the templates.
+
+### What needs a recent sign-in
+
+| Operation of a user | Without a recent sign-in |
+| --- | --- |
+| A reveal of a key/value or of one of its versions (`reveal=true`), and a diff of a secret's versions | `401 StepUpRequired` for a secret; a public pair is answered |
+| An export of key/values with secrets | `401 StepUpRequired`; an export without secrets is answered |
+| A set, delete or import of a secret, a change to or from a secret level, and a protect | `401 StepUpRequired` for a secret key or item; public writes are answered |
+| A restore or purge of key/values | `200`; each secret key it could not write gets the outcome `Forbidden` with `ErrorCode` `StepUpRequired` and the message of the step-up |
+| A resolved configuration | `200` without the secrets: secret bindings stay unresolved, and the response carries `X-2S-Secrets-Withheld: step-up-required` (see [Headers](inheritance.md#headers)) |
+| A grant or revoke of a role (`POST v1/access/grant`, `POST v1/access/revoke`), a member's role change, the removal of another member, and a new invitation | `401 StepUpRequired` |
+| Creating or resetting a machine, replacing its federation rules, replacing a [trusted issuer](#trusted-issuers), and issuing a shared certificate | `401 StepUpRequired` |
+| Adding or changing a recipient of client-encrypted key/values | `401 StepUpRequired` |
+
+The operations that answer the `401` are listed in `OperationAccess.StepUp` (`Api.Functions/src/OpenApi/`), and the OpenAPI document gives their `401` the `ErrorResponse` and the `WWW-Authenticate` header. They give out or change what reads secrets or holds a credential. Everything else needs no recent sign-in: reads without secret values, leaving an access point, deleting a machine, a trusted issuer or a shared certificate, creating a trusted issuer, resending, revoking, accepting and declining invitations, the machine authentication policy, the key/value policy, and creating accounts and projects.
+
+The order of the checks:
+
+- **What a new sign-in cannot fix comes first:** a machine on a route for users only, the role checks of the route, the [restriction of the actor](#restrictions-of-actors) and a bad body. So a person without the role gets `403`, as before.
+- **The role checks inside the service come after it.** Grant, revoke, a member's role change and the removal of a member check the role in the service, so a person without the role whose sign-in is old gets `401` first, and `403` after signing in again. The admin UI offers these actions only to the roles that may use them.
+- **Secret rights are withheld only where the role gives them.** A user below `ContributorWithSecrets` gets `403 AccessDenied` and no header, whatever the time of the sign-in.
+- **The actor wins for reads.** Through an actor under `NoSecretReveal`, a secret read answers `403 ActorRestricted` and a resolved configuration `actor-restricted`, because a new sign-in would not lift the restriction. Writes through the actor are judged by the step-up.
+
+### The step-up answer
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer error="insufficient_user_authentication", error_description="A recent sign-in is required", max_age="600"
+Content-Type: application/json; charset=utf-8
+
+{ "Message": "This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.",
+  "ErrorCode": "StepUpRequired", "Details": { "MaxAge": 600 } }
+```
+
+- The header is the challenge of RFC 9470 (Figure 3), and `max_age` is the window in whole seconds.
+- A browser on another origin cannot read the header, because the Function App's CORS settings cannot expose one ([CORS for browser clients](#cors-for-browser-clients)), so the body repeats the window as `Details.MaxAge`.
+- The message writes the window out, in seconds, minutes or hours.
+- Every other `401` keeps no body and no `WWW-Authenticate` header (see [401 and 403](#401-and-403)).
+- A refresh of the token does not help, as it keeps `auth_time`. The client signs the person in again, with `max_age` where it can, and repeats the request.
+- The API logs it as the warning `Request rejected with 401 (StepUpRequired)`. It is a client error, so Sentry gets no event.
+
+### Who is judged
+
+`BearerAuthenticationMiddleware` judges the sign-in once per request, for every user: a provider token, a token that a Debug build decodes, and a [Storyteller user token](#storyteller-user-tokens). The handlers read that judgement.
+
+- **The window.** A sign-in counts when `auth_time` is at most `MaxAge` old and at most 5 minutes in the future, the clock skew allowed to the provider. A missing or unreadable `auth_time`, or one further in the future, is no recent sign-in.
+- **Impersonation.** A token with an `act` claim, a WorkOS impersonation, is never recent, whatever its `auth_time`: the sign-in is the impersonator's.
+- **Actors.** A Storyteller user token carries the person's `auth_time` from its subject token, so a call through the MCP server is judged by the person's sign-in at the MCP client. Its actor stays in the delegation, never in the claims.
+- **Machines** are never judged: API keys, certificates, client credentials and federated tokens have no sign-in. Their secret rights follow their scopes and the mTLS rule only.
+
+### The clients
+
+- **Admin UI.** A step-up answer, and every item of a bulk result with `StepUpRequired`, opens one dialog, **Confirm it's you**, however many requests failed. Confirming signs the person in again with `max_age=0`, a forced authentication, and returns to the page: its reads run again, and a reveal that failed is repeated once. A write is never replayed, so the person repeats it. Before the person types what the redirect would lose, such as a new secret value, the UI compares the token's `auth_time` with `StepUp.MaxAge` and asks first. See the [admin UI's README](../../../src/Platform/ui.admin/README.md).
+- **`sform`.** It prints the step-up message, the error code and a hint, and ends with exit code `44`. The device flow takes no `max_age`, and a device code approved in a browser that is still signed in to AuthKit may not count as a new sign-in. So sign out in the browser first (the admin UI's **Sign out** ends the WorkOS session) or approve the code in a private window, then run `sform account logout` and `sform account`, and repeat the command. `sform story config <key> -r` and `sform story config export` name the remedy of each withheld reason, a new sign-in for `step-up-required`.
+- **MCP server.** MCP clients sign in at the provider themselves and cannot send `max_age`, and a reconnect that reuses the person's browser session keeps the old `auth_time`. The tool tells the assistant so: the person signs out at the identity provider first (under AuthKit, **Sign out** in the admin UI), then reconnects the MCP server in the client and retries, or makes the change in the admin UI (see [MCP Server](mcp.md#a-recent-sign-in)).
+- **SDKs.** `IsStepUpRequired(out maxAge)` of the C# SDK tells the step-up from every other `401` of an `ApiException`, with the window from the header or the body ([its readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md#step-up)). The TypeScript SDK neither refreshes nor retries a step-up `401`, calls `onStepUpRequired`, and has `isStepUpRequired` and `stepUpMaxAge` ([its README](../../../src/Platform/Storyteller/sdk.typescript/README.md#step-up-a-recent-sign-in)).
+
+### Rollout of the step-up
+
+- **The admin UI goes out with the API, or first.** An admin UI from before the step-up answers the `401` with a plain sign-in redirect, which AuthKit completes with the existing session and the old `auth_time`: the person never gets through.
+- **Older `sform` versions** print their general refusal of a `401` ("You are not authorized to execute the command or you don't have access to requested resources."). The remedy is the same.
+- **The escape hatch.** `Auth:StepUp:Enabled` `false` turns the step-up off when a client cannot satisfy it. `MaxAge` can change any time.
+
+### Limits of the step-up
+
+- **A recent sign-in, not MFA.** `auth_time` says when the person signed in, not how. WorkOS enforces MFA, and the API cannot check it (see [MFA policy](#mfa-policy)).
+- **Code in the admin UI's origin.** For SSO users, and for anyone whose identity provider still has a session, the step-up protects against a token taken out of the browser, not against code that runs in the admin UI's origin: such code can start the `max_age` sign-in itself, and an identity provider with a live session may complete it without asking.
+- **The device code.** Whether WorkOS counts the approval of a device code in a browser that is still signed in as an active authentication is not documented, and it is not verified yet. If it does, code that controls the browser gets a fresh `sform` session through the device flow, around the step-up.
+- **Not guarded.** The key/value policy and the machine authentication policy change no holder of a credential, so they need no recent sign-in.
+
+## MFA policy
+
+MFA is required in the production WorkOS environment for every sign-in without SSO.
+
+- **Sign-ins without SSO.** Production signs in with Magic Auth today, and passwords are off there. The WorkOS setting **Required** makes every user enrol a factor (TOTP) and asks for it at sign-in. Passkey and social sign-ins, which production does not offer, skip the challenge too: turning one on needs this policy reviewed.
+- **SSO.** SSO sign-ins skip the WorkOS challenge: the customer's identity provider is responsible for the MFA of its users.
+- **What the API proves.** `auth_time` proves a recent sign-in, not MFA. WorkOS returns the authentication method at sign-in, not in the access token, so the API cannot tell a sign-in with MFA from one without. WorkOS enforces MFA, and the [step-up](#recent-sign-in-step-up) makes the sensitive operations need a sign-in that went through it.
+- **The state.** As of 2026-11-15 MFA is off in production. The owner turns it on in the WorkOS dashboard ([AuthKit dashboard setup](#authkit-dashboard-setup), and step 13 of the [cookbook](../Deployment/cookbook-azure-production.md#13-workos-production)). Staging stays without MFA, so the automation pools sign in with passwords.
+- **ISO 27001.** The ISO 27001 notes are kept outside the repository. They must record this policy and the day MFA was turned on in production.
 
 ## User token exchange
 
@@ -767,7 +885,7 @@ An issued user token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) ac
 | `act` | `{ "sub": "<actor id>" }` ([RFC 8693 §4.1](https://www.rfc-editor.org/rfc/rfc8693#section-4.1)): delegation, not impersonation. Never nested. |
 | `client_id` | The actor id. |
 | `restrictions` | The actor's [restrictions](#restrictions-of-actors), an array of strings, empty when it has none. |
-| `auth_time` | When the person signed in, when the subject token says so. |
+| `auth_time` | When the person signed in, when the subject token says so. The API reads it on its routes for the [step-up](#recent-sign-in-step-up). |
 | `iat`, `nbf`, `exp` | The time of the exchange, and at most `TokenLifetimeMinutes` (10) later, never after the subject token's `exp`. |
 | `jti` | A GUID. |
 
@@ -781,7 +899,7 @@ The token carries no name or email: the API reads them from the account.
 - `Auth:TokenExchange:Enabled` on, and `act.sub` the `Id` of an actor of `Auth:TokenExchange:Actors`, compared exactly;
 - `restrictions`, an array of known restrictions. An unknown one refuses the token, because the API cannot enforce it.
 
-The middleware then reads the account once per call (a point read) and takes `name` and `preferred_username` from its `Name` and `UserName`; when the account no longer exists, the call gets `401`. The result is a user, not a machine: `sub` is the account id, and each scope of the token that the actor's `Scopes` still hold becomes an `scp` claim; the others are dropped. The actor and the restrictions are kept for the request from the validated token, never from claims. From there it is a user token like any other: it needs `User.Impersonation`, the role decides, and the routes for users only accept it. The [audit actor](audit-stamps.md#the-actor) is the account, with `Via` set to the actor id.
+The middleware then reads the account once per call (a point read) and takes `name` and `preferred_username` from its `Name` and `UserName`; when the account no longer exists, the call gets `401`. The result is a user, not a machine: `sub` is the account id, and each scope of the token that the actor's `Scopes` still hold becomes an `scp` claim; the others are dropped. A non-negative integer `auth_time` becomes the claim `auth_time`, so the [step-up](#recent-sign-in-step-up) judges the person's sign-in as for a provider token; a token without it, or with another value, has no sign-in time and never counts as recent. The actor and the restrictions are kept for the request from the validated token, never from claims. From there it is a user token like any other: it needs `User.Impersonation`, the role decides, and the routes for users only accept it. The [audit actor](audit-stamps.md#the-actor) is the account, with `Via` set to the actor id.
 
 **Tokens issued to an actor.** A provider token whose `aud` is one of an actor's `SubjectAudiences` was issued to the actor, for the exchange only. As a bearer token on API routes it gets `401`, in every build and whether the exchange is on or not, even when its provider accepts it. A token of an `AdditionalIssuers` entry never passes on API routes either.
 
@@ -815,7 +933,7 @@ An actor's restrictions narrow what a person may do through it, whatever the per
 | Granting `ContributorWithSecrets`, `Administrator` or `Owner`: a grant, a member's role change or an invitation | `403 ActorRestricted`, before the service checks the caller's role: the role reads secrets, and the person who gets it may be the one acting through the assistant. `Reader` and `Contributor` are allowed. |
 | Writes of secrets (set, protect, import, delete) and deleting a machine | Allowed: they return no value |
 
-The refusal is `403` with `ErrorCode` `ActorRestricted` and "The token acts for the person through an actor that may not reveal secrets.". It comes after the role check, so a person without the role the operation needs (`ContributorWithSecrets` for a secret read) gets `403 AccessDenied`, as without the actor; only a grant of a role that reads secrets is refused before the role check. Debug builds give every user the role, so they answer `ActorRestricted` there. The restriction leaves the rest of the person's rights alone: an Administrator acting through the actor still grants `Reader` and `Contributor`, invites people with those roles, revokes roles and deletes machines. See [Secret delivery](key-values.md#secret-delivery) for secret reads in general.
+The refusal is `403` with `ErrorCode` `ActorRestricted` and "The token acts for the person through an actor that may not reveal secrets.". It comes after the role check, so a person without the role the operation needs (`ContributorWithSecrets` for a secret read) gets `403 AccessDenied`, as without the actor; only a grant of a role that reads secrets is refused before the role check. Debug builds give every user the role, so they answer `ActorRestricted` there. The restriction leaves the rest of the person's rights alone: an Administrator acting through the actor still grants `Reader` and `Contributor`, invites people with those roles, revokes roles and deletes machines. See [Secret delivery](key-values.md#secret-delivery) for secret reads in general. For reads the restriction comes before the [step-up](#recent-sign-in-step-up), as a new sign-in does not lift it; the writes and grants the restriction allows still need a recent sign-in of the person.
 
 ### Configuration of the exchange
 
@@ -1516,7 +1634,7 @@ A Storyteller token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) acc
 * the machine in the route's project, with the stored kind `Federated`;
 * the project still enabling `Federated`.
 
-So a machine token cannot act as an API key machine or outlive its machine, even when it was signed with a stolen key. Any failure is 401 with an empty body. No `WWW-Authenticate` header is sent, as for every other token. Each operation then needs its [scopes](#scopes-of-machines) stored on the machine and carried by the token. A scope the token carries but the machine does not store grants nothing, so the token cannot exceed its machine's scopes either, and a token that asked for a subset gets `403 AccessDenied` outside it. A machine token that carries `User.Impersonation` still gets `403` on every route for users only.
+So a machine token cannot act as an API key machine or outlive its machine, even when it was signed with a stolen key. Any failure is 401 with an empty body. No `WWW-Authenticate` header is sent, as for every other token; only the [step-up](#recent-sign-in-step-up) of users sends one. Each operation then needs its [scopes](#scopes-of-machines) stored on the machine and carried by the token. A scope the token carries but the machine does not store grants nothing, so the token cannot exceed its machine's scopes either, and a token that asked for a subset gets `403 AccessDenied` outside it. A machine token that carries `User.Impersonation` still gets `403` on every route for users only.
 
 The deployment signs both kinds with one RSA 2048 key, stored in the core container, partition `signing-keys`, id `tsk.1`, its `kid` being the RFC 7638 thumbprint, and publishes its public part at [`/api/.well-known/jwks.json`](#discovery-of-the-issuer). With `SigningKeyAutoBootstrap` the first exchange creates it; concurrent instances settle on one key through a create conflict. An instance signs with the stored key for 10 minutes before it reads the store again. If the store then has no key and `SigningKeyAutoBootstrap` is off, or holds a key that is not RS256, the exchange answers 503 instead of signing with the old key, and the next exchange reads the store again. A store that cannot be read keeps the loaded key in use. Validation never creates a key. A validating instance reads the store again after 10 minutes too, and at most once per 30 seconds for an unknown `kid` or while no key is stored; in between, such tokens are refused without I/O.
 
@@ -1793,11 +1911,14 @@ The two status codes mean different things, so a client knows whether signing in
 | `401` | A provider token issued to an actor of the user token exchange: its `aud` is one of an actor's `SubjectAudiences`. This applies in every build, even when its provider accepts the token (see [Storyteller user tokens](#storyteller-user-tokens)). | none |
 | `401` | Machine credentials that fail their checks: a machine the project does not know or whose kind it does not enable, an API key or a certificate whose record has no scopes, or a Storyteller machine token whose machine is gone or no longer `Federated`, or whose project is not the route's. | none |
 | `401` | A [Storyteller user token](#storyteller-user-tokens) whose account is gone, whose actor is no longer configured, or which names an unknown restriction, and every Storyteller user token while the exchange is off. | none |
+| `401` | A user whose sign-in is older than `Auth:StepUp:MaxAge` called an operation that needs a [recent sign-in](#recent-sign-in-step-up): secret values, roles and members, machine credentials. "This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes." Signing in again helps; a refresh of the token does not. | `ErrorResponse` with `ErrorCode` `StepUpRequired` and `Details.MaxAge` in seconds, and the header `WWW-Authenticate: Bearer error="insufficient_user_authentication", error_description="A recent sign-in is required", max_age="600"` |
 | `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 | `403` | The user acts through an actor whose [restrictions](#restrictions-of-actors) forbid the operation, in any build; the role check comes first. "The token acts for the person through an actor that may not reveal secrets." | `ErrorResponse` with `ErrorCode` `ActorRestricted` |
 | `403` | A machine called a route for users only, in any build and whatever its credentials carry: "Only users may call this operation; machines cannot.", or the route's own message (see [Scopes of machines](#scopes-of-machines)). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 | `403` | A machine restricted to an annotation addressed another annotation, or an operation of the whole project (see [Annotation restriction of machines](#annotation-restriction-of-machines)). | `ErrorResponse` with `ErrorCode` `AnnotationRestricted` |
 | `403` | A machine called an operation without one of its scopes: the machine was not created with it ("This operation needs the scope Schema.Write, which the machine was not created with."), or its credentials do not carry it ("…, which the credentials of the machine do not carry."). See [Scopes of machines](#scopes-of-machines). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
+
+Only the step-up `401` has a body and a `WWW-Authenticate` header, because it is the one case where signing in again helps a valid token. Every other `401` has neither, so it never says why a credential failed; the API logs the reason.
 
 **Scopes describe machines, roles describe people.** A user role check runs on every project endpoint (`CheckAccessToProjectAsync`, `CheckAccessToAnnotationAsync`, `CheckAccessToAnnotationsAsync` and `CheckAccessToProjectMetadataAsync`) and inside the access-management operations. Users need no data scope there, only `User.Impersonation`. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so do reading the machine authentication policy, reading trusted issuers and replacing federation rules. Secret values and secret writes need `ContributorWithSecrets`, and so do creating a machine with a secrets scope, resetting one, replacing its federation rules and deleting it. Shared certificates, access points, setting the machine authentication policy and writing trusted issuers need `Administrator`, and so do creating a machine with a management scope, resetting one, replacing its federation rules and deleting it, and the export and the import of a view, with the reads of their jobs ([export-import.md](export-import.md#access)). Granting or revoking `Owner` needs `Owner`.
 
@@ -1815,6 +1936,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), a `PUT` changes the `Issuer` of a trusted issuer, or the body of a federation `PUT` is not a trusted issuer or a list of federation rules. |
 | `400` | `MachineNotFederated` | Federation rules for a machine of another kind. |
 | `400` | `NotInRenewalWindow` | A certificate renewal before its window opens (see [The `MachineAccess` object](#the-machineaccess-object)); the message names when it opens. |
+| `401` | `StepUpRequired` | A grant, a revoke, a member's role change or removal, an invitation, a new or reset machine, new federation rules, a replaced trusted issuer or a shared certificate by a user whose sign-in is not [recent](#recent-sign-in-step-up), with `Details.MaxAge` and `WWW-Authenticate`. |
 | `403` | `ActorRestricted` | Through an actor under `NoSecretReveal`, an operation that gives out credentials that read secrets (see [Restrictions of actors](#restrictions-of-actors)). |
 | `404` | `NotFound` | The target account, the access point or the machine access does not exist, the machine was deleted during its reset, or it has no API key to reset (it is being deleted, or its creation failed). A certificate renewal with a certificate that is not the machine's current one, or of a machine without the expiry of its certificate. `GET` and `DELETE` of a machine or a trusted issuer that does not exist answer `404` without a body. |
 | `409` | `AccountExists`, `AccessPointExists` | The account or project already exists. |
@@ -1845,6 +1967,8 @@ az functionapp cors add --name <function-app> --resource-group <group> --allowed
 
 The admin UI uses neither yet: it writes whole bodies without a condition.
 
+For the same reason a cross-origin browser reads neither `WWW-Authenticate` nor `X-2S-Secrets-Withheld`. The [step-up](#recent-sign-in-step-up) repeats its window in the body, and the admin UI tells a stale sign-in by the `auth_time` of its own token.
+
 ## Switching an existing deployment
 
 `Account.Id` is the [account id of the provider](#account-ids): `{tid}:{oid}` under Entra ID, the WorkOS user ID under AuthKit, and the realm's `sub` under Keycloak. They are unrelated, so **changing `Auth:Provider` on a deployment that already has accounts orphans them**. Access maps, ownership and the [audit actors](audit-stamps.md#the-actor) (`Account` with the account id as its id) on annotations, configurations and key/value pairs stop resolving. AuthKit can federate to Microsoft sign-in, but the id still changes. Under Entra ID the host notes the rule once at start ("Entra ID accounts are keyed by {tid}:{oid} of the user token. Accounts registered under another identity provider, or under the pairwise Entra sub, do not resolve."), so the reason shows in the logs. The Entra ID account id changes in this version as well: accounts were keyed by the pairwise `sub` before and are keyed by `{tid}:{oid}` now, so an Entra ID deployment that already has accounts orphans them on upgrade, even without a change of `Auth:Provider`. Nothing migrates them. Each person registers again (`POST v1/access/account`) and is given their roles again, and DbCreator, run again with `baseAccount:id` set to the owner's `{tid}:{oid}`, seeds the owner of its organization again; it merges the owner into the access maps of that organization and its default project and keeps the members already there, so orphaned members have to be removed by hand. No deployment had Entra ID accounts when the id changed. A deployment has one provider at a time, and accounts are not linked across providers. A migration tool is not available yet.
@@ -1859,4 +1983,5 @@ The admin UI uses neither yet: it writes whole bodies without a condition.
 * The scopes of an existing machine cannot be edited. Create a new machine and delete the old one (see [Scopes of machines](#scopes-of-machines)).
 * The Storyteller signing key cannot be rotated except by the [emergency procedure](#security-notes), and it cannot live in Key Vault. So the [JWKS](#discovery-of-the-issuer) publishes one key and never a next one.
 * The token endpoint of federated machines has no replay protection and no rate limit. Rules know only exact values and a separator-anchored subject prefix; there are no glob, regex or CEL conditions. The replay limit of the user token exchange and its record of client assertions are kept in memory per instance.
-* 401 responses carry no `WWW-Authenticate` header.
+* Only the [step-up](#recent-sign-in-step-up) `401` carries a `WWW-Authenticate` header. The other `401` responses carry none, so a client gets no `invalid_token` challenge.
+* The step-up checks the time of a sign-in, never its method: the API cannot prove MFA (see [MFA policy](#mfa-policy)). `sform` cannot ask for a fresh sign-in, MCP clients cannot send `max_age`, and Entra ID's authentication contexts (claims challenges) are not used. The key/value policy and the machine authentication policy need no recent sign-in.

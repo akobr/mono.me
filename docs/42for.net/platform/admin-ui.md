@@ -41,6 +41,18 @@ The overview of an organization has a card for each of its projects you are a me
 
 Selecting the screen you are already on in the sidebar goes back to its start: the filter, the open annotation or configuration, the mode, the layout and the focus start over, and **Modeling** opens **Schemas**. The other things above stay as they were. The memory lasts until you reload the page or sign out. An address you type or open from a bookmark is shown as it is.
 
+### Signing in again to confirm
+
+Some actions need a recent sign-in, not only an open session: revealing, setting or exporting secret values, changing roles, removing members, inviting people, and creating or resetting machines, their federation rules and shared certificates. The platform counts a sign-in for 10 minutes unless the deployment sets another window. When yours is older, the UI asks you to **Confirm it's you**, once however many requests failed:
+
+- Confirming signs you in again. The sign-in page asks you to authenticate even while you are still signed in, with a second factor where the environment requires one, and brings you back to the page you were on.
+- The page loads again, so what you were reading shows with its secret values, and a reveal you asked for is repeated once. A change is never repeated for you: the toast **You signed in again** reminds you to repeat it if it did not finish.
+- Unsaved changes on the page are lost, and the dialog says so first. Before you type something the sign-in would lose, such as a new secret value, a new machine, an invitation or a role change, the UI checks your sign-in and asks first.
+- Cancelling leaves the screen and its error as they are.
+- When the new sign-in still does not count, the dialog says **Your sign-in could not be confirmed** and asks you to sign out and sign in again, instead of sending you to the sign-in page once more.
+
+**Resolved** of a configuration says **Secret values are hidden** when your role gives them but your sign-in is too old: they stay as their bindings until you confirm it's you, from the same alert.
+
 ## The catalog
 
 **Annotations** lists the catalog of the view in two modes:
@@ -244,6 +256,8 @@ The CLI does the same with `sform story export` and `sform story import` (see [C
 | Settings | Everyone (description and policies: Administrator, time zone, date format and types: Contributor) | The description of the project, the default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy, the CA certificate download and, in the **Secrets** section, how the key values of the project are protected. |
 | Monitor | Administrator | The **Usage** of the key values (totals, estimated charges, a daily chart) and the **Audit** trail of secrets, one tab each. |
 | Audit (organization) | Administrator of the organization | The access audit of the organization and its projects, newest first: who granted, changed or removed a role, who joined through an invitation, who created a project or changed its description, who created, reset or deleted a machine or changed its federation rules, and who changed the machine authentication, the protection of secrets, a trusted issuer or a shared certificate. Each record names its project (or the organization), the account, machine, issuer or certificate it changed, the value before and after (a long value or JSON opens in full from the button at its end), the person (with "via mcp" when the MCP server acted for them) and the first characters of the correlation id, with a copy button. Filter by project, action, the exact id of a target, and a range of dates; **Load more** shows older records. Records are kept for two years by default; the deployment sets the retention in `AccessAudit:RetentionDays`, from 1 to 3650 days. In a deployment that existed before the audit, the records of members, projects and policies expire only after DbCreator has run once. Below Administrator of the organization itself (a role on a project is not enough) the page shows **Administrators only**. |
+
+Role changes, removing someone else, invitations, new machines, resets, new federation rules, replacing a trusted issuer and shared certificates need a recent sign-in: an older one asks you to [confirm it's you](#signing-in-again-to-confirm) first. Leaving a project and deleting a machine do not.
 
 The **Project** card on Settings shows the description of the project to every member, or **No description**. Administrators edit it there instead: **Save description** stores the text trimmed, and saving an empty text removes the description. The organization overview shows the same text.
 
