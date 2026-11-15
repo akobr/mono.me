@@ -24,9 +24,22 @@ public class KeyValueRestoreCommand : KeyValueBulkCommandBase
     }
 }
 
-[Command(CommandNames.PURGE, Description = "Remove soft-deleted keys with every version before their retention ends (Administrator).")]
+[Command(CommandNames.PURGE, Description = "Purge soft-deleted keys (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValuePurgeCommand : KeyValueBulkCommandBase
 {
+    // After the options of 'sform story kv purge --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The keys, given as arguments or by --prefix (an empty prefix means every
+        key), are removed with every version before their retention ends, without a
+        way to restore them. The purge asks for a confirmation, for a prefix the view
+        name; -y skips it.
+
+        A user needs the Administrator role on the project. A machine cannot purge,
+        whatever its scopes.
+        """;
+
     public KeyValuePurgeCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {
