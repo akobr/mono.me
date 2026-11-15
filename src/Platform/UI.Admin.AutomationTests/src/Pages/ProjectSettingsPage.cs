@@ -10,7 +10,12 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // "Recipients (HYOK)". The navbar's title is hidden below 2xl, so the "Project" heading is the sign the page is there.
 // - Project: the access point and, for an Administrator or Owner, the description with "Save description" (disabled
 //   until it changes; the toast "Description saved"); a Reader sees the text only.
-// - Annotations: "Default time zone" (Contributor and up), a setting of this browser: no Save, no toast.
+// - Annotations ("Default time zone"), Dates ("Date format") and Annotation types: the project settings, which the API
+//   keeps for everyone in the project. An Administrator or Owner changes them in one draft, with "Use the default" of
+//   the zone and the format and "Reset to built-in" of the types, and saves it with "Save project settings" below
+//   Annotation types (the toast "Project settings saved"); below Administrator the fields are disabled and each card
+//   shows the badge "Administrator" and "Only Administrators change the project settings.". A banner above them offers
+//   to save the settings this browser kept before the API stored them.
 // - Machine authentication (Administrator and up): the checkboxes of "Enabled credential kinds" (ApiKey, Certificate,
 //   CertificateAndApiKey, ClientCredentials, Federated), "Default for new machines", "Save machine policy" (the toast
 //   "Machine policy saved"). A new project enables ApiKey only.
@@ -19,7 +24,8 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 //   level", "Save secrets policy" (the toast "Secrets policy saved"; a refused change is an alert in the card, no
 //   toast), and "Add recipient" (Name, Id (optional), Public key: an RSA key of 3072 bits or more as PEM or JWK; the
 //   toast "Recipient <id> added"). HYOK needs an enabled recipient, BYOK a verified customer key.
-// Machine policy, secrets policy and recipients are project-wide: change them only in a disposable project.
+// The project settings, machine policy, secrets policy and recipients are project-wide: change them only in a
+// disposable project.
 public sealed partial class ProjectSettingsPage(App app, AppRoutes routes)
 {
     public ILocator ProjectHeading => app.Page.GetByRole(AriaRole.Heading, new() { Name = "Project", Exact = true, Level = 2 });
@@ -28,7 +34,7 @@ public sealed partial class ProjectSettingsPage(App app, AppRoutes routes)
 
     public ILocator SaveDescriptionButton => app.Page.GetByRole(AriaRole.Button, new() { Name = "Save description", Exact = true });
 
-    // The time zone new annotations of the project start in (browser-local; "UTC" by default).
+    // The time zone new annotations of the project start in (a project setting, for everyone; "UTC" by default).
     public TimeZoneSelect DefaultTimeZone => new(app, app.Page.GetByRole(AriaRole.Button, new() { Name = "Default time zone", Exact = true }));
 
     public ILocator MachineAuthenticationCard => Card("Machine authentication", 2);

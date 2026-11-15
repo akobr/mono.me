@@ -537,24 +537,24 @@ The cases of the onboarding wizard (ACC-SGN-06 to ACC-SGN-13) are in the class's
 | SET-PRJ-01 | 17 | Settings page shows every section of the project for an Administrator | Elementary | Admin | B | `Settings_OpenAsAdministrator_ShowsEverySection` |
 | SET-PRJ-02 | 39 | Administrator changes the project description and it shows on the organization overview | High | Owner | B,P | `Settings_SaveDescription_ShowsOnOrganizationOverview` |
 | SET-PRJ-03 | 41 | A Reader sees the project settings read-only | High | Reader | B | `Settings_OpenAsReader_ShowsEverythingReadOnly` |
-| SET-PRJ-04 | 61 | A Contributor changes the browser settings but not the project-wide ones | Medium | Contributor | B | `Settings_OpenAsContributor_ChangesOnlyBrowserSettings` |
+| SET-PRJ-04 | 61 | A Contributor sees the project settings read-only | Medium | Contributor | B | `Settings_OpenAsContributor_ShowsProjectSettingsReadOnly` |
 
-### Browser Settings (`SettingsBrowserTests`)
+### Shared Settings (`SettingsSharedTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Test |
 |---|---|---|---|---|---|---|
-| SET-BRW-01 | 65 | The default time zone is kept in this browser, and new annotations start and are saved in it | High | Editor | B | `Settings_DefaultTimeZone_NewAnnotationStartsInIt` |
-| SET-BRW-02 | 78 | The project's date format changes how dates are shown | High | Editor | B | `Settings_DateFormat_ChangesShownDates` |
-| SET-BRW-03 | 88 | The project renames, recolors and re-icons an annotation type | High | Editor | B | `Settings_CustomizeType_ShowsOnTemplates` |
-| SET-BRW-04 | 108 | A type's plural needs a name, and one type or all types can be reset | Medium | Editor | B | `Settings_ResetTypes_RestoresBuiltInNames` |
+| SET-BRW-01 | 65 | The project's default time zone is saved for everyone, and new annotations start and are saved in it | High | Owner | B,P | `Settings_DefaultTimeZone_NewAnnotationStartsInIt` |
+| SET-BRW-02 | 78 | The project's date format changes how dates are shown | High | Owner | B,P | `Settings_DateFormat_ChangesShownDates` |
+| SET-BRW-03 | 88 | The project renames, recolors and re-icons an annotation type for everyone | High | Owner | B,P | `Settings_CustomizeType_ShowsOnTemplates` |
+| SET-BRW-04 | 108 | A type's plural needs a name, and one type or all types can be reset | Medium | Owner | B,P | `Settings_ResetTypes_RestoresBuiltInNames` |
 
 ### Preferences (`SettingsPreferencesTests`)
 
 | Reference | Testiny | Title | Priority | Role | Mode | Test |
 |---|---|---|---|---|---|---|
 | SET-PRF-01 | 118 | Preferences are kept in this browser and 'Reset preferences' restores the defaults | Medium | Any | B | `Preferences_ChangeAndReset_RestoresDefaults` |
-| SET-PRF-02 | 124 | A personal date format in Preferences wins over the project's | Medium | Editor | B | `Preferences_PersonalDateFormat_WinsOverProject` |
-| SET-PRF-03 | 137 | Personal type names in Preferences win over the project's on Templates and Annotations | Medium | Editor | B | `Preferences_PersonalTypeName_WinsOverProject` |
+| SET-PRF-02 | 124 | A personal date format in Preferences wins over the project's | Medium | Owner | B,P | `Preferences_PersonalDateFormat_WinsOverProject` |
+| SET-PRF-03 | 137 | Personal type names in Preferences win over the project's on Templates and Annotations | Medium | Owner | B,P | `Preferences_PersonalTypeName_WinsOverProject` |
 
 ### Machine Authentication (`SettingsMachineAuthenticationTests`)
 

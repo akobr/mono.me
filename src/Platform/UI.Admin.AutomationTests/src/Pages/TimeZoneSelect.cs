@@ -5,8 +5,8 @@ using static Microsoft.Playwright.Assertions;
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
 // The time zone picker (components/annotations/TimeZoneSelect.vue): a button that shows the zone ("UTC", "Asia/Tokyo")
-// and opens a searchable, virtualized list: UTC first, then every IANA zone of the browser, each option named by the
-// zone and its current offset ("Asia/Tokyo GMT+9"). Only the options in view exist, so a zone is searched first. The
+// and opens a searchable, virtualized list: UTC first, then the IANA zones of the browser that the API accepts too (the
+// catalog of project settings), each option named by the zone and its current offset ("Asia/Tokyo GMT+9"). Only the options in view exist, so a zone is searched first. The
 // button is "Time zone" in the New annotation dialog and an annotation's form, "Default time zone" in the project's
 // Settings.
 public sealed partial class TimeZoneSelect(App app, ILocator button)

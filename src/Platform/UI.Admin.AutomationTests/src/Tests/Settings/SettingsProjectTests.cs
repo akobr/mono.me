@@ -8,15 +8,20 @@ using static Microsoft.Playwright.Assertions;
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Settings;
 
 // Project and Roles: the Project card of Settings and what each role sees there. An Administrator sees every section
-// and changes the description (in a disposable project); a Reader sees everything read-only; a Contributor changes
-// the cards kept in this browser but none of the project-wide ones.
+// and changes the description (in a disposable project); a Reader sees everything read-only; a Contributor sees the
+// project settings read-only too and none of the administrator actions.
 [Area(Area.Settings)]
 public sealed partial class SettingsProjectTests : PlatformTest
 {
+    // The cards of the project settings, which only Administrators and Owners change.
+    private static readonly string[] ProjectSettingsCards = ["Annotations", "Dates", "Annotation types"];
+
     // SET-PRJ-01: Settings page shows every section of the project for an Administrator.
     // Read-only: an Administrator or Owner of the target project sees the Project card with the access point, the role
     // and the number of members, every card and the four cards of the Secrets section, and the administrator controls:
-    // the description form, "Save machine policy", the CA download and the secrets policy with Public always allowed.
+    // the description form, the project settings without the badge "Administrator" and with "Save project settings"
+    // (disabled while nothing changed), "Save machine policy", the CA download and the secrets policy with Public always
+    // allowed.
     [Test]
     [Elementary]
     [TestCase(17)]
@@ -37,6 +42,16 @@ public sealed partial class SettingsProjectTests : PlatformTest
 
         await Expect(settings.Description).ToBeVisibleAsync();
         await Expect(settings.SaveDescriptionButton).ToBeDisabledAsync();
+
+        await settings.WaitForEditableSettingsAsync();
+        await Expect(settings.SaveSettingsButton).ToBeDisabledAsync();
+        await Expect(settings.ResetToBuiltInButton).ToBeVisibleAsync();
+        foreach (var card in ProjectSettingsCards)
+        {
+            await Expect(settings.SettingsAdministratorBadge(card)).ToHaveCountAsync(0);
+            await Expect(settings.SettingsAdministratorsOnly(card)).ToHaveCountAsync(0);
+        }
+
         await Expect(settings.SaveMachinePolicyButton).ToBeVisibleAsync();
         await Expect(settings.DownloadCaButton).ToBeVisibleAsync();
 
@@ -102,9 +117,10 @@ public sealed partial class SettingsProjectTests : PlatformTest
 
     // SET-PRJ-03: A Reader sees the project settings read-only.
     // Exactly a Reader of the project: the role and the description as text, without Members and without the form; the
-    // browser settings disabled; Machine authentication and the Secrets section (opened through settings#secrets,
-    // scrolled into view and focused) marked "Administrator", with disabled fields and no administrator action. The CA
-    // download stays for everyone.
+    // project settings disabled, each of their cards marked "Administrator", without "Save project settings" and the
+    // resets; Machine authentication and the Secrets section (opened through settings#secrets, scrolled into view and
+    // focused) marked "Administrator", with disabled fields and no administrator action. The CA download stays for
+    // everyone.
     [Test]
     [TestCase(41)]
     [UserRole(Role.Reader)]
@@ -119,12 +135,7 @@ public sealed partial class SettingsProjectTests : PlatformTest
         await Expect(settings.Description).ToHaveCountAsync(0);
         await Expect(settings.SaveDescriptionButton).ToHaveCountAsync(0);
 
-        var types = settings.ProjectTypes;
-        await Expect(settings.DefaultTimeZone.Button).ToBeDisabledAsync();
-        await Expect(settings.DateFormat.Combobox).ToBeDisabledAsync();
-        await Expect(types.Name(PlatformData.Execution)).ToBeDisabledAsync();
-        await Expect(settings.ResetToBuiltInButton).ToHaveCountAsync(0);
-        await Expect(types.Reset(PlatformData.Execution)).ToHaveCountAsync(0);
+        await ExpectProjectSettingsReadOnlyAsync(settings);
 
         await Expect(settings.MachinePolicyAdministratorBadge).ToBeVisibleAsync();
         await Expect(settings.MachinePolicyAdministratorsOnly).ToBeVisibleAsync();
@@ -145,14 +156,15 @@ public sealed partial class SettingsProjectTests : PlatformTest
         }
     }
 
-    // SET-PRJ-04: A Contributor changes the browser settings but not the project-wide ones.
+    // SET-PRJ-04: A Contributor sees the project settings read-only.
     // Exactly a Contributor of the project (the role does not follow an Owner role of the organization): the role and
-    // the description as text; the browser settings enabled, so an own type name shows in the preview and "Reset to
-    // built-in" takes it back; Machine authentication and the Secrets section without any administrator action.
+    // the description as text; the project settings disabled, each of their cards marked "Administrator" with "Only
+    // Administrators change the project settings.", without "Save project settings", "Use the default" and the resets;
+    // Machine authentication and the Secrets section without any administrator action.
     [Test]
     [TestCase(61)]
     [UserRole(Role.Contributor)]
-    public async Task Settings_OpenAsContributor_ChangesOnlyBrowserSettings()
+    public async Task Settings_OpenAsContributor_ShowsProjectSettingsReadOnly()
     {
         var settings = new ProjectSettingsPage(App, Routes);
         await settings.OpenAsync();
@@ -162,20 +174,7 @@ public sealed partial class SettingsProjectTests : PlatformTest
         await Expect(settings.ProjectValue("Description")).ToHaveTextAsync(NotBlank());
         await Expect(settings.SaveDescriptionButton).ToHaveCountAsync(0);
 
-        var types = settings.ProjectTypes;
-        await Expect(settings.DefaultTimeZone.Button).ToBeEnabledAsync();
-        await Expect(settings.DateFormat.Combobox).ToBeEnabledAsync();
-        await Expect(types.Name(PlatformData.Execution)).ToBeEnabledAsync();
-        await Expect(settings.ResetToBuiltInButton).ToBeVisibleAsync();
-        await Expect(settings.ResetToBuiltInButton).ToBeDisabledAsync();
-
-        await types.SetNameAsync(PlatformData.Execution, "Job");
-        await Expect(types.Reset(PlatformData.Execution)).ToBeVisibleAsync();
-        await Expect(settings.ResetToBuiltInButton).ToBeEnabledAsync();
-
-        await settings.ResetToBuiltInButton.ClickAsync();
-        await Expect(types.Preview(PlatformData.Execution)).ToHaveTextAsync("Execution");
-        await Expect(settings.ResetToBuiltInButton).ToBeDisabledAsync();
+        await ExpectProjectSettingsReadOnlyAsync(settings);
 
         await Expect(settings.MachinePolicyAdministratorBadge).ToBeVisibleAsync();
         await Expect(settings.MachinePolicyAdministratorsOnly).ToBeVisibleAsync();
@@ -185,6 +184,28 @@ public sealed partial class SettingsProjectTests : PlatformTest
         {
             await Expect(settings.SecretsButton(action)).ToHaveCountAsync(0);
         }
+    }
+
+    // Below Administrator: the fields of the project settings disabled, each card with the badge "Administrator" and
+    // its text, and none of the actions of an Administrator (Save, the resets, "Use the default").
+    private static async Task ExpectProjectSettingsReadOnlyAsync(ProjectSettingsPage settings)
+    {
+        var types = settings.ProjectTypes;
+        foreach (var card in ProjectSettingsCards)
+        {
+            await Expect(settings.SettingsAdministratorBadge(card)).ToBeVisibleAsync();
+            await Expect(settings.SettingsAdministratorsOnly(card)).ToBeVisibleAsync();
+        }
+
+        await Expect(settings.DefaultTimeZone.Button).ToBeDisabledAsync();
+        await Expect(settings.DateFormat.Combobox).ToBeDisabledAsync();
+        await Expect(types.Name(PlatformData.Execution)).ToBeDisabledAsync();
+        await Expect(types.Color(PlatformData.Execution)).ToBeDisabledAsync();
+        await Expect(settings.SaveSettingsButton).ToHaveCountAsync(0);
+        await Expect(settings.ResetToBuiltInButton).ToHaveCountAsync(0);
+        await Expect(types.Reset(PlatformData.Execution)).ToHaveCountAsync(0);
+        await Expect(settings.UseDefaultTimeZoneButton).ToHaveCountAsync(0);
+        await Expect(settings.UseDefaultDateFormatButton).ToHaveCountAsync(0);
     }
 
     [GeneratedRegex("^(Owner|Administrator)$")]
