@@ -46,9 +46,17 @@ public class FederationHttpTests
     private readonly RecordingTokenExchange _exchange = new();
     private readonly FederationOptions _options = new() { Issuer = "urn:storyteller:2s.platform", Audience = Audience };
 
+    // The store of the handlers: _issuers, with the writes and their callers recorded. Tests seed _issuers directly.
+    private readonly RecordingIssuerStore _issuerWrites;
+
+    public FederationHttpTests()
+    {
+        _issuerWrites = new RecordingIssuerStore(_issuers);
+    }
+
     private static bool DevAuth => Security.HttpRequestDataExtensions.IsDevelopmentAuthentication;
 
-    private FederationHttp Http => new(_access, _issuers, _exchange, Options.Create(_options), FunctionTestDoubles.ApiJsonOptions, NullLogger<FederationHttp>.Instance);
+    private FederationHttp Http => new(_access, _issuerWrites, _exchange, Options.Create(_options), FunctionTestDoubles.ApiJsonOptions, NullLogger<FederationHttp>.Instance);
 
     // Token endpoint: form and parameters
     [Fact]
@@ -365,8 +373,8 @@ public class FederationHttpTests
     [Fact]
     public async Task GetIssuers_ReturnsTheIssuersOfTheProject()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
-        await _issuers.SetAsync(Org, "other", GitHub("elsewhere"));
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
+        await _issuers.SetAsync(Org, "other", GitHub("elsewhere"), AccessCaller.System);
 
         var result = await Http.GetFederatedIssuers(UserRequest(), Org, Project);
 
@@ -378,7 +386,7 @@ public class FederationHttpTests
     [Fact]
     public async Task GetIssuer_KnownAndUnknown()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
 
         (await Http.GetFederatedIssuer(UserRequest(), Org, Project, "github")).ShouldBeOfType<OkObjectResult>().Value.ShouldBe(GitHub());
         (await Http.GetFederatedIssuer(UserRequest(), Org, Project, "gitlab")).ShouldBeOfType<NotFoundResult>();
@@ -472,7 +480,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutIssuer_ChangingTheIssuerOfAnExistingOne_IsBadRequest()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         var changed = GitHub() with { Issuer = $"{GitHubIssuer}/acme" };
 
         var result = await Http.PutFederatedIssuer(IssuerRequest(changed), Org, Project, "github");
@@ -486,7 +494,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutIssuer_ExistingOne_ChangesEverythingButTheIssuer()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()));
         var changed = GitHub() with { Description = "CI", MaxTokenLifetimeSeconds = 600 };
 
@@ -535,7 +543,7 @@ public class FederationHttpTests
     {
         for (var index = 0; index < FederationValidation.MaxIssuersPerProject; index++)
         {
-            await _issuers.SetAsync(Org, Project, Custom($"issuer-{index:D2}"));
+            await _issuers.SetAsync(Org, Project, Custom($"issuer-{index:D2}"), AccessCaller.System);
         }
 
         var result = await Http.PutFederatedIssuer(IssuerRequest(GitHub()), Org, Project, "github");
@@ -551,17 +559,29 @@ public class FederationHttpTests
     [Fact]
     public async Task DeleteIssuer_ExistingAndUnknown()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
 
         (await Http.DeleteFederatedIssuer(UserRequest(), Org, Project, "github")).ShouldBeOfType<OkResult>();
         (await Http.DeleteFederatedIssuer(UserRequest(), Org, Project, "github")).ShouldBeOfType<NotFoundResult>();
         (await _issuers.ListAsync(Org, Project)).ShouldBeEmpty();
     }
 
+    // The access audit records who created, changed and deleted a trusted issuer, and the request it came with.
+    [Fact]
+    public async Task PutAndDeleteIssuer_PassTheAccessCallerToTheStore()
+    {
+        (await Http.PutFederatedIssuer(IssuerRequest(GitHub()), Org, Project, "github")).ShouldBeOfType<OkObjectResult>();
+        (await Http.DeleteFederatedIssuer(UserRequest(method: "DELETE"), Org, Project, "github")).ShouldBeOfType<OkResult>();
+
+        _issuerWrites.Writes.Select(write => write.Call).ShouldBe([$"set:{Org}/{Project}/github", $"delete:{Org}/{Project}/github"]);
+        _issuerWrites.Writes[0].Caller.ShouldBeUserCaller();
+        _issuerWrites.Writes[1].Caller.ShouldBeUserCaller();
+    }
+
     [Fact]
     public async Task DeleteIssuer_WhileRulesReferenceIt_IsAllowed()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()));
 
         (await Http.DeleteFederatedIssuer(UserRequest(), Org, Project, "github")).ShouldBeOfType<OkResult>();
@@ -573,7 +593,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutIssuer_ReplacingAnExistingIssuer_ThroughARestrictedActor_IsActorRestrictedAndNotStored()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
 
         var exception = await Should.ThrowAsync<AccessDeniedException>(
@@ -595,7 +615,7 @@ public class FederationHttpTests
     [Fact]
     public async Task DeleteIssuer_ThroughARestrictedActor_IsDeleted()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
 
         (await Http.DeleteFederatedIssuer(RestrictedActor(UserRequest(method: "DELETE")), Org, Project, "github")).ShouldBeOfType<OkResult>();
@@ -605,7 +625,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutIssuer_ReplacingAnExistingIssuer_ThroughAnActorThatAllowsSecrets_IsStored()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
         var request = IssuerRequest(Rekeyed());
         request.FunctionContext.Items[FunctionContextItemKeys.DelegatedActor] = TestRequests.ActorId;
@@ -625,7 +645,7 @@ public class FederationHttpTests
     [InlineData(AccountRole.Owner, true, true)]
     public async Task IssuerRoutes_ReadByContributors_WrittenByAdministrators(AccountRole role, bool canRead, bool canWrite)
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Role = role;
 
         await ShouldBeAllowedAsync(() => Http.GetFederatedIssuers(UserRequest(), Org, Project), canRead);
@@ -639,7 +659,7 @@ public class FederationHttpTests
     [Fact]
     public async Task IssuerAndRulesRoutes_Machine_IsAccessDeniedInEveryBuild()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = MachineScopes.All });
 
         await UserOnlyRoutes.ShouldRefuseMachineAsync(() => Http.GetFederatedIssuers(MachineRequest(), Org, Project));
@@ -673,7 +693,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutRules_ReplacesTheRulesAndReturnsTheTokenEndpoint()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()));
         var rules = new List<FederationRule> { Rule("repo:acme/app:environment:prod"), Rule("repo:acme/app:ref:refs/heads/*") };
 
@@ -683,6 +703,17 @@ public class FederationHttpTests
         machine.FederationRules.ShouldBe(rules);
         machine.TokenEndpoint.ShouldBe("https://api.example/api/v1/org1/proj1/access/token");
         _access.Find(Org, Project, MachineId)!.FederationRules.ShouldBe(rules);
+    }
+
+    [Fact]
+    public async Task PutRules_PassesTheAccessCaller()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
+        _access.Add(Org, Project, FederatedMachine(Rule()));
+
+        (await Http.PutMachineFederationRules(RulesRequest([Rule("repo:acme/app:environment:prod")]), Org, Project, MachineId)).ShouldBeOfType<OkObjectResult>();
+
+        _access.Callers.ShouldHaveSingleItem().ShouldBeUserCaller();
     }
 
     [Fact]
@@ -701,7 +732,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutRules_UnsafeRule_IsBadRequest()
     {
-        await _issuers.SetAsync(Org, Project, GitHub() with { RequiredClaims = null });
+        await _issuers.SetAsync(Org, Project, GitHub() with { RequiredClaims = null }, AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()));
 
         var result = await Http.PutMachineFederationRules(RulesRequest([Rule()]), Org, Project, MachineId);
@@ -712,7 +743,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutRules_NoRules_IsBadRequest()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
 
         (await Http.PutMachineFederationRules(RulesRequest(null), Org, Project, MachineId)).ShouldBeOfType<BadRequestObjectResult>();
         (await Http.PutMachineFederationRules(RulesRequest([]), Org, Project, MachineId)).ShouldBeOfType<BadRequestObjectResult>();
@@ -723,7 +754,7 @@ public class FederationHttpTests
     [InlineData("null")]
     public async Task PutRules_WithAnEmptyOrNullBody_IsBadRequest(string body)
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()));
 
         var result = await Http.PutMachineFederationRules(RawRequest(body), Org, Project, MachineId);
@@ -739,7 +770,7 @@ public class FederationHttpTests
     [InlineData("[ { \"Issuer\": 42 } ]")]
     public async Task PutRules_WithABodyThatIsNotAListOfRules_IsBadRequest(string body)
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()));
 
         var result = await Http.PutMachineFederationRules(RawRequest(body), Org, Project, MachineId);
@@ -753,7 +784,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutRules_UnknownMachine_IsNotFound()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
 
         var result = await Http.PutMachineFederationRules(RulesRequest([Rule()]), Org, Project, MachineId);
 
@@ -763,7 +794,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutRules_MachineOfAnotherKind_IsBadRequest()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine() with { CredentialKind = MachineCredentialKind.ApiKey, FederationRules = null });
 
         var result = await Http.PutMachineFederationRules(RulesRequest([Rule()]), Org, Project, MachineId);
@@ -796,7 +827,7 @@ public class FederationHttpTests
     [InlineData(new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.SecretsRead, MachineScope.SecretsWrite, MachineScope.AnnotationManage }, AccountRole.Owner, AccountRole.Administrator)]
     public async Task PutRules_TheStoredScopes_NeedTheRoleOfTheirHighestGroup(MachineScope[] stored, AccountRole role, AccountRole needed)
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = stored });
         _access.Role = role;
         var replace = () => Http.PutMachineFederationRules(RulesRequest([Rule("repo:acme/app:environment:prod")]), Org, Project, MachineId);
@@ -824,7 +855,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutRules_OfASecretsMachine_ThroughARestrictedActor_IsActorRestrictedAndNotStored()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] });
         _access.Role = AccountRole.ContributorWithSecrets;
 
@@ -839,7 +870,7 @@ public class FederationHttpTests
     [Fact]
     public async Task PutRules_OfAMachineWithoutASecretsScope_ThroughARestrictedActor_AreReplaced()
     {
-        await _issuers.SetAsync(Org, Project, GitHub());
+        await _issuers.SetAsync(Org, Project, GitHub(), AccessCaller.System);
         _access.Add(Org, Project, FederatedMachine(Rule()));
         _access.Role = AccountRole.ContributorWithSecrets;
 
@@ -1080,5 +1111,29 @@ public class FederationHttpTests
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = rules,
         };
+    }
+
+    // The trusted issuers of an inner store, with every write the handlers make and its caller.
+    private sealed class RecordingIssuerStore(IFederatedIssuerStore inner) : IFederatedIssuerStore
+    {
+        public List<(string Call, AccessCaller Caller)> Writes { get; } = [];
+
+        public Task<IReadOnlyList<FederatedIssuer>> ListAsync(string organization, string project, CancellationToken cancellationToken = default)
+            => inner.ListAsync(organization, project, cancellationToken);
+
+        public Task<FederatedIssuer?> GetAsync(string organization, string project, string name, CancellationToken cancellationToken = default)
+            => inner.GetAsync(organization, project, name, cancellationToken);
+
+        public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
+        {
+            Writes.Add(($"set:{organization}/{project}/{issuer.Name}", caller));
+            return inner.SetAsync(organization, project, issuer, caller, cancellationToken);
+        }
+
+        public Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default)
+        {
+            Writes.Add(($"delete:{organization}/{project}/{name}", caller));
+            return inner.DeleteAsync(organization, project, name, caller, cancellationToken);
+        }
     }
 }

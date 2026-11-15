@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Federation;
 
 namespace _42.Platform.Storyteller.Access.Federation.UnitTests;
@@ -5,13 +6,15 @@ namespace _42.Platform.Storyteller.Access.Federation.UnitTests;
 // The in-memory stores behave like the Cosmos DB ones, so tests and local runs see the same rules.
 public class InMemoryStoresTests
 {
+    private static readonly AccessCaller Caller = AccessCaller.Account("user-1", "Ada");
+
     [Fact]
     public async Task IssuerStore_ListsByNameAndKeepsProjectsApart()
     {
         var store = new InMemoryFederatedIssuerStore();
-        await store.SetAsync("org1", "proj1", Issuer("zeta"));
-        await store.SetAsync("org1", "proj1", Issuer("alpha"));
-        await store.SetAsync("org1", "proj2", Issuer("beta"));
+        await store.SetAsync("org1", "proj1", Issuer("zeta"), Caller);
+        await store.SetAsync("org1", "proj1", Issuer("alpha"), Caller);
+        await store.SetAsync("org1", "proj2", Issuer("beta"), Caller);
 
         (await store.ListAsync("org1", "proj1")).Select(issuer => issuer.Name).ShouldBe(["alpha", "zeta"]);
         (await store.ListAsync("org2", "proj1")).ShouldBeEmpty();
@@ -24,13 +27,13 @@ public class InMemoryStoresTests
     public async Task IssuerStore_ReplacesAnIssuerButNotItsIssuerString()
     {
         var store = new InMemoryFederatedIssuerStore();
-        await store.SetAsync("org1", "proj1", Issuer("cluster"));
+        await store.SetAsync("org1", "proj1", Issuer("cluster"), Caller);
 
-        await store.SetAsync("org1", "proj1", Issuer("cluster") with { Description = "Production" });
+        await store.SetAsync("org1", "proj1", Issuer("cluster") with { Description = "Production" }, Caller);
         (await store.GetAsync("org1", "proj1", "cluster"))!.Description.ShouldBe("Production");
 
         var exception = await Should.ThrowAsync<InvalidInputException>(
-            () => store.SetAsync("org1", "proj1", Issuer("cluster") with { Issuer = "https://other.example" }));
+            () => store.SetAsync("org1", "proj1", Issuer("cluster") with { Issuer = "https://other.example" }, Caller));
         exception.Message.ShouldBe(FederationValidation.IssuerImmutableMessage);
         exception.ErrorCode.ShouldBe(ErrorCodes.InvalidFederation);
     }
@@ -42,26 +45,26 @@ public class InMemoryStoresTests
 
         for (var index = 0; index < FederationValidation.MaxIssuersPerProject; index++)
         {
-            await store.SetAsync("org1", "proj1", Issuer($"issuer-{index}"));
+            await store.SetAsync("org1", "proj1", Issuer($"issuer-{index}"), Caller);
         }
 
-        (await Should.ThrowAsync<InvalidInputException>(() => store.SetAsync("org1", "proj1", Issuer("one-too-many"))))
+        (await Should.ThrowAsync<InvalidInputException>(() => store.SetAsync("org1", "proj1", Issuer("one-too-many"), Caller)))
             .Message.ShouldBe(FederationValidation.TooManyIssuersMessage);
-        await Should.ThrowAsync<InvalidInputException>(() => new InMemoryFederatedIssuerStore().SetAsync("org1", "proj1", Issuer("Bad_Name")));
+        await Should.ThrowAsync<InvalidInputException>(() => new InMemoryFederatedIssuerStore().SetAsync("org1", "proj1", Issuer("Bad_Name"), Caller));
 
         // Replacing an existing one still works at the limit.
-        await store.SetAsync("org1", "proj1", Issuer("issuer-3") with { Description = "kept" });
+        await store.SetAsync("org1", "proj1", Issuer("issuer-3") with { Description = "kept" }, Caller);
     }
 
     [Fact]
     public async Task IssuerStore_DeletesOnce()
     {
         var store = new InMemoryFederatedIssuerStore();
-        await store.SetAsync("org1", "proj1", Issuer("cluster"));
+        await store.SetAsync("org1", "proj1", Issuer("cluster"), Caller);
 
-        (await store.DeleteAsync("org1", "proj1", "cluster")).ShouldBeTrue();
-        (await store.DeleteAsync("org1", "proj1", "cluster")).ShouldBeFalse();
-        (await store.DeleteAsync("org9", "proj1", "cluster")).ShouldBeFalse();
+        (await store.DeleteAsync("org1", "proj1", "cluster", Caller)).ShouldBeTrue();
+        (await store.DeleteAsync("org1", "proj1", "cluster", Caller)).ShouldBeFalse();
+        (await store.DeleteAsync("org9", "proj1", "cluster", Caller)).ShouldBeFalse();
     }
 
     [Fact]

@@ -12,6 +12,9 @@ internal sealed class FederationAccessService : IAccessService
 
     public List<string> Calls { get; } = [];
 
+    // The caller of every create and rules change, in order.
+    public List<AccessCaller> Callers { get; } = [];
+
     public Dictionary<string, Account> Accounts { get; } = new(StringComparer.Ordinal);
 
     // What CreateMachineAccessAsync returns; the router's work is not part of these tests.
@@ -47,9 +50,10 @@ internal sealed class FederationAccessService : IAccessService
         return Task.FromResult<IEnumerable<MachineAccess>>(_machines.Where(entry => entry.Key.StartsWith(prefix, StringComparison.Ordinal)).Select(entry => entry.Value).ToList());
     }
 
-    public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
+    public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model, AccessCaller caller)
     {
         Calls.Add($"create:{model.Organization}/{model.Project}");
+        Callers.Add(caller);
         return Task.FromResult(Created ?? throw new InvalidOperationException("Set Created first."));
     }
 
@@ -59,9 +63,10 @@ internal sealed class FederationAccessService : IAccessService
         return Task.FromResult(Find(organization, project, appId) is not null);
     }
 
-    public Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, IReadOnlyList<FederationRule> rules)
+    public Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, IReadOnlyList<FederationRule> rules, AccessCaller caller)
     {
         Calls.Add($"rules:{organization}/{project}/{id}");
+        Callers.Add(caller);
         var machine = Find(organization, project, id) ?? throw new NotFoundException($"The machine {id} doesn't exist.");
 
         if (machine.CredentialKind != MachineCredentialKind.Federated)
@@ -85,32 +90,32 @@ internal sealed class FederationAccessService : IAccessService
         return Task.FromResult(ids);
     }
 
-    public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+    public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
-    public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+    public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
     // The accounts the user token exchange finds.
     public Task<Account?> GetAccountAsync(string id) => Task.FromResult(Accounts.GetValueOrDefault(id));
 
-    public Task<Account> CreateAccountAsync(AccountCreate model) => throw new NotImplementedException();
+    public Task<Account> CreateAccountAsync(AccountCreate model, AccessCaller caller) => throw new NotImplementedException();
 
     public Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId) => throw new NotImplementedException();
 
     public Task<AccessPoint?> GetAccessPointAsync(string key) => throw new NotImplementedException();
 
-    public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model) => throw new NotImplementedException();
+    public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model, AccessCaller caller) => throw new NotImplementedException();
 
-    public Task<bool> GrantPermissionAsync(Permission model) => throw new NotImplementedException();
+    public Task<bool> GrantPermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
-    public Task<bool> RevokePermissionAsync(Permission model) => throw new NotImplementedException();
+    public Task<bool> RevokePermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
     public Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId) => throw new NotImplementedException();
 
-    public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, string actorId) => throw new NotImplementedException();
+    public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller) => throw new NotImplementedException();
 
-    public Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId) => throw new NotImplementedException();
+    public Task RemoveMemberAsync(string accessPointKey, string accountId, AccessCaller caller) => throw new NotImplementedException();
 
-    public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role) => throw new NotImplementedException();
+    public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller, string? detail = null) => throw new NotImplementedException();
 
     private static string Key(string organization, string project, string id) => $"{organization}/{project}/{id}";
 }

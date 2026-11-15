@@ -23,21 +23,23 @@ public class ClientCredentialsRoutingTests(CosmosFixture fixture)
 
         try
         {
-            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" });
+            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" }, AccessCaller.System);
         }
         catch
         {
             // Already exists — fine.
         }
 
-        await policyStore.SetAsync(Organization, Project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ClientCredentials });
+        await policyStore.SetAsync(Organization, Project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ClientCredentials }, AccessCaller.System);
 
-        var created = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = Project,
-            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
-        });
+        var created = await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = Project,
+                Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
+            },
+            AccessCaller.System);
 
         created.CredentialKind.ShouldBe(MachineCredentialKind.ClientCredentials);
         created.Id.ShouldStartWith("client_");
@@ -50,12 +52,12 @@ public class ClientCredentialsRoutingTests(CosmosFixture fixture)
         stored.AccessKey.ShouldBe("sec***");
 
         // The project moves back to API keys; the existing M2M machine is still managed as one.
-        await policyStore.SetAsync(Organization, Project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey });
+        await policyStore.SetAsync(Organization, Project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey }, AccessCaller.System);
 
-        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, created.Id);
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, created.Id, AccessCaller.System);
         reset.AccessKey.ShouldBe($"reset-secret-{created.ObjectId}");
 
-        (await accessService.DeleteMachineAccessAsync(Organization, Project, created.Id)).ShouldBeTrue();
+        (await accessService.DeleteMachineAccessAsync(Organization, Project, created.Id, AccessCaller.System)).ShouldBeTrue();
         (await accessService.VerifyAccessForMachineAsync(Organization, Project, created.Id)).ShouldBeFalse();
 
         identityProvider.Calls.ShouldContain($"create:{Organization}.{Project}");

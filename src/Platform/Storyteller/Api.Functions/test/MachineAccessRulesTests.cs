@@ -533,7 +533,7 @@ public class MachineAccessRulesTests
             return Task.FromResult(_policy);
         }
 
-        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy)
+        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy, AccessCaller caller)
         {
             throw new NotSupportedException();
         }

@@ -187,7 +187,7 @@ public class CertificatesHttp
 
         try
         {
-            var certificate = await _sharedCertService.IssueAsync(organization, project, model.Label, model.LifetimeDays);
+            var certificate = await _sharedCertService.IssueAsync(organization, project, model.Label, model.LifetimeDays, request.GetAccessCaller());
             return new OkObjectResult(certificate);
         }
         catch (MachineAccessNotSupportedException exception)
@@ -220,7 +220,7 @@ public class CertificatesHttp
             return new StatusCodeResult((int)HttpStatusCode.NotImplemented);
         }
 
-        var revoked = await _sharedCertService.RevokeAsync(organization, project, thumbprint);
+        var revoked = await _sharedCertService.RevokeAsync(organization, project, thumbprint, request.GetAccessCaller());
 
         return revoked
             ? new OkResult()

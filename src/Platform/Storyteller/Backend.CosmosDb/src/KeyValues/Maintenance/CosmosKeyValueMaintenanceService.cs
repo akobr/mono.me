@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.KeyValues.Audit;
 using _42.Platform.Storyteller.KeyValues.Policy;
@@ -181,7 +182,7 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
 
             try
             {
-                return await _policies.SetAsync(organization, project, recorded, cancellationToken);
+                return await _policies.SetAsync(organization, project, recorded, AccessCaller.System, cancellationToken);
             }
             catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.PolicyVersionMismatch && attempt < 2)
             {
@@ -340,7 +341,7 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
                 {
                     Version = policy.Version + 1,
                     Modified = AuditStamp.Of(AuditActor.System, _timeProvider.GetUtcNow()),
-                }, cancellationToken);
+                }, AccessCaller.System, cancellationToken);
             }
             catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.PolicyVersionMismatch && attempt < 2)
             {

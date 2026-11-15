@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.DbCreator.Commands;
 using _42.Platform.Storyteller.DbCreator.DataSets;
@@ -70,7 +71,7 @@ public class SeedCommandTests
 
         (await Command(sets: ["base"]).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
 
-        _fixture.Access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()), Times.Never);
+        _fixture.Access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()), Times.Never);
         _fixture.Importer.Calls.ShouldBeEmpty();
     }
 
@@ -153,8 +154,8 @@ public class SeedCommandTests
         (await Command(sets: ["base"], dryRun: true).OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
 
         _fixture.Importer.Calls.ShouldHaveSingleItem().Options.DryRun.ShouldBeTrue();
-        _fixture.Access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>()), Times.Never);
-        _fixture.Access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()), Times.Never);
+        _fixture.Access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>(), It.IsAny<AccessCaller>()), Times.Never);
+        _fixture.Access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()), Times.Never);
         _fixture.Records.Saves.ShouldBe(0);
     }
 

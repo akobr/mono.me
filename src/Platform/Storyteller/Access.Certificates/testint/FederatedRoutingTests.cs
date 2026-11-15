@@ -23,27 +23,37 @@ public class FederatedRoutingTests(CosmosFixture fixture)
     {
         var accessService = fixture.Services.GetRequiredService<IAccessService>();
         await EnsureProjectAsync(accessService);
-        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(Organization, Project, new MachineAuthenticationPolicy
-        {
-            EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Federated],
-            CredentialKind = MachineCredentialKind.ApiKey,
-        });
-        await fixture.Services.GetRequiredService<IFederatedIssuerStore>().SetAsync(Organization, Project, new FederatedIssuer
-        {
-            Name = "github",
-            Issuer = "https://token.actions.githubusercontent.com",
-            RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["repository_owner_id"] = ["1342004"] },
-        });
+        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(
+            Organization,
+            Project,
+            new MachineAuthenticationPolicy
+            {
+                EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Federated],
+                CredentialKind = MachineCredentialKind.ApiKey,
+            },
+            AccessCaller.System);
+        await fixture.Services.GetRequiredService<IFederatedIssuerStore>().SetAsync(
+            Organization,
+            Project,
+            new FederatedIssuer
+            {
+                Name = "github",
+                Issuer = "https://token.actions.githubusercontent.com",
+                RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["repository_owner_id"] = ["1342004"] },
+            },
+            AccessCaller.System);
         var rule = new FederationRule { Issuer = "github", Audience = "urn:storyteller:test.platform:api", Subject = "repo:acme/app:*" };
 
-        var created = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = Project,
-            Scopes = [MachineScope.ConfigurationRead],
-            CredentialKind = MachineCredentialKind.Federated,
-            FederationRules = [rule],
-        });
+        var created = await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = Project,
+                Scopes = [MachineScope.ConfigurationRead],
+                CredentialKind = MachineCredentialKind.Federated,
+                FederationRules = [rule],
+            },
+            AccessCaller.System);
 
         created.CredentialKind.ShouldBe(MachineCredentialKind.Federated);
         created.AccessKey.ShouldBeEmpty();
@@ -54,10 +64,10 @@ public class FederatedRoutingTests(CosmosFixture fixture)
         stored.FederationRules.ShouldNotBeNull();
         stored.FederationRules.Single().ShouldBe(rule);
 
-        var reset = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => accessService.ResetMachineAccessAsync(Organization, Project, created.Id));
+        var reset = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => accessService.ResetMachineAccessAsync(Organization, Project, created.Id, AccessCaller.System));
         reset.Message.ShouldBe("A Federated machine has no secret to reset. Change its federation rules instead.");
 
-        (await accessService.DeleteMachineAccessAsync(Organization, Project, created.Id)).ShouldBeTrue();
+        (await accessService.DeleteMachineAccessAsync(Organization, Project, created.Id, AccessCaller.System)).ShouldBeTrue();
         (await accessService.GetMachineAccessAsync(Organization, Project, created.Id)).ShouldBeNull();
     }
 
@@ -66,18 +76,24 @@ public class FederatedRoutingTests(CosmosFixture fixture)
     {
         var accessService = fixture.Services.GetRequiredService<IAccessService>();
         await EnsureProjectAsync(accessService);
-        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(Organization, Project, new MachineAuthenticationPolicy
-        {
-            EnabledCredentialKinds = [MachineCredentialKind.Federated],
-        });
+        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(
+            Organization,
+            Project,
+            new MachineAuthenticationPolicy
+            {
+                EnabledCredentialKinds = [MachineCredentialKind.Federated],
+            },
+            AccessCaller.System);
 
-        var exception = await Should.ThrowAsync<InvalidInputException>(() => accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = Project,
-            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
-            FederationRules = [new FederationRule { Issuer = "nobody", Audience = "urn:storyteller:test.platform:api", Subject = "sub" }],
-        }));
+        var exception = await Should.ThrowAsync<InvalidInputException>(() => accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = Project,
+                Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
+                FederationRules = [new FederationRule { Issuer = "nobody", Audience = "urn:storyteller:test.platform:api", Subject = "sub" }],
+            },
+            AccessCaller.System));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.InvalidFederation);
         exception.Message.ShouldBe("Rule 1: the trusted issuer 'nobody' doesn't exist in the project.");
@@ -133,7 +149,7 @@ public class FederatedRoutingTests(CosmosFixture fixture)
     {
         try
         {
-            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" });
+            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" }, AccessCaller.System);
         }
         catch (ConflictException)
         {

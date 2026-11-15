@@ -454,7 +454,7 @@ public class MachineAuthenticationMiddlewareTests
             return Task.FromResult(Policy);
         }
 
-        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy)
+        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy, AccessCaller caller)
         {
             throw new NotSupportedException();
         }

@@ -46,12 +46,12 @@ public class CosmosSharedCertificateStoreTests(Startup startup)
         (await store.ListAsync(Org, project)).Should().BeEmpty();
 
         var first = NewCertificate("ci");
-        await store.StoreAsync(Org, project, first);
+        await store.StoreAsync(Org, project, first, AccessCaller.System);
         (await store.ListAsync(Org, project)).Should().ContainSingle(c => c.Thumbprint == first.Thumbprint, "the write evicted the cached empty list");
 
         (await other.ListAsync(Org, project)).Should().ContainSingle();
 
-        await store.RevokeAsync(Org, project, first.Thumbprint);
+        await store.RevokeAsync(Org, project, first.Thumbprint, AccessCaller.System);
         (await store.ListAsync(Org, project)).Single().IsRevoked.Should().BeTrue("the revocation evicted the cached list");
         (await other.ListAsync(Org, project)).Single().IsRevoked.Should().BeFalse("another instance keeps its cached list until it expires");
         (await CreateStore().ListAsync(Org, project)).Single().IsRevoked.Should().BeTrue();
@@ -65,14 +65,14 @@ public class CosmosSharedCertificateStoreTests(Startup startup)
         var certificate = NewCertificate("edge");
 
         (await store.GetByThumbprintAsync(Org, project, certificate.Thumbprint)).Should().BeNull();
-        await store.StoreAsync(Org, project, certificate);
+        await store.StoreAsync(Org, project, certificate, AccessCaller.System);
 
         var found = await store.GetByThumbprintAsync(Org, project, certificate.Thumbprint.ToLowerInvariant());
         found.Should().NotBeNull("the write evicted the cached miss and the lookup ignores case");
         found!.Label.Should().Be("edge");
         found.IsRevoked.Should().BeFalse();
 
-        await store.RevokeAsync(Org, project, certificate.Thumbprint);
+        await store.RevokeAsync(Org, project, certificate.Thumbprint, AccessCaller.System);
         (await store.GetByThumbprintAsync(Org, project, certificate.Thumbprint))!.IsRevoked.Should().BeTrue();
         (await CreateStore().GetByThumbprintAsync(Org, "other-project", certificate.Thumbprint)).Should().BeNull("projects are isolated");
     }

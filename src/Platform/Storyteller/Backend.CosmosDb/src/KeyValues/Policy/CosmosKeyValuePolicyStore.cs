@@ -4,6 +4,7 @@ using System.Net;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Entities.Access;
 using _42.Platform.Storyteller.KeyValues.Policy;
 using Microsoft.Azure.Cosmos;
@@ -22,15 +23,18 @@ public class CosmosKeyValuePolicyStore : IKeyValuePolicyStore
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly IMemoryCache _cache;
+    private readonly AccessAuditRecords _audit;
 
     public CosmosKeyValuePolicyStore(
         IContainerRepositoryProvider repositoryProvider,
         IOptions<JsonSerializerOptions> serializerOptions,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        AccessAuditRecords? audit = null)
     {
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
         _cache = cache;
+        _audit = audit ?? AccessAuditRecords.Default;
     }
 
     public async Task<KeyValuePolicy> GetAsync(string organization, string project, CancellationToken cancellationToken = default)
@@ -56,9 +60,10 @@ public class CosmosKeyValuePolicyStore : IKeyValuePolicyStore
         return policy;
     }
 
-    public async Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default)
+    public async Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, AccessCaller caller, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(policy);
+        ArgumentNullException.ThrowIfNull(caller);
         var (entity, etag) = await ReadAsync(organization, project, cancellationToken);
 
         if (entity is null)
@@ -77,23 +82,33 @@ public class CosmosKeyValuePolicyStore : IKeyValuePolicyStore
         }
 
         var repository = _repositoryProvider.GetCore();
+        var batch = repository.Container.CreateTransactionalBatch(new PartitionKey(Partition))
+            .ReplaceItem(entity.Id, entity with { KeyValues = policy }, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
 
-        try
+        // Only what decides who gets secrets and how is recorded: key versions, health and rewrap progress change no view.
+        var oldView = AccessAuditValues.KeyValuePolicy(entity.KeyValues ?? KeyValuePolicyDefaults.Create());
+        var newView = AccessAuditValues.KeyValuePolicy(policy);
+
+        if (!string.Equals(oldView, newView, StringComparison.Ordinal))
         {
-            await repository.Container.ReplaceItemAsync(
-                entity with { KeyValues = policy },
-                entity.Id,
-                new PartitionKey(Partition),
-                new ItemRequestOptions { IfMatchEtag = etag },
-                cancellationToken);
+            batch.CreateItem(_audit.ForAccessPoint($"{organization}.{project}", new AccessAuditChange(AccessAuditAction.KeyValuePolicyChanged, caller)
+            {
+                OldValue = oldView,
+                NewValue = newView,
+            }));
         }
-        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.PreconditionFailed)
+
+        using var response = await batch.ExecuteAsync(cancellationToken);
+
+        if (response.Failed(HttpStatusCode.PreconditionFailed))
         {
             _cache.Remove(GetCacheKey(organization, project));
             throw new ConflictException(
                 $"The access point '{organization}.{project}' was changed concurrently; reload and retry.",
                 ErrorCodes.PolicyVersionMismatch);
         }
+
+        response.ThrowIfFailed($"Saving the key/value policy of '{organization}.{project}'");
 
         _cache.Set(GetCacheKey(organization, project), policy, CacheExpiration);
         return policy;

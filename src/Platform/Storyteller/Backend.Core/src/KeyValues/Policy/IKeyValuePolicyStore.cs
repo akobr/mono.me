@@ -1,3 +1,5 @@
+using _42.Platform.Storyteller.Accessing;
+
 namespace _42.Platform.Storyteller.KeyValues.Policy;
 
 // The policy of a project, with the defaults when none was stored. Cached briefly.
@@ -10,7 +12,8 @@ public interface IKeyValuePolicyStore
     Task<KeyValuePolicy> GetCurrentAsync(string organization, string project, CancellationToken cancellationToken = default);
 
     // Replaces the policy; a concurrent change (the stored version differs from policy.Version - 1) fails with PolicyVersionMismatch.
-    Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default);
+    // A change of what decides access (AccessAuditValues.KeyValuePolicy) writes the caller's access audit record with it.
+    Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, AccessCaller caller, CancellationToken cancellationToken = default);
 
     // Every project that has a stored policy, for the maintenance runs: an Administrator saved it, or the project's
     // first Standard write recorded its Standard key.

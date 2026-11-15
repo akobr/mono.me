@@ -83,22 +83,26 @@ public class AccessIsolationTests(Startup startup)
         var onlyOfB = await ETagAsync(OrgB, partition, onlyB);
 
         // a reset through A replaces A's hash only, and doesn't find B's machine
-        var reset = await access.ResetMachineAccessAsync(OrgA, project, shared);
+        var reset = await access.ResetMachineAccessAsync(OrgA, project, shared, AccessCaller.System);
         reset.AccessKey.Should().Be("a-key-2");
         (await HashStore.GetAsync(OrgA, project, shared))!.HashedSecret.Should().Be("a-hash-2");
         (await HashStore.GetAsync(OrgB, project, shared))!.HashedSecret.Should().Be("b-hash-1");
-        var resetOfB = () => access.ResetMachineAccessAsync(OrgA, project, onlyB);
+        var resetOfB = () => access.ResetMachineAccessAsync(OrgA, project, onlyB, AccessCaller.System);
         await resetOfB.Should().ThrowAsync<NotFoundException>();
 
         // a delete through A removes A's machine only
-        (await access.DeleteMachineAccessAsync(OrgA, project, shared)).Should().BeTrue();
-        (await access.DeleteMachineAccessAsync(OrgA, project, onlyB)).Should().BeFalse("B's machine is no machine of A");
+        (await access.DeleteMachineAccessAsync(OrgA, project, shared, AccessCaller.System)).Should().BeTrue();
+        (await access.DeleteMachineAccessAsync(OrgA, project, onlyB, AccessCaller.System)).Should().BeFalse("B's machine is no machine of A");
         (await access.GetMachineAccessAsync(OrgA, project, shared)).Should().BeNull();
         (await access.VerifyAccessForMachineAsync(OrgB, project, shared)).Should().BeTrue();
         (await access.GetMachineAccessesAsync(OrgB, project)).Select(machine => machine.Id).Should().BeEquivalentTo(new[] { shared, onlyB });
         (await HashStore.GetAsync(OrgB, project, shared))!.HashedSecret.Should().Be("b-hash-1");
         (await ETagAsync(OrgB, partition, shared)).Should().Be(sharedOfB, "nothing done through A writes B's machine");
         (await ETagAsync(OrgB, partition, onlyB)).Should().Be(onlyOfB, "nothing done through A writes B's machine");
+
+        // the access audit records of the changes stay in the organization of the change
+        await ShouldHaveRecordsAsync(OrgA, project, partition, AccessAuditAction.MachineCreated, AccessAuditAction.MachineCreated, AccessAuditAction.MachineReset, AccessAuditAction.MachineDeleted);
+        await ShouldHaveRecordsAsync(OrgB, project, partition, AccessAuditAction.MachineCreated, AccessAuditAction.MachineCreated);
     }
 
     [Fact]
@@ -119,11 +123,11 @@ public class AccessIsolationTests(Startup startup)
         var sharedOfB = await ETagAsync(OrgB, partition, shared);
         var onlyOfB = await ETagAsync(OrgB, partition, onlyB);
 
-        var updated = await access.SetMachineFederationRulesAsync(OrgA, project, shared, [Rule("github", "repo:a/other:*")]);
+        var updated = await access.SetMachineFederationRulesAsync(OrgA, project, shared, [Rule("github", "repo:a/other:*")], AccessCaller.System);
         updated.FederationRules!.Single().Subject.Should().Be("repo:a/other:*");
         (await access.GetMachineAccessAsync(OrgA, project, shared))!.FederationRules!.Single().Subject.Should().Be("repo:a/other:*");
         (await access.GetMachineAccessAsync(OrgB, project, shared))!.FederationRules!.Single().Subject.Should().Be("repo:b/app:*");
-        var rulesOfB = () => access.SetMachineFederationRulesAsync(OrgA, project, onlyB, [Rule("github", "repo:a/app:*")]);
+        var rulesOfB = () => access.SetMachineFederationRulesAsync(OrgA, project, onlyB, [Rule("github", "repo:a/app:*")], AccessCaller.System);
         await rulesOfB.Should().ThrowAsync<NotFoundException>();
 
         (await ETagAsync(OrgB, partition, shared)).Should().Be(sharedOfB, "nothing done through A writes B's machine");
@@ -136,9 +140,9 @@ public class AccessIsolationTests(Startup startup)
     {
         const string project = "trust";
         var partition = CosmosFederatedIssuerStore.GetPartition(project);
-        await Issuers().SetAsync(OrgA, project, NewIssuer("github", "a"));
-        await Issuers().SetAsync(OrgB, project, NewIssuer("github", "b"));
-        await Issuers().SetAsync(OrgB, project, NewIssuer("gitlab", "b"));
+        await Issuers().SetAsync(OrgA, project, NewIssuer("github", "a"), AccessCaller.System);
+        await Issuers().SetAsync(OrgB, project, NewIssuer("github", "b"), AccessCaller.System);
+        await Issuers().SetAsync(OrgB, project, NewIssuer("gitlab", "b"), AccessCaller.System);
 
         var listA = await Issuers().ListAsync(OrgA, project);
         listA.Select(issuer => issuer.Name).Should().Equal("github");
@@ -155,17 +159,19 @@ public class AccessIsolationTests(Startup startup)
         var gitlabOfB = await ETagAsync(OrgB, partition, "gitlab");
 
         // the replace compares the Issuer with the stored one: B's differs, so a read of B's issuer would refuse it
-        await Issuers().SetAsync(OrgA, project, NewIssuer("github", "a") with { Description = "a-github-2" });
+        await Issuers().SetAsync(OrgA, project, NewIssuer("github", "a") with { Description = "a-github-2" }, AccessCaller.System);
         (await Issuers().GetAsync(OrgA, project, "github"))!.Description.Should().Be("a-github-2");
         (await Issuers().GetAsync(OrgB, project, "github"))!.Description.Should().Be("b-github");
 
-        (await Issuers().DeleteAsync(OrgA, project, "gitlab")).Should().BeFalse("only B trusts gitlab");
-        (await Issuers().DeleteAsync(OrgA, project, "github")).Should().BeTrue();
+        (await Issuers().DeleteAsync(OrgA, project, "gitlab", AccessCaller.System)).Should().BeFalse("only B trusts gitlab");
+        (await Issuers().DeleteAsync(OrgA, project, "github", AccessCaller.System)).Should().BeTrue();
         (await Issuers().GetAsync(OrgA, project, "github")).Should().BeNull();
         (await Issuers().ListAsync(OrgA, project)).Should().BeEmpty();
         (await Issuers().ListAsync(OrgB, project)).Select(issuer => issuer.Name).Should().Equal("github", "gitlab");
         (await ETagAsync(OrgB, partition, "github")).Should().Be(githubOfB, "nothing done through A writes B's issuer");
         (await ETagAsync(OrgB, partition, "gitlab")).Should().Be(gitlabOfB, "nothing done through A writes B's issuer");
+        await ShouldHaveRecordsAsync(OrgA, project, partition, AccessAuditAction.FederatedIssuerCreated, AccessAuditAction.FederatedIssuerUpdated, AccessAuditAction.FederatedIssuerDeleted);
+        await ShouldHaveRecordsAsync(OrgB, project, partition, AccessAuditAction.FederatedIssuerCreated, AccessAuditAction.FederatedIssuerCreated);
     }
 
     [Fact]
@@ -175,12 +181,12 @@ public class AccessIsolationTests(Startup startup)
 
         for (var index = 1; index <= FederationValidation.MaxIssuersPerProject; index++)
         {
-            await Issuers().SetAsync(OrgB, project, NewIssuer($"issuer-{index:D2}", "b"));
+            await Issuers().SetAsync(OrgB, project, NewIssuer($"issuer-{index:D2}", "b"), AccessCaller.System);
         }
 
         // B's project is full; A's project of the same name has no issuer, so a count of B's would refuse A's first one
-        await Issuers().SetAsync(OrgA, project, NewIssuer("issuer-01", "a"));
-        var overTheLimit = () => Issuers().SetAsync(OrgB, project, NewIssuer("issuer-21", "b"));
+        await Issuers().SetAsync(OrgA, project, NewIssuer("issuer-01", "a"), AccessCaller.System);
+        var overTheLimit = () => Issuers().SetAsync(OrgB, project, NewIssuer("issuer-21", "b"), AccessCaller.System);
 
         (await overTheLimit.Should().ThrowAsync<InvalidInputException>()).Which.Message.Should().Be(FederationValidation.TooManyIssuersMessage);
         (await Issuers().ListAsync(OrgA, project)).Select(issuer => issuer.Name).Should().Equal("issuer-01");
@@ -195,9 +201,9 @@ public class AccessIsolationTests(Startup startup)
         var partition = AccessPartition(project);
         var shared = NewThumbprint();
         var onlyB = NewThumbprint();
-        await SharedCertificates().StoreAsync(OrgA, project, NewSharedCertificate(shared, "edge", 2030));
-        await SharedCertificates().StoreAsync(OrgB, project, NewSharedCertificate(shared, "edge", 2031));
-        await SharedCertificates().StoreAsync(OrgB, project, NewSharedCertificate(onlyB, "b-only", 2031));
+        await SharedCertificates().StoreAsync(OrgA, project, NewSharedCertificate(shared, "edge", 2030), AccessCaller.System);
+        await SharedCertificates().StoreAsync(OrgB, project, NewSharedCertificate(shared, "edge", 2031), AccessCaller.System);
+        await SharedCertificates().StoreAsync(OrgB, project, NewSharedCertificate(onlyB, "b-only", 2031), AccessCaller.System);
 
         var listA = await SharedCertificates().ListAsync(OrgA, project);
         listA.Should().ContainSingle().Which.Thumbprint.Should().Be(shared);
@@ -216,13 +222,13 @@ public class AccessIsolationTests(Startup startup)
         var sharedOfB = await ETagAsync(OrgB, partition, SharedCertificateId(shared));
         var onlyOfB = await ETagAsync(OrgB, partition, SharedCertificateId(onlyB));
 
-        (await SharedCertificates().RevokeAsync(OrgA, project, shared)).Should().BeTrue();
-        (await SharedCertificates().RevokeAsync(OrgA, project, onlyB)).Should().BeFalse("B's certificate is no certificate of A");
+        (await SharedCertificates().RevokeAsync(OrgA, project, shared, AccessCaller.System)).Should().BeTrue();
+        (await SharedCertificates().RevokeAsync(OrgA, project, onlyB, AccessCaller.System)).Should().BeFalse("B's certificate is no certificate of A");
         (await SharedCertificates().GetByThumbprintAsync(OrgA, project, shared))!.IsRevoked.Should().BeTrue();
         (await SharedCertificates().GetByThumbprintAsync(OrgB, project, shared))!.IsRevoked.Should().BeFalse();
 
         // a certificate only B has is new to A: the same id in another organization is another item, not a conflict
-        await SharedCertificates().StoreAsync(OrgA, project, NewSharedCertificate(onlyB, "a-late", 2030));
+        await SharedCertificates().StoreAsync(OrgA, project, NewSharedCertificate(onlyB, "a-late", 2030), AccessCaller.System);
         (await SharedCertificates().GetByThumbprintAsync(OrgA, project, onlyB))!.Label.Should().Be("a-late");
         (await SharedCertificates().GetByThumbprintAsync(OrgB, project, onlyB))!.Label.Should().Be("b-only");
 
@@ -408,15 +414,17 @@ public class AccessIsolationTests(Startup startup)
             FederationRules = rules,
         };
 
-        await AccessService(new TaggedMachineAccessService(HashStore, tag, machine)).CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = organization,
-            Project = project,
-            Scopes = Granted,
-            AnnotationKey = machine.AnnotationKey,
-            CredentialKind = kind,
-            FederationRules = rules,
-        });
+        await AccessService(new TaggedMachineAccessService(HashStore, tag, machine)).CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = organization,
+                Project = project,
+                Scopes = Granted,
+                AnnotationKey = machine.AnnotationKey,
+                CredentialKind = kind,
+                FederationRules = rules,
+            },
+            AccessCaller.System);
     }
 
     // The Organization of the stored document, read with the full key of the organization; null when it has no such item.
@@ -433,6 +441,15 @@ public class AccessIsolationTests(Startup startup)
         response.EnsureSuccessStatusCode();
         using var document = await JsonDocument.ParseAsync(response.Content);
         return document.RootElement.GetProperty("Organization").GetString();
+    }
+
+    // The access audit records of a partition of the organization, all of them of the organization and its project.
+    private async Task ShouldHaveRecordsAsync(string organization, string project, string partition, params AccessAuditAction[] actions)
+    {
+        var records = await StoredAccessAudit.ReadAsync(Repositories, organization, partition);
+
+        records.Select(record => record.Action).Should().Equal(actions);
+        records.Should().OnlyContain(record => record.Organization == organization && record.AccessPointKey == $"{organization}.{project}");
     }
 
     // The ETag of a stored item: the same ETag after an operation means nothing wrote the item meanwhile.

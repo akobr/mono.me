@@ -78,7 +78,8 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         string newHashedSecret)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = repository.Key($"{project}.access");
+        var partitionKeyValue = $"{project}.access";
+        var partitionKey = repository.Key(partitionKeyValue);
 
         // A concurrent write to another field (a certificate renewal) only moves the ETag, so a few retries suffice.
         const int maxAttempts = 3;
@@ -101,18 +102,19 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
                 return false;
             }
 
-            using var response = await repository.Container.PatchItemStreamAsync(
-                machineAccessId,
-                partitionKey,
-                [PatchOperation.Set($"/{nameof(MachineAccessEntity.HashedSecret)}", newHashedSecret)],
-                new PatchItemRequestOptions { IfMatchEtag = machineAccess.ETag, EnableContentResponseOnWrite = false });
+            // The new hash is the reset: when the access service opened the record of this reset, it is patched in
+            // one batch with it, so the key never changes without its access audit record.
+            var pending = PendingAccessAudit.Find(repository.Organization, partitionKeyValue, machineAccessId);
+            var status = pending is null
+                ? await PatchHashAsync(repository, machineAccessId, partitionKey, newHashedSecret, machineAccess.ETag)
+                : await PatchHashWithRecordAsync(repository, machineAccessId, partitionKey, newHashedSecret, machineAccess.ETag, pending);
 
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            if (status == HttpStatusCode.NotFound)
             {
                 throw new NotFoundException($"The machine access {machineAccessId} has not been found.");
             }
 
-            if (response.StatusCode == HttpStatusCode.PreconditionFailed)
+            if (status == HttpStatusCode.PreconditionFailed)
             {
                 if (attempt >= maxAttempts)
                 {
@@ -123,7 +125,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
                 continue;
             }
 
-            response.EnsureSuccessStatusCode();
+            pending?.MarkWritten();
             return true;
         }
     }
@@ -171,5 +173,51 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         }
 
         return true;
+    }
+
+    private static async Task<HttpStatusCode> PatchHashAsync(
+        OrganizationContainer repository,
+        string machineAccessId,
+        PartitionKey partitionKey,
+        string newHashedSecret,
+        string? eTag)
+    {
+        using var response = await repository.Container.PatchItemStreamAsync(
+            machineAccessId,
+            partitionKey,
+            [PatchOperation.Set($"/{nameof(MachineAccessEntity.HashedSecret)}", newHashedSecret)],
+            new PatchItemRequestOptions { IfMatchEtag = eTag, EnableContentResponseOnWrite = false });
+
+        if (response.StatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.PreconditionFailed))
+        {
+            response.EnsureSuccessStatusCode();
+        }
+
+        return response.StatusCode;
+    }
+
+    private static async Task<HttpStatusCode> PatchHashWithRecordAsync(
+        OrganizationContainer repository,
+        string machineAccessId,
+        PartitionKey partitionKey,
+        string newHashedSecret,
+        string? eTag,
+        PendingAccessAudit pending)
+    {
+        using var response = await repository.Container.CreateTransactionalBatch(partitionKey)
+            .PatchItem(
+                machineAccessId,
+                [PatchOperation.Set($"/{nameof(MachineAccessEntity.HashedSecret)}", newHashedSecret)],
+                new TransactionalBatchPatchItemRequestOptions { IfMatchEtag = eTag })
+            .CreateItem(pending.Record)
+            .ExecuteAsync();
+
+        if (response.Failed(HttpStatusCode.NotFound) || response.Failed(HttpStatusCode.PreconditionFailed))
+        {
+            return response.StatusCode;
+        }
+
+        response.ThrowIfFailed($"Replacing the API key of the machine access {machineAccessId}");
+        return HttpStatusCode.OK;
     }
 }

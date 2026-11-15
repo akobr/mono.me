@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.Transferring;
@@ -158,7 +159,7 @@ public class SeedTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
 
         // the project, an annotation of a file and one of a line (with the defaults, not the set's titles), and a
         // configuration the set has otherwise
-        await Access.CreateAccessPointAsync(new AccessPointCreate { Organization = organization, Project = Project, OwnerId = owner });
+        await Access.CreateAccessPointAsync(new AccessPointCreate { Organization = organization, Project = Project, OwnerId = owner }, new AccessCaller(someone));
         await Annotations.CreateAnnotationsFromStringAsync(organization, Project, target.View, ["rst.billing", "sbt.globex"], someone);
         await Configurations.CreateOrUpdateConfigurationAsync(Key(target, "rst.billing"), JObject.Parse("""{"currency":"CZK"}"""), someone);
 
@@ -334,7 +335,7 @@ public class SeedTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
     {
         using var set = TestSetFolder.Accounting();
         var (organization, owner, intruder) = (NewOrganization(), NewOwner(), NewOwner());
-        await Access.CreateAccessPointAsync(new AccessPointCreate { Organization = organization, Project = "main", OwnerId = owner });
+        await Access.CreateAccessPointAsync(new AccessPointCreate { Organization = organization, Project = "main", OwnerId = owner }, AccessCaller.Account(owner));
         var stored = await StoredItems.ReadAsync(Services, organization, "main", owner);
 
         await Should.ThrowAsync<DataSetException>(() => Seeder.SeedAsync(Request(set, organization, intruder), Cancellation));

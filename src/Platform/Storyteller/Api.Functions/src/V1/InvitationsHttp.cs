@@ -194,7 +194,7 @@ public class InvitationsHttp
         string id)
     {
         request.EnsureUser();
-        var account = await _invitations.AcceptInvitationAsync(id, await ResolveInviteeAsync(request));
+        var account = await _invitations.AcceptInvitationAsync(id, await ResolveInviteeAsync(request), request.FunctionContext.InvocationId);
         return new OkObjectResult(account);
     }
 

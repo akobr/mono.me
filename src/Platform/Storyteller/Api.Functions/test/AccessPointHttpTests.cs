@@ -90,6 +90,21 @@ public class AccessPointHttpTests
         access.Updates.ShouldBe([("acme.billing", new AccessPointUpdate { Description = "Billing of Acme." })]);
     }
 
+    // The access audit records who created and who described an access point, and the request it came with.
+    [Fact]
+    public async Task PostAccessPointsAndPutAccessPoint_PassTheAccessCaller()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        await http.PostAccessPoints(UserRequest("""{ "Organization": "acme", "Project": "billing" }"""));
+        await http.PutAccessPoint(UserRequest("""{ "Description": "Billing of Acme." }""", "PUT"), "acme.billing");
+
+        access.Callers.Count.ShouldBe(2);
+        access.Callers[0].ShouldBeUserCaller();
+        access.Callers[1].ShouldBeUserCaller();
+    }
+
     // The body of an update is optional: without one, the description is cleared, as with {}.
     [Theory]
     [InlineData("")]
@@ -300,9 +315,13 @@ public class AccessPointHttpTests
         // The keys and models the handler passed to UpdateAccessPointAsync.
         public List<(string Key, AccessPointUpdate Model)> Updates { get; } = [];
 
-        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model)
+        // The caller of every create and update, in order.
+        public List<AccessCaller> Callers { get; } = [];
+
+        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model, AccessCaller caller)
         {
             Created = model;
+            Callers.Add(caller);
             return Task.FromResult(new AccessPoint
             {
                 Key = model.Project is null ? model.Organization : $"{model.Organization}.{model.Project}",
@@ -310,10 +329,11 @@ public class AccessPointHttpTests
             });
         }
 
-        public Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate model)
+        public Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate model, AccessCaller caller)
         {
             Calls.Add($"update:{key}");
             Updates.Add((key, model));
+            Callers.Add(caller);
             return Task.FromResult(new AccessPoint
             {
                 Key = key,
@@ -338,23 +358,23 @@ public class AccessPointHttpTests
 
         public Task<Account?> GetAccountAsync(string id) => throw new NotImplementedException();
 
-        public Task<Account> CreateAccountAsync(AccountCreate model) => throw new NotImplementedException();
+        public Task<Account> CreateAccountAsync(AccountCreate model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId) => throw new NotImplementedException();
 
         public Task<AccessPoint?> GetAccessPointAsync(string key) => throw new NotImplementedException();
 
-        public Task<bool> GrantPermissionAsync(Permission model) => throw new NotImplementedException();
+        public Task<bool> GrantPermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> RevokePermissionAsync(Permission model) => throw new NotImplementedException();
+        public Task<bool> RevokePermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId) => throw new NotImplementedException();
 
-        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, string actorId) => throw new NotImplementedException();
+        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId) => throw new NotImplementedException();
+        public Task RemoveMemberAsync(string accessPointKey, string accountId, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role) => throw new NotImplementedException();
+        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller, string? detail = null) => throw new NotImplementedException();
 
         public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotImplementedException();
 
@@ -364,11 +384,11 @@ public class AccessPointHttpTests
             return Task.FromResult<MachineAccess?>(null);
         }
 
-        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotImplementedException();
+        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotImplementedException();
     }

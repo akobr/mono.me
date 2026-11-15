@@ -31,6 +31,9 @@ public class MachineResetTests(CosmosFixture fixture)
 
     private static readonly PartitionKey PartitionKey = OrganizationKeys.Key(Organization, $"{Project}.access");
 
+    // Who resets, with the invocation of the request: the access audit record keeps both.
+    private static readonly AccessCaller Admin = AccessCaller.Account("admin-1", "Ada Admin") with { CorrelationId = "invocation-reset" };
+
     private IApiKeyValidator Validator => fixture.Services.GetRequiredService<IApiKeyValidator>();
 
     private IApiKeyHashStore HashStore => fixture.Services.GetRequiredService<IApiKeyHashStore>();
@@ -47,10 +50,10 @@ public class MachineResetTests(CosmosFixture fixture)
     public async Task Reset_OfAnApiKey_ChangesOnlyTheHash(MachineCredentialKind kind, bool useSharedCertificate)
     {
         var accessService = await PrepareAsync();
-        var machine = await accessService.CreateMachineAccessAsync(Model(kind) with { UseSharedCertificate = useSharedCertificate });
+        var machine = await accessService.CreateMachineAccessAsync(Model(kind) with { UseSharedCertificate = useSharedCertificate }, AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
 
-        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
 
         var after = await ReadDocumentAsync(machine.Id);
         ChangedProperties(before!, after!).ShouldBe([nameof(MachineAccessEntity.HashedSecret)]);
@@ -82,25 +85,26 @@ public class MachineResetTests(CosmosFixture fixture)
     public async Task Reset_OfACertificateMachine_IsNotSupported_AndWritesNothing()
     {
         var accessService = await PrepareAsync();
-        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.Certificate));
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.Certificate), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
 
         var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(
-            () => accessService.ResetMachineAccessAsync(Organization, Project, machine.Id));
+            () => accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         exception.Message.ShouldBe(PolicyAwareMachineAccessService.CertificateResetNotSupportedMessage);
         exception.ErrorCode.ShouldBe(ErrorCodes.MachineAccessNotSupported);
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(before!));
+        (await ResetRecordsAsync(machine.Id)).ShouldBeEmpty();
     }
 
     [Fact]
     public async Task Reset_OfAClientCredentialsMachine_ChangesOnlyTheMaskedKey()
     {
         var accessService = await PrepareAsync();
-        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.ClientCredentials));
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.ClientCredentials), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
 
-        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
 
         var after = await ReadDocumentAsync(machine.Id);
         reset.AccessKey.ShouldBe($"reset-secret-{machine.ObjectId}");
@@ -113,13 +117,13 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task Reset_DeletedBeforeTheRouter_AnswersNotFound_AndBringsNothingBack()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var router = new InterleavingRouter(fixture.Services.GetRequiredService<IMachineAccessService>())
         {
             BeforeReset = () => DeleteAsync(machine.Id),
         };
 
-        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id));
+        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         exception.Message.ShouldBe(DeletedDuringItsReset(machine.Id));
         router.IssuedKey.ShouldBeNull();
@@ -130,13 +134,13 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task Reset_DeletedBeforeTheHashReplace_AnswersNotFound_AndBringsNothingBack()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var hashStore = new InterleavingHashStore(HashStore)
         {
             BeforeReplace = () => DeleteAsync(machine.Id),
         };
 
-        await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id));
+        await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         (await ReadDocumentAsync(machine.Id)).ShouldBeNull();
         (await Validator.ValidateAsync(machine.AccessKey)).ShouldBeNull();
@@ -146,13 +150,13 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task Reset_DeletedAfterTheRouter_AnswersNotFound_AndBringsNothingBack()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var router = new InterleavingRouter(fixture.Services.GetRequiredService<IMachineAccessService>())
         {
             AfterReset = () => DeleteAsync(machine.Id),
         };
 
-        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id));
+        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         exception.Message.ShouldBe(DeletedDuringItsReset(machine.Id));
         (await ReadDocumentAsync(machine.Id)).ShouldBeNull();
@@ -165,7 +169,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task Reset_HashClearedByADeleteBeforeTheRouter_AnswersNotFound_AndWritesNothing()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
         JsonObject? cleared = null;
         var router = new InterleavingRouter(fixture.Services.GetRequiredService<IMachineAccessService>())
@@ -173,12 +177,13 @@ public class MachineResetTests(CosmosFixture fixture)
             BeforeReset = async () => cleared = await ClearTheHashAsync(machine.Id),
         };
 
-        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id));
+        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         exception.Message.ShouldBe(DeletedDuringItsReset(machine.Id));
         router.IssuedKey.ShouldBeNull();
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(cleared!));
         await ShouldHoldOnlyTheClearedHashAsync(before!, machine, router.IssuedKey);
+        (await ResetRecordsAsync(machine.Id)).ShouldBeEmpty();
     }
 
     // A delete that cleared the hash before the reset read the machine, or stopped after it (as the compensation of a
@@ -190,15 +195,16 @@ public class MachineResetTests(CosmosFixture fixture)
     public async Task Reset_HashClearedBeforeTheRead_AnswersNotFound_AndWritesNothing(MachineCredentialKind kind)
     {
         var accessService = await PrepareAsync();
-        var machine = await accessService.CreateMachineAccessAsync(Model(kind));
+        var machine = await accessService.CreateMachineAccessAsync(Model(kind), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
         var cleared = await ClearTheHashAsync(machine.Id);
 
-        var exception = await Should.ThrowAsync<NotFoundException>(() => accessService.ResetMachineAccessAsync(Organization, Project, machine.Id));
+        var exception = await Should.ThrowAsync<NotFoundException>(() => accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         exception.Message.ShouldBe($"The machine access {machine.Id} has no API key to reset; it is being deleted, or its creation failed. Delete it and create a new one.");
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(cleared));
         await ShouldHoldOnlyTheClearedHashAsync(before!, machine, issuedKey: null);
+        (await ResetRecordsAsync(machine.Id)).ShouldBeEmpty();
     }
 
     // A ClientCredentials machine never has a hash. Its identity provider giving no secret is a failure there, not a
@@ -206,20 +212,21 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task Reset_OfAClientCredentialsMachineWithoutASecret_IsNotAnsweredAsDeleted()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ClientCredentials));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ClientCredentials), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
 
         var exception = await Should.ThrowAsync<InvalidOperationException>(
-            () => CreateAccessService(new SecretlessRouter()).ResetMachineAccessAsync(Organization, Project, machine.Id));
+            () => CreateAccessService(new SecretlessRouter()).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         exception.Message.ShouldBe($"The machine access {machine.Id} reset failed.");
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(before!));
+        (await ResetRecordsAsync(machine.Id)).ShouldBeEmpty();
     }
 
     [Fact]
     public async Task Reset_HashClearedByADeleteBeforeTheHashReplace_AnswersNotFound_AndWritesNothing()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
         JsonObject? cleared = null;
         var hashStore = new InterleavingHashStore(HashStore)
@@ -227,26 +234,27 @@ public class MachineResetTests(CosmosFixture fixture)
             BeforeReplace = async () => cleared = await ClearTheHashAsync(machine.Id),
         };
 
-        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id));
+        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         // The hash store's own answer: it finds no hash to replace.
         exception.Message.ShouldBe($"The machine access {machine.Id} has not been found.");
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(cleared!));
         await ShouldHoldOnlyTheClearedHashAsync(before!, machine, issuedKey: null);
+        (await ResetRecordsAsync(machine.Id)).ShouldBeEmpty();
     }
 
     // The new hash was written, then the delete cleared it. Answering 200 would hand out a key that never works.
     [Fact]
     public async Task Reset_HashClearedByADeleteAfterTheRouter_AnswersNotFound_AndLeavesNoWorkingKey()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
         var router = new InterleavingRouter(fixture.Services.GetRequiredService<IMachineAccessService>())
         {
             AfterReset = () => ClearTheHashAsync(machine.Id),
         };
 
-        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id));
+        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         // The masked-key patch did run, but it wrote the 2s.*** that was already there.
         exception.Message.ShouldBe(DeletedDuringItsReset(machine.Id));
@@ -257,7 +265,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task Reset_RenewedBeforeTheHashReplace_KeepsTheRenewal()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel());
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel(), AccessCaller.System);
         string? renewedThumbprint = null;
         JsonObject? renewed = null;
         var hashStore = new InterleavingHashStore(HashStore)
@@ -269,7 +277,7 @@ public class MachineResetTests(CosmosFixture fixture)
             },
         };
 
-        var reset = await CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id);
+        var reset = await CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
 
         ChangedProperties(renewed!, (await ReadDocumentAsync(machine.Id))!).ShouldBe([nameof(MachineAccessEntity.HashedSecret)]);
         await ShouldKeepTheRenewalAsync(machine, renewedThumbprint!, reset);
@@ -278,7 +286,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task Reset_RenewedAfterTheRouter_KeepsTheRenewal()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel());
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel(), AccessCaller.System);
         string? renewedThumbprint = null;
         JsonObject? renewed = null;
         var router = new InterleavingRouter(fixture.Services.GetRequiredService<IMachineAccessService>())
@@ -290,7 +298,7 @@ public class MachineResetTests(CosmosFixture fixture)
             },
         };
 
-        var reset = await CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id);
+        var reset = await CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
 
         // The masked key was already 2s.***, so the patch leaves the renewed document as it was.
         ChangedProperties(renewed!, (await ReadDocumentAsync(machine.Id))!).ShouldBeEmpty();
@@ -298,11 +306,12 @@ public class MachineResetTests(CosmosFixture fixture)
     }
 
     // After every read of the access service, right before its write. A write of a copy read earlier (a re-read and
-    // an upsert, say) would put the old certificate back; the strict container refuses any write but a patch.
+    // an upsert, say) would put the old certificate back; the strict container refuses any write but a patch or a batch,
+    // and records both.
     [Fact]
     public async Task Reset_RenewedBeforeTheReadBack_KeepsTheRenewal_AndWritesNothingAfterTheHash()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel());
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel(), AccessCaller.System);
         string? renewedThumbprint = null;
         JsonObject? renewed = null;
         var reads = 0;
@@ -322,42 +331,161 @@ public class MachineResetTests(CosmosFixture fixture)
 
         // The real router, so the real hash store over the real container; only the access service is wrapped.
         var accessService = CreateAccessService(fixture.Services.GetRequiredService<IMachineAccessService>(), repositoryProvider);
-        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
 
-        // The mask of an API key does not change, so the reset writes nothing after the hash.
+        // The mask of an API key does not change, so the reset writes nothing after the hash: its record went with
+        // the hash, in the batch of the hash store.
         statuses.ShouldBeEmpty();
         reads.ShouldBe(2);
         ChangedProperties(renewed!, (await ReadDocumentAsync(machine.Id))!).ShouldBeEmpty();
         await ShouldKeepTheRenewalAsync(machine, renewedThumbprint!, reset);
+        (await ResetRecordsAsync(machine.Id)).ShouldHaveSingleItem();
     }
 
+    // Only the winner is recorded: the loser changed nothing.
     [Fact]
     public async Task Reset_AnotherResetWonTheHash_AnswersConflict_AndKeepsTheWinner()
     {
         var accessService = await PrepareAsync();
-        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         MachineAccess? winner = null;
         JsonObject? won = null;
         var hashStore = new InterleavingHashStore(HashStore)
         {
             BeforeReplace = async () =>
             {
-                winner = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
+                winner = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, Admin);
                 won = await ReadDocumentAsync(machine.Id);
             },
         };
 
-        await Should.ThrowAsync<ConflictException>(() => CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id));
+        await Should.ThrowAsync<ConflictException>(() => CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
 
         ETag((await ReadDocumentAsync(machine.Id))!).ShouldBe(ETag(won!));
         (await Validator.ValidateAsync(winner!.AccessKey)).ShouldNotBeNull();
         (await Validator.ValidateAsync(machine.AccessKey)).ShouldBeNull();
+        (await ResetRecordsAsync(machine.Id)).ShouldHaveSingleItem().Record.Actor.ShouldBe(Admin.Actor);
+    }
+
+    // The access audit record of an API key's reset: one, written in the batch of the new hash, with what was replaced
+    // and never the key or a hash. A CertificateAndApiKey machine resets only its API key.
+    [Theory]
+    [InlineData(MachineCredentialKind.ApiKey, false)]
+    [InlineData(MachineCredentialKind.CertificateAndApiKey, false)]
+    [InlineData(MachineCredentialKind.CertificateAndApiKey, true)]
+    public async Task Reset_OfAnApiKey_RecordsOneReset_WithoutTheKeyOrAHash(MachineCredentialKind kind, bool useSharedCertificate)
+    {
+        var accessService = await PrepareAsync();
+        var machine = await accessService.CreateMachineAccessAsync(Model(kind) with { UseSharedCertificate = useSharedCertificate }, AccessCaller.System);
+        var before = await ReadDocumentAsync(machine.Id);
+
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, Admin);
+
+        var after = await ReadDocumentAsync(machine.Id);
+        var record = (await ResetRecordsAsync(machine.Id)).ShouldHaveSingleItem();
+        record.ShouldBeBy(Admin, Organization, Project, $"{Project}.access");
+        record.Record.Target.ShouldBe(AccessAuditTarget.Machine(machine.Id));
+        record.Record.OldValue.ShouldBeNull();
+        record.Record.NewValue.ShouldBe(kind.ToString());
+        record.Record.Detail.ShouldBe("The API key was replaced.");
+        record.ShouldHoldNoSecret(machine.AccessKey, reset.AccessKey, Hash(before!), Hash(after!), machine.Certificate, machine.CertificatePassword);
+    }
+
+    [Fact]
+    public async Task Reset_Twice_RecordsEachReset()
+    {
+        var accessService = await PrepareAsync();
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
+
+        await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, Admin);
+        await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
+
+        var records = await ResetRecordsAsync(machine.Id);
+        records.Select(stored => stored.Record.Actor).ShouldBe([Admin.Actor, AuditActor.System]);
+        records.Select(stored => stored.Record.Id).Distinct().Count().ShouldBe(2);
+    }
+
+    // A renewal between the hash store's read and its batch only moves the ETag: the batch of the hash and the record
+    // fails as a whole (412), and its retry stores both, once.
+    [Fact]
+    public async Task Reset_RenewedBetweenTheReadAndTheBatchOfTheHash_RetriesAndRecordsOnce()
+    {
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel(), AccessCaller.System);
+        var statuses = new List<HttpStatusCode>();
+        string? renewedThumbprint = null;
+        var hashStore = CreateHashStore(FirstOnly(async () => renewedThumbprint = await RenewAsync(machine)), statuses);
+
+        var reset = await CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id, Admin);
+
+        statuses.ShouldBe([HttpStatusCode.PreconditionFailed, HttpStatusCode.OK]);
+        await ShouldKeepTheRenewalAsync(machine, renewedThumbprint!, reset);
+        (await ResetRecordsAsync(machine.Id)).ShouldHaveSingleItem().Record.Actor.ShouldBe(Admin.Actor);
+    }
+
+    // Another reset lands between the hash store's read and its batch: the batch fails on the ETag (412), the store reads
+    // the winner's hash, and the loser answers 409 without a record.
+    [Fact]
+    public async Task Reset_LosingAtTheBatchOfTheHash_AnswersConflict_AndRecordsOnlyTheWinner()
+    {
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
+        var statuses = new List<HttpStatusCode>();
+        MachineAccess? winner = null;
+        var hashStore = CreateHashStore(
+            FirstOnly(async () => winner = await fixture.Services.GetRequiredService<IAccessService>().ResetMachineAccessAsync(Organization, Project, machine.Id, Admin)),
+            statuses);
+
+        await Should.ThrowAsync<ConflictException>(() => CreateAccessService(hashStore).ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System));
+
+        statuses.ShouldBe([HttpStatusCode.PreconditionFailed]);
+        (await ResetRecordsAsync(machine.Id)).ShouldHaveSingleItem().Record.Actor.ShouldBe(Admin.Actor);
+        (await Validator.ValidateAsync(winner!.AccessKey)).ShouldNotBeNull();
+    }
+
+    // The identity provider replaced the secret outside any transaction of ours: the service patches the mask in one batch
+    // with the record, always, also when the mask stays the same, before it hands the secret out.
+    [Fact]
+    public async Task Reset_OfAClientCredentialsMachine_RecordsEveryReset_WithTheMaskPatched()
+    {
+        var accessService = await PrepareAsync();
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.ClientCredentials), AccessCaller.System);
+
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, Admin);
+        var first = await ReadDocumentAsync(machine.Id);
+        await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
+
+        // The recording provider issues the same secret again, so the second patch keeps the mask.
+        first![nameof(MachineAccessEntity.AccessKey)]!.GetValue<string>().ShouldBe("res***");
+        ETag((await ReadDocumentAsync(machine.Id))!).ShouldNotBe(ETag(first));
+        var records = await ResetRecordsAsync(machine.Id);
+        records.Select(stored => stored.Record.Actor).ShouldBe([Admin.Actor, AuditActor.System]);
+        records[0].ShouldBeBy(Admin, Organization, Project, $"{Project}.access");
+        records[0].Record.Target.ShouldBe(AccessAuditTarget.Machine(machine.Id));
+        records[0].Record.NewValue.ShouldBe(nameof(MachineCredentialKind.ClientCredentials));
+        records[0].Record.Detail.ShouldBe("The client secret was replaced.");
+        records[0].ShouldHoldNoSecret(machine.AccessKey, reset.AccessKey);
+    }
+
+    // The batch of the mask and the record finds no machine: neither is stored, and the new secret never leaves.
+    [Fact]
+    public async Task Reset_OfAClientCredentialsMachineDeletedAfterTheRouter_AnswersNotFound_AndRecordsNothing()
+    {
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ClientCredentials), AccessCaller.System);
+        var router = new InterleavingRouter(fixture.Services.GetRequiredService<IMachineAccessService>())
+        {
+            AfterReset = () => DeleteAsync(machine.Id),
+        };
+
+        var exception = await Should.ThrowAsync<NotFoundException>(() => CreateAccessService(router).ResetMachineAccessAsync(Organization, Project, machine.Id, Admin));
+
+        exception.Message.ShouldBe(DeletedDuringItsReset(machine.Id));
+        (await ReadDocumentAsync(machine.Id)).ShouldBeNull();
+        (await ResetRecordsAsync(machine.Id)).ShouldBeEmpty();
     }
 
     [Fact]
     public async Task HashStore_ReplaceOverAStaleHash_ReturnsFalse_AndKeepsTheStoredHash()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
 
         (await HashStore.ReplaceAsync(Organization, Project, machine.Id, "stale-hash", "new-hash")).ShouldBeFalse();
@@ -391,7 +519,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task HashStore_DeleteOnAStoredMachine_ClearsOnlyTheHash()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.CertificateAndApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.CertificateAndApiKey), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
 
         (await HashStore.DeleteAsync(Organization, Project, machine.Id)).ShouldBeTrue();
@@ -405,7 +533,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task HashStore_ReplaceRenewedBetweenItsReadAndPatch_RetriesAndKeepsTheRenewal()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel());
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(RenewableModel(), AccessCaller.System);
         var stored = await HashStore.GetAsync(Organization, Project, machine.Id);
         var statuses = new List<HttpStatusCode>();
         string? renewedThumbprint = null;
@@ -422,7 +550,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task HashStore_ReplaceOverAHashChangedBetweenItsReadAndPatch_ReturnsFalse()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var stored = await HashStore.GetAsync(Organization, Project, machine.Id);
         var statuses = new List<HttpStatusCode>();
         var hashStore = CreateHashStore(
@@ -438,7 +566,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task HashStore_ReplaceChangedBeforeEveryPatch_IsAConflict()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var stored = await HashStore.GetAsync(Organization, Project, machine.Id);
         var statuses = new List<HttpStatusCode>();
         var hashStore = CreateHashStore(() => TouchAsync(machine.Id), statuses);
@@ -453,7 +581,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task HashStore_ReplaceDeletedBetweenItsReadAndPatch_ThrowsNotFound_AndCreatesNothing()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var stored = await HashStore.GetAsync(Organization, Project, machine.Id);
         var statuses = new List<HttpStatusCode>();
         var hashStore = CreateHashStore(FirstOnly(() => DeleteAsync(machine.Id)), statuses);
@@ -469,7 +597,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task HashStore_ReplaceWhoseHashIsClearedBetweenItsReadAndPatch_ThrowsNotFound()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var stored = await HashStore.GetAsync(Organization, Project, machine.Id);
         var statuses = new List<HttpStatusCode>();
         JsonObject? cleared = null;
@@ -487,7 +615,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task HashStore_DeleteOnAMachineDeletedBetweenItsReadAndPatch_ReturnsTrue_AndCreatesNothing()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey), AccessCaller.System);
         var statuses = new List<HttpStatusCode>();
         var hashStore = CreateHashStore(FirstOnly(() => DeleteAsync(machine.Id)), statuses);
 
@@ -500,7 +628,7 @@ public class MachineResetTests(CosmosFixture fixture)
     [Fact]
     public async Task HashStore_StoreOnAStoredMachine_ChangesOnlyTheHashAndTheScopes()
     {
-        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.CertificateAndApiKey));
+        var machine = await (await PrepareAsync()).CreateMachineAccessAsync(Model(MachineCredentialKind.CertificateAndApiKey), AccessCaller.System);
         var before = await ReadDocumentAsync(machine.Id);
 
         await HashStore.StoreAsync(Organization, Project, machine.Id, "hash-2", [MachineScope.ConfigurationRead]);
@@ -521,6 +649,12 @@ public class MachineResetTests(CosmosFixture fixture)
             .Where(name => !JsonNode.DeepEquals(before[name], after[name]))
             .Order(StringComparer.Ordinal)
             .ToArray();
+    }
+
+    // The stored hash of a machine document.
+    private static string Hash(JsonObject document)
+    {
+        return document[nameof(MachineAccessEntity.HashedSecret)]!.GetValue<string>();
     }
 
     // Moves with every write, so an equal one proves that nothing was written.
@@ -568,6 +702,14 @@ public class MachineResetTests(CosmosFixture fixture)
         return Model(MachineCredentialKind.CertificateAndApiKey) with { CertificateLifetimeDays = 10 };
     }
 
+    // The access audit records of the machine's resets, oldest first.
+    private async Task<IReadOnlyList<StoredAccessAudit>> ResetRecordsAsync(string machineId)
+    {
+        return (await StoredAccessAudit.ReadMachineAsync(fixture.Services, Organization, Project, machineId))
+            .Where(stored => stored.Record.Action == AccessAuditAction.MachineReset)
+            .ToList();
+    }
+
     private async Task ShouldKeepTheRenewalAsync(MachineAccess machine, string renewedThumbprint, MachineAccess reset)
     {
         var stored = (await ReadDocumentAsync(machine.Id))!;
@@ -604,24 +746,28 @@ public class MachineResetTests(CosmosFixture fixture)
 
         try
         {
-            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" });
+            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" }, AccessCaller.System);
         }
         catch (ConflictException)
         {
             // Already exists.
         }
 
-        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(Organization, Project, new MachineAuthenticationPolicy
-        {
-            EnabledCredentialKinds =
-            [
-                MachineCredentialKind.ApiKey,
-                MachineCredentialKind.Certificate,
-                MachineCredentialKind.CertificateAndApiKey,
-                MachineCredentialKind.ClientCredentials,
-            ],
-            CredentialKind = MachineCredentialKind.ApiKey,
-        });
+        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(
+            Organization,
+            Project,
+            new MachineAuthenticationPolicy
+            {
+                EnabledCredentialKinds =
+                [
+                    MachineCredentialKind.ApiKey,
+                    MachineCredentialKind.Certificate,
+                    MachineCredentialKind.CertificateAndApiKey,
+                    MachineCredentialKind.ClientCredentials,
+                ],
+                CredentialKind = MachineCredentialKind.ApiKey,
+            },
+            AccessCaller.System);
 
         return accessService;
     }
@@ -646,8 +792,8 @@ public class MachineResetTests(CosmosFixture fixture)
             fixture.Services.GetRequiredService<IOptions<JsonSerializerOptions>>());
     }
 
-    // The organization's real container behind a strict wrapper: reads go through, a patch runs the step first and
-    // records the status it got. Any other call (an upsert, a replace) fails the test.
+    // The organization's real container behind a strict wrapper: reads go through, a patch or a batch runs the step first
+    // and records the status it got. Any other call (an upsert, a replace) fails the test.
     private IContainerRepositoryProvider CreateInterleavingProvider(Func<Task> beforePatch, List<HttpStatusCode> patchStatuses, Func<Task>? beforeRead = null)
     {
         var real = Container;
@@ -672,6 +818,9 @@ public class MachineResetTests(CosmosFixture fixture)
                 patchStatuses.Add(response.StatusCode);
                 return response;
             });
+        container
+            .Setup(c => c.CreateTransactionalBatch(It.IsAny<PartitionKey>()))
+            .Returns((PartitionKey partitionKey) => new InterleavingBatch(real.CreateTransactionalBatch(partitionKey), beforePatch, patchStatuses));
 
         // a real scope over the wrapper (the class is sealed): the keys are the organization's, the calls reach the wrapper
         var repository = new OrganizationContainer(Organization, container.Object);
@@ -699,7 +848,7 @@ public class MachineResetTests(CosmosFixture fixture)
     // A real delete: the credential first, then the document.
     private async Task DeleteAsync(string id)
     {
-        (await fixture.Services.GetRequiredService<IAccessService>().DeleteMachineAccessAsync(Organization, Project, id)).ShouldBeTrue();
+        (await fixture.Services.GetRequiredService<IAccessService>().DeleteMachineAccessAsync(Organization, Project, id, AccessCaller.System)).ShouldBeTrue();
     }
 
     // A delete in progress: the first step of a real delete (the hash cleared), and the document read afterwards.
@@ -789,6 +938,53 @@ public class MachineResetTests(CosmosFixture fixture)
         public Task<string?> ResetMachineAccessAsync(MachineAccess existingAccess, string organization, string project) => Task.FromResult<string?>(null);
 
         public Task<bool> DeleteMachineAccessAsync(string objectId, string organization, string project) => throw new NotSupportedException();
+    }
+
+    // A batch of the real container that runs the step before it executes and records the status it got: the patch of
+    // a hash or a mask with its access audit record. Any other operation fails the test.
+    private sealed class InterleavingBatch(TransactionalBatch inner, Func<Task> beforeExecute, List<HttpStatusCode> statuses) : TransactionalBatch
+    {
+        public override TransactionalBatch CreateItem<T>(T item, TransactionalBatchItemRequestOptions? requestOptions = null)
+        {
+            inner.CreateItem(item, requestOptions);
+            return this;
+        }
+
+        public override TransactionalBatch PatchItem(string id, IReadOnlyList<PatchOperation> patchOperations, TransactionalBatchPatchItemRequestOptions? requestOptions = null)
+        {
+            inner.PatchItem(id, patchOperations, requestOptions);
+            return this;
+        }
+
+        public override TransactionalBatch CreateItemStream(Stream streamPayload, TransactionalBatchItemRequestOptions? requestOptions = null) => throw new NotSupportedException();
+
+        public override TransactionalBatch ReadItem(string id, TransactionalBatchItemRequestOptions? requestOptions = null) => throw new NotSupportedException();
+
+        public override TransactionalBatch UpsertItem<T>(T item, TransactionalBatchItemRequestOptions? requestOptions = null) => throw new NotSupportedException();
+
+        public override TransactionalBatch UpsertItemStream(Stream streamPayload, TransactionalBatchItemRequestOptions? requestOptions = null) => throw new NotSupportedException();
+
+        public override TransactionalBatch ReplaceItem<T>(string id, T item, TransactionalBatchItemRequestOptions? requestOptions = null) => throw new NotSupportedException();
+
+        public override TransactionalBatch ReplaceItemStream(string id, Stream streamPayload, TransactionalBatchItemRequestOptions? requestOptions = null) => throw new NotSupportedException();
+
+        public override TransactionalBatch DeleteItem(string id, TransactionalBatchItemRequestOptions? requestOptions = null) => throw new NotSupportedException();
+
+        public override async Task<TransactionalBatchResponse> ExecuteAsync(CancellationToken cancellationToken = default)
+        {
+            await beforeExecute();
+            var response = await inner.ExecuteAsync(cancellationToken);
+            statuses.Add(response.StatusCode);
+            return response;
+        }
+
+        public override async Task<TransactionalBatchResponse> ExecuteAsync(TransactionalBatchRequestOptions requestOptions, CancellationToken cancellationToken = default)
+        {
+            await beforeExecute();
+            var response = await inner.ExecuteAsync(requestOptions, cancellationToken);
+            statuses.Add(response.StatusCode);
+            return response;
+        }
     }
 
     // Runs a step after the API key service read the stored hash and before it replaces it.

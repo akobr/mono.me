@@ -188,12 +188,14 @@ public class CertificateRenewalTests(CosmosFixture fixture)
         try
         {
             var accessService = fixture.Services.GetRequiredService<IAccessService>();
-            await accessService.CreateAccessPointAsync(new AccessPointCreate
-            {
-                Organization = Organization,
-                Project = Project,
-                OwnerId = "test-owner",
-            });
+            await accessService.CreateAccessPointAsync(
+                new AccessPointCreate
+                {
+                    Organization = Organization,
+                    Project = Project,
+                    OwnerId = "test-owner",
+                },
+                AccessCaller.System);
         }
         catch
         {

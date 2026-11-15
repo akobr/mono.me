@@ -11,12 +11,13 @@ public class FederatedMachineAccessServiceTests
     public FederatedMachineAccessServiceTests()
     {
         _service = new FederatedMachineAccessService(_issuers);
-        _issuers.SetAsync("org1", "proj1", new FederatedIssuer
+        var issuer = new FederatedIssuer
         {
             Name = "cluster",
             Issuer = "https://oidc.prod-aks.azure.com/tenant/issuer/",
             KeySource = FederatedIssuerKeySource.Discovery,
-        }).GetAwaiter().GetResult();
+        };
+        _issuers.SetAsync("org1", "proj1", issuer, AccessCaller.System).GetAwaiter().GetResult();
     }
 
     [Fact]

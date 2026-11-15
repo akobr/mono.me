@@ -1,15 +1,17 @@
 using System.Text.Json;
+using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace _42.Platform.Storyteller.DbCreator.IntegrationTests;
 
 // What a target holds in the database, with the ETag of every item: the items of the organization in the container
-// organizations ("{PartitionKey}/{id}") and, in core, its access points and the owner's account ("core/{id}"). Two
-// equal snapshots mean that nothing was written in between.
+// organizations ("{PartitionKey}/{id}") and, in core, its access points, the owner's account and the organization's
+// access audit records ("core/{id}"). Two equal snapshots mean that nothing was written in between, no record of an
+// access change either.
 public static class StoredItems
 {
-    // the partition of accounts and access points in core (CosmosAccessService)
+    // the partition of accounts, access points and their access audit records in core (CosmosAccessService)
     private const string AccessPartition = "access";
 
     public static async Task<IReadOnlyDictionary<string, string>> ReadAsync(
@@ -36,6 +38,11 @@ public static class StoredItems
             items[$"core/{id}"] = response.Headers.ETag;
         }
 
+        using var records = core.GetItemQueryStreamIterator(
+            AccessAuditQuery("SELECT c.id, c._etag", organization),
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(AccessPartition) });
+        await CollectAsync(records, items, item => $"core/{item.GetProperty("id").GetString()}");
+
         return items;
     }
 
@@ -47,7 +54,39 @@ public static class StoredItems
             new QueryDefinition("SELECT c.id, c.PartitionKey, c._etag FROM c WHERE c.Organization = @organization"));
         var items = new Dictionary<string, string>(StringComparer.Ordinal);
         using var iterator = repository.Container.GetItemQueryStreamIterator(query, requestOptions: repository.QueryOptions());
+        await CollectAsync(iterator, items, item => $"{item.GetProperty("PartitionKey").GetString()}/{item.GetProperty("id").GetString()}");
 
+        return items;
+    }
+
+    // The access audit records of the organization in core "access" (its access points and memberships), oldest first:
+    // the id order is the time order.
+    public static async Task<IReadOnlyList<AccessAuditEntity>> ReadAccessAuditAsync(IServiceProvider services, string organization)
+    {
+        var core = services.GetRequiredService<IContainerRepositoryProvider>().GetCore().Container;
+        var records = new List<AccessAuditEntity>();
+        using var iterator = core.GetItemQueryIterator<AccessAuditEntity>(
+            AccessAuditQuery("SELECT *", organization),
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(AccessPartition) });
+
+        while (iterator.HasMoreResults)
+        {
+            records.AddRange(await iterator.ReadNextAsync());
+        }
+
+        return records.OrderBy(record => record.Id, StringComparer.Ordinal).ToList();
+    }
+
+    private static QueryDefinition AccessAuditQuery(string select, string organization)
+    {
+        return new QueryDefinition($"{select} FROM c WHERE STARTSWITH(c.id, @prefix) AND c.Organization = @organization")
+            .WithParameter("@prefix", AccessAuditEntity.IdPrefix)
+            .WithParameter("@organization", organization);
+    }
+
+    // The ETag of every item of the pages, by the key of the item.
+    private static async Task CollectAsync(FeedIterator iterator, Dictionary<string, string> items, Func<JsonElement, string> keyOf)
+    {
         while (iterator.HasMoreResults)
         {
             using var response = await iterator.ReadNextAsync();
@@ -56,11 +95,8 @@ public static class StoredItems
 
             foreach (var item in page.RootElement.GetProperty("Documents").EnumerateArray())
             {
-                var key = $"{item.GetProperty("PartitionKey").GetString()}/{item.GetProperty("id").GetString()}";
-                items[key] = item.GetProperty("_etag").GetString()!;
+                items[keyOf(item)] = item.GetProperty("_etag").GetString()!;
             }
         }
-
-        return items;
     }
 }

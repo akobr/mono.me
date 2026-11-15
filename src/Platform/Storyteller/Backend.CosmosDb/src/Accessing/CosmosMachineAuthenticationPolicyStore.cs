@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing;
@@ -17,15 +18,18 @@ public class CosmosMachineAuthenticationPolicyStore : IMachineAuthenticationPoli
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly IMemoryCache _cache;
+    private readonly AccessAuditRecords _audit;
 
     public CosmosMachineAuthenticationPolicyStore(
         IContainerRepositoryProvider repositoryProvider,
         IOptions<JsonSerializerOptions> serializerOptions,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        AccessAuditRecords? audit = null)
     {
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
         _cache = cache;
+        _audit = audit ?? AccessAuditRecords.Default;
     }
 
     public async Task<MachineAuthenticationPolicy?> GetAsync(string organization, string project)
@@ -50,24 +54,59 @@ public class CosmosMachineAuthenticationPolicyStore : IMachineAuthenticationPoli
         return policy;
     }
 
-    public async Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy)
+    public async Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy, AccessCaller caller)
     {
+        ArgumentNullException.ThrowIfNull(caller);
         var repository = _repositoryProvider.GetCore();
         var accessPointId = $"apt.{organization}.{project}";
         var partitionKey = new PartitionKey(Partition);
 
-        var entity = await repository.Container.TryReadItemAsync(
-            accessPointId,
-            partitionKey,
-            stream => stream.DeserializeSystemTextJson<AccessPointEntity>(_serializerOptions));
-
-        if (entity is null)
+        // Replaced with its ETag, so a membership or a key/value policy saved meanwhile is never overwritten; such a
+        // write only moves the ETag, so one retry suffices.
+        for (var attempt = 1; ; attempt++)
         {
-            throw new InvalidOperationException($"The access point '{organization}.{project}' doesn't exist.");
-        }
+            var (entity, eTag) = await repository.Container.TryReadItemWithETagAsync(
+                accessPointId,
+                partitionKey,
+                stream => stream.DeserializeSystemTextJson<AccessPointEntity>(_serializerOptions));
 
-        var updated = entity with { MachineAuthentication = policy };
-        await repository.Container.UpsertItemAsync(updated, partitionKey);
+            if (entity is null)
+            {
+                throw new InvalidOperationException($"The access point '{organization}.{project}' doesn't exist.");
+            }
+
+            var updated = entity with { MachineAuthentication = policy };
+            var batch = repository.Container.CreateTransactionalBatch(partitionKey)
+                .ReplaceItem(accessPointId, updated, new TransactionalBatchItemRequestOptions { IfMatchEtag = eTag });
+            var oldValue = AccessAuditValues.MachineAuthentication(entity.MachineAuthentication);
+            var newValue = AccessAuditValues.MachineAuthentication(policy);
+
+            if (!string.Equals(oldValue, newValue, StringComparison.Ordinal))
+            {
+                batch.CreateItem(_audit.ForAccessPoint($"{organization}.{project}", new AccessAuditChange(AccessAuditAction.MachineAuthenticationPolicyChanged, caller)
+                {
+                    OldValue = oldValue,
+                    NewValue = newValue,
+                }));
+            }
+
+            using var response = await batch.ExecuteAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                break;
+            }
+
+            if (!response.Failed(HttpStatusCode.PreconditionFailed))
+            {
+                response.ThrowIfFailed($"Saving the machine authentication policy of '{organization}.{project}'");
+            }
+
+            if (attempt > 1)
+            {
+                throw new ConflictException($"The project '{organization}.{project}' was changed concurrently, try again.", ErrorCodes.Conflict);
+            }
+        }
 
         var cacheKey = $"machauth:{organization}.{project}";
         _cache.Set(cacheKey, policy, CacheExpiration);

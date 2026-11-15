@@ -173,7 +173,7 @@ public class CosmosInvitationServiceTests(Startup startup)
         var invitation = await Invitations.CreateInvitationAsync(pointKey, Create(email, AccountRole.Contributor), OwnerId, null);
         var invitee = Invitee(email);
         await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
-        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, OwnerId);
+        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, AccessCaller.Account(OwnerId));
 
         var again = await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
 
@@ -189,11 +189,11 @@ public class CosmosInvitationServiceTests(Startup startup)
         var invitation = await Invitations.CreateInvitationAsync(pointKey, Create(email, AccountRole.Contributor), OwnerId, null);
         var invitee = Invitee(email);
         await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
-        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, OwnerId);
+        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, AccessCaller.Account(OwnerId));
         await MarkJoinPendingAsync(invitation.Id);
 
         var again = await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
-        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, OwnerId);
+        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, AccessCaller.Account(OwnerId));
         var third = await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
 
         again.AccessMap.Should().Contain(pointKey, AccountRole.Contributor);
@@ -208,7 +208,7 @@ public class CosmosInvitationServiceTests(Startup startup)
         var invitation = await Invitations.CreateInvitationAsync(pointKey, Create(email, AccountRole.Contributor) with { ExpiresInDays = 1 }, OwnerId, null);
         var invitee = Invitee(email);
         await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
-        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, OwnerId);
+        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, AccessCaller.Account(OwnerId));
         await MarkJoinPendingAsync(invitation.Id);
         _clock.Now = _clock.Now.AddDays(2);
 
@@ -364,22 +364,26 @@ public class CosmosInvitationServiceTests(Startup startup)
     {
         if (await Access.GetAccountAsync(OwnerId) is null)
         {
-            await Access.CreateAccountAsync(new AccountCreate
-            {
-                IdentityId = OwnerId,
-                UserName = "owner@example.com",
-                Name = "Owner",
-                Organization = Organization,
-                Project = "base",
-            });
+            await Access.CreateAccountAsync(
+                new AccountCreate
+                {
+                    IdentityId = OwnerId,
+                    UserName = "owner@example.com",
+                    Name = "Owner",
+                    Organization = Organization,
+                    Project = "base",
+                },
+                AccessCaller.System);
         }
 
-        var point = await Access.CreateAccessPointAsync(new AccessPointCreate
-        {
-            Organization = Organization,
-            Project = NewProjectName(),
-            OwnerId = OwnerId,
-        });
+        var point = await Access.CreateAccessPointAsync(
+            new AccessPointCreate
+            {
+                Organization = Organization,
+                Project = NewProjectName(),
+                OwnerId = OwnerId,
+            },
+            AccessCaller.System);
         return point.Key;
     }
 
@@ -400,7 +404,7 @@ public class CosmosInvitationServiceTests(Startup startup)
         await repository.Container.CreateItemAsync(
             new AccountEntity { Id = id, UserName = $"{id}@example.com", Name = id, AccessMap = new() },
             new PartitionKey("access"));
-        await Access.JoinAccessPointAsync(pointKey, id, role);
+        await Access.JoinAccessPointAsync(pointKey, id, role, AccessCaller.System);
         return id;
     }
 

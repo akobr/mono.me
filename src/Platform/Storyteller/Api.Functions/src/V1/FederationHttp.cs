@@ -202,7 +202,7 @@ public class FederationHttp
 
         try
         {
-            var stored = await _issuerStore.SetAsync(organization, project, requested, cancellationToken);
+            var stored = await _issuerStore.SetAsync(organization, project, requested, request.GetAccessCaller(), cancellationToken);
             return new OkObjectResult(stored);
         }
         catch (InvalidInputException exception)
@@ -233,7 +233,7 @@ public class FederationHttp
     {
         await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
 
-        var deleted = await _issuerStore.DeleteAsync(organization, project, name, request.FunctionContext.CancellationToken);
+        var deleted = await _issuerStore.DeleteAsync(organization, project, name, request.GetAccessCaller(), request.FunctionContext.CancellationToken);
 
         return deleted
             ? new OkResult()
@@ -292,7 +292,7 @@ public class FederationHttp
 
         try
         {
-            var machine = await _accessService.SetMachineFederationRulesAsync(organization, project, id, requested);
+            var machine = await _accessService.SetMachineFederationRulesAsync(organization, project, id, requested, request.GetAccessCaller());
             return new OkObjectResult(WithTokenEndpoint(machine, request, _options, organization, project));
         }
         catch (Exception exception) when (exception is NotFoundException or InvalidInputException or ConflictException)

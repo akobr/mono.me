@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.KeyValues.Policy;
 
 namespace _42.Platform.Storyteller.KeyValues.Azure.KeyVault.IntegrationTests;
@@ -17,7 +18,7 @@ internal sealed class InMemoryPolicyStore : IKeyValuePolicyStore
         return GetAsync(organization, project, cancellationToken);
     }
 
-    public Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default)
+    public Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, AccessCaller caller, CancellationToken cancellationToken = default)
     {
         _policies[$"{organization}.{project}"] = policy;
         return Task.FromResult(policy);

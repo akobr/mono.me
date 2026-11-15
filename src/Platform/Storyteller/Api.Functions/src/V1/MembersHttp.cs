@@ -82,7 +82,7 @@ public class MembersHttp
 
         AccessHttp.EnsureActorMayGrantRole(request, update.Role);
 
-        var member = await _accessService.SetMemberRoleAsync(NormalizeKey(key), accountId, update.Role, request.GetIdentityUniqueId());
+        var member = await _accessService.SetMemberRoleAsync(NormalizeKey(key), accountId, update.Role, request.GetAccessCaller());
         return new OkObjectResult(member);
     }
 
@@ -105,7 +105,7 @@ public class MembersHttp
         string accountId)
     {
         request.EnsureUser();
-        await _accessService.RemoveMemberAsync(NormalizeKey(key), accountId, request.GetIdentityUniqueId());
+        await _accessService.RemoveMemberAsync(NormalizeKey(key), accountId, request.GetAccessCaller());
         return new NoContentResult();
     }
 

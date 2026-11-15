@@ -36,7 +36,7 @@ public class CosmosMachineAccessScopesTests(Startup startup)
         var hashStore = CreateHashStore();
         var access = CreateAccessService(new HashStoringMachineAccessService(hashStore));
 
-        var created = await access.CreateMachineAccessAsync(new MachineAccessCreate { Organization = Org, Project = project, Scopes = Granted });
+        var created = await access.CreateMachineAccessAsync(new MachineAccessCreate { Organization = Org, Project = project, Scopes = Granted }, AccessCaller.System);
 
         created.Scopes.Should().Equal(Granted);
         (await access.GetMachineAccessAsync(Org, project, created.Id))!.Scopes.Should().Equal(Granted);
@@ -55,7 +55,7 @@ public class CosmosMachineAccessScopesTests(Startup startup)
         var project = $"scopes-{Guid.NewGuid():N}"[..20];
         var hashStore = CreateHashStore();
         var access = CreateAccessService(new HashStoringMachineAccessService(hashStore));
-        var created = await access.CreateMachineAccessAsync(new MachineAccessCreate { Organization = Org, Project = project, Scopes = Granted });
+        var created = await access.CreateMachineAccessAsync(new MachineAccessCreate { Organization = Org, Project = project, Scopes = Granted }, AccessCaller.System);
 
         // as a reset does: a new hash with the scopes the machine already has
         await hashStore.StoreAsync(Org, project, created.Id, "hash-2", [MachineScope.ConfigurationRead]);

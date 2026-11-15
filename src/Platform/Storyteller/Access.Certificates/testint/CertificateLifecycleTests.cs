@@ -31,12 +31,14 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         // Create access point for the certificate project.
         try
         {
-            await accessService.CreateAccessPointAsync(new AccessPointCreate
-            {
-                Organization = Organization,
-                Project = certProject,
-                OwnerId = "test-owner",
-            });
+            await accessService.CreateAccessPointAsync(
+                new AccessPointCreate
+                {
+                    Organization = Organization,
+                    Project = certProject,
+                    OwnerId = "test-owner",
+                },
+                AccessCaller.System);
         }
         catch
         {
@@ -44,10 +46,14 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         }
 
         // Configure Certificate policy so machine access always issues a certificate.
-        await policyStore.SetAsync(Organization, certProject, new MachineAuthenticationPolicy
-        {
-            CredentialKind = MachineCredentialKind.Certificate,
-        });
+        await policyStore.SetAsync(
+            Organization,
+            certProject,
+            new MachineAuthenticationPolicy
+            {
+                CredentialKind = MachineCredentialKind.Certificate,
+            },
+            AccessCaller.System);
 
         // Create machine access with certificate.
         var model = new MachineAccessCreate
@@ -57,7 +63,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
             Scopes = ReadScopes,
         };
 
-        var machine = await accessService.CreateMachineAccessAsync(model);
+        var machine = await accessService.CreateMachineAccessAsync(model, AccessCaller.System);
         machine.ShouldNotBeNull();
         machine.Id.ShouldNotBeNullOrEmpty();
 
@@ -83,26 +89,34 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         var accessService = fixture.Services.GetRequiredService<IAccessService>();
         var policyStore = fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
         await EnsureAccessPointAsync(accessService, mixedProject);
-        await policyStore.SetAsync(Organization, mixedProject, new MachineAuthenticationPolicy
-        {
-            EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate],
-            CredentialKind = MachineCredentialKind.ApiKey,
-            CertificateLifetimeDays = 120,
-        });
+        await policyStore.SetAsync(
+            Organization,
+            mixedProject,
+            new MachineAuthenticationPolicy
+            {
+                EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate],
+                CredentialKind = MachineCredentialKind.ApiKey,
+                CertificateLifetimeDays = 120,
+            },
+            AccessCaller.System);
 
-        var apiKeyMachine = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = mixedProject,
-            Scopes = ReadScopes,
-        });
-        var certificateMachine = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = mixedProject,
-            Scopes = ReadScopes,
-            CredentialKind = MachineCredentialKind.Certificate,
-        });
+        var apiKeyMachine = await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = mixedProject,
+                Scopes = ReadScopes,
+            },
+            AccessCaller.System);
+        var certificateMachine = await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = mixedProject,
+                Scopes = ReadScopes,
+                CredentialKind = MachineCredentialKind.Certificate,
+            },
+            AccessCaller.System);
 
         var storedApiKey = await accessService.GetMachineAccessAsync(Organization, mixedProject, apiKeyMachine.Id);
         var storedCertificate = await accessService.GetMachineAccessAsync(Organization, mixedProject, certificateMachine.Id);
@@ -123,18 +137,24 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         var accessService = fixture.Services.GetRequiredService<IAccessService>();
         var policyStore = fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
         await EnsureAccessPointAsync(accessService, sharedProject);
-        await policyStore.SetAsync(Organization, sharedProject, new MachineAuthenticationPolicy
-        {
-            EnabledCredentialKinds = [MachineCredentialKind.CertificateAndApiKey],
-        });
+        await policyStore.SetAsync(
+            Organization,
+            sharedProject,
+            new MachineAuthenticationPolicy
+            {
+                EnabledCredentialKinds = [MachineCredentialKind.CertificateAndApiKey],
+            },
+            AccessCaller.System);
 
-        var machine = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = sharedProject,
-            Scopes = ReadScopes,
-            UseSharedCertificate = true,
-        });
+        var machine = await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = sharedProject,
+                Scopes = ReadScopes,
+                UseSharedCertificate = true,
+            },
+            AccessCaller.System);
 
         machine.Certificate.ShouldBeNull();
         machine.AccessKey.ShouldStartWith("2s.");
@@ -163,7 +183,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
             Scopes = ReadWriteScopes,
         };
 
-        var machine = await accessService.CreateMachineAccessAsync(model);
+        var machine = await accessService.CreateMachineAccessAsync(model, AccessCaller.System);
 
         machine.ShouldNotBeNull();
         machine.Id.ShouldNotBeNullOrEmpty();
@@ -188,8 +208,8 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
             Scopes = ReadScopes,
         };
 
-        var machine = await accessService.CreateMachineAccessAsync(model);
-        var deleted = await accessService.DeleteMachineAccessAsync(Organization, Project, machine.Id);
+        var machine = await accessService.CreateMachineAccessAsync(model, AccessCaller.System);
+        var deleted = await accessService.DeleteMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
         deleted.ShouldBeTrue();
 
         var hasAccess = await accessService.VerifyAccessForMachineAsync(Organization, Project, machine.Id);
@@ -209,10 +229,10 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
             Scopes = ReadScopes,
         };
 
-        var machine = await accessService.CreateMachineAccessAsync(model);
+        var machine = await accessService.CreateMachineAccessAsync(model, AccessCaller.System);
         var originalKey = machine.AccessKey;
 
-        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
         reset.ShouldNotBeNull();
         reset!.AccessKey.ShouldNotBe(originalKey);
     }
@@ -221,12 +241,14 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
     {
         try
         {
-            await accessService.CreateAccessPointAsync(new AccessPointCreate
-            {
-                Organization = Organization,
-                Project = project,
-                OwnerId = "test-owner",
-            });
+            await accessService.CreateAccessPointAsync(
+                new AccessPointCreate
+                {
+                    Organization = Organization,
+                    Project = project,
+                    OwnerId = "test-owner",
+                },
+                AccessCaller.System);
         }
         catch
         {

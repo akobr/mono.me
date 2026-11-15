@@ -184,6 +184,28 @@ public class HttpRequestDataExtensionsTests
         TestRequests.User().GetAuditActor().ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada"));
     }
 
+    // The caller of an access change: the audit actor, and the invocation id as the correlation id of its record.
+    [Fact]
+    public void GetAccessCaller_DirectUser_IsTheAccountWithTheInvocationId()
+    {
+        TestRequests.User().GetAccessCaller().ShouldBe(new AccessCaller(AuditActor.Account(TestRequests.UserId, "Ada")) { CorrelationId = "invocation" });
+    }
+
+    [Fact]
+    public void GetAccessCaller_UserThroughAnActor_IsTheAccountViaTheActor()
+    {
+        var caller = TestRequests.DelegatedUser().GetAccessCaller();
+
+        caller.Actor.ShouldBe(AuditActor.Account(TestRequests.UserId, "Ada") with { Via = TestRequests.ActorId });
+        caller.CorrelationId.ShouldBe("invocation");
+    }
+
+    [Fact]
+    public void GetAccessCaller_Machine_IsTheMachine()
+    {
+        TestRequests.Machine().GetAccessCaller().ShouldBe(new AccessCaller(AuditActor.Machine(TestRequests.MachineId)) { CorrelationId = "invocation" });
+    }
+
     // The key/value caller carries the audit actor, so key/value audit events record Via too.
     [Fact]
     public async Task GetSecretRights_UserThroughAnActor_CallerIsTheAccountViaTheActor()

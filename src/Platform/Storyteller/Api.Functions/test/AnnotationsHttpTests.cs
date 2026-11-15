@@ -1467,35 +1467,35 @@ public partial class AnnotationsHttpTests
 
         public Task<Account?> GetAccountAsync(string id) => throw new NotImplementedException();
 
-        public Task<Account> CreateAccountAsync(AccountCreate model) => throw new NotImplementedException();
+        public Task<Account> CreateAccountAsync(AccountCreate model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId) => throw new NotImplementedException();
 
         public Task<AccessPoint?> GetAccessPointAsync(string key) => throw new NotImplementedException();
 
-        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model) => throw new NotImplementedException();
+        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> GrantPermissionAsync(Permission model) => throw new NotImplementedException();
+        public Task<bool> GrantPermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> RevokePermissionAsync(Permission model) => throw new NotImplementedException();
+        public Task<bool> RevokePermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId) => throw new NotImplementedException();
 
-        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, string actorId) => throw new NotImplementedException();
+        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId) => throw new NotImplementedException();
+        public Task RemoveMemberAsync(string accessPointKey, string accountId, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role) => throw new NotImplementedException();
+        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller, string? detail = null) => throw new NotImplementedException();
 
         public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotImplementedException();
 
         public Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id) => throw new NotImplementedException();
 
-        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotImplementedException();
+        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotImplementedException();
     }

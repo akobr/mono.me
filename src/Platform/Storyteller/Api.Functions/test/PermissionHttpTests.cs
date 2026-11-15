@@ -59,6 +59,22 @@ public class PermissionHttpTests
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<AccessPoint>().Key.ShouldBe(PointKey);
         access.Calls.ShouldBe(["grant:user-1:user-2:Contributor", $"point:{PointKey}"]);
+        access.Writes.ShouldHaveSingleItem().Model.CreatedById.ShouldBe("user-1");
+    }
+
+    // The access audit records who granted and who revoked, and the request it came with.
+    [Fact]
+    public async Task GrantAndRevoke_PassTheAccessCaller()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        await http.PostGrantPermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(AccountRole.Reader))));
+        await http.PostRevokePermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(AccountRole.Reader))));
+
+        access.Writes.Count.ShouldBe(2);
+        access.Writes[0].Caller.ShouldBeUserCaller();
+        access.Writes[1].Caller.ShouldBeUserCaller();
     }
 
     [Fact]
@@ -230,15 +246,21 @@ public class PermissionHttpTests
 
         public Exception? RevokeError { get; init; }
 
-        public Task<bool> GrantPermissionAsync(Permission model)
+        // The permissions the handler passed, with their callers, in order.
+        public List<(Permission Model, AccessCaller Caller)> Writes { get; } = [];
+
+        // The service authorizes the caller's account; the model's CreatedById is not read.
+        public Task<bool> GrantPermissionAsync(Permission model, AccessCaller caller)
         {
-            Calls.Add($"grant:{model.CreatedById}:{model.AccountId}:{model.Role}");
+            Calls.Add($"grant:{caller.Actor.Id}:{model.AccountId}:{model.Role}");
+            Writes.Add((model, caller));
             return Task.FromResult(true);
         }
 
-        public Task<bool> RevokePermissionAsync(Permission model)
+        public Task<bool> RevokePermissionAsync(Permission model, AccessCaller caller)
         {
-            Calls.Add($"revoke:{model.CreatedById}:{model.AccountId}:{model.Role}");
+            Calls.Add($"revoke:{caller.Actor.Id}:{model.AccountId}:{model.Role}");
+            Writes.Add((model, caller));
             return RevokeError is null ? Task.FromResult(true) : Task.FromException<bool>(RevokeError);
         }
 
@@ -254,32 +276,32 @@ public class PermissionHttpTests
 
         public Task<Account?> GetAccountAsync(string id) => throw new NotImplementedException();
 
-        public Task<Account> CreateAccountAsync(AccountCreate model) => throw new NotImplementedException();
+        public Task<Account> CreateAccountAsync(AccountCreate model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey) => throw new NotImplementedException();
 
         public Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId) => throw new NotImplementedException();
 
-        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model) => throw new NotImplementedException();
+        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotImplementedException();
 
         public Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id) => throw new NotImplementedException();
 
-        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotImplementedException();
+        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotImplementedException();
 
         public Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId) => throw new NotImplementedException();
 
-        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, string actorId) => throw new NotImplementedException();
+        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId) => throw new NotImplementedException();
+        public Task RemoveMemberAsync(string accessPointKey, string accountId, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role) => throw new NotImplementedException();
+        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller, string? detail = null) => throw new NotImplementedException();
     }
 }

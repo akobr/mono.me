@@ -5,6 +5,7 @@ using System.Net;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Federation;
 using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
@@ -14,7 +15,7 @@ using Microsoft.Extensions.Options;
 namespace _42.Platform.Storyteller;
 
 // Trusted issuers of a project: one document per issuer in the organization's data, partition {project}.federation
-// (outside the machine list of {project}.access), id = name. The list is cached for a minute per instance and dropped
+// (outside the machine list of {project}.access), id = name, next to the access audit records of their changes. The list is cached for a minute per instance and dropped
 // on a local write, like the machine authentication policy; another instance sees a change within that minute.
 public class CosmosFederatedIssuerStore : IFederatedIssuerStore
 {
@@ -24,15 +25,18 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly IMemoryCache _cache;
+    private readonly AccessAuditRecords _audit;
 
     public CosmosFederatedIssuerStore(
         IContainerRepositoryProvider repositoryProvider,
         IOptions<JsonSerializerOptions> serializerOptions,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        AccessAuditRecords? audit = null)
     {
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
         _cache = cache;
+        _audit = audit ?? AccessAuditRecords.Default;
     }
 
     public static string GetPartition(string project)
@@ -76,9 +80,10 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         return entity is null ? null : ToModel(entity);
     }
 
-    public async Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, CancellationToken cancellationToken = default)
+    public async Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(issuer);
+        ArgumentNullException.ThrowIfNull(caller);
 
         if (!FederationValidation.IsValidName(issuer.Name))
         {
@@ -91,67 +96,95 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         var existing = await ReadAsync(organization, project, issuer.Name, cancellationToken);
         var now = DateTimeOffset.UtcNow;
         FederatedIssuerEntity entity;
+        var batch = repository.Container.CreateTransactionalBatch(partitionKey);
 
-        try
+        if (existing is null)
         {
-            if (existing is null)
+            // Counted from the store, not the cached list, so concurrent instances cannot pass the limit together by much.
+            if (await CountAsync(repository, partitionKeyValue, cancellationToken) >= FederationValidation.MaxIssuersPerProject)
             {
-                // Counted from the store, not the cached list, so concurrent instances cannot pass the limit together by much.
-                if (await CountAsync(repository, partitionKeyValue, cancellationToken) >= FederationValidation.MaxIssuersPerProject)
-                {
-                    throw new InvalidInputException(FederationValidation.TooManyIssuersMessage, ErrorCodes.InvalidFederation);
-                }
-
-                entity = ToEntity(issuer, repository.Organization, partitionKeyValue, now, now);
-                await repository.Container.CreateItemAsync(entity, partitionKey, cancellationToken: cancellationToken);
+                throw new InvalidInputException(FederationValidation.TooManyIssuersMessage, ErrorCodes.InvalidFederation);
             }
-            else
-            {
-                // Rules reference issuers by name and were written for this Issuer.
-                if (!string.Equals(existing.Issuer, issuer.Issuer, StringComparison.Ordinal))
-                {
-                    throw new InvalidInputException(FederationValidation.IssuerImmutableMessage, ErrorCodes.InvalidFederation);
-                }
 
-                entity = ToEntity(issuer, repository.Organization, partitionKeyValue, existing.CreatedAt, now);
-                await repository.Container.ReplaceItemAsync(
-                    entity,
-                    entity.Id,
-                    partitionKey,
-                    new ItemRequestOptions { IfMatchEtag = existing.ETag },
-                    cancellationToken);
+            entity = ToEntity(issuer, repository.Organization, partitionKeyValue, now, now);
+            batch.CreateItem(entity);
+            batch.CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.FederatedIssuerCreated, caller)
+            {
+                Target = AccessAuditTarget.Issuer(issuer.Name),
+                NewValue = AccessAuditValues.Issuer(ToModel(entity)),
+            }));
+        }
+        else
+        {
+            // Rules reference issuers by name and were written for this Issuer.
+            if (!string.Equals(existing.Issuer, issuer.Issuer, StringComparison.Ordinal))
+            {
+                throw new InvalidInputException(FederationValidation.IssuerImmutableMessage, ErrorCodes.InvalidFederation);
+            }
+
+            entity = ToEntity(issuer, repository.Organization, partitionKeyValue, existing.CreatedAt, now);
+            batch.ReplaceItem(entity.Id, entity, new TransactionalBatchItemRequestOptions { IfMatchEtag = existing.ETag });
+            var oldValue = AccessAuditValues.Issuer(ToModel(existing));
+            var newValue = AccessAuditValues.Issuer(ToModel(entity));
+
+            if (!string.Equals(oldValue, newValue, StringComparison.Ordinal))
+            {
+                batch.CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.FederatedIssuerUpdated, caller)
+                {
+                    Target = AccessAuditTarget.Issuer(issuer.Name),
+                    OldValue = oldValue,
+                    NewValue = newValue,
+                }));
             }
         }
-        catch (CosmosException exception) when (exception.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed)
+
+        using var response = await batch.ExecuteAsync(cancellationToken);
+        Invalidate(organization, project);
+
+        if (response.Failed(HttpStatusCode.Conflict) || response.Failed(HttpStatusCode.PreconditionFailed))
         {
-            Invalidate(organization, project);
             throw new ConflictException($"The trusted issuer '{issuer.Name}' was changed concurrently; reload and retry.");
         }
 
-        Invalidate(organization, project);
+        response.ThrowIfFailed($"Saving the trusted issuer '{issuer.Name}'");
         return ToModel(entity);
     }
 
-    public async Task<bool> DeleteAsync(string organization, string project, string name, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(caller);
+
         if (!FederationValidation.IsValidName(name))
         {
             return false;
         }
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        using var response = await repository.Container.DeleteItemStreamAsync(
-            name,
-            repository.Key(GetPartition(project)),
-            cancellationToken: cancellationToken);
+        var partitionKeyValue = GetPartition(project);
+        var existing = await ReadAsync(organization, project, name, cancellationToken);
+
+        if (existing is null)
+        {
+            Invalidate(organization, project);
+            return false;
+        }
+
+        using var response = await repository.Container.CreateTransactionalBatch(repository.Key(partitionKeyValue))
+            .DeleteItem(name)
+            .CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.FederatedIssuerDeleted, caller)
+            {
+                Target = AccessAuditTarget.Issuer(name),
+                OldValue = AccessAuditValues.Issuer(ToModel(existing)),
+            }))
+            .ExecuteAsync(cancellationToken);
         Invalidate(organization, project);
 
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        if (response.Failed(HttpStatusCode.NotFound))
         {
             return false;
         }
 
-        response.EnsureSuccessStatusCode();
+        response.ThrowIfFailed($"Deleting the trusted issuer '{name}'");
         return true;
     }
 
@@ -163,7 +196,8 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
     private static async Task<int> CountAsync(OrganizationContainer repository, string partitionKey, CancellationToken cancellationToken)
     {
         using var iterator = repository.Container.GetItemQueryIterator<int>(
-            new QueryDefinition("SELECT VALUE COUNT(1) FROM c"),
+            new QueryDefinition("SELECT VALUE COUNT(1) FROM c WHERE NOT STARTSWITH(c.id, @audit)")
+                .WithParameter("@audit", AccessAuditEntity.IdPrefix),
             requestOptions: repository.QueryOptions(partitionKey));
         var count = 0;
 
@@ -237,7 +271,8 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
         var entities = new List<FederatedIssuerEntity>();
 
         using var iterator = repository.Container.GetItemQueryStreamIterator(
-            new QueryDefinition("SELECT * FROM c"),
+            new QueryDefinition("SELECT * FROM c WHERE NOT STARTSWITH(c.id, @audit)")
+                .WithParameter("@audit", AccessAuditEntity.IdPrefix),
             requestOptions: repository.QueryOptions(GetPartition(project)));
 
         while (iterator.HasMoreResults)

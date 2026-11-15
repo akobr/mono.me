@@ -29,22 +29,28 @@ public class FederatedExchangeTests(CosmosFixture fixture)
         var policyStore = fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
         var exchange = fixture.Services.GetRequiredService<IFederatedTokenExchange>();
         await EnsureProjectAsync(accessService);
-        await policyStore.SetAsync(Organization, Project, FederatedPolicy());
-        await fixture.Services.GetRequiredService<IFederatedIssuerStore>().SetAsync(Organization, Project, new FederatedIssuer
-        {
-            Name = "ci",
-            Issuer = PlatformIssuer,
-            KeySource = FederatedIssuerKeySource.Jwks,
-            Jwks = Jwks(platformKey),
-        });
-        var machine = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = Project,
-            Scopes = [MachineScope.ConfigurationRead],
-            CredentialKind = MachineCredentialKind.Federated,
-            FederationRules = [new FederationRule { Issuer = "ci", Audience = PlatformAudience, Subject = "ci:job:deploy" }],
-        });
+        await policyStore.SetAsync(Organization, Project, FederatedPolicy(), AccessCaller.System);
+        await fixture.Services.GetRequiredService<IFederatedIssuerStore>().SetAsync(
+            Organization,
+            Project,
+            new FederatedIssuer
+            {
+                Name = "ci",
+                Issuer = PlatformIssuer,
+                KeySource = FederatedIssuerKeySource.Jwks,
+                Jwks = Jwks(platformKey),
+            },
+            AccessCaller.System);
+        var machine = await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = Project,
+                Scopes = [MachineScope.ConfigurationRead],
+                CredentialKind = MachineCredentialKind.Federated,
+                FederationRules = [new FederationRule { Issuer = "ci", Audience = PlatformAudience, Subject = "ci:job:deploy" }],
+            },
+            AccessCaller.System);
         var request = new FederatedTokenExchangeRequest
         {
             Organization = Organization,
@@ -73,13 +79,13 @@ public class FederatedExchangeTests(CosmosFixture fixture)
         (await exchange.ExchangeAsync(request with { SubjectToken = Sign(platformKey, "ci:job:other") })).Error.ShouldBe(OAuthTokenExchange.Errors.InvalidRequest);
 
         // The exchange reads the policy of the access point itself, so disabling the kind applies at once.
-        await policyStore.SetAsync(Organization, Project, new MachineAuthenticationPolicy { EnabledCredentialKinds = [MachineCredentialKind.ApiKey] });
+        await policyStore.SetAsync(Organization, Project, new MachineAuthenticationPolicy { EnabledCredentialKinds = [MachineCredentialKind.ApiKey] }, AccessCaller.System);
         (await exchange.ExchangeAsync(request)).ErrorDescription.ShouldBe(FederatedTokenExchangeResult.NotAcceptedDescription);
 
-        await policyStore.SetAsync(Organization, Project, FederatedPolicy());
+        await policyStore.SetAsync(Organization, Project, FederatedPolicy(), AccessCaller.System);
         (await exchange.ExchangeAsync(request)).Succeeded.ShouldBeTrue();
 
-        (await accessService.DeleteMachineAccessAsync(Organization, Project, machine.Id)).ShouldBeTrue();
+        (await accessService.DeleteMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System)).ShouldBeTrue();
         (await exchange.ExchangeAsync(request)).ErrorDescription.ShouldBe(FederatedTokenExchangeResult.NotAcceptedDescription);
     }
 
@@ -123,7 +129,7 @@ public class FederatedExchangeTests(CosmosFixture fixture)
     {
         try
         {
-            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" });
+            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" }, AccessCaller.System);
         }
         catch (ConflictException)
         {
