@@ -31,12 +31,12 @@ public class DataSetSeederTests
 
     public DataSetSeederTests()
     {
-        _access.Setup(access => access.CreateAccountAsync(It.IsAny<AccountCreate>()))
-            .Callback<AccountCreate>(model => _writes.Add($"account {model.IdentityId} {model.UserName}"))
-            .ReturnsAsync((AccountCreate model) => new Account { Id = model.IdentityId, UserName = model.UserName, Name = model.Name, AccessMap = new Dictionary<string, AccountRole>() });
-        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()))
-            .Callback<AccessPointCreate>(model => _writes.Add($"project {model.Organization}.{model.Project} {model.OwnerId} {model.ProjectDescription}"))
-            .ReturnsAsync((AccessPointCreate model) => new AccessPoint { Key = $"{model.Organization}.{model.Project}", AccessMap = new Dictionary<string, AccountRole>() });
+        _access.Setup(access => access.CreateAccountAsync(It.IsAny<AccountCreate>(), It.IsAny<AccessCaller>()))
+            .Callback<AccountCreate, AccessCaller>((model, _) => _writes.Add($"account {model.IdentityId} {model.UserName}"))
+            .ReturnsAsync((AccountCreate model, AccessCaller _) => new Account { Id = model.IdentityId, UserName = model.UserName, Name = model.Name, AccessMap = new Dictionary<string, AccountRole>() });
+        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()))
+            .Callback<AccessPointCreate, AccessCaller>((model, _) => _writes.Add($"project {model.Organization}.{model.Project} {model.OwnerId} {model.ProjectDescription}"))
+            .ReturnsAsync((AccessPointCreate model, AccessCaller _) => new AccessPoint { Key = $"{model.Organization}.{model.Project}", AccessMap = new Dictionary<string, AccountRole>() });
         _views.Setup(views => views.GetViewsAsync(Organization, Project, false))
             .ReturnsAsync([new View { Name = "default", IsDefault = true }]);
         _views.Setup(views => views.CreateViewAsync(Organization, Project, It.IsAny<ViewCreate>(), AuditActor.System))

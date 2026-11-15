@@ -65,6 +65,18 @@ public class InvitationsHttpTests
         service.Calls.ShouldBe(["accept:inv-1"]);
     }
 
+    // The invitee's join is recorded in the access audit with the request's invocation id as its correlation id.
+    [Fact]
+    public async Task Accept_PassesTheInvocationIdAsTheCorrelationId()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service, IdentityProviderKind.AuthKit);
+
+        await http.AcceptInvitation(Request([new("sub", "user_01"), new("email", "ada@example.com")]), "inv-1");
+
+        service.LastCorrelationId.ShouldBe(AccessCallerAssertions.InvocationId);
+    }
+
     [Fact]
     public async Task Accept_TokenWithoutNames_StillReachesTheService()
     {
@@ -430,6 +442,9 @@ public class InvitationsHttpTests
 
         public InvitationIdentity? LastInvitee { get; private set; }
 
+        // The correlation id the handler passed to AcceptInvitationAsync.
+        public string? LastCorrelationId { get; private set; }
+
         // The model the handler passed to CreateInvitationAsync; null while nothing was created.
         public InvitationCreate? LastCreated { get; private set; }
 
@@ -450,10 +465,11 @@ public class InvitationsHttpTests
             return Task.FromResult<IReadOnlyList<Invitation>>([]);
         }
 
-        public Task<Account> AcceptInvitationAsync(string invitationId, InvitationIdentity invitee)
+        public Task<Account> AcceptInvitationAsync(string invitationId, InvitationIdentity invitee, string? correlationId = null)
         {
             Calls.Add($"accept:{invitationId}");
             LastInvitee = invitee;
+            LastCorrelationId = correlationId;
             return Task.FromResult(new Account
             {
                 Id = invitee.AccountId,

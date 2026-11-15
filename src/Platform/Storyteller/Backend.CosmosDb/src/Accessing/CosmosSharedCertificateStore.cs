@@ -18,7 +18,7 @@ namespace _42.Platform.Storyteller;
 // certificates and 30 seconds when it is empty. A revocation is seen by other instances within 5 minutes.
 public class CosmosSharedCertificateStore : ISharedCertificateStore
 {
-    private const string IdPrefix = "scr.";
+    internal const string IdPrefix = "scr.";
 
     private static readonly TimeSpan ListExpiration = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan EmptyListExpiration = TimeSpan.FromSeconds(30);
@@ -28,15 +28,18 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly IMemoryCache _cache;
+    private readonly AccessAuditRecords _audit;
 
     public CosmosSharedCertificateStore(
         IContainerRepositoryProvider repositoryProvider,
         IOptions<JsonSerializerOptions> serializerOptions,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        AccessAuditRecords? audit = null)
     {
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
         _cache = cache;
+        _audit = audit ?? AccessAuditRecords.Default;
     }
 
     public async Task<IReadOnlyList<SharedCertificate>> ListAsync(string organization, string project)
@@ -93,8 +96,9 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
         return certificate;
     }
 
-    public async Task StoreAsync(string organization, string project, SharedCertificate certificate)
+    public async Task StoreAsync(string organization, string project, SharedCertificate certificate, AccessCaller caller)
     {
+        ArgumentNullException.ThrowIfNull(caller);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = $"{project}.access";
         var partitionKey = repository.Key(partitionKeyValue);
@@ -111,31 +115,73 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
             IsRevoked = false,
         };
 
-        await repository.Container.CreateItemAsync(entity, partitionKey);
+        // The certificate and its record in one batch; never the PFX or its password, which are not stored either.
+        using var response = await repository.Container.CreateTransactionalBatch(partitionKey)
+            .CreateItem(entity)
+            .CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.SharedCertificateIssued, caller)
+            {
+                Target = AccessAuditTarget.Certificate(certificate.Thumbprint, certificate.Label),
+                NewValue = AccessAuditValues.Certificate(ToModel(entity)),
+            }))
+            .ExecuteAsync();
+        response.ThrowIfFailed($"Storing the shared certificate {certificate.Thumbprint}");
         Evict(organization, project, certificate.Thumbprint);
     }
 
-    public async Task<bool> RevokeAsync(string organization, string project, string thumbprint)
+    public async Task<bool> RevokeAsync(string organization, string project, string thumbprint, AccessCaller caller)
     {
+        ArgumentNullException.ThrowIfNull(caller);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = repository.Key($"{project}.access");
+        var partitionKeyValue = $"{project}.access";
+        var partitionKey = repository.Key(partitionKeyValue);
         var id = $"{IdPrefix}{thumbprint}";
 
-        var entity = await repository.Container.TryReadItemAsync(
-            id,
-            partitionKey,
-            stream => stream.DeserializeSystemTextJson<SharedCertificateEntity>(_serializerOptions));
-
-        if (entity is null)
+        // Replaced with the ETag of the read, so of two concurrent revocations only one commits and records; the other
+        // reads the certificate again and finds it revoked.
+        for (var attempt = 1; ; attempt++)
         {
-            Evict(organization, project, thumbprint);
-            return false;
-        }
+            var (entity, eTag) = await repository.Container.TryReadItemWithETagAsync(
+                id,
+                partitionKey,
+                stream => stream.DeserializeSystemTextJson<SharedCertificateEntity>(_serializerOptions));
 
-        var updated = entity with { IsRevoked = true };
-        await repository.Container.ReplaceItemAsync(updated, id, partitionKey);
-        Evict(organization, project, thumbprint);
-        return true;
+            if (entity is null)
+            {
+                Evict(organization, project, thumbprint);
+                return false;
+            }
+
+            if (entity.IsRevoked)
+            {
+                Evict(organization, project, thumbprint);
+                return true;
+            }
+
+            var updated = entity with { IsRevoked = true };
+            using var response = await repository.Container.CreateTransactionalBatch(partitionKey)
+                .ReplaceItem(id, updated, new TransactionalBatchItemRequestOptions { IfMatchEtag = eTag })
+                .CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.SharedCertificateRevoked, caller)
+                {
+                    Target = AccessAuditTarget.Certificate(entity.Thumbprint, entity.Label),
+                    OldValue = AccessAuditValues.Certificate(ToModel(entity)),
+                    NewValue = AccessAuditValues.Certificate(ToModel(updated)),
+                }))
+                .ExecuteAsync();
+            Evict(organization, project, thumbprint);
+
+            if (response.Failed(HttpStatusCode.NotFound))
+            {
+                return false;
+            }
+
+            if (response.Failed(HttpStatusCode.PreconditionFailed) && attempt < 3)
+            {
+                continue;
+            }
+
+            response.ThrowIfFailed($"Revoking the shared certificate {thumbprint}");
+            return true;
+        }
     }
 
     public async Task<bool> LabelExistsAsync(string organization, string project, string label)

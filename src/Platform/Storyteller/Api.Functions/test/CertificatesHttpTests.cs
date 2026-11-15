@@ -70,6 +70,24 @@ public class CertificatesHttpTests
         backend.Calls.ShouldBe(["policy:acme.billing", "label:acme.billing:build-agent", "issue:acme.billing:build-agent:30", "store:acme.billing:THUMBPRINT"]);
     }
 
+    // The access audit records who issued and who revoked a shared certificate, and the request it came with.
+    [Fact]
+    public async Task IssueAndRevokeSharedCertificate_PassTheAccessCallerToTheStore()
+    {
+        var backend = new SharedCertificateBackend();
+        var http = CreateHttp(backend.CreateService());
+        var body = FunctionTestDoubles.ToJsonBody(new SharedCertificateCreate { Label = "build-agent", LifetimeDays = 30 });
+
+        (await http.PostSharedCertificate(UserRequest(body), "acme", "billing")).ShouldBeOfType<OkObjectResult>();
+        (await http.DeleteSharedCertificate(TestRequests.User("DELETE"), "acme", "billing", "THUMBPRINT")).ShouldBeOfType<OkResult>();
+
+        backend.Calls.ShouldContain("store:acme.billing:THUMBPRINT");
+        backend.Calls.ShouldContain("revoke:acme.billing:THUMBPRINT");
+        backend.Callers.Count.ShouldBe(2);
+        backend.Callers[0].ShouldBeUserCaller();
+        backend.Callers[1].ShouldBeUserCaller();
+    }
+
     // A shared certificate belongs to CertificateAndApiKey: a project without that kind gets a coded 400 and no
     // certificate.
     [Fact]
@@ -288,6 +306,9 @@ public class CertificatesHttpTests
     {
         public List<string> Calls { get; } = [];
 
+        // The caller of every store and revoke, in order.
+        public List<AccessCaller> Callers { get; } = [];
+
         public IReadOnlyList<MachineCredentialKind> EnabledCredentialKinds { get; init; } = [MachineCredentialKind.CertificateAndApiKey];
 
         public SharedCertificateService CreateService()
@@ -322,19 +343,26 @@ public class CertificatesHttpTests
             return Task.FromResult(new IssuedCertificate([1, 2, 3], "secret", "THUMBPRINT", "01", notBefore, notBefore.AddDays(lifetimeDays)));
         }
 
-        public Task StoreAsync(string organization, string project, SharedCertificate certificate)
+        public Task StoreAsync(string organization, string project, SharedCertificate certificate, AccessCaller caller)
         {
             Calls.Add($"store:{organization}.{project}:{certificate.Thumbprint}");
+            Callers.Add(caller);
             return Task.CompletedTask;
         }
 
-        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy) => throw new NotSupportedException();
+        // Every certificate exists and is revoked.
+        public Task<bool> RevokeAsync(string organization, string project, string thumbprint, AccessCaller caller)
+        {
+            Calls.Add($"revoke:{organization}.{project}:{thumbprint}");
+            Callers.Add(caller);
+            return Task.FromResult(true);
+        }
+
+        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy, AccessCaller caller) => throw new NotSupportedException();
 
         public Task<IReadOnlyList<SharedCertificate>> ListAsync(string organization, string project) => throw new NotSupportedException();
 
         public Task<SharedCertificate?> GetByThumbprintAsync(string organization, string project, string thumbprint) => throw new NotSupportedException();
-
-        public Task<bool> RevokeAsync(string organization, string project, string thumbprint) => throw new NotSupportedException();
 
         public Task<IssuedCertificate> IssueCertificateAsync(string organization, string project, string machineAccessId, int lifetimeDays)
             => throw new NotSupportedException();

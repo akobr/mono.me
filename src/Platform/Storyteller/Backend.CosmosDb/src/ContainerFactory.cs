@@ -47,7 +47,8 @@ public class ContainerFactory : IContainerFactory
     }
 
     // The container organizations gets its hierarchical key and its settings; any other container (core) the single
-    // path /PartitionKey.
+    // path /PartitionKey, the default indexing and TTL on without a default expiry: only the access audit records have a
+    // ttl there. An existing core container created before gets TTL on now (DbCreator runs this on every start).
     public async Task<Container> CreateContainerIfNotExistsAsync(string containerName)
     {
         if (string.Equals(containerName, CosmosConstants.OrganizationsContainerName, StringComparison.Ordinal))
@@ -56,8 +57,19 @@ public class ContainerFactory : IContainerFactory
         }
 
         var database = await _database;
-        var properties = new ContainerProperties(containerName, OrganizationKeys.PartitionKeyPath);
+        var properties = new ContainerProperties(containerName, OrganizationKeys.PartitionKeyPath) { DefaultTimeToLive = -1 };
         var containerResult = await database.CreateContainerIfNotExistsAsync(properties);
+
+        if (containerResult.StatusCode != HttpStatusCode.Created)
+        {
+            var stored = containerResult.Resource;
+
+            if (ApplyTimeToLive(stored))
+            {
+                await containerResult.Container.ReplaceContainerAsync(stored);
+            }
+        }
+
         return containerResult.Container;
     }
 
@@ -145,19 +157,24 @@ public class ContainerFactory : IContainerFactory
                && paths.SequenceEqual(OrganizationsPartitionKeyPaths, StringComparer.Ordinal);
     }
 
-    // Returns whether anything changed.
-    private static bool ApplySettings(ContainerProperties properties)
+    // null: TTL off, so the ttl of versions, deleted items and audit records is ignored; positive: every item without
+    // its own ttl expires, which active records never may. -1 keeps TTL on with no default expiry. Returns whether it
+    // changed anything.
+    private static bool ApplyTimeToLive(ContainerProperties properties)
     {
-        var changed = false;
-
-        // null: TTL off, so the ttl of versions and deleted items is ignored; positive: every item without its own ttl
-        // expires, which active records never may. -1 keeps TTL on with no default expiry.
         if (properties.DefaultTimeToLive is null or > 0)
         {
             properties.DefaultTimeToLive = -1;
-            changed = true;
+            return true;
         }
 
+        return false;
+    }
+
+    // Returns whether anything changed.
+    private static bool ApplySettings(ContainerProperties properties)
+    {
+        var changed = ApplyTimeToLive(properties);
         var policy = properties.IndexingPolicy;
 
         if (policy.IncludedPaths.Count == 0)

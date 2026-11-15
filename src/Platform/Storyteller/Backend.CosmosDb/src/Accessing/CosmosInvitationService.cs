@@ -173,10 +173,16 @@ public class CosmosInvitationService : IInvitationService
             .ToList();
     }
 
-    public async Task<Account> AcceptInvitationAsync(string invitationId, InvitationIdentity invitee)
+    public async Task<Account> AcceptInvitationAsync(string invitationId, InvitationIdentity invitee, string? correlationId = null)
     {
         var (entity, eTag) = await ReadAsync(invitationId);
         EnsureInvitee(entity, invitee);
+
+        // The invitee accepts directly (a call through an actor is never email-verified), so it is the actor of the join.
+        var caller = AccessCaller.Account(invitee.AccountId, string.IsNullOrWhiteSpace(invitee.Name) ? invitee.UserName : invitee.Name) with
+        {
+            CorrelationId = correlationId,
+        };
 
         if (entity.Status == InvitationStatus.Accepted
             && string.Equals(entity.AcceptedById, invitee.AccountId, StringComparison.Ordinal))
@@ -190,14 +196,14 @@ public class CosmosInvitationService : IInvitationService
                     throw new ConflictException("The invitation has expired, ask for a new one.", ErrorCodes.InvitationExpired);
                 }
 
-                await JoinAsync(entity, invitee.AccountId, eTag);
+                await JoinAsync(entity, invitee.AccountId, eTag, caller);
             }
 
             return await GetAccountAsync(invitee.AccountId);
         }
 
         EnsurePending(entity, allowExpired: false);
-        await EnsureAccountAsync(invitee, entity.Email);
+        await EnsureAccountAsync(invitee, entity.Email, caller);
 
         // The invitation is claimed first, so a concurrent revoke or decline that wins the ETag grants nothing.
         var accepted = entity with
@@ -209,7 +215,7 @@ public class CosmosInvitationService : IInvitationService
         };
         var acceptedETag = await ReplaceAsync(accepted, eTag);
 
-        await JoinAsync(accepted, invitee.AccountId, acceptedETag);
+        await JoinAsync(accepted, invitee.AccountId, acceptedETag, caller);
         return await GetAccountAsync(invitee.AccountId);
     }
 
@@ -278,7 +284,7 @@ public class CosmosInvitationService : IInvitationService
         }
     }
 
-    private async Task EnsureAccountAsync(InvitationIdentity invitee, string email)
+    private async Task EnsureAccountAsync(InvitationIdentity invitee, string email, AccessCaller caller)
     {
         if (await _accessService.GetAccountAsync(invitee.AccountId) is not null)
         {
@@ -292,7 +298,7 @@ public class CosmosInvitationService : IInvitationService
                 IdentityId = invitee.AccountId,
                 UserName = string.IsNullOrWhiteSpace(invitee.UserName) ? email : invitee.UserName,
                 Name = string.IsNullOrWhiteSpace(invitee.Name) ? email : invitee.Name,
-            });
+            }, caller);
         }
         catch (ConflictException)
         {
@@ -328,9 +334,17 @@ public class CosmosInvitationService : IInvitationService
     }
 
     // The role was authorized when the invitation was created, so the inviter's current role is not checked again.
-    private async Task JoinAsync(InvitationEntity accepted, string accountId, string? eTag)
+    private async Task JoinAsync(InvitationEntity accepted, string accountId, string? eTag, AccessCaller caller)
     {
-        await _accessService.JoinAccessPointAsync(accepted.AccessPointKey, accountId, accepted.Role);
+        var sender = string.IsNullOrWhiteSpace(accepted.InvitedByName)
+            ? accepted.InvitedById
+            : $"{accepted.InvitedByName} ({accepted.InvitedById})";
+        await _accessService.JoinAccessPointAsync(
+            accepted.AccessPointKey,
+            accountId,
+            accepted.Role,
+            caller,
+            $"Invitation {accepted.InvitationId} sent by {sender}.");
 
         try
         {

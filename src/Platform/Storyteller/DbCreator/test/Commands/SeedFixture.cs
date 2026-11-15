@@ -19,7 +19,8 @@ namespace _42.Platform.Storyteller.DbCreator.UnitTests.Commands;
 // (nothing exists, every write succeeds), the importer, bulk writer, key/value service and record store of the seeder
 // tests (no key-encryption provider), and a
 // container factory that finds the layout fine unless told otherwise, with a container where every item is missing
-// (the access seed of the root reads and creates).
+// (the access seed of the root reads and creates; each access point with its access audit record in a transactional
+// batch, which succeeds).
 internal sealed class SeedFixture
 {
     public static readonly string Tool = MockUnixSupport.Path(@"C:\tool");
@@ -29,12 +30,23 @@ internal sealed class SeedFixture
         Container
             .Setup(container => container.ReadItemAsync<It.IsAnyType>(It.IsAny<string>(), It.IsAny<PartitionKey>(), It.IsAny<ItemRequestOptions>(), It.IsAny<CancellationToken>()))
             .Throws(new CosmosException("The item does not exist.", HttpStatusCode.NotFound, 0, string.Empty, 0));
+        Container.Setup(container => container.CreateTransactionalBatch(It.IsAny<PartitionKey>())).Returns(Batch.Object);
+        Batch
+            .Setup(batch => batch.CreateItem(It.IsAny<It.IsAnyType>(), It.IsAny<TransactionalBatchItemRequestOptions>()))
+            .Returns(Batch.Object);
+        var response = new Mock<TransactionalBatchResponse>();
+        response.Setup(result => result.IsSuccessStatusCode).Returns(true);
+        response.Setup(result => result.StatusCode).Returns(HttpStatusCode.OK);
+        Batch.Setup(batch => batch.ExecuteAsync(It.IsAny<CancellationToken>())).ReturnsAsync(response.Object);
         Containers.Setup(factory => factory.FindLayoutProblemsAsync()).ReturnsAsync(() => LayoutProblems.ToList());
         Containers.Setup(factory => factory.CreateContainerIfNotExistsAsync(It.IsAny<string>())).ReturnsAsync(Container.Object);
         Containers.Setup(factory => factory.EnsureOrganizationsContainerAsync()).ReturnsAsync(Container.Object);
     }
 
     public Mock<Container> Container { get; } = new();
+
+    // Every batch of the container: the items of all of them accumulate in its invocations.
+    public Mock<TransactionalBatch> Batch { get; } = new();
 
     public MockFileSystem FileSystem { get; } = new();
 

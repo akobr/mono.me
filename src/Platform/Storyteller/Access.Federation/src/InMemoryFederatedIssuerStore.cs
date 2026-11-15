@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Federation;
 
 namespace _42.Platform.Storyteller;
@@ -36,7 +37,7 @@ public class InMemoryFederatedIssuerStore : IFederatedIssuerStore
         }
     }
 
-    public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, CancellationToken cancellationToken = default)
+    public Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(issuer);
 
@@ -60,7 +61,7 @@ public class InMemoryFederatedIssuerStore : IFederatedIssuerStore
         return Task.FromResult(issuer);
     }
 
-    public Task<bool> DeleteAsync(string organization, string project, string name, CancellationToken cancellationToken = default)
+    public Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default)
     {
         if (!_projects.TryGetValue(GetProjectKey(organization, project), out var issuers))
         {

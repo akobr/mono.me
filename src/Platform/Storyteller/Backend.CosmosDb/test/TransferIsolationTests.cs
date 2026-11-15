@@ -244,9 +244,9 @@ public class TransferIsolationTests(Startup startup)
         var catalog = Context.Services.GetRequiredService<CosmosOrganizationCatalog>();
         var dataOnly = $"iso-transfers-c-{_run}";
 
-        await access.CreateAccessPointAsync(new AccessPointCreate { Organization = Alpha, Project = Project, OwnerId = Owner });
-        await access.CreateAccessPointAsync(new AccessPointCreate { Organization = Bravo, Project = Project, OwnerId = Owner });
-        await access.CreateAccessPointAsync(new AccessPointCreate { Organization = Bravo, Project = "shipping", OwnerId = Owner });
+        await access.CreateAccessPointAsync(new AccessPointCreate { Organization = Alpha, Project = Project, OwnerId = Owner }, AccessCaller.System);
+        await access.CreateAccessPointAsync(new AccessPointCreate { Organization = Bravo, Project = Project, OwnerId = Owner }, AccessCaller.System);
+        await access.CreateAccessPointAsync(new AccessPointCreate { Organization = Bravo, Project = "shipping", OwnerId = Owner }, AccessCaller.System);
 
         // data in the shared container does not make an organization: core is the record of them
         await Store.CreateAsync(Job(dataOnly, Guid.NewGuid().ToString("N"), "charlie", DateTimeOffset.UtcNow));

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing;
@@ -24,13 +25,15 @@ public class CosmosAccessServiceTests(Startup startup)
     private const string Organization = "acc-tests";
     private const string OwnerId = "acc-tests-owner";
 
+    private static readonly AccessCaller Owner = AccessCaller.Account(OwnerId, "Owner");
+
     private IAccessService Access => Context.Services.GetRequiredService<IAccessService>();
 
     private IMachineAuthenticationPolicyStore MachinePolicies => Context.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
 
     private IKeyValuePolicyStore KeyValuePolicies => Context.Services.GetRequiredService<IKeyValuePolicyStore>();
 
-    private CosmosDbOptions CosmosOptions => Context.Services.GetRequiredService<IOptions<CosmosDbOptions>>().Value;
+    private IContainerRepositoryProvider Repositories => Context.Services.GetRequiredService<IContainerRepositoryProvider>();
 
     [Fact]
     public async Task Grant_ByOwner_StoresMembershipInPointAndAccount()
@@ -38,7 +41,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
 
-        var granted = await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+        var granted = await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Contributor);
 
         granted.Should().BeTrue();
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().Contain(memberId, AccountRole.Contributor);
@@ -51,10 +54,10 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Administrator));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Administrator);
 
-        var sameRole = await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Administrator));
-        var lowerRole = await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        var sameRole = await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Administrator);
+        var lowerRole = await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
 
         sameRole.Should().BeFalse();
         lowerRole.Should().BeFalse();
@@ -68,7 +71,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var outsiderId = await CreateBareAccountAsync();
         var memberId = await CreateBareAccountAsync();
 
-        var act = () => Access.GrantPermissionAsync(Permission(outsiderId, memberId, pointKey, AccountRole.Reader));
+        var act = () => GrantAsync(outsiderId, memberId, pointKey, AccountRole.Reader);
 
         await act.Should().ThrowAsync<AccessDeniedException>();
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().NotContainKey(memberId);
@@ -80,9 +83,9 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var adminId = await CreateBareAccountAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, adminId, pointKey, AccountRole.Administrator));
+        await GrantAsync(OwnerId, adminId, pointKey, AccountRole.Administrator);
 
-        var act = () => Access.GrantPermissionAsync(Permission(adminId, memberId, pointKey, AccountRole.Owner));
+        var act = () => GrantAsync(adminId, memberId, pointKey, AccountRole.Owner);
 
         await act.Should().ThrowAsync<AccessDeniedException>();
     }
@@ -93,9 +96,9 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var adminId = await CreateBareAccountAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, adminId, pointKey, AccountRole.Administrator));
+        await GrantAsync(OwnerId, adminId, pointKey, AccountRole.Administrator);
 
-        var granted = await Access.GrantPermissionAsync(Permission(adminId, memberId, pointKey, AccountRole.ContributorWithSecrets));
+        var granted = await GrantAsync(adminId, memberId, pointKey, AccountRole.ContributorWithSecrets);
 
         granted.Should().BeTrue();
         (await Access.GetAccountRoleAsync(memberId, pointKey)).Should().Be(AccountRole.ContributorWithSecrets);
@@ -106,7 +109,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
 
-        var act = () => Access.GrantPermissionAsync(Permission(OwnerId, $"missing-{Guid.NewGuid():N}", pointKey, AccountRole.Reader));
+        var act = () => GrantAsync(OwnerId, $"missing-{Guid.NewGuid():N}", pointKey, AccountRole.Reader);
 
         await act.Should().ThrowAsync<NotFoundException>();
     }
@@ -117,7 +120,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
 
-        var act = () => Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.None));
+        var act = () => GrantAsync(OwnerId, memberId, pointKey, AccountRole.None);
 
         await act.Should().ThrowAsync<ArgumentException>();
     }
@@ -128,7 +131,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
 
-        var act = () => Access.JoinAccessPointAsync(pointKey, memberId, (AccountRole)42);
+        var act = () => Access.JoinAccessPointAsync(pointKey, memberId, (AccountRole)42, AccessCaller.System);
 
         await act.Should().ThrowAsync<ArgumentException>();
     }
@@ -139,7 +142,7 @@ public class CosmosAccessServiceTests(Startup startup)
         // An existing project key is not an organization: "acme.web" + "x" would create a dotted project "web.x".
         var pointKey = await CreateProjectAsync();
 
-        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = pointKey, Project = NewProjectName(), OwnerId = OwnerId });
+        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = pointKey, Project = NewProjectName(), OwnerId = OwnerId }, Owner);
 
         (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
     }
@@ -149,9 +152,9 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Contributor);
 
-        var revoked = await Access.RevokePermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+        var revoked = await RevokeAsync(OwnerId, memberId, pointKey, AccountRole.Contributor);
 
         revoked.Should().BeTrue();
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().NotContainKey(memberId);
@@ -165,9 +168,9 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
         var outsiderId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Contributor);
 
-        var act = () => Access.RevokePermissionAsync(Permission(outsiderId, memberId, pointKey, AccountRole.Contributor));
+        var act = () => RevokeAsync(outsiderId, memberId, pointKey, AccountRole.Contributor);
 
         await act.Should().ThrowAsync<AccessDeniedException>();
         (await Access.GetAccountRoleAsync(memberId, pointKey)).Should().Be(AccountRole.Contributor);
@@ -179,10 +182,10 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var contributorId = await CreateBareAccountAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, contributorId, pointKey, AccountRole.Contributor));
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        await GrantAsync(OwnerId, contributorId, pointKey, AccountRole.Contributor);
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
 
-        var act = () => Access.RevokePermissionAsync(Permission(contributorId, memberId, pointKey, AccountRole.Reader));
+        var act = () => RevokeAsync(contributorId, memberId, pointKey, AccountRole.Reader);
 
         await act.Should().ThrowAsync<AccessDeniedException>();
     }
@@ -192,9 +195,9 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Administrator));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Administrator);
 
-        var act = () => Access.RevokePermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+        var act = () => RevokeAsync(OwnerId, memberId, pointKey, AccountRole.Contributor);
 
         (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.ElevatedRole);
     }
@@ -205,7 +208,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
 
-        var revoked = await Access.RevokePermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        var revoked = await RevokeAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
 
         revoked.Should().BeFalse();
     }
@@ -215,7 +218,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
 
-        var act = () => Access.RevokePermissionAsync(Permission(OwnerId, OwnerId, pointKey, AccountRole.Owner));
+        var act = () => RevokeAsync(OwnerId, OwnerId, pointKey, AccountRole.Owner);
 
         (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.LastOwner);
         (await Access.GetAccountRoleAsync(OwnerId, pointKey)).Should().Be(AccountRole.Owner);
@@ -226,9 +229,9 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var secondOwnerId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, secondOwnerId, pointKey, AccountRole.Owner));
+        await GrantAsync(OwnerId, secondOwnerId, pointKey, AccountRole.Owner);
 
-        var revoked = await Access.RevokePermissionAsync(Permission(OwnerId, secondOwnerId, pointKey, AccountRole.Owner));
+        var revoked = await RevokeAsync(OwnerId, secondOwnerId, pointKey, AccountRole.Owner);
 
         revoked.Should().BeTrue();
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().ContainSingle()
@@ -255,7 +258,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var project = pointKey[(Organization.Length + 1)..];
 
-        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = project, OwnerId = OwnerId });
+        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = project, OwnerId = OwnerId }, Owner);
 
         (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.AccessPointExists);
     }
@@ -266,7 +269,7 @@ public class CosmosAccessServiceTests(Startup startup)
         await EnsureOwnerAsync();
         var outsiderId = await CreateBareAccountAsync();
 
-        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = NewProjectName(), OwnerId = outsiderId });
+        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = NewProjectName(), OwnerId = outsiderId }, Owner);
 
         await act.Should().ThrowAsync<AccessDeniedException>();
     }
@@ -276,14 +279,16 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         await EnsureOwnerAsync();
 
-        var act = () => Access.CreateAccountAsync(new AccountCreate
-        {
-            IdentityId = OwnerId,
-            UserName = "owner@example.com",
-            Name = "Owner",
-            Organization = Organization,
-            Project = NewProjectName(),
-        });
+        var act = () => Access.CreateAccountAsync(
+            new AccountCreate
+            {
+                IdentityId = OwnerId,
+                UserName = "owner@example.com",
+                Name = "Owner",
+                Organization = Organization,
+                Project = NewProjectName(),
+            },
+            AccessCaller.System);
 
         (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.AccountExists);
     }
@@ -302,8 +307,8 @@ public class CosmosAccessServiceTests(Startup startup)
         var administered = await CreateProjectAsync();
         var contributed = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, administered, AccountRole.Administrator));
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, contributed, AccountRole.Contributor));
+        await GrantAsync(OwnerId, memberId, administered, AccountRole.Administrator);
+        await GrantAsync(OwnerId, memberId, contributed, AccountRole.Contributor);
 
         var points = await Access.GetAccessPointsAsync(memberId);
 
@@ -318,7 +323,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         await EnsureOwnerAsync();
 
-        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = project, OwnerId = OwnerId });
+        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = project, OwnerId = OwnerId }, Owner);
 
         (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
     }
@@ -326,7 +331,7 @@ public class CosmosAccessServiceTests(Startup startup)
     [Fact]
     public async Task CreateAccessPoint_ReservedNewOrganization_ThrowsInvalidName()
     {
-        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = "access", Project = NewProjectName(), OwnerId = OwnerId });
+        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = "access", Project = NewProjectName(), OwnerId = OwnerId }, Owner);
 
         (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
         (await Access.GetAccessPointAsync("access")).Should().BeNull();
@@ -343,7 +348,7 @@ public class CosmosAccessServiceTests(Startup startup)
             new PartitionKey("access"));
         await EnsureOwnerAsync();
 
-        var point = await Access.CreateAccessPointAsync(new AccessPointCreate { Organization = legacyOrganization, Project = NewProjectName(), OwnerId = OwnerId });
+        var point = await Access.CreateAccessPointAsync(new AccessPointCreate { Organization = legacyOrganization, Project = NewProjectName(), OwnerId = OwnerId }, Owner);
 
         point.Key.Should().StartWith($"{legacyOrganization}.");
     }
@@ -353,7 +358,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var id = $"acc-{Guid.NewGuid():N}";
 
-        var account = await Access.CreateAccountAsync(new AccountCreate { IdentityId = id, UserName = $"{id}@example.com", Name = "Invitee" });
+        var account = await Access.CreateAccountAsync(new AccountCreate { IdentityId = id, UserName = $"{id}@example.com", Name = "Invitee" }, AccessCaller.System);
 
         account.Id.Should().Be(id);
         account.AccessMap.Should().BeEmpty();
@@ -363,7 +368,7 @@ public class CosmosAccessServiceTests(Startup startup)
     [Fact]
     public async Task CreateAccount_OnlyOrganization_ThrowsArgumentException()
     {
-        var act = () => Access.CreateAccountAsync(new AccountCreate { IdentityId = $"acc-{Guid.NewGuid():N}", UserName = "u", Name = "n", Organization = Organization });
+        var act = () => Access.CreateAccountAsync(new AccountCreate { IdentityId = $"acc-{Guid.NewGuid():N}", UserName = "u", Name = "n", Organization = Organization }, AccessCaller.System);
 
         await act.Should().ThrowAsync<ArgumentException>();
     }
@@ -373,7 +378,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
 
         var members = await Access.GetMembersAsync(pointKey, OwnerId);
 
@@ -387,7 +392,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var contributorId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, contributorId, pointKey, AccountRole.Contributor));
+        await GrantAsync(OwnerId, contributorId, pointKey, AccountRole.Contributor);
 
         var act = () => Access.GetMembersAsync(pointKey, contributorId);
 
@@ -399,16 +404,16 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Administrator));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Administrator);
 
-        var lowered = await Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.Reader, OwnerId);
+        var lowered = await Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.Reader, AccessCaller.Account(OwnerId));
 
         lowered.Role.Should().Be(AccountRole.Reader);
         lowered.UserName.Should().Be($"{memberId}@example.com");
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().Contain(memberId, AccountRole.Reader);
         (await Access.GetAccountAsync(memberId))!.AccessMap.Should().Contain(pointKey, AccountRole.Reader);
 
-        var raised = await Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.ContributorWithSecrets, OwnerId);
+        var raised = await Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.ContributorWithSecrets, AccessCaller.Account(OwnerId));
         raised.Role.Should().Be(AccountRole.ContributorWithSecrets);
     }
 
@@ -418,11 +423,11 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var adminId = await CreateBareAccountAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, adminId, pointKey, AccountRole.Administrator));
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        await GrantAsync(OwnerId, adminId, pointKey, AccountRole.Administrator);
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
 
-        var promote = () => Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.Owner, adminId);
-        var demoteOwner = () => Access.SetMemberRoleAsync(pointKey, OwnerId, AccountRole.Reader, adminId);
+        var promote = () => Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.Owner, AccessCaller.Account(adminId));
+        var demoteOwner = () => Access.SetMemberRoleAsync(pointKey, OwnerId, AccountRole.Reader, AccessCaller.Account(adminId));
 
         await promote.Should().ThrowAsync<AccessDeniedException>();
         await demoteOwner.Should().ThrowAsync<AccessDeniedException>();
@@ -433,9 +438,9 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var adminId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, adminId, pointKey, AccountRole.Administrator));
+        await GrantAsync(OwnerId, adminId, pointKey, AccountRole.Administrator);
 
-        var act = () => Access.SetMemberRoleAsync(pointKey, adminId, AccountRole.Reader, adminId);
+        var act = () => Access.SetMemberRoleAsync(pointKey, adminId, AccountRole.Reader, AccessCaller.Account(adminId));
 
         (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.SelfRoleChange);
     }
@@ -446,7 +451,7 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var outsiderId = await CreateBareAccountAsync();
 
-        var act = () => Access.SetMemberRoleAsync(pointKey, outsiderId, AccountRole.Reader, OwnerId);
+        var act = () => Access.SetMemberRoleAsync(pointKey, outsiderId, AccountRole.Reader, AccessCaller.Account(OwnerId));
 
         (await act.Should().ThrowAsync<NotFoundException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotFound);
     }
@@ -456,9 +461,9 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var secondOwnerId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, secondOwnerId, pointKey, AccountRole.Owner));
+        await GrantAsync(OwnerId, secondOwnerId, pointKey, AccountRole.Owner);
 
-        var member = await Access.SetMemberRoleAsync(pointKey, secondOwnerId, AccountRole.Administrator, OwnerId);
+        var member = await Access.SetMemberRoleAsync(pointKey, secondOwnerId, AccountRole.Administrator, AccessCaller.Account(OwnerId));
 
         member.Role.Should().Be(AccountRole.Administrator);
     }
@@ -468,9 +473,9 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Contributor);
 
-        await Access.RemoveMemberAsync(pointKey, memberId, OwnerId);
+        await Access.RemoveMemberAsync(pointKey, memberId, AccessCaller.Account(OwnerId));
 
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().NotContainKey(memberId);
         (await Access.GetAccountAsync(memberId))!.AccessMap.Should().NotContainKey(pointKey);
@@ -481,9 +486,9 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
 
-        await Access.RemoveMemberAsync(pointKey, memberId, memberId);
+        await Access.RemoveMemberAsync(pointKey, memberId, AccessCaller.Account(memberId));
 
         (await Access.GetAccountRoleAsync(memberId, pointKey)).Should().Be(AccountRole.None);
     }
@@ -494,10 +499,10 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var contributorId = await CreateBareAccountAsync();
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, contributorId, pointKey, AccountRole.Contributor));
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        await GrantAsync(OwnerId, contributorId, pointKey, AccountRole.Contributor);
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
 
-        var act = () => Access.RemoveMemberAsync(pointKey, memberId, contributorId);
+        var act = () => Access.RemoveMemberAsync(pointKey, memberId, AccessCaller.Account(contributorId));
 
         await act.Should().ThrowAsync<AccessDeniedException>();
     }
@@ -507,7 +512,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
 
-        var act = () => Access.RemoveMemberAsync(pointKey, OwnerId, OwnerId);
+        var act = () => Access.RemoveMemberAsync(pointKey, OwnerId, AccessCaller.Account(OwnerId));
 
         (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.LastOwner);
     }
@@ -518,9 +523,9 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
 
-        var joined = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Contributor);
-        var lower = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader);
-        var higher = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Administrator);
+        var joined = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Contributor, AccessCaller.System);
+        var lower = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader, AccessCaller.System);
+        var higher = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Administrator, AccessCaller.System);
 
         joined.Should().Be(AccountRole.Contributor);
         lower.Should().Be(AccountRole.Contributor);
@@ -566,8 +571,8 @@ public class CosmosAccessServiceTests(Startup startup)
         var secondId = await CreateBareAccountAsync();
 
         await Task.WhenAll(
-            Access.GrantPermissionAsync(Permission(OwnerId, firstId, pointKey, AccountRole.Reader)),
-            Access.GrantPermissionAsync(Permission(OwnerId, secondId, pointKey, AccountRole.Reader)));
+            GrantAsync(OwnerId, firstId, pointKey, AccountRole.Reader),
+            GrantAsync(OwnerId, secondId, pointKey, AccountRole.Reader));
 
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().ContainKeys(firstId, secondId);
     }
@@ -578,13 +583,15 @@ public class CosmosAccessServiceTests(Startup startup)
         await EnsureOwnerAsync();
         var organization = NewOrganizationName();
 
-        var point = await Access.CreateAccessPointAsync(new AccessPointCreate
-        {
-            Organization = organization,
-            Project = NewProjectName(),
-            ProjectDescription = "  Billing of the customers.\n",
-            OwnerId = OwnerId,
-        });
+        var point = await Access.CreateAccessPointAsync(
+            new AccessPointCreate
+            {
+                Organization = organization,
+                Project = NewProjectName(),
+                ProjectDescription = "  Billing of the customers.\n",
+                OwnerId = OwnerId,
+            },
+            Owner);
 
         point.Description.Should().Be("Billing of the customers.");
         (await Access.GetAccessPointAsync(point.Key))!.Description.Should().Be("Billing of the customers.");
@@ -600,13 +607,15 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         await EnsureOwnerAsync();
 
-        var point = await Access.CreateAccessPointAsync(new AccessPointCreate
-        {
-            Organization = Organization,
-            Project = NewProjectName(),
-            ProjectDescription = description,
-            OwnerId = OwnerId,
-        });
+        var point = await Access.CreateAccessPointAsync(
+            new AccessPointCreate
+            {
+                Organization = Organization,
+                Project = NewProjectName(),
+                ProjectDescription = description,
+                OwnerId = OwnerId,
+            },
+            Owner);
 
         point.Description.Should().BeNull();
         (await IsDescriptionStoredAsync(point.Key)).Should().BeFalse();
@@ -620,15 +629,17 @@ public class CosmosAccessServiceTests(Startup startup)
         var project = NewProjectName();
         var pointKey = $"{organization}.{project}";
 
-        var account = await Access.CreateAccountAsync(new AccountCreate
-        {
-            IdentityId = id,
-            UserName = $"{id}@example.com",
-            Name = "Founder",
-            Organization = organization,
-            Project = project,
-            ProjectDescription = " Shipping of the orders. ",
-        });
+        var account = await Access.CreateAccountAsync(
+            new AccountCreate
+            {
+                IdentityId = id,
+                UserName = $"{id}@example.com",
+                Name = "Founder",
+                Organization = organization,
+                Project = project,
+                ProjectDescription = " Shipping of the orders. ",
+            },
+            AccessCaller.System);
 
         account.AccessMap.Should().Contain(pointKey, AccountRole.Owner);
         (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Shipping of the orders.");
@@ -644,20 +655,20 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync();
 
-        var set = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "  First.  " });
+        var set = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "  First.  " }, Owner);
         set.Description.Should().Be("First.");
         (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("First.");
 
-        var replaced = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Second." });
+        var replaced = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Second." }, Owner);
         replaced.Description.Should().Be("Second.");
         (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Second.");
 
-        var cleared = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate());
+        var cleared = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate(), Owner);
         cleared.Description.Should().BeNull();
         (await IsDescriptionStoredAsync(pointKey)).Should().BeFalse();
 
-        await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Third." });
-        var blank = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = " \n " });
+        await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Third." }, Owner);
+        var blank = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = " \n " }, Owner);
         blank.Description.Should().BeNull();
         (await IsDescriptionStoredAsync(pointKey)).Should().BeFalse();
     }
@@ -668,11 +679,11 @@ public class CosmosAccessServiceTests(Startup startup)
         var pointKey = await CreateProjectAsync();
         var project = ProjectOf(pointKey);
         var memberId = await CreateBareAccountAsync();
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
-        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.Certificate });
-        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 });
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
+        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.Certificate }, Owner);
+        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 }, Owner);
 
-        var point = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Described." });
+        var point = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Described." }, Owner);
 
         point.AccessMap.Should().Contain(memberId, AccountRole.Reader);
         var stored = await ReadPointEntityAsync(pointKey);
@@ -686,7 +697,7 @@ public class CosmosAccessServiceTests(Startup startup)
     [Fact]
     public async Task UpdateAccessPoint_UnknownProject_ThrowsNotFound()
     {
-        var act = () => Access.UpdateAccessPointAsync($"{Organization}.{NewProjectName()}", new AccessPointUpdate { Description = "Nowhere." });
+        var act = () => Access.UpdateAccessPointAsync($"{Organization}.{NewProjectName()}", new AccessPointUpdate { Description = "Nowhere." }, Owner);
 
         await act.Should().ThrowAsync<NotFoundException>();
     }
@@ -696,7 +707,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         await EnsureOwnerAsync();
 
-        var act = () => Access.UpdateAccessPointAsync(Organization, new AccessPointUpdate { Description = "An organization." });
+        var act = () => Access.UpdateAccessPointAsync(Organization, new AccessPointUpdate { Description = "An organization." }, Owner);
 
         await act.Should().ThrowAsync<ArgumentException>();
         (await IsDescriptionStoredAsync(Organization)).Should().BeFalse();
@@ -710,13 +721,13 @@ public class CosmosAccessServiceTests(Startup startup)
         var project = ProjectOf(pointKey);
         var memberId = await CreateBareAccountAsync();
 
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Contributor);
         (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Kept.");
 
-        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 });
+        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 }, Owner);
         (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Kept.");
 
-        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey });
+        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey }, Owner);
         (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Kept.");
     }
 
@@ -729,8 +740,8 @@ public class CosmosAccessServiceTests(Startup startup)
         var memberId = await CreateBareAccountAsync();
 
         await Task.WhenAll(
-            Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader)),
-            Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." }));
+            GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader),
+            Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." }, Owner));
 
         var point = await Access.GetAccessPointAsync(pointKey);
         point!.AccessMap.Should().ContainKey(memberId);
@@ -740,26 +751,33 @@ public class CosmosAccessServiceTests(Startup startup)
     [Fact]
     public async Task UpdateAccessPoint_GrantBeforeReplace_RetriesAndKeepsTheMember()
     {
-        // The replace fails on the ETag, and the retry reads the new member.
+        // The batch of the replace fails on the ETag, and the retry reads the new member.
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
-        var interceptor = new ReplaceInterceptor($"apt.{pointKey}", async replace =>
+        var (access, storage) = InterceptedAccess();
+        var replaces = 0;
+        storage.CoreInterceptor.BeforeBatch = async batch =>
         {
-            if (replace == 1)
+            if (batch.Contains(BatchOperationKind.Replace, $"apt.{pointKey}") && ++replaces == 1)
             {
-                await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+                await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
             }
-        });
-        using var client = interceptor.CreateClient(CosmosOptions);
 
-        var updated = await AccessOn(client).UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." });
+            return null;
+        };
 
-        interceptor.Replaces.Should().Be(2);
+        var updated = await access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." }, Owner);
+
+        storage.CoreInterceptor.Batches.Select(batch => batch.StatusCode).Should().Equal(HttpStatusCode.PreconditionFailed, HttpStatusCode.OK);
         updated.AccessMap.Should().ContainKey(memberId);
         var point = await Access.GetAccessPointAsync(pointKey);
         point!.AccessMap.Should().Contain(memberId, AccountRole.Reader);
         point.Description.Should().Be("Raced.");
         (await Access.GetAccountAsync(memberId))!.AccessMap.Should().Contain(pointKey, AccountRole.Reader);
+        (await StoredAccessAudit.ReadCoreAsync(Repositories, pointKey)).Select(record => record.Action).Should().Equal(
+            AccessAuditAction.AccessPointCreated,
+            AccessAuditAction.MemberGranted,
+            AccessAuditAction.AccessPointUpdated);
     }
 
     [Fact]
@@ -767,17 +785,25 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync("Before.");
         var memberIds = new[] { await CreateBareAccountAsync(), await CreateBareAccountAsync() };
-        var interceptor = new ReplaceInterceptor($"apt.{pointKey}", replace =>
-            Access.GrantPermissionAsync(Permission(OwnerId, memberIds[replace - 1], pointKey, AccountRole.Reader)));
-        using var client = interceptor.CreateClient(CosmosOptions);
+        var (access, storage) = InterceptedAccess();
+        var replaces = 0;
+        storage.CoreInterceptor.BeforeBatch = async _ =>
+        {
+            await GrantAsync(OwnerId, memberIds[replaces++], pointKey, AccountRole.Reader);
+            return null;
+        };
 
-        var act = () => AccessOn(client).UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." });
+        var act = () => access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." }, Owner);
 
         (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.Conflict);
-        interceptor.Replaces.Should().Be(2);
+        storage.CoreInterceptor.Batches.Select(batch => batch.StatusCode).Should().Equal(HttpStatusCode.PreconditionFailed, HttpStatusCode.PreconditionFailed);
         var point = await Access.GetAccessPointAsync(pointKey);
         point!.AccessMap.Should().ContainKeys(memberIds);
         point.Description.Should().Be("Before.");
+        (await StoredAccessAudit.ReadCoreAsync(Repositories, pointKey)).Select(record => record.Action).Should().Equal(
+            AccessAuditAction.AccessPointCreated,
+            AccessAuditAction.MemberGranted,
+            AccessAuditAction.MemberGranted);
     }
 
     [Fact]
@@ -791,12 +817,12 @@ public class CosmosAccessServiceTests(Startup startup)
             // two of the projects have no description
             var description = role is AccountRole.Contributor or AccountRole.Administrator ? null : $"A project of a {role}.";
             var pointKey = await CreateProjectAsync(description);
-            await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, role));
+            await GrantAsync(OwnerId, memberId, pointKey, role);
             expected.Add(new ProjectSummary { Key = pointKey, Role = role, Description = description });
         }
 
         // a role on the organization is not a project
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, Organization, AccountRole.Reader));
+        await GrantAsync(OwnerId, memberId, Organization, AccountRole.Reader);
 
         var projects = await Access.GetProjectsAsync(memberId);
 
@@ -808,7 +834,7 @@ public class CosmosAccessServiceTests(Startup startup)
     {
         var pointKey = await CreateProjectAsync("Present.");
         var memberId = await CreateBareAccountAsync(new() { [$"{Organization}.{NewProjectName()}"] = AccountRole.Reader });
-        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        await GrantAsync(OwnerId, memberId, pointKey, AccountRole.Reader);
 
         var projects = await Access.GetProjectsAsync(memberId);
 
@@ -836,12 +862,22 @@ public class CosmosAccessServiceTests(Startup startup)
 
     private static string NewProjectName() => $"p-{Guid.NewGuid():N}"[..14];
 
-    // The access service on a client of its own, for example one with a ReplaceInterceptor.
-    private CosmosAccessService AccessOn(CosmosClient client)
+    // The access service over storage whose batches of core a test sees and can interleave or fail.
+    private (CosmosAccessService Access, InterceptedRepositoryProvider Storage) InterceptedAccess()
     {
-        return new CosmosAccessService(
-            new ContainerRepositoryProvider(new FixedClientProvider(client)),
-            Context.Services.GetRequiredService<IOptions<JsonSerializerOptions>>());
+        var storage = new InterceptedRepositoryProvider(Repositories);
+        return (new CosmosAccessService(storage, Context.Services.GetRequiredService<IOptions<JsonSerializerOptions>>()), storage);
+    }
+
+    // The caller of a membership change is the account that authorizes it.
+    private Task<bool> GrantAsync(string actorId, string accountId, string pointKey, AccountRole role)
+    {
+        return Access.GrantPermissionAsync(Permission(actorId, accountId, pointKey, role), AccessCaller.Account(actorId));
+    }
+
+    private Task<bool> RevokeAsync(string actorId, string accountId, string pointKey, AccountRole role)
+    {
+        return Access.RevokePermissionAsync(Permission(actorId, accountId, pointKey, role), AccessCaller.Account(actorId));
     }
 
     // A new organization is only its access point in core (its data shares the container organizations).
@@ -856,26 +892,30 @@ public class CosmosAccessServiceTests(Startup startup)
             return;
         }
 
-        await Access.CreateAccountAsync(new AccountCreate
-        {
-            IdentityId = OwnerId,
-            UserName = "owner@example.com",
-            Name = "Owner",
-            Organization = Organization,
-            Project = "base",
-        });
+        await Access.CreateAccountAsync(
+            new AccountCreate
+            {
+                IdentityId = OwnerId,
+                UserName = "owner@example.com",
+                Name = "Owner",
+                Organization = Organization,
+                Project = "base",
+            },
+            AccessCaller.System);
     }
 
     private async Task<string> CreateProjectAsync(string description = null)
     {
         await EnsureOwnerAsync();
-        var point = await Access.CreateAccessPointAsync(new AccessPointCreate
-        {
-            Organization = Organization,
-            Project = NewProjectName(),
-            ProjectDescription = description,
-            OwnerId = OwnerId,
-        });
+        var point = await Access.CreateAccessPointAsync(
+            new AccessPointCreate
+            {
+                Organization = Organization,
+                Project = NewProjectName(),
+                ProjectDescription = description,
+                OwnerId = OwnerId,
+            },
+            Owner);
         return point.Key;
     }
 
@@ -930,10 +970,5 @@ public class CosmosAccessServiceTests(Startup startup)
             $"apt.{pointKey}",
             new PartitionKey("access"),
             stream => stream.DeserializeSystemTextJson<AccessPointEntity>(options));
-    }
-
-    private sealed class FixedClientProvider(CosmosClient client) : ICosmosClientProvider
-    {
-        public CosmosClient Client => client;
     }
 }

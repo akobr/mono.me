@@ -31,7 +31,7 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
     {
         var accessService = await PrepareAsync(MachineCredentialKind.ApiKey);
 
-        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey, Granted));
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey, Granted), AccessCaller.System);
 
         machine.Scopes.ShouldBe(Granted);
         (await accessService.GetMachineAccessAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
@@ -39,7 +39,7 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
         validated.ShouldNotBeNull();
         validated.Scopes.ShouldBe(Granted);
 
-        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
 
         reset.Scopes.ShouldBe(Granted);
         (await accessService.GetMachineAccessAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
@@ -56,7 +56,7 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
     {
         var accessService = await PrepareAsync(MachineCredentialKind.Certificate);
 
-        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.Certificate, Granted));
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.Certificate, Granted), AccessCaller.System);
 
         machine.Scopes.ShouldBe(Granted);
         (await accessService.GetMachineAccessAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
@@ -77,7 +77,7 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
     {
         var accessService = await PrepareAsync(MachineCredentialKind.CertificateAndApiKey);
 
-        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.CertificateAndApiKey, Granted));
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.CertificateAndApiKey, Granted), AccessCaller.System);
 
         machine.Scopes.ShouldBe(Granted);
         (await accessService.GetMachineAccessAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
@@ -86,7 +86,7 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
         (await fixture.Services.GetRequiredService<IClientCertificateValidator>().ValidateAsync(certificate))!.Scopes.ShouldBe(Granted);
 
         // A reset replaces the API key only; both credentials keep the stored list.
-        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
+        var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id, AccessCaller.System);
 
         reset.Scopes.ShouldBe(Granted);
         (await accessService.GetMachineAccessAsync(Organization, Project, machine.Id))!.Scopes.ShouldBe(Granted);
@@ -106,7 +106,7 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
         var accessService = await PrepareAsync(MachineCredentialKind.CertificateAndApiKey);
 
         // The API refuses a machine without a runtime scope; below it, a missing list is stored as none, never null.
-        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.CertificateAndApiKey, null));
+        var machine = await accessService.CreateMachineAccessAsync(Model(MachineCredentialKind.CertificateAndApiKey, null), AccessCaller.System);
 
         machine.Scopes.ShouldBeEmpty();
         (await accessService.GetMachineAccessAsync(Organization, Project, machine.Id))!.Scopes.ShouldBeEmpty();
@@ -132,18 +132,22 @@ public class ScopesPersistenceTests(CosmosFixture fixture)
 
         try
         {
-            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" });
+            await accessService.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = Project, OwnerId = "test-owner" }, AccessCaller.System);
         }
         catch (ConflictException)
         {
             // Already exists.
         }
 
-        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(Organization, Project, new MachineAuthenticationPolicy
-        {
-            EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate, MachineCredentialKind.CertificateAndApiKey],
-            CredentialKind = kind,
-        });
+        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(
+            Organization,
+            Project,
+            new MachineAuthenticationPolicy
+            {
+                EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate, MachineCredentialKind.CertificateAndApiKey],
+                CredentialKind = kind,
+            },
+            AccessCaller.System);
 
         return accessService;
     }

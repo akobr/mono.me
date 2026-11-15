@@ -31,7 +31,8 @@ public class SharedCertificateService
         string organization,
         string project,
         string label,
-        int? requestedLifetimeDays)
+        int? requestedLifetimeDays,
+        AccessCaller caller)
     {
         var opts = _options.Value;
         var policy = await _policyStore.GetEffectiveAsync(organization, project, opts);
@@ -67,7 +68,7 @@ public class SharedCertificateService
             CertificatePassword = issued.Password,
         };
 
-        await _store.StoreAsync(organization, project, certificate);
+        await _store.StoreAsync(organization, project, certificate, caller);
 
         _logger.LogInformation(
             "Shared certificate issued for {Organization}/{Project} label={Label} thumbprint={Thumbprint}",
@@ -84,9 +85,9 @@ public class SharedCertificateService
         return await _store.ListAsync(organization, project);
     }
 
-    public async Task<bool> RevokeAsync(string organization, string project, string thumbprint)
+    public async Task<bool> RevokeAsync(string organization, string project, string thumbprint, AccessCaller caller)
     {
-        var result = await _store.RevokeAsync(organization, project, thumbprint);
+        var result = await _store.RevokeAsync(organization, project, thumbprint, caller);
 
         if (result)
         {

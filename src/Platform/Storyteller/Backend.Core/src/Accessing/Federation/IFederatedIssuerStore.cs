@@ -10,10 +10,11 @@ public interface IFederatedIssuerStore
     // Read from the store, not from the list cache.
     Task<FederatedIssuer?> GetAsync(string organization, string project, string name, CancellationToken cancellationToken = default);
 
-    // Creates the issuer named issuer.Name or replaces it. InvalidInputException when it would be the project's
-    // issuer number MaxIssuersPerProject + 1 or when it changes the Issuer of an existing one.
-    Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, CancellationToken cancellationToken = default);
+    // Creates the issuer named issuer.Name or replaces it, with the caller's access audit record when it changes.
+    // InvalidInputException when it would be the project's issuer number MaxIssuersPerProject + 1 or when it changes the
+    // Issuer of an existing one.
+    Task<FederatedIssuer> SetAsync(string organization, string project, FederatedIssuer issuer, AccessCaller caller, CancellationToken cancellationToken = default);
 
-    // False when the issuer did not exist.
-    Task<bool> DeleteAsync(string organization, string project, string name, CancellationToken cancellationToken = default);
+    // False when the issuer did not exist; a delete is recorded with the caller.
+    Task<bool> DeleteAsync(string organization, string project, string name, AccessCaller caller, CancellationToken cancellationToken = default);
 }

@@ -70,7 +70,7 @@ internal sealed class FixedKeyValuePolicies(bool requireMtls = true, KeyValuePol
     public Task<KeyValuePolicy> GetCurrentAsync(string organization, string project, CancellationToken cancellationToken = default)
         => GetAsync(organization, project, cancellationToken);
 
-    public Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default)
+    public Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, AccessCaller caller, CancellationToken cancellationToken = default)
         => Task.FromResult(policy);
 
     public Task<IReadOnlyList<(string Organization, string Project, KeyValuePolicy Policy)>> ListAsync(CancellationToken cancellationToken = default)
@@ -92,25 +92,25 @@ internal sealed class RoleAccess(
 
     public Task<Account?> GetAccountAsync(string id) => throw new NotSupportedException();
 
-    public Task<Account> CreateAccountAsync(AccountCreate model) => throw new NotSupportedException();
+    public Task<Account> CreateAccountAsync(AccountCreate model, AccessCaller caller) => throw new NotSupportedException();
 
     public Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId) => throw new NotSupportedException();
 
     public Task<AccessPoint?> GetAccessPointAsync(string key) => throw new NotSupportedException();
 
-    public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model) => throw new NotSupportedException();
+    public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model, AccessCaller caller) => throw new NotSupportedException();
 
-    public Task<bool> GrantPermissionAsync(Permission model) => throw new NotSupportedException();
+    public Task<bool> GrantPermissionAsync(Permission model, AccessCaller caller) => throw new NotSupportedException();
 
-    public Task<bool> RevokePermissionAsync(Permission model) => throw new NotSupportedException();
+    public Task<bool> RevokePermissionAsync(Permission model, AccessCaller caller) => throw new NotSupportedException();
 
     public Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId) => throw new NotSupportedException();
 
-    public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole newRole, string actorId) => throw new NotSupportedException();
+    public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole newRole, AccessCaller caller) => throw new NotSupportedException();
 
-    public Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId) => throw new NotSupportedException();
+    public Task RemoveMemberAsync(string accessPointKey, string accountId, AccessCaller caller) => throw new NotSupportedException();
 
-    public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole newRole) => throw new NotSupportedException();
+    public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole newRole, AccessCaller caller, string? detail = null) => throw new NotSupportedException();
 
     public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotSupportedException();
 
@@ -124,11 +124,11 @@ internal sealed class RoleAccess(
             AnnotationKey = machineAnnotationKey,
         });
 
-    public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotSupportedException();
+    public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model, AccessCaller caller) => throw new NotSupportedException();
 
-    public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId) => throw new NotSupportedException();
+    public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotSupportedException();
 
-    public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotSupportedException();
+    public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotSupportedException();
 }
 
 // Records the calls and plays back canned pairs; refuses secrets like the real service does.

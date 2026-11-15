@@ -58,12 +58,14 @@ public class OrganizationsContainerStructureTests(Startup startup)
 
         foreach (var organization in organizations)
         {
-            await Access.CreateAccessPointAsync(new AccessPointCreate
-            {
-                Organization = organization,
-                Project = Constants.DefaultProjectName,
-                OwnerId = OwnerId,
-            });
+            await Access.CreateAccessPointAsync(
+                new AccessPointCreate
+                {
+                    Organization = organization,
+                    Project = Constants.DefaultProjectName,
+                    OwnerId = OwnerId,
+                },
+                AccessCaller.System);
         }
 
         // a new organization is usable at once: its data goes to the shared container, nothing waits for a container

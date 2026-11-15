@@ -142,7 +142,7 @@ public class AccessHttp
             Project = accountModel.Project,
             ProjectDescription = accountModel.ProjectDescription,
         };
-        account = await _accessService.CreateAccountAsync(internalAccountModel);
+        account = await _accessService.CreateAccountAsync(internalAccountModel, request.GetAccessCaller());
 
         return new OkObjectResult(account);
     }
@@ -217,7 +217,7 @@ public class AccessHttp
 
         // The caller owns what they create; clients do not send the owner.
         pointModel = pointModel with { OwnerId = accountId };
-        var point = await _accessService.CreateAccessPointAsync(pointModel);
+        var point = await _accessService.CreateAccessPointAsync(pointModel, request.GetAccessCaller());
         return new OkObjectResult(point);
     }
 
@@ -257,7 +257,7 @@ public class AccessHttp
         }
 
         // Without a body, the description is cleared, as for views.
-        var point = await _accessService.UpdateAccessPointAsync(pointKey, model ?? new AccessPointUpdate());
+        var point = await _accessService.UpdateAccessPointAsync(pointKey, model ?? new AccessPointUpdate(), request.GetAccessCaller());
         return new OkObjectResult(point);
     }
 
@@ -310,7 +310,7 @@ public class AccessHttp
 
         var accountId = request.GetIdentityUniqueId();
         permissionModel = permissionModel with { CreatedById = accountId };
-        await _accessService.GrantPermissionAsync(permissionModel);
+        await _accessService.GrantPermissionAsync(permissionModel, request.GetAccessCaller());
         var point = await _accessService.GetAccessPointAsync(permissionModel.AccessPointKey);
         return new OkObjectResult(point);
     }
@@ -343,7 +343,7 @@ public class AccessHttp
 
         var accountId = request.GetIdentityUniqueId();
         permissionModel = permissionModel with { CreatedById = accountId };
-        await _accessService.RevokePermissionAsync(permissionModel);
+        await _accessService.RevokePermissionAsync(permissionModel, request.GetAccessCaller());
         var point = await _accessService.GetAccessPointAsync(permissionModel.AccessPointKey);
         return new OkObjectResult(point);
     }
@@ -473,7 +473,7 @@ public class AccessHttp
 
         try
         {
-            var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel);
+            var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel, request.GetAccessCaller());
             return new OkObjectResult(FederationHttp.WithTokenEndpoint(machineAccess, request, _federationOptions, organization, project));
         }
         catch (MachineAccessNotSupportedException exception)
@@ -517,7 +517,7 @@ public class AccessHttp
 
         try
         {
-            var machineAccess = await _accessService.ResetMachineAccessAsync(organization, project, id);
+            var machineAccess = await _accessService.ResetMachineAccessAsync(organization, project, id, request.GetAccessCaller());
             return new OkObjectResult(machineAccess);
         }
         catch (MachineAccessNotSupportedException exception)
@@ -557,7 +557,7 @@ public class AccessHttp
         // Deleting a machine stops whatever runs with its scopes, so it needs the role they need, as the reset does.
         await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
 
-        var isSuccess = await _accessService.DeleteMachineAccessAsync(organization, project, id);
+        var isSuccess = await _accessService.DeleteMachineAccessAsync(organization, project, id, request.GetAccessCaller());
 
         return isSuccess
             ? new OkResult()
@@ -655,7 +655,7 @@ public class AccessHttp
 
         // Validate refuses a missing policy, so there is one here.
         var normalized = MachineAuthenticationPolicies.Normalize(policy!);
-        await _policyStore.SetAsync(organization, project, normalized);
+        await _policyStore.SetAsync(organization, project, normalized, request.GetAccessCaller());
         return new OkObjectResult(MachineAuthenticationPolicies.Resolve(normalized, _machineOptions));
     }
 

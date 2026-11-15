@@ -25,6 +25,24 @@ public class DataSetProvisionerTests
             .ReturnsAsync([new View { Name = "default", IsDefault = true }]);
     }
 
+    // DbCreator is no one's actor: the owner owns what it creates, and the access audit records the System as who did it
+    [Fact]
+    public async Task Provision_ANewTarget_CreatesTheOwnersAccountAndTheProjectAsTheSystem()
+    {
+        (await Provision()).ShouldBe(new DataSetProvisioning(true, true, true, true));
+
+        _access.Verify(
+            access => access.CreateAccountAsync(It.Is<AccountCreate>(account => account.IdentityId == OwnerId), AccessCaller.System),
+            Times.Once);
+        _access.Verify(
+            access => access.CreateAccessPointAsync(
+                It.Is<AccessPointCreate>(point => point.OwnerId == OwnerId && point.Organization == Target.Organization && point.Project == Target.Project),
+                AccessCaller.System),
+            Times.Once);
+        _access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>(), It.IsAny<AccessCaller>()), Times.Once);
+        _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()), Times.Once);
+    }
+
     [Fact]
     public async Task Provision_ADottedOrganizationThatIsAProject_IsRefusedBeforeAnythingIsWritten()
     {
@@ -39,19 +57,19 @@ public class DataSetProvisionerTests
             () => Provisioner().ProvisionAsync(new DataSetTarget("42dotnet.main", "xyz", "default"), Owner, null, null, dryRun: false, TestContext.Current.CancellationToken));
 
         exception.Message.ShouldContain("organization name '42dotnet.main' is not valid");
-        _access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>()), Times.Never);
-        _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()), Times.Never);
+        _access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>(), It.IsAny<AccessCaller>()), Times.Never);
+        _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()), Times.Never);
     }
 
     [Fact]
     public async Task Provision_WhatTheAccessModelRefusesAfterAll_IsWrongInput()
     {
-        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()))
+        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()))
             .ThrowsAsync(new AccessDeniedException("The account 'user_01owner' doesn't have owner rights to the organization 'fabrikam'."));
 
         (await Should.ThrowAsync<DataSetException>(() => Provision())).Message.ShouldContain("doesn't have owner rights");
 
-        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()))
+        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()))
             .ThrowsAsync(new InvalidInputException("The project name 'x' is not valid.", ErrorCodes.InvalidName));
 
         (await Should.ThrowAsync<DataSetException>(() => Provision())).Message.ShouldBe("The project name 'x' is not valid.");
@@ -69,17 +87,17 @@ public class DataSetProvisionerTests
     [Fact]
     public async Task Provision_WhatWasCreatedInTheMeantime_IsUsedAsItIs()
     {
-        _access.Setup(access => access.CreateAccountAsync(It.IsAny<AccountCreate>()))
+        _access.Setup(access => access.CreateAccountAsync(It.IsAny<AccountCreate>(), It.IsAny<AccessCaller>()))
             .ThrowsAsync(new ConflictException("The account exists.", ErrorCodes.AccountExists));
-        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()))
+        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()))
             .ThrowsAsync(new ConflictException("The access point exists.", ErrorCodes.AccessPointExists));
         _views.Setup(views => views.CreateViewAsync(Target.Organization, Target.Project, It.IsAny<ViewCreate>(), AuditActor.System))
             .ThrowsAsync(new ConflictException("The view exists.", ErrorCodes.ViewExists));
 
         (await Provision()).ShouldBe(new DataSetProvisioning(false, false, false, false));
 
-        _access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>()), Times.Once);
-        _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()), Times.Once);
+        _access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>(), It.IsAny<AccessCaller>()), Times.Once);
+        _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()), Times.Once);
         _views.Verify(views => views.CreateViewAsync(Target.Organization, Target.Project, It.IsAny<ViewCreate>(), AuditActor.System), Times.Once);
     }
 
@@ -98,7 +116,7 @@ public class DataSetProvisionerTests
 
         (await Should.ThrowAsync<DataSetException>(() => Provision())).Message.ShouldContain("is not its Administrator or Owner");
 
-        _access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>()), Times.Never);
+        _access.Verify(access => access.CreateAccountAsync(It.IsAny<AccountCreate>(), It.IsAny<AccessCaller>()), Times.Never);
         _views.Verify(views => views.CreateViewAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ViewCreate>(), It.IsAny<AuditActor>()), Times.Never);
     }
 
@@ -115,7 +133,7 @@ public class DataSetProvisionerTests
 
         (await Provision()).IsProjectCreated.ShouldBeFalse();
 
-        _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()), Times.Never);
+        _access.Verify(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()), Times.Never);
     }
 
     [Fact]
@@ -128,7 +146,7 @@ public class DataSetProvisionerTests
                 Key = Target.ProjectKey,
                 AccessMap = new Dictionary<string, AccountRole> { ["user_01other"] = AccountRole.Owner },
             });
-        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>()))
+        _access.Setup(access => access.CreateAccessPointAsync(It.IsAny<AccessPointCreate>(), It.IsAny<AccessCaller>()))
             .ThrowsAsync(new ConflictException("The access point exists.", ErrorCodes.AccessPointExists));
 
         (await Should.ThrowAsync<DataSetException>(() => Provision())).Message.ShouldContain("is not its Administrator or Owner");

@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.DbCreator.Configuration;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using Colorful;
@@ -11,7 +12,8 @@ public class CoreDbStructureBuilder(
     IContainerFactory containerFactory,
     DataSetSeeder seeder,
     IOptions<BaseAccountOptions> baseAccount,
-    IOptions<StagingSeedOptions> stagingSeed)
+    IOptions<StagingSeedOptions> stagingSeed,
+    AccessAuditRecords? audit = null)
 {
     // The built-in set of the platform's own annotations, seeded into 42dotnet / main / default by every run.
     public const string CORE_SET = "core";
@@ -73,13 +75,15 @@ public class CoreDbStructureBuilder(
         return coreContainer;
     }
 
-    private static Task SeedAsync(Container container, SeedAccount account, params string[] accessPoints)
+    // Every access point created or changed is recorded in the access audit, by System.
+    private Task SeedAsync(Container container, SeedAccount account, params string[] accessPoints)
     {
         return Data.SeedAccountAccessAsync(
             container,
             account.Id,
             account.UserName,
             account.Name,
-            SeedAccounts.Roles(account.Role, accessPoints));
+            SeedAccounts.Roles(account.Role, accessPoints),
+            audit);
     }
 }

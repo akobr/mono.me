@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities;
+using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json.Linq;
 
@@ -91,6 +92,10 @@ public sealed class InterceptedBatch(TransactionalBatch inner, PartitionKey part
         return item switch
         {
             Entity entity => entity.Id,
+            AccessAuditEntity record => record.Id,
+            AccessPointEntity point => point.Id,
+            AccountEntity account => account.Id,
+            MachineAccessEntity machine => machine.Id,
             JObject json => json.Value<string>("id"),
             _ => null,
         };

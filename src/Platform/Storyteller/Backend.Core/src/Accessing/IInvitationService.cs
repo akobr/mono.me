@@ -15,7 +15,9 @@ public interface IInvitationService
     // Pending, unexpired invitations for the caller's email.
     Task<IReadOnlyList<Invitation>> GetPendingInvitationsAsync(string email);
 
-    Task<Account> AcceptInvitationAsync(string invitationId, InvitationIdentity invitee);
+    // The invitee joins, and the access audit records it with the invitation and its sender; correlationId is the
+    // request's (the Functions invocation id).
+    Task<Account> AcceptInvitationAsync(string invitationId, InvitationIdentity invitee, string? correlationId = null);
 
     Task<Invitation> DeclineInvitationAsync(string invitationId, InvitationIdentity invitee);
 }

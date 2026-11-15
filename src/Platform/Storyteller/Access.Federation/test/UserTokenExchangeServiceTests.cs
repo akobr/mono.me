@@ -108,7 +108,7 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         payload.GetProperty("restrictions").GetRawText().ShouldBe("""["NoSecretReveal"]""");
 
         _access.Verify(service => service.GetAccountAsync(AccountId), Times.Once);
-        _access.Verify(service => service.CreateAccountAsync(It.IsAny<Accessing.Model.AccountCreate>()), Times.Never);
+        _access.Verify(service => service.CreateAccountAsync(It.IsAny<Accessing.Model.AccountCreate>(), It.IsAny<AccessCaller>()), Times.Never);
     }
 
     // The provider's user name against the stored one (AccountUserNameCheck): logged, and the token is still issued.
@@ -425,7 +425,7 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
 
         ShouldBeRefused(result, OAuthTokenExchange.Errors.InvalidGrant, "No Storyteller account exists for this sign-in. Register once with sform or the admin UI.");
         _access.Verify(service => service.GetAccountAsync("user_unregistered"), Times.Once);
-        _access.Verify(service => service.CreateAccountAsync(It.IsAny<Accessing.Model.AccountCreate>()), Times.Never);
+        _access.Verify(service => service.CreateAccountAsync(It.IsAny<Accessing.Model.AccountCreate>(), It.IsAny<AccessCaller>()), Times.Never);
         _signingKeys.Creates.ShouldBe(0);
     }
 

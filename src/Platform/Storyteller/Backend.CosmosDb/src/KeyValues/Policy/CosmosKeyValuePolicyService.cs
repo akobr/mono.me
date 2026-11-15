@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.KeyValues.Audit;
 using _42.Platform.Storyteller.KeyValues.ClientEncryption;
@@ -458,7 +459,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
         {
             Version = policy.Version + 1,
             Modified = AuditStamp.Of(caller.Actor, _timeProvider.GetUtcNow()),
-        }, cancellationToken);
+        }, new AccessCaller(caller.Actor) { CorrelationId = caller.CorrelationId }, cancellationToken);
     }
 
     private async Task AuditAsync(string organization, string project, KeyValueCaller caller, KeyValueAuditOperation operation, string? detail, CancellationToken cancellationToken)

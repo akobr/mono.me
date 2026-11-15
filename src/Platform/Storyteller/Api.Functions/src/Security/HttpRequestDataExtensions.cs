@@ -112,6 +112,13 @@ public static class HttpRequestDataExtensions
         return @this.TryGetDelegatedActor(out var actorId) ? account with { Via = actorId } : account;
     }
 
+    // Who changes access in this request, for the access audit: the audit actor (with Via) and the invocation id, the
+    // correlation id of the key/value audit too.
+    public static AccessCaller GetAccessCaller(this HttpRequestData @this)
+    {
+        return new AccessCaller(@this.GetAuditActor()) { CorrelationId = @this.FunctionContext.InvocationId };
+    }
+
     // Who the caller is for key/value secrets, and what it may do with secret values. A machine reads them with
     // Secrets.Read and writes them with Secrets.Write, each stored on the machine and carried by its credentials, in
     // every build; when the project delivers secrets only over mTLS and the request has none, both are withheld, and

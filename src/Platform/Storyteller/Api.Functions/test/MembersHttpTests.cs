@@ -137,6 +137,45 @@ public class MembersHttpTests
         access.Calls.ShouldBe(["remove:acme.billing:user-1:user-1"]);
     }
 
+    // The access audit records who changed a membership: the account, through the actor that acted for it.
+    [Fact]
+    public async Task SetMemberRole_ThroughAnActor_PassesTheAccessCallerViaTheActor()
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+        var body = FunctionTestDoubles.ToJsonBody(new MemberRoleUpdate { Role = AccountRole.Reader });
+
+        (await http.SetMemberRole(TestRequests.DelegatedUser(method: "PUT", body: body), "acme.billing", "user-2")).ShouldBeOfType<OkObjectResult>();
+
+        access.Callers.ShouldHaveSingleItem().ShouldBe(new AccessCaller(AuditActor.Account(TestRequests.UserId, "Ada") with { Via = TestRequests.ActorId })
+        {
+            CorrelationId = AccessCallerAssertions.InvocationId,
+        });
+    }
+
+    [Fact]
+    public async Task RemoveMember_PassesTheAccessCaller()
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+
+        await http.RemoveMember(UserRequest(), "acme.billing", "user-2");
+
+        access.Callers.ShouldHaveSingleItem().ShouldBeUserCaller();
+    }
+
+    // Registration with a project creates its access points, so it is an access change of the caller.
+    [Fact]
+    public async Task PostAccount_PassesTheAccessCaller()
+    {
+        var access = new RecordingAccess();
+        var http = AccountHttp(access);
+
+        await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { Organization = "acme", Project = "billing" })));
+
+        access.Callers.ShouldHaveSingleItem().ShouldBeUserCaller();
+    }
+
     [Fact]
     public async Task GetMembers_PassesTheCaller()
     {
@@ -333,6 +372,9 @@ public class MembersHttpTests
     {
         public List<string> Calls { get; } = [];
 
+        // The caller of every write, in order.
+        public List<AccessCaller> Callers { get; } = [];
+
         public AccountCreate? Created { get; private set; }
 
         public Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId)
@@ -341,15 +383,17 @@ public class MembersHttpTests
             return Task.FromResult<IReadOnlyList<AccessPointMember>>([]);
         }
 
-        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, string actorId)
+        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller)
         {
-            Calls.Add($"set:{accessPointKey}:{accountId}:{role}:{actorId}");
+            Calls.Add($"set:{accessPointKey}:{accountId}:{role}:{caller.Actor.Id}");
+            Callers.Add(caller);
             return Task.FromResult(new AccessPointMember { AccountId = accountId, Role = role });
         }
 
-        public Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId)
+        public Task RemoveMemberAsync(string accessPointKey, string accountId, AccessCaller caller)
         {
-            Calls.Add($"remove:{accessPointKey}:{accountId}:{actorId}");
+            Calls.Add($"remove:{accessPointKey}:{accountId}:{caller.Actor.Id}");
+            Callers.Add(caller);
             return Task.CompletedTask;
         }
 
@@ -359,9 +403,10 @@ public class MembersHttpTests
             return Task.FromResult<Account?>(null);
         }
 
-        public Task<Account> CreateAccountAsync(AccountCreate model)
+        public Task<Account> CreateAccountAsync(AccountCreate model, AccessCaller caller)
         {
             Created = model;
+            Callers.Add(caller);
             return Task.FromResult(new Account
             {
                 Id = model.IdentityId,
@@ -371,7 +416,7 @@ public class MembersHttpTests
             });
         }
 
-        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role) => throw new NotImplementedException();
+        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller, string? detail = null) => throw new NotImplementedException();
 
         public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey) => throw new NotImplementedException();
 
@@ -379,21 +424,21 @@ public class MembersHttpTests
 
         public Task<AccessPoint?> GetAccessPointAsync(string key) => throw new NotImplementedException();
 
-        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model) => throw new NotImplementedException();
+        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> GrantPermissionAsync(Permission model) => throw new NotImplementedException();
+        public Task<bool> GrantPermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> RevokePermissionAsync(Permission model) => throw new NotImplementedException();
+        public Task<bool> RevokePermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotImplementedException();
 
         public Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id) => throw new NotImplementedException();
 
-        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotImplementedException();
+        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotImplementedException();
+        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotImplementedException();
     }

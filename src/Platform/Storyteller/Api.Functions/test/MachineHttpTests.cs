@@ -93,6 +93,39 @@ public class MachineHttpTests
         access.Roles.ShouldBe(RoleLookups("org1.proj1", "org1.proj1", "org1.proj1"));
     }
 
+    // The access audit records who created, reset and deleted a machine, and the request it came with.
+    [Fact]
+    public async Task CreateResetAndDelete_PassTheAccessCaller()
+    {
+        var access = new RecordingAccess(Machine());
+        var http = CreateHttp(access);
+
+        await http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(MachineCreate(null))), "org1", "proj1");
+        await http.PutMachine(ContributorRequest(), "org1", "proj1", KeycloakId);
+        await http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId);
+
+        access.Calls.Where(call => !call.StartsWith("get:", StringComparison.Ordinal))
+            .ShouldBe(["create:org1/proj1", $"reset:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
+        access.Callers.Count.ShouldBe(3);
+
+        foreach (var caller in access.Callers)
+        {
+            caller.ShouldBeUserCaller();
+        }
+    }
+
+    // Through an actor, the reset is recorded as the account via the actor.
+    [Fact]
+    public async Task PutMachine_ThroughAnActor_PassesTheAccessCallerViaTheActor()
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.ContributorWithSecrets };
+        var http = CreateHttp(access);
+
+        (await http.PutMachine(RestrictedActorRequest("PUT"), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkObjectResult>();
+
+        access.Callers.ShouldHaveSingleItem().ShouldBeUserCaller(via: TestRequests.ActorId);
+    }
+
     [Fact]
     public async Task GetMachineAuthentication_WithoutAStoredPolicy_ReturnsTheDeploymentDefaults()
     {
@@ -139,6 +172,19 @@ public class MachineHttpTests
         store.Stored.CertificateLifetimeDays.ShouldBeNull();
         var policy = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAuthenticationPolicy>();
         policy.CertificateLifetimeDays.ShouldBe(180);
+    }
+
+    // The policy store records the change with the caller: the account via the actor that acted for it.
+    [Fact]
+    public async Task PutMachineAuthentication_ThroughAnActor_PassesTheAccessCallerViaTheActor()
+    {
+        var store = new PolicyStore();
+        var http = CreateHttp(Administrator(), store);
+        var policy = FunctionTestDoubles.ToJsonBody(new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey });
+
+        (await http.PutMachineAuthentication(TestRequests.DelegatedUser(method: "PUT", body: policy), "org1.proj1")).ShouldBeOfType<OkObjectResult>();
+
+        store.Caller.ShouldBeUserCaller(via: TestRequests.ActorId);
     }
 
     [Fact]
@@ -907,6 +953,9 @@ public class MachineHttpTests
     {
         public MachineAuthenticationPolicy? Stored { get; set; }
 
+        // The caller of the last write; null while nothing was stored.
+        public AccessCaller? Caller { get; private set; }
+
         public List<string> Reads { get; } = [];
 
         public Task<MachineAuthenticationPolicy?> GetAsync(string organization, string project)
@@ -915,9 +964,10 @@ public class MachineHttpTests
             return Task.FromResult(Stored);
         }
 
-        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy)
+        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy, AccessCaller caller)
         {
             Stored = policy;
+            Caller = caller;
             return Task.CompletedTask;
         }
     }
@@ -940,6 +990,9 @@ public class MachineHttpTests
         // Thrown by create, reset and delete after they record their call, as a service refuses an operation.
         public Exception? Refusal { get; init; }
 
+        // The caller of every create, reset and delete, in order.
+        public List<AccessCaller> Callers { get; } = [];
+
         public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey)
         {
             Roles.Add(accessPointKey);
@@ -959,9 +1012,10 @@ public class MachineHttpTests
         }
 
         // As the Cosmos service: an unknown machine is not found.
-        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId)
+        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId, AccessCaller caller)
         {
             Calls.Add($"reset:{organization}/{project}/{appId}");
+            Callers.Add(caller);
 
             if (Refusal is not null)
             {
@@ -974,16 +1028,18 @@ public class MachineHttpTests
         }
 
         // As the Cosmos service: an unknown machine is not deleted.
-        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)
+        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId, AccessCaller caller)
         {
             Calls.Add($"delete:{organization}/{project}/{appId}");
+            Callers.Add(caller);
             return Refusal is null ? Task.FromResult(machine is not null) : Task.FromException<bool>(Refusal);
         }
 
         // Every service returns exactly the requested scopes (spec 3.5).
-        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
+        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model, AccessCaller caller)
         {
             Calls.Add($"create:{model.Organization}/{model.Project}");
+            Callers.Add(caller);
 
             if (Refusal is not null)
             {
@@ -996,26 +1052,26 @@ public class MachineHttpTests
 
         public Task<Account?> GetAccountAsync(string id) => throw new NotImplementedException();
 
-        public Task<Account> CreateAccountAsync(AccountCreate model) => throw new NotImplementedException();
+        public Task<Account> CreateAccountAsync(AccountCreate model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId) => throw new NotImplementedException();
 
         public Task<AccessPoint?> GetAccessPointAsync(string key) => throw new NotImplementedException();
 
-        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model) => throw new NotImplementedException();
+        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> GrantPermissionAsync(Permission model) => throw new NotImplementedException();
+        public Task<bool> GrantPermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<bool> RevokePermissionAsync(Permission model) => throw new NotImplementedException();
+        public Task<bool> RevokePermissionAsync(Permission model, AccessCaller caller) => throw new NotImplementedException();
 
         public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotImplementedException();
 
         public Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId) => throw new NotImplementedException();
 
-        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, string actorId) => throw new NotImplementedException();
+        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId) => throw new NotImplementedException();
+        public Task RemoveMemberAsync(string accessPointKey, string accountId, AccessCaller caller) => throw new NotImplementedException();
 
-        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role) => throw new NotImplementedException();
+        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role, AccessCaller caller, string? detail = null) => throw new NotImplementedException();
     }
 }

@@ -136,6 +136,15 @@ public static class EntryPoint
                 $"{ConfigurationSchemaOptions.SectionName}:{nameof(ConfigurationSchemaOptions.PatternMatchTimeout)} must be between 10 ms and 10 s, and {nameof(ConfigurationSchemaOptions.CheckBudget)} between 1 s and 5 min.")
             .ValidateOnStart();
 
+        // The access audit: every access change writes its record in its own batch; the records expire after the retention.
+        services.AddOptions<AccessAuditOptions>()
+            .Bind(configuration.GetSection(AccessAuditOptions.SectionName))
+            .Validate(
+                options => options.RetentionDays is >= AccessAuditOptions.MinRetentionDays and <= AccessAuditOptions.MaxRetentionDays,
+                $"{AccessAuditOptions.SectionName}:{nameof(AccessAuditOptions.RetentionDays)} must be between {AccessAuditOptions.MinRetentionDays} and {AccessAuditOptions.MaxRetentionDays}.")
+            .ValidateOnStart();
+        services.AddSingleton<AccessAuditRecords>();
+
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();

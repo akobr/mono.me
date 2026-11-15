@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Federation;
 using _42.Platform.Storyteller.Accessing.Model;
@@ -16,6 +17,11 @@ namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 public class FederationPersistenceTests(CosmosFixture fixture)
 {
     private const string Organization = "fedorg";
+
+    // The public key of the JWKS below; a record keeps only the number of keys.
+    private const string JwksKeyX = "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU";
+
+    private static readonly AccessCaller Admin = AccessCaller.Account("admin-1", "Ada Admin") with { CorrelationId = "invocation-federation" };
 
     private static readonly IReadOnlyList<FederationRule> Rules =
     [
@@ -60,7 +66,7 @@ public class FederationPersistenceTests(CosmosFixture fixture)
             Description = "Production cluster",
         };
 
-        await store.SetAsync(Organization, project, issuer);
+        await store.SetAsync(Organization, project, issuer, AccessCaller.System);
 
         var stored = await store.GetAsync(Organization, project, "k8s");
         stored.ShouldNotBeNull();
@@ -74,18 +80,18 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         stored.RequiredClaims["/https:~1~1sts.amazonaws.com~1/aws_account"].ShouldBe(["123456789012"]);
         (await store.ListAsync(Organization, project)).Select(item => item.Name).ShouldBe(["k8s"]);
 
-        await store.SetAsync(Organization, project, issuer with { Description = "Renamed", RequiredClaims = null });
+        await store.SetAsync(Organization, project, issuer with { Description = "Renamed", RequiredClaims = null }, AccessCaller.System);
         var updated = await store.GetAsync(Organization, project, "k8s");
         updated!.Description.ShouldBe("Renamed");
         updated.RequiredClaims.ShouldBeNull();
 
         var changed = await Should.ThrowAsync<InvalidInputException>(
-            () => store.SetAsync(Organization, project, issuer with { Issuer = "https://kubernetes.default.svc.cluster.local/" }));
+            () => store.SetAsync(Organization, project, issuer with { Issuer = "https://kubernetes.default.svc.cluster.local/" }, AccessCaller.System));
         changed.Message.ShouldBe(FederationValidation.IssuerImmutableMessage);
         changed.ErrorCode.ShouldBe(ErrorCodes.InvalidFederation);
 
-        (await store.DeleteAsync(Organization, project, "k8s")).ShouldBeTrue();
-        (await store.DeleteAsync(Organization, project, "k8s")).ShouldBeFalse();
+        (await store.DeleteAsync(Organization, project, "k8s", AccessCaller.System)).ShouldBeTrue();
+        (await store.DeleteAsync(Organization, project, "k8s", AccessCaller.System)).ShouldBeFalse();
         (await store.GetAsync(Organization, project, "k8s")).ShouldBeNull();
         (await store.ListAsync(Organization, project)).ShouldBeEmpty();
     }
@@ -100,12 +106,12 @@ public class FederationPersistenceTests(CosmosFixture fixture)
 
         (await first.ListAsync(Organization, project)).ShouldBeEmpty();
 
-        await second.SetAsync(Organization, project, Issuer("b"));
+        await second.SetAsync(Organization, project, Issuer("b"), AccessCaller.System);
 
         (await first.ListAsync(Organization, project)).ShouldBeEmpty();
         (await second.ListAsync(Organization, project)).Select(item => item.Name).ShouldBe(["b"]);
 
-        await first.SetAsync(Organization, project, Issuer("a"));
+        await first.SetAsync(Organization, project, Issuer("a"), AccessCaller.System);
 
         (await first.ListAsync(Organization, project)).Select(item => item.Name).ShouldBe(["a", "b"]);
     }
@@ -119,15 +125,69 @@ public class FederationPersistenceTests(CosmosFixture fixture)
 
         for (var index = 1; index <= FederationValidation.MaxIssuersPerProject; index++)
         {
-            await store.SetAsync(Organization, project, Issuer($"issuer-{index}"));
+            await store.SetAsync(Organization, project, Issuer($"issuer-{index}"), AccessCaller.System);
         }
 
-        var refused = await Should.ThrowAsync<InvalidInputException>(() => store.SetAsync(Organization, project, Issuer("issuer-21")));
+        var refused = await Should.ThrowAsync<InvalidInputException>(() => store.SetAsync(Organization, project, Issuer("issuer-21"), AccessCaller.System));
         refused.Message.ShouldBe(FederationValidation.TooManyIssuersMessage);
 
         // Replacing an existing issuer needs no room.
-        await store.SetAsync(Organization, project, Issuer("issuer-20") with { Description = "kept" });
+        await store.SetAsync(Organization, project, Issuer("issuer-20") with { Description = "kept" }, AccessCaller.System);
         (await store.ListAsync(Organization, project)).Count.ShouldBe(FederationValidation.MaxIssuersPerProject);
+
+        // The partition holds a record of each change, which neither the count nor the list takes for an issuer.
+        (await StoredAccessAudit.ReadAsync(fixture.Services, Organization, $"{project}.federation")).Count.ShouldBe(FederationValidation.MaxIssuersPerProject + 1);
+    }
+
+    // Each change of a trusted issuer is recorded in the issuers' partition with what decides the trust, its JWKS only as
+    // the number of keys; the same issuer again and the delete of a missing one change nothing and record nothing.
+    [Fact]
+    public async Task IssuerStore_RecordsEachChangeOfAnIssuer_ButNoUnchangedOne()
+    {
+        const string project = "issueraudit";
+        await EnsureProjectAsync(project);
+        var store = CreateIssuerStore();
+        var issuer = new FederatedIssuer
+        {
+            Name = "k8s",
+            Issuer = "https://kubernetes.default.svc.cluster.local",
+            KeySource = FederatedIssuerKeySource.Jwks,
+            Jwks = $$"""{"keys":[{"kty":"EC","kid":"ec-1","crv":"P-256","x":"{{JwksKeyX}}","y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"}]}""",
+            MaxTokenLifetimeSeconds = 7200,
+            Description = "Production cluster",
+        };
+
+        await store.SetAsync(Organization, project, issuer, Admin);
+        await store.SetAsync(Organization, project, issuer, AccessCaller.System);
+        await store.SetAsync(Organization, project, issuer with { Description = "Renamed" }, Admin);
+        (await store.DeleteAsync(Organization, project, "k8s", Admin)).ShouldBeTrue();
+        (await store.DeleteAsync(Organization, project, "k8s", AccessCaller.System)).ShouldBeFalse();
+
+        var records = await StoredAccessAudit.ReadAsync(fixture.Services, Organization, $"{project}.federation");
+        records.Select(stored => stored.Record.Action).ShouldBe(
+            [AccessAuditAction.FederatedIssuerCreated, AccessAuditAction.FederatedIssuerUpdated, AccessAuditAction.FederatedIssuerDeleted]);
+
+        foreach (var stored in records)
+        {
+            stored.ShouldBeBy(Admin, Organization, project, $"{project}.federation");
+            stored.Record.Target.ShouldBe(AccessAuditTarget.Issuer("k8s"));
+            stored.ShouldHoldNoSecret(JwksKeyX);
+        }
+
+        records[0].Record.OldValue.ShouldBeNull();
+        var created = StoredAccessAudit.Json(records[0].Record.NewValue);
+        created["Issuer"]!.GetValue<string>().ShouldBe(issuer.Issuer);
+        created["KeySource"]!.GetValue<string>().ShouldBe(nameof(FederatedIssuerKeySource.Jwks));
+        created["JwksKeys"]!.GetValue<int>().ShouldBe(1);
+        created["MaxTokenLifetimeSeconds"]!.GetValue<int>().ShouldBe(7200);
+        created["Description"]!.GetValue<string>().ShouldBe("Production cluster");
+        records[1].Record.OldValue.ShouldBe(records[0].Record.NewValue);
+        StoredAccessAudit.Json(records[1].Record.NewValue)["Description"]!.GetValue<string>().ShouldBe("Renamed");
+        records[2].Record.OldValue.ShouldBe(records[1].Record.NewValue);
+        records[2].Record.NewValue.ShouldBeNull();
+
+        // The list skips the records the partition holds now.
+        (await store.ListAsync(Organization, project)).ShouldBeEmpty();
     }
 
     [Fact]
@@ -144,14 +204,16 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         var machineId = Guid.NewGuid().ToString("D");
         var accessService = CreateAccessService(machineId);
 
-        var created = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = project,
-            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
-            CredentialKind = MachineCredentialKind.Federated,
-            FederationRules = Rules,
-        });
+        var created = await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = project,
+                Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
+                CredentialKind = MachineCredentialKind.Federated,
+                FederationRules = Rules,
+            },
+            AccessCaller.System);
 
         created.FederationRules.ShouldNotBeNull();
 
@@ -169,34 +231,75 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         await EnsureProjectAsync(project);
         var machineId = Guid.NewGuid().ToString("D");
         var accessService = CreateAccessService(machineId);
-        await accessService.CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = project,
-            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
-            CredentialKind = MachineCredentialKind.Federated,
-            FederationRules = [Rules[1]],
-        });
+        await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = project,
+                Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
+                CredentialKind = MachineCredentialKind.Federated,
+                FederationRules = [Rules[1]],
+            },
+            AccessCaller.System);
 
-        var updated = await accessService.SetMachineFederationRulesAsync(Organization, project, machineId, Rules);
+        var updated = await accessService.SetMachineFederationRulesAsync(Organization, project, machineId, Rules, AccessCaller.System);
 
         updated.Id.ShouldBe(machineId);
         ShouldMatchRules(updated);
         ShouldMatchRules((await accessService.GetMachineAccessAsync(Organization, project, machineId))!);
 
         await Should.ThrowAsync<NotFoundException>(
-            () => accessService.SetMachineFederationRulesAsync(Organization, project, Guid.NewGuid().ToString("D"), Rules));
+            () => accessService.SetMachineFederationRulesAsync(Organization, project, Guid.NewGuid().ToString("D"), Rules, AccessCaller.System));
 
-        var apiKeyMachine = await fixture.Services.GetRequiredService<IAccessService>().CreateMachineAccessAsync(new MachineAccessCreate
-        {
-            Organization = Organization,
-            Project = project,
-            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
-            CredentialKind = MachineCredentialKind.ApiKey,
-        });
+        var apiKeyMachine = await fixture.Services.GetRequiredService<IAccessService>().CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = project,
+                Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
+                CredentialKind = MachineCredentialKind.ApiKey,
+            },
+            AccessCaller.System);
         var refused = await Should.ThrowAsync<InvalidInputException>(
-            () => accessService.SetMachineFederationRulesAsync(Organization, project, apiKeyMachine.Id, Rules));
+            () => accessService.SetMachineFederationRulesAsync(Organization, project, apiKeyMachine.Id, Rules, AccessCaller.System));
         refused.ErrorCode.ShouldBe(ErrorCodes.MachineNotFederated);
+    }
+
+    // A change of the rules records them before and after; the same rules again change nothing that decides access, so
+    // they record nothing.
+    [Fact]
+    public async Task SetMachineFederationRules_RecordsEachChangeOfTheRules()
+    {
+        const string project = "fedrulesaudit";
+        await EnsureProjectAsync(project);
+        var machineId = Guid.NewGuid().ToString("D");
+        var accessService = CreateAccessService(machineId);
+        await accessService.CreateMachineAccessAsync(
+            new MachineAccessCreate
+            {
+                Organization = Organization,
+                Project = project,
+                Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
+                CredentialKind = MachineCredentialKind.Federated,
+                FederationRules = [Rules[1]],
+            },
+            AccessCaller.System);
+
+        await accessService.SetMachineFederationRulesAsync(Organization, project, machineId, Rules, Admin);
+        await accessService.SetMachineFederationRulesAsync(Organization, project, machineId, Rules, AccessCaller.System);
+
+        var records = await StoredAccessAudit.ReadMachineAsync(fixture.Services, Organization, project, machineId);
+        records.Select(stored => stored.Record.Action).ShouldBe([AccessAuditAction.MachineCreated, AccessAuditAction.MachineFederationRulesChanged]);
+        var changed = records[1];
+        changed.ShouldBeBy(Admin, Organization, project, $"{project}.access");
+        changed.Record.Target.ShouldBe(AccessAuditTarget.Machine(machineId));
+        RuleIssuers(changed.Record.OldValue).ShouldBe(["k8s"]);
+        RuleIssuers(changed.Record.NewValue).ShouldBe(["github", "k8s"]);
+        changed.Record.NewValue.ShouldNotBeNull().ShouldContain("repo:acme/app:*");
+        changed.ShouldHoldNoSecret();
+
+        // The machine list skips the records of the partition.
+        (await accessService.GetMachineAccessesAsync(Organization, project)).Select(access => access.Id).ShouldBe([machineId]);
     }
 
     [Fact]
@@ -210,14 +313,16 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         {
             var machineId = Guid.NewGuid().ToString("D");
             ids.Add(machineId);
-            await CreateAccessService(machineId).CreateMachineAccessAsync(new MachineAccessCreate
-            {
-                Organization = Organization,
-                Project = project,
-                Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
-                CredentialKind = MachineCredentialKind.Federated,
-                FederationRules = index == 0 ? [Rules[1]] : Rules,
-            });
+            await CreateAccessService(machineId).CreateMachineAccessAsync(
+                new MachineAccessCreate
+                {
+                    Organization = Organization,
+                    Project = project,
+                    Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
+                    CredentialKind = MachineCredentialKind.Federated,
+                    FederationRules = index == 0 ? [Rules[1]] : Rules,
+                },
+                AccessCaller.System);
         }
 
         var accessService = fixture.Services.GetRequiredService<IAccessService>();
@@ -254,6 +359,12 @@ public class FederationPersistenceTests(CosmosFixture fixture)
     private static FederatedIssuer Issuer(string name)
     {
         return new FederatedIssuer { Name = name, Issuer = $"https://{name}.oidc.example.com" };
+    }
+
+    // The issuers of the rules a record keeps, in their order.
+    private static IEnumerable<string> RuleIssuers(string? rules)
+    {
+        return JsonNode.Parse(rules.ShouldNotBeNull())!.AsArray().Select(rule => rule!["Issuer"]!.GetValue<string>());
     }
 
     private static TokenSigningKey NewKey(string kid)
@@ -309,7 +420,7 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         try
         {
             await fixture.Services.GetRequiredService<IAccessService>()
-                .CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = project, OwnerId = "test-owner" });
+                .CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = project, OwnerId = "test-owner" }, AccessCaller.System);
         }
         catch (ConflictException)
         {

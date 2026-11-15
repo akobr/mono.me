@@ -8,6 +8,9 @@ namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 
 public class SharedCertificateServiceTests
 {
+    // The administrator who acts, with the invocation of the request: the store records both with the change.
+    private static readonly AccessCaller Caller = AccessCaller.Account("admin-1", "Ada Admin") with { CorrelationId = "invocation-1" };
+
     private readonly MachineAuthenticationOptions _options = TestCertificateHelper.DefaultOptions;
 
     [Fact]
@@ -33,7 +36,7 @@ public class SharedCertificateServiceTests
             Options.Create(_options),
             NullLogger<SharedCertificateService>.Instance);
 
-        var result = await service.IssueAsync("org1", "proj1", "my-service", 365);
+        var result = await service.IssueAsync("org1", "proj1", "my-service", 365, Caller);
 
         result.ShouldNotBeNull();
         result.Label.ShouldBe("my-service");
@@ -41,7 +44,7 @@ public class SharedCertificateServiceTests
         result.Certificate.ShouldNotBeNullOrEmpty();
         result.CertificatePassword.ShouldNotBeNullOrEmpty();
 
-        storeMock.Verify(s => s.StoreAsync("org1", "proj1", It.IsAny<SharedCertificate>()), Times.Once);
+        storeMock.Verify(s => s.StoreAsync("org1", "proj1", It.IsAny<SharedCertificate>(), Caller), Times.Once);
     }
 
     [Fact]
@@ -67,7 +70,7 @@ public class SharedCertificateServiceTests
             Options.Create(_options),
             NullLogger<SharedCertificateService>.Instance);
 
-        var result = await service.IssueAsync("org1", "proj1", "my-service", 365);
+        var result = await service.IssueAsync("org1", "proj1", "my-service", 365, Caller);
 
         result.Label.ShouldStartWith("my-service-");
         result.Label.Length.ShouldBeGreaterThan("my-service".Length);
@@ -77,7 +80,7 @@ public class SharedCertificateServiceTests
     public async Task RevokeAsync_DelegatesToStore()
     {
         var storeMock = new Mock<ISharedCertificateStore>();
-        storeMock.Setup(s => s.RevokeAsync("org1", "proj1", "THUMBPRINT")).ReturnsAsync(true);
+        storeMock.Setup(s => s.RevokeAsync("org1", "proj1", "THUMBPRINT", Caller)).ReturnsAsync(true);
 
         var authorityMock = new Mock<IClientCertificateAuthority>();
 
@@ -88,10 +91,10 @@ public class SharedCertificateServiceTests
             Options.Create(_options),
             NullLogger<SharedCertificateService>.Instance);
 
-        var result = await service.RevokeAsync("org1", "proj1", "THUMBPRINT");
+        var result = await service.RevokeAsync("org1", "proj1", "THUMBPRINT", Caller);
 
         result.ShouldBeTrue();
-        storeMock.Verify(s => s.RevokeAsync("org1", "proj1", "THUMBPRINT"), Times.Once);
+        storeMock.Verify(s => s.RevokeAsync("org1", "proj1", "THUMBPRINT", Caller), Times.Once);
     }
 
     [Fact]
@@ -108,7 +111,7 @@ public class SharedCertificateServiceTests
             NullLogger<SharedCertificateService>.Instance);
 
         var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(
-            () => service.IssueAsync("org1", "proj1", "my-service", 365));
+            () => service.IssueAsync("org1", "proj1", "my-service", 365, Caller));
 
         exception.Message.ShouldBe("The project org1.proj1 does not enable CertificateAndApiKey, which shared certificates belong to.");
         authorityMock.VerifyNoOtherCalls();
@@ -131,7 +134,7 @@ public class SharedCertificateServiceTests
             NullLogger<SharedCertificateService>.Instance);
 
         await Should.ThrowAsync<MachineAccessNotSupportedException>(
-            () => service.IssueAsync("org1", "proj1", "my-service", 365));
+            () => service.IssueAsync("org1", "proj1", "my-service", 365, Caller));
 
         authorityMock.VerifyNoOtherCalls();
         storeMock.VerifyNoOtherCalls();
@@ -141,7 +144,7 @@ public class SharedCertificateServiceTests
     public async Task RevokeAsync_AProjectWithoutCertificateAndApiKey_StillRevokes()
     {
         var storeMock = new Mock<ISharedCertificateStore>();
-        storeMock.Setup(s => s.RevokeAsync("org1", "proj1", "THUMBPRINT")).ReturnsAsync(true);
+        storeMock.Setup(s => s.RevokeAsync("org1", "proj1", "THUMBPRINT", Caller)).ReturnsAsync(true);
 
         var service = new SharedCertificateService(
             new Mock<IClientCertificateAuthority>().Object,
@@ -150,7 +153,49 @@ public class SharedCertificateServiceTests
             Options.Create(_options),
             NullLogger<SharedCertificateService>.Instance);
 
-        (await service.RevokeAsync("org1", "proj1", "THUMBPRINT")).ShouldBeTrue();
+        (await service.RevokeAsync("org1", "proj1", "THUMBPRINT", Caller)).ShouldBeTrue();
+    }
+
+    // The store records the change with the caller it is given, so the service hands it on as it got it.
+    [Fact]
+    public async Task IssueAsync_PassesTheCallerToTheStore()
+    {
+        var material = TestCertificateHelper.CreateCaMaterial();
+        var caProviderMock = new Mock<ICertificateAuthorityProvider>();
+        caProviderMock.Setup(p => p.GetActiveAsync()).ReturnsAsync(material);
+        var store = new RecordingSharedCertificateStore();
+
+        var service = new SharedCertificateService(
+            new LocalCertificateAuthority(caProviderMock.Object, Options.Create(_options), NullLogger<LocalCertificateAuthority>.Instance),
+            store,
+            PolicyStore(MachineCredentialKind.CertificateAndApiKey),
+            Options.Create(_options),
+            NullLogger<SharedCertificateService>.Instance);
+
+        var issued = await service.IssueAsync("org1", "proj1", "my-service", 365, Caller);
+
+        var stored = store.Stored.ShouldHaveSingleItem();
+        stored.Caller.ShouldBeSameAs(Caller);
+        stored.Certificate.Thumbprint.ShouldBe(issued.Thumbprint);
+    }
+
+    [Fact]
+    public async Task RevokeAsync_PassesTheCallerToTheStore()
+    {
+        var store = new RecordingSharedCertificateStore();
+
+        var service = new SharedCertificateService(
+            new Mock<IClientCertificateAuthority>().Object,
+            store,
+            PolicyStore(MachineCredentialKind.CertificateAndApiKey),
+            Options.Create(_options),
+            NullLogger<SharedCertificateService>.Instance);
+
+        (await service.RevokeAsync("org1", "proj1", "THUMBPRINT", AccessCaller.System)).ShouldBeTrue();
+
+        var revoked = store.Revoked.ShouldHaveSingleItem();
+        revoked.Thumbprint.ShouldBe("THUMBPRINT");
+        revoked.Caller.ShouldBeSameAs(AccessCaller.System);
     }
 
     private static IMachineAuthenticationPolicyStore PolicyStore(params MachineCredentialKind[] kinds)
@@ -159,5 +204,40 @@ public class SharedCertificateServiceTests
         policyStore.Setup(store => store.GetAsync("org1", "proj1"))
             .ReturnsAsync(new MachineAuthenticationPolicy { EnabledCredentialKinds = kinds });
         return policyStore.Object;
+    }
+
+    // Keeps what it was asked to store and revoke, with the caller of each.
+    private sealed class RecordingSharedCertificateStore : ISharedCertificateStore
+    {
+        public List<(SharedCertificate Certificate, AccessCaller Caller)> Stored { get; } = [];
+
+        public List<(string Thumbprint, AccessCaller Caller)> Revoked { get; } = [];
+
+        public Task<IReadOnlyList<SharedCertificate>> ListAsync(string organization, string project)
+        {
+            return Task.FromResult<IReadOnlyList<SharedCertificate>>(Stored.Select(stored => stored.Certificate).ToList());
+        }
+
+        public Task<SharedCertificate?> GetByThumbprintAsync(string organization, string project, string thumbprint)
+        {
+            return Task.FromResult(Stored.Select(stored => stored.Certificate).FirstOrDefault(certificate => certificate.Thumbprint == thumbprint));
+        }
+
+        public Task StoreAsync(string organization, string project, SharedCertificate certificate, AccessCaller caller)
+        {
+            Stored.Add((certificate, caller));
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> RevokeAsync(string organization, string project, string thumbprint, AccessCaller caller)
+        {
+            Revoked.Add((thumbprint, caller));
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> LabelExistsAsync(string organization, string project, string label)
+        {
+            return Task.FromResult(false);
+        }
     }
 }
