@@ -18,7 +18,7 @@ public class KeyValueDeleteCommand : KeyValueCommandBase
     [Argument(0, Description = "The key.")]
     public string Key { get; set; } = string.Empty;
 
-    [Option("--permanent", CommandOptionType.NoValue, Description = "Remove the key and every version for good (Administrator).")]
+    [Option("--permanent", CommandOptionType.NoValue, Description = "Remove the key for good (for administrators).")]
     public bool Permanent { get; set; }
 
     [Option("-y|--yes", CommandOptionType.NoValue, Description = "Do not ask for a confirmation of a permanent delete.")]

@@ -32,9 +32,21 @@ public class KeyValuePolicyCommand : KeyValueCommandBase
     }
 }
 
-[Command(CommandNames.SET, Description = "Change the policy (Administrator); members not given keep their value.")]
+[Command(CommandNames.SET, Description = "Change the policy (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValuePolicySetCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv policy set --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        Only the members given change; the others keep their value. --allow lists
+        every allowed level and replaces the stored list: public is always allowed,
+        and a level still in use has to stay listed.
+
+        A user needs the Administrator role on the project. A machine cannot change
+        the policy, whatever its scopes.
+        """;
+
     public KeyValuePolicySetCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {

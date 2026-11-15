@@ -9,9 +9,23 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.KeyValues;
 
-[Command(CommandNames.AUDIT, Description = "The audit trail of the project's secrets, newest first (Administrator). -v filters by view.")]
+[Command(CommandNames.AUDIT, Description = "The audit trail of secrets (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValueAuditCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv audit --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The events of the project's secrets, newest first: who revealed, wrote,
+        deleted, restored, exported, imported or re-protected them, who changed the
+        policy or the keys, and the aggregated binding reads; never a value. Without
+        -v the events of every view are listed; -v, --key, --operation, --from and
+        --to narrow them.
+
+        A user needs the Administrator role on the project. A machine cannot read the
+        audit trail, whatever its scopes.
+        """;
+
     public KeyValueAuditCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {
@@ -79,9 +93,21 @@ public class KeyValueAuditCommand : KeyValueCommandBase
     }
 }
 
-[Command(CommandNames.USAGE, Description = "The key/value usage of the project over a range of days (the last 30 by default), with estimated charges when the deployment has prices (Administrator).")]
+[Command(CommandNames.USAGE, Description = "The project's key/value usage (for administrators).", ExtendedHelpText = HelpDetail)]
 public class KeyValueUsageCommand : KeyValueCommandBase
 {
+    // After the options of 'sform story kv usage --help', as it is: the empty first line separates it from them,
+    // and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The daily meters of the project's key/value pairs and their totals over a
+        range of days: the last 30 by default, or --from to --to (at most 400 days),
+        with the estimated charges when the deployment has prices.
+
+        A user needs the Administrator role on the project. A machine cannot read the
+        usage, whatever its scopes.
+        """;
+
     public KeyValueUsageCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
         : base(console, context, keyValues)
     {
