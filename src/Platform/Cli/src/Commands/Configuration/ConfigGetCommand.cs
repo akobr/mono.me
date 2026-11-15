@@ -96,7 +96,7 @@ public class ConfigGetCommand : BaseContextCommand
             Console.WriteErrorLine($"Warning: the API withheld the secrets of the configuration ({secretsWithheld}): the values of secret bindings are their expressions.{(hint is null ? string.Empty : " " + hint)}");
         }
 
-        return await WriteAsync(options, configuration);
+        return await WriteAsync(options, configuration, secretsWithheld);
     }
 
     // Every check before the first call, so a wrong command line writes its message and nothing else.
@@ -162,10 +162,11 @@ public class ConfigGetCommand : BaseContextCommand
         return await ConfigurationReads.ReadAsync(_configurationApi, Context, key, IsResolvedRetrievalRequested);
     }
 
-    // The model as before, or the content alone as text.
-    private async Task<int> WriteAsync(ReadOptions options, ConfigurationModel configuration)
+    // The model as before, or the content alone as text. When the API said why it withheld the secrets, that warning
+    // stands alone: the unresolved bindings are the secrets it withheld, not a missing scope.
+    private async Task<int> WriteAsync(ReadOptions options, ConfigurationModel configuration, string? secretsWithheld)
     {
-        if (IsResolvedRetrievalRequested)
+        if (IsResolvedRetrievalRequested && secretsWithheld is null)
         {
             await WarnOfUnresolvedAsync(options.Key, configuration);
         }

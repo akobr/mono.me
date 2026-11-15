@@ -449,6 +449,23 @@ public class ConfigGetCommandTests
         _error.ToString().ShouldBe($"Warning: the API withheld the secrets of the configuration ({reason}): the values of secret bindings are their expressions.{hint}\n");
     }
 
+    // The bindings the API withheld are its reason, not a missing scope: no second warning about Secrets.Read.
+    [Fact]
+    public async Task WithheldSecrets_WithUnresolvedBindings_WarnOnlyOfTheReason()
+    {
+        const string unresolved = """{ "db": { "host": "db.local", "password": "@(db.password, vault)" } }""";
+        SetupResolved(Envelope(unresolved), withheld: "step-up-required");
+        SetupEffective(Envelope(unresolved));
+
+        var exitCode = await Execute(Key, "-r", "-f", "env", "--content-only");
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _out.ToString().ShouldBe(Formatted(unresolved, "env"));
+        _error.ToString().ShouldStartWith("Warning: the API withheld the secrets of the configuration (step-up-required)");
+        _error.ToString().ShouldNotContain("Secrets.Read");
+        _api.Verify(api => api.GetConfigurationConditionalAsync("org1", "proj1", "default", Key, null, It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     [Fact]
     public async Task UnresolvedBindings_AreAWarningWithThePaths_WhenPrinting()
     {

@@ -662,7 +662,7 @@ The operations that answer the `401` are listed in `OperationAccess.StepUp` (`Ap
 The order of the checks:
 
 - **What a new sign-in cannot fix comes first:** a machine on a route for users only, the role checks of the route, the [restriction of the actor](#restrictions-of-actors) and a bad body. So a person without the role gets `403`, as before.
-- **The role checks inside the service come after it.** Grant, revoke, a member's role change and the removal of a member check the role in the service, so a person without the role whose sign-in is old gets `401` first, and `403` after signing in again. The admin UI offers these actions only to the roles that may use them.
+- **The role checks inside the service come after it.** Grant, revoke, a member's role change, the removal of a member and a new invitation check the role in the service, and a new invitation also its email, role and validity there, so a person without the role (or with such a bad invitation) whose sign-in is old gets `401` first, and `403` (or `400`) after signing in again. The admin UI offers these actions only to the roles that may use them, and asks for the sign-in before their dialogs open.
 - **Secret rights are withheld only where the role gives them.** A user below `ContributorWithSecrets` gets `403 AccessDenied` and no header, whatever the time of the sign-in.
 - **The actor wins for reads.** Through an actor under `NoSecretReveal`, a secret read answers `403 ActorRestricted` and a resolved configuration `actor-restricted`, because a new sign-in would not lift the restriction. Writes through the actor are judged by the step-up.
 
@@ -711,7 +711,7 @@ Content-Type: application/json; charset=utf-8
 - **A recent sign-in, not MFA.** `auth_time` says when the person signed in, not how. WorkOS enforces MFA, and the API cannot check it (see [MFA policy](#mfa-policy)).
 - **Code in the admin UI's origin.** For SSO users, and for anyone whose identity provider still has a session, the step-up protects against a token taken out of the browser, not against code that runs in the admin UI's origin: such code can start the `max_age` sign-in itself, and an identity provider with a live session may complete it without asking.
 - **The device code.** Whether WorkOS counts the approval of a device code in a browser that is still signed in as an active authentication is not documented, and it is not verified yet. If it does, code that controls the browser gets a fresh `sform` session through the device flow, around the step-up.
-- **Not guarded.** The key/value policy and the machine authentication policy change no holder of a credential, so they need no recent sign-in.
+- **Not guarded, an accepted risk.** The key/value policy and the machine authentication policy need no recent sign-in, although they widen what existing machine credentials can do: an Administrator with an old sign-in can turn `RequireMtlsForSecretDelivery` off, so machines without their certificate receive secrets, or enable a credential kind again, which brings back the machines of that kind. Using either needs a machine credential that is already out; a later change may guard both.
 
 ## MFA policy
 
@@ -1981,4 +1981,4 @@ For the same reason a cross-origin browser reads neither `WWW-Authenticate` nor 
 * The Storyteller signing key cannot be rotated except by the [emergency procedure](#security-notes), and it cannot live in Key Vault. So the [JWKS](#discovery-of-the-issuer) publishes one key and never a next one.
 * The token endpoint of federated machines has no replay protection and no rate limit. Rules know only exact values and a separator-anchored subject prefix; there are no glob, regex or CEL conditions. The replay limit of the user token exchange and its record of client assertions are kept in memory per instance.
 * Only the [step-up](#recent-sign-in-step-up) `401` carries a `WWW-Authenticate` header. The other `401` responses carry none, so a client gets no `invalid_token` challenge.
-* The step-up checks the time of a sign-in, never its method: the API cannot prove MFA (see [MFA policy](#mfa-policy)). `sform` cannot ask for a fresh sign-in, MCP clients cannot send `max_age`, and Entra ID's authentication contexts (claims challenges) are not used. The key/value policy and the machine authentication policy need no recent sign-in.
+* The step-up checks the time of a sign-in, never its method: the API cannot prove MFA (see [MFA policy](#mfa-policy)). `sform` cannot ask for a fresh sign-in, MCP clients cannot send `max_age`, and Entra ID's authentication contexts (claims challenges) are not used. The key/value policy and the machine authentication policy need no recent sign-in (an accepted risk, see [Limits of the step-up](#limits-of-the-step-up)).

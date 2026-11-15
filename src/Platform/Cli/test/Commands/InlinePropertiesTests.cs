@@ -513,6 +513,35 @@ public class InlinePropertiesTests
         Json(sent!).ShouldBe("""{"db":{"host":"x","port":5432},"Logging":{"LogLevel":{"Microsoft.AspNetCore":"Warning"}}}""");
     }
 
+    // 424-264: -r reads through the conditional twin, so secrets the API withheld (here for the step-up) are named.
+    [Fact]
+    public async Task ConfigSet_Resolved_NamesWithheldSecrets()
+    {
+        var fixture = new AnnotationCommandFixture();
+        var error = new StringWriter();
+        fixture.InnerConsole.SetupGet(console => console.Error).Returns(error);
+        var api = new Mock<IConfigurationsApiClient>(MockBehavior.Strict);
+        api
+            .Setup(client => client.SetConfigurationAsync("org1", "proj1", "default", "exe.app", false, It.IsAny<object>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Storyteller.Sdk.Configuration());
+        api
+            .Setup(client => client.GetResolvedConfigurationConditionalAsync("org1", "proj1", "default", "exe.app", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ConditionalResponse<Storyteller.Sdk.Configuration>(
+                200,
+                new Storyteller.Sdk.Configuration { AnnotationKey = "exe.app", Content = JObject.Parse("""{ "db": { "password": "@(db.password, vault)" } }""") },
+                new Dictionary<string, IEnumerable<string>> { ["X-2S-Secrets-Withheld"] = ["step-up-required"] }));
+
+        var exitCode = await new ConfigSetCommand(fixture.Console.Object, fixture.Context.Object, api.Object, _fileSystem)
+        {
+            AnnotationKey = "exe.app",
+            InlineProperties = ["db.host=x"],
+            IsResolvedRetrievalRequested = true,
+        }.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        error.ToString().ShouldStartWith("Warning: the API withheld the secrets of the configuration (step-up-required): the values of secret bindings are their expressions. Secrets need a recent sign-in:");
+    }
+
     [Fact]
     public async Task ConfigSet_WithAWrongPath_SendsNothing()
     {

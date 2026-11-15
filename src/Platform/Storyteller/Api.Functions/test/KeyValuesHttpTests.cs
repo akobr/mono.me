@@ -798,6 +798,55 @@ public class KeyValuesHttpTests
         service.LastExport!.IncludeSecrets.ShouldBeFalse();
     }
 
+    // Delete and import of a secret with a stale sign-in: 401 once the service refused it; public ones pass.
+    [Fact]
+    public async Task DeleteAndImportOfASecret_WithAStaleSignIn_RequireAStepUp_PublicOnesDoNot()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        service.Pair = RecordingKeyValueService.Secret("db.password", "s3cret");
+        var secretImport = new KeyValueDocument { Items = [new KeyValueDocumentItem { Key = "db.password", Protection = KeyValueProtection.Standard, Value = "s3cret" }] };
+        var publicImport = new KeyValueDocument { Items = [new KeyValueDocumentItem { Key = "db.host", Protection = KeyValueProtection.Public, Value = "db-1" }] };
+
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.DeleteKeyValue(Stale(KeyValueRequests.User("DELETE")), Org, Project, View, "db.password"));
+        await UserOnlyRoutes.ShouldRequireStepUpAsync(() => http.ImportKeyValues(Stale(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(secretImport))), Org, Project, View));
+        var deletedPublic = await http.DeleteKeyValue(Stale(KeyValueRequests.User("DELETE")), Org, Project, View, "db.host");
+        var importedPublic = await http.ImportKeyValues(Stale(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(publicImport))), Org, Project, View);
+
+        deletedPublic.ShouldBeOfType<NoContentResult>();
+        importedPublic.ShouldBeOfType<OkObjectResult>();
+        service.Calls.ShouldBe(["delete:db.password", "import", "delete:db.host", "import"]);
+    }
+
+    // Restore and purge answer 200; the items the service refused for missing write rights name the step-up, the others
+    // stay as they are.
+    [Fact]
+    public async Task RestoreAndPurge_WithAStaleSignIn_NameTheStepUpInTheRefusedItems()
+    {
+        var (http, service) = Create(AccountRole.Administrator);
+        service.BulkItems =
+        [
+            new KeyValueBulkItemResult { Key = "db.password", Outcome = KeyValueBulkOutcome.Forbidden, ErrorCode = ErrorCodes.AccessDenied },
+            new KeyValueBulkItemResult { Key = "db.host", Outcome = KeyValueBulkOutcome.Done, Version = 3 },
+        ];
+        var body = FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["db.password", "db.host"] });
+
+        foreach (var result in new[]
+        {
+            await http.RestoreKeyValues(Stale(KeyValueRequests.User("POST", body: body)), Org, Project, View),
+            await http.PurgeKeyValues(Stale(KeyValueRequests.User("POST", body: body)), Org, Project, View),
+        })
+        {
+            var items = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValueBulkResult>().Items;
+            items[0].ErrorCode.ShouldBe(ErrorCodes.StepUpRequired);
+            items[0].Message.ShouldBe(new StepUpRequiredException(StepUpOptions.DefaultMaxAge).Message);
+            items[0].Outcome.ShouldBe(KeyValueBulkOutcome.Forbidden);
+            items[1].ShouldBe(service.BulkItems[1]);
+        }
+
+        var recent = await http.RestoreKeyValues(KeyValueRequests.User("POST", body: body), Org, Project, View);
+        recent.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValueBulkResult>().Items[0].ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+    }
+
     // Machines never need a step-up: a machine with a stray stale judgement reveals over mTLS as before.
     [Fact]
     public async Task Machine_WithAStaleJudgement_RevealsAsBefore()
