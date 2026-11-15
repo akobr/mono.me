@@ -9,6 +9,8 @@ import { recreatedAnnotations, writtenConfigurations, writtenContents } from '@/
 
 const base = (scope: Scope) => `/v1/${scope.org}/${scope.project}/${scope.view}`
 const projectKeyValues = (org: string, project: string) => `/v1/${org}/${project}/key-values`
+/** The access audit trail of the organization of an access point key (`org` or `org.project`, 424-263). */
+const organizationAudit = (accessPointKey: string) => `/v1/access/points/${accessPointKey.split('.')[0]}/audit`
 
 export function invalidateAnnotation(client: QueryClient, scope: Scope, key: string): Promise<void> {
   return invalidateByPath(client, `${base(scope)}/annotations/${key}`)
@@ -111,6 +113,10 @@ export async function invalidateImport(
   return written
 }
 
+/**
+ * After an access change: the access point (its members, invitations, machine authentication and own audit), the
+ * project's machines, issuers and certificates, and the organization's access audit, which records every change.
+ */
 export async function invalidateAccess(
   client: QueryClient,
   accessPointKey: string,
@@ -120,14 +126,16 @@ export async function invalidateAccess(
   await Promise.all([
     invalidateByPath(client, `/v1/access/points/${accessPointKey}`),
     org && project ? invalidateByPath(client, `/v1/${org}/${project}/access`) : Promise.resolve(),
+    invalidateByPath(client, organizationAudit(accessPointKey)),
   ])
 }
 
-/** The description of a project: the caller's projects and the project's access point. */
+/** The description of a project: the caller's projects, the project's access point and the organization's audit. */
 export async function invalidateProject(client: QueryClient, key: string): Promise<void> {
   await Promise.all([
     invalidateByPath(client, '/v1/access/projects'),
     invalidateByPath(client, `/v1/access/points/${key}`),
+    invalidateByPath(client, organizationAudit(key)),
   ])
 }
 
@@ -145,7 +153,13 @@ export async function invalidateKeyValues(client: QueryClient, scope: Scope): Pr
   ])
 }
 
-/** The project's key/value policy, its recipients, and the lists (a level change shows up there). */
+/**
+ * The project's key/value policy, its recipients, and the lists (a level change shows up there); and the organization's
+ * access audit, which records a change of the policy's access view (424-263).
+ */
 export async function invalidateKeyValuePolicy(client: QueryClient, org: string, project: string): Promise<void> {
-  await invalidateByPath(client, projectKeyValues(org, project))
+  await Promise.all([
+    invalidateByPath(client, projectKeyValues(org, project)),
+    invalidateByPath(client, organizationAudit(org)),
+  ])
 }

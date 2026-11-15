@@ -8,11 +8,13 @@ import type {
   KeyValueDocument,
   KeyValueExportRequest,
   KeyValueImportItemResult,
+  KeyValuePolicy,
   KeyValuePolicyUpdate,
   KeyValueProtection,
   KeyValueRotateRequest,
   KeyValueWrite,
 } from '@42for.net/2splatform.sdk'
+import { keyValuePolicyValue, recordAccessChange } from './access-audit'
 import { mockActor, stamp } from './audit'
 import type { MockDb } from './db'
 import { diffTexts } from './diff'
@@ -55,6 +57,13 @@ const referencePattern =
 const notFound = (view: string, key: string) => errorResponse(404, `The key '${key}' does not exist in view '${view}'.`, 'KeyValueNotFound')
 
 const hasSecretRights = (db: MockDb, projectKey: string) => !requireRole(db, projectKey, 'ContributorWithSecrets')
+
+/**
+ * The access audit record of a policy change (424-263): only when its access view changed, so a verification, a
+ * rotation and a policy saved as it was record nothing there; the key/value audit records them.
+ */
+const recordPolicyChange = (db: MockDb, projectKey: string, before: string, policy: KeyValuePolicy) =>
+  recordAccessChange(db, projectKey, { Action: 'KeyValuePolicyChanged', OldValue: before, NewValue: keyValuePolicyValue(policy) })
 
 function listPairs(db: MockDb, scope: ScopeRef, state: string | null, prefix: string | null, levels: string[] | null): StoredKeyValue[] {
   const store = storeOf(db, scope)
@@ -160,6 +169,7 @@ const projectHandlers: HttpHandler[] = [
       }
       const update = (await request.json()) as KeyValuePolicyUpdate
       const policy = policyOf(db, projectKey)
+      const before = keyValuePolicyValue(policy)
 
       if (update.ExpectedVersion !== undefined && update.ExpectedVersion !== null && update.ExpectedVersion !== policy.Version) {
         return errorResponse(409, `The policy is at version ${policy.Version}, not ${update.ExpectedVersion}.`, 'PolicyVersionMismatch')
@@ -234,6 +244,7 @@ const projectHandlers: HttpHandler[] = [
       policy.Version = (policy.Version ?? 0) + 1
       policy.Modified = stamp(db)
       recordAudit(db, projectKey, { Operation: 'PolicyChange', Detail: `Allowed: ${(policy.AllowedProtections ?? []).join(', ')}` })
+      recordPolicyChange(db, projectKey, before, policy)
       return HttpResponse.json(policy)
     }),
   ),
@@ -348,9 +359,11 @@ const projectHandlers: HttpHandler[] = [
         return errorResponse(400, 'The public key is neither PEM nor a JWK object.', 'RecipientInvalid')
       }
       const recipient: ClientEncryptionRecipient = { Id: id, Name: body.Name, PublicKey: publicKey, IsEnabled: true, Created: stamp(db) }
+      const before = keyValuePolicyValue(policy)
       recipients.push(recipient)
       policy.Version = (policy.Version ?? 0) + 1
       recordAudit(db, projectKey, { Operation: 'RecipientAdded', Detail: id })
+      recordPolicyChange(db, projectKey, before, policy)
       return HttpResponse.json(recipient)
     }),
   ),
@@ -375,6 +388,7 @@ const projectHandlers: HttpHandler[] = [
           return errorResponse(409, 'The last enabled recipient cannot be disabled while Hyok is allowed.', 'ProtectionInUse')
         }
       }
+      const before = keyValuePolicyValue(policy)
       if (body.Name) {
         recipient.Name = body.Name
       }
@@ -383,6 +397,7 @@ const projectHandlers: HttpHandler[] = [
       }
       policy.Version = (policy.Version ?? 0) + 1
       recordAudit(db, projectKey, { Operation: 'RecipientChanged', Detail: recipient.Id })
+      recordPolicyChange(db, projectKey, before, policy)
       return HttpResponse.json(recipient)
     }),
   ),
@@ -404,9 +419,11 @@ const projectHandlers: HttpHandler[] = [
       if (recipient.IsEnabled !== false && others.length === 0 && (policy.AllowedProtections ?? []).includes('Hyok')) {
         return errorResponse(409, 'The last enabled recipient cannot be removed while Hyok is allowed.', 'ProtectionInUse')
       }
+      const before = keyValuePolicyValue(policy)
       policy.Recipients = (policy.Recipients ?? []).filter((entry) => entry.Id !== recipient.Id)
       policy.Version = (policy.Version ?? 0) + 1
       recordAudit(db, projectKey, { Operation: 'RecipientRemoved', Detail: recipient.Id })
+      recordPolicyChange(db, projectKey, before, policy)
       return new HttpResponse(null, { status: 204 })
     }),
   ),

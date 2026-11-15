@@ -1,4 +1,5 @@
 import type {
+  AccessAuditEntry,
   AccessPoint,
   Account,
   AccountRole,
@@ -76,6 +77,8 @@ export interface MockDb {
   keyValuePolicies?: Record<string, KeyValuePolicy>
   /** The secret audit trail per project key, newest last. */
   keyValueAudit?: Record<string, KeyValueAuditEvent[]>
+  /** The access audit trail per organization, newest last (424-263, access-audit.ts). */
+  accessAudit?: Record<string, AccessAuditEntry[]>
 }
 
 export type MockScenario = 'default' | 'new-user' | 'invited' | 'large' | 'showcase'

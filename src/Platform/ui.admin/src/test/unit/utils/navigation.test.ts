@@ -138,11 +138,41 @@ describe('project section', () => {
     })
   })
 
+  // The organization's Audit is an entry of its own section (424-263), so only the project section is checked.
   it('has no entry for a page that another one took over', () => {
-    const paths = entries().map((item) => item.to.split('/').at(-1))
+    const paths = buildNavigation({ org: 'acme', project: 'billing', view: 'default', projectRole: 'Owner', orgRole: 'Owner' })
+      .filter((section) => section.id !== 'org')
+      .flatMap((section) => section.items.map((item) => item.to.split('/').at(-1)))
 
     for (const moved of ['invitations', 'certificates', 'secrets', 'audit', 'usage']) {
       expect(paths).not.toContain(moved)
     }
+  })
+})
+
+describe('organization section', () => {
+  const organizationEntries = (orgRole: 'Owner' | 'Administrator' | 'Contributor' | 'Reader' | 'None') =>
+    buildNavigation({ org: 'acme', projectRole: 'None', orgRole })
+      .find((section) => section.id === 'org')!
+      .items.map((item) => item.label)
+
+  it.each([
+    ['Owner', ['Overview', 'Members', 'Audit']],
+    ['Administrator', ['Overview', 'Members', 'Audit']],
+    ['Contributor', ['Overview']],
+    ['Reader', ['Overview']],
+    ['None', ['Overview']],
+  ] as const)('shows %s the entries of their role', (role, labels) => {
+    expect(organizationEntries(role)).toEqual(labels)
+  })
+
+  it('opens the access audit of the organization after Members, for Administrators', () => {
+    expect(entries().find((item) => item.to === '/acme/audit')).toEqual({
+      label: 'Audit',
+      icon: 'i-lucide-scroll-text',
+      to: '/acme/audit',
+      minRole: 'Administrator',
+      locked: false,
+    })
   })
 })

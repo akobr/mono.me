@@ -18,6 +18,22 @@ import type {
   SharedCertificateCreate,
 } from '@42for.net/2splatform.sdk'
 import { MachineScope, roleRank } from '@42for.net/2splatform.sdk'
+import {
+  accessAuditActions,
+  accessAuditPageSize,
+  accountTarget,
+  certificateTarget,
+  certificateValue,
+  federationRulesValue,
+  issuerTarget,
+  issuerValue,
+  machineAuthenticationValue,
+  machineTarget,
+  machineValue,
+  queryAccessAudit,
+  recordAccessAudit,
+  recordAccessChange,
+} from './access-audit'
 import { mockDirectory, type MockDb, type MockExhibition } from './db'
 import {
   certificateResetNotSupportedMessage,
@@ -34,7 +50,8 @@ import { errorResponse, requireRole, roleOf, withDb } from './handlers'
 
 // Members, invitations, the exhibition (424-267), machines, shared certificates, the machine policy, the trusted
 // issuers and federation rules (424-46) and the CA of the mock API, with the rules of companion spec E2/E3 (last
-// owner, elevated roles, self changes, pending invitations).
+// owner, elevated roles, self changes, pending invitations). Every change is a record of the
+// organization's access audit (424-263).
 
 const api = '*/api/v1'
 const random = (length: number) =>
@@ -69,10 +86,18 @@ function syncAccount(db: MockDb) {
  * Makes the user a member of the access point with at least the role, never with a lower one, and gives them an account
  * when they have none: what accepting an invitation and joining the exhibition do.
  */
-function joinAccessPoint(db: MockDb, point: AccessPoint, role: AccountRole): Account {
+function joinAccessPoint(db: MockDb, point: AccessPoint, role: AccountRole, detail?: string): Account {
   const current = point.AccessMap?.[db.user.id]
   if (!current || roleRank(current) < roleRank(role)) {
     point.AccessMap = { ...point.AccessMap, [db.user.id]: role }
+    // The one who joins is the actor; a role kept as it is records nothing.
+    recordAccessAudit(db, point.Key!, {
+      Action: 'MemberJoined',
+      Target: accountTarget(db.user.id, db.user.name),
+      OldValue: current,
+      NewValue: role,
+      Detail: detail,
+    })
   }
   db.account ??= { Id: db.user.id, UserName: db.user.email, Name: db.user.name, AccessMap: {} }
   syncAccount(db)
@@ -277,7 +302,70 @@ const stripSecrets = (machine: MachineAccess): MachineAccess => ({
   CertificatePassword: undefined,
 })
 
+/** A time filter of the access audit as the API reads it: an ISO string, or `invalid` when it does not parse. */
+function auditTime(value: string | null): { time?: string; invalid?: boolean } {
+  if (!value?.trim()) {
+    return {}
+  }
+  const time = new Date(value)
+  return Number.isNaN(time.getTime()) ? { invalid: true } : { time: time.toISOString() }
+}
+
 export const accessManagementHandlers: HttpHandler[] = [
+  // The access audit trail (424-263): with an organization key its whole trail, with a project key the project's
+  // records; for the Owners and Administrators of the key itself. Newest first, 100 per page, the offset as the token.
+  http.get<{ key: string }>(
+    `${api}/access/points/:key/audit`,
+    withDb((db, { params, request }) => {
+      const key = params.key.trim().toLowerCase()
+      const denied = requireRole(db, key, 'Administrator')
+      if (denied) {
+        return denied
+      }
+      const [org, keyProject] = key.split('.') as [string, string | undefined]
+      const url = new URL(request.url)
+      const queryProject = url.searchParams.get('project')?.trim().toLowerCase() || undefined
+      if (keyProject && queryProject && keyProject !== queryProject) {
+        return errorResponse(
+          400,
+          `The project '${queryProject}' of the query is not the project of the key '${key}'.`,
+          'InvalidQuery',
+        )
+      }
+      const actionText = url.searchParams.get('action')?.trim()
+      const action = actionText
+        ? accessAuditActions.find((candidate) => candidate.toLowerCase() === actionText.toLowerCase())
+        : undefined
+      if (actionText && !action) {
+        return errorResponse(400, `The action '${actionText}' is not an access audit action.`, 'InvalidQuery')
+      }
+      const from = auditTime(url.searchParams.get('from'))
+      const to = auditTime(url.searchParams.get('to'))
+      if (from.invalid || to.invalid) {
+        return errorResponse(400, 'A time filter is not a date and time.', 'InvalidQuery')
+      }
+      const token = url.searchParams.get('continuationToken')
+      const offset = token ? Number(token) : 0
+      if (!Number.isInteger(offset) || offset < 0) {
+        return errorResponse(400, 'The continuation token is not one of this trail.', 'InvalidQuery')
+      }
+      const records = queryAccessAudit(db, org, {
+        project: keyProject ?? queryProject,
+        action,
+        target: url.searchParams.get('target')?.trim() || undefined,
+        from: from.time,
+        to: to.time,
+      })
+      const page = records.slice(offset, offset + accessAuditPageSize)
+      const next = offset + accessAuditPageSize
+      return HttpResponse.json({
+        Items: page,
+        Count: page.length,
+        ContinuationToken: next < records.length ? String(next) : undefined,
+      })
+    }),
+  ),
+
   http.get<{ key: string }>(
     `${api}/access/points/:key/members`,
     withDb(
@@ -310,6 +398,12 @@ export const accessManagementHandlers: HttpHandler[] = [
       }
       point.AccessMap = { ...point.AccessMap, [params.accountId]: Role! }
       syncAccount(db)
+      recordAccessChange(db, params.key, {
+        Action: 'MemberRoleChanged',
+        Target: accountTarget(params.accountId),
+        OldValue: current,
+        NewValue: Role!,
+      })
       return HttpResponse.json(members(db, params.key).find((member) => member.AccountId === params.accountId))
     }),
   ),
@@ -332,6 +426,11 @@ export const accessManagementHandlers: HttpHandler[] = [
       const { [params.accountId]: _removed, ...rest } = point.AccessMap ?? {}
       point.AccessMap = rest
       syncAccount(db)
+      recordAccessAudit(db, params.key, {
+        Action: 'MemberRemoved',
+        Target: accountTarget(params.accountId),
+        OldValue: current,
+      })
       return new HttpResponse(null, { status: 204 })
     }),
   ),
@@ -430,7 +529,12 @@ export const accessManagementHandlers: HttpHandler[] = [
       invitation.AcceptedById = db.user.id
       invitation.RespondedAt = new Date().toISOString()
       const point = (db.accessPoints[invitation.AccessPointKey!] ??= { Key: invitation.AccessPointKey, AccessMap: {} })
-      return HttpResponse.json(joinAccessPoint(db, point, invitation.Role!))
+      const sender = invitation.InvitedByName
+        ? `${invitation.InvitedByName} (${invitation.InvitedById})`
+        : invitation.InvitedById
+      return HttpResponse.json(
+        joinAccessPoint(db, point, invitation.Role!, `Invitation ${invitation.Id} sent by ${sender}.`),
+      )
     }),
   ),
 
@@ -498,7 +602,13 @@ export const accessManagementHandlers: HttpHandler[] = [
         return errorResponse(400, invalid)
       }
       const stored = { ...effectivePolicy(policy), CertificateLifetimeDays: policy.CertificateLifetimeDays }
+      const before = db.accessPoints[params.key]?.MachineAuthentication
       db.accessPoints[params.key] = { ...db.accessPoints[params.key], MachineAuthentication: stored }
+      recordAccessChange(db, params.key, {
+        Action: 'MachineAuthenticationPolicyChanged',
+        OldValue: machineAuthenticationValue(before),
+        NewValue: machineAuthenticationValue(stored),
+      })
       return HttpResponse.json(effectivePolicy(stored))
     }),
   ),
@@ -591,6 +701,14 @@ export const accessManagementHandlers: HttpHandler[] = [
         !!body.UseSharedCertificate,
       )
       ;((db.machines ??= {})[key] ??= []).push(stripSecrets(machine))
+      recordAccessAudit(db, key, {
+        Action: 'MachineCreated',
+        Target: machineTarget(id),
+        NewValue: machineValue(machine),
+        Detail: machine.FederationRules?.length
+          ? `Federation rules: ${federationRulesValue(machine.FederationRules)}`
+          : undefined,
+      })
       return HttpResponse.json(withTokenEndpoint(machine, request, params.org, params.project), { status: 201 })
     }),
   ),
@@ -641,6 +759,13 @@ export const accessManagementHandlers: HttpHandler[] = [
           ? { ...stripSecrets(stored), AccessKey: fakeApiKey() }
           : withCredentials(stored, kind)
       list[index] = stripSecrets(machine)
+      // Never the key: only which credential was replaced.
+      recordAccessAudit(db, key, {
+        Action: 'MachineReset',
+        Target: machineTarget(params.id),
+        NewValue: kind,
+        Detail: kind === 'ClientCredentials' ? 'The client secret was replaced.' : 'The API key was replaced.',
+      })
       return HttpResponse.json(machine)
     }),
   ),
@@ -656,6 +781,13 @@ export const accessManagementHandlers: HttpHandler[] = [
         return denied
       }
       ;(db.machines ??= {})[key] = (db.machines[key] ?? []).filter((entry) => entry.Id !== params.id)
+      if (machine) {
+        recordAccessAudit(db, key, {
+          Action: 'MachineDeleted',
+          Target: machineTarget(params.id),
+          OldValue: machineValue(machine),
+        })
+      }
       return new HttpResponse(null, { status: 204 })
     }),
   ),
@@ -681,7 +813,14 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (machine.CredentialKind !== 'Federated') {
         return errorResponse(400, rulesOnOtherKindMessage, 'MachineNotFederated')
       }
+      const before = federationRulesValue(machine.FederationRules)
       machine.FederationRules = rules!
+      recordAccessChange(db, key, {
+        Action: 'MachineFederationRulesChanged',
+        Target: machineTarget(params.id),
+        OldValue: before,
+        NewValue: federationRulesValue(rules),
+      })
       return HttpResponse.json(withTokenEndpoint(stripSecrets(machine), request, params.org, params.project))
     }),
   ),
@@ -756,6 +895,20 @@ export const accessManagementHandlers: HttpHandler[] = [
         Description: requested.Description || undefined,
       }
       ;(db.issuers ??= {})[key] = [...issuers.filter((entry) => entry.Name !== params.name), stored]
+      if (existing) {
+        recordAccessChange(db, key, {
+          Action: 'FederatedIssuerUpdated',
+          Target: issuerTarget(params.name),
+          OldValue: issuerValue(existing),
+          NewValue: issuerValue(stored),
+        })
+      } else {
+        recordAccessAudit(db, key, {
+          Action: 'FederatedIssuerCreated',
+          Target: issuerTarget(params.name),
+          NewValue: issuerValue(stored),
+        })
+      }
       return HttpResponse.json(stored)
     }),
   ),
@@ -769,11 +922,17 @@ export const accessManagementHandlers: HttpHandler[] = [
         return denied
       }
       const issuers = issuersOf(db, key)
-      if (!issuers.some((entry) => entry.Name === params.name)) {
+      const issuer = issuers.find((entry) => entry.Name === params.name)
+      if (!issuer) {
         return new HttpResponse(null, { status: 404 })
       }
       // The kill switch: allowed while rules reference the issuer; those rules stop matching.
       ;(db.issuers ??= {})[key] = issuers.filter((entry) => entry.Name !== params.name)
+      recordAccessAudit(db, key, {
+        Action: 'FederatedIssuerDeleted',
+        Target: issuerTarget(params.name),
+        OldValue: issuerValue(issuer),
+      })
       return new HttpResponse(null, { status: 200 })
     }),
   ),
@@ -815,6 +974,12 @@ export const accessManagementHandlers: HttpHandler[] = [
         IsRevoked: false,
       }
       ;((db.certificates ??= {})[key] ??= []).push(certificate)
+      // Never the certificate or its password.
+      recordAccessAudit(db, key, {
+        Action: 'SharedCertificateIssued',
+        Target: certificateTarget(certificate),
+        NewValue: certificateValue(certificate),
+      })
       return HttpResponse.json(
         { ...certificate, Certificate: fakeSecret(), CertificatePassword: random(16) },
         { status: 201 },
@@ -831,7 +996,17 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (denied || !certificate) {
         return denied ?? errorResponse(404, 'Not found.', 'NotFound')
       }
-      certificate.IsRevoked = true
+      // A certificate revoked twice records nothing the second time.
+      if (!certificate.IsRevoked) {
+        const before = certificateValue(certificate)
+        certificate.IsRevoked = true
+        recordAccessAudit(db, key, {
+          Action: 'SharedCertificateRevoked',
+          Target: certificateTarget(certificate),
+          OldValue: before,
+          NewValue: certificateValue(certificate),
+        })
+      }
       return new HttpResponse(null, { status: 204 })
     }),
   ),

@@ -11,6 +11,8 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AccessAuditChange: typeof import('./components/access/AccessAuditChange.vue')['default']
+    AccessAuditTrail: typeof import('./components/access/AccessAuditTrail.vue')['default']
     AnnotationBreadcrumb: typeof import('./components/annotations/AnnotationBreadcrumb.vue')['default']
     AnnotationBulkBar: typeof import('./components/annotations/AnnotationBulkBar.vue')['default']
     AnnotationBulkCreateDialog: typeof import('./components/annotations/AnnotationBulkCreateDialog.vue')['default']
