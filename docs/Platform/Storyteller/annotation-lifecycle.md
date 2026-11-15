@@ -85,7 +85,7 @@ A second delete of the same key returns the existing deletion. A delete that did
 2. The key itself is restored; with descendants (the default), also every descendant with the same `DeletionId` (cause `Cascade`). Descendants deleted by an earlier, separate delete stay deleted.
 3. A restored item loses `Deletion` and `ttl`; its configuration loses the stamp and `ttl`, its cached calculation is cleared, and the version snapshot is removed.
 4. An annotation restored alone keeps its deleted children deleted: they leave its arrays and become roots.
-5. Active parents get the names of the restored children back. The parents outside the restored tree are read in one read of many items, and each changed one is replaced under the ETag of that read; a deleted or missing parent is left as it is.
+5. Active parents get the names of the restored children back. The ancestors of the key come from the reads of step 1; the other parents outside the restored tree are read in one read of many items. Each changed parent is replaced under the ETag of its read. A deleted or missing parent gets no names (a deleted child of an annotation restored alone can still become a root, step 4).
 
 ## Re-create
 
