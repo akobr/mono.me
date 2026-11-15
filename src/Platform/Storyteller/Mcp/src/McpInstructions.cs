@@ -10,6 +10,7 @@ public static class McpInstructions
         Addressing:
         - Everything belongs to an organization, a project and a view. list_projects returns keys "organization.project"; view defaults to "default".
         - Annotation keys are {typeCode}.{name}[.{name}...]: rst.{responsibility}, sbt.{subject}, unt.{responsibility}.{unit}, usg.{subject}.{responsibility}, cnt.{subject}.{context}, exe.{subject}.{responsibility}.{context}, uxe.{subject}.{responsibility}.{context}.{unit}.
+        - A project can name its annotation types (Settings.Types of list_projects, by type code): talk to the person in the project's type names, such as "Solution CRM" for rst.crm when rst is named "Solution", but use the type codes and keys in calls.
 
         Configuration:
         - A configuration inherits along the annotation hierarchy and through the view's templates; explain_configuration shows where each value comes from.

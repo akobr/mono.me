@@ -293,8 +293,10 @@ Tools carry the MCP hints: reads are read-only; deletes, purges, resets and repl
 | Tool | What it does |
 | --- | --- |
 | `get_my_account` | The signed-in account and its roles per organization and project |
-| `list_projects` | The person's projects with role and description |
+| `list_projects` | The person's projects with role, description and [settings](access.md#project-settings): the names, colors and icons of the annotation types by type code, the default time zone and the date format |
 | `list_views` | The registered views of a project |
+
+A project can name its annotation types, for example `rst` as "Solution". The tool's description and the server's instructions ask the assistant to talk to the person in those names ("Solution CRM" for `rst.crm`) and to use the type codes and keys in every call. A type missing from `Settings.Types` keeps its built-in name; a missing `DefaultTimeZone` is `UTC` and a missing `DateFormat` is `yyyy-mm-dd`. The server reads the settings only; an Administrator changes them with `sform project settings` or in the admin UI.
 
 ### Annotations
 
@@ -407,5 +409,5 @@ A value returned by a tool enters the model's context, the client's transcript a
 
 - Under Entra ID: one tenant per deployment, and no dynamic client registration; clients use pre-registered client ids.
 - No sessions, subscriptions, server-initiated requests or elicitation. So no `notifications/tools/list_changed` either: a change of the tool list shows on the client's next `tools/list`.
-- Not offered: view and key/value export and import, BYOK setup, key rotation, Hyok writes and decryption, recipients, shared certificates, trusted issuers, invitations and members, the access audit.
+- Not offered: view and key/value export and import, BYOK setup, key rotation, Hyok writes and decryption, recipients, shared certificates, trusted issuers, invitations and members, the access audit, and project settings writes (`list_projects` reads them; `sform project settings` and the admin UI change them).
 - Search reads stored documents, not effective ones: a value inherited from an ancestor is found on the ancestor.

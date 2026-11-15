@@ -31,7 +31,12 @@ public sealed class DiscoveryTools(Sdk.IAccessApiClient access, Sdk.IAnnotations
     }
 
     [McpServerTool(Name = "list_projects", Title = "List my projects", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Lists the projects the signed-in person is a member of: the key \"organization.project\", the person's role and the description.")]
+    [Description(
+        "Lists the projects the signed-in person is a member of: the key \"organization.project\", the person's role, the description "
+        + "and the project's Settings: the names (Label, Plural), colors and icons of the annotation types in Types by type code "
+        + "(a type left out keeps its built-in name, such as Responsibility for rst), the default time zone of new annotations "
+        + "(DefaultTimeZone, an IANA id; absent for UTC) and the date format (DateFormat; absent for yyyy-mm-dd). Talk to the "
+        + "person in the project's type names; keys and arguments always take the type codes.")]
     public async Task<CallToolResult> ListProjects(CancellationToken cancellationToken)
     {
         return ToolResults.Json(await access.GetProjectsAsync(cancellationToken));
