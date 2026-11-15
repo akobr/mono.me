@@ -77,6 +77,30 @@ public class FederatedTokenTests
         handler.AllowAutoRedirect.ShouldBeFalse();
     }
 
+    // The proxy of the callback serves the token endpoint. The handler of the managed identity request takes the rest of
+    // the callback, and no proxy.
+    [Fact]
+    public void TheHandlerOfTheManagedIdentityRequest_UsesNoProxy_WhateverTheCallbackSets()
+    {
+        var proxy = new WebProxy("http://proxy.example.com:8080");
+        Action<SocketsHttpHandler> configure = handler =>
+        {
+            handler.Proxy = proxy;
+            handler.UseProxy = true;
+            handler.AllowAutoRedirect = true;
+            handler.ConnectTimeout = TimeSpan.FromSeconds(3);
+        };
+
+        using var proxied = TokenEndpointClient.CreatePrimaryHandler(configure);
+        using var direct = TokenEndpointClient.CreatePrimaryHandler(configure, useProxy: false);
+
+        proxied.UseProxy.ShouldBeTrue();
+        proxied.Proxy.ShouldBeSameAs(proxy);
+        direct.UseProxy.ShouldBeFalse();
+        direct.AllowAutoRedirect.ShouldBeFalse();
+        direct.ConnectTimeout.ShouldBe(TimeSpan.FromSeconds(3));
+    }
+
     [Fact]
     public async Task ARedirectFromTheExchange_IsRejectedAndNotFollowed()
     {
@@ -258,6 +282,96 @@ public class FederatedTokenTests
             new FederatedTokenOptions { ClientId = MachineId, SubjectTokenPath = SubjectPath, SubjectTokenType = type }));
 
         exception.Reason.ShouldBe(StorytellerAuthenticationFailureReason.Configuration);
+    }
+
+    // No source, or more than one.
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void TheOptions_TakeExactlyOneSourceOfThePlatformToken(bool hasPath, bool hasProvider, bool hasManagedIdentity)
+    {
+        var options = new FederatedTokenOptions
+        {
+            ClientId = MachineId,
+            SubjectTokenPath = hasPath ? SubjectPath : null,
+            SubjectTokenProvider = hasProvider ? (_, _) => ValueTask.FromResult("platform-token") : null,
+            AzureManagedIdentity = hasManagedIdentity ? new AzureManagedIdentityTokenOptions { Resource = "api://storyteller" } : null,
+        };
+
+        foreach (var create in new Func<FederatedTokenOptions, StorytellerCredential>[] { StorytellerCredential.FromFederatedToken, StorytellerCredential.FromFederatedTokenFile })
+        {
+            var exception = Should.Throw<ArgumentException>(() => create(options));
+
+            exception.Message.ShouldBe("Set exactly one of SubjectTokenPath, SubjectTokenProvider and AzureManagedIdentity.");
+        }
+    }
+
+    [Theory]
+    [InlineData(" ", "api://storyteller", "options.SubjectTokenPath")]
+    [InlineData(null, " ", "options.AzureManagedIdentity.Resource")]
+    public void ABlankSource_IsRefused(string? path, string resource, string parameter)
+    {
+        var options = new FederatedTokenOptions
+        {
+            ClientId = MachineId,
+            SubjectTokenPath = path,
+            AzureManagedIdentity = path is null ? new AzureManagedIdentityTokenOptions { Resource = resource } : null,
+        };
+
+        Should.Throw<ArgumentException>(() => StorytellerCredential.FromFederatedToken(options)).ParamName.ShouldBe(parameter);
+    }
+
+    // FromFederatedToken is the name for every source; FromFederatedTokenFile stays, and takes every source too.
+    [Fact]
+    public void BothFactories_TakeEverySource()
+    {
+        var file = new FederatedTokenOptions { ClientId = MachineId, SubjectTokenPath = SubjectPath, FileSystem = _fileSystem };
+        var provider = new FederatedTokenOptions { ClientId = MachineId, SubjectTokenProvider = (_, _) => ValueTask.FromResult("platform-token") };
+        var identity = FederatedTokenOptions.ForAzureManagedIdentity(MachineId, "api://storyteller", " ");
+
+        foreach (var create in new Func<FederatedTokenOptions, StorytellerCredential>[] { StorytellerCredential.FromFederatedToken, StorytellerCredential.FromFederatedTokenFile })
+        {
+            create(file).ShouldBeOfType<FederatedTokenCredential>().SubjectTokenSource.ShouldBe(StorytellerSubjectTokenSource.File);
+            create(file).ToString().ShouldBe($"StorytellerCredential {{ Kind = Federated, ClientId = {MachineId}, SubjectTokenPath = {SubjectPath} }}");
+            create(provider).ShouldBeOfType<FederatedTokenCredential>().SubjectTokenSource.ShouldBe(StorytellerSubjectTokenSource.Provider);
+            create(identity).ShouldBeOfType<FederatedTokenCredential>().SubjectTokenSource.ShouldBe(StorytellerSubjectTokenSource.AzureManagedIdentity);
+
+            // A blank client id is the system-assigned identity.
+            create(identity).ToString().ShouldBe(
+                $"StorytellerCredential {{ Kind = Federated, ClientId = {MachineId}, SubjectTokenSource = AzureManagedIdentity, Resource = api://storyteller, ManagedIdentityClientId =  }}");
+        }
+    }
+
+    // The numbers are part of the contract of a logged or stored value: new sources come after the old ones.
+    [Fact]
+    public void TheSources_KeepTheirNumbers()
+    {
+        ((int)StorytellerSubjectTokenSource.File).ShouldBe(0);
+        ((int)StorytellerSubjectTokenSource.GitHubActions).ShouldBe(1);
+        ((int)StorytellerSubjectTokenSource.AzureManagedIdentity).ShouldBe(2);
+        ((int)StorytellerSubjectTokenSource.Provider).ShouldBe(3);
+    }
+
+    [Fact]
+    public void TheOptions_PrintTheirSource_AndNeverADelegate()
+    {
+        var withUserInfo = new Uri("https://u:p4ss@api.example.com/api");
+        StorytellerSubjectTokenProvider provider = (_, _) => ValueTask.FromResult("platform-t0ken");
+
+        new FederatedTokenOptions { ClientId = MachineId, SubjectTokenPath = SubjectPath, Scope = "Configuration.Read" }.ToString().ShouldBe(
+            $"FederatedTokenOptions {{ Endpoint = , Organization = , Project = , ClientId = {MachineId}, SubjectTokenPath = {SubjectPath}, SubjectTokenType = urn:ietf:params:oauth:token-type:jwt, Scope = Configuration.Read }}");
+        (FederatedTokenOptions.ForAzureManagedIdentity(MachineId, "api://storyteller", "user-assigned") with { Endpoint = withUserInfo }).ToString().ShouldBe(
+            $"FederatedTokenOptions {{ Endpoint = https://api.example.com/api, Organization = , Project = , ClientId = {MachineId}, SubjectTokenSource = AzureManagedIdentity, Resource = api://storyteller, ManagedIdentityClientId = user-assigned, SubjectTokenType = urn:ietf:params:oauth:token-type:access_token, Scope =  }}");
+        new FederatedTokenOptions { ClientId = MachineId, SubjectTokenProvider = provider, Organization = "acme", Project = "billing" }.ToString().ShouldBe(
+            $"FederatedTokenOptions {{ Endpoint = , Organization = acme, Project = billing, ClientId = {MachineId}, SubjectTokenSource = Provider, SubjectTokenType = urn:ietf:params:oauth:token-type:jwt, Scope =  }}");
+
+        // Printed before they are checked: no source, and more than one.
+        new FederatedTokenOptions { ClientId = MachineId }.ToString().ShouldContain($"ClientId = {MachineId}, SubjectTokenPath = , SubjectTokenType = ");
+        new FederatedTokenOptions { ClientId = MachineId, SubjectTokenPath = SubjectPath, SubjectTokenProvider = provider }.ToString().ShouldContain(
+            $"SubjectTokenPath = {SubjectPath}, SubjectTokenSource = Provider, SubjectTokenType = ");
     }
 
     [Fact]

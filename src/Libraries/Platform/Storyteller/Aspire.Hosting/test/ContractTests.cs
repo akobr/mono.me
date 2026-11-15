@@ -7,13 +7,15 @@ namespace _42.Platform.Storyteller.AspireHosting.UnitTests;
 // reference them; these tests keep the copies equal to the originals.
 public sealed class ContractTests
 {
-    // Credential names of the SDK that no resource sets: processes started by an AppHost have no projected or CI token,
-    // and the canonical names are read before the deprecated ones.
+    // Credential names of the SDK that no resource sets: processes started by an AppHost have no projected or CI token
+    // and no managed identity, and the canonical names are read before the deprecated ones.
     private static readonly string[] NotOffered =
     [
         StorytellerVariables.TOKEN_FILE,
         StorytellerVariables.SUBJECT_TOKEN_TYPE,
         StorytellerVariables.SUBJECT_TOKEN_FILE,
+        StorytellerVariables.MANAGED_IDENTITY_RESOURCE,
+        StorytellerVariables.MANAGED_IDENTITY_CLIENT_ID,
         StorytellerVariables.CERTIFICATE_FILE,
         StorytellerVariables.CERTIFICATE_PASSWORD,
     ];
@@ -49,6 +51,8 @@ public sealed class ContractTests
         StorytellerVariableNames.TOKEN_FILE.ShouldBe(StorytellerVariables.TOKEN_FILE);
         StorytellerVariableNames.SUBJECT_TOKEN_FILE.ShouldBe(StorytellerVariables.SUBJECT_TOKEN_FILE);
         StorytellerVariableNames.SUBJECT_TOKEN_TYPE.ShouldBe(StorytellerVariables.SUBJECT_TOKEN_TYPE);
+        StorytellerVariableNames.MANAGED_IDENTITY_RESOURCE.ShouldBe(StorytellerVariables.MANAGED_IDENTITY_RESOURCE);
+        StorytellerVariableNames.MANAGED_IDENTITY_CLIENT_ID.ShouldBe(StorytellerVariables.MANAGED_IDENTITY_CLIENT_ID);
     }
 
     // What the resources write with every credential set, so a new SDK credential name fails here until a With… method

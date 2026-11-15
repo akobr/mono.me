@@ -185,6 +185,68 @@ public class CredentialFingerprintTests
         }))));
     }
 
+    // The machine, the resource and the identity are the principal; the endpoint of the host and its header, which the
+    // platform rotates, are not part of it.
+    [Fact]
+    public async Task AFederatedCredential_OfAnAzureManagedIdentity_HasAFingerprintOfItsOwn()
+    {
+        var credential = StorytellerCredential.FromEnvironment(Variables(new Dictionary<string, string?>
+        {
+            ["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = "api://storyteller",
+            ["IDENTITY_ENDPOINT"] = "http://127.0.0.1:41741/MSI/token/",
+            ["IDENTITY_HEADER"] = "1dent1ty-h3ader",
+        }));
+
+        credential.ShouldNotBeNull().ToString().ShouldBe(
+            $"StorytellerCredential {{ Kind = Federated, ClientId = {FederatedMachineId}, SubjectTokenSource = AzureManagedIdentity, Resource = api://storyteller, ManagedIdentityClientId =  }}");
+        var fingerprint = await Compute(credential);
+
+        fingerprint.ShouldBe("FederatedTokenCredential:6e5ed3b5caa8a6f34a86cc7de40ad955");
+        fingerprint.ShouldBe(await Compute(StorytellerCredential.FromEnvironment(Variables(new Dictionary<string, string?>
+        {
+            ["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = "api://storyteller",
+            ["IDENTITY_ENDPOINT"] = "http://127.0.0.1:41999/MSI/token/",
+            ["IDENTITY_HEADER"] = "r0tated-h3ader",
+        }))));
+        fingerprint.ShouldNotBe(await Compute(StorytellerCredential.FromEnvironment(Variables(new Dictionary<string, string?>
+        {
+            ["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = "api://another",
+        }))));
+        fingerprint.ShouldNotBe(await Compute(StorytellerCredential.FromEnvironment(Variables(new Dictionary<string, string?>
+        {
+            ["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = "api://storyteller",
+            ["STORYTELLER_MANAGED_IDENTITY_CLIENT_ID"] = "7c4d2b1a-0e9f-4a3b-8c7d-6e5f4a3b2c1d",
+        }))));
+    }
+
+    // A provider is a delegate, which has no text: the machine id tells two apart, and two providers of one machine
+    // share their entries. Neither is asked for a token.
+    [Fact]
+    public async Task AFederatedCredential_OfAProvider_IsSeparatedByItsMachineOnly()
+    {
+        var asked = false;
+
+        StorytellerCredential Create(string machineId, string token) => StorytellerCredential.FromFederatedToken(new FederatedTokenOptions
+        {
+            ClientId = machineId,
+            SubjectTokenProvider = (_, _) =>
+            {
+                asked = true;
+                return ValueTask.FromResult(token);
+            },
+        });
+
+        var credential = Create(FederatedMachineId, "platform-token-1");
+
+        credential.ToString().ShouldBe($"StorytellerCredential {{ Kind = Federated, ClientId = {FederatedMachineId}, SubjectTokenSource = Provider }}");
+        var fingerprint = await Compute(credential);
+
+        fingerprint.ShouldBe("FederatedTokenCredential:5536a5c62f877fcaaad0cc36d74e2947");
+        fingerprint.ShouldBe(await Compute(Create(FederatedMachineId, "platform-token-2")));
+        fingerprint.ShouldNotBe(await Compute(Create("7c4d2b1a-0e9f-4a3b-8c7d-6e5f4a3b2c1d", "platform-token-1")));
+        asked.ShouldBeFalse();
+    }
+
     private static Func<string, string?> Variables(Dictionary<string, string?> variables)
     {
         variables.TryAdd("STORYTELLER_CLIENT_ID", FederatedMachineId);

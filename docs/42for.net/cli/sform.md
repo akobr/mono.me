@@ -52,7 +52,7 @@ In a CI/CD pipeline or a GitHub Action nobody can type a code, so `sform` signs 
 | Certificate | `STORYTELLER_CLIENT_CERTIFICATE`, `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD` |
 | Certificate and API key | all three of the above |
 | Client credentials | `STORYTELLER_CLIENT_ID`, `STORYTELLER_CLIENT_SECRET`, `STORYTELLER_TOKEN_URL`, `STORYTELLER_TOKEN_SCOPE` |
-| Federated | `STORYTELLER_CLIENT_ID`, the machine id, and `STORYTELLER_TOKEN_FILE`, a file with a token of your platform; in a GitHub Actions job with `permissions: id-token: write`, the machine id alone |
+| Federated | `STORYTELLER_CLIENT_ID`, the machine id, and `STORYTELLER_TOKEN_FILE`, a file with a token of your platform; in a GitHub Actions job with `permissions: id-token: write`, the machine id alone; on an Azure host with a managed identity, the machine id and `STORYTELLER_MANAGED_IDENTITY_RESOURCE` |
 | Any bearer token | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID`, a file the token is read from before every request |
 
 A job that receives secret values, such as a resolved configuration with secret bindings, best uses a certificate machine over mTLS. A federated machine, an API key and client credentials receive them only when an Administrator turns the mTLS policy of the project off, which then holds for every machine of the project, see **Secrets need more than a credential** under [Export to GitHub Actions](#export-to-github-actions).
@@ -62,6 +62,8 @@ Every machine also needs `STORYTELLER_ENDPOINT`, the address of the API, `/api` 
 The older names still work, but are deprecated, and `sform account` names them: `STORYTELLER_API_URL` (now `STORYTELLER_ENDPOINT`), `STORYTELLER_CERTIFICATE_FILE` and `STORYTELLER_CERTIFICATE_PASSWORD` (now `STORYTELLER_CLIENT_CERTIFICATE` and `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD`), and `STORYTELLER_SUBJECT_TOKEN_FILE` (now `STORYTELLER_TOKEN_FILE` with `STORYTELLER_CLIENT_ID`). A new and an old name with different values stop the job.
 
 A federated machine has no secret. `sform` exchanges the platform token for a short-lived Storyteller token at the token endpoint of the project, `<STORYTELLER_ENDPOINT>/v1/<organization>/<project>/access/token`, and exchanges again before that token expires. In GitHub Actions it asks the runner for the platform token itself, for the audience of that address, so the audience of the machine's GitHub rule must be exactly that address, in the same case: use the `TokenEndpoint` and the variables that `sform account machine create` prints. A token from a file is sent as it is, so its audience is whatever your platform put in it, and the rule's audience must match that instead. The `TokenEndpoint` is a good choice where you pick the audience yourself, as in the Kubernetes example below.
+
+On an Azure host with a managed identity (App Service, Functions, Container Apps, a virtual machine or a scale set), `sform` asks the managed identity for the platform token itself. Set `STORYTELLER_MANAGED_IDENTITY_RESOURCE` to the identifier URI of the app registration that stands for Storyteller, `api://<appId>`, and for a user-assigned identity also `STORYTELLER_MANAGED_IDENTITY_CLIENT_ID` to its client id. The audience of the machine's rule is then the app registration's, not the `TokenEndpoint`: `<appId>` when the registration issues version 2 tokens, `api://<appId>` with version 1.
 
 `STORYTELLER_CLIENT_ID` decides what `STORYTELLER_TOKEN_FILE` holds: without it, a token the API accepts, sent as it is; with it, a token of your platform, which `sform` exchanges. Earlier versions of `sform` refused the two together, so check that a job with a bearer token file has no `STORYTELLER_CLIENT_ID` left over. They also ended with exit code `3` where a refused token request now ends with `44`, and they made one token request where `sform` now retries transient failures.
 
@@ -116,7 +118,15 @@ volumes:
             audience: https://storyteller.example.com/api/v1/acme/billing/access/token
 ```
 
-`sform account` checks the variables without calling the account API, which is a good first step of a job. For client credentials and a federated machine it also gets a token; a federated machine needs `STORYTELLER_PROJECT` or `STORYTELLER_KEY` for that, as `sform account` has no `-p`. A wrong setting or a missing token file stops the job with exit code `2`. A token endpoint or GitHub request that fails, after up to three retries, or gets no answer within 100 seconds stops it with `3`. Rejected credentials, a refused exchange, or a token request that is refused or redirected stop it with `44`.
+``` text
+# Azure App Service, Functions or Container Apps, federated machine: the app settings, no secret, no file
+STORYTELLER_ENDPOINT=https://storyteller.example.com/api
+STORYTELLER_KEY=@acme.billing.production.sbt.northwind
+STORYTELLER_CLIENT_ID=3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07
+STORYTELLER_MANAGED_IDENTITY_RESOURCE=api://<appId>
+```
+
+`sform account` checks the variables without calling the account API, which is a good first step of a job. For client credentials and a federated machine it also gets a token; a federated machine needs `STORYTELLER_PROJECT` or `STORYTELLER_KEY` for that, as `sform account` has no `-p`. A wrong setting or a missing token file stops the job with exit code `2`. A token endpoint, GitHub or managed identity request that fails, after up to three retries, or gets no answer within 100 seconds stops it with `3`. Rejected credentials, a refused exchange, or a token request that is refused or redirected stop it with `44`.
 
 A machine can do what its scopes allow, and it gets them when it is created. **Runtime scopes** read and write single documents. **Management scopes** add bulk and structural work, on top of the runtime scope of the operation. `sform account machine create` picks them:
 

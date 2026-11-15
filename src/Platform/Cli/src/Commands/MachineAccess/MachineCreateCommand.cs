@@ -354,7 +354,9 @@ public class MachineCreateCommand : BaseContextCommand
 
         Console.WriteLine($"In a GitHub Actions job with permissions: id-token: write, leave out {StorytellerVariables.TOKEN_FILE}: sform asks the runner for a token for the token endpoint above.");
         Console.WriteLine(
-            $"Optional: {StorytellerVariables.SUBJECT_TOKEN_TYPE}=jwt (access_token for Azure managed identity, id_token for Google Cloud) and {StorytellerVariables.TOKEN_SCOPE}=<a subset of the machine's scopes>.");
+            $"On an Azure host with a managed identity, set {StorytellerVariables.MANAGED_IDENTITY_RESOURCE}=api://<appId> instead of {StorytellerVariables.TOKEN_FILE}: sform asks the managed identity for a token of the Storyteller app registration; {StorytellerVariables.MANAGED_IDENTITY_CLIENT_ID}=<client id> picks a user-assigned identity.");
+        Console.WriteLine(
+            $"Optional: {StorytellerVariables.SUBJECT_TOKEN_TYPE}=jwt (id_token for Google Cloud; a managed identity defaults to access_token) and {StorytellerVariables.TOKEN_SCOPE}=<a subset of the machine's scopes>.");
     }
 
     // The base of the server's token endpoint: the endpoint sform builds from it, and the audience it asks GitHub

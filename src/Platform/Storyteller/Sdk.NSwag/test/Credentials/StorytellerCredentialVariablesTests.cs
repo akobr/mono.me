@@ -11,6 +11,8 @@ public class StorytellerCredentialVariablesTests
     private const string MachineId = "0b9f6a52-5d1c-4c47-9d0c-0f1e2d3c4b5a";
     private const string GitHubRequestUrl = "https://pipelines.actions.githubusercontent.com/abc/idtoken?api-version=2.0";
     private const string GitHubRequestToken = "github-request-t0ken";
+    private const string ManagedIdentityResource = "api://4f6a1c2e-7b3d-4e5f-8a9b-0c1d2e3f4a5b";
+    private const string UserAssignedClientId = "7c4d2b1a-0e9f-4a3b-8c7d-6e5f4a3b2c1d";
 
     private readonly Dictionary<string, string?> _variables = [];
     private readonly MockFileSystem _fileSystem = new();
@@ -394,6 +396,158 @@ public class StorytellerCredentialVariablesTests
         _variables["STORYTELLER_CLIENT_ID"] = MachineId;
 
         Read().ShouldNotBeNull().SubjectTokenSource.ShouldBe(StorytellerSubjectTokenSource.GitHubActions);
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(UserAssignedClientId, null)]
+    [InlineData(UserAssignedClientId, "Configuration.Read")]
+    public void AManagedIdentityResourceWithAClientId_IsFederation_ThroughTheManagedIdentity_ForAnyClientId(string? managedIdentityClientId, string? scope)
+    {
+        _variables["STORYTELLER_CLIENT_ID"] = "any-machine-id";
+        _variables["STORYTELLER_TOKEN_SCOPE"] = scope;
+        _variables["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = $"  {ManagedIdentityResource}  ";
+        _variables["STORYTELLER_MANAGED_IDENTITY_CLIENT_ID"] = managedIdentityClientId;
+
+        var variables = Read().ShouldNotBeNull();
+        var names = new[] { "STORYTELLER_CLIENT_ID", "STORYTELLER_TOKEN_SCOPE", "STORYTELLER_MANAGED_IDENTITY_RESOURCE", "STORYTELLER_MANAGED_IDENTITY_CLIENT_ID" }
+            .Where(name => _variables[name] is not null)
+            .ToList();
+
+        variables.Kind.ShouldBe(StorytellerCredentialKind.Federated);
+        variables.SubjectTokenSource.ShouldBe(StorytellerSubjectTokenSource.AzureManagedIdentity);
+        variables.ClientId.ShouldBe("any-machine-id");
+        variables.TokenFile.ShouldBeNull();
+        variables.TokenScope.ShouldBe(scope);
+        variables.Names.ShouldBe(names);
+        variables.DeprecatedNames.ShouldBeEmpty();
+        variables.ToString().ShouldBe($"StorytellerCredentialVariables {{ Kind = Federated, Names = {string.Join(", ", names)} }}");
+        variables.CreateCredential(_fileSystem).ToString().ShouldBe(
+            $"StorytellerCredential {{ Kind = Federated, ClientId = any-machine-id, SubjectTokenSource = AzureManagedIdentity, Resource = {ManagedIdentityResource}, ManagedIdentityClientId = {managedIdentityClientId} }}");
+    }
+
+    // A managed identity token is an access token; a file and the runner keep jwt as their default.
+    [Theory]
+    [InlineData(null, FederatedTokenOptions.AccessTokenType)]
+    [InlineData("jwt", FederatedTokenOptions.JwtTokenType)]
+    [InlineData("ID_TOKEN", FederatedTokenOptions.IdTokenType)]
+    public void TheSubjectTokenType_OfAManagedIdentity_DefaultsToAccessToken(string? type, string expected)
+    {
+        _variables["STORYTELLER_CLIENT_ID"] = MachineId;
+        _variables["STORYTELLER_SUBJECT_TOKEN_TYPE"] = type;
+        _variables["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = ManagedIdentityResource;
+
+        Read().ShouldNotBeNull().SubjectTokenType.ShouldBe(expected);
+
+        _variables.Remove("STORYTELLER_MANAGED_IDENTITY_RESOURCE");
+        _variables["STORYTELLER_TOKEN_FILE"] = "/run/token";
+
+        Read().ShouldNotBeNull().SubjectTokenType.ShouldBe(type is null ? FederatedTokenOptions.JwtTokenType : expected);
+    }
+
+    [Fact]
+    public void AnUnknownSubjectTokenType_OfAManagedIdentity_NamesTheVariable()
+    {
+        _variables["STORYTELLER_CLIENT_ID"] = MachineId;
+        _variables["STORYTELLER_SUBJECT_TOKEN_TYPE"] = "saml";
+        _variables["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = ManagedIdentityResource;
+
+        ShouldFail("STORYTELLER_SUBJECT_TOKEN_TYPE");
+    }
+
+    // Both GitHub variables are in every job with id-token: write, also in one that runs on an Azure host.
+    [Fact]
+    public void AManagedIdentityResource_WinsOverTheGitHubActionsVariables_WhoseUrlIsThenNotChecked()
+    {
+        UseGitHubActions("http://runner.example.com/idtoken");
+        _variables["STORYTELLER_CLIENT_ID"] = MachineId;
+        _variables["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = ManagedIdentityResource;
+
+        var variables = Read().ShouldNotBeNull();
+
+        variables.SubjectTokenSource.ShouldBe(StorytellerSubjectTokenSource.AzureManagedIdentity);
+        variables.Names.ShouldBe(["STORYTELLER_CLIENT_ID", "STORYTELLER_MANAGED_IDENTITY_RESOURCE"]);
+    }
+
+    [Fact]
+    public void AManagedIdentityResourceWithoutAClientId_NeedsTheMachineId()
+    {
+        _variables["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = ManagedIdentityResource;
+        _variables["STORYTELLER_MANAGED_IDENTITY_CLIENT_ID"] = UserAssignedClientId;
+
+        ShouldFail("STORYTELLER_CLIENT_ID").Message.ShouldBe("A federated machine needs STORYTELLER_CLIENT_ID, the machine id.");
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(MachineId, null)]
+    [InlineData(MachineId, "/run/token")]
+    public void AManagedIdentityClientIdWithoutTheResource_IsAnError(string? clientId, string? tokenFile)
+    {
+        UseGitHubActions();
+        _variables["STORYTELLER_CLIENT_ID"] = clientId;
+        _variables["STORYTELLER_TOKEN_FILE"] = tokenFile;
+        _variables["STORYTELLER_MANAGED_IDENTITY_CLIENT_ID"] = UserAssignedClientId;
+
+        ShouldFail("STORYTELLER_MANAGED_IDENTITY_RESOURCE").Message.ShouldBe(
+            "STORYTELLER_MANAGED_IDENTITY_CLIENT_ID is set without STORYTELLER_MANAGED_IDENTITY_RESOURCE.");
+    }
+
+    // One source of the platform token: the message names the file variable as it was set.
+    [Theory]
+    [InlineData("STORYTELLER_TOKEN_FILE")]
+    [InlineData("STORYTELLER_SUBJECT_TOKEN_FILE")]
+    public void AManagedIdentityResourceWithATokenFile_IsAnError_ThatNamesBoth(string fileVariable)
+    {
+        _variables["STORYTELLER_CLIENT_ID"] = MachineId;
+        _variables[fileVariable] = "/run/token";
+        _variables["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = ManagedIdentityResource;
+
+        ShouldFail(fileVariable).Message.ShouldBe(
+            $"STORYTELLER_MANAGED_IDENTITY_RESOURCE and {fileVariable} are both set; a federated machine takes its platform token from one of them.");
+    }
+
+    [Theory]
+    [InlineData("STORYTELLER_TOKEN_FILE", "/run/token", "STORYTELLER_TOKEN_FILE, STORYTELLER_MANAGED_IDENTITY_RESOURCE")]
+    [InlineData("STORYTELLER_API_KEY", ApiKey, "STORYTELLER_API_KEY, STORYTELLER_MANAGED_IDENTITY_RESOURCE")]
+    [InlineData("STORYTELLER_CLIENT_CERTIFICATE", "/run/machine.pfx", "STORYTELLER_CLIENT_CERTIFICATE, STORYTELLER_MANAGED_IDENTITY_RESOURCE")]
+    [InlineData("STORYTELLER_CLIENT_SECRET", ClientSecret, "STORYTELLER_CLIENT_SECRET, STORYTELLER_MANAGED_IDENTITY_RESOURCE")]
+    [InlineData("STORYTELLER_TOKEN_URL", "https://idp.example.com/token", "STORYTELLER_TOKEN_URL, STORYTELLER_MANAGED_IDENTITY_RESOURCE")]
+    public void AManagedIdentityResourceWithAVariableOfAnotherKind_AreTwoKinds_ThatAreNamed(string variable, string value, string names)
+    {
+        _variables[variable] = value;
+        _variables["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = ManagedIdentityResource;
+
+        ShouldFail("different kinds").Message.ShouldBe($"Storyteller credential variables of different kinds are set: {names}. Set the variables of one kind only.");
+    }
+
+    [Fact]
+    public void AManagedIdentityResourceWithClientCredentials_AreTwoKinds_ThatAreNamed()
+    {
+        _variables["STORYTELLER_CLIENT_ID"] = MachineId;
+        _variables["STORYTELLER_CLIENT_SECRET"] = ClientSecret;
+        _variables["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = ManagedIdentityResource;
+        _variables["STORYTELLER_MANAGED_IDENTITY_CLIENT_ID"] = UserAssignedClientId;
+
+        ShouldFail("different kinds").Message.ShouldBe(
+            "Storyteller credential variables of different kinds are set: STORYTELLER_CLIENT_ID, STORYTELLER_CLIENT_SECRET, STORYTELLER_MANAGED_IDENTITY_RESOURCE, STORYTELLER_MANAGED_IDENTITY_CLIENT_ID. Set the variables of one kind only.");
+    }
+
+    // The host sets them whether or not a machine federates: alone they are no credential, and they make no machine
+    // federated, unlike the runner's with a GUID.
+    [Fact]
+    public void TheVariablesOfAnAzureHost_AreNoCredential_AndMakeNoMachineFederated()
+    {
+        _variables["IDENTITY_ENDPOINT"] = "http://127.0.0.1:41741/MSI/token/";
+        _variables["IDENTITY_HEADER"] = "1dent1ty-h3ader-s3cret";
+
+        Read().ShouldBeNull();
+
+        _variables["STORYTELLER_CLIENT_ID"] = MachineId;
+
+        var exception = ShouldFail("STORYTELLER_CLIENT_SECRET");
+        exception.Message.ShouldNotContain("IDENTITY_");
+        exception.Message.ShouldNotContain("h3ader-s3cret");
     }
 
     [Theory]

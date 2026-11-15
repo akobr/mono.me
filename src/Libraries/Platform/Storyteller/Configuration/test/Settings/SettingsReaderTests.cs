@@ -526,6 +526,50 @@ public class SettingsReaderTests
         exception.Message.ShouldNotContain(GitHubRequestToken);
     }
 
+    // The app settings of an Azure Function, and the two variables its host sets: the provider's own environment reads
+    // them, also the host's, before the exchange.
+    [Fact]
+    public async Task AManagedIdentityResource_FederatesThroughTheManagedIdentityOfTheHost()
+    {
+        _environment["STORYTELLER_CLIENT_ID"] = FederatedMachineId;
+        _environment["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = "api://storyteller";
+        _environment["IDENTITY_ENDPOINT"] = "http://127.0.0.1:9/msi/token";
+        _environment["IDENTITY_HEADER"] = "1dent1ty-h3ader";
+
+        var settings = Read(options =>
+        {
+            options.Resilience.MaxRetryAttempts = 0;
+
+            // No network: the host's request fails as transient, and its message names the endpoint without its query.
+            options.ConfigurePrimaryHandler = handler => handler.ConnectCallback = (_, _) => ValueTask.FromException<Stream>(new IOException("Offline."));
+        });
+
+        var credential = settings.Credential.ShouldNotBeNull();
+        credential.ToString().ShouldBe($"StorytellerCredential {{ Kind = Federated, ClientId = {FederatedMachineId}, SubjectTokenSource = AzureManagedIdentity, Resource = api://storyteller, ManagedIdentityClientId =  }}");
+
+        var exception = await Should.ThrowAsync<StorytellerAuthenticationException>(() => credential.GetAuthorizationAsync(null, CancellationToken.None).AsTask());
+
+        exception.Reason.ShouldBe(StorytellerAuthenticationFailureReason.Unavailable);
+        exception.Message.ShouldContain("The managed identity token request to http://127.0.0.1:9/msi/token for the resource api://storyteller failed");
+        exception.Message.ShouldNotContain("api-version");
+        exception.Message.ShouldNotContain("1dent1ty-h3ader");
+    }
+
+    [Fact]
+    public void AManagedIdentityResourceWithAnotherKind_IsAConfigurationError_ThatNamesTheVariables()
+    {
+        _environment["STORYTELLER_CLIENT_ID"] = FederatedMachineId;
+        _environment["STORYTELLER_CLIENT_SECRET"] = "cl13nt-s3cret";
+        _environment["STORYTELLER_MANAGED_IDENTITY_RESOURCE"] = "api://storyteller";
+
+        var exception = ShouldFail();
+
+        exception.Message.ShouldContain("STORYTELLER_CLIENT_SECRET");
+        exception.Message.ShouldContain("STORYTELLER_MANAGED_IDENTITY_RESOURCE");
+        exception.Message.ShouldNotContain("cl13nt-s3cret");
+        exception.InnerException.ShouldBeOfType<StorytellerAuthenticationException>().Reason.ShouldBe(StorytellerAuthenticationFailureReason.Configuration);
+    }
+
     [Fact]
     public void AClientIdThatIsNoGuid_InAGitHubActionsJob_IsAConfigurationError()
     {

@@ -56,7 +56,8 @@ public sealed class MachineSignInSettings
     public bool IsKeyInvalid { get; private init; }
 
     // Any credential variable is set, valid or not: sform signs in as that machine and never as the stored user.
-    // The GitHub Actions variables are not among them: a job with id-token: write may run sform as a user.
+    // The GitHub Actions variables are not among them: a job with id-token: write may run sform as a user. Nor are
+    // IDENTITY_ENDPOINT and IDENTITY_HEADER of an Azure host with a managed identity.
     public bool IsConfigured => CredentialVariables.Count > 0;
 
     // The names of the credential variables that are set, as named, never their values.

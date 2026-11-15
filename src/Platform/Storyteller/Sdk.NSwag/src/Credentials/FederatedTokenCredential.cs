@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
 // RFC 8693 at the token endpoint of the target project, with a platform token got again for every exchange: from a file,
-// or from the GitHub Actions runner.
+// from the GitHub Actions runner, from the managed identity of an Azure host, or from a provider of the application.
 internal sealed class FederatedTokenCredential : CachedTokenCredential
 {
     private const string GrantType = "urn:ietf:params:oauth:grant-type:token-exchange";
@@ -34,16 +34,15 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
         _source = source;
     }
 
-    public StorytellerSubjectTokenSource SubjectTokenSource => _source is GitHubActionsSource
-        ? StorytellerSubjectTokenSource.GitHubActions
-        : StorytellerSubjectTokenSource.File;
+    public StorytellerSubjectTokenSource SubjectTokenSource => _source.Kind;
 
-    // pathSource names the variable the subject token path came from, for messages; null for code.
+    // pathSource names the variable the subject token path came from, for messages; null for code. getVariable also
+    // reads the variables of an Azure host for a managed identity.
     public static FederatedTokenCredential Create(FederatedTokenOptions options, string? pathSource, Func<string, string?> getVariable)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.ClientId, "options.ClientId");
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.SubjectTokenPath, "options.SubjectTokenPath");
+        var source = CreateSource(options, pathSource, getVariable);
 
         var subjectTokenType = NormalizeSubjectTokenType(options.SubjectTokenType)
             ?? throw StorytellerAuthenticationException.Configuration(
@@ -64,7 +63,7 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
             options.ConfigureHandler,
             options.TimeProvider);
 
-        return new FederatedTokenCredential(exchange, new FileSource(options.SubjectTokenPath, options.FileSystem ?? new FileSystem(), pathSource), null, getVariable, null);
+        return new FederatedTokenCredential(exchange, source, null, getVariable, null);
     }
 
     // The ID token of the GitHub Actions job, for the audience of the token endpoint; reached through the variables only.
@@ -88,14 +87,19 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
         return new FederatedTokenCredential(_exchange, _source, binding, GetVariable, PrimaryHandler);
     }
 
-    // Part of the cache identity of the provider (CredentialFingerprint): the file-sourced text must not change.
+    // Part of the cache identity of the provider (CredentialFingerprint): the texts of the file and GitHub Actions
+    // sources must not change. A managed identity adds what tells two of one machine apart, its resource and its client
+    // id. A provider is a delegate, which has no text, so two providers of one machine share a cache identity.
     public override string ToString()
     {
-        return _source switch
+        var source = _source switch
         {
-            FileSource file => $"{nameof(StorytellerCredential)} {{ Kind = Federated, ClientId = {_exchange.ClientId}, SubjectTokenPath = {file.Path} }}",
-            _ => $"{nameof(StorytellerCredential)} {{ Kind = Federated, ClientId = {_exchange.ClientId}, SubjectTokenSource = {StorytellerSubjectTokenSource.GitHubActions} }}",
+            FileSource file => $"SubjectTokenPath = {file.Path}",
+            AzureManagedIdentitySource identity => $"SubjectTokenSource = {identity.Kind}, Resource = {identity.Resource}, ManagedIdentityClientId = {identity.ManagedIdentityClientId}",
+            _ => $"SubjectTokenSource = {_source.Kind}",
         };
+
+        return $"{nameof(StorytellerCredential)} {{ Kind = Federated, ClientId = {_exchange.ClientId}, {source} }}";
     }
 
     internal override StorytellerCredential WithPrimaryHandler(HttpMessageHandler primaryHandler)
@@ -126,7 +130,7 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
             ["client_id"] = _exchange.ClientId,
 
             // A projected Kubernetes token has no scheme; sent as it is.
-            ["subject_token"] = await _source.GetTokenAsync(client, target.Audience, cancellationToken).ConfigureAwait(false),
+            ["subject_token"] = await _source.GetTokenAsync(client, new StorytellerSubjectTokenRequest(target.Audience, _exchange.ClientId), cancellationToken).ConfigureAwait(false),
             ["subject_token_type"] = _exchange.SubjectTokenType,
         };
 
@@ -147,6 +151,35 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
                 $"{exception.Message.TrimEnd('.')}; the GitHub Actions token of this job was requested for the audience {target.Audience}, which a rule of the machine must name exactly. For client credentials, set {StorytellerVariables.CLIENT_SECRET} instead.",
                 exception);
         }
+    }
+
+    // Exactly one source, so that no option is silently ignored.
+    private static PlatformTokenSource CreateSource(FederatedTokenOptions options, string? pathSource, Func<string, string?> getVariable)
+    {
+        var sources = new object?[] { options.SubjectTokenPath, options.SubjectTokenProvider, options.AzureManagedIdentity };
+
+        if (sources.Count(source => source is not null) != 1)
+        {
+            throw new ArgumentException(
+                $"Set exactly one of {nameof(FederatedTokenOptions.SubjectTokenPath)}, {nameof(FederatedTokenOptions.SubjectTokenProvider)} and {nameof(FederatedTokenOptions.AzureManagedIdentity)}.");
+        }
+
+        if (options.SubjectTokenProvider is { } provider)
+        {
+            return new ProviderSource(provider);
+        }
+
+        if (options.AzureManagedIdentity is { } managedIdentity)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(managedIdentity.Resource, "options.AzureManagedIdentity.Resource");
+
+            // A blank client id is the system-assigned identity, as an empty variable is unset.
+            var managedIdentityClientId = string.IsNullOrWhiteSpace(managedIdentity.ManagedIdentityClientId) ? null : managedIdentity.ManagedIdentityClientId;
+            return new AzureManagedIdentitySource(managedIdentity.Resource, managedIdentityClientId, getVariable);
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.SubjectTokenPath, "options.SubjectTokenPath");
+        return new FileSource(options.SubjectTokenPath, options.FileSystem ?? new FileSystem(), pathSource);
     }
 
     private ExchangeTarget ResolveTarget()
@@ -192,17 +225,22 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
 
     private sealed record ExchangeTarget(Uri Url, string Audience);
 
-    // Asked again before every exchange: a file the platform renews, or an ID token that lives about 5 minutes.
+    // Asked again before every exchange: a file the platform renews, an ID token that lives about 5 minutes, a managed
+    // identity whose endpoint caches its token, or a provider that decides for itself.
     private abstract class PlatformTokenSource
     {
-        public abstract Task<string> GetTokenAsync(TokenEndpointClient client, string audience, CancellationToken cancellationToken);
+        public abstract StorytellerSubjectTokenSource Kind { get; }
+
+        public abstract Task<string> GetTokenAsync(TokenEndpointClient client, StorytellerSubjectTokenRequest request, CancellationToken cancellationToken);
     }
 
     private sealed class FileSource(string path, IFileSystem fileSystem, string? pathSource) : PlatformTokenSource
     {
+        public override StorytellerSubjectTokenSource Kind => StorytellerSubjectTokenSource.File;
+
         public string Path => path;
 
-        public override Task<string> GetTokenAsync(TokenEndpointClient client, string audience, CancellationToken cancellationToken)
+        public override Task<string> GetTokenAsync(TokenEndpointClient client, StorytellerSubjectTokenRequest request, CancellationToken cancellationToken)
         {
             return Task.FromResult(CredentialFiles.ReadText(fileSystem, path, pathSource, "platform token file"));
         }
@@ -210,15 +248,74 @@ internal sealed class FederatedTokenCredential : CachedTokenCredential
 
     private sealed class GitHubActionsSource(Uri requestUrl, string requestToken) : PlatformTokenSource
     {
-        public override Task<string> GetTokenAsync(TokenEndpointClient client, string audience, CancellationToken cancellationToken)
+        public override StorytellerSubjectTokenSource Kind => StorytellerSubjectTokenSource.GitHubActions;
+
+        public override Task<string> GetTokenAsync(TokenEndpointClient client, StorytellerSubjectTokenRequest request, CancellationToken cancellationToken)
         {
-            return client.RequestGitHubIdTokenAsync(requestUrl, requestToken, audience, cancellationToken);
+            return client.RequestGitHubIdTokenAsync(requestUrl, requestToken, request.Audience, cancellationToken);
         }
 
         // The request token is a secret.
         public override string ToString()
         {
             return $"{nameof(GitHubActionsSource)} {{ RequestUrl = {StorytellerUrlRule.Describe(requestUrl)} }}";
+        }
+    }
+
+    // The token is for the resource, the app registration that stands for Storyteller, not for the token endpoint.
+    private sealed class AzureManagedIdentitySource(string resource, string? managedIdentityClientId, Func<string, string?> getVariable) : PlatformTokenSource
+    {
+        public override StorytellerSubjectTokenSource Kind => StorytellerSubjectTokenSource.AzureManagedIdentity;
+
+        public string Resource => resource;
+
+        public string? ManagedIdentityClientId => managedIdentityClientId;
+
+        // The endpoint and its header are read from the environment every time: the platform rotates the header value.
+        public override Task<string> GetTokenAsync(TokenEndpointClient client, StorytellerSubjectTokenRequest request, CancellationToken cancellationToken)
+        {
+            return client.RequestAzureManagedIdentityTokenAsync(AzureManagedIdentityEndpoint.Read(getVariable), resource, managedIdentityClientId, cancellationToken);
+        }
+    }
+
+    private sealed class ProviderSource(StorytellerSubjectTokenProvider provider) : PlatformTokenSource
+    {
+        public override StorytellerSubjectTokenSource Kind => StorytellerSubjectTokenSource.Provider;
+
+        // Messages name the type of the provider's exception, never its message, which may hold anything; the exception
+        // itself is the inner one.
+        public override async Task<string> GetTokenAsync(TokenEndpointClient client, StorytellerSubjectTokenRequest request, CancellationToken cancellationToken)
+        {
+            string? token;
+
+            try
+            {
+                token = await provider(request, cancellationToken).ConfigureAwait(false);
+            }
+            catch (StorytellerAuthenticationException)
+            {
+                throw;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                // A cancellation the caller did not request is a timeout of the provider.
+                throw new StorytellerAuthenticationException(
+                    exception is OperationCanceledException or TimeoutException or HttpRequestException
+                        ? StorytellerAuthenticationFailureReason.Unavailable
+                        : StorytellerAuthenticationFailureReason.Rejected,
+                    $"The subject token provider failed with {exception.GetType().Name}.",
+                    exception);
+            }
+
+            token = token?.Trim();
+
+            return string.IsNullOrEmpty(token)
+                ? throw new StorytellerAuthenticationException(StorytellerAuthenticationFailureReason.Rejected, "The subject token provider returned no token.")
+                : token;
         }
     }
 }

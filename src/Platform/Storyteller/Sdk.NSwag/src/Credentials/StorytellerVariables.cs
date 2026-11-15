@@ -4,7 +4,8 @@ using System.Collections.Generic;
 namespace _42.Platform.Storyteller.Sdk.Credentials;
 
 // The STORYTELLER_* names of the shared integration contract, the deprecated sform names that are still read when the
-// canonical name is unset, and the GitHub Actions names a federated machine can take its platform token from.
+// canonical name is unset, and the names of GitHub Actions and of an Azure host that a federated machine can take its
+// platform token from.
 public static class StorytellerVariables
 {
     public const string ENDPOINT = "STORYTELLER_ENDPOINT";
@@ -36,13 +37,26 @@ public static class StorytellerVariables
 
     public const string SUBJECT_TOKEN_TYPE = "STORYTELLER_SUBJECT_TOKEN_TYPE";
 
+    // With CLIENT_ID, a federated machine that takes its platform token from the managed identity of its Azure host, for
+    // this resource: the identifier URI of the app registration that stands for Storyteller, api://<appId>.
+    public const string MANAGED_IDENTITY_RESOURCE = "STORYTELLER_MANAGED_IDENTITY_RESOURCE";
+
+    // Optional, with MANAGED_IDENTITY_RESOURCE: the client id of a user-assigned identity.
+    public const string MANAGED_IDENTITY_CLIENT_ID = "STORYTELLER_MANAGED_IDENTITY_CLIENT_ID";
+
     // Set by GitHub Actions in a job with permissions: id-token: write. Not credential variables: alone they configure
     // no machine; they only supply the platform token of one that STORYTELLER_CLIENT_ID already makes federated.
     public const string ACTIONS_ID_TOKEN_REQUEST_URL = "ACTIONS_ID_TOKEN_REQUEST_URL";
     public const string ACTIONS_ID_TOKEN_REQUEST_TOKEN = "ACTIONS_ID_TOKEN_REQUEST_TOKEN";
 
+    // Set by Azure App Service, Functions and Container Apps on a host with a managed identity. Not credential
+    // variables: they only say where a machine that MANAGED_IDENTITY_RESOURCE makes federated asks for its platform
+    // token; without them it asks IMDS. Read before every exchange, as the platform rotates the header value.
+    public const string IDENTITY_ENDPOINT = "IDENTITY_ENDPOINT";
+    public const string IDENTITY_HEADER = "IDENTITY_HEADER";
+
     // Every name that makes a credential, deprecated ones included, in the order they are read; not ENDPOINT, API_URL,
-    // KEY or the GitHub Actions names.
+    // KEY, the GitHub Actions names or the names of an Azure host.
     public static IReadOnlyList<string> Credentials { get; } =
     [
         API_KEY,
@@ -57,6 +71,8 @@ public static class StorytellerVariables
         TOKEN_FILE,
         SUBJECT_TOKEN_FILE,
         SUBJECT_TOKEN_TYPE,
+        MANAGED_IDENTITY_RESOURCE,
+        MANAGED_IDENTITY_CLIENT_ID,
     ];
 
     // A deprecated name and the canonical name that replaces it; read only when the canonical name is unset, and both set

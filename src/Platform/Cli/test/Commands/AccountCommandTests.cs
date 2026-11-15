@@ -163,6 +163,36 @@ public class AccountCommandTests
     }
 
     [Fact]
+    public async Task Machine_Federated_WithAManagedIdentity_AsksTheHostAndExchanges()
+    {
+        _environment[StorytellerVariables.CLIENT_ID] = FederatedMachineId;
+        _environment[StorytellerVariables.MANAGED_IDENTITY_RESOURCE] = "api://storyteller";
+        _environment[StorytellerVariables.IDENTITY_ENDPOINT] = "http://127.0.0.1:41741/MSI/token/";
+        _environment[StorytellerVariables.IDENTITY_HEADER] = "identity-header-value";
+        _environment[StorytellerVariables.KEY] = "@acme.billing.default.rst.invoicing";
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"mi-token","token_type":"Bearer"}""")
+            .Respond(HttpStatusCode.OK, JwtExchangeAnswer);
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _console.Lines.ShouldBe(
+        [
+            "# Machine sign-in",
+            $"Signed in as machine {FederatedMachineId} with workload identity federation (STORYTELLER_CLIENT_ID, STORYTELLER_MANAGED_IDENTITY_RESOURCE).",
+            "Project acme.billing with default view.",
+            $"API {ApiUrl}",
+            "Token valid until 2026-10-17T12:15:00.0000000+00:00.",
+        ]);
+        _http.Requests.Select(request => (request.Method, request.Uri.OriginalString)).ShouldBe(
+        [
+            (HttpMethod.Get, "http://127.0.0.1:41741/MSI/token/?api-version=2019-08-01&resource=api%3A%2F%2Fstoryteller"),
+            (HttpMethod.Post, TokenEndpoint),
+        ]);
+        _console.Lines.ShouldNotContain(line => line.Contains("identity-header-value"));
+    }
+
+    [Fact]
     public async Task Machine_Federated_WithoutAProject_AsksForOneBeforeAnyRequest()
     {
         UseFederatedFile();

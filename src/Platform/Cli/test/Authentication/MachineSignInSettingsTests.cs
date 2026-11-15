@@ -46,6 +46,8 @@ public class MachineSignInSettingsTests
     [InlineData(MachineSignInKind.TokenFile, StorytellerVariables.TOKEN_FILE)]
     [InlineData(MachineSignInKind.Federated, StorytellerVariables.CLIENT_ID, StorytellerVariables.TOKEN_FILE)]
     [InlineData(MachineSignInKind.Federated, StorytellerVariables.CLIENT_ID, StorytellerVariables.SUBJECT_TOKEN_FILE, StorytellerVariables.SUBJECT_TOKEN_TYPE, StorytellerVariables.TOKEN_SCOPE)]
+    [InlineData(MachineSignInKind.Federated, StorytellerVariables.CLIENT_ID, StorytellerVariables.MANAGED_IDENTITY_RESOURCE)]
+    [InlineData(MachineSignInKind.Federated, StorytellerVariables.CLIENT_ID, StorytellerVariables.TOKEN_SCOPE, StorytellerVariables.MANAGED_IDENTITY_RESOURCE, StorytellerVariables.MANAGED_IDENTITY_CLIENT_ID)]
     public void GetKind_FollowsTheKindOfTheSdk(MachineSignInKind expected, params string[] variables)
     {
         var settings = Machine(variables);
@@ -64,6 +66,54 @@ public class MachineSignInSettingsTests
 
         settings.GetKind().ShouldBe(MachineSignInKind.Federated);
         settings.GetCredential().SubjectTokenSource.ShouldBe(StorytellerSubjectTokenSource.File);
+    }
+
+    // The variables of the host (IDENTITY_ENDPOINT, IDENTITY_HEADER) are no credential variables, as the GitHub ones.
+    [Fact]
+    public void GetKind_AManagedIdentityResourceWithAClientId_IsFederatedThroughTheManagedIdentity()
+    {
+        var settings = Read(new()
+        {
+            [StorytellerVariables.ENDPOINT] = Endpoint,
+            [StorytellerVariables.CLIENT_ID] = MachineId,
+            [StorytellerVariables.MANAGED_IDENTITY_RESOURCE] = "api://storyteller",
+            [StorytellerVariables.IDENTITY_ENDPOINT] = "http://127.0.0.1:41741/MSI/token/",
+            [StorytellerVariables.IDENTITY_HEADER] = "top-secret-identity-header",
+            [StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL] = GitHubRequestUrl,
+            [StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN] = "request-token",
+        });
+
+        settings.GetKind().ShouldBe(MachineSignInKind.Federated);
+        settings.GetCredential().SubjectTokenSource.ShouldBe(StorytellerSubjectTokenSource.AzureManagedIdentity);
+        settings.CredentialVariables.ShouldBe([StorytellerVariables.CLIENT_ID, StorytellerVariables.MANAGED_IDENTITY_RESOURCE]);
+        settings.DeprecatedVariables.ShouldBeEmpty();
+        settings.GetCredential().ToString().ShouldNotContain("top-secret");
+    }
+
+    // Any credential variable makes sform a machine, never the stored user: also this one alone, where it is invalid.
+    [Fact]
+    public void GetKind_AManagedIdentityResourceAlone_IsConfiguredAndRefused()
+    {
+        var settings = Machine(StorytellerVariables.MANAGED_IDENTITY_RESOURCE);
+
+        settings.IsConfigured.ShouldBeTrue();
+        settings.CredentialVariables.ShouldBe([StorytellerVariables.MANAGED_IDENTITY_RESOURCE]);
+        Should.Throw<AuthenticationException>(() => settings.GetKind()).Message.ShouldBe("A federated machine needs STORYTELLER_CLIENT_ID, the machine id.");
+    }
+
+    // The host's variables alone configure no machine: an Azure host may run sform as a user.
+    [Fact]
+    public void GetKind_TheVariablesOfAnAzureHostAlone_ConfigureNoMachine()
+    {
+        var settings = Read(new()
+        {
+            [StorytellerVariables.ENDPOINT] = Endpoint,
+            [StorytellerVariables.IDENTITY_ENDPOINT] = "http://127.0.0.1:41741/MSI/token/",
+            [StorytellerVariables.IDENTITY_HEADER] = "top-secret-identity-header",
+        });
+
+        settings.IsConfigured.ShouldBeFalse();
+        settings.CredentialVariables.ShouldBeEmpty();
     }
 
     // Change against the sform names: the scheme alone was sent as the key.

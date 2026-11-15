@@ -11,7 +11,8 @@ using _42.Platform.Storyteller.Sdk.Credentials;
 namespace _42.Platform.Cli.Authentication;
 
 // Non-interactive sign-in of a machine with the credentials in STORYTELLER_* environment variables: an API key, a
-// client certificate, both, client credentials, a token file, or the platform token a federated machine exchanges.
+// client certificate, both, client credentials, a token file, or the platform token a federated machine exchanges (a
+// file, the GitHub Actions runner, or the managed identity of an Azure host).
 // The credential is the SDK's (StorytellerCredentialVariables.CreateCredential): it requests, caches and renews the
 // tokens. Nothing is stored on disk; a token lives in memory for the process.
 public sealed class MachineAuthenticationService : IAuthenticationService, IMachineSignIn, IDisposable
@@ -124,7 +125,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         var target = _target;
 
         // Only for the target a command bound: sform account ca and the user-only commands must not exchange, nor ask
-        // GitHub for a token, just because STORYTELLER_PROJECT or STORYTELLER_KEY is set.
+        // GitHub or a managed identity for a token, just because STORYTELLER_PROJECT or STORYTELLER_KEY is set.
         if (credential.Identity.Kind == MachineSignInKind.Federated && target is null)
         {
             return null;
@@ -263,7 +264,8 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
             // Loads the certificate.
             credential = CredentialFailures.Guard(() => variables.CreateCredential(_fileSystem, _time));
 
-            // Messages say where a platform token from GitHub Actions came from; names only, never values.
+            // Messages say where a platform token from GitHub Actions came from; names only, never values. A managed
+            // identity is named by its own credential variable, STORYTELLER_MANAGED_IDENTITY_RESOURCE.
             IReadOnlyList<string> names = variables.SubjectTokenSource == StorytellerSubjectTokenSource.GitHubActions
                 ? [.. variables.Names, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN]
                 : variables.Names;
@@ -305,7 +307,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 _ => new MachineIdentity(kind, names, null, null, null),
             };
 
-            return new LoadResult(new LoadedCredential(identity, credential, endpoint), null);
+            return new LoadResult(new LoadedCredential(identity, credential, endpoint, variables.SubjectTokenSource), null);
         }
         catch (AuthenticationException exception)
         {
@@ -377,9 +379,14 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
+            // Who was asked: a managed identity gets its platform token from the host, not from the runner.
+            var asked = credential.SubjectTokenSource == StorytellerSubjectTokenSource.AzureManagedIdentity
+                ? "the token endpoint or the managed identity endpoint of the host"
+                : "the token endpoint, the sign-in discovery or the GitHub Actions runner";
+
             throw new AuthenticationException(
                 AuthenticationFailureReason.ServiceError,
-                $"The machine got no token within {deadline.TotalSeconds:0} seconds, retries and Retry-After waits included: the token endpoint, the sign-in discovery or the GitHub Actions runner did not answer, or kept failing.");
+                $"The machine got no token within {deadline.TotalSeconds:0} seconds, retries and Retry-After waits included: {asked} did not answer, or kept failing.");
         }
     }
 
@@ -432,10 +439,12 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     // Key is the organization.project of a federated copy, null for every other kind.
     private sealed record BoundCredential(string? Key, StorytellerCredential Credential);
 
+    // SubjectTokenSource is where a federated machine gets its platform token, null for every other kind.
     private sealed record LoadedCredential(
         MachineIdentity Identity,
         StorytellerCredential Credential,
-        Uri Endpoint);
+        Uri Endpoint,
+        StorytellerSubjectTokenSource? SubjectTokenSource);
 
     // The loaded credential, or why it could not be loaded.
     private sealed record LoadResult(LoadedCredential? Credential, AuthenticationException? Failure);

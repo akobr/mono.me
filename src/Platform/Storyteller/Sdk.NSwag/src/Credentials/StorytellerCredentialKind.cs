@@ -18,6 +18,7 @@ public enum StorytellerCredentialKind
     // STORYTELLER_TOKEN_FILE without STORYTELLER_CLIENT_ID: a bearer token the API accepts.
     TokenFile,
 
-    // STORYTELLER_CLIENT_ID with a platform token to exchange: a file, or the GitHub Actions runner.
+    // STORYTELLER_CLIENT_ID with a platform token to exchange: a file, the GitHub Actions runner, or the managed identity
+    // of an Azure host (STORYTELLER_MANAGED_IDENTITY_RESOURCE).
     Federated,
 }
