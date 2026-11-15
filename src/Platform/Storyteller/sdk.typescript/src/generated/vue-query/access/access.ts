@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.34.56348
+ * OpenAPI spec version: 0.10.40.6327
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -32,6 +32,7 @@ import type {
   AuthorizationServerMetadata,
   CertificateRenewalResult,
   ErrorResponse,
+  Exhibition,
   FederatedIssuer,
   FederationRule,
   Invitation,
@@ -2550,6 +2551,167 @@ export const useRevokeSharedCertificate = <
     getRevokeSharedCertificateMutationOptions(options),
     queryClient,
   );
+};
+export const getGetExhibitionUrl = () => {
+  return `/v1/access/exhibition`;
+};
+
+/**
+ * The exhibition: the demo project of the deployment, which the caller may join as a Reader. Its view is default. Works before the account exists.
+ */
+export const getExhibition = async (
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Exhibition> => {
+  return storytellerFetch<Exhibition>(getGetExhibitionUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetExhibitionQueryKey = () => {
+  return ["v1", "access", "exhibition"] as const;
+};
+
+export const getGetExhibitionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getExhibition>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getExhibition>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetExhibitionQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getExhibition>>> = ({
+    signal,
+  }) => getExhibition({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getExhibition>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetExhibitionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getExhibition>>
+>;
+export type GetExhibitionQueryError = ErrorType<void | ErrorResponse>;
+
+export function useGetExhibition<
+  TData = Awaited<ReturnType<typeof getExhibition>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getExhibition>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetExhibitionQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getJoinExhibitionUrl = () => {
+  return `/v1/access/exhibition/join`;
+};
+
+/**
+ * Makes the caller a Reader of the exhibition project: creates the account, without an organization, when needed, and keeps a higher role. No request body.
+ */
+export const joinExhibition = async (
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Account> => {
+  return storytellerFetch<Account>(getJoinExhibitionUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getJoinExhibitionMutationKey = () => ["joinExhibition"] as const;
+
+export const getJoinExhibitionMutationOptions = <
+  TError = ErrorType<void | ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof joinExhibition>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof joinExhibition>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = getJoinExhibitionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof joinExhibition>>,
+    void
+  > = () => {
+    return joinExhibition(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type JoinExhibitionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof joinExhibition>>
+>;
+
+export type JoinExhibitionMutationError = ErrorType<void | ErrorResponse>;
+
+export const useJoinExhibition = <
+  TError = ErrorType<void | ErrorResponse>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof joinExhibition>>,
+      TError,
+      void,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof joinExhibition>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getJoinExhibitionMutationOptions(options), queryClient);
 };
 export const getGetFederatedIssuersUrl = (
   organization: string,

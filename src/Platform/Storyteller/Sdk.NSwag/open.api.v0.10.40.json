@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.10.34.56348"
+    "version": "0.10.40.6327"
   },
   "servers": [
     {
@@ -10023,6 +10023,132 @@
         ]
       }
     },
+    "/v1/access/exhibition": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "description": "The exhibition: the demo project of the deployment, which the caller may join as a Reader. Its view is default. Works before the account exists.",
+        "operationId": "GetExhibition",
+        "responses": {
+          "200": {
+            "description": "The organization and the project of the exhibition, and the description of the project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Exhibition"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The deployment has no exhibition."
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/access/exhibition/join": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Makes the caller a Reader of the exhibition project: creates the account, without an organization, when needed, and keeps a higher role. No request body.",
+        "operationId": "JoinExhibition",
+        "responses": {
+          "200": {
+            "description": "The account of the signed-in user, with the membership of the exhibition project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The members of the exhibition project changed concurrently too many times (Conflict); try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The deployment has no exhibition."
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing)."
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
     "/v1/{organization}/{project}/access/issuers": {
       "get": {
         "tags": [
@@ -18548,6 +18674,24 @@
             }
           }
         ]
+      },
+      "Exhibition": {
+        "required": [
+          "Organization",
+          "Project"
+        ],
+        "type": "object",
+        "properties": {
+          "Organization": {
+            "type": "string"
+          },
+          "Project": {
+            "type": "string"
+          },
+          "Description": {
+            "type": "string"
+          }
+        }
       },
       "FederatedIssuer": {
         "type": "object",
