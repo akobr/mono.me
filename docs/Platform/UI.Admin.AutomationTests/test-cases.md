@@ -1,6 +1,6 @@
 # Test Cases of the Admin UI
 
-The functional test cases of the admin UI in Testiny project `2SP` (id 1) and the automated test of each, in `src/Platform/UI.Admin.AutomationTests/src/Tests/`. Every case has type Functional, status Ready for Test and automation Automated. Each Testiny folder is a folder of `Tests/`, and each sub-folder is a test class. The case's steps are in Testiny and in the plan [2026-11-02 Initial Test Cases of the Admin UI and Their Automation](specs/2026-11-02%20Initial%20Test%20Cases%20of%20the%20Admin%20UI%20and%20Their%20Automation.md), which also lists what is not automated and why. How to run and write the tests: [automation-tests.md](automation-tests.md).
+The functional test cases of the admin UI in Testiny project `2SP` (id 1) and the automated test of each, in `src/Platform/UI.Admin.AutomationTests/src/Tests/`. Every case has type Functional, status Ready for Test and automation Automated. Each Testiny folder is a folder of `Tests/`, and each sub-folder is a test class. The case's steps are in Testiny and in the plan [2026-11-02 Initial Test Cases of the Admin UI and Their Automation](specs/2026-11-02%20Initial%20Test%20Cases%20of%20the%20Admin%20UI%20and%20Their%20Automation.md), which also lists what is not automated and why; the steps of the cases of the onboarding wizard (ACC-SGN-06 to ACC-SGN-13) are in section 6 of the plan [2026-11-15 Onboarding Wizard with EU Hosting, Security and the Exhibition](../ui.admin/specs/2026-11-15%20Onboarding%20Wizard%20with%20EU%20Hosting,%20Security%20and%20the%20Exhibition.md). How to run and write the tests: [automation-tests.md](automation-tests.md).
 
 - **Reference**: `<section>-<sub-folder>-<n>`; it starts the Testiny precondition and the comment above the test.
 - **Priority**: Elementary (the section's PR-gate test, `[Elementary]`), High, Medium or Low.
@@ -18,11 +18,11 @@ The functional test cases of the admin UI in Testiny project `2SP` (id 1) and th
   - M: mock only (`[MockOnly]`).
   - P: in a disposable project (`[DisposableProject]`).
 
-233 cases:
+240 cases:
 
 | Section | Folder | Cases |
 |---|---|---|
-| [Access](#access) | `Tests/Access` | 33 |
+| [Access](#access) | `Tests/Access` | 40 |
 | [Organizations and Projects](#organizations-and-projects) | `Tests/Projects` | 10 |
 | [Navigation](#navigation) | `Tests/Navigation` | 23 |
 | [Annotations](#annotations) | `Tests/Annotations` | 34 |
@@ -44,7 +44,16 @@ The functional test cases of the admin UI in Testiny project `2SP` (id 1) and th
 | ACC-SGN-03 | 13 | A signed-out deep link signs in and returns to the requested page | High | Any | B | `SignIn_SignedOutDeepLink_ReturnsToThePage` |
 | ACC-SGN-04 | 19 | The login, callback and unsupported pages handle the return path, sign-in errors and the configured state | Medium | Any | B | `SignIn_LoginPage_HandlesReturnPathAndErrors` |
 | ACC-SGN-05 | 20 | The Account page shows the profile and the memberships, and a membership opens its project | Medium | Any | B | `Account_Memberships_OpenTheProject` |
-| ACC-SGN-06 | 21 | A new user creates the first organization and project on onboarding | Medium | Any | M | `Onboarding_NewUser_CreatesFirstOrganization` |
+| ACC-SGN-06 | 21 | A new user passes the onboarding steps and creates the first organization and project | Medium | Any | M | `Onboarding_NewUser_CreatesFirstOrganization` |
+| ACC-SGN-07 | 492 | The first onboarding step states the EU hosting and lists the sub-processors | Medium | Any | M | `Onboarding_Welcome_StatesEuHostingAndSubProcessors` |
+| ACC-SGN-08 | 493 | The security step of onboarding explains federated auth and links to the documentation | Low | Any | M | `Onboarding_Security_ExplainsFederatedAuthAndLinksToDocs` |
+| ACC-SGN-09 | 494 | Back, Next, the step list and the browser's back move between the onboarding steps and keep what was entered | Medium | Any | M | `Onboarding_Steps_MoveBackAndForthAndKeepInput` |
+| ACC-SGN-10 | 495 | A new user joins the exhibition with an own organization and opens it as a Reader | High | Any | M | `Onboarding_JoinExhibitionWithOrganization_OpensItAsReader` |
+| ACC-SGN-11 | 496 | A new user joins only the exhibition and creates an organization later | Medium | Any | M | `Onboarding_JoinOnlyExhibition_CreatesOrganizationLater` |
+| ACC-SGN-12 | 497 | Onboarding has no exhibition step when the deployment has none | Medium | Any | M | `Onboarding_NoExhibition_HasThreeSteps` |
+| ACC-SGN-13 | 498 | Sign out on onboarding returns to the sign-in page | Low | Any | M | `Onboarding_SignOut_ReturnsToSignIn` |
+
+The cases of the onboarding wizard (ACC-SGN-06 to ACC-SGN-13) are in the class's second file, `SignInTests.Onboarding.cs`.
 
 ### Members (`MemberTests`)
 
