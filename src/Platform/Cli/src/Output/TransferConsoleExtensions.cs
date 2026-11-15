@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 
@@ -31,13 +32,13 @@ public static class TransferConsoleExtensions
     /// Writes a table of the documents that were not unchanged, with their warnings under them, then the summary per kind,
     /// the total, and the excluded and ignored files.
     /// </summary>
-    public static void WriteImport(this IExtendedConsole @this, ViewImport import)
+    public static void WriteImport(this IExtendedConsole @this, ViewImport import, ProjectDisplay? display = null)
     {
         var items = import.Items ?? [];
 
         if (items.Count > 0)
         {
-            @this.WriteTable(GetItemRows(items), ItemHeaders);
+            @this.WriteTable(GetItemRows(items, display), ItemHeaders);
         }
 
         if (import.AreItemsTruncated)
@@ -60,13 +61,13 @@ public static class TransferConsoleExtensions
     /// One row per document (kind, document, outcome, code, message), followed by one row per warning, marked
     /// <see cref="WarningMark"/> in the outcome column.
     /// </summary>
-    public static IReadOnlyList<string[]> GetItemRows(IEnumerable<ViewImportItem> items)
+    public static IReadOnlyList<string[]> GetItemRows(IEnumerable<ViewImportItem> items, ProjectDisplay? display = null)
     {
         var rows = new List<string[]>();
 
         foreach (var item in items)
         {
-            rows.Add([FormatKind(item.Kind), FormatDocument(item), item.Outcome.ToString(), item.ErrorCode ?? string.Empty, item.Message ?? string.Empty]);
+            rows.Add([FormatKind(item.Kind), FormatDocument(item, display), item.Outcome.ToString(), item.ErrorCode ?? string.Empty, item.Message ?? string.Empty]);
 
             foreach (var warning in item.Warnings ?? [])
             {
@@ -108,18 +109,19 @@ public static class TransferConsoleExtensions
     }
 
     // The key of an annotation, a configuration or an annotation schema; the type code of a template or a type schema; both
-    // for a descendant-type schema. The path when the server named neither.
-    public static string FormatDocument(ViewImportItem item)
+    // for a descendant-type schema. The path when the server named neither. A type is named by the project's name of it.
+    public static string FormatDocument(ViewImportItem item, ProjectDisplay? display = null)
     {
         var hasKey = !string.IsNullOrEmpty(item.AnnotationKey);
         var hasType = !string.IsNullOrEmpty(item.AnnotationType);
+        var type = hasType ? TypeNames.Of(item.AnnotationType, display ?? ProjectDisplay.BuiltIn) : string.Empty;
 
         return item.Kind switch
         {
-            ViewImportItemKind.DescendantTypeSchema when hasKey && hasType => $"{item.AnnotationType} below {item.AnnotationKey}",
-            ViewImportItemKind.Template or ViewImportItemKind.TypeSchema when hasType => item.AnnotationType,
+            ViewImportItemKind.DescendantTypeSchema when hasKey && hasType => $"{type} below {item.AnnotationKey}",
+            ViewImportItemKind.Template or ViewImportItemKind.TypeSchema when hasType => type,
             _ when hasKey => item.AnnotationKey,
-            _ when hasType => item.AnnotationType,
+            _ when hasType => type,
             _ => item.Path ?? string.Empty,
         };
     }

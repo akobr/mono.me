@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -10,14 +11,17 @@ namespace _42.Platform.Cli.Commands.Configuration;
 public class ConfigVersionsCommand : BaseContextCommand
 {
     private readonly IConfigurationsApiClient _configurationApi;
+    private readonly IProjectSettingsProvider _projectSettings;
 
     public ConfigVersionsCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IConfigurationsApiClient configurationApi)
+        IConfigurationsApiClient configurationApi,
+        IProjectSettingsProvider? projectSettings = null)
         : base(console, context)
     {
         _configurationApi = configurationApi;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Argument(0, Description = "An annotation key to list the configuration versions for.")]
@@ -39,7 +43,7 @@ public class ConfigVersionsCommand : BaseContextCommand
             return ExitCodes.SUCCESS;
         }
 
-        Console.WriteVersions(versions);
+        Console.WriteVersions(versions, await _projectSettings.GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 }

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -26,9 +27,12 @@ public class KeyValueAuditCommand : KeyValueCommandBase
         audit trail, whatever its scopes.
         """;
 
-    public KeyValueAuditCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
+    private readonly IProjectSettingsProvider _projectSettings;
+
+    public KeyValueAuditCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, IProjectSettingsProvider? projectSettings = null)
         : base(console, context, keyValues)
     {
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Option("--key", CommandOptionType.SingleValue, Description = "Only events of this key.")]
@@ -60,7 +64,7 @@ public class KeyValueAuditCommand : KeyValueCommandBase
             ContinuationToken);
 
         Console.WriteHeader($"Secret audit trail of {Context.OrganizationName}.{Context.ProjectName}");
-        Console.WriteAudit(response);
+        Console.WriteAudit(response, await _projectSettings.GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 
@@ -108,9 +112,12 @@ public class KeyValueUsageCommand : KeyValueCommandBase
         usage, whatever its scopes.
         """;
 
-    public KeyValueUsageCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
+    private readonly IProjectSettingsProvider _projectSettings;
+
+    public KeyValueUsageCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, IProjectSettingsProvider? projectSettings = null)
         : base(console, context, keyValues)
     {
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Option("--from", CommandOptionType.SingleValue, Description = "The first day (yyyy-MM-dd).")]
@@ -122,7 +129,7 @@ public class KeyValueUsageCommand : KeyValueCommandBase
     protected override async Task<int> ExecuteKeyValuesAsync()
     {
         var report = await KeyValues.GetKeyValueUsageAsync(Context.OrganizationName, Context.ProjectName, ParseDay(From, "--from"), ParseDay(To, "--to"));
-        Console.WriteUsage(report);
+        Console.WriteUsage(report, await _projectSettings.GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 

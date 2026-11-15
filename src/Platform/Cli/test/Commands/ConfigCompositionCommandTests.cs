@@ -10,6 +10,7 @@ using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.Configuration;
 using _42.Platform.Cli.GitHubActions;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using Alba.CsConsoleFormat;
 using McMaster.Extensions.CommandLineUtils;
@@ -321,6 +322,7 @@ public class ConfigCompositionCommandTests
             .AddSingleton(_api.Object)
             .AddSingleton(Mock.Of<IFileSystem>())
             .AddSingleton(GitHubActionsSettings.FromEnvironment(_ => null))
+            .AddSingleton<IProjectSettingsProvider>(BuiltInProjectSettings.Instance)
             .BuildServiceProvider();
         var app = new CommandLineApplication<ConfigGetCommand>(NullConsole.Singleton);
         app.Conventions.UseDefaultConventions().UseConstructorInjection(services);

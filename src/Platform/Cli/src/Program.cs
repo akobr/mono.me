@@ -13,6 +13,7 @@ using _42.Platform.Cli.ErrorReporting;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
 using _42.Platform.Cli.Services;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Cli.Telemetry;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -292,6 +293,12 @@ public class Program
         }
     }
 
+    // --builtin, which the root gives every command (an inherited option).
+    internal static bool IsBuiltInRequested(CommandLineApplication command)
+    {
+        return command.GetOptions().Any(option => option.LongName == OutputSwitches.BUILTIN_OPTION && option.HasValue());
+    }
+
     // Also the host of CommandConstructionTests, which builds the model of every command through its container.
     internal static IHostBuilder CreateHostBuilder(string[] args, CliPaths? paths)
     {
@@ -409,6 +416,19 @@ public class Program
         catch (Exception)
         {
             run.Command = CommandPath.UNKNOWN;
+        }
+
+        try
+        {
+            if (_host?.Services.GetService<OutputSwitches>() is { } switches)
+            {
+                switches.IsBuiltInRequested = IsBuiltInRequested(result.SelectedCommand);
+            }
+        }
+        catch (Exception)
+        {
+            // The console output shows the project settings then, as without the option.
+            return;
         }
     }
 

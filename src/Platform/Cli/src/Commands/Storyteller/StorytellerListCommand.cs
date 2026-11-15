@@ -8,6 +8,7 @@ using _42.Platform.Cli.Commands.KeyValues;
 using _42.Platform.Cli.Commands.Schemas;
 using _42.Platform.Cli.Commands.Templates;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -34,14 +35,17 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 public class StorytellerListCommand : BaseContextCommand
 {
     private readonly IAnnotationsApiClient _annotationsApi;
+    private readonly IProjectSettingsProvider _projectSettings;
 
     public StorytellerListCommand(
         IExtendedConsole console,
         IAnnotationsApiClient annotationsApi,
-        ICommandContext context)
+        ICommandContext context,
+        IProjectSettingsProvider? projectSettings = null)
         : base(console, context)
     {
         _annotationsApi = annotationsApi;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Option("-r|--responsibilities", CommandOptionType.SingleValue, Description = "Query responsibilities by name.")]
@@ -204,7 +208,8 @@ public class StorytellerListCommand : BaseContextCommand
             includeInactive: InactiveFlag,
             includeDeleted: DeletedFlag);
 
-        Console.WriteHeader("Subjects");
+        var display = await _projectSettings.GetDisplayAsync();
+        Console.WriteHeader(display.PluralOf(AnnotationTypeCodes.Subject));
 
         if (response.Annotations.Count < 1)
         {
@@ -237,7 +242,8 @@ public class StorytellerListCommand : BaseContextCommand
             includeInactive: InactiveFlag,
             includeDeleted: DeletedFlag);
 
-        Console.WriteHeader("Responsibilities");
+        var display = await _projectSettings.GetDisplayAsync();
+        Console.WriteHeader(display.PluralOf(AnnotationTypeCodes.Responsibility));
 
         if (response.Annotations.Count < 1)
         {
@@ -271,7 +277,8 @@ public class StorytellerListCommand : BaseContextCommand
             includeInactive: InactiveFlag,
             includeDeleted: DeletedFlag);
 
-        Console.WriteHeader("Usages");
+        var display = await _projectSettings.GetDisplayAsync();
+        Console.WriteHeader(display.PluralOf(AnnotationTypeCodes.Usage));
 
         if (response.Annotations.Count < 1)
         {
@@ -305,7 +312,8 @@ public class StorytellerListCommand : BaseContextCommand
             includeInactive: InactiveFlag,
             includeDeleted: DeletedFlag);
 
-        Console.WriteHeader("Contexts");
+        var display = await _projectSettings.GetDisplayAsync();
+        Console.WriteHeader(display.PluralOf(AnnotationTypeCodes.Context));
 
         if (response.Annotations.Count < 1)
         {
@@ -340,7 +348,8 @@ public class StorytellerListCommand : BaseContextCommand
             includeInactive: InactiveFlag,
             includeDeleted: DeletedFlag);
 
-        Console.WriteHeader("Executions");
+        var display = await _projectSettings.GetDisplayAsync();
+        Console.WriteHeader(display.PluralOf(AnnotationTypeCodes.Execution));
 
         if (response.Annotations.Count < 1)
         {
@@ -435,6 +444,7 @@ public class StorytellerListCommand : BaseContextCommand
             includeInactive: InactiveFlag,
             includeDeleted: DeletedFlag);
 
+        var display = await _projectSettings.GetDisplayAsync();
         var root = new Composition("Tree of responsibilities");
 
         if (response.Annotations.Count < 1)
@@ -450,7 +460,7 @@ public class StorytellerListCommand : BaseContextCommand
 
             var responsibilityNode = new Composition(new ConsoleOutputComposition(
                 new ConsoleOutput(responsibility.Name),
-                new ConsoleOutputThemedText($" [responsibility]{StatusSuffix(responsibility)}", t => t.LowlightColor)));
+                display.TreeTag(AnnotationTypeCodes.Responsibility, "responsibility", StatusSuffix(responsibility))));
             root.Children.Add(responsibilityNode);
 
             var executionsResponse = await _annotationsApi.GetExecutionsAsync(
@@ -473,14 +483,14 @@ public class StorytellerListCommand : BaseContextCommand
                 {
                     subjectNode = new Composition(new ConsoleOutputComposition(
                         new ConsoleOutput(subjectName),
-                        new ConsoleOutputThemedText(" [subject]", t => t.LowlightColor)));
+                        display.TreeTag(AnnotationTypeCodes.Subject, "subject", string.Empty)));
                     mapOfSubjects.Add(subjectName, subjectNode);
                     responsibilityNode.Children.Add(subjectNode);
                 }
 
                 subjectNode.Children.Add(new Composition(new ConsoleOutputComposition(
                     new ConsoleOutput(key.ContextName),
-                    new ConsoleOutputThemedText($" [context]{StatusSuffix(execution)}", t => t.LowlightColor))));
+                    display.TreeTag(AnnotationTypeCodes.Context, "context", StatusSuffix(execution)))));
             }
 
             foreach (var childNode in responsibilityNode.Children
@@ -511,6 +521,7 @@ public class StorytellerListCommand : BaseContextCommand
             includeInactive: InactiveFlag,
             includeDeleted: DeletedFlag);
 
+        var display = await _projectSettings.GetDisplayAsync();
         var root = new Composition("Tree of subjects");
 
         if (response.Annotations.Count < 1)
@@ -525,7 +536,7 @@ public class StorytellerListCommand : BaseContextCommand
             var mapOfContexts = new Dictionary<string, Composition>();
             var subjectNode = new Composition(new ConsoleOutputComposition(
                 new ConsoleOutput(subject.Name),
-                new ConsoleOutputThemedText($" [subject]{StatusSuffix(subject)}", t => t.LowlightColor)));
+                display.TreeTag(AnnotationTypeCodes.Subject, "subject", StatusSuffix(subject))));
             root.Children.Add(subjectNode);
 
             var executionsResponse = await _annotationsApi.GetExecutionsAsync(
@@ -548,14 +559,14 @@ public class StorytellerListCommand : BaseContextCommand
                 {
                     contextNode = new Composition(new ConsoleOutputComposition(
                         new ConsoleOutput(contextName),
-                        new ConsoleOutputThemedText(" [context]", t => t.LowlightColor)));
+                        display.TreeTag(AnnotationTypeCodes.Context, "context", string.Empty)));
                     mapOfContexts.Add(contextName, contextNode);
                     subjectNode.Children.Add(contextNode);
                 }
 
                 contextNode.Children.Add(new Composition(new ConsoleOutputComposition(
                     new ConsoleOutput(key.ResponsibilityName),
-                    new ConsoleOutputThemedText($" [responsibility]{StatusSuffix(execution)}", t => t.LowlightColor))));
+                    display.TreeTag(AnnotationTypeCodes.Responsibility, "responsibility", StatusSuffix(execution)))));
             }
         }
 

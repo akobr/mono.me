@@ -79,7 +79,10 @@ namespace _42.Platform.Cli
             services.AddSingleton<IUserSettingsStore, UserSettingsStore>();
             services.AddSingleton(EnvironmentEditor.FromEnvironment(System.Environment.GetEnvironmentVariable));
             services.AddSingleton<IEditorService, EditorService>();
-            services.AddSingleton<IProjectSettingsCache, NoProjectSettingsCache>();
+            services.AddSingleton<OutputSwitches>();
+            services.AddSingleton<ProjectSettingsProvider>();
+            services.AddSingleton<IProjectSettingsProvider>(provider => provider.GetRequiredService<ProjectSettingsProvider>());
+            services.AddSingleton<IProjectSettingsCache>(provider => provider.GetRequiredService<ProjectSettingsProvider>());
             services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
             services.AddSingleton<TransferPolling>();
 
@@ -255,7 +258,7 @@ namespace _42.Platform.Cli
         /// <summary>
         /// Registers and binds specific configuration sections to their corresponding options types in the dependency injection container.
         /// </summary>
-        /// <param name="configuration">The application configuration root from which the LOGGING, ACCESS, AUTHENTICATION, GENERAL, EDITOR, and TELEMETRY sections are read.</param>
+        /// <param name="configuration">The application configuration root from which the LOGGING, ACCESS, AUTHENTICATION, GENERAL, EDITOR, TELEMETRY and OUTPUT sections are read.</param>
         /// <param name="services">The service collection where the configured options are registered.</param>
         private static void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
         {
@@ -265,6 +268,7 @@ namespace _42.Platform.Cli
             services.Configure<GeneralOptions>(configuration.GetSection(ConfigurationSections.GENERAL));
             services.Configure<EditorOptions>(configuration.GetSection(ConfigurationSections.EDITOR));
             services.Configure<TelemetryOptions>(configuration.GetSection(ConfigurationSections.TELEMETRY));
+            services.Configure<OutputOptions>(configuration.GetSection(ConfigurationSections.OUTPUT));
         }
 
         // On standard error, so a redirected standard output stays as the command writes it.

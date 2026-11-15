@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
@@ -13,14 +14,17 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 public class StorytellerHistoryCommand : BaseContextCommand
 {
     private readonly IAnnotationsApiClient _annotationsApi;
+    private readonly IProjectSettingsProvider _projectSettings;
 
     public StorytellerHistoryCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAnnotationsApiClient annotationsApi)
+        IAnnotationsApiClient annotationsApi,
+        IProjectSettingsProvider? projectSettings = null)
         : base(console, context)
     {
         _annotationsApi = annotationsApi;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Argument(0, Description = "An annotation key, active or deleted.")]
@@ -65,7 +69,7 @@ public class StorytellerHistoryCommand : BaseContextCommand
         }
 
         Console.WriteHeader($"History of {annotationKey}");
-        Console.WriteHistory(history, Top);
+        Console.WriteHistory(history, Top, await _projectSettings.GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 }

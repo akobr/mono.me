@@ -33,6 +33,12 @@ public static class SformVariables
     // Any non-empty value turns the colors of annotation types off (https://no-color.org).
     public const string NO_COLOR = "NO_COLOR";
 
+    // auto, always or never: the icons of annotation types in the console output, over output.icons (OutputSwitches).
+    public const string ICONS = "SFORM_ICONS";
+
+    // project or builtin: whether the console output follows the project settings, over output.projectSettings.
+    public const string PROJECT_SETTINGS = "SFORM_PROJECT_SETTINGS";
+
     // The values.
     public const string TOKEN_STORE_FILE = "file";
     public const string DEVICE_CODE_OUTPUT_JSON = "json";

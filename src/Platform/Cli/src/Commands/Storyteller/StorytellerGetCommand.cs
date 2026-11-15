@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Services;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -14,16 +15,19 @@ public class StorytellerGetCommand : BaseContextCommand
 {
     private readonly IAnnotationsApiClient _annotationsApi;
     private readonly IFileSystem _fileSystem;
+    private readonly IProjectSettingsProvider _projectSettings;
 
     public StorytellerGetCommand(
         IExtendedConsole console,
         ICommandContext context,
         IAnnotationsApiClient annotationsApi,
-        IFileSystem fileSystem)
+        IFileSystem fileSystem,
+        IProjectSettingsProvider? projectSettings = null)
         : base(console, context)
     {
         _annotationsApi = annotationsApi;
         _fileSystem = fileSystem;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Argument(0, Description = "An annotation key to get.")]
@@ -73,9 +77,11 @@ public class StorytellerGetCommand : BaseContextCommand
                 return Console.WriteApiError(lookup);
             }
 
+            var display = deleted?.Deletion is null ? ProjectDisplay.BuiltIn : await _projectSettings.GetDisplayAsync();
+
             Console.WriteLine(deleted?.Deletion is { } deletion
-                ? $"The annotation '{AnnotationKey}' is deleted ({AuditConsoleExtensions.FormatDeletion(deletion)})"
-                  + (deletion.PurgeAt is { } purgeAt ? $" and will be purged on {AuditConsoleExtensions.FormatDate(purgeAt)}" : string.Empty)
+                ? $"The annotation '{AnnotationKey}' is deleted ({AuditConsoleExtensions.FormatDeletion(deletion, display)})"
+                  + (deletion.PurgeAt is { } purgeAt ? $" and will be purged on {AuditConsoleExtensions.FormatDate(purgeAt, display)}" : string.Empty)
                   + $". Restore it with 'sform story restore {AnnotationKey}'."
                 : $"The annotation '{AnnotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;

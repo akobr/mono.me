@@ -9,8 +9,8 @@ namespace _42.Platform.Cli.Configuration;
 // Where sform keeps its files, resolved once per process (Program.Main), so that no other code builds a path from the
 // location of the assembly or the user profile:
 // - ApplicationDirectory, the folder of the assembly: app.config.json, always;
-// - StateDirectory: access.default.json, editor.config.json, auth.discovery.json and the log files (logs/). Without
-//   SFORM_HOME the folder of the assembly, as before;
+// - StateDirectory: access.default.json, editor.config.json, auth.discovery.json, project-settings.cache.json and the
+//   log files (logs/). Without SFORM_HOME the folder of the assembly, as before;
 // - UserDirectory: the AuthKit session, the Entra ID MSAL cache and telemetry.json. Without SFORM_HOME the user's
 //   .42for.net folder (%LOCALAPPDATA%\.42for.net on Windows, ~/.42for.net elsewhere), which survives tool updates.
 // With SFORM_HOME both are SFORM_HOME. SFORM_HOME must be an absolute path; a relative one, or one that names a file,
@@ -50,6 +50,8 @@ public sealed class CliPaths
     public string EditorConfigFile => _fileSystem.Path.Combine(StateDirectory, Constants.EDITOR_CONFIG_JSON);
 
     public string AuthDiscoveryFile => _fileSystem.Path.Combine(StateDirectory, Constants.AUTH_DISCOVERY_JSON);
+
+    public string ProjectSettingsCacheFile => _fileSystem.Path.Combine(StateDirectory, Constants.PROJECT_SETTINGS_CACHE_JSON);
 
     // sform.settings.json, the user's settings (the editor and the default project; IUserSettingsStore).
     public string UserSettingsFile => _fileSystem.Path.Combine(UserDirectory, Constants.USER_SETTINGS_JSON);

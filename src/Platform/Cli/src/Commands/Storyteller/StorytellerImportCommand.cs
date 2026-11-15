@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Services;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -32,18 +33,21 @@ public class StorytellerImportCommand : BaseContextCommand
     private readonly ITransfersApiClient _transfersApi;
     private readonly IFileSystem _fileSystem;
     private readonly TransferPolling _polling;
+    private readonly IProjectSettingsProvider _projectSettings;
 
     public StorytellerImportCommand(
         IExtendedConsole console,
         ICommandContext context,
         ITransfersApiClient transfersApi,
         IFileSystem fileSystem,
-        TransferPolling polling)
+        TransferPolling polling,
+        IProjectSettingsProvider? projectSettings = null)
         : base(console, context)
     {
         _transfersApi = transfersApi;
         _fileSystem = fileSystem;
         _polling = polling;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Argument(0, Name = "zip-or-folder", Description = "A zip, for example an export, or a folder; its *.json files are packed, without hidden folders and files (.git, .github, ._*).")]
@@ -159,7 +163,7 @@ public class StorytellerImportCommand : BaseContextCommand
         }
 
         Console.WriteHeader($"Import of {fileName}");
-        Console.WriteImport(finished);
+        Console.WriteImport(finished, await _projectSettings.GetDisplayAsync());
 
         // warnings do not change the exit code
         return finished.Summary?.Failed > 0 ? ExitCodes.ERROR_WRONG_INPUT : ExitCodes.SUCCESS;

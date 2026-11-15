@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -351,9 +352,10 @@ public static class KeyGlob
 
 public static class KeyValueTimes
 {
-    public static string Format(DateTimeOffset? time)
+    // Local time, "2026-10-11 14:02", or the date in the project's format; "—" for none.
+    public static string Format(DateTimeOffset? time, ProjectDisplay? display = null)
     {
-        return time is null ? "—" : time.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        return time is null ? "—" : (display ?? ProjectDisplay.BuiltIn).FormatDateTime(time.Value);
     }
 
     public static string FormatExpiry(DateTimeOffset? expiresAt, DateTimeOffset now)

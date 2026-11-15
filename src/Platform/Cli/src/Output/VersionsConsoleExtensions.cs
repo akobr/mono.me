@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Model;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 
 namespace _42.Platform.Cli.Output;
@@ -13,8 +14,9 @@ public static class VersionsConsoleExtensions
     /// <summary>
     /// Writes the versions of a configuration, a template or a schema as a table, the newest first. When a listed version
     /// was stored by a restore, a last column <c>Restored from</c> names the version it copied (<c>v2</c>, else <c>—</c>).
+    /// The times are in the project's date format.
     /// </summary>
-    public static void WriteVersions(this IExtendedConsole @this, IEnumerable<ConfigurationVersion> versions)
+    public static void WriteVersions(this IExtendedConsole @this, IEnumerable<ConfigurationVersion> versions, ProjectDisplay? display = null)
     {
         var rows = versions.OrderByDescending(version => version.Version).ToList();
         var showsRestoredFrom = rows.Any(version => version.RestoredFrom is not null);
@@ -27,18 +29,18 @@ public static class VersionsConsoleExtensions
 
         @this.WriteTable(
             rows,
-            version => Row(version, showsRestoredFrom),
+            version => Row(version, showsRestoredFrom, display ?? ProjectDisplay.BuiltIn),
             headers);
     }
 
-    private static string[] Row(ConfigurationVersion version, bool showsRestoredFrom)
+    private static string[] Row(ConfigurationVersion version, bool showsRestoredFrom, ProjectDisplay display)
     {
         var cells = new List<string>
         {
             version.Version.ToString(CultureInfo.InvariantCulture),
             AuditConsoleExtensions.FormatActor(version.Modified?.By),
-            FormatTime(version.Modified?.At),
-            version.IsCurrent() ? "—" : FormatTime(version.ExpirationTime),
+            FormatTime(version.Modified?.At, display),
+            version.IsCurrent() ? "—" : FormatTime(version.ExpirationTime, display),
         };
 
         if (showsRestoredFrom)
@@ -49,8 +51,8 @@ public static class VersionsConsoleExtensions
         return [.. cells];
     }
 
-    private static string FormatTime(DateTimeOffset? time)
+    private static string FormatTime(DateTimeOffset? time, ProjectDisplay display)
     {
-        return time is null ? "—" : time.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        return time is null ? "—" : display.FormatDateTime(time.Value);
     }
 }

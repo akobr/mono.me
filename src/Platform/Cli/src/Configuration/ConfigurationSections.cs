@@ -8,4 +8,5 @@ public static class ConfigurationSections
     public const string GENERAL = "general";
     public const string EDITOR = "editor";
     public const string TELEMETRY = "telemetry";
+    public const string OUTPUT = "output";
 }

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -11,9 +12,12 @@ namespace _42.Platform.Cli.Commands.KeyValues;
 [Command(CommandNames.VERSIONS, Description = "List the stored versions of a key.")]
 public class KeyValueVersionsCommand : KeyValueCommandBase
 {
-    public KeyValueVersionsCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
+    private readonly IProjectSettingsProvider _projectSettings;
+
+    public KeyValueVersionsCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, IProjectSettingsProvider? projectSettings = null)
         : base(console, context, keyValues)
     {
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Argument(0, Description = "The key.")]
@@ -25,7 +29,7 @@ public class KeyValueVersionsCommand : KeyValueCommandBase
         var versions = await KeyValues.GetKeyValueVersionsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key);
 
         Console.WriteHeader($"Versions of '{key}'");
-        Console.WriteKeyValueVersions(versions);
+        Console.WriteKeyValueVersions(versions, await _projectSettings.GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 }

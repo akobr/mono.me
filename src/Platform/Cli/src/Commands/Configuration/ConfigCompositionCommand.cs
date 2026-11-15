@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -13,16 +14,19 @@ public class ConfigCompositionCommand : BaseContextCommand
 {
     private readonly IConfigurationsApiClient _configurationApi;
     private readonly IFileSystem _fileSystem;
+    private readonly IProjectSettingsProvider _projectSettings;
 
     public ConfigCompositionCommand(
         IExtendedConsole console,
         ICommandContext context,
         IConfigurationsApiClient configurationApi,
-        IFileSystem fileSystem)
+        IFileSystem fileSystem,
+        IProjectSettingsProvider? projectSettings = null)
         : base(console, context)
     {
         _configurationApi = configurationApi;
         _fileSystem = fileSystem;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Argument(0, Description = "An annotation key to show the composition of the configuration for.")]
@@ -55,7 +59,7 @@ public class ConfigCompositionCommand : BaseContextCommand
             return Console.WriteApiError(e);
         }
 
-        Console.WriteComposition(composition);
+        Console.WriteComposition(composition, await _projectSettings.GetDisplayAsync());
 
         if (!string.IsNullOrWhiteSpace(ExportFilePath))
         {

@@ -58,6 +58,8 @@ public class AccountSettingsCommandsTests
             ["editor.command", "(not set)", "default"],
             ["access.project", "house.main", "default"],
             ["access.view", "default", "default"],
+            ["output.icons", "auto", "default"],
+            ["output.projectSettings", "project", "default"],
         ]);
     }
 
@@ -79,6 +81,8 @@ public class AccountSettingsCommandsTests
             ["editor.command", "code --wait", "settings"],
             ["access.project", "contoso.payments", "settings"],
             ["access.view", "preview", "settings"],
+            ["output.icons", "auto", "default"],
+            ["output.projectSettings", "project", "default"],
         ]);
     }
 
@@ -96,6 +100,8 @@ public class AccountSettingsCommandsTests
             ["editor.command", "(not set)", "default"],
             ["access.project", "contoso.payments", "legacy access.default.json"],
             ["access.view", "default", "default"],
+            ["output.icons", "auto", "default"],
+            ["output.projectSettings", "project", "default"],
         ]);
     }
 
@@ -151,6 +157,35 @@ public class AccountSettingsCommandsTests
         var rows = _console.Tables.ShouldHaveSingleItem().Rows;
         rows[2].ShouldBe(["access.project", "acme.web", "STORYTELLER_PROJECT"]);
         rows[3].ShouldBe(["access.view", "default", "default (STORYTELLER_PROJECT is set)"]);
+    }
+
+    // SFORM_ICONS and SFORM_PROJECT_SETTINGS switch the output of one run over the preferences; a value that is none of
+    // the switch's values is ignored, and the list says so.
+    [Fact]
+    public async Task TheList_ShowsTheOutputSwitchesOfTheEnvironment()
+    {
+        _environment["SFORM_ICONS"] = "NEVER";
+        _environment["SFORM_PROJECT_SETTINGS"] = "sometimes";
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"output":{"icons":"always","projectSettings":"builtin"}}"""));
+
+        await List();
+
+        var rows = _console.Tables.ShouldHaveSingleItem().Rows;
+        rows[4].ShouldBe(["output.icons", "never", "SFORM_ICONS"]);
+        rows[5].ShouldBe(["output.projectSettings", "builtin", "settings (SFORM_PROJECT_SETTINGS is not project, builtin)"]);
+    }
+
+    // Values written by hand are read in any case; one that is none of the values is left out.
+    [Fact]
+    public async Task TheList_ReadsTheOutputSectionOfTheFile()
+    {
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"output":{"Icons":"Always","projectSettings":"maybe"}}"""));
+
+        await List();
+
+        var rows = _console.Tables.ShouldHaveSingleItem().Rows;
+        rows[4].ShouldBe(["output.icons", "always", "settings"]);
+        rows[5].ShouldBe(["output.projectSettings", "project", "default"]);
     }
 
     [Fact]
@@ -218,7 +253,9 @@ public class AccountSettingsCommandsTests
               "editor.type": "custom",
               "editor.command": "code --wait",
               "access.project": "contoso.payments",
-              "access.view": "default"
+              "access.view": "default",
+              "output.icons": "auto",
+              "output.projectSettings": "project"
             }
             """);
         _console.Lines.ShouldBeEmpty();
@@ -238,7 +275,9 @@ public class AccountSettingsCommandsTests
               "editor.type": "vim",
               "editor.command": null,
               "access.project": null,
-              "access.view": null
+              "access.view": null,
+              "output.icons": "auto",
+              "output.projectSettings": "project"
             }
             """);
     }
@@ -248,7 +287,7 @@ public class AccountSettingsCommandsTests
     {
         (await List(json: true)).ShouldBe(ExitCodes.SUCCESS);
 
-        JObject.Parse(_out.ToString()).ShouldBeJson("""{"editor.type":null,"editor.command":null,"access.project":"house.main","access.view":"default"}""");
+        JObject.Parse(_out.ToString()).ShouldBeJson("""{"editor.type":null,"editor.command":null,"access.project":"house.main","access.view":"default","output.icons":"auto","output.projectSettings":"project"}""");
     }
 
     // set editor.type custom without a command: the next edit asks, so the list does not show custom as the editor.
@@ -431,6 +470,8 @@ public class AccountSettingsCommandsTests
     [InlineData("editor.command", " nano -w ", "editor", """{"customCommand":"nano -w"}""", "editor.command = nano -w")]
     [InlineData("access.project", "contoso.payments", "access", """{"organizationName":"contoso","projectName":"payments"}""", "access.project = contoso.payments")]
     [InlineData("ACCESS.VIEW", "preview", "access", """{"viewName":"preview"}""", "access.view = preview")]
+    [InlineData("output.icons", " NEVER ", "output", """{"icons":"never"}""", "output.icons = never")]
+    [InlineData("OUTPUT.PROJECTSETTINGS", "BuiltIn", "output", """{"projectSettings":"builtin"}""", "output.projectSettings = builtin")]
     public async Task Set_WritesTheKey(string key, string value, string section, string expected, string line)
     {
         var exitCode = await Set(key, value);
@@ -477,8 +518,8 @@ public class AccountSettingsCommandsTests
     }
 
     [Theory]
-    [InlineData("editor.colour", "red", "! 'editor.colour' is no setting sform knows; the settings are editor.type, editor.command, access.project, access.view.")]
-    [InlineData(null, null, "! Name the setting; the settings are editor.type, editor.command, access.project, access.view.")]
+    [InlineData("editor.colour", "red", "! 'editor.colour' is no setting sform knows; the settings are editor.type, editor.command, access.project, access.view, output.icons, output.projectSettings.")]
+    [InlineData(null, null, "! Name the setting; the settings are editor.type, editor.command, access.project, access.view, output.icons, output.projectSettings.")]
     [InlineData("editor.type", "notepad", "! 'notepad' is no value of editor.type; the values are vscode, neovim, vim, custom.")]
     [InlineData("editor.type", null, "! Give the value of editor.type; the values are vscode, neovim, vim, custom.")]
     [InlineData("access.project", "payments", "! 'payments' is no value of access.project; it takes <organization>.<project>.")]
@@ -486,6 +527,8 @@ public class AccountSettingsCommandsTests
     [InlineData("access.project", "contoso.", "! 'contoso.' is no value of access.project; it takes <organization>.<project>.")]
     [InlineData("access.view", " ", "! ' ' is no value of access.view; it takes a view name.")]
     [InlineData("editor.command", "\"\"", "! '\"\"' is no value of editor.command; it takes a command line, e.g. \"code --wait\".")]
+    [InlineData("output.icons", "sometimes", "! 'sometimes' is no value of output.icons; the values are auto, always, never.")]
+    [InlineData("output.projectSettings", "custom", "! 'custom' is no value of output.projectSettings; the values are project, builtin.")]
     public async Task Set_RefusesAnUnknownKeyOrAnInvalidValue(string? key, string? value, string line)
     {
         var exitCode = await Set(key, value);
@@ -576,7 +619,7 @@ public class AccountSettingsCommandsTests
             AccountSettingsCommand.HELP_TEXT.ShouldContain($"  {definition.Key} ");
         }
 
-        UserSettingDefinitions.All.Select(definition => definition.Key).ShouldBe(["editor.type", "editor.command", "access.project", "access.view"]);
+        UserSettingDefinitions.All.Select(definition => definition.Key).ShouldBe(["editor.type", "editor.command", "access.project", "access.view", "output.icons", "output.projectSettings"]);
     }
 
     private UserSettingsStore CreateStore()
@@ -594,6 +637,7 @@ public class AccountSettingsCommandsTests
         {
             ShowPath = showPath,
             Json = json,
+            GetVariable = name => _environment.GetValueOrDefault(name),
         }.OnExecuteAsync();
     }
 

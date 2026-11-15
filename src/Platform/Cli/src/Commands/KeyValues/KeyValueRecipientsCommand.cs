@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -18,16 +19,19 @@ namespace _42.Platform.Cli.Commands.KeyValues;
 [Command(CommandNames.RECIPIENTS, Description = "The recipients of client-encrypted (hyok) values: the RSA public keys the clients encrypt for.")]
 public class KeyValueRecipientsCommand : KeyValueCommandBase
 {
-    public KeyValueRecipientsCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues)
+    private readonly IProjectSettingsProvider _projectSettings;
+
+    public KeyValueRecipientsCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, IProjectSettingsProvider? projectSettings = null)
         : base(console, context, keyValues)
     {
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     protected override async Task<int> ExecuteKeyValuesAsync()
     {
         var recipients = await KeyValues.GetRecipientsAsync(Context.OrganizationName, Context.ProjectName);
         Console.WriteHeader($"Recipients of {Context.OrganizationName}.{Context.ProjectName}");
-        Console.WriteRecipients(recipients);
+        Console.WriteRecipients(recipients, await _projectSettings.GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 }
