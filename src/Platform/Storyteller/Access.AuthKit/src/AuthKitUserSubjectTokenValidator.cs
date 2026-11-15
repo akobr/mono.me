@@ -84,7 +84,8 @@ public class AuthKitUserSubjectTokenValidator : IUserSubjectTokenValidator
 
         var rawClaims = result.ClaimsIdentity.Claims.ToList();
 
-        if (UserSubjectTokenRules.HasActor(rawClaims))
+        // The payload, not the claims: "act": [] gives no claim (AuthKitTokenSource.HasActor).
+        if (AuthKitTokenSource.HasActor(result.SecurityToken))
         {
             return UserSubjectTokenResult.Refused("The token already names an actor (act).");
         }

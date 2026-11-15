@@ -1,6 +1,7 @@
 using _42.Platform.Storyteller.Accessing;
 
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Protocols;
@@ -16,12 +17,14 @@ public class AuthKitBearerTokenValidator : IBearerTokenValidator
 
     private readonly AuthKitTokenSource _source;
     private readonly AuthKitClaimNormalizer _normalizer;
+    private readonly ILogger<AuthKitBearerTokenValidator> _logger;
 
     public AuthKitBearerTokenValidator(
         IOptions<UserAuthenticationOptions> options,
         AuthKitClaimNormalizer normalizer,
-        IHostEnvironment environment)
-        : this(options, normalizer, environment, AuthKitTokenSource.CreateKeyManager(options.Value.AuthKit.GetJwksUri()))
+        IHostEnvironment environment,
+        ILogger<AuthKitBearerTokenValidator> logger)
+        : this(options, normalizer, environment, logger, AuthKitTokenSource.CreateKeyManager(options.Value.AuthKit.GetJwksUri()))
     {
     }
 
@@ -29,11 +32,13 @@ public class AuthKitBearerTokenValidator : IBearerTokenValidator
         IOptions<UserAuthenticationOptions> options,
         AuthKitClaimNormalizer normalizer,
         IHostEnvironment environment,
+        ILogger<AuthKitBearerTokenValidator> logger,
         IConfigurationManager<JsonWebKeySet> keyManager)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(normalizer);
         ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(keyManager);
 
         var authKit = options.Value.AuthKit;
@@ -48,6 +53,7 @@ public class AuthKitBearerTokenValidator : IBearerTokenValidator
             string.IsNullOrWhiteSpace(authKit.Audience) ? null : authKit.Audience,
             keyManager);
         _normalizer = normalizer;
+        _logger = logger;
 
         if (environment.IsDevelopment())
         {
@@ -69,13 +75,37 @@ public class AuthKitBearerTokenValidator : IBearerTokenValidator
             return null;
         }
 
-        var claims = await _source.ValidateAsync(rawToken, cancellationToken);
-        var subject = claims?.FirstOrDefault(claim => claim.Type == "sub")?.Value;
+        // A token that does not pass names nobody, so its refusal is not logged here.
+        var result = await _source.ValidateTokenAsync(rawToken, cancellationToken);
+
+        if (!result.IsValid)
+        {
+            return null;
+        }
+
+        var claims = result.ClaimsIdentity.Claims.ToList();
+        var subject = claims.FirstOrDefault(claim => claim.Type == "sub")?.Value;
 
         // User tokens carry a WorkOS user id. Anything else must not be treated as a user; with a
         // custom auth domain an M2M token can share this issuer and is left to the machine validator.
-        return claims is not null && subject is not null && subject.StartsWith(UserIdPrefix, StringComparison.Ordinal)
-            ? _normalizer.NormalizeUser(claims)
-            : null;
+        if (subject is null || !subject.StartsWith(UserIdPrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        // WorkOS impersonation: a dashboard member signed in as the user, and act.sub is their email. Refused: 2S does
+        // not support impersonated sessions, and accepting one would serve and record the user, not the impersonator.
+        // Supporting it is a separate decision: act.sub as the audit's Via, no secret read or write for the session,
+        // and a log of every request. No machine validator takes a user_ token, so the request gets 401.
+        if (AuthKitTokenSource.HasActor(result.SecurityToken))
+        {
+            _logger.LogWarning(
+                "An AuthKit user token of {Subject} is refused: it names an actor (act.sub {Actor}), a WorkOS impersonation",
+                subject,
+                AuthKitTokenSource.DescribeActor(result.SecurityToken));
+            return null;
+        }
+
+        return _normalizer.NormalizeUser(claims);
     }
 }

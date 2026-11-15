@@ -279,6 +279,7 @@ public sealed class UserTokenExchangeProviderTests : IDisposable
                     sp.GetRequiredService<IOptions<UserAuthenticationOptions>>(),
                     sp.GetRequiredService<AuthKitClaimNormalizer>(),
                     validatorEnvironment,
+                    NullLogger<AuthKitBearerTokenValidator>.Instance,
                     new StubConfigurationManager<JsonWebKeySet>(KeySet(), keyFailure)));
                 services.AddAuthKitUserAuthentication(configuration);
                 break;

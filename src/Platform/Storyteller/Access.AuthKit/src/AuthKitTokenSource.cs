@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 
 using _42.Platform.Storyteller.Accessing;
 
@@ -12,6 +13,9 @@ namespace _42.Platform.Storyteller;
 // (only a trailing slash may differ) and the audience when one is required.
 internal sealed class AuthKitTokenSource
 {
+    public const string NoActorSubject = "(no act.sub)";
+    public const int MaxLoggedLength = 256;
+
     private static readonly TimeSpan ClockSkew = TimeSpan.FromSeconds(30);
 
     private readonly JsonWebTokenHandler _handler = new();
@@ -66,11 +70,42 @@ internal sealed class AuthKitTokenSource
         }
     }
 
+    // A top-level act member of the validated token, whatever its value. The claims miss some shapes: "act": [] gives no
+    // claim, and of a duplicated member the last one wins. Fails closed for a token that is not a JsonWebToken.
+    public static bool HasActor(SecurityToken token)
+    {
+        return token is not JsonWebToken jwt || jwt.TryGetPayloadValue<object>(UserSubjectTokenRules.ActorClaimType, out _);
+    }
+
+    // The actor of the validated token for a log: act.sub (WorkOS impersonation puts the impersonator's email there), a
+    // string act as it is, otherwise a marker. Never the raw JSON; cut to MaxLoggedLength, control characters replaced.
+    public static string DescribeActor(SecurityToken token)
+    {
+        object? act = null;
+        var found = token is JsonWebToken jwt && jwt.TryGetPayloadValue(UserSubjectTokenRules.ActorClaimType, out act);
+        var actor = act switch
+        {
+            JsonElement { ValueKind: JsonValueKind.Object } element
+                when element.TryGetProperty(JwtRegisteredClaimNames.Sub, out var sub) && sub.ValueKind == JsonValueKind.String
+                => sub.GetString(),
+            string text => text,
+            _ => null,
+        };
+
+        return found && actor is not null ? Sanitize(actor) : NoActorSubject;
+    }
+
     // Null when the token is not valid for this source.
     public async Task<List<Claim>?> ValidateAsync(string rawToken, CancellationToken cancellationToken)
     {
-        var result = await ValidateTokenAsync(rawToken, Audience is null ? null : [Audience], cancellationToken);
+        var result = await ValidateTokenAsync(rawToken, cancellationToken);
         return result.IsValid ? result.ClaimsIdentity.Claims.ToList() : null;
+    }
+
+    // ValidateTokenAsync with the source's own audience (none: aud is not checked).
+    public Task<TokenValidationResult> ValidateTokenAsync(string rawToken, CancellationToken cancellationToken)
+    {
+        return ValidateTokenAsync(rawToken, Audience is null ? null : [Audience], cancellationToken);
     }
 
     // The source's keys, issuer and lifetime rules with the given audiences (null: aud is not checked); the result keeps
@@ -119,5 +154,17 @@ internal sealed class AuthKitTokenSource
         }
 
         return result;
+    }
+
+    private static string Sanitize(string value)
+    {
+        var text = value.Length > MaxLoggedLength ? value[..MaxLoggedLength] : value;
+        return string.Create(text.Length, text, static (span, source) =>
+        {
+            for (var index = 0; index < source.Length; index++)
+            {
+                span[index] = char.IsControl(source[index]) ? '?' : source[index];
+            }
+        });
     }
 }

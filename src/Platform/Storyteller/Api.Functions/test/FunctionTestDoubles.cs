@@ -64,10 +64,11 @@ internal static class FunctionTestDoubles
         IServiceProvider services,
         IDictionary<string, string>? headers = null,
         string method = "GET",
-        string? body = null)
+        string? body = null,
+        Uri? url = null)
     {
         var context = new TestFunctionContext(services);
-        var request = new TestHttpRequestData(context, headers, method, body);
+        var request = new TestHttpRequestData(context, headers, method, body, url: url);
         ((TestInvocationFeatures)context.Features).Set<IHttpRequestDataFeature>(new TestHttpRequestFeature(request));
         return (context, request);
     }
