@@ -3,7 +3,16 @@ import type { MachineAccess } from '@42for.net/2splatform.sdk'
 import { getStorytellerMock } from '@42for.net/2splatform.sdk/msw'
 import { clearCatalogSnapshots } from '@/stores/catalog'
 import { accountActor } from './audit'
-import { applyStartScenario, launchScenario, loadDb, resetDb, saveDb, type MockDb, type MockScenario } from './db'
+import {
+  applyStartScenario,
+  launchScenario,
+  loadDb,
+  resetDb,
+  saveDb,
+  type MockDb,
+  type MockExhibition,
+  type MockScenario,
+} from './db'
 import { getDocument, latest, putVersion, type ScopeRef } from './documents'
 import { mockHandlers } from './all-handlers'
 import { writeShowcaseSettings } from './showcase/settings'
@@ -16,6 +25,8 @@ declare global {
       changeConfiguration: (key: string, changes: Record<string, unknown>, scope?: ScopeRef) => void
       /** Adds a machine to a project as its Owner would, for what a lower role may do with it (E2E access flows). */
       addMachine: (projectKey: string, machine: MachineAccess) => void
+      /** Sets the exhibition, or none with null; onboarding asks for it once per page load (E2E onboarding flows). */
+      setExhibition: (value: MockExhibition | null) => void
     }
   }
 }
@@ -55,6 +66,11 @@ export async function startMockApi(): Promise<void> {
     addMachine: (projectKey, machine) => {
       const db = loadDb()
       ;((db.machines ??= {})[projectKey] ??= []).push(machine)
+      saveDb(db)
+    },
+    setExhibition: (value) => {
+      const db = loadDb()
+      db.exhibition = value
       saveDb(db)
     },
   }

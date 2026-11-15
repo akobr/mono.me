@@ -11,6 +11,8 @@ declare global {
       changeConfiguration: (key: string, changes: Record<string, unknown>) => void
       /** Typed as the API's machines, so the machines of a test follow the SDK. */
       addMachine: (projectKey: string, machine: MachineAccess) => void
+      /** null turns the exhibition off; onboarding asks for it once per page load, so a test opens the page again. */
+      setExhibition: (value: { Organization: string; Project: string } | null) => void
     }
   }
 }

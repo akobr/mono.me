@@ -1,11 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { applyStartScenario, currentScenario, launchScenario, loadDb, resetDb, saveDb } from '@/mock/db'
+import {
+  applyStartScenario,
+  createSeed,
+  currentScenario,
+  launchScenario,
+  loadDb,
+  resetDb,
+  saveDb,
+  storageKey,
+} from '@/mock/db'
 
 // The dataset of a page load in the mock mode (spec 424-77, section 2): ?mock-scenario= first, then the dataset the
 // build was started with when it changed, else the session's own dataset with its edits.
 
 const open = (search = '') => history.replaceState(null, '', `/${search}`)
-const stored = () => sessionStorage.getItem('2s-admin:mock-db')
+const stored = () => sessionStorage.getItem(storageKey)
 
 afterEach(() => {
   open()
@@ -35,6 +44,19 @@ describe('the dataset of a page load', () => {
     expect(applyStartScenario('default')).toBe(true)
     expect(currentScenario()).toBe('default')
     expect(stored()).toBeNull()
+  })
+
+  it('starts a tab with data under the previous key from the new seed', () => {
+    // A tab opened before the exhibition (424-267): the same dataset and build, its edits under the key of that shape.
+    applyStartScenario('default')
+    const { exhibition: _exhibition, ...previous } = createSeed('default')
+    sessionStorage.setItem('2s-admin:mock-db:2', JSON.stringify({ ...previous, invitations: [] }))
+
+    expect(applyStartScenario('default')).toBe(true)
+    expect(currentScenario()).toBe('default')
+    expect(stored()).toBeNull()
+    expect(loadDb().exhibition).toEqual({ Organization: 'exhibition', Project: 'exhibition' })
+    expect(loadDb().invitations).toHaveLength(1)
   })
 
   it('prefers ?mock-scenario=, and keeps that choice on later loads', () => {
