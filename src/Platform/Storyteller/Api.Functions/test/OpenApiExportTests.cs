@@ -773,7 +773,7 @@ public class OpenApiExportTests
         list.GetProperty("items").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ProjectSummary");
 
         var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
-        PropertyNames(schemas, "ProjectSummary").ShouldBe(["Key", "Role", "Description"], ignoreOrder: true);
+        PropertyNames(schemas, "ProjectSummary").ShouldBe(["Key", "Role", "Description", "Settings"], ignoreOrder: true);
         PropertyNames(schemas, "AccessPointUpdate").ShouldBe(["Description"]);
         PropertyNames(schemas, "AccessPoint").ShouldContain("Description");
         PropertyNames(schemas, "AccessPointCreate").ShouldContain("ProjectDescription");

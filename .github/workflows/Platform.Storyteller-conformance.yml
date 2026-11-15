@@ -1,9 +1,10 @@
 name: Platform.Storyteller-conformance
 
 # The conformance suite of the configuration providers and SDKs, src/Platform/Storyteller/conformance: the .NET
-# reference (the formats library and the provider, with all their tests) on Linux and Windows, and the TypeScript SDK,
-# on the same commit. The SDK release calls it as its gate. Spec: docs/Platform/Storyteller/specs/2026-10-28 Shared
-# Conformance Vectors for Configuration Providers and SDKs.md, section 7.
+# reference (the formats library and the provider, with all their tests, and the rules of project settings) on Linux and
+# Windows, and the TypeScript SDK, on the same commit. The SDK release calls it as its gate. Spec:
+# docs/Platform/Storyteller/specs/2026-10-28 Shared Conformance Vectors for Configuration Providers and SDKs.md,
+# section 7; the project settings: docs/Platform/Storyteller/specs/2026-11-15 Project Settings on the Server.md.
 on:
   push:
     branches:
@@ -11,6 +12,8 @@ on:
     paths:
       - src/Platform/Storyteller/conformance/**
       - src/Platform/Storyteller/Abstractions.Annotations/**
+      - src/Platform/Storyteller/Backend.Core/test/Backend.Core.UnitTests.csproj
+      - src/Platform/Storyteller/Backend.Core/test/ProjectSettings/**
       - src/Libraries/Platform/Storyteller/Configuration/**
       - src/Libraries/Platform/Storyteller/ConfigurationFormats/**
       - src/Libraries/Platform/Storyteller/version.json
@@ -33,6 +36,8 @@ on:
     paths:
       - src/Platform/Storyteller/conformance/**
       - src/Platform/Storyteller/Abstractions.Annotations/**
+      - src/Platform/Storyteller/Backend.Core/test/Backend.Core.UnitTests.csproj
+      - src/Platform/Storyteller/Backend.Core/test/ProjectSettings/**
       - src/Libraries/Platform/Storyteller/Configuration/**
       - src/Libraries/Platform/Storyteller/ConfigurationFormats/**
       - src/Libraries/Platform/Storyteller/version.json
@@ -100,6 +105,10 @@ jobs:
 
       - name: Configuration provider – suite, error and refresh vectors
         run: dotnet test --project src/Libraries/Platform/Storyteller/Configuration/test/Configuration.UnitTests.csproj
+
+      # Only the runner of the kind: the rest of Backend.Core's tests are not part of the suite.
+      - name: Project settings – catalog and vectors
+        run: dotnet test --project src/Platform/Storyteller/Backend.Core/test/Backend.Core.UnitTests.csproj --filter-class "*ProjectSettingsConformanceTests"
 
   typescript:
     name: TypeScript SDK

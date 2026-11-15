@@ -10,4 +10,7 @@ public record class ProjectSummary
     public required AccountRole Role { get; init; }
 
     public string? Description { get; init; }
+
+    // The project's settings: the names, colors and icons of its types, its default time zone and date format.
+    public ProjectSettings? Settings { get; init; }
 }

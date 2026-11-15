@@ -29,4 +29,11 @@
     <ProjectReference Include="..\src\Backend.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The project-settings kind of the conformance suite, which ProjectSettingsConformanceTests runs as the .NET
+         reference, and the settings file of the exhibit data set. -->
+    <EmbeddedResource Include="..\..\conformance\project-settings.json" LogicalName="Conformance/project-settings.json" Link="Conformance\project-settings.json" />
+    <EmbeddedResource Include="..\..\DbCreator\src\data-sets\exhibit\project-settings.json" LogicalName="DataSets/exhibit/project-settings.json" Link="DataSets\exhibit\project-settings.json" />
+  </ItemGroup>
+
 </Project>

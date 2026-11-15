@@ -1,14 +1,15 @@
 {
   "$schema": "./schema/suite.schema.json",
   "name": "storyteller-configuration",
-  "version": "1.0.0",
-  "description": "The conformance suite of the Storyteller configuration providers and SDKs: how a configuration becomes flat keys, the exact text of the flat formats, how an answer of the platform maps to an error, and how a refresh behaves. Every provider runs the files of the kinds it implements, fails on a kind it does not know, and states the version it passes. A vector is identified by its file and its name; a flattening file by its target.",
+  "version": "1.1.0",
+  "description": "The conformance suite of the Storyteller configuration providers and SDKs: how a configuration becomes flat keys, the exact text of the flat formats, how an answer of the platform maps to an error, how a refresh behaves, and the catalog and rules of project settings. Every provider runs the files of the kinds it implements, fails on a kind it does not know, and states the version it passes. A vector is identified by its file and its name; a flattening file by its target.",
   "files": [
     { "path": "flattening/flat.json", "kind": "flattening" },
     { "path": "flattening/properties.json", "kind": "flattening" },
     { "path": "flattening/env.json", "kind": "flattening" },
     { "path": "formats.json", "kind": "formats" },
     { "path": "errors.json", "kind": "errors" },
-    { "path": "refresh.json", "kind": "refresh" }
+    { "path": "refresh.json", "kind": "refresh" },
+    { "path": "project-settings.json", "kind": "project-settings" }
   ]
 }

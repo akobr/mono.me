@@ -13,4 +13,8 @@
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
+  </ItemGroup>
+
 </Project>
