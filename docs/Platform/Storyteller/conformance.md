@@ -180,7 +180,7 @@ A runtime whose own text differs, as JavaScript's `String(1e20)` does, emulates 
 | --- | --- | --- | --- |
 | .NET (reference) | `ConfigurationFormats/test`: `FlatteningVectorTests`, `FormatVectorTests` | `flattening` (all targets), `formats` (all formats) | |
 | .NET (reference) | `Configuration/test/Conformance`: `SuiteTests`, `ErrorVectorTests`, `RefreshScenarioTests` | the suite itself (manifest, schemas, coverage, portability); `errors` at startup and at refresh; `refresh` | |
-| TypeScript SDK | `sdk.typescript/src/test/conformance` | `flattening` through `flattenConfiguration`; `formats` for `flat` and `env` through `formatConfiguration`; `errors` through the conditional reads and `isTransientError` | `refresh`: the SDK has no configuration provider. `formats` for `properties` and `yaml`, whose count the runner reports |
+| TypeScript SDK | `sdk.typescript/src/test/conformance` | `flattening` through `flattenConfiguration`; `formats` for `flat` and `env` through `formatConfiguration`; `errors` through the conditional reads and `isTransientError`; `project-settings` through `validateProjectSettings`, and the catalog module (`generated/catalog/project-settings.ts`) against the file's catalog | `refresh`: the SDK has no configuration provider. `formats` for `properties` and `yaml`, whose count the runner reports |
 
 **.NET.**
 
@@ -191,6 +191,7 @@ A runtime whose own text differs, as JavaScript's `String(1e20)` does, emulates 
 
 - The runners read the folder from the repository with `node:fs`.
 - The error runner configures the SDK with a fake `fetch`, then reads through `getResolvedConfigurationConditional` or `getConfigurationConditional`.
+- The project settings runner compares the normalized settings as values (the order of the members does not count) and the problems by `path` and `rule` in any order, as the .NET reference does; `npm run generate` writes the catalog module from the same file.
 
 Run them:
 

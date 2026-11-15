@@ -3,6 +3,7 @@
 // conformance suite, src/Platform/Storyteller/conformance, pins them for every language; test/conformance runs it here.
 // A different contract from the key/value helpers of key-values.ts, which keep dotted keys, arrays as JSON and null as ''.
 import type { ConfigurationFormat } from './conditional'
+import { isPlainObject, toPropertyPath } from './json'
 
 /** The flattening targets: flat (the `:` keys of .NET IConfiguration), properties (Spring Boot) and env. */
 export type ConfigurationTarget = Extract<ConfigurationFormat, 'flat' | 'properties' | 'env'>
@@ -319,38 +320,6 @@ function describeType(value: unknown): string {
 
 // --- JSON paths (JsonPaths) ----------------------------------------------------------------------------------------
 
-const plainName = /^[A-Za-z_][A-Za-z0-9_-]*$/
-
-// .name for a plain name, ['name'] for any other: \ and ' escaped, C0 controls and DEL as \n, \r, \t or \uXXXX, and #
-// as \u0023, so a path never holds a line break or a #.
-function toPropertyPath(parent: string, name: string): string {
-  if (plainName.test(name)) {
-    return `${parent}.${name}`
-  }
-
-  let escaped = ''
-
-  for (const unit of name.split('')) {
-    const code = unit.charCodeAt(0)
-
-    if (unit === '\\' || unit === '\'') {
-      escaped += `\\${unit}`
-    } else if (unit === '\n') {
-      escaped += '\\n'
-    } else if (unit === '\r') {
-      escaped += '\\r'
-    } else if (unit === '\t') {
-      escaped += '\\t'
-    } else if (code < 0x20 || code === 0x7f || unit === '#') {
-      escaped += `\\u${code.toString(16).toUpperCase().padStart(4, '0')}`
-    } else {
-      escaped += unit
-    }
-  }
-
-  return `${parent}['${escaped}']`
-}
-
 function toItemPath(parent: string, index: number): string {
   return `${parent}[${index}]`
 }
@@ -510,14 +479,4 @@ function quoteEnvValue(value: string): string {
     .replaceAll('\t', '\\t')
 
   return `"${escaped}"`
-}
-
-// An object of JSON.parse, or one with a null prototype; a Date or a Map is not JSON data.
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return false
-  }
-
-  const prototype = Object.getPrototypeOf(value) as unknown
-  return prototype === Object.prototype || prototype === null
 }

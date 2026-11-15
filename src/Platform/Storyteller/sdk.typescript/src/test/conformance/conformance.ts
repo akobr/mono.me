@@ -69,6 +69,37 @@ export interface ErrorsFile {
   vectors: ErrorVector[]
 }
 
+export interface ProjectSettingsAppearance {
+  label: string
+  plural: string
+  color: string
+  icon: string
+}
+
+export interface ProjectSettingsCatalog {
+  format: string
+  typeCodes: string[]
+  builtIn: Record<string, ProjectSettingsAppearance>
+  colors: string[]
+  icons: string[]
+  dateFormats: string[]
+  defaults: { timeZone: string; dateFormat: string }
+  limits: { label: number; plural: number }
+  timeZones: string[]
+}
+
+export interface ProjectSettingsVector {
+  name: string
+  settings: unknown
+  expected?: Record<string, unknown>
+  problems?: DocumentError[]
+}
+
+export interface ProjectSettingsFile {
+  catalog: ProjectSettingsCatalog
+  vectors: ProjectSettingsVector[]
+}
+
 export function readConformance<T>(path: string): T {
   return JSON.parse(readFileSync(new URL(path, root), 'utf8')) as T
 }

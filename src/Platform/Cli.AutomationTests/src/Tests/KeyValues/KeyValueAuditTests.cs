@@ -183,19 +183,20 @@ public sealed partial class KeyValueAuditTests : CliTest
         (await Sform(InProject("story", "kv", "usage"))).ShouldExitWith(CliExit.Unauthorized);
     }
 
-    // KV-AUD-05: kv audit --operation filters each of the nineteen operations, and an unknown one fails with exit 2.
+    // KV-AUD-05: kv audit --operation filters each of the twenty operations, and an unknown one fails with exit 2.
     // In a disposable project: <rst> with a configuration bound to the secret <s>, read resolved (a binding read); <s>
     // created, updated, revealed, exported with the secrets, deleted and restored; an import of a secret; <s2> deleted and
     // purged, <s3> removed for good; mTLS turned off (a policy change); the Standard key rotated; a recipient added,
-    // disabled and removed. kv audit --operation <op> lists only events of <op> for each of the nineteen, the one its step
+    // disabled and removed. kv audit --operation <op> lists only events of <op> for each of the twenty, the one its step
     // caused among them: the binding read once the API wrote it (within a few minutes), the re-wrap once it ran (the
-    // policy's Rewrap is complete); reprotect, byokverify and byokunavailable print "No audit events." (a project without
-    // HSM and BYOK causes none). kv audit --operation nope ends with 2 and "Unknown operation 'nope'.".
+    // policy's Rewrap is complete); reprotect, byokverify, byokunavailable and projectsettingschange print "No audit
+    // events." (a project without HSM and BYOK causes none of the first three, and the test changes no project settings).
+    // kv audit --operation nope ends with 2 and "Unknown operation 'nope'.".
     [Test]
     [TestCase(460)]
     [UserRole(Role.Owner)]
     [DisposableProject]
-    [Covers("story kv audit", "--operation", "--operation=Reveal", "--operation=Export", "--operation=BindingRead", "--operation=Create", "--operation=Update", "--operation=Delete", "--operation=Restore", "--operation=PermanentDelete", "--operation=Purge", "--operation=Reprotect", "--operation=Import", "--operation=PolicyChange", "--operation=Rotate", "--operation=Rewrap", "--operation=ByokVerify", "--operation=ByokUnavailable", "--operation=RecipientAdded", "--operation=RecipientChanged", "--operation=RecipientRemoved")]
+    [Covers("story kv audit", "--operation", "--operation=Reveal", "--operation=Export", "--operation=BindingRead", "--operation=Create", "--operation=Update", "--operation=Delete", "--operation=Restore", "--operation=PermanentDelete", "--operation=Purge", "--operation=Reprotect", "--operation=Import", "--operation=PolicyChange", "--operation=Rotate", "--operation=Rewrap", "--operation=ByokVerify", "--operation=ByokUnavailable", "--operation=RecipientAdded", "--operation=RecipientChanged", "--operation=RecipientRemoved", "--operation=ProjectSettingsChange")]
     public async Task KvAudit_EachOperation_Filters()
     {
         await CreateDisposableProjectAsync();
@@ -276,7 +277,7 @@ public sealed partial class KeyValueAuditTests : CliTest
             await Assert.That(rewraps.Count).IsGreaterThanOrEqualTo(1);
         }
 
-        foreach (var operation in new[] { "reprotect", "byokverify", "byokunavailable" })
+        foreach (var operation in new[] { "reprotect", "byokverify", "byokunavailable", "projectsettingschange" })
         {
             (await Sform(KeyValuesSupportB.WithProject(ProjectKey, "story", "kv", "audit", "--operation", operation)))
                 .ShouldSucceed()
