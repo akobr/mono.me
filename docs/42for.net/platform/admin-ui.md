@@ -8,7 +8,7 @@ You sign in through AuthKit. When you sign in for the first time, the UI checks 
 
 - **You were invited:** the invitations page lists the projects you can join.
 - **You were not invited:** onboarding takes you through four short steps. Move between them with **Next**, **Back**, the step list or the browser's back button; nothing is saved before the last step.
-  1. **Welcome** says where customer data lives: all customer data, configuration and secrets are stored and processed only in the EU (Sweden). It lists the sub-processors with their purpose and region.
+  1. **Welcome** says where customer data lives: all customer data, configuration and secrets are stored and processed only in the EU (Sweden), and so is all AI data processing within the platform. It lists the sub-processors with their purpose and region; the entry of WorkOS says what it receives.
   2. **Security** says how machines and pipelines sign in without a stored secret, and how people sign in.
   3. **Exhibition** is optional. Check **Join the exhibition** to become a **Reader** of the platform's demo project: you browse its annotations, their configurations and the graph, and you cannot change anything. Its administrators see your name and email among its members; other visitors do not. A platform without an exhibition has no such step.
   4. **Organization** asks for an organization and a first project, with an optional description of the project. You become their Owner.

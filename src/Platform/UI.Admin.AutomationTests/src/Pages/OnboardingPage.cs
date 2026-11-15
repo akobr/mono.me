@@ -25,11 +25,12 @@ public sealed partial class OnboardingPage(App app, AppRoutes routes)
     public const string OrganizationHeading = "Create your organization";
 
     // The bold sentence of the callout of the first step, under its heading.
-    public const string HostingLeadText = "All customer data, configuration and secrets are stored and processed only in the EU (Sweden).";
+    public const string HostingLeadText = "All customer data, configuration and secrets are stored and processed only in the EU (Sweden). The same applies to all AI data processing within the platform.";
 
-    // The paragraph under the callout, in the form the admin UI shows until the three safeguards run in production
-    // (blocked impersonation, the audit log of access changes, a recent sign-in for secrets): without their sentence.
-    public const string HostingStatementText = "WorkOS (USA) is used only to sign in administrators of the 2S Admin UI and to send their invitation emails. It processes only their name, email, IP address and session data, and the email address of a person they invite. Every authorization decision is made by 2S in the EU. Customers that need an EU-only identity provider can use Entra ID or Keycloak.";
+    // The purpose of WorkOS in the list of sub-processors, in the form the admin UI shows until the three safeguards run
+    // in production (blocked impersonation, the audit log of access changes, a recent sign-in for secrets): without
+    // their sentence.
+    public const string HostingStatementText = "Signs in the operators of the 2S Platform and sends their invitation emails. It processes only their name, email, IP address and session data, and the email address of a person they invite. Every authorization decision is made by 2S in the EU. Customers that need an EU-only identity provider can use their own SSO provider or host the platform themselves.";
 
     // The paragraph of "Machines and pipelines" on the security step.
     public const string MachinesText = "They need no stored secret. A machine exchanges its own platform token, for example a GitHub Actions OIDC token or a Kubernetes service account token, for a short-lived 2S token.";

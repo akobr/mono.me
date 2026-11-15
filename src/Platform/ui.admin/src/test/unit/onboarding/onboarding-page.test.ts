@@ -414,7 +414,7 @@ describe('the steps of the onboarding wizard', () => {
     await mountWizard()
 
     expect(body()).toContain(
-      'All customer data, configuration and secrets are stored and processed only in the EU (Sweden).',
+      'All customer data, configuration and secrets are stored and processed only in the EU (Sweden). The same applies to all AI data processing within the platform.',
     )
     expect(body()).toContain('Every authorization decision is made by 2S in the EU.')
     expect(body()).not.toContain('recorded')
@@ -427,7 +427,7 @@ describe('the steps of the onboarding wizard', () => {
       [
         'WorkOS',
         'USA',
-        'Sign-in of the administrators of the 2S Admin UI and their invitation emails (name, email, IP address, session data)',
+        'Signs in the operators of the 2S Platform and sends their invitation emails. It processes only their name, email, IP address and session data, and the email address of a person they invite. Every authorization decision is made by 2S in the EU. Customers that need an EU-only identity provider can use their own SSO provider or host the platform themselves.',
       ],
     ])
     const details = link('Details of the EU hosting')!
