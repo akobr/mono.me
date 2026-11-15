@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CRM",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "crm"
+  ],
+  "properties": {
+    "crm": {
+      "type": "object",
+      "required": [
+        "pipeline",
+        "tickets"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pipeline": {
+          "type": "object",
+          "required": [
+            "stages"
+          ],
+          "properties": {
+            "stages": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "string"
+              }
+            },
+            "staleAfterDays": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "leadScoring": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "model": {
+              "enum": [
+                "rule-based",
+                "machine-learning",
+                "gut-feeling"
+              ]
+            },
+            "hotThreshold": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "tickets": {
+          "type": "object",
+          "required": [
+            "prefix"
+          ],
+          "properties": {
+            "prefix": {
+              "type": "string",
+              "pattern": "^[A-Z]{2,10}$"
+            },
+            "numberFormat": {
+              "$ref": "#/definitions/binding"
+            }
+          }
+        },
+        "deduplication": {
+          "type": "object",
+          "properties": {
+            "matchOn": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "email",
+                  "phone",
+                  "name",
+                  "lair-address"
+                ]
+              }
+            },
+            "autoMerge": {
+              "type": "boolean"
+            }
+          }
+        },
+        "notifications": {
+          "type": "object",
+          "properties": {
+            "dealWon": {
+              "type": "boolean"
+            },
+            "dealLost": {
+              "type": "boolean"
+            },
+            "digest": {
+              "enum": [
+                "realtime",
+                "hourly",
+                "daily",
+                "weekly"
+              ]
+            }
+          }
+        },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "closedTicketsDays": {
+              "type": "integer",
+              "minimum": 30
+            },
+            "anonymizeAfterDays": {
+              "type": "integer",
+              "minimum": 30
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "binding": {
+      "type": "string",
+      "pattern": "^@"
+    }
+  }
+}

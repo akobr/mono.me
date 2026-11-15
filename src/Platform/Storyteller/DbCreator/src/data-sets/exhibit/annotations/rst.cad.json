@@ -1,0 +1,14 @@
+{
+  "Title": "CAD",
+  "Description": "**Computer-Aided Design.** Software for creating, changing and analysing precise 2D drawings and 3D models of physical things, and for simulating how they behave before anybody builds them.",
+  "DocumentationLink": "https://en.wikipedia.org/wiki/Computer-aided_design",
+  "Labels": [
+    "solution",
+    "engineering"
+  ],
+  "Values": {
+    "acronym": "CAD",
+    "fullName": "Computer-Aided Design",
+    "productOwner": "Polly Gon"
+  }
+}

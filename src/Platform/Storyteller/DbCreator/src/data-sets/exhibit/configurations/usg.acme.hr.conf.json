@@ -1,0 +1,41 @@
+{
+  "application": {
+    "name": "ToonDayHR",
+    "version": "@annotation(\"/version\", \"Usage\")",
+    "url": "@[https://@acme.toonday.host]"
+  },
+  "features": [
+    "survival-tracking",
+    "reconstitution"
+  ],
+  "hr": {
+    "leave": {
+      "bonusDays": 5
+    },
+    "survivalTracking": {
+      "enabled": true,
+      "livesPerEmployee": 9,
+      "resetCycle": "per-episode"
+    },
+    "reconstitution": {
+      "methods": [
+        "accordion-shake",
+        "inflate-with-bicycle-pump",
+        "peel-off-the-pavement"
+      ],
+      "maxPerDay": 3,
+      "requiresForm": "TD-7 (Flattened)"
+    },
+    "physicsCompliance": {
+      "checks": [
+        "looked-down-before-falling",
+        "held-up-a-help-sign",
+        "opened-an-umbrella"
+      ],
+      "auditEveryDays": 7
+    },
+    "reviews": {
+      "frequency": "after-every-incident"
+    }
+  }
+}

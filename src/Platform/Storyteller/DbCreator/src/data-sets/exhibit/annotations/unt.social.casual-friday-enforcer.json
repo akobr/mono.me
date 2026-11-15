@@ -1,0 +1,12 @@
+{
+  "Title": "CasualFridayEnforcer",
+  "Description": "Scans employee profile avatars every Friday at 8:00 AM and automatically flags anyone wearing a necktie with a friendly reminder from Hank Scorpio to relax.",
+  "Labels": [
+    "scheduled",
+    "dress-code"
+  ],
+  "ValidFrom": "2027-01-01T08:00:00-06:00",
+  "TimeZone": "America/Chicago",
+  "UnitType": "time",
+  "UnitDefinition": "0 8 * * FRI"
+}

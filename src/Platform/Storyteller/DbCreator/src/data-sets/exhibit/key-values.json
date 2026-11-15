@@ -1,0 +1,124 @@
+{
+  "Format": "2s.key-values.v1",
+  "Items": [
+    {
+      "Key": "acme.boomdesk.apiKeyRef",
+      "Protection": "Public",
+      "Value": "kv://acme-vault/boomdesk-api-key",
+      "ContentType": "application/vnd.2s.secret-reference"
+    },
+    {
+      "Key": "acme.boomdesk.apiVersion",
+      "Protection": "Public",
+      "Value": "v2",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "acme.boomdesk.host",
+      "Protection": "Public",
+      "Value": "boomdesk.acme.example",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "acme.delivery.rocketMail",
+      "Protection": "Public",
+      "Value": "https://rocketmail.acme.example/dispatch",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "acme.looneycad.licenseServer",
+      "Protection": "Public",
+      "Value": "licenses.acme.example:27000",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "acme.portal.host",
+      "Protection": "Public",
+      "Value": "portal.acme.example",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "acme.safety.hotline",
+      "Protection": "Public",
+      "Value": "+1-555-0142",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "acme.toonday.host",
+      "Protection": "Public",
+      "Value": "toonday.acme.example",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "fourthwall.status.url",
+      "Protection": "Public",
+      "Value": "https://status.fourthwall.example",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "fourthwall.support.email",
+      "Protection": "Public",
+      "Value": "help@fourthwall.example",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "fourthwall.support.hours",
+      "Protection": "Public",
+      "Value": "24/7, except during plot twists",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "fourthwall.telemetry.endpoint",
+      "Protection": "Public",
+      "Value": "https://telemetry.fourthwall.example/ingest",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "globex.hammock.vendorsUrl",
+      "Protection": "Public",
+      "Value": "https://hammocks.cypresscreek.example/vendors",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "globex.lair.host",
+      "Protection": "Public",
+      "Value": "lair.globex.example",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "globex.lairforce.escrowPin",
+      "Protection": "Standard",
+      "Value": "0000-NICE-TRY"
+    },
+    {
+      "Key": "globex.lairforce.host",
+      "Protection": "Public",
+      "Value": "lairforce.globex.example",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "globex.slack.giphyRating",
+      "Protection": "Public",
+      "Value": "pg",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "globex.slack.workspace",
+      "Protection": "Public",
+      "Value": "scorpio.globex.example",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "globex.takeover.target",
+      "Protection": "Public",
+      "Value": "East Coast",
+      "ContentType": "text/plain"
+    },
+    {
+      "Key": "globex.un.demandsUrl",
+      "Protection": "Public",
+      "Value": "https://lair.globex.example/demands",
+      "ContentType": "text/plain"
+    }
+  ]
+}

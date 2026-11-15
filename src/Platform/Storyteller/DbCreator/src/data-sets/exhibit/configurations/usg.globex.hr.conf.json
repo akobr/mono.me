@@ -1,0 +1,42 @@
+{
+  "application": {
+    "name": "HammockHR",
+    "version": "@annotation(\"/version\", \"Usage\")",
+    "url": "@[https://@globex.lair.host/hammock]"
+  },
+  "features": [
+    "relocation",
+    "perks-marketplace"
+  ],
+  "hr": {
+    "onboarding": {
+      "checklist": [
+        "hammock-fitting",
+        "monorail-pass",
+        "lair-orientation"
+      ],
+      "durationDays": 1
+    },
+    "leave": {
+      "bonusDays": 15
+    },
+    "payroll": {
+      "currency": "XAU",
+      "bonusDelivery": "gold bars, hand-delivered by the CEO"
+    },
+    "relocation": {
+      "package": "Cypress Creek Deluxe",
+      "includes": [
+        "split-level home",
+        "moving truck",
+        "welcome basket"
+      ],
+      "vendors": "@globex.hammock.vendorsUrl"
+    },
+    "dressCode": {
+      "default": "casual",
+      "neckties": "strongly discouraged",
+      "shoes": "optional"
+    }
+  }
+}

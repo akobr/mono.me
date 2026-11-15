@@ -1,0 +1,14 @@
+{
+  "Title": "CRM",
+  "Description": "**Customer Relationship Management.** Software that keeps every account, contact, deal and support ticket of a company in one place, so that the whole company knows who its customers are and what they were promised.",
+  "DocumentationLink": "https://en.wikipedia.org/wiki/Customer_relationship_management",
+  "Labels": [
+    "solution",
+    "sales"
+  ],
+  "Values": {
+    "acronym": "CRM",
+    "fullName": "Customer Relationship Management",
+    "productOwner": "Dale Closer"
+  }
+}

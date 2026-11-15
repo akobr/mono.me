@@ -1,0 +1,32 @@
+{
+  "application": {
+    "name": "BoomDesk",
+    "version": "@annotation(\"/version\", \"Usage\")",
+    "url": "@[https://@acme.boomdesk.host/@acme.boomdesk.apiVersion]",
+    "apiKeyReference": "@acme.boomdesk.apiKeyRef"
+  },
+  "solution": {
+    "supportTier": "platinum"
+  },
+  "features": [
+    "incident-reports",
+    "soot-detection"
+  ],
+  "crm": {
+    "tickets": {
+      "prefix": "BOOM",
+      "autoAttachSootSample": true
+    },
+    "customers": {
+      "singleCustomerMode": true,
+      "customerOfRecord": "@annotation(\"/primaryCustomer\", \"Subject\")"
+    },
+    "reviews": {
+      "expectedStars": 1,
+      "autoReply": "We're sorry the product did not work as expected. Have you considered ordering a bigger one?"
+    },
+    "notifications": {
+      "digest": "hourly"
+    }
+  }
+}

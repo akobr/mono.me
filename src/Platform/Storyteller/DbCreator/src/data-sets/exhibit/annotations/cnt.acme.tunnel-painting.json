@@ -1,0 +1,22 @@
+{
+  "Title": "R&D: Tunnel Painting & Trompe-l'œil Illusion",
+  "Description": "Specializes in hyper-realistic cliff paintings that only solidify for roadrunners. Current research focuses on painted tunnels that also let trains through, and on the long-standing mystery of why the paint is always dry before the brush leaves the wall.",
+  "Labels": [
+    "r-and-d",
+    "art",
+    "illusion"
+  ],
+  "Values": {
+    "costCenter": "AC-RND-220",
+    "headOfDepartment": "Vincent van Gopher",
+    "headcount": 17,
+    "hazardLevel": "medium",
+    "maxReconstitutionsPerShift": 1,
+    "slackChannel": "#trompe-loeil",
+    "paintStockLiters": 4200,
+    "solidifiesFor": [
+      "roadrunners",
+      "trains"
+    ]
+  }
+}

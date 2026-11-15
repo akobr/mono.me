@@ -1,0 +1,23 @@
+{
+  "appUsage": {
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "seats": 8,
+    "appVersion": "@annotation(\"/version\", \"Usage\")"
+  },
+  "cad": {
+    "catalogParts": [
+      "anvil-100t"
+    ],
+    "simulation": {
+      "looseObjectScan": true,
+      "ledgeDetectionCm": 5
+    },
+    "projects": [
+      "Overhead Anvil Rig Mk. IV",
+      "Piano on a Rope (Concert Edition)"
+    ]
+  },
+  "features": [
+    "ledge-detection"
+  ]
+}

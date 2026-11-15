@@ -1,0 +1,25 @@
+{
+  "appUsage": {
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "seats": "@{@annotation(\"/headcount\", \"Context\") * 2}",
+    "appVersion": "@annotation(\"/version\", \"Usage\")"
+  },
+  "crm": {
+    "tickets": {
+      "prefix": "HIRE"
+    },
+    "candidates": {
+      "stages": [
+        "spotted",
+        "charmed",
+        "relocated",
+        "hammock-assigned"
+      ],
+      "approach": "@annotation(\"/hiringStyle\", \"Context\")",
+      "offerExpiresInMinutes": 15
+    }
+  },
+  "features": [
+    "candidate-pipeline"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "Title": "Doomsday Device UX & Ergonomics",
+  "Description": "Ensures cobalt-thorium G bombs have intuitive interfaces and cupholders. The team runs weekly usability tests on launch consoles, maintains the Doomsday Design System (friendly-red buttons, rounded corners, a confirmation dialog nobody reads) and insists that every apocalypse be accessible.",
+  "Labels": [
+    "ux",
+    "r-and-d",
+    "doomsday"
+  ],
+  "Values": {
+    "costCenter": "GX-DUX-666",
+    "headOfDepartment": "Dr. Ada Ergon",
+    "headcount": 12,
+    "building": "Volcano Annex, level -7",
+    "monorailStop": "Crater Rim",
+    "hammocksPerEngineer": 1,
+    "cupholdersPerDevice": 4,
+    "accessibility": "WCAG AAA (Apocalypse Accessible Always)"
+  }
+}

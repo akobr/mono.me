@@ -1,0 +1,10 @@
+{
+  "Title": "BoomDesk for Rocket Skates",
+  "Description": "Tracks every launch, every crater and every cliff the skates failed to stop at. Tickets close themselves when the dust cloud settles. The contract is up for renewal on April Fools' Day, which nobody at Acme finds suspicious.",
+  "Labels": [
+    "production",
+    "renewal-due"
+  ],
+  "ExpiresAt": "2027-04-01T00:00:00-07:00",
+  "TimeZone": "America/Phoenix"
+}

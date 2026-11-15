@@ -1,0 +1,21 @@
+{
+  "department": {
+    "name": "Tunnel Painting & Trompe-l'œil Illusion",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "head": "@annotation(\"/headOfDepartment\", \"Context\")",
+    "headcount": "@annotation(\"/headcount\", \"Context\")",
+    "channel": "@annotation(\"/slackChannel\", \"Context\")"
+  },
+  "illusions": {
+    "solidFor": "@annotation(\"/solidifiesFor\", \"Context\")",
+    "paintDryingSeconds": 0,
+    "palette": [
+      "sky blue",
+      "canyon orange",
+      "tunnel black"
+    ]
+  },
+  "features": [
+    "paint-inventory"
+  ]
+}

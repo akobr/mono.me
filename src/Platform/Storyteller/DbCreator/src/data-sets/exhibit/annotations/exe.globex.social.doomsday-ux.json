@@ -1,0 +1,11 @@
+{
+  "Title": "ScorpioSlack for Doomsday Device UX",
+  "Description": "Design reviews, cupholder polls and the always-on East Coast takeover countdown widget. The rollout ends on 21 December 2027, the date the team has scheduled for the end of the world.",
+  "Labels": [
+    "production",
+    "schema-validated",
+    "countdown"
+  ],
+  "ExpiresAt": "2027-12-21T00:00:00-06:00",
+  "TimeZone": "America/Chicago"
+}

@@ -1,0 +1,63 @@
+{
+  "solution": {
+    "code": "@annotation(\"/acronym\", \"Responsibility\")",
+    "category": "sales",
+    "supportTier": "gold",
+    "sla": {
+      "responseMinutes": 60,
+      "uptimePercent": 99.9
+    },
+    "support": {
+      "email": "@fourthwall.support.email",
+      "hours": "@fourthwall.support.hours"
+    },
+    "statusPage": "@[@fourthwall.status.url/crm]"
+  },
+  "telemetry": {
+    "endpoint": "@public(fourthwall.telemetry.endpoint)",
+    "service": "crm",
+    "sampleRate": 0.25
+  },
+  "features": [
+    "accounts",
+    "contacts",
+    "pipeline"
+  ],
+  "crm": {
+    "pipeline": {
+      "stages": [
+        "lead",
+        "qualified",
+        "proposal",
+        "won",
+        "lost"
+      ],
+      "staleAfterDays": 30
+    },
+    "leadScoring": {
+      "enabled": true,
+      "model": "rule-based",
+      "hotThreshold": 80
+    },
+    "tickets": {
+      "prefix": "TKT",
+      "numberFormat": "@[@config(\"/crm/tickets/prefix\")-000000]"
+    },
+    "deduplication": {
+      "matchOn": [
+        "email",
+        "phone"
+      ],
+      "autoMerge": false
+    },
+    "notifications": {
+      "dealWon": true,
+      "dealLost": false,
+      "digest": "daily"
+    },
+    "retention": {
+      "closedTicketsDays": 365,
+      "anonymizeAfterDays": 1095
+    }
+  }
+}

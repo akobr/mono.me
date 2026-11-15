@@ -1,0 +1,51 @@
+{
+  "solution": {
+    "code": "@annotation(\"/acronym\", \"Responsibility\")",
+    "category": "engineering",
+    "supportTier": "platinum",
+    "sla": {
+      "responseMinutes": 30,
+      "uptimePercent": 99.95
+    },
+    "support": {
+      "email": "@fourthwall.support.email",
+      "hours": "@fourthwall.support.hours"
+    },
+    "statusPage": "@[@fourthwall.status.url/cad]"
+  },
+  "telemetry": {
+    "endpoint": "@public(fourthwall.telemetry.endpoint)",
+    "service": "cad",
+    "sampleRate": 0.5
+  },
+  "features": [
+    "3d-modeling",
+    "assemblies",
+    "simulation"
+  ],
+  "cad": {
+    "units": "metric",
+    "precisionMm": 0.01,
+    "simulation": {
+      "gravity": 9.81,
+      "friction": true,
+      "structuralIntegrity": "enforced"
+    },
+    "rendering": {
+      "engine": "raytracer",
+      "maxSamples": 1024,
+      "outlines": false
+    },
+    "export": {
+      "formats": [
+        "step",
+        "stl",
+        "dwg"
+      ]
+    },
+    "collaboration": {
+      "maxEditors": 10,
+      "lockTimeoutMinutes": 30
+    }
+  }
+}

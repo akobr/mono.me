@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Company",
+  "description": "What every customer Company declares. The identity is bound to the Company's values, so it is typed once, on the annotation.",
+  "type": "object",
+  "required": [
+    "company",
+    "branding"
+  ],
+  "properties": {
+    "company": {
+      "type": "object",
+      "required": [
+        "code",
+        "name",
+        "currency",
+        "timeZone"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/definitions/binding"
+        },
+        "name": {
+          "$ref": "#/definitions/binding"
+        },
+        "ceo": {
+          "$ref": "#/definitions/binding"
+        },
+        "accountManager": {
+          "$ref": "#/definitions/binding"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "$ref": "#/definitions/binding"
+            }
+          ]
+        },
+        "locale": {
+          "type": "string",
+          "pattern": "^[a-z]{2}-[A-Z]{2}$"
+        },
+        "timeZone": {
+          "type": "string",
+          "pattern": "^[A-Za-z_]+/[A-Za-z_]+$"
+        },
+        "portal": {
+          "$ref": "#/definitions/binding"
+        },
+        "motto": {
+          "type": "string",
+          "maxLength": 80
+        }
+      }
+    },
+    "branding": {
+      "type": "object",
+      "required": [
+        "primaryColor"
+      ],
+      "properties": {
+        "primaryColor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            {
+              "$ref": "#/definitions/binding"
+            }
+          ]
+        },
+        "logo": {
+          "$ref": "#/definitions/binding"
+        },
+        "tagline": {
+          "type": "string"
+        }
+      }
+    },
+    "features": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "definitions": {
+    "binding": {
+      "type": "string",
+      "pattern": "^@"
+    }
+  }
+}

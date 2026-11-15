@@ -1,0 +1,20 @@
+{
+  "Title": "Department of Aggressive Talent Acquisition & Relocation",
+  "Description": "Kidnaps top engineers and provides them with lovely split-level homes in Cypress Creek. Candidates are approached with a warm smile, a generous offer and a moving truck that is already parked outside. 100% of offers have been accepted, most of them on the way to the airport.",
+  "Labels": [
+    "hr",
+    "relocation",
+    "persuasive"
+  ],
+  "Values": {
+    "costCenter": "GX-TAL-001",
+    "headOfDepartment": "Abby Duction",
+    "headcount": 64,
+    "building": "Lair Tower A, floor 3 (the one with the ball pit)",
+    "monorailStop": "Talent Terminal",
+    "hammocksPerEngineer": 2,
+    "relocationsThisQuarter": 128,
+    "hiringStyle": "aggressively friendly",
+    "welcomeBasket": "fruit, cookies and a non-disclosure agreement"
+  }
+}

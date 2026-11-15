@@ -1,0 +1,9 @@
+{
+  "Title": "ToonDayHR for Rocket Skates",
+  "Description": "Survival tracking for test pilots: counts launches, landings and the difference between the two. Extra leave is granted for every successful landing, which keeps the leave budget remarkably stable.",
+  "Labels": [
+    "production",
+    "high-risk",
+    "schema-validated"
+  ]
+}

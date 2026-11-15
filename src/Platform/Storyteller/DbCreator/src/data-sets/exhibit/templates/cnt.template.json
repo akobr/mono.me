@@ -1,0 +1,34 @@
+{
+  "cypressCreek": {
+    "$binding": "jsone",
+    "$context": {
+      "company": "@annotation(\"$\", \"Subject\")",
+      "department": "@annotation(\"$\", \"Context\")"
+    },
+    "$definition": {
+      "$if": "company.code == 'GLOBEX'",
+      "then": {
+        "office": "${department.building}",
+        "monorailStop": "${department.monorailStop}",
+        "hammocksPerEngineer": {
+          "$eval": "department.hammocksPerEngineer"
+        },
+        "relocation": {
+          "homeType": "split-level",
+          "includes": [
+            "moving truck",
+            "welcome basket",
+            "friendly neighbour (henchman)"
+          ],
+          "vendorPortal": "@globex.hammock.vendorsUrl"
+        },
+        "casualFriday": {
+          "enforcedBy": "CasualFridayEnforcer",
+          "neckties": "discouraged"
+        },
+        "escalation": "${department.headOfDepartment} → ${company.ceo}"
+      },
+      "else": {}
+    }
+  }
+}

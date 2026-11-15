@@ -1,0 +1,23 @@
+{
+  "appUsage": {
+    "riskProfile": "high",
+    "seats": "@{@annotation(\"/headcount\", \"Context\") + 1}",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "goLive": "2022-09-17"
+  },
+  "hr": {
+    "leave": {
+      "bonusDays": 7
+    },
+    "survivalTracking": {
+      "alertAfterLosses": 3,
+      "alertChannel": "@annotation(\"/slackChannel\", \"Context\")"
+    },
+    "reconstitution": {
+      "maxPerDay": 3
+    }
+  },
+  "features": [
+    "hard-hat-inspections"
+  ]
+}

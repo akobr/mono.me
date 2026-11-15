@@ -1,0 +1,46 @@
+{
+  "application": {
+    "name": "ScorpioSlack",
+    "version": "@annotation(\"/version\", \"Usage\")",
+    "workspace": "@[https://@globex.slack.workspace]"
+  },
+  "features": [
+    "team-gifs",
+    "countdown-widget"
+  ],
+  "social": {
+    "channels": {
+      "defaults": [
+        "#welcome-to-cypress-creek",
+        "#hammock-reservations",
+        "#world-domination"
+      ]
+    },
+    "gifs": {
+      "rating": "@globex.slack.giphyRating",
+      "favourites": [
+        "thumbs-up",
+        "volcano-high-five",
+        "evil-laugh-but-friendly"
+      ]
+    },
+    "countdown": {
+      "$binding": "jsone",
+      "$context": {
+        "target": "@(globex.takeover.target, public)"
+      },
+      "$definition": {
+        "title": "${target} takeover",
+        "endsAt": {
+          "$fromNow": "7 days"
+        },
+        "message": "Only 7 days to go! (It is always 7 days to go.)",
+        "pinned": true
+      }
+    },
+    "reactions": {
+      "default": "🦂",
+      "takeoverProgress": "🎉"
+    }
+  }
+}

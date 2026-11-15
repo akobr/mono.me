@@ -1,0 +1,56 @@
+{
+  "solution": {
+    "code": "@annotation(\"/acronym\", \"Responsibility\")",
+    "category": "collaboration",
+    "supportTier": "silver",
+    "sla": {
+      "responseMinutes": 240,
+      "uptimePercent": 99.0
+    },
+    "support": {
+      "email": "@fourthwall.support.email",
+      "hours": "@fourthwall.support.hours"
+    },
+    "statusPage": "@[@fourthwall.status.url/social]"
+  },
+  "telemetry": {
+    "endpoint": "@public(fourthwall.telemetry.endpoint)",
+    "service": "social",
+    "sampleRate": 0.05
+  },
+  "features": [
+    "channels",
+    "direct-messages",
+    "presence"
+  ],
+  "social": {
+    "channels": {
+      "defaults": [
+        "#general",
+        "#random"
+      ],
+      "maxPerUser": 50
+    },
+    "messages": {
+      "retentionDays": 365,
+      "editWindowMinutes": 15,
+      "maxLength": 4000
+    },
+    "gifs": {
+      "enabled": true,
+      "provider": "giphy",
+      "rating": "g"
+    },
+    "presence": {
+      "idleAfterMinutes": 10,
+      "statuses": [
+        "available",
+        "busy",
+        "away"
+      ]
+    },
+    "moderation": {
+      "profanityFilter": true
+    }
+  }
+}

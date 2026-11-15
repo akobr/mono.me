@@ -1,0 +1,19 @@
+{
+  "Title": "Rocket-Powered Skates & Uncontrolled Propulsion",
+  "Description": "Focuses on personal mobility devices with no steering, no brakes, and an ignition switch that always sticks. The department's test track ends at a cliff by design, and its test pilots end there by tradition.",
+  "Labels": [
+    "propulsion",
+    "mobility",
+    "hazardous"
+  ],
+  "Values": {
+    "costCenter": "AC-PRP-310",
+    "headOfDepartment": "Rhoda Rocket",
+    "headcount": 23,
+    "hazardLevel": "extreme",
+    "maxReconstitutionsPerShift": 5,
+    "slackChannel": "#skates-launch-log",
+    "testTrack": "Canyon Road 66 (ends abruptly)",
+    "topSpeedKmh": 1200
+  }
+}

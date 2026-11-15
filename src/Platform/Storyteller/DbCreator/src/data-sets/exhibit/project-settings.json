@@ -1,0 +1,48 @@
+{
+  "types": {
+    "sbt": {
+      "label": "Company",
+      "plural": "Companies",
+      "color": "pink",
+      "icon": "i-lucide-building-2"
+    },
+    "cnt": {
+      "label": "Department",
+      "plural": "Departments",
+      "color": "blue",
+      "icon": "i-lucide-users"
+    },
+    "rst": {
+      "label": "Solution",
+      "plural": "Solutions",
+      "color": "green",
+      "icon": "i-lucide-puzzle"
+    },
+    "usg": {
+      "label": "Application",
+      "plural": "Applications",
+      "color": "violet",
+      "icon": "i-lucide-monitor"
+    },
+    "exe": {
+      "label": "AppUsage",
+      "plural": "AppUsages",
+      "color": "orange",
+      "icon": "i-lucide-rocket"
+    },
+    "unt": {
+      "label": "Job",
+      "plural": "Jobs",
+      "color": "yellow",
+      "icon": "i-lucide-cog"
+    },
+    "uxe": {
+      "label": "JobInstance",
+      "plural": "JobInstances",
+      "color": "gray",
+      "icon": "i-lucide-zap"
+    }
+  },
+  "defaultTimeZone": "America/Phoenix",
+  "dateFormat": "yyyy-mm-dd"
+}

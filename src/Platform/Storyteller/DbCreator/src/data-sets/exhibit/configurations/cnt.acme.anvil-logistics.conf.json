@@ -1,0 +1,23 @@
+{
+  "department": {
+    "name": "Anvil Logistics & Gravity Compliance",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "head": "@annotation(\"/headOfDepartment\", \"Context\")",
+    "headcount": "@annotation(\"/headcount\", \"Context\")",
+    "channel": "@annotation(\"/slackChannel\", \"Context\")"
+  },
+  "physics": {
+    "gravityDelayMs": 3000
+  },
+  "inventory": {
+    "anvilStockTons": "@annotation(\"/anvilStockTons\", \"Context\")",
+    "reorderAtTons": 100,
+    "suppliers": [
+      "Acme Anvil Works (also Acme)"
+    ]
+  },
+  "features": [
+    "anvil-tracking",
+    "look-down-detection"
+  ]
+}

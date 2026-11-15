@@ -1,0 +1,10 @@
+{
+  "Name": "exhibit",
+  "Version": 1,
+  "Description": "The demo of the 2S Platform: Fourth Wall Software and its customers Acme Corp (cartoon physics) and Globex (a friendly supervillain). Custom type names, labels, values, templates gated per company with JSON-e, schemas of all three kinds, configurations with every binding form, and key/value pairs (seeded once 424-265 is done; until then sform story kv import key-values.json).",
+  "Organization": "fourth-wall",
+  "Project": "toons-and-tyrants",
+  "View": "default",
+  "ProjectDescription": "Toons & Tyrants: Fourth Wall Software delivers CRM, HR, CAD and Social solutions to Acme Corp and Globex.",
+  "ViewDescription": "Production"
+}

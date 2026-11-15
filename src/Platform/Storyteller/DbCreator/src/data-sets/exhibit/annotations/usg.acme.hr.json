@@ -1,0 +1,15 @@
+{
+  "Title": "ToonDayHR",
+  "Description": "It replaces standard corporate talent management with survival tracking, cartoon physics compliance, and rapid employee reconstitution.",
+  "DocumentationLink": "https://toonday.acme.example/help",
+  "Labels": [
+    "hr",
+    "reconstitution",
+    "schema-validated"
+  ],
+  "Values": {
+    "version": "2.0.0-flattened",
+    "codename": "Accordion",
+    "goLive": "2022-09-17"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "application": {
+    "name": "LooneyCAD",
+    "version": "@annotation(\"/version\", \"Usage\")",
+    "licenseServer": "@(acme.looneycad.licenseServer, public)",
+    "physicsEngine": "@annotation(\"/physicsEngine\", \"Usage\")"
+  },
+  "features": [
+    "portable-holes",
+    "speed-lines"
+  ],
+  "cad": {
+    "units": "imperial-ish",
+    "simulation": {
+      "gravity": 0,
+      "friction": false,
+      "structuralIntegrity": "suggested"
+    },
+    "rendering": {
+      "outlines": true,
+      "style": "cel-shaded",
+      "speedLines": true
+    },
+    "export": {
+      "formats": [
+        "acme-blueprint"
+      ]
+    },
+    "catalogParts": [
+      "anvil-1t",
+      "anvil-10t",
+      "grand-piano",
+      "safe",
+      "dehydrated-boulder"
+    ]
+  },
+  "physics": {
+    "gravity": "disabled"
+  }
+}

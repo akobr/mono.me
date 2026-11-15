@@ -1,0 +1,12 @@
+{
+  "Title": "GravitySuspensionWorker",
+  "Description": "A background worker of the CAD solution that keeps heavy objects in a design hanging in mid-air for exactly as long as nobody is looking down. It waits for the `user_looked_down` event and lets go immediately.",
+  "DocumentationLink": "https://docs.fourthwall.example/jobs/gravity-suspension-worker",
+  "Labels": [
+    "worker",
+    "event-driven",
+    "physics"
+  ],
+  "UnitType": "event",
+  "UnitDefinition": "user_looked_down"
+}

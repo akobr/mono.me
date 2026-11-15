@@ -1,0 +1,8 @@
+{
+  "Title": "LooneyCAD for Anvil Logistics",
+  "Description": "Designs suspension rigs for anvils, pianos and safes. Gravity is a configurable option here, and, as the composition read shows, the option the department ends up with is not the one the application chose.",
+  "Labels": [
+    "production",
+    "physics-optional"
+  ]
+}

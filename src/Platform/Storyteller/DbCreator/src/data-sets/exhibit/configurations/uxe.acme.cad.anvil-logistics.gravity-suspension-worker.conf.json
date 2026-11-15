@@ -1,0 +1,25 @@
+{
+  "job": {
+    "batch": "@annotation(\"/assemblyBatch\")",
+    "scan": {
+      "objects": [
+        "anvil",
+        "piano",
+        "safe",
+        "boulder"
+      ],
+      "minWeightKg": 100,
+      "ledgeProximityCm": "@config(\"/cad/simulation/ledgeDetectionCm\")",
+      "intervalSeconds": "@annotation(\"/scanIntervalSeconds\")"
+    },
+    "suspend": {
+      "vector": "down",
+      "until": "user_looked_down",
+      "hangTimeMs": "@config(\"/physics/gravityDelayMs\")"
+    },
+    "reportTo": "@[https://@acme.boomdesk.host/@acme.boomdesk.apiVersion/incidents]"
+  },
+  "physics": {
+    "gravity": "suspended-until-looked-down"
+  }
+}

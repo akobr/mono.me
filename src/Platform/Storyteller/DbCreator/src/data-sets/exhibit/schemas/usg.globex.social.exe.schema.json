@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "An AppUsage of ScorpioSlack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appUsage"
+  ],
+  "properties": {
+    "appUsage": {
+      "type": "object",
+      "required": [
+        "channel",
+        "costCenter",
+        "members",
+        "teamBuilding"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "type": "string",
+          "pattern": "^#[a-z0-9-]+$"
+        },
+        "costCenter": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^GX-[A-Z]{3}-[0-9]{3}$"
+            },
+            {
+              "$ref": "#/definitions/binding"
+            }
+          ]
+        },
+        "members": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "$ref": "#/definitions/binding"
+            }
+          ]
+        },
+        "teamBuilding": {
+          "type": "object",
+          "required": [
+            "gifQuotaPerDay"
+          ],
+          "properties": {
+            "gifQuotaPerDay": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "icebreaker": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "social": {
+      "type": "object",
+      "description": "The countdown is inherited from ScorpioSlack and must not be touched here.",
+      "not": {
+        "required": [
+          "countdown"
+        ]
+      },
+      "properties": {
+        "pinned": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "string"
+          }
+        },
+        "polls": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "question": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "definitions": {
+    "binding": {
+      "type": "string",
+      "pattern": "^@"
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ScorpioSlack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "application",
+    "social"
+  ],
+  "properties": {
+    "application": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "workspace"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "const": "ScorpioSlack"
+        },
+        "version": {
+          "$ref": "#/definitions/binding"
+        },
+        "workspace": {
+          "$ref": "#/definitions/binding"
+        }
+      }
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "social": {
+      "type": "object",
+      "required": [
+        "channels",
+        "gifs",
+        "countdown"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "type": "object",
+          "properties": {
+            "defaults": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^#[a-z0-9-]+$"
+              }
+            }
+          }
+        },
+        "gifs": {
+          "type": "object",
+          "required": [
+            "rating"
+          ],
+          "properties": {
+            "rating": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "g",
+                    "pg",
+                    "pg-13"
+                  ]
+                },
+                {
+                  "$ref": "#/definitions/binding"
+                }
+              ]
+            },
+            "favourites": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "countdown": {
+          "$ref": "#/definitions/envelope"
+        },
+        "reactions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "binding": {
+      "type": "string",
+      "pattern": "^@"
+    },
+    "envelope": {
+      "type": "object",
+      "required": [
+        "$binding",
+        "$definition"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$binding": {
+          "enum": [
+            "jlogic",
+            "jsone"
+          ]
+        },
+        "$definition": {},
+        "$context": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

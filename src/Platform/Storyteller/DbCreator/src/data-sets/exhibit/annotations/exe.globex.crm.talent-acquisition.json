@@ -1,0 +1,7 @@
+{
+  "Title": "LairForce CRM for Talent Acquisition",
+  "Description": "Tracks candidate engineers from the first friendly email to already living in Cypress Creek. The stage \"Declined\" exists in the database but has never been used.",
+  "Labels": [
+    "production"
+  ]
+}

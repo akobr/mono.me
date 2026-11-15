@@ -1,0 +1,14 @@
+{
+  "Title": "Social",
+  "Description": "**Enterprise Social Network (ESN).** Internal messaging and collaboration software (channels, direct messages, presence and announcements) that keeps the people of a company talking to each other instead of to their inboxes.",
+  "DocumentationLink": "https://en.wikipedia.org/wiki/Enterprise_social_networking",
+  "Labels": [
+    "solution",
+    "collaboration"
+  ],
+  "Values": {
+    "acronym": "ESN",
+    "fullName": "Enterprise Social Network",
+    "productOwner": "Kat Channels"
+  }
+}

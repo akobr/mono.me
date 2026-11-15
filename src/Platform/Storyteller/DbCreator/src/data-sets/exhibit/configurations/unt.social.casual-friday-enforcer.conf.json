@@ -1,0 +1,28 @@
+{
+  "job": {
+    "trigger": {
+      "type": "time",
+      "cron": "0 8 * * FRI",
+      "timeZone": "America/Chicago"
+    },
+    "scan": {
+      "source": "employee-avatars",
+      "detect": [
+        "necktie",
+        "bow-tie",
+        "cravat"
+      ]
+    },
+    "action": {
+      "type": "friendly-reminder",
+      "from": "Hank Scorpio",
+      "message": "Hey, relax! It's Friday. Lose the tie and grab a cookie.",
+      "escalateAfterReminders": 3,
+      "escalation": "complimentary hammock assignment"
+    },
+    "postTo": "#casual-friday"
+  },
+  "features": [
+    "dress-code-scan"
+  ]
+}

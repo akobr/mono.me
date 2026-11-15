@@ -1,0 +1,20 @@
+{
+  "appUsage": {
+    "riskProfile": "medium",
+    "seats": "@annotation(\"/headcount\", \"Context\")",
+    "costCenter": "@annotation(\"/costCenter\", \"Context\")",
+    "goLive": "2023-02-14"
+  },
+  "hr": {
+    "leave": {
+      "bonusDays": 2
+    },
+    "survivalTracking": {
+      "alertAfterLosses": 5,
+      "alertChannel": "@annotation(\"/slackChannel\", \"Context\")"
+    }
+  },
+  "features": [
+    "wall-impact-claims"
+  ]
+}
