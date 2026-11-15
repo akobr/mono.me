@@ -48,15 +48,21 @@ public class SeedCommandTests
         _fixture.AddSet("base", Manifest, ("annotations/sbt.base.json", "{}"));
         _fixture.AddSet("cycle", """{ "DependsOn": [ "cycle-two" ] }""");
         _fixture.AddSet("cycle-two", """{ "DependsOn": [ "cycle" ] }""");
+        _fixture.AddSet("styled", Manifest, ("project-settings.json", """{ "Types": { "sbt": { "Color": "pinkish" } } }"""));
+        _fixture.AddSet("other-styled", Manifest, ("project-settings.json", """{ "DateFormat": "dd.mm.yyyy" }"""));
+        _fixture.AddSet("restyled", Manifest, ("project-settings.json", """{ "DateFormat": "mm/dd/yyyy" }"""));
 
         (await Command(sets: ["unknown"]).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         (await Command(sets: ["cycle"], organization: "fabrikam", project: "invoicing-suite").OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         (await Command(sets: ["base"], project: "Bad Name").OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         (await Command(sets: ["base"], owner: "not:an-entra-id").OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         (await Command(sets: [], paths: [SeedFixture.Tool + "-missing"]).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        (await Command(sets: ["styled"]).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        (await Command(sets: ["other-styled", "restyled"]).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
 
         _fixture.Containers.Verify(factory => factory.FindLayoutProblemsAsync(), Times.Never);
         _fixture.Access.Invocations.ShouldBeEmpty();
+        _fixture.ProjectSettings.Writes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -147,6 +153,30 @@ public class SeedCommandTests
     }
 
     [Fact]
+    public async Task Seed_ProjectSettings_AreWrittenOnceThenKeptAndAFailedWriteExitsWithFour()
+    {
+        _fixture.AddSet(
+            "styled",
+            Manifest,
+            ("project-settings.json", """{ "Format": "2s.project-settings.v1", "Types": { "sbt": { "Label": "Customer" } }, "DefaultTimeZone": "Europe/Oslo" }"""),
+            ("annotations/sbt.base.json", "{}"));
+
+        (await Command(sets: ["styled"]).OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
+        _fixture.ProjectSettings.Writes.ShouldHaveSingleItem();
+
+        // other settings are kept, which is no failure, also in a dry run
+        _fixture.ProjectSettings.Store("fabrikam", "invoicing-suite", new ProjectSettings { DateFormat = "dd.mm.yyyy" });
+        (await Again(Command(sets: ["styled"])).OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
+        (await Again(Command(sets: ["styled"], dryRun: true)).OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
+        _fixture.ProjectSettings.Writes.ShouldHaveSingleItem();
+
+        _fixture.ProjectSettings.Stored.Clear();
+        _fixture.ProjectSettings.SetFailure = new ConflictException("The project changed concurrently twice; try again.");
+        (await Again(Command(sets: ["styled"])).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
+        _fixture.Records.Saves.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task Seed_ADryRun_WritesNothing()
     {
         _fixture.AddSet("base", Manifest, ("annotations/sbt.base.json", "{}"));
@@ -207,6 +237,12 @@ public class SeedCommandTests
         DataSetSeedItem Pair(ViewImportOutcome outcome) => new() { Path = "key-values.json", KeyValueKey = "smtp.host", Protection = KeyValueProtection.Public, Outcome = outcome };
         ExitCodes.Of(Run(new DataSetSeedResult { Set = set, Items = [Pair(ViewImportOutcome.Skipped)] })).ShouldBe(ExitCodes.SUCCESS);
         ExitCodes.Of(Run(new DataSetSeedResult { Set = set, Items = [Pair(ViewImportOutcome.Failed)] })).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
+    }
+
+    private static SeedCommand Again(SeedCommand command)
+    {
+        command.IsAgain = true;
+        return command;
     }
 
     private SeedCommand Command(

@@ -18,12 +18,24 @@ public class DataSetSeederTests
     private const string Owner = "user_01owner";
     private const string Organization = "fabrikam";
     private const string Project = "invoicing-suite";
+    private const string Manifest = """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""";
+
+    // the settings of the styled sets: two types, a time zone and a date format
+    private const string Settings = """
+        {
+          "Format": "2s.project-settings.v1",
+          "Types": { "sbt": { "Label": "Customer", "Color": "blue" }, "rst": { "Label": "Module", "Icon": "i-lucide-puzzle" } },
+          "DefaultTimeZone": "Europe/Oslo",
+          "DateFormat": "dd.mm.yyyy"
+        }
+        """;
 
     private static readonly string Tool = MockUnixSupport.Path(@"C:\tool");
 
     private readonly MockFileSystem _fileSystem = new();
     private readonly Mock<IAccessService> _access = new();
     private readonly Mock<IViewService> _views = new();
+    private readonly FakeProjectSettingsService _settings = new();
     private readonly FakeViewImporter _importer = new();
     private readonly FakeBulkWriter _bulkWriter = new();
     private readonly FakeRecordStore _records = new();
@@ -439,7 +451,204 @@ public class DataSetSeederTests
         _views.Invocations.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Seed_GivesTheProjectTheSettingsOfTheSetAfterTheProvisioningAndBeforeTheDocuments()
+    {
+        AddStyled("styled");
+        _settings.OnSet = () => _writes.Add($"settings after {_importer.Calls.Count} imports");
+
+        var run = await Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["styled"], Owner = Owner }, TestContext.Current.CancellationToken);
+
+        _writes.ShouldBe([$"account {Owner} {Owner}", $"project {Organization}.{Project} {Owner} ", "settings after 0 imports"]);
+
+        // through the service of the API, as the System caller, only while the project's settings were never set
+        var write = _settings.Writes.ShouldHaveSingleItem();
+        (write.Organization, write.Project).ShouldBe((Organization, Project));
+        write.Condition.ShouldBe(ProjectSettingsCondition.Version(0), new ConditionComparer());
+        (write.Caller.Actor, write.Caller.Channel).ShouldBe((AuditActor.System, KeyValueChannel.System));
+        write.Settings.Types.Keys.ShouldBe(["rst", "sbt"]);
+        (write.Settings.DefaultTimeZone, write.Settings.DateFormat).ShouldBe(("Europe/Oslo", "dd.mm.yyyy"));
+        _settings.Stored[$"{Organization}.{Project}"].Version.ShouldBe(1);
+
+        var set = run.Sets.ShouldHaveSingleItem();
+        set.ProjectSettings.ShouldNotBeNull().Outcome.ShouldBe(ViewImportOutcome.Created);
+        set.ProjectSettings.Settings.ShouldBeSameAs(write.Settings);
+        set.Items.ShouldBeEmpty();
+        set.IsRecorded.ShouldBeTrue();
+
+        // the record counts the settings with the documents
+        var record = _records.Records.Values.ShouldHaveSingleItem();
+        (record.ProjectSettings, record.Documents, record.Created).ShouldBe((ViewImportOutcome.Created, 1, 2));
+    }
+
+    [Fact]
+    public async Task Seed_NeverOverwritesProjectSettingsThatAreSet()
+    {
+        AddStyled("styled");
+        var again = new DataSetSeedRequest { Sets = ["styled"], Owner = Owner, Options = new DataSetSeedOptions { Again = true } };
+
+        // the same values at any version: Unchanged, nothing written
+        _settings.Store(Organization, Project, Read(Settings), version: 2);
+
+        var unchanged = (await Seeder().SeedAsync(again, TestContext.Current.CancellationToken)).Sets.Single();
+
+        unchanged.ProjectSettings.ShouldNotBeNull().Outcome.ShouldBe(ViewImportOutcome.Unchanged);
+        unchanged.Items.ShouldBeEmpty();
+        _records.Records.Values.Single().ProjectSettings.ShouldBe(ViewImportOutcome.Unchanged);
+
+        // other values: kept, and Skipped with DocumentExists, which is no failure
+        _settings.Store(Organization, Project, Read("""{ "Types": { "sbt": { "Label": "Company" } } }"""), version: 3);
+
+        var skipped = (await Seeder().SeedAsync(again, TestContext.Current.CancellationToken)).Sets.Single();
+
+        var result = skipped.ProjectSettings.ShouldNotBeNull();
+        (result.Outcome, result.ErrorCode).ShouldBe((ViewImportOutcome.Skipped, ErrorCodes.DocumentExists));
+        result.Message.ShouldBe("The project has other settings (version 3); a seed never overwrites them.");
+        var item = skipped.Items.ShouldHaveSingleItem();
+        (item.Path, item.Kind, item.IsProjectSettings, item.Outcome, item.ErrorCode).ShouldBe(
+            (DataSetProjectSettings.FileName, null, true, ViewImportOutcome.Skipped, ErrorCodes.DocumentExists));
+        skipped.HasFailures.ShouldBeFalse();
+        skipped.IsRecorded.ShouldBeTrue();
+        _records.Records.Values.Single().ProjectSettings.ShouldBe(ViewImportOutcome.Skipped);
+
+        // settings reset to the defaults were set too, at a later version
+        _settings.Store(Organization, Project, new ProjectSettings(), version: 4);
+        (await Seeder().SeedAsync(again, TestContext.Current.CancellationToken)).Sets.Single().ProjectSettings!.Outcome.ShouldBe(ViewImportOutcome.Skipped);
+
+        _settings.Writes.ShouldBeEmpty();
+        _settings.Stored[$"{Organization}.{Project}"].Version.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task Seed_DecidesAgainWhenTheSettingsAreSetBetweenTheReadAndTheWrite()
+    {
+        AddStyled("styled");
+        var request = new DataSetSeedRequest { Sets = ["styled"], Owner = Owner, Options = new DataSetSeedOptions { Again = true } };
+
+        _settings.OnSet = () => _settings.Store(Organization, Project, Read(Settings), version: 1);
+        (await Seeder().SeedAsync(request, TestContext.Current.CancellationToken)).Sets.Single().ProjectSettings!.Outcome.ShouldBe(ViewImportOutcome.Unchanged);
+
+        _settings.Stored.Clear();
+        _settings.OnSet = () => _settings.Store(Organization, Project, new ProjectSettings { DateFormat = "mm/dd/yyyy" }, version: 1);
+        var set = (await Seeder().SeedAsync(request, TestContext.Current.CancellationToken)).Sets.Single();
+
+        set.ProjectSettings!.Outcome.ShouldBe(ViewImportOutcome.Skipped);
+        _settings.Stored[$"{Organization}.{Project}"].DateFormat.ShouldBe("mm/dd/yyyy");
+    }
+
+    [Fact]
+    public async Task Seed_AFailedWriteOfTheProjectSettingsFailsTheSetButNotItsDocuments()
+    {
+        AddStyled("styled");
+        _settings.SetFailure = new ConflictException("The project changed concurrently twice; try again.");
+
+        var run = await Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["styled"], Owner = Owner }, TestContext.Current.CancellationToken);
+
+        var set = run.Sets.Single();
+        var result = set.ProjectSettings.ShouldNotBeNull();
+        (result.Outcome, result.ErrorCode, result.Message).ShouldBe((ViewImportOutcome.Failed, ErrorCodes.Conflict, "The project changed concurrently twice; try again."));
+        set.Failures.ShouldHaveSingleItem().IsProjectSettings.ShouldBeTrue();
+        set.Documents!.Summary.Created.ShouldBe(1);
+        set.IsRecorded.ShouldBeFalse();
+        run.HasFailures.ShouldBeTrue();
+        ExitCodes.Of(run).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
+    }
+
+    [Fact]
+    public async Task Seed_WritesTheEqualSettingsOfSeveralSetsOnce()
+    {
+        AddStyled("styled");
+        AddStyled("restyled", Settings.Replace("Europe/Oslo", "europe/oslo"));
+        var request = new DataSetSeedRequest { Sets = ["styled", "restyled"], Owner = Owner };
+
+        // a dry run into a project it would create: Created by the first set, which the second one sees; nothing written
+        _settings.Missing.Add($"{Organization}.{Project}");
+
+        var dryRun = await Seeder().SeedAsync(request with { Options = new DataSetSeedOptions { DryRun = true } }, TestContext.Current.CancellationToken);
+
+        dryRun.Sets.Select(set => set.ProjectSettings!.Outcome).ShouldBe([ViewImportOutcome.Created, ViewImportOutcome.Unchanged]);
+        _settings.Writes.ShouldBeEmpty();
+        _writes.ShouldBeEmpty();
+
+        _settings.Missing.Clear();
+        var run = await Seeder().SeedAsync(request, TestContext.Current.CancellationToken);
+
+        run.Sets.Select(set => set.ProjectSettings!.Outcome).ShouldBe([ViewImportOutcome.Created, ViewImportOutcome.Unchanged]);
+        _settings.Writes.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Seed_ADryRunDecidesFromTheStoredSettingsAndWritesNothing()
+    {
+        AddStyled("styled");
+        var request = new DataSetSeedRequest { Sets = ["styled"], Owner = Owner, Options = new DataSetSeedOptions { DryRun = true } };
+
+        (await Seeder().SeedAsync(request, TestContext.Current.CancellationToken)).Sets.Single().ProjectSettings!.Outcome.ShouldBe(ViewImportOutcome.Created);
+
+        _settings.Store(Organization, Project, new ProjectSettings { DefaultTimeZone = "UTC" });
+        var skipped = (await Seeder().SeedAsync(request, TestContext.Current.CancellationToken)).Sets.Single();
+
+        skipped.ProjectSettings!.Outcome.ShouldBe(ViewImportOutcome.Skipped);
+        skipped.Items.ShouldHaveSingleItem().ErrorCode.ShouldBe(ErrorCodes.DocumentExists);
+        _settings.Writes.ShouldBeEmpty();
+        _records.Saves.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Seed_RefusesProjectSettingsThatBreakARuleBeforeAnythingIsWritten()
+    {
+        AddSet("first", Manifest, ("annotations/sbt.first.json", "{}"));
+        AddSet(
+            "broken",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite", "DependsOn": [ "first" ] }""",
+            ("project-settings.json", """{ "Types": { "sbt": { "Color": "pinkish" } }, "DefaultTimeZone": "Central Europe Standard Time" }"""));
+
+        var exception = await Should.ThrowAsync<DataSetException>(
+            () => Seeder().SeedAsync(new DataSetSeedRequest { Sets = ["broken"], Owner = Owner }, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldStartWith($"The project settings '{Path.Combine(Folder("broken"), "project-settings.json")}' are not valid (2 problems):");
+        exception.Message.ShouldContain("\n  $.Types.sbt.Color: 'pinkish' is not a color of the catalog");
+        exception.Message.ShouldContain("\n  $.DefaultTimeZone: 'Central Europe Standard Time' is not an IANA time zone id");
+        _access.Invocations.ShouldBeEmpty();
+        _importer.Calls.ShouldBeEmpty();
+        _settings.Writes.ShouldBeEmpty();
+        _records.Saves.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Plan_RefusesSetsOfOneRunWithDifferentProjectSettings()
+    {
+        AddStyled("styled");
+        AddStyled("plain", """{ "DateFormat": "yyyy-mm-dd" }""");
+        AddSet(
+            "on-top",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite", "DependsOn": [ "styled" ] }""",
+            ("project-settings.json", """{ "DateFormat": "yyyy-mm-dd" }"""));
+
+        // two named sets
+        Should.Throw<DataSetException>(() => Seeder().Plan(new DataSetSeedRequest { Sets = ["styled", "plain"], Owner = Owner }))
+            .Message.ShouldStartWith(
+                $"The sets 'styled' and 'plain' carry different project settings ('{Path.Combine(Folder("styled"), "project-settings.json")}', '{Path.Combine(Folder("plain"), "project-settings.json")}')");
+
+        // a dependency seeds into the same project
+        Should.Throw<DataSetException>(() => Seeder().Plan(new DataSetSeedRequest { Sets = ["on-top"], Owner = Owner }))
+            .Message.ShouldStartWith("The sets 'styled' and 'on-top' carry different project settings");
+
+        // equal settings, and a set without any, agree
+        AddStyled("same");
+        AddSet("bare", Manifest, ("annotations/sbt.bare.json", "{}"));
+        Seeder().Plan(new DataSetSeedRequest { Sets = ["styled", "same", "bare"], Owner = Owner }).Sets.Count.ShouldBe(3);
+        _access.Invocations.ShouldBeEmpty();
+    }
+
     private static string Folder(string name) => Path.Combine(Tool, "data-sets", name);
+
+    private static ProjectSettings Read(string content)
+    {
+        var check = ProjectSettingsJson.Read(System.Text.Json.Nodes.JsonNode.Parse(content));
+        check.Problems.ShouldBeEmpty();
+        return check.Settings!;
+    }
 
     private static AccessPoint Point(string key, string ownerId, AccountRole otherRole = AccountRole.None, string? other = null)
     {
@@ -463,6 +672,7 @@ public class DataSetSeederTests
             _fileSystem,
             new DataSetCatalog(_fileSystem, Tool),
             new DataSetProvisioner(_access.Object, _views.Object, NullLogger<DataSetProvisioner>.Instance),
+            _settings,
             _importer,
             _bulkWriter,
             new DataSetKeyValueSeeder(new FakeKeyValueService(), [], Options.Create(new KeyValueOptions()), NullLogger<DataSetKeyValueSeeder>.Instance),
@@ -475,6 +685,12 @@ public class DataSetSeederTests
     private void AddSet(string name, string manifest, params (string Path, string Content)[] files)
     {
         SetFiles.Add(_fileSystem, Folder(name), [("set.json", manifest), .. files]);
+    }
+
+    // a set with project-settings.json (Settings unless given) and an annotation file of its own
+    private void AddStyled(string name, string settings = Settings)
+    {
+        AddSet(name, Manifest, ("project-settings.json", settings), ($"annotations/sbt.{name}.json", "{}"));
     }
 
     // the lines rst.payments and sbt.acme above the file unt.payments.ledger, a line below that file, a file without a
@@ -528,6 +744,21 @@ public class DataSetSeederTests
                 .. withFailures ? [("annotations/sbt.bad.json", "{}"), ("configurations/cnt.bad.x.conf.json", """{ "a": 1 }""")] : Array.Empty<(string, string)>(),
                 ("configurations/sbt.a.conf.json", """{ "a": 1 }"""),
             ]);
+    }
+
+    // A condition by its versions (the record compares its list by reference).
+    private sealed class ConditionComparer : IEqualityComparer<ProjectSettingsCondition>
+    {
+        public bool Equals(ProjectSettingsCondition? x, ProjectSettingsCondition? y)
+        {
+            return x is not null
+                   && y is not null
+                   && x.Any == y.Any
+                   && (x.Versions is null) == (y.Versions is null)
+                   && (x.Versions ?? []).SequenceEqual(y.Versions ?? []);
+        }
+
+        public int GetHashCode(ProjectSettingsCondition obj) => obj.Any.GetHashCode();
     }
 
     private sealed class RecordingProgress : IProgress<int>

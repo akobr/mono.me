@@ -121,6 +121,11 @@ public static class DataSetOutput
             Console.WriteLine($"  Depends on: {string.Join(", ", manifest.DependsOn.Select(name => catalog.Contains(name) ? name : $"{name} (not in the catalog)"))}");
         }
 
+        if (overview.ProjectSettings is { } settings)
+        {
+            Console.WriteLine($"  Project settings: {Describe(settings.Settings)}");
+        }
+
         var documents = string.Join(", ", overview.Documents.Select(pair => Count(pair.Count, Name(pair.Content).TrimEnd('s'))));
         var unreadable = overview.FailedDocuments > 0 ? $", {N(overview.FailedDocuments)} of them cannot be read" : string.Empty;
         var ignored = overview.IgnoredFiles > 0 ? $"; {Count(overview.IgnoredFiles, "other file")} ignored" : string.Empty;
@@ -202,7 +207,7 @@ public static class DataSetOutput
 
         if (!provisioning.IsProjectCreated)
         {
-            Console.WriteLine($"The project '{run.Target.ProjectKey}' exists and is used as it is.", Muted);
+            Console.WriteLine($"The project '{run.Target.ProjectKey}' exists: its access is used as it is.", Muted);
         }
     }
 
@@ -228,6 +233,18 @@ public static class DataSetOutput
         }
 
         var documents = result.Documents!;
+
+        if (result.ProjectSettings is { } settings)
+        {
+            // the outcome as the counts of a kind spell it; a failure is listed with the others below
+            var outcome = settings.Outcome.ToString().ToLowerInvariant();
+            Console.WriteLine($"  project settings: {Describe(settings.Settings)}: {(settings.ErrorCode is null ? outcome : $"{outcome} {settings.ErrorCode}")}");
+
+            if (settings.Outcome == ViewImportOutcome.Skipped && settings.Message is not null)
+            {
+                Console.WriteLine($"    {settings.Message}", Muted);
+            }
+        }
 
         foreach (var summary in documents.Summaries.Where(HasAny))
         {
@@ -262,7 +279,7 @@ public static class DataSetOutput
                 $"  {DataSetKeyValues.FileName}: {Count(pairs.Pairs, "pair")}{levels}: {N(summary.Created)} created, {N(summary.Updated)} updated, {N(summary.Unchanged)} unchanged, {N(summary.Skipped)} skipped, {N(summary.Failed)} failed");
         }
 
-        if (documents.Total == 0 && result.Lines is null && result.KeyValues is null)
+        if (documents.Total == 0 && result.Lines is null && result.KeyValues is null && result.ProjectSettings is null)
         {
             Console.WriteLine("  No documents.", Muted);
         }
@@ -287,9 +304,10 @@ public static class DataSetOutput
             Console.WriteLine($"  Warnings: {string.Join(", ", warnings)}.", Color.Yellow);
         }
 
-        // the other listed outcomes, by what they are: kept documents, deleted annotations, what hangs on a failure
+        // the other listed outcomes, by what they are: kept documents, deleted annotations, what hangs on a failure (the
+        // project settings have their line)
         var others = result.Items
-            .Where(item => item.Outcome != ViewImportOutcome.Failed)
+            .Where(item => item.Outcome != ViewImportOutcome.Failed && !item.IsProjectSettings)
             .GroupBy(item => $"{item.Outcome} {item.ErrorCode}".TrimEnd())
             .OrderBy(group => group.Key, StringComparer.Ordinal)
             .Select(group => $"{N(group.Count())} {group.Key}")
@@ -352,14 +370,15 @@ public static class DataSetOutput
         var documents = result.Documents?.Summary ?? new ViewImportSummary();
         var lines = result.Lines?.Summary ?? new ViewImportSummary();
         var pairs = result.KeyValues?.Summary ?? new ViewImportSummary();
+        var settings = result.ProjectSettings?.Outcome;
 
         return new ViewImportSummary
         {
-            Created = documents.Created + lines.Created + pairs.Created,
+            Created = documents.Created + lines.Created + pairs.Created + (settings == ViewImportOutcome.Created ? 1 : 0),
             Updated = documents.Updated + lines.Updated + pairs.Updated,
-            Unchanged = documents.Unchanged + lines.Unchanged + pairs.Unchanged,
-            Skipped = documents.Skipped + lines.Skipped + pairs.Skipped,
-            Failed = documents.Failed + lines.Failed + pairs.Failed,
+            Unchanged = documents.Unchanged + lines.Unchanged + pairs.Unchanged + (settings == ViewImportOutcome.Unchanged ? 1 : 0),
+            Skipped = documents.Skipped + lines.Skipped + pairs.Skipped + (settings == ViewImportOutcome.Skipped ? 1 : 0),
+            Failed = documents.Failed + lines.Failed + pairs.Failed + (settings == ViewImportOutcome.Failed ? 1 : 0),
             Warnings = documents.Warnings + lines.Warnings,
         };
     }
@@ -368,6 +387,15 @@ public static class DataSetOutput
     private static string Levels(IReadOnlyList<(KeyValueProtection Level, int Count)> levels)
     {
         return string.Join(", ", levels.Select(entry => $"{N(entry.Count)} {entry.Level}"));
+    }
+
+    // The project settings in short: how many types they name, the time zone and the date format, the defaults marked.
+    private static string Describe(ProjectSettings settings)
+    {
+        var catalog = ProjectSettingsCatalog.Default;
+        var timeZone = settings.DefaultTimeZone ?? $"{catalog.DefaultTimeZone} (default)";
+        var dateFormat = settings.DateFormat ?? $"{catalog.DefaultDateFormat} (default)";
+        return $"{Count(settings.Types.Count, "type")}, time zone {timeZone}, date format {dateFormat}";
     }
 
     private static bool HasAny(ViewImportSummary summary)

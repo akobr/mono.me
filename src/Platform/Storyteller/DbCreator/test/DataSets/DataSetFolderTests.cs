@@ -40,21 +40,23 @@ public class DataSetFolderTests
     }
 
     [Fact]
-    public void GetEntries_LeavesTheManifestTheLinesAndThePairsAtTheRootOut()
+    public void GetEntries_LeavesTheManifestTheLinesThePairsAndTheProjectSettingsAtTheRootOut()
     {
         var fileSystem = SetFiles.Create(
             Folder,
             ("set.json", "{}"),
             ("annotations.jsonl", "{}"),
             ("key-values.json", """{ "Items": [] }"""),
+            ("project-settings.json", "{}"),
             ("nested/set.json", "{}"),
             ("nested/annotations.jsonl", "{}"),
             ("nested/key-values.json", "{}"),
+            ("nested/project-settings.json", "{}"),
             ("annotations/sbt.a.json", """{ "Title": "A" }"""));
 
         var entries = DataSetFolder.GetEntries(fileSystem, Folder);
 
-        entries.Select(entry => entry.Path).ShouldBe(["annotations/sbt.a.json", "nested/annotations.jsonl", "nested/key-values.json", "nested/set.json"]);
+        entries.Select(entry => entry.Path).ShouldBe(["annotations/sbt.a.json", "nested/annotations.jsonl", "nested/key-values.json", "nested/project-settings.json", "nested/set.json"]);
         entries[0].Length.ShouldBe(16);
         using var reader = new StreamReader(entries[0].Open());
         reader.ReadToEnd().ShouldBe("""{ "Title": "A" }""");
@@ -140,6 +142,9 @@ public class DataSetFolderTests
         DataSetFolder.ComputeHash(SetFiles.Create(Folder, [.. files, (".git/HEAD", "ref"), ("annotations/.DS_Store", "x")]), Folder).ShouldBe(hash);
 
         DataSetFolder.ComputeHash(SetFiles.Create(Folder, [.. files, ("README.md", string.Empty)]), Folder).ShouldNotBe(hash);
+        var withSettings = DataSetFolder.ComputeHash(SetFiles.Create(Folder, [.. files, ("project-settings.json", "{}")]), Folder);
+        withSettings.ShouldNotBe(hash);
+        DataSetFolder.ComputeHash(SetFiles.Create(Folder, [.. files, ("project-settings.json", """{ "DateFormat": "dd.mm.yyyy" }""")]), Folder).ShouldNotBe(withSettings);
         DataSetFolder.ComputeHash(SetFiles.Create(Folder, files[..2]), Folder).ShouldNotBe(hash);
         DataSetFolder.ComputeHash(SetFiles.Create(Folder, [files[0], ("annotations/sbt.c.json", "{}"), files[2]]), Folder).ShouldNotBe(hash);
         DataSetFolder.ComputeHash(SetFiles.Create(Folder, [files[0], ("annotations/sbt.a.json", "{ }"), files[2]]), Folder).ShouldNotBe(hash);

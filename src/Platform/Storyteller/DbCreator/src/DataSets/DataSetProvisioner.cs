@@ -10,7 +10,9 @@ namespace _42.Platform.Storyteller.DbCreator.DataSets;
 
 // Makes the target of a seed exist, through the access model and the view registry as the API does: the owner's
 // account, a missing organization and project with the owner as Owner, and a view other than "default". An existing
-// project is used as it is (its access is not changed), and only when the owner administers it. The data services check none of this, so it runs first.
+// project is used as it is (its access is not changed), and only when the owner administers it, which also lets the
+// seed give it the project settings of a set when it has none (the API's rule for them). The data services check none
+// of this, so it runs first.
 public sealed class DataSetProvisioner
 {
     private readonly IAccessService _access;

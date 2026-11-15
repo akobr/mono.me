@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Abstractions;
 using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using _42.Platform.Storyteller.Transferring;
@@ -13,6 +14,8 @@ namespace _42.Platform.Storyteller.DbCreator.IntegrationTests;
 // the sets with Standard pairs with the vault (DbCreatorFixture.GetVaultServicesAsync).
 public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
 {
+    private IProjectSettingsService ProjectSettings => Services.GetRequiredService<IProjectSettingsService>();
+
     [Fact]
     public async Task Core_IsSeededByTheBuildOfTheDatabase()
     {
@@ -44,14 +47,11 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
 
         var result = await SeedAsync(new DataSetSeedRequest { Sets = ["showcase"], Organization = organization }, services);
 
-        // every file is created, in the summary of its folder's kind, except project-settings.json, the settings of the
-        // project (424-266), which is no document and which the seed does not read yet; the counts come from the folder,
-        // which the admin UI's test/unit/mock/showcase-set.test.ts writes, so a change of the mock needs none here
-        var files = DataSetFolder.GetEntries(new FileSystem(), result.Set.Folder)
-            .Where(file => file.Path != "project-settings.json")
-            .ToList();
+        // every file is created, in the summary of its folder's kind; the counts come from the folder, which the admin
+        // UI's test/unit/mock/showcase-set.test.ts writes, so a change of the mock needs none here
+        var files = DataSetFolder.GetEntries(new FileSystem(), result.Set.Folder);
         result.Lines.ShouldBeNull();
-        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = files.Count, IgnoredFiles = 1 });
+        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = files.Count });
         result.Documents.Summaries.Single(summary => summary.Content == ViewArchiveContent.Annotations).Created.ShouldBeGreaterThan(0);
         result.Documents.Summaries
             .Where(summary => summary.Created > 0)
@@ -78,6 +78,12 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
         payments.Content.SelectToken("adyen.merchantAccount")!.ToString().ShouldBe(values["payments.adyen.merchantAccount"]);
         payments.Content.SelectToken("adyen.hmacKey")!.ToString().ShouldBe(values["payments.adyen.hmacKey"]);
         dunning.Content.SelectToken("maxReminders")!.ToString().ShouldBe(values["dunning.maxReminders"]);
+
+        // and the project gets the settings of the mock's project
+        result.ProjectSettings.ShouldNotBeNull().Outcome.ShouldBe(ViewImportOutcome.Created);
+        var settings = await ProjectSettings.GetAsync(organization, "invoicing-suite", Cancellation);
+        (settings.Version, settings.DefaultTimeZone, settings.DateFormat).ShouldBe((1L, "Europe/Oslo", "dd.mm.yyyy"));
+        settings.Types["sbt"].Label.ShouldBe("Customer");
     }
 
     [Fact]
@@ -88,9 +94,9 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
 
         var result = await SeedAsync(new DataSetSeedRequest { Sets = ["exhibit"], Organization = organization }, services);
 
-        // README.md and project-settings.json are ignored files; the 20 pairs are created, the Standard one with the vault
+        // README.md is an ignored file; the 20 pairs are created, the Standard one with the vault
         var files = DataSetFolder.GetEntries(new FileSystem(), result.Set.Folder);
-        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = files.Count - 2, IgnoredFiles = 2 });
+        result.Documents!.Summary.ShouldBe(new ViewImportSummary { Created = files.Count - 1, IgnoredFiles = 1 });
         result.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = 20 });
 
         // a resolved read binds the public pairs, their interpolations and the Standard secret
@@ -102,6 +108,14 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
         var globex = (await configurations.GetResolvedConfigurationWithSecretsAsync(Key(target, "sbt.globex"))).ShouldNotBeNull();
         globex.Content.SelectToken("company.portal")!.ToString().ShouldBe("https://lair.globex.example");
         globex.Content.SelectToken("perks.hammockVendors")!.ToString().ShouldBe("https://hammocks.cypresscreek.example/vendors");
+
+        // the type names, colors and icons of Fourth Wall Software's project, its time zone and its date format
+        result.ProjectSettings.ShouldNotBeNull().Outcome.ShouldBe(ViewImportOutcome.Created);
+        var settings = await ProjectSettings.GetAsync(organization, "toons-and-tyrants", Cancellation);
+        settings.Version.ShouldBe(1);
+        settings.Types.Select(type => type.Value.Label).ShouldBe(["Solution", "Job", "Company", "Application", "Department", "AppUsage", "JobInstance"]);
+        settings.Types["sbt"].ShouldBe(new ProjectTypeAppearance { Label = "Company", Plural = "Companies", Color = "pink", Icon = "i-lucide-building-2" });
+        (settings.DefaultTimeZone, settings.DateFormat).ShouldBe(("America/Phoenix", "yyyy-mm-dd"));
     }
 
     [Fact]

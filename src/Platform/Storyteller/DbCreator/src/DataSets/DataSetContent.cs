@@ -6,8 +6,9 @@ using _42.Platform.Storyteller.Transferring;
 
 namespace _42.Platform.Storyteller.DbCreator.DataSets;
 
-// What a set seeds: its document files, its annotations.jsonl and its key-values.json (each null without the file).
-public sealed record class DataSetContent(ViewArchiveDocuments Documents, DataSetAnnotationLines? Lines, DataSetKeyValues? KeyValues = null)
+// What a set seeds: its document files, its annotations.jsonl, its key-values.json and its project-settings.json (each
+// null without the file).
+public sealed record class DataSetContent(ViewArchiveDocuments Documents, DataSetAnnotationLines? Lines, DataSetKeyValues? KeyValues = null, DataSetProjectSettings? ProjectSettings = null)
 {
     // Reads the set's folder for the target. One key is one document, as in an archive: an annotation of
     // annotations.jsonl whose key a file already holds, or an earlier line, fails with DuplicateFile. DataSetException
@@ -17,8 +18,9 @@ public sealed record class DataSetContent(ViewArchiveDocuments Documents, DataSe
         var documents = DataSetFolder.ReadDocuments(fileSystem, folder);
         var lines = DataSetAnnotationLinesReader.Read(fileSystem, folder, target);
         var keyValues = DataSetKeyValues.Read(fileSystem, folder);
+        var settings = DataSetProjectSettings.Read(fileSystem, folder);
 
-        return new DataSetContent(documents, lines is null ? null : WithoutDuplicates(documents, lines), keyValues);
+        return new DataSetContent(documents, lines is null ? null : WithoutDuplicates(documents, lines), keyValues, settings);
     }
 
     public static DataSetAnnotationLines WithoutDuplicates(ViewArchiveDocuments documents, DataSetAnnotationLines lines)

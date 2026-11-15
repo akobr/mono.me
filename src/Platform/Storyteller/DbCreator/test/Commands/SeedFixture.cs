@@ -16,11 +16,10 @@ using Moq;
 namespace _42.Platform.Storyteller.DbCreator.UnitTests.Commands;
 
 // The services of the commands over fakes: built-in sets in a MockFileSystem, the access model and the views of Moq
-// (nothing exists, every write succeeds), the importer, bulk writer, key/value service and record store of the seeder
-// tests (no key-encryption provider), and a
-// container factory that finds the layout fine unless told otherwise, with a container where every item is missing
-// (the access seed of the root reads and creates; each access point with its access audit record in a transactional
-// batch, which succeeds).
+// (nothing exists, every write succeeds), the project settings, importer, bulk writer, key/value service and record
+// store of the seeder tests (no key-encryption provider), and a container factory that finds the layout fine unless
+// told otherwise, with a container where every item is missing (the access seed of the root reads and creates; each
+// access point with its access audit record in a transactional batch, which succeeds).
 internal sealed class SeedFixture
 {
     public static readonly string Tool = MockUnixSupport.Path(@"C:\tool");
@@ -54,6 +53,8 @@ internal sealed class SeedFixture
 
     public Mock<IViewService> Views { get; } = new();
 
+    public FakeProjectSettingsService ProjectSettings { get; } = new();
+
     public Mock<IContainerFactory> Containers { get; } = new();
 
     public FakeViewImporter Importer { get; } = new();
@@ -79,6 +80,7 @@ internal sealed class SeedFixture
             FileSystem,
             Catalog,
             new DataSetProvisioner(Access.Object, Views.Object, NullLogger<DataSetProvisioner>.Instance),
+            ProjectSettings,
             Importer,
             BulkWriter,
             new DataSetKeyValueSeeder(KeyValues, Providers, Options.Create(new KeyValueOptions()), NullLogger<DataSetKeyValueSeeder>.Instance),

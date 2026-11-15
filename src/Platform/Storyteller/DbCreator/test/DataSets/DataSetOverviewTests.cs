@@ -48,6 +48,29 @@ public class DataSetOverviewTests
     }
 
     [Fact]
+    public void Read_TheProjectSettingsAreNoDocument()
+    {
+        var folder = SetFiles.Folder("styled");
+        var fileSystem = SetFiles.Create(
+            folder,
+            ("set.json", "{}"),
+            ("annotations/rst.r.json", "{}"),
+            ("project-settings.json", """{ "Format": "2s.project-settings.v1", "Types": { "rst": { "Label": "Module" } }, "DateFormat": "dd.mm.yyyy" }"""));
+        var set = new DataSet(DataSetManifest.Read(fileSystem, folder), folder, DataSetSource.Path);
+
+        var overview = DataSetOverview.Read(fileSystem, set);
+
+        overview.IgnoredFiles.ShouldBe(0);
+        var settings = overview.ProjectSettings.ShouldNotBeNull().Settings;
+        settings.Types.ShouldHaveSingleItem().Value.Label.ShouldBe("Module");
+        (settings.DefaultTimeZone, settings.DateFormat).ShouldBe((null, "dd.mm.yyyy"));
+
+        // one that breaks a rule ends the listing as wrong input
+        fileSystem.File.WriteAllText(Path.Combine(folder, "project-settings.json"), """{ "DateFormat": "someday" }""");
+        Should.Throw<DataSetException>(() => DataSetOverview.Read(fileSystem, set)).Message.ShouldContain("$.DateFormat: 'someday' is not a date format");
+    }
+
+    [Fact]
     public void Read_ASetWithoutTargetOrLines()
     {
         var folder = SetFiles.Folder("bare");
@@ -57,6 +80,7 @@ public class DataSetOverviewTests
 
         overview.Documents.Sum(pair => pair.Count).ShouldBe(1);
         overview.Lines.ShouldBeNull();
+        overview.ProjectSettings.ShouldBeNull();
         (overview.Annotations, overview.FailedAnnotations).ShouldBe((0, 0));
         overview.KeyValues.ShouldBeNull();
     }
