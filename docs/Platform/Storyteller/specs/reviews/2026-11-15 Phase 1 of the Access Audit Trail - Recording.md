@@ -53,6 +53,14 @@ The Cosmos DB suites ran on the vNext Testcontainers emulator in chunks; the TTL
 
 `docs/Platform/Storyteller/access-audit.md` (new: what is recorded, where, why atomic, what is never stored, retention, size), and `access.md`, `audit-stamps.md`, `annotation-lifecycle.md` (core TTL), `key-values.md`, `authentication.md`, `mcp.md`, `data-sets.md` and the production cookbook (DbCreator's TTL on `core`).
 
+## Review
+
+An adversarial review of the branch (four lenses, each finding checked by a skeptic) confirmed three defects of phase 1, fixed after it:
+
+1. **A trusted issuer's key swap was not recorded.** The issuer's value kept only the number of its JWKS keys, so replacing a key by another left the view equal and the replace committed without a record. `AccessAuditValues.Issuer` adds `JwksThumbprint`, a thumbprint of the key set in its compact form (a reformatted set is no change). Tests: `Issuer_ChangesWithItsKeys_ButNotWithTheirFormatting`, `TrustedIssuers_AKeyReplacedByAnother_IsRecorded_AReformattedKeySetIsNot`.
+2. **An issuer's delete could record a stale version.** It deleted without the ETag of its read, so a replace landing in between was deleted under the old value. The delete now carries the ETag and reads again once (`ConflictException` after that). Test: `TrustedIssuers_ADeleteRacingAnUpdate_RecordsTheVersionItDeleted`.
+3. **The base seeding wrote the account outside the recorded batch.** `Data.SeedAccountAccessAsync` merged the account first, alone, so a failure between it and the access point's batch left a role on the account (which the role checks read) without a record. Each membership is now one batch of the access point, the account and the record (`MergeMembershipAsync`); a role only one of the two documents holds is repaired and recorded. An account without roles is still merged alone. Test: `Seeding_WritesTheAccountInTheBatchOfItsRecord_AndRepairsARoleOnlyTheAccessPointHolds`; `InitDbCommandTests` expects the account in the batch.
+
 ## Notes
 
 - A database deployed before this change gets TTL on `core` only when DbCreator runs again; until then the records do not expire.
