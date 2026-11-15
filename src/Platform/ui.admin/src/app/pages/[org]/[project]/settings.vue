@@ -95,11 +95,20 @@ const settingsConflict = ref(false)
 const settingsProblems = ref<{ path?: string; message: string }[]>()
 
 const draft = shallowRef<ProjectSettingsDraft>(draftOf(savedSettings.value))
+// The saved settings the draft started from; Save sends their version as If-Match. A newer answer under a changed
+// draft (someone else saved, and the query read the settings again, e.g. after a reconnect) moves neither the draft nor
+// this base, so Save gets a 412 and says so instead of storing the draft over that change. After the 412 the base is
+// the newer answer: a second Save then stores the draft over it.
+const draftBase = shallowRef<ProjectSettingsState>(savedSettings.value)
+function startDraft(saved: ProjectSettingsState) {
+  draft.value = draftOf(saved)
+  draftBase.value = saved
+}
 watch(
   [() => context.projectKey, savedSettings] as const,
-  ([key, saved], [previousKey, previous]) => {
-    if (key !== previousKey || !previous || sameSettings(draft.value, previous)) {
-      draft.value = draftOf(saved)
+  ([key, saved], [previousKey]) => {
+    if (key !== previousKey || sameSettings(draft.value, draftBase.value) || sameSettings(draft.value, saved)) {
+      startDraft(saved)
     }
     if (key !== previousKey) {
       settingsConflict.value = false
@@ -154,20 +163,25 @@ async function saveSettings() {
   if (!org || !project || !projectKey || !settingsDirty.value || savingSettings.value) {
     return
   }
-  const saved = savedSettings.value
+  const base = draftBase.value
   const sent = draft.value
   savingSettings.value = true
   settingsConflict.value = false
   settingsProblems.value = undefined
   try {
     // A browser cannot read the ETag of another origin; the Version of the body makes the same tag.
-    const answer = await setProjectSettings(org, project, toApi(sent, saved), {
-      headers: { 'If-Match': projectSettingsEntityTag(saved.version) },
+    const answer = await setProjectSettings(org, project, toApi(sent, base), {
+      headers: { 'If-Match': projectSettingsEntityTag(base.version) },
     })
     queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
-    // The fields show what is stored, unless the user went on editing.
-    if (context.projectKey === projectKey && draft.value === sent) {
-      draft.value = draftOf(fromApi(answer))
+    // The fields show what is stored, unless the user went on editing; further changes start from the stored settings.
+    if (context.projectKey === projectKey) {
+      const stored = fromApi(answer)
+      if (draft.value === sent) {
+        startDraft(stored)
+      } else {
+        draftBase.value = stored
+      }
     }
     toast.add({ title: 'Project settings saved', color: 'success', icon: 'i-lucide-check' })
     // The list of the caller's projects and the access point carry the settings too.
@@ -176,6 +190,11 @@ async function saveSettings() {
     if (hasErrorCode(error, 'SettingsPreconditionFailed') || isPreconditionFailed(error)) {
       settingsConflict.value = true
       await settingsQuery.refetch()
+      // The user is told of the other change now: a second Save stores the draft over the settings read again.
+      const latest = queryClient.getQueryData<ProjectSettings>(getGetProjectSettingsQueryKey(org, project))
+      if (context.projectKey === projectKey && latest) {
+        draftBase.value = fromApi(latest)
+      }
     } else if (hasErrorCode(error, 'InvalidSettings')) {
       settingsProblems.value = problemsOf(error)
     } else {
@@ -192,7 +211,7 @@ async function saveSettings() {
 
 /** After a 412: the draft starts again from the settings saved meanwhile. */
 function loadSavedSettings() {
-  draft.value = draftOf(savedSettings.value)
+  startDraft(savedSettings.value)
   settingsConflict.value = false
   settingsProblems.value = undefined
 }
