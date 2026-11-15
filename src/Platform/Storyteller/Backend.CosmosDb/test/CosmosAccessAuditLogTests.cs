@@ -417,6 +417,29 @@ public class CosmosAccessAuditLogTests(Startup startup)
     }
 
     [Fact]
+    public async Task TheDocumentsOfAViewNamedAca_AreNoRecords()
+    {
+        var trail = await SeedAsync(NewOrganizationName());
+        var stored = await StoredAsync(trail);
+        var repository = Repositories.GetOrganizationContainer(trail.Organization);
+
+        // an annotation and a configuration of the view "aca": their ids start with the prefix of the records
+        foreach (var (id, partition) in new[] { ("aca.sbt.web", $"{trail.Project1}.sbt.web"), ("aca.cnf.sbt.web", $"{trail.Project1}.sbt.web") })
+        {
+            await repository.Container.UpsertItemAsync(
+                new { id, Organization = trail.Organization, PartitionKey = partition, ViewName = "aca", ProjectName = trail.Project1 },
+                repository.Key(partition),
+                cancellationToken: TestContext.Current.CancellationToken);
+        }
+
+        var response = await Log.QueryAsync(trail.Organization, new AccessAuditQuery(), TestContext.Current.CancellationToken);
+        var ofProject = await Log.QueryAsync(trail.Organization, new AccessAuditQuery { Project = trail.Project1 }, TestContext.Current.CancellationToken);
+
+        response.Items.Select(entry => entry.Id).Should().Equal(stored.Select(record => record.Id));
+        ofProject.Items.Select(entry => entry.Id).Should().NotContain(["aca.sbt.web", "aca.cnf.sbt.web"]);
+    }
+
+    [Fact]
     public async Task AnOrganizationWithoutRecords_AnswersAnEmptyPageWithoutAToken()
     {
         var organization = NewOrganizationName();

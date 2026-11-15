@@ -309,6 +309,66 @@ public class AccessAuditOrganizationRecordTests(Startup startup)
     }
 
     [Fact]
+    public async Task TrustedIssuers_AKeyReplacedByAnother_IsRecorded_AReformattedKeySetIsNot()
+    {
+        var project = NewName("p");
+        var partition = CosmosFederatedIssuerStore.GetPartition(project);
+        var issuers = Issuers();
+        var issuer = new FederatedIssuer { Name = "k8s", Issuer = "https://k8s.example.com", KeySource = FederatedIssuerKeySource.Jwks, Jwks = TwoKeys };
+        var swapped = issuer with { Jwks = TwoKeys.Replace("\"kid\":\"two\"", "\"kid\":\"three\"", StringComparison.Ordinal) };
+        var reformatted = swapped with { Jwks = swapped.Jwks!.Replace(",", ", ", StringComparison.Ordinal) };
+        await issuers.SetAsync(Organization, project, issuer, Admin);
+
+        var changes = await AddedAsync(partition, async () =>
+        {
+            await issuers.SetAsync(Organization, project, swapped, ViaMcp);
+            await issuers.SetAsync(Organization, project, reformatted, ViaMcp);
+        });
+
+        changes.Should().ContainSingle().Which.ShouldMatch(new ExpectedAccessAudit(AccessAuditAction.FederatedIssuerUpdated, $"{Organization}.{project}", ViaMcp)
+        {
+            PartitionKey = partition,
+            Target = AccessAuditTarget.Issuer("k8s"),
+            OldValue = AccessAuditValues.Issuer(issuer),
+            NewValue = AccessAuditValues.Issuer(swapped),
+        });
+        changes[0].NewValue.Should().Contain("\"JwksKeys\":2").And.NotContain(Modulus);
+    }
+
+    [Fact]
+    public async Task TrustedIssuers_ADeleteRacingAnUpdate_RecordsTheVersionItDeleted()
+    {
+        var project = NewName("p");
+        var partition = CosmosFederatedIssuerStore.GetPartition(project);
+        var issuer = new FederatedIssuer { Name = "github", Issuer = "https://token.actions.githubusercontent.com", Description = "CI" };
+        var updated = issuer with { Description = "CI of the company" };
+        await Issuers().SetAsync(Organization, project, issuer, Admin);
+        var storage = new InterceptedRepositoryProvider(Repositories);
+        var racing = new CosmosFederatedIssuerStore(storage, SerializerOptions, new MemoryCache(new MemoryCacheOptions()));
+        var raced = false;
+
+        // another Administrator saves the issuer between the delete's read and its batch
+        storage.Interceptor.BeforeBatch = async batch =>
+        {
+            if (!raced && batch.Contains(BatchOperationKind.Delete, "github"))
+            {
+                raced = true;
+                await Issuers().SetAsync(Organization, project, updated, Admin);
+            }
+
+            return null;
+        };
+
+        var changes = await AddedAsync(partition, async () =>
+            (await racing.DeleteAsync(Organization, project, "github", ViaMcp)).Should().BeTrue());
+
+        changes.Select(change => change.Action).Should().Equal(AccessAuditAction.FederatedIssuerUpdated, AccessAuditAction.FederatedIssuerDeleted);
+        changes[1].OldValue.Should().Be(AccessAuditValues.Issuer(updated), "the record describes the version the delete removed");
+        storage.Interceptor.Batches.Select(batch => batch.StatusCode).Should().Equal(HttpStatusCode.PreconditionFailed, HttpStatusCode.OK);
+        (await Issuers().ListAsync(Organization, project)).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task TrustedIssuers_TheLimitCountsNoRecord()
     {
         // every issuer created writes a record next to it: counted, they would refuse the issuer after half the limit

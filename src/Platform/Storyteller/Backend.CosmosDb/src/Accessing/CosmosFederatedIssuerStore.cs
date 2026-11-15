@@ -161,31 +161,47 @@ public class CosmosFederatedIssuerStore : IFederatedIssuerStore
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetPartition(project);
-        var existing = await ReadAsync(organization, project, name, cancellationToken);
 
-        if (existing is null)
+        // Deleted with the ETag of the read, so the record describes the version that was deleted; a change in between
+        // is read again once.
+        for (var attempt = 1; ; attempt++)
         {
-            Invalidate(organization, project);
-            return false;
-        }
+            var existing = await ReadAsync(organization, project, name, cancellationToken);
 
-        using var response = await repository.Container.CreateTransactionalBatch(repository.Key(partitionKeyValue))
-            .DeleteItem(name)
-            .CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.FederatedIssuerDeleted, caller)
+            if (existing is null)
             {
-                Target = AccessAuditTarget.Issuer(name),
-                OldValue = AccessAuditValues.Issuer(ToModel(existing)),
-            }))
-            .ExecuteAsync(cancellationToken);
-        Invalidate(organization, project);
+                Invalidate(organization, project);
+                return false;
+            }
 
-        if (response.Failed(HttpStatusCode.NotFound))
-        {
-            return false;
+            using var response = await repository.Container.CreateTransactionalBatch(repository.Key(partitionKeyValue))
+                .DeleteItem(name, new TransactionalBatchItemRequestOptions { IfMatchEtag = existing.ETag })
+                .CreateItem(_audit.ForProject(repository.Organization, project, partitionKeyValue, new AccessAuditChange(AccessAuditAction.FederatedIssuerDeleted, caller)
+                {
+                    Target = AccessAuditTarget.Issuer(name),
+                    OldValue = AccessAuditValues.Issuer(ToModel(existing)),
+                }))
+                .ExecuteAsync(cancellationToken);
+            Invalidate(organization, project);
+
+            if (response.Failed(HttpStatusCode.NotFound))
+            {
+                return false;
+            }
+
+            if (response.Failed(HttpStatusCode.PreconditionFailed))
+            {
+                if (attempt < 2)
+                {
+                    continue;
+                }
+
+                throw new ConflictException($"The trusted issuer '{name}' was changed concurrently; reload and retry.");
+            }
+
+            response.ThrowIfFailed($"Deleting the trusted issuer '{name}'");
+            return true;
         }
-
-        response.ThrowIfFailed($"Deleting the trusted issuer '{name}'");
-        return true;
     }
 
     private static string GetCacheKey(string organization, string project)

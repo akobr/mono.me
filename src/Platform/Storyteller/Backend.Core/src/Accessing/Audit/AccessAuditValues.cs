@@ -10,7 +10,8 @@ namespace _42.Platform.Storyteller.Accessing;
 
 // The old and new values of the access audit records: a role name, a description, or compact JSON of what decides access.
 // Never a secret: no API key, client secret, certificate, password, hash or stored mask (it keeps a client secret's first
-// characters), no JWKS key (only their number) and no recipient's public key (only its thumbprint).
+// characters), no JWKS key (only their number and a thumbprint of the set) and no recipient's public key (only its
+// thumbprint).
 public static class AccessAuditValues
 {
     // A longer value is cut, and ends with the start of its SHA-256, so a full copy can still be matched.
@@ -98,6 +99,7 @@ public static class AccessAuditValues
             issuer.KeySource,
             issuer.JwksUri,
             JwksKeys = CountJwksKeys(issuer.Jwks),
+            JwksThumbprint = JwksThumbprint(issuer.Jwks),
             issuer.MaxTokenLifetimeSeconds,
             issuer.RequiredClaims,
             issuer.Description,
@@ -131,6 +133,26 @@ public static class AccessAuditValues
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
         return Convert.ToHexString(hash, 0, 8).ToLower(CultureInfo.InvariantCulture);
+    }
+
+    // A thumbprint of the key set in its compact form, so a key replaced by another (the same number of keys) is a change
+    // of the issuer, and a key set only formatted differently is none.
+    private static string? JwksThumbprint(string? jwks)
+    {
+        if (string.IsNullOrWhiteSpace(jwks))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(jwks);
+            return Thumbprint(JsonSerializer.Serialize(document.RootElement));
+        }
+        catch (JsonException)
+        {
+            return Thumbprint(jwks);
+        }
     }
 
     private static int? CountJwksKeys(string? jwks)

@@ -160,8 +160,22 @@ public class AccessAuditValuesTests
 
         var value = AccessAuditValues.Issuer(issuer);
 
-        value.Should().Be("{\"Issuer\":\"https://k8s.example.com\",\"KeySource\":\"Jwks\",\"JwksKeys\":2,\"Description\":\"Cluster\"}");
+        value.Should().MatchRegex("^\\{\"Issuer\":\"https://k8s\\.example\\.com\",\"KeySource\":\"Jwks\",\"JwksKeys\":2,\"JwksThumbprint\":\"[0-9a-f]{16}\",\"Description\":\"Cluster\"\\}$");
+        value.Should().NotContain(Modulus);
         AccessAuditValues.Issuer(issuer with { Jwks = "not json" }).Should().NotContain("JwksKeys").And.NotContain("not json");
+    }
+
+    [Fact]
+    public void Issuer_ChangesWithItsKeys_ButNotWithTheirFormatting()
+    {
+        var one = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"one\",\"n\":\"" + Modulus + "\",\"e\":\"AQAB\"}]}";
+        var other = "{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"other\",\"n\":\"" + Modulus + "x\",\"e\":\"AQAB\"}]}";
+        var reformatted = "{ \"keys\": [ { \"kty\": \"RSA\", \"kid\": \"one\", \"n\": \"" + Modulus + "\", \"e\": \"AQAB\" } ] }";
+        var issuer = new FederatedIssuer { Name = "k8s", Issuer = "https://k8s.example.com", KeySource = FederatedIssuerKeySource.Jwks, Jwks = one };
+
+        // the same number of keys, but another key: the trust changed, so the view does
+        AccessAuditValues.Issuer(issuer with { Jwks = other }).Should().NotBe(AccessAuditValues.Issuer(issuer));
+        AccessAuditValues.Issuer(issuer with { Jwks = reformatted }).Should().Be(AccessAuditValues.Issuer(issuer));
     }
 
     [Fact]
