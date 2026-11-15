@@ -2,7 +2,6 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.IO.Abstractions;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -304,6 +303,17 @@ public class Program
             .UseStartup<Startup>();
     }
 
+    // Also the configuration of the tests that parse as Main does, with a run of their own.
+    internal static void ConfigureConsoleApplication(CommandLineApplication<PlatformCommand> application, CommandRun run)
+    {
+        application.ResponseFileHandling = ResponseFileHandling.ParseArgsAsLineSeparated;
+        application.AllowArgumentSeparator = true;
+        application.MakeSuggestionsInErrorMessage = true;
+        application.ShortVersionGetter = null;
+        application.SetLongVersionGetter();
+        application.OnParsingComplete(result => OnParsingComplete(result, run));
+    }
+
     // A service failure, not a crash: the reason, and the address sform called. The report has the exception, never the
     // URL of the request.
     private static async Task<int> ReportUnreachableServiceAsync(Exception exception, string reason, CommandRun currentRun, ErrorReporter reporter)
@@ -378,25 +388,21 @@ public class Program
 
     private static void ConfigureConsoleApplication(CommandLineApplication<PlatformCommand> application)
     {
-        application.ResponseFileHandling = ResponseFileHandling.ParseArgsAsLineSeparated;
-        application.AllowArgumentSeparator = true;
-        application.MakeSuggestionsInErrorMessage = true;
-        application.ShortVersionGetter = null;
-        application.SetLongVersionGetter();
-        application.OnParsingComplete(OnParsingComplete);
+        ConfigureConsoleApplication(application, CurrentRun);
     }
 
-    // On the root, it runs for every selected subcommand too, before the command executes. A handler that throws
-    // would end the run in place of the command, so nothing escapes.
-    private static void OnParsingComplete(ParseResult result)
+    // On the root, it runs for every selected subcommand too, before the command executes, and before the handlers of the
+    // subcommands write the defaults of the model into their options. A handler that throws would end the run in place of
+    // the command, so nothing escapes.
+    private static void OnParsingComplete(ParseResult result, CommandRun run)
     {
         try
         {
-            CurrentRun.RecordParsing(result.SelectedCommand);
+            run.RecordParsing(result.SelectedCommand);
         }
         catch (Exception)
         {
-            CurrentRun.Command = CommandPath.UNKNOWN;
+            run.Command = CommandPath.UNKNOWN;
         }
     }
 
@@ -420,19 +426,23 @@ public class Program
         }
     }
 
-    // Never throws: without a reporter the failures are only printed.
+    // Never throws: without a reporter the failures are only printed. The opt-out is read here, not taken from the
+    // telemetry, which turns itself off on any failure of its own and would lose it.
     private static ErrorReporter CreateErrorReporter(IHostEnvironment environment)
     {
         try
         {
-            var access = Host.Services.GetService<IOptions<AccessDefaultOptions>>()?.Value;
-            var settings = new ErrorReportingSettings(
-                _loggingOptions?.SentryDsn,
+            var settings = ErrorReportingSettings.Create(
+                _loggingOptions,
                 TelemetrySettings.IsOptedOutBy(System.Environment.GetEnvironmentVariable),
                 _telemetry.InstallationId,
                 environment.EnvironmentName.ToLowerInvariant(),
                 $"{typeof(Program).Assembly.GetName().Name}@{PostHogCommandTelemetry.CliVersion}",
-                [access?.OrganizationName, access?.ProjectName, access?.ViewName, _machineSignIn?.Project, _machineSignIn?.View]);
+                Host.Services.GetService<IOptions<AccessDefaultOptions>>()?.Value,
+                _machineSignIn,
+                Host.Services.GetService<IMachineSignIn>(),
+                System.Environment.GetEnvironmentVariables(),
+                [System.Environment.UserName, System.Environment.MachineName, System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile)]);
 
             return ErrorReporter.Create(_logger, settings);
         }

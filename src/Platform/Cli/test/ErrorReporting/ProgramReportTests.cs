@@ -110,6 +110,29 @@ public class ProgramReportTests
         _logger.AllText.ShouldNotContain("secret-plans");
     }
 
+    // args hold only @file: the values come from the model, which Program's own configuration expands and records.
+    [Fact]
+    public async Task AValueOfAResponseFile_ReachesNeitherSentryNorTheLog()
+    {
+        var file = Path.Combine(Path.GetTempPath(), $"sform-report-{Guid.NewGuid():N}.rsp");
+        await File.WriteAllLinesAsync(file, ["story", "kv", "set", "rsp-key", "rsp-secret-value", "--secret"], TestContext.Current.CancellationToken);
+
+        try
+        {
+            var exitCode = await RunAsync([$"@{file}"], () => throw new InvalidOperationException("Cannot encrypt rsp-secret-value of rsp-key."));
+
+            exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+            Formatted(_transport.Events.Single()).ShouldBe("Unhandled exception at sform storyteller kv set --secret");
+            ExceptionValue(_transport.Events.Single()).ShouldBe("Cannot encrypt *** of ***.");
+            _transport.AllText.ShouldNotContain("rsp-secret-value");
+            _logger.AllText.ShouldNotContain("rsp-secret-value");
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
     [Fact]
     public async Task AFailureAfterTheTelemetryOptOut_GoesToTheLogOnly()
     {
@@ -138,13 +161,13 @@ public class ProgramReportTests
             _reporter);
     }
 
-    private static string? Formatted(System.Text.Json.JsonElement sentryEvent)
+    private static string Formatted(System.Text.Json.JsonElement sentryEvent)
     {
-        return sentryEvent.GetProperty("logentry").GetProperty("formatted").GetString();
+        return sentryEvent.GetProperty("logentry").GetProperty("formatted").GetString() ?? string.Empty;
     }
 
-    private static string? ExceptionValue(System.Text.Json.JsonElement sentryEvent)
+    private static string ExceptionValue(System.Text.Json.JsonElement sentryEvent)
     {
-        return sentryEvent.GetProperty("exception").GetProperty("values").EnumerateArray().Single().GetProperty("value").GetString();
+        return sentryEvent.GetProperty("exception").GetProperty("values").EnumerateArray().Single().GetProperty("value").GetString() ?? string.Empty;
     }
 }

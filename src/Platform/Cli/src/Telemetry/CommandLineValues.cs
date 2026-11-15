@@ -157,18 +157,44 @@ internal sealed class CommandLineValues
             commandNames);
     }
 
-    // The value and its parts of four characters or more.
+    // The value and its parts:
+    // - each line of a value of several lines (the first line is all a message in Sentry keeps);
+    // - both sides of the first '=' (the path and the value of -x path=value), whatever their length: a short one is
+    //   replaced as a whole word only;
+    // - the pieces between = , ; . / \ of four characters or more, without a leading '@' (of a full key), and none that
+    //   ends with ':' (the scheme of a URL, which would hide the shape of every other URL from its rule).
     internal static IEnumerable<string> WithParts(string value)
     {
-        yield return value;
+        var parts = new List<string> { value };
+        var lines = value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        foreach (var part in value.Split(PartSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        if (lines.Length > 1)
         {
-            if (part.Length >= MinimumPartLength && !string.Equals(part, value, StringComparison.Ordinal))
+            parts.AddRange(lines);
+        }
+
+        foreach (var line in lines)
+        {
+            var equals = line.IndexOf('=');
+
+            if (equals >= 0)
             {
-                yield return part;
+                parts.Add(line[..equals].Trim());
+                parts.Add(line[(equals + 1)..].Trim());
+            }
+
+            foreach (var piece in line.Split(PartSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var part = piece.TrimStart('@');
+
+                if (part.Length >= MinimumPartLength && !part.EndsWith(':'))
+                {
+                    parts.Add(part);
+                }
             }
         }
+
+        return parts.Where(part => part.Length > 0).Distinct(StringComparer.Ordinal);
     }
 
     private static IReadOnlyList<string> Clean(IEnumerable<string?> values)

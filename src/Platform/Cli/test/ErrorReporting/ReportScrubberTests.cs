@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using _42.Platform.Cli.ErrorReporting;
+using _42.Platform.Cli.Telemetry;
 using Sentry;
 using Sentry.Protocol;
 using Shouldly;
@@ -80,6 +81,45 @@ public class ReportScrubberTests
     public void ScrubForSentry_RemovesCustomerData(string text, string expected)
     {
         ReportScrubber.ScrubForSentry(text, NoValues).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("Access to the path 'C:\\Users\\O'Brien\\.sform\\logs\\cli20261115.log' is denied.", "Access to the path '***' is denied.")]
+    [InlineData("Could not find file '/home/o'brien/.sform/sform.settings.json'.", "Could not find file '***'.")]
+    [InlineData("The certificate file C:\\Users\\Alice Smith\\certs\\globex-payroll.pfx in STORYTELLER_CLIENT_CERTIFICATE does not exist.", "The certificate file *** in STORYTELLER_CLIENT_CERTIFICATE does not exist.")]
+    [InlineData("The file C:\\Users\\O'Brien\\x.log is locked.", "The file *** is locked.")]
+    [InlineData("The input string 'first-line-secret", "The input string '***")]
+    [InlineData("{\"name\":\"b", "{\"***\":\"***")]
+    public void ScrubForSentry_RemovesAPathOrAQuoteWhole(string text, string expected)
+    {
+        ReportScrubber.ScrubForSentry(text, NoValues).ShouldBe(expected);
+    }
+
+    // The shapes go before the values: a value inside a shape would hide it from its rule and leave the rest.
+    [Theory]
+    [InlineData("WorkOS rejected the sign-in: ada.lovelace@acme.com is not a member.", "acme", "WorkOS rejected the sign-in: *** is not a member.")]
+    [InlineData("Cannot write C:\\Users\\ada\\plans\\out.zip now", "c", "Cannot write *** now")]
+    [InlineData("Tenant 7c9e6679-7425-40de-944b-e07fc1f90ae7 not found", "7425", "Tenant *** not found")]
+    [InlineData("The discovery of https://auth.example.com/tenants/acme-corp/.well-known/openid-configuration?state=xyz123 failed.", "example", "The discovery of https://auth.***.com/*** failed.")]
+    public void ScrubForSentry_AValueInsideAShape_LeavesNothingOfIt(string text, string value, string expected)
+    {
+        ReportScrubber.ScrubForSentry(text, [value]).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("Login failed: Server=db1;Password=Hunter2xyz;Database=app", "Hunter2xyz")]
+    [InlineData("{\"token\":\"abc123secretxyz\"}", "abc123secretxyz")]
+    public void ScrubSecrets_APartThatNamesASecret_DoesNotHideItsShape(string text, string secret)
+    {
+        ReportScrubber.ScrubSecrets(text, ["db.password", "password", "app.token", "token"]).ShouldNotContain(secret);
+    }
+
+    [Fact]
+    public void ScrubForSentry_AValueOfSeveralLines_LosesItsFirstLine()
+    {
+        var values = CommandLineValues.FromArguments(["first-line-secret\nsecond line"]).All;
+
+        ReportScrubber.ScrubForSentry("The value first-line-secret\nsecond line is not valid.", values).ShouldBe("The value ***");
     }
 
     [Fact]

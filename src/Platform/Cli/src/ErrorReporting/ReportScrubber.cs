@@ -8,12 +8,14 @@ namespace _42.Platform.Cli.ErrorReporting;
 
 // What the reports of a run may show of a text. The values the customer gave sform are known (CommandLineValues), so they
 // go by value; the other secrets and customer data go by shape.
-// - ScrubSecrets, for the local log: the given values and the shapes of secrets (the rules of the API's SentryScrubber).
-// - ScrubForSentry, for an exception message in Sentry: its first line, ScrubSecrets, then quoted text, the paths and
-//   queries of URLs, file paths, e-mail addresses and GUIDs, cut at 300 characters.
+// - ScrubSecrets, for the local log: the shapes of secrets (the rules of the API's SentryScrubber), then the values.
+// - ScrubForSentry, for an exception message in Sentry: its first line; the shapes of secrets, quoted text, the paths and
+//   queries of URLs, file paths, e-mail addresses and GUIDs; then the values; cut at 300 characters.
 // - ScrubEvent, the BeforeSend of ErrorReporter: the exception messages, and what the SDK adds on its own (user,
 //   server name, assembly paths, tags, extras, contexts, Exception.Data).
-// A regex that times out throws: ErrorReporter writes the report without the exception, and BeforeSend drops the event.
+// The shapes go first: a value replaced inside one ("acme" of ada@acme.com, "https:" of a URL, "password" of
+// Password=…) would hide the shape from its rule and leave the rest of it.
+// A regex that times out throws: RedactedException writes the chain without messages, and BeforeSend drops the event.
 internal static class ReportScrubber
 {
     public const string Mask = "***";
@@ -24,8 +26,15 @@ internal static class ReportScrubber
 
     public const int MaxSentryMessageLength = 300;
 
-    // A shorter value is replaced as a whole word only: "v1" or "a" would cut every other word.
-    private const int MinimumSubstringLength = 3;
+    // A shorter value is replaced as a whole word only: "v1", "dev" or "a" would cut every other word.
+    private const int MinimumSubstringLength = 4;
+
+    // The rest of a file path: a space only before a part that has a separator further on (C:\Users\Ada Lovelace\x.pfx
+    // in …), an apostrophe only inside a word (O'Brien).
+    private const string PathRest = @"(?:[^\s'""<>|]|(?<=\p{L})'(?=\p{L})|[ ](?=[^\s'""<>|\\/]*[\\/]))*";
+
+    // The start of an absolute file path.
+    private const string PathStart = @"(?:[A-Za-z]:[\\/]|\\\\|~[\\/]|/)";
 
     // Opaque tokens: base64 keys and secrets have at least this entropy per character; names, GUIDs and hex stay below it.
     private const double TokenEntropy = 4.2;
@@ -95,10 +104,17 @@ internal static class ReportScrubber
     // valid number"); an apostrophe inside a word ("can't") opens no quote.
     private static readonly (Regex Pattern, string Replacement)[] QuoteRules =
     [
+        // a quoted file path up to the last closing quote of the line, so an apostrophe in it (O'Brien) does not end it
+        (Create($@"(?<![\p{{L}}\p{{N}}])'(?={PathStart})[^\r\n]*'(?![\p{{L}}\p{{N}}])"), $"'{Mask}'"),
+
         (Create(@"(?<![\p{L}\p{N}])'[^'\r\n]*'(?![\p{L}\p{N}])"), $"'{Mask}'"),
         (Create(@"""[^""\r\n]*"""), $"\"{Mask}\""),
         (Create(@"‘[^’\r\n]*’"), $"‘{Mask}’"),
         (Create(@"“[^”\r\n]*”"), $"“{Mask}”"),
+
+        // a quote the first line cut off, up to the end: an opening quote (after a space or a bracket) with no other after it
+        (Create(@"(?<![^\s(\[{:=,])'[^'\r\n]+$"), $"'{Mask}"),
+        (Create(@"(?<![^\s(\[{:=,])""[^""\r\n]+$"), $"\"{Mask}"),
     ];
 
     // A URL keeps its scheme, host and port; the user information, the path and the query go.
@@ -108,10 +124,10 @@ internal static class ReportScrubber
     private static readonly (Regex Pattern, string Replacement)[] SentryRules =
     [
         // file paths: a drive, a UNC path, the home directory, or an absolute path of two or more segments
-        (Create(@"\b[A-Za-z]:[\\/][^\s'""<>|]*"), Mask),
-        (Create(@"(?<![\w\\])\\\\[^\s\\'""<>|]+\\[^\s'""<>|]*"), Mask),
-        (Create(@"(?<![\w/~.])~[\\/][^\s'""<>|]*"), Mask),
-        (Create(@"(?<![\w/:.~*-])/[^\s/'""<>|]+(?:/[^\s/'""<>|]*)+"), Mask),
+        (Create($@"\b[A-Za-z]:[\\/]{PathRest}"), Mask),
+        (Create($@"(?<![\w\\])\\\\[^\s\\'""<>|]+\\{PathRest}"), Mask),
+        (Create($@"(?<![\w/~.])~[\\/]{PathRest}"), Mask),
+        (Create($@"(?<![\w/:.~*-])/[^\s/'""<>|]+/{PathRest}"), Mask),
 
         // e-mail addresses
         (Create(@"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"), Mask),
@@ -130,14 +146,7 @@ internal static class ReportScrubber
             return text ?? string.Empty;
         }
 
-        text = ScrubValues(text, values);
-
-        foreach (var (pattern, replacement) in SecretRules)
-        {
-            text = pattern.Replace(text, replacement);
-        }
-
-        return TokenRun.Replace(text, match => ScrubRun(match.Value));
+        return ScrubValues(ScrubShapesOfSecrets(text), values);
     }
 
     public static string ScrubForSentry(string? text, IEnumerable<string> values)
@@ -148,7 +157,7 @@ internal static class ReportScrubber
         }
 
         var lineEnd = text.IndexOfAny(['\r', '\n']);
-        text = ScrubSecrets(lineEnd < 0 ? text : text[..lineEnd], values);
+        text = ScrubShapesOfSecrets(lineEnd < 0 ? text : text[..lineEnd]);
 
         foreach (var (pattern, replacement) in QuoteRules)
         {
@@ -164,7 +173,7 @@ internal static class ReportScrubber
             text = pattern.Replace(text, replacement);
         }
 
-        text = text.Trim();
+        text = ScrubValues(text, values).Trim();
         return text.Length <= MaxSentryMessageLength ? text : $"{text[..(MaxSentryMessageLength - 1)]}…";
     }
 
@@ -221,6 +230,16 @@ internal static class ReportScrubber
         sentryEvent.Request = new SentryRequest();
         sentryEvent.ServerName = null;
         return sentryEvent;
+    }
+
+    private static string ScrubShapesOfSecrets(string text)
+    {
+        foreach (var (pattern, replacement) in SecretRules)
+        {
+            text = pattern.Replace(text, replacement);
+        }
+
+        return TokenRun.Replace(text, match => ScrubRun(match.Value));
     }
 
     // Longest first, so a value goes before its parts; case-insensitive, also JSON-escaped and URL-encoded.

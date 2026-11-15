@@ -12,8 +12,8 @@ namespace _42.Platform.Cli.UnitTests.Telemetry;
 // The command tree of sform as the host builds it, without its services: every constructor dependency is a mock.
 internal static class SformApplication
 {
-    // With a run, configured as Program.ConfigureConsoleApplication does: response files, the separator, and the run
-    // recorded from the root's OnParsingComplete, before the handlers of the subcommands.
+    // With a run, configured by Program as Main is: response files, the separator, and the run recorded from the root's
+    // OnParsingComplete, before the handlers of the subcommands.
     public static CommandLineApplication<PlatformCommand> Create(CommandRun? run = null)
     {
         var app = new CommandLineApplication<PlatformCommand>(NullConsole.Singleton);
@@ -21,10 +21,7 @@ internal static class SformApplication
 
         if (run is not null)
         {
-            app.ResponseFileHandling = ResponseFileHandling.ParseArgsAsLineSeparated;
-            app.AllowArgumentSeparator = true;
-            app.MakeSuggestionsInErrorMessage = true;
-            app.OnParsingComplete(result => run.RecordParsing(result.SelectedCommand));
+            Program.ConfigureConsoleApplication(app, run);
         }
 
         return app;
