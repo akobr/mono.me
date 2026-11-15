@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 using _42.Platform.Storyteller.Accessing;
 
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
@@ -219,7 +220,7 @@ public sealed class AuthKitMachineTokenValidationTests : IDisposable
     private AuthKitBearerTokenValidator CreateUserValidator(string userIssuer = UserIssuer)
     {
         var options = Options(userIssuer: userIssuer);
-        return new AuthKitBearerTokenValidator(options, new AuthKitClaimNormalizer(options), new TestHostEnvironment(), _userKeys);
+        return new AuthKitBearerTokenValidator(options, new AuthKitClaimNormalizer(options), new TestHostEnvironment(), NullLogger<AuthKitBearerTokenValidator>.Instance, _userKeys);
     }
 
     private AuthKitMachineTokenValidator CreateMachineValidator(string? machineOrganization = MachineOrganization)

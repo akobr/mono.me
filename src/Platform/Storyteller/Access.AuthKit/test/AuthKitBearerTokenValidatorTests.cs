@@ -4,6 +4,8 @@ using System.Text;
 
 using _42.Platform.Storyteller.Accessing;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
@@ -45,6 +47,8 @@ public class AuthKitBearerTokenValidatorTests
         Value(result, "name").ShouldBe("Ada Lovelace");
         Value(result, "preferred_username").ShouldBe("ada@example.com");
         Value(result, "scp").ShouldBe("User.Impersonation Annotation.Read Secrets.Read");
+        result.Claims.ShouldNotContain(claim => claim.Type == "act");
+        fixture.Logger.Entries.ShouldBeEmpty();
     }
 
     [Theory]
@@ -278,6 +282,163 @@ public class AuthKitBearerTokenValidatorTests
     }
 
     [Fact]
+    public async Task Validate_ImpersonationToken_IsRefusedAndLogged()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(new Dictionary<string, object>
+        {
+            ["sub"] = "user_01",
+            ["email"] = "ada@example.com",
+            ["act"] = new Dictionary<string, object> { ["sub"] = "admin@example.com" },
+        });
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldBeNull();
+        var entry = fixture.Logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        LoggedValue(entry, "Subject").ShouldBe("user_01");
+        LoggedValue(entry, "Actor").ShouldBe("admin@example.com");
+        entry.Message.ShouldContain("WorkOS impersonation");
+        entry.Message.ShouldNotContain(rawToken);
+        entry.Message.ShouldNotContain("{\"sub\"");
+        entry.Values.Where(pair => pair.Key != "{OriginalFormat}").Any(pair => pair.Value is string text && (text.Contains(rawToken) || text.Contains('{'))).ShouldBeFalse();
+        entry.Exception.ShouldBeNull();
+    }
+
+    // Any top-level act is refused, whatever its value, also when the claims show none ([] gives no claim, and of a
+    // duplicated member the last one wins).
+    [Theory]
+    [InlineData("\"act\":\"admin@example.com\"", "admin@example.com")]
+    [InlineData("\"act\":null", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":[]", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":{}", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":[\"admin@example.com\"]", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":{\"email\":\"admin@example.com\"}", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":{\"sub\":42}", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":42", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":true", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":{\"sub\":\"admin@example.com\",\"act\":{\"sub\":\"other\"}}", "admin@example.com")]
+    [InlineData("\"act\":{\"sub\":\"admin@example.com\"},\"email\":\"ada@example.com\",\"act\":[]", AuthKitTokenSource.NoActorSubject)]
+    [InlineData("\"act\":[],\"email\":\"ada@example.com\",\"act\":{\"sub\":\"admin@example.com\"}", "admin@example.com")]
+    [InlineData("\"\u0061ct\":{\"sub\":\"admin@example.com\"}", "admin@example.com")]
+    public async Task Validate_TokenWithActOfAnyValue_IsRefused(string act, string loggedActor)
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateRawToken(RawUserPayload(act));
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldBeNull();
+        var entry = fixture.Logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        LoggedValue(entry, "Subject").ShouldBe("user_01");
+        LoggedValue(entry, "Actor").ShouldBe(loggedActor);
+    }
+
+    [Theory]
+    [InlineData("\"ACT\":{\"sub\":\"admin@example.com\"}")]
+    [InlineData("\"act \":{\"sub\":\"admin@example.com\"}")]
+    [InlineData("\"may_act\":{\"sub\":\"admin@example.com\"}")]
+    public async Task Validate_ClaimThatIsNotAct_IsAccepted(string claim)
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateRawToken(RawUserPayload(claim));
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        fixture.Logger.Entries.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Validate_ActorForTheLog_IsCutAndHasNoControlCharacters()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(new Dictionary<string, object>
+        {
+            ["sub"] = "user_01",
+            ["act"] = new Dictionary<string, object> { ["sub"] = "admin\n@example.com" + new string('x', 400) },
+        });
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldBeNull();
+        var actor = LoggedValue(fixture.Logger.Entries.ShouldHaveSingleItem(), "Actor").ShouldBeOfType<string>();
+        actor.Length.ShouldBe(AuthKitTokenSource.MaxLoggedLength);
+        actor.ShouldStartWith("admin?@example.com");
+        actor.Any(char.IsControl).ShouldBeFalse();
+    }
+
+    // A token that does not pass names nobody: refused as before, and not logged as an impersonation.
+    [Fact]
+    public async Task Validate_ImpersonationTokenWithAnUnknownKey_IsRefusedWithoutALog()
+    {
+        using var fixture = new TokenFixture();
+        using var otherRsa = RSA.Create(2048);
+        var rawToken = fixture.CreateToken(
+            new Dictionary<string, object> { ["sub"] = "user_01", ["act"] = new Dictionary<string, object> { ["sub"] = "admin@example.com" } },
+            signingKey: new RsaSecurityKey(otherRsa) { KeyId = "test-key" });
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldBeNull();
+        fixture.Logger.Entries.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Validate_ExpiredImpersonationToken_IsRefusedWithoutALog()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(
+            new Dictionary<string, object> { ["sub"] = "user_01", ["act"] = new Dictionary<string, object> { ["sub"] = "admin@example.com" } },
+            expires: DateTime.UtcNow.AddMinutes(-2));
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldBeNull();
+        fixture.Logger.Entries.ShouldBeEmpty();
+    }
+
+    // Not a user token: left to the machine validator as before, so it is not logged as an impersonation.
+    [Fact]
+    public async Task Validate_TokenThatIsNotAUsersWithAct_ReturnsNullWithoutALog()
+    {
+        using var fixture = new TokenFixture();
+        var rawToken = fixture.CreateToken(new Dictionary<string, object>
+        {
+            ["sub"] = "client_01",
+            ["act"] = new Dictionary<string, object> { ["sub"] = "admin@example.com" },
+        });
+
+        var result = await fixture.Validator.ValidateAsync(rawToken);
+
+        result.ShouldBeNull();
+        fixture.Logger.Entries.ShouldBeEmpty();
+    }
+
+    // Why the payload is checked: IdentityModel 8.23 gives an object act as one JSON claim, but "act": [] as no claim.
+    [Fact]
+    public async Task Source_ActClaims_DoNotShowAnEmptyArray()
+    {
+        using var fixture = new TokenFixture();
+        var objectAct = await fixture.Validator.Source.ValidateTokenAsync(
+            fixture.CreateRawToken(RawUserPayload("\"act\":{\"sub\":\"admin@example.com\"}")),
+            TestContext.Current.CancellationToken);
+        var emptyAct = await fixture.Validator.Source.ValidateTokenAsync(
+            fixture.CreateRawToken(RawUserPayload("\"act\":[]")),
+            TestContext.Current.CancellationToken);
+
+        objectAct.IsValid.ShouldBeTrue();
+        var claim = objectAct.ClaimsIdentity.Claims.Where(candidate => candidate.Type == "act").ShouldHaveSingleItem();
+        claim.Value.ShouldBe("{\"sub\":\"admin@example.com\"}");
+        emptyAct.IsValid.ShouldBeTrue();
+        emptyAct.ClaimsIdentity.Claims.ShouldNotContain(candidate => candidate.Type == "act");
+        AuthKitTokenSource.HasActor(objectAct.SecurityToken).ShouldBeTrue();
+        AuthKitTokenSource.HasActor(emptyAct.SecurityToken).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Constructor_BlankIssuer_Throws()
     {
         var options = Options.Create(new UserAuthenticationOptions
@@ -289,7 +450,8 @@ public class AuthKitBearerTokenValidatorTests
         Should.Throw<InvalidOperationException>(() => new AuthKitBearerTokenValidator(
             options,
             new AuthKitClaimNormalizer(options),
-            new TestHostEnvironment()));
+            new TestHostEnvironment(),
+            NullLogger<AuthKitBearerTokenValidator>.Instance));
     }
 
     private static ConfigurationManager<JsonWebKeySet> CreateHttpKeyManager(HttpMessageHandler handler)
@@ -305,9 +467,21 @@ public class AuthKitBearerTokenValidatorTests
         return new Dictionary<string, object> { ["sub"] = "user_01" };
     }
 
+    // A user token's payload with the given members appended, valid for ten minutes.
+    private static string RawUserPayload(string members)
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return $$"""{"iss":"{{Issuer}}","sub":"user_01","iat":{{now - 60}},"nbf":{{now - 60}},"exp":{{now + 600}},{{members}}}""";
+    }
+
     private static string? Value(BearerValidationResult result, string type)
     {
         return result.Claims.FirstOrDefault(claim => claim.Type == type)?.Value;
+    }
+
+    private static object? LoggedValue(CapturingLogger<AuthKitBearerTokenValidator>.Entry entry, string name)
+    {
+        return entry.Values.FirstOrDefault(pair => pair.Key == name).Value;
     }
 
     private sealed class TokenFixture : IDisposable
@@ -346,13 +520,24 @@ public class AuthKitBearerTokenValidatorTests
 
         public AuthKitBearerTokenValidator Validator { get; }
 
+        public CapturingLogger<AuthKitBearerTokenValidator> Logger { get; } = new();
+
         public AuthKitBearerTokenValidator CreateValidator(IConfigurationManager<JsonWebKeySet> manager)
         {
             return new AuthKitBearerTokenValidator(
                 _options,
                 new AuthKitClaimNormalizer(_options),
                 new TestHostEnvironment(),
+                Logger,
                 manager);
+        }
+
+        // RS256 over the payload as written, for payloads a claims dictionary cannot hold (a duplicated member).
+        public string CreateRawToken(string payloadJson)
+        {
+            var input = $"{Base64UrlEncoder.Encode("""{"alg":"RS256","kid":"test-key","typ":"JWT"}""")}.{Base64UrlEncoder.Encode(payloadJson)}";
+            var signature = Rsa.SignData(Encoding.ASCII.GetBytes(input), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            return $"{input}.{Base64UrlEncoder.Encode(signature)}";
         }
 
         public string CreateToken(

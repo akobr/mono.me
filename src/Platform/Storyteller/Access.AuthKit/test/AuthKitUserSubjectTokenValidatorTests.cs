@@ -5,6 +5,7 @@ using _42.Platform.Storyteller.Accessing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
@@ -97,7 +98,7 @@ public sealed class AuthKitUserSubjectTokenValidatorTests : IDisposable
     {
         var token = Token(UserClaims(), issuer: AuthKitDomain, key: _domainKey, audience: null);
         var options = UserOptions(authKit => authKit.Audience = null);
-        var bearer = new AuthKitBearerTokenValidator(options, new AuthKitClaimNormalizer(options), new TestHostEnvironment(), _userKeys);
+        var bearer = new AuthKitBearerTokenValidator(options, new AuthKitClaimNormalizer(options), new TestHostEnvironment(), NullLogger<AuthKitBearerTokenValidator>.Instance, _userKeys);
 
         var result = await bearer.ValidateAsync(token);
 
@@ -161,6 +162,17 @@ public sealed class AuthKitUserSubjectTokenValidatorTests : IDisposable
     public async Task TokenThatAlreadyNamesAnActor_IsRefused()
     {
         var token = Token(UserClaims(new Dictionary<string, object> { ["act"] = new Dictionary<string, object> { ["sub"] = "other-actor" } }));
+
+        var result = await CreateValidator().ValidateAsync(token, Audiences, []);
+
+        result.RefusalReason.ShouldBe("The token already names an actor (act).");
+    }
+
+    // "act": [] gives no claim of type act, so the payload is checked.
+    [Fact]
+    public async Task TokenWithAnEmptyActArray_IsRefused()
+    {
+        var token = Token(UserClaims(new Dictionary<string, object> { ["act"] = new List<string>() }));
 
         var result = await CreateValidator().ValidateAsync(token, Audiences, []);
 
@@ -317,7 +329,7 @@ public sealed class AuthKitUserSubjectTokenValidatorTests : IDisposable
     {
         var options = UserOptions(configure);
         var normalizer = new AuthKitClaimNormalizer(options);
-        var bearer = new AuthKitBearerTokenValidator(options, normalizer, new TestHostEnvironment(), userKeys ?? _userKeys);
+        var bearer = new AuthKitBearerTokenValidator(options, normalizer, new TestHostEnvironment(), NullLogger<AuthKitBearerTokenValidator>.Instance, userKeys ?? _userKeys);
         var exchange = Options.Create(new TokenExchangeOptions
         {
             AdditionalIssuers = [new TokenExchangeIssuerOptions { Issuer = AuthKitDomain, JwksUri = AuthKitDomainJwks }],
