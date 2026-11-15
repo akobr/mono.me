@@ -75,6 +75,15 @@ public sealed partial class AnnotationsPage(App app, AppRoutes routes)
         }
     }
 
+    // Asserts that the page has none of its create actions, as for a Reader: New (from 640 px), New annotation (a
+    // phone's navbar, an empty state) and Bulk create (the navbar from 640 px, an empty state).
+    public async Task ExpectNoCreateActionsAsync()
+    {
+        await Expect(app.Page.GetByRole(AriaRole.Button, new() { Name = "New", Exact = true })).ToHaveCountAsync(0);
+        await Expect(app.Page.GetByRole(AriaRole.Button, new() { Name = "New annotation", Exact = true })).ToHaveCountAsync(0);
+        await Expect(app.Page.GetByRole(AriaRole.Button, new() { Name = "Bulk create", Exact = true })).ToHaveCountAsync(0);
+    }
+
     // Types the query into the filter and waits until it applied: the debounced URL has exactly ?q=<query>, or no q for
     // an empty query, so a second filter or a page opened with ?q= does not return early.
     public async Task FilterAsync(string query)

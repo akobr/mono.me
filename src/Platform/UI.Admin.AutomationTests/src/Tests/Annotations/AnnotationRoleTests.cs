@@ -25,13 +25,13 @@ public sealed partial class AnnotationRoleTests : PlatformTest
         var annotations = new AnnotationsPage(App, Routes);
         await annotations.OpenAsync();
         await Expect(annotations.Filter).ToBeVisibleAsync();
-        await ExpectNoCreateActionsAsync();
+        await annotations.ExpectNoCreateActionsAsync();
 
         var empty = new AnnotationsPage(App, Routes with { View = PlatformData.ViewName() });
         await empty.OpenAsync();
         await Expect(empty.EmptyState).ToBeVisibleAsync();
         await Expect(empty.EmptyStateBlock.GetByText("Create the first annotations, or import them with the sform CLI.", new() { Exact = true })).ToBeVisibleAsync();
-        await ExpectNoCreateActionsAsync();
+        await empty.ExpectNoCreateActionsAsync();
         await Expect(empty.FilterCount).ToHaveTextAsync("0");
     }
 
@@ -147,15 +147,6 @@ public sealed partial class AnnotationRoleTests : PlatformTest
         }
 
         await Expect(detail.MenuItem("Delete")).ToHaveCountAsync(0);
-    }
-
-    // None of the create actions of the annotations page: New (from 640 px), New annotation (a phone's navbar, an
-    // empty state) and Bulk create (the navbar from 640 px, an empty state).
-    private async Task ExpectNoCreateActionsAsync()
-    {
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "New", Exact = true })).ToHaveCountAsync(0);
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "New annotation", Exact = true })).ToHaveCountAsync(0);
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Bulk create", Exact = true })).ToHaveCountAsync(0);
     }
 
     // The detail of an annotation in the list's view, …/annotations/<key>, with any query.

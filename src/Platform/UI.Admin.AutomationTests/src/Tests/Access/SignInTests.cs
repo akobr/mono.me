@@ -7,7 +7,7 @@ using static Microsoft.Playwright.Assertions;
 namespace _42.Platform.UI.Admin.AutomationTests.Tests.Access;
 
 // Sign In and Account: signing in and out, the login, callback and unsupported pages, the Account page and a new
-// user's onboarding.
+// user's onboarding, whose tests are in SignInTests.Onboarding.cs.
 [Area(Area.Access)]
 public sealed partial class SignInTests : PlatformTest
 {
@@ -174,49 +174,6 @@ public sealed partial class SignInTests : PlatformTest
 
         await membership.ClickAsync();
         await App.ExpectAtAsync((Routes with { View = AppRoutes.DefaultView }).Annotations);
-    }
-
-    // ACC-SGN-06: A new user creates the first organization and project on onboarding.
-    // In the mock's new-user scenario Ada Lovelace has no account, so the app opens onboarding; its form refuses empty
-    // and reserved names, then creates the organization and the project, whose card shows the trimmed description.
-    [Test]
-    [TestCase(21)]
-    [MockOnly("the new-user scenario, a signed-in user without an account")]
-    public async Task Onboarding_NewUser_CreatesFirstOrganization()
-    {
-        var organization = PlatformData.OrganizationKey();
-        var project = PlatformData.ProjectKey();
-        var description = PlatformData.Description(200);
-        var created = new AppRoutes(organization, project, AppRoutes.DefaultView);
-
-        // Not PlatformTest.App: its first navigation would add the default scenario.
-        var app = new App(Page, "new-user");
-        await app.GotoAsync(created.Home);
-        var onboarding = new OnboardingPage(app, created);
-        await onboarding.WaitForAsync();
-        await Expect(onboarding.Heading).ToHaveTextAsync("Welcome, Ada Lovelace");
-        await Expect(onboarding.Intro).ToBeVisibleAsync();
-        await Expect(onboarding.CreateAndContinueButton).ToBeVisibleAsync();
-
-        await onboarding.CreateAndContinueButton.ClickAsync();
-        await Expect(onboarding.FieldError("Enter a organization name.")).ToBeVisibleAsync();
-        await Expect(onboarding.FieldError("Enter a project name.")).ToBeVisibleAsync();
-
-        await onboarding.OrganizationField.FillAsync("invitations");
-        await onboarding.CreateAndContinueButton.ClickAsync();
-        await Expect(onboarding.FieldError("This organization name is reserved.")).ToBeVisibleAsync();
-
-        await onboarding.CreateAsync(organization, project, $"  {description}  ");
-        await app.ExpectAtAsync(created.Annotations);
-        await Expect(new AnnotationsPage(app, created).EmptyState).ToBeVisibleAsync();
-
-        var overview = new OrganizationOverview(app, created);
-        await overview.OpenAsync();
-        var card = overview.ProjectCard(project);
-        await Expect(card.GetByText("Owner", new() { Exact = true })).ToBeVisibleAsync();
-        await Expect(card.GetByText($"{organization}.{project}", new() { Exact = true })).ToBeVisibleAsync();
-        await Expect(overview.ProjectCardDescription(project)).ToHaveTextAsync(description);
-        await Expect(overview.ProjectCardDescription(project)).ToHaveAttributeAsync("title", description);
     }
 
     [GeneratedRegex(@"^[^@\s]+@[^@\s]+$")]
