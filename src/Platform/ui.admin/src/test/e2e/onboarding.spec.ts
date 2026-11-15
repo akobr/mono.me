@@ -299,6 +299,11 @@ test('a new user joins only the exhibition and creates an organization later', a
   await chooseExhibition(page)
   await nextTo(page, 'Create your organization')
   await expect(page.getByText('You are joining the exhibition.')).toBeVisible()
+  // The first field has the focus. Leaving it empty for the button shows no error: the error would move the button
+  // under the pointer, and the press would miss it.
+  await expect(page.getByRole('textbox', { name: 'Organization' })).toBeFocused()
+  await exhibitionOnly(page).focus()
+  await expect(page.getByText('Enter a organization name.')).toBeHidden()
   await exhibitionOnly(page).click()
 
   // The join created the account. The user lands in the exhibition, so the toast needs no link to it.

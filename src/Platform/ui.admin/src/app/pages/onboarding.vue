@@ -191,6 +191,7 @@ watch(
               :submit="submit"
               :submit-label="texts.organization.submit"
               :autofocus="false"
+              :validate-on-blur="false"
               :disabled="end.state.value !== 'idle'"
             >
               <template #actions>

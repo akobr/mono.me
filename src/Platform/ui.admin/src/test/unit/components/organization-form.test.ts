@@ -4,7 +4,10 @@ import ui from '@nuxt/ui/vue-plugin'
 import { StorytellerError } from '@42for.net/2splatform.sdk'
 import OrganizationForm from '@/components/orgs/OrganizationForm.vue'
 
-function mountForm(submit = vi.fn(async () => {}), props: { autofocus?: boolean; disabled?: boolean } = {}) {
+function mountForm(
+  submit = vi.fn(async () => {}),
+  props: { autofocus?: boolean; disabled?: boolean; validateOnBlur?: boolean } = {},
+) {
   const wrapper = mount(OrganizationForm, {
     props: { submit, ...props },
     global: { plugins: [ui] },
@@ -98,6 +101,29 @@ describe('OrganizationForm (VeeValidate + Zod)', () => {
     expect(document.activeElement).not.toBe(organization.element)
     expect(document.activeElement).toBe(document.body)
     wrapper.unmount()
+  })
+
+  // The dialog checks a field when the user leaves it. The wizard has Back and a second way to end below the form:
+  // there the error of an untouched field would move those buttons while they are pressed (424-267).
+  it('checks a field that the user leaves, unless the page turns that off', async () => {
+    const dialog = mountForm()
+    await dialog.organization.trigger('blur')
+    await vi.waitFor(() => expect(dialog.wrapper.text()).toContain('Enter a organization name.'))
+    dialog.wrapper.unmount()
+
+    const wizard = mountForm(undefined, { validateOnBlur: false })
+    await wizard.organization.trigger('blur')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(wizard.wrapper.text()).not.toContain('Enter a organization name.')
+
+    // A change and the submit still check it.
+    await wizard.organization.setValue('Acme Corp')
+    await vi.waitFor(() => expect(wizard.wrapper.find('[id$="-error"]').exists()).toBe(true))
+    await wizard.organization.setValue('')
+    await wizard.wrapper.find('form').trigger('submit')
+    await vi.waitFor(() => expect(wizard.wrapper.text()).toContain('Enter a organization name.'))
+    expect(wizard.submit).not.toHaveBeenCalled()
+    wizard.wrapper.unmount()
   })
 
   it('submits with an enabled button by default', () => {
