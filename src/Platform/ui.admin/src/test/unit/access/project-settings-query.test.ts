@@ -9,6 +9,7 @@ import { createSeed, loadDb, resetDb, saveDb } from '@/mock/db'
 import { useCurrentProjectSettings } from '@/queries/project-settings'
 import { useContextStore } from '@/stores/context'
 import { useProjectSettingsStore } from '@/stores/project-settings'
+import { legacyProjectSettingsKey } from '@/utils/legacy-project-settings'
 import { mountScreen, settle } from '../../helpers'
 
 // The settings of the current project (424-266, spec section 2): read from the API into the store, the first answer
@@ -133,6 +134,25 @@ describe('useCurrentProjectSettings', () => {
     expect(store.loaded('acme.shipping')).toBe(true)
     expect(store.defaultTimeZone).toBe('UTC')
     expect(store.settingsOf('acme.billing').defaultTimeZone).toBe('Asia/Tokyo')
+  })
+
+  it('removes the settings this browser kept for a project once it has settings on the server', async () => {
+    localStorage.setItem(
+      legacyProjectSettingsKey,
+      JSON.stringify({ 'acme.billing': { dateFormat: 'dd.mm.yyyy' }, 'acme.shipping': { dateFormat: 'mm/dd/yyyy' } }),
+    )
+    resetDb('default')
+    const { show, queryClient } = await mountQuery()
+    useContextStore().set({ org: 'acme', project: 'billing' })
+    await show()
+
+    // Version 0: the offer to save them stays possible.
+    expect(JSON.parse(localStorage.getItem(legacyProjectSettingsKey)!)).toHaveProperty(['acme.billing'])
+
+    queryClient.setQueryData(getGetProjectSettingsQueryKey('acme', 'billing'), tokyo)
+    expect(JSON.parse(localStorage.getItem(legacyProjectSettingsKey)!)).toEqual({
+      'acme.shipping': { dateFormat: 'mm/dd/yyyy' },
+    })
   })
 
   it('reads nothing outside a project or for a project without access', async () => {

@@ -26,6 +26,12 @@ import { useContextStore } from '@/stores/context'
 import { usePreferencesStore } from '@/stores/preferences'
 import { dateFormatItems, defaultDateFormat, type DateFormat } from '@/utils/dates'
 import { errorMessage, writeFailureTitle } from '@/utils/errors'
+import {
+  legacyProjectSettingsDraft,
+  readLegacyProjectSettings,
+  removeLegacyProjectSettings,
+  type LegacyProjectSettings,
+} from '@/utils/legacy-project-settings'
 import { credentialKindDescriptions, credentialKinds, issuesCertificates } from '@/utils/machines'
 import {
   defaultTimeZone as builtInTimeZone,
@@ -175,6 +181,89 @@ function loadSavedSettings() {
   draft.value = draftOf(savedSettings.value)
   settingsConflict.value = false
   settingsProblems.value = undefined
+}
+
+// The settings this browser kept for the project before the API stored them (424-266, spec section 4): while the
+// project has none on the server (Version 0), an Administrator can save them for everyone or discard them, and anyone
+// else is asked to have an Administrator save them. Once the server has settings, the entry goes.
+const legacySettings = shallowRef<LegacyProjectSettings>()
+watch(
+  [() => context.projectKey, () => settingsQuery.data.value] as const,
+  ([key, data]) => {
+    if (key && (data?.Version ?? 0) > 0) {
+      removeLegacyProjectSettings(key)
+      legacySettings.value = undefined
+    } else {
+      legacySettings.value = key ? readLegacyProjectSettings(key) : undefined
+    }
+  },
+  { immediate: true },
+)
+const showLegacySettings = computed(
+  () => !!legacySettings.value && settingsLoaded.value && savedSettings.value.version === 0,
+)
+/** What the old settings change, for the banner. */
+const legacySummary = computed(() => {
+  const settings = legacySettings.value
+  if (!settings) {
+    return ''
+  }
+  const parts: string[] = []
+  if (settings.defaultTimeZone) {
+    parts.push(`time zone ${settings.defaultTimeZone}`)
+  }
+  if (settings.dateFormat) {
+    parts.push(`date format ${settings.dateFormat}`)
+  }
+  const typeCount = Object.keys(settings.types ?? {}).length
+  if (typeCount > 0) {
+    parts.push(`names, colors or icons of ${typeCount} annotation ${typeCount === 1 ? 'type' : 'types'}`)
+  }
+  const text = parts.join(', ')
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`
+})
+const savingLegacySettings = ref(false)
+
+/** Saves the old settings of this browser for the project, under If-Match "0": only while it has none on the server. */
+async function saveLegacySettings() {
+  const { org, project, projectKey } = context
+  const settings = legacySettings.value
+  if (!org || !project || !projectKey || !settings || savingLegacySettings.value) {
+    return
+  }
+  savingLegacySettings.value = true
+  try {
+    const answer = await setProjectSettings(
+      org,
+      project,
+      toApi(legacyProjectSettingsDraft(settings), savedSettings.value),
+      { headers: { 'If-Match': projectSettingsEntityTag(0) } },
+    )
+    removeLegacyProjectSettings(projectKey)
+    legacySettings.value = undefined
+    queryClient.setQueryData(getGetProjectSettingsQueryKey(org, project), answer)
+    toast.add({ title: 'Project settings saved', color: 'success', icon: 'i-lucide-check' })
+    await invalidateProject(queryClient, projectKey)
+  } catch (error) {
+    toast.add({
+      title: writeFailureTitle(error, 'The project settings were not saved'),
+      description: errorMessage(error),
+      color: 'error',
+    })
+    // Someone saved settings meanwhile: their answer removes the entry.
+    if (hasErrorCode(error, 'SettingsPreconditionFailed') || isPreconditionFailed(error)) {
+      await settingsQuery.refetch()
+    }
+  } finally {
+    savingLegacySettings.value = false
+  }
+}
+
+function discardLegacySettings() {
+  if (context.projectKey) {
+    removeLegacyProjectSettings(context.projectKey)
+  }
+  legacySettings.value = undefined
 }
 
 const accessPoint = useGetAccessPoint(() => context.projectKey ?? '', {
@@ -359,6 +448,44 @@ async function downloadCa() {
           compact
           @retry="settingsQuery.refetch()"
         />
+
+        <UAlert
+          v-if="showLegacySettings"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-upload"
+          title="Project settings of this browser"
+          :actions="
+            canManageSettings
+              ? [
+                  {
+                    label: 'Save for the project',
+                    color: 'info',
+                    loading: savingLegacySettings,
+                    onClick: saveLegacySettings,
+                  },
+                  {
+                    label: 'Discard',
+                    color: 'neutral',
+                    variant: 'outline',
+                    disabled: savingLegacySettings,
+                    onClick: discardLegacySettings,
+                  },
+                ]
+              : []
+          "
+        >
+          <template #description>
+            <p v-if="canManageSettings">
+              These project settings were set in this browser before they were shared. Save them for the whole project?
+            </p>
+            <p v-else>
+              These project settings were set in this browser before they were shared. Ask an Administrator of the
+              project to save them for everyone.
+            </p>
+            <p class="mt-1 text-xs">{{ legacySummary }}</p>
+          </template>
+        </UAlert>
 
         <UCard>
           <template #header>
