@@ -33,6 +33,22 @@ public class SetsCommandTests
         (await Command().OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
 
         _fixture.AddSet("bad", "{}", ("key-values.json", """{ "Items": [ { "Key": "a", "Protection": "Byok", "Value": "1" } ] }"""));
+
+        (await Command().OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+    }
+
+    [Fact]
+    public async Task Sets_ShowsTheProjectSettingsAndRefusesThoseThatBreakARule()
+    {
+        _fixture.AddSet(
+            "styled",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""",
+            ("project-settings.json", """{ "Format": "2s.project-settings.v1", "Types": { "sbt": { "Label": "Customer" } }, "DefaultTimeZone": "Europe/Oslo" }"""));
+
+        (await Command().OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
+
+        _fixture.AddSet("broken", "{}", ("project-settings.json", """{ "DefaultTimeZone": "Central Europe Standard Time" }"""));
+
         (await Command().OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
     }
 

@@ -452,6 +452,7 @@ public class DataSetSeederKeyValuesTests
             _fileSystem,
             new DataSetCatalog(_fileSystem, Tool),
             new DataSetProvisioner(_access.Object, _views.Object, NullLogger<DataSetProvisioner>.Instance),
+            new FakeProjectSettingsService(),
             _importer,
             _bulkWriter,
             new DataSetKeyValueSeeder(_keyValues, _providers, Options.Create(new KeyValueOptions()), NullLogger<DataSetKeyValueSeeder>.Instance),

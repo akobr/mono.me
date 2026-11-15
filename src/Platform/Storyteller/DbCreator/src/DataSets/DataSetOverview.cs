@@ -6,8 +6,8 @@ using _42.Platform.Storyteller.Transferring;
 namespace _42.Platform.Storyteller.DbCreator.DataSets;
 
 // What a set holds, read from its folder alone, for the listing of the sets: the documents per kind (those that
-// cannot be read included), the files that are not documents, and the lines of annotations.jsonl with the annotations
-// they stand for.
+// cannot be read included), the files that are not documents, the lines of annotations.jsonl with the annotations
+// they stand for, and the project settings of project-settings.json.
 public sealed record class DataSetOverview
 {
     public required DataSet Set { get; init; }
@@ -29,8 +29,11 @@ public sealed record class DataSetOverview
     // Null without key-values.json.
     public DataSetKeyValues? KeyValues { get; init; }
 
-    // DataSetException for a folder beyond the limits and for a key-values.json that a seed refuses, as a seed refuses
-    // them; a document or a line that cannot be read is counted.
+    // Null without project-settings.json.
+    public DataSetProjectSettings? ProjectSettings { get; init; }
+
+    // DataSetException for a folder beyond the limits, for a key-values.json that a seed refuses, as a seed refuses them,
+    // and for a project-settings.json that breaks a rule; a document or a line that cannot be read is counted.
     public static DataSetOverview Read(IFileSystem fileSystem, DataSet set)
     {
         var documents = DataSetFolder.ReadDocuments(fileSystem, set.Folder);
@@ -54,6 +57,7 @@ public sealed record class DataSetOverview
             IgnoredFiles = documents.IgnoredFiles,
             Lines = lines is null ? null : DataSetContent.WithoutDuplicates(documents, lines),
             KeyValues = DataSetKeyValues.Read(fileSystem, set.Folder),
+            ProjectSettings = DataSetProjectSettings.Read(fileSystem, set.Folder),
         };
     }
 }

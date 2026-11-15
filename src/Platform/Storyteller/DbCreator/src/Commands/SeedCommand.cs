@@ -31,7 +31,7 @@ public class SeedCommand
     [Option("--organization", CommandOptionType.SingleValue, ValueName = "organization", Description = "The organization to seed into, created with the owner when missing. Default: the Organization of the named sets' set.json.")]
     public string? Organization { get; set; }
 
-    [Option("--project", CommandOptionType.SingleValue, ValueName = "project", Description = "The project to seed into, created when missing; an existing one is used as it is. Default: the Project of the named sets' set.json.")]
+    [Option("--project", CommandOptionType.SingleValue, ValueName = "project", Description = "The project to seed into, created when missing; an existing one keeps its access, and its project settings once they are set. Default: the Project of the named sets' set.json.")]
     public string? Project { get; set; }
 
     [Option("--view", CommandOptionType.SingleValue, ValueName = "view", Description = "The view to seed into, registered when missing. Default: the View of the named sets' set.json, otherwise default.")]

@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using System.Text.Json;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
@@ -110,12 +111,11 @@ public class BuiltInSetsTests
         var content = DataSetContent.Read(FileSystem, showcase.Folder, target);
 
         // the files a Git export of the scope gives (ui.admin's test/unit/mock/showcase-set.test.ts writes them): every
-        // file of the folder is a document in the folder of its kind, except project-settings.json, the settings of the
-        // project (424-266), which is no document of the view and which the seed does not read yet. The counts come from
-        // the folder, so a change of the mock needs no change here.
+        // file of the folder is a document in the folder of its kind. The counts come from the folder, so a change of
+        // the mock needs no change here.
         content.Lines.ShouldBeNull();
-        content.Documents.IgnoredFiles.ShouldBe(1);
-        content.Documents.Files.Count.ShouldBe(DataSetFolder.GetEntries(FileSystem, showcase.Folder).Count - 1);
+        content.Documents.IgnoredFiles.ShouldBe(0);
+        content.Documents.Files.Count.ShouldBe(DataSetFolder.GetEntries(FileSystem, showcase.Folder).Count);
         content.Documents.Files.ShouldAllBe(file => file.ErrorCode == null);
         content.Documents.Files.ShouldAllBe(file => file.Path.StartsWith(ViewArchiveNames.GetFolder(ViewArchiveNames.GetContent(file.Kind)) + "/"));
         content.Documents.Files.ShouldContain(file => file.Kind == ViewDocumentKind.Annotation);
@@ -136,6 +136,61 @@ public class BuiltInSetsTests
         var pairs = content.KeyValues.ShouldNotBeNull();
         pairs.Levels.Select(level => level.Level).ShouldBe([KeyValueProtection.Public, KeyValueProtection.Standard]);
         pairs.Items.Select(item => item.Key).ShouldBe(pairs.Items.Select(item => item.Key).Order(StringComparer.Ordinal));
+
+        // the project settings of the mock's project, written by the same test
+        var settings = content.ProjectSettings.ShouldNotBeNull().Settings;
+        settings.Types.Keys.ShouldBe(ProjectSettingsCatalog.Default.TypeCodes);
+        settings.Types["sbt"].ShouldBe(new ProjectTypeAppearance { Label = "Customer", Color = "blue", Icon = "i-lucide-building-2" });
+        (settings.DefaultTimeZone, settings.DateFormat).ShouldBe(("Europe/Oslo", "dd.mm.yyyy"));
+    }
+
+    [Fact]
+    public void Exhibit_IsTheDemoOfAcmeCorpAndGlobexWithItsTypeNames()
+    {
+        var exhibit = new DataSetCatalog(FileSystem).GetSets().Single(set => set.Name == "exhibit");
+        var target = DataSetTarget.Resolve([exhibit]);
+
+        target.ShouldBe(new DataSetTarget("fourth-wall", "toons-and-tyrants", "default"));
+        exhibit.Manifest.DependsOn.ShouldBeEmpty();
+
+        var content = DataSetContent.Read(FileSystem, exhibit.Folder, target);
+
+        // README.md is no document; key-values.json and project-settings.json are the set's pairs and settings
+        content.Lines.ShouldBeNull();
+        content.Documents.IgnoredFiles.ShouldBe(1);
+        content.Documents.Files.Count.ShouldBe(DataSetFolder.GetEntries(FileSystem, exhibit.Folder).Count - 1);
+        content.Documents.Files.ShouldAllBe(file => file.ErrorCode == null);
+
+        var settings = content.ProjectSettings.ShouldNotBeNull().Settings;
+        settings.Types.ToDictionary(type => type.Key, type => type.Value.Label).ShouldBe(
+            new Dictionary<string, string?>
+            {
+                ["rst"] = "Solution",
+                ["unt"] = "Job",
+                ["sbt"] = "Company",
+                ["usg"] = "Application",
+                ["cnt"] = "Department",
+                ["exe"] = "AppUsage",
+                ["uxe"] = "JobInstance",
+            });
+        settings.Types["sbt"].ShouldBe(new ProjectTypeAppearance { Label = "Company", Plural = "Companies", Color = "pink", Icon = "i-lucide-building-2" });
+        settings.Types.Values.ShouldAllBe(type => type.Plural != null && type.Color != null && type.Icon != null);
+        (settings.DefaultTimeZone, settings.DateFormat).ShouldBe(("America/Phoenix", "yyyy-mm-dd"));
+    }
+
+    // The settings files of the sets are in the file shape that sform project settings -e writes, so a file and an
+    // export compare line by line.
+    [Theory]
+    [InlineData("exhibit")]
+    [InlineData("showcase")]
+    public void ProjectSettings_AreInTheFileShape(string name)
+    {
+        var set = new DataSetCatalog(FileSystem).GetSets().Single(set => set.Name == name);
+        var settings = DataSetProjectSettings.Read(FileSystem, set.Folder).ShouldNotBeNull();
+
+        var text = FileSystem.File.ReadAllText(settings.Path).ReplaceLineEndings("\n");
+
+        text.ShouldBe(ProjectSettingsJson.ToJson(settings.Settings, ProjectSettingsJsonShape.File).ToJsonString(new JsonSerializerOptions { WriteIndented = true }).ReplaceLineEndings("\n") + "\n");
     }
 
     [Fact]
@@ -168,8 +223,8 @@ public class BuiltInSetsTests
 
         var content = DataSetContent.Read(FileSystem, exhibit.Folder, target);
 
-        // README.md and project-settings.json are ignored; key-values.json is the set's pairs, not an ignored file
-        content.Documents.IgnoredFiles.ShouldBe(2);
+        // README.md is ignored; key-values.json and project-settings.json are the set's pairs and settings, not ignored files
+        content.Documents.IgnoredFiles.ShouldBe(1);
         var pairs = content.KeyValues.ShouldNotBeNull();
         pairs.Levels.ShouldBe([(KeyValueProtection.Public, 19), (KeyValueProtection.Standard, 1)]);
         pairs.Items.Single(item => item.Protection == KeyValueProtection.Standard).Key.ShouldBe("globex.lairforce.escrowPin");
@@ -195,6 +250,10 @@ public class BuiltInSetsTests
             content.Documents.Files.ShouldAllBe(file => file.ErrorCode == null, set.Name);
             (content.Lines?.Annotations ?? []).ShouldAllBe(line => line.ErrorCode == null, set.Name);
         }
+
+        // the sets with project settings, which DataSetContent.Read checks by the rules
+        sets.Where(set => DataSetProjectSettings.Read(FileSystem, set.Folder) is not null).Select(set => set.Name).Order(StringComparer.Ordinal)
+            .ShouldBe(["exhibit", "showcase"]);
     }
 
     // The import stores a binding as it is, but a resolved read of a configuration parses every binding of it and of the

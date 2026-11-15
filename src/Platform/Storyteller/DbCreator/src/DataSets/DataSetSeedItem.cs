@@ -2,9 +2,10 @@ using System.Collections.Generic;
 
 namespace _42.Platform.Storyteller.DbCreator.DataSets;
 
-// An outcome worth a line of its own: a document, an annotation of annotations.jsonl or a pair of key-values.json that
-// was skipped, failed or updated. Path is below the set's folder; Line is the line of annotations.jsonl (null for a
-// file); Kind is null for a pair, which KeyValueKey and Protection name.
+// An outcome worth a line of its own: a document, an annotation of annotations.jsonl, a pair of key-values.json or the
+// project settings of project-settings.json that was skipped, failed or updated. Path is below the set's folder; Line
+// is the line of annotations.jsonl (null for a file); Kind is null for a pair, which KeyValueKey and Protection name,
+// and for the project settings (IsProjectSettings).
 public sealed record class DataSetSeedItem
 {
     public required string Path { get; init; }
@@ -12,6 +13,8 @@ public sealed record class DataSetSeedItem
     public int? Line { get; init; }
 
     public ViewDocumentKind? Kind { get; init; }
+
+    public bool IsProjectSettings => Kind is null && Path == DataSetProjectSettings.FileName;
 
     public string? AnnotationType { get; init; }
 

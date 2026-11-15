@@ -1,48 +1,49 @@
 {
-  "types": {
-    "sbt": {
-      "label": "Company",
-      "plural": "Companies",
-      "color": "pink",
-      "icon": "i-lucide-building-2"
-    },
-    "cnt": {
-      "label": "Department",
-      "plural": "Departments",
-      "color": "blue",
-      "icon": "i-lucide-users"
-    },
+  "Format": "2s.project-settings.v1",
+  "Types": {
     "rst": {
-      "label": "Solution",
-      "plural": "Solutions",
-      "color": "green",
-      "icon": "i-lucide-puzzle"
-    },
-    "usg": {
-      "label": "Application",
-      "plural": "Applications",
-      "color": "violet",
-      "icon": "i-lucide-monitor"
-    },
-    "exe": {
-      "label": "AppUsage",
-      "plural": "AppUsages",
-      "color": "orange",
-      "icon": "i-lucide-rocket"
+      "Label": "Solution",
+      "Plural": "Solutions",
+      "Color": "green",
+      "Icon": "i-lucide-puzzle"
     },
     "unt": {
-      "label": "Job",
-      "plural": "Jobs",
-      "color": "yellow",
-      "icon": "i-lucide-cog"
+      "Label": "Job",
+      "Plural": "Jobs",
+      "Color": "yellow",
+      "Icon": "i-lucide-cog"
+    },
+    "sbt": {
+      "Label": "Company",
+      "Plural": "Companies",
+      "Color": "pink",
+      "Icon": "i-lucide-building-2"
+    },
+    "usg": {
+      "Label": "Application",
+      "Plural": "Applications",
+      "Color": "violet",
+      "Icon": "i-lucide-monitor"
+    },
+    "cnt": {
+      "Label": "Department",
+      "Plural": "Departments",
+      "Color": "blue",
+      "Icon": "i-lucide-users"
+    },
+    "exe": {
+      "Label": "AppUsage",
+      "Plural": "AppUsages",
+      "Color": "orange",
+      "Icon": "i-lucide-rocket"
     },
     "uxe": {
-      "label": "JobInstance",
-      "plural": "JobInstances",
-      "color": "gray",
-      "icon": "i-lucide-zap"
+      "Label": "JobInstance",
+      "Plural": "JobInstances",
+      "Color": "gray",
+      "Icon": "i-lucide-zap"
     }
   },
-  "defaultTimeZone": "America/Phoenix",
-  "dateFormat": "yyyy-mm-dd"
+  "DefaultTimeZone": "America/Phoenix",
+  "DateFormat": "yyyy-mm-dd"
 }

@@ -6,11 +6,12 @@ using _42.Platform.Storyteller.Transferring;
 namespace _42.Platform.Storyteller.DbCreator.DataSets;
 
 // The seed of one set. Already seeded: its record has its version and hash, so nothing was read further. Not seeded:
-// a set it depends on failed (FailedDependency). Otherwise Documents counts the document files per kind, Lines the
-// annotations of annotations.jsonl, KeyValues the pairs of key-values.json, Items lists every outcome but Created and
-// Unchanged (of the documents, the lines and the pairs), RelationsCompleted counts the
-// stored parents whose relation arrays got the names of annotation files an earlier run left out (in a dry run: would
-// get), and IsRecorded tells whether the record was written (never in a dry run or after a failure).
+// a set it depends on failed (FailedDependency). Otherwise ProjectSettings tells what became of project-settings.json
+// (null without one), Documents counts the document files per kind, Lines the annotations of annotations.jsonl,
+// KeyValues the pairs of key-values.json, Items lists every outcome but Created and Unchanged (of the project settings,
+// the documents, the lines and the pairs), RelationsCompleted counts the stored parents whose relation arrays got the
+// names of annotation files an earlier run left out (in a dry run: would get), and IsRecorded tells whether the record
+// was written (never in a dry run or after a failure).
 public sealed record class DataSetSeedResult
 {
     public required DataSet Set { get; init; }
@@ -20,6 +21,8 @@ public sealed record class DataSetSeedResult
     public bool IsAlreadySeeded { get; init; }
 
     public string? FailedDependency { get; init; }
+
+    public DataSetProjectSettingsResult? ProjectSettings { get; init; }
 
     public ViewImportTally? Documents { get; init; }
 

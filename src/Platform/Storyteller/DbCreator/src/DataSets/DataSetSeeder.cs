@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.DbCreator.Configuration;
+using _42.Platform.Storyteller.KeyValues;
 using _42.Platform.Storyteller.Transferring;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,13 +16,15 @@ using Microsoft.Extensions.Options;
 namespace _42.Platform.Storyteller.DbCreator.DataSets;
 
 // Seeds data sets into one target through the services of the API, as the System actor and with Existing = Skip: what
-// exists stays, what is missing is created, so a run again or after a stop completes what is missing. Writes nothing
-// to the console; the result tells what happened.
+// exists stays, what is missing is created, so a run again or after a stop completes what is missing. That holds for
+// the project settings too: a set's settings are written only into a project whose settings were never set. Writes
+// nothing to the console; the result tells what happened.
 public sealed class DataSetSeeder
 {
     private readonly IFileSystem _fileSystem;
     private readonly DataSetCatalog _catalog;
     private readonly DataSetProvisioner _provisioner;
+    private readonly IProjectSettingsService _projectSettings;
     private readonly IViewImporter _importer;
     private readonly IAnnotationBulkWriter _bulkWriter;
     private readonly DataSetKeyValueSeeder _keyValues;
@@ -32,6 +37,7 @@ public sealed class DataSetSeeder
         IFileSystem fileSystem,
         DataSetCatalog catalog,
         DataSetProvisioner provisioner,
+        IProjectSettingsService projectSettings,
         IViewImporter importer,
         IAnnotationBulkWriter bulkWriter,
         DataSetKeyValueSeeder keyValues,
@@ -43,6 +49,7 @@ public sealed class DataSetSeeder
         _fileSystem = fileSystem;
         _catalog = catalog;
         _provisioner = provisioner;
+        _projectSettings = projectSettings;
         _importer = importer;
         _bulkWriter = bulkWriter;
         _keyValues = keyValues;
@@ -84,8 +91,10 @@ public sealed class DataSetSeeder
         target.EnsureNames(isNewOrganization: false);
 
         // the limits of every set's files and of its annotations.jsonl, without reading the documents or expanding a
-        // generator, and its key-values.json with the levels the tool can encrypt, so a set beyond them is refused
-        // before the target is provisioned and the sets before it are seeded
+        // generator, its key-values.json with the levels the tool can encrypt, and the rules of its project-settings.json,
+        // so a set beyond them is refused before the target is provisioned and the sets before it are seeded
+        var settings = new List<(DataSet Set, DataSetProjectSettings Settings)>();
+
         foreach (var set in sets)
         {
             DataSetFolder.Validate(_fileSystem, set.Folder);
@@ -95,7 +104,16 @@ public sealed class DataSetSeeder
             {
                 _keyValues.EnsureSeedable(set, pairs, request.Options.PublicPairsOnly);
             }
+
+            if (DataSetProjectSettings.Read(_fileSystem, set.Folder) is { } setSettings)
+            {
+                settings.Add((set, setSettings));
+            }
         }
+
+        // every set of the run, a dependency too, seeds into one project, so their settings must be one: the first set
+        // writes them, and the later ones find them Unchanged
+        DataSetProjectSettings.Agree(settings);
 
         // the descriptions of the named sets first: a dependency such as core is not what the project is about
         var described = named.Concat(sets.Except(named)).Select(set => set.Manifest).ToList();
@@ -126,7 +144,7 @@ public sealed class DataSetSeeder
         var failed = new HashSet<string>(StringComparer.Ordinal);
 
         // a dry run stores nothing, so each set starts from what the sets before it would have written
-        var written = options.DryRun ? new ViewImportOverlay() : null;
+        var written = options.DryRun ? new DryRunWrites() : null;
         var writtenPairs = options.DryRun ? new Dictionary<string, KeyValueDocumentItem>(StringComparer.Ordinal) : null;
 
         foreach (var set in plan.Sets)
@@ -153,10 +171,11 @@ public sealed class DataSetSeeder
         return new DataSetRunResult(target, plan.Owner, provisioning, results, options.DryRun);
     }
 
-    // One set into a target that exists: the annotation files (ancestors first) and the annotations of
-    // annotations.jsonl in bulk, in rounds so that neither creates an annotation of the other with defaults (GetRounds),
-    // the relation arrays of the files completed (what an earlier run that stopped left out), the pairs of
-    // key-values.json, then the schemas, templates and configurations, the documents all with one overlay, so each
+    // One set into a target that exists: the project settings of project-settings.json (SeedProjectSettingsAsync), the
+    // annotation files (ancestors first) and the annotations of annotations.jsonl in bulk, in rounds so that neither
+    // creates an annotation of the other with defaults (GetRounds), the relation arrays of the files completed (what an
+    // earlier run that stopped left out), the pairs of key-values.json, then the schemas, templates and configurations,
+    // the documents all with one overlay, so each
     // step sees what the earlier ones made active or failed (also in a dry run). The record is written after a seed
     // without failures; a set whose record has its version and hash is not read further, unless Again.
     public Task<DataSetSeedResult> SeedSetAsync(DataSet set, DataSetTarget target, DataSetSeedOptions options, CancellationToken cancellationToken = default)
@@ -186,7 +205,12 @@ public sealed class DataSetSeeder
 
     private static bool IsListed(ViewImportResult result)
     {
-        return result.Outcome is not (ViewImportOutcome.Created or ViewImportOutcome.Unchanged);
+        return IsListed(result.Outcome);
+    }
+
+    private static bool IsListed(ViewImportOutcome outcome)
+    {
+        return outcome is not (ViewImportOutcome.Created or ViewImportOutcome.Unchanged);
     }
 
     // What the importer's overlay tracks of a failed annotation: what hangs on it is DependencyFailed. A duplicate
@@ -212,10 +236,40 @@ public sealed class DataSetSeeder
             });
     }
 
+    // A seed never overwrites or merges project settings: a project whose settings were never set (version 0) gets the
+    // set's, one with the same values keeps them (Unchanged), and one with other values keeps them too (Skipped).
+    private static DataSetProjectSettingsResult DecideProjectSettings(ProjectSettings settings, ProjectSettings stored)
+    {
+        if (ProjectSettingsRules.SameValues(settings, stored))
+        {
+            return new DataSetProjectSettingsResult(settings, ViewImportOutcome.Unchanged);
+        }
+
+        return stored.Version == 0
+            ? new DataSetProjectSettingsResult(settings, ViewImportOutcome.Created)
+            : new DataSetProjectSettingsResult(
+                settings,
+                ViewImportOutcome.Skipped,
+                ErrorCodes.DocumentExists,
+                $"The project has other settings (version {stored.Version.ToString(CultureInfo.InvariantCulture)}); a seed never overwrites them.");
+    }
+
+    private static DataSetSeedItem ToItem(DataSetProjectSettingsResult result)
+    {
+        return new DataSetSeedItem
+        {
+            Path = DataSetProjectSettings.FileName,
+            Outcome = result.Outcome,
+            ErrorCode = result.ErrorCode,
+            Message = result.Message,
+        };
+    }
+
     private static DataSetSeedRecord CreateRecord(
         DataSet set,
         DataSetTarget target,
         string hash,
+        DataSetProjectSettingsResult? settings,
         ViewImportTally documents,
         DataSetLinesResult? lines,
         DataSetKeyValuesResult? keyValues,
@@ -224,6 +278,7 @@ public sealed class DataSetSeeder
         var total = documents.Summary;
         var bulk = lines?.Summary ?? new ViewImportSummary();
         var pairs = keyValues?.Summary ?? new ViewImportSummary();
+        var outcome = settings?.Outcome;
 
         return new DataSetSeedRecord
         {
@@ -234,13 +289,14 @@ public sealed class DataSetSeeder
             Version = set.Manifest.Version,
             Hash = hash,
             Seeded = AuditStamp.Of(AuditActor.System, seeded),
+            ProjectSettings = outcome,
             Documents = documents.Total,
             Annotations = lines?.Annotations ?? 0,
             KeyValues = keyValues?.Pairs ?? 0,
-            Created = total.Created + bulk.Created + pairs.Created,
+            Created = total.Created + bulk.Created + pairs.Created + (outcome == ViewImportOutcome.Created ? 1 : 0),
             Updated = total.Updated + bulk.Updated + pairs.Updated,
-            Unchanged = total.Unchanged + bulk.Unchanged + pairs.Unchanged,
-            Skipped = total.Skipped + bulk.Skipped + pairs.Skipped,
+            Unchanged = total.Unchanged + bulk.Unchanged + pairs.Unchanged + (outcome == ViewImportOutcome.Unchanged ? 1 : 0),
+            Skipped = total.Skipped + bulk.Skipped + pairs.Skipped + (outcome == ViewImportOutcome.Skipped ? 1 : 0),
             Warnings = total.Warnings + bulk.Warnings,
         };
     }
@@ -377,13 +433,14 @@ public sealed class DataSetSeeder
             totals.RelationUpdates);
     }
 
-    // written: in a dry run of several sets, what the sets before this one would have written; this set's overlay
-    // starts from it, and adds to it what this set would write. writtenPairs: the same for the pairs, by normalized key.
+    // written: in a dry run of several sets, what the sets before this one would have written; this set's overlay and
+    // project settings start from it, and it gets what this set would write. writtenPairs: the same for the pairs, by
+    // normalized key.
     private async Task<DataSetSeedResult> SeedSetAsync(
         DataSet set,
         DataSetTarget target,
         DataSetSeedOptions options,
-        ViewImportOverlay? written,
+        DryRunWrites? written,
         Dictionary<string, KeyValueDocumentItem>? writtenPairs,
         CancellationToken cancellationToken)
     {
@@ -411,7 +468,21 @@ public sealed class DataSetSeeder
 
         if (written is not null)
         {
-            AddWritten(written, overlay);
+            AddWritten(written.View, overlay);
+        }
+
+        var items = new List<DataSetSeedItem>();
+        DataSetProjectSettingsResult? settings = null;
+
+        // the project first: it does not depend on the documents
+        if (content.ProjectSettings is { } setSettings)
+        {
+            settings = await SeedProjectSettingsAsync(target, setSettings, options, written, cancellationToken);
+
+            if (IsListed(settings.Outcome))
+            {
+                items.Add(ToItem(settings));
+            }
         }
 
         var documents = new ViewImportTally(
@@ -419,7 +490,6 @@ public sealed class DataSetSeeder
             content.Documents.Files.Count,
             content.Documents.IgnoredFiles,
             content.Documents.ExcludedFiles);
-        var items = new List<DataSetSeedItem>();
         var files = content.Documents.Files.Where(IsAnnotation).ToList();
         var annotations = content.Lines?.Annotations ?? [];
         var results = FailUnreadableLines(annotations, overlay);
@@ -448,7 +518,7 @@ public sealed class DataSetSeeder
 
         if (written is not null)
         {
-            AddWritten(overlay, written);
+            AddWritten(overlay, written.View);
         }
 
         var isRecorded = false;
@@ -457,7 +527,7 @@ public sealed class DataSetSeeder
         if (!options.DryRun
             && items.All(item => item.Outcome != ViewImportOutcome.Failed && item.ErrorCode != DataSetKeyValueSeeder.PublicPairsOnly))
         {
-            await _records.SaveAsync(CreateRecord(set, target, hash, documents, lines, keyValues, _time.GetUtcNow()), cancellationToken);
+            await _records.SaveAsync(CreateRecord(set, target, hash, settings, documents, lines, keyValues, _time.GetUtcNow()), cancellationToken);
             isRecorded = true;
         }
 
@@ -465,6 +535,7 @@ public sealed class DataSetSeeder
         {
             Set = set,
             Hash = hash,
+            ProjectSettings = settings,
             Documents = documents,
             Lines = lines,
             KeyValues = keyValues,
@@ -482,6 +553,78 @@ public sealed class DataSetSeeder
             result.Failures.Count(),
             isRecorded);
         return result;
+    }
+
+    // The settings of the set's project-settings.json into the target's project, decided against what the project has
+    // (DecideProjectSettings) and written through the service of the API as the System caller, on the condition that
+    // they are still at version 0; when someone stores settings between the read and the write, the outcome is decided
+    // again from those. A dry run decides from what the sets before it would have written and writes nothing; a project
+    // that it would create has no settings. A write that fails is Failed with its error code.
+    private async Task<DataSetProjectSettingsResult> SeedProjectSettingsAsync(
+        DataSetTarget target,
+        DataSetProjectSettings file,
+        DataSetSeedOptions options,
+        DryRunWrites? written,
+        CancellationToken cancellationToken)
+    {
+        var settings = file.Settings;
+        DataSetProjectSettingsResult result;
+
+        try
+        {
+            var stored = written?.ProjectSettings ?? await ReadProjectSettingsAsync(target, options.DryRun, cancellationToken);
+            result = DecideProjectSettings(settings, stored);
+
+            if (result.Outcome == ViewImportOutcome.Created && !options.DryRun)
+            {
+                try
+                {
+                    await _projectSettings.SetAsync(
+                        target.Organization,
+                        target.Project,
+                        settings,
+                        ProjectSettingsCondition.Version(0),
+                        KeyValueCaller.System(),
+                        cancellationToken);
+                }
+                catch (ProjectSettingsPreconditionFailedException)
+                {
+                    // no longer at version 0, so Unchanged or kept
+                    result = DecideProjectSettings(settings, await _projectSettings.GetAsync(target.Organization, target.Project, cancellationToken));
+                }
+            }
+        }
+        catch (StorytellerException exception)
+        {
+            result = new DataSetProjectSettingsResult(settings, ViewImportOutcome.Failed, exception.ErrorCode, exception.Message);
+        }
+
+        if (written is not null && result.Outcome == ViewImportOutcome.Created)
+        {
+            written.ProjectSettings = settings with { Version = 1 };
+        }
+
+        _logger.LogInformation(
+            "The project settings of {File} in {Target}: {Outcome} {ErrorCode}.",
+            file.Path,
+            target,
+            result.Outcome,
+            result.ErrorCode);
+        return result;
+    }
+
+    // The project's settings, the defaults (version 0) when it has none; in a dry run also for a project that does not
+    // exist, which the dry run did not create.
+    private async Task<ProjectSettings> ReadProjectSettingsAsync(DataSetTarget target, bool isDryRun, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _projectSettings.GetAsync(target.Organization, target.Project, cancellationToken);
+        }
+        catch (NotFoundException) when (isDryRun)
+        {
+            return new ProjectSettings();
+        }
     }
 
     private async Task ImportAsync(
@@ -632,6 +775,15 @@ public sealed class DataSetSeeder
 
         totals.AncestorsCreated.AddRange(bulk.AncestorsCreated);
         totals.RelationUpdates += bulk.RelationUpdates;
+    }
+
+    // What the sets of a dry run would have written, which the dry run does not store: what the view would hold, and the
+    // project settings once a set would create them.
+    private sealed class DryRunWrites
+    {
+        public ViewImportOverlay View { get; } = new();
+
+        public ProjectSettings? ProjectSettings { get; set; }
     }
 
     // What the bulk writer reported over the rounds of one set, and what it committed, for the progress.

@@ -31,8 +31,13 @@ public sealed record class DataSetSeedRecord
 
     public required AuditStamp Seeded { get; init; }
 
+    // What became of project-settings.json; null for a set without one (and in a record of a seed before the project
+    // settings).
+    public ViewImportOutcome? ProjectSettings { get; init; }
+
     // The document files, the annotations of annotations.jsonl and the pairs of key-values.json the seed read, and the
-    // outcomes of all of them together. A record written before sets had pairs has no KeyValues (0).
+    // outcomes of all of them and of the project settings together. A record written before sets had pairs has no
+    // KeyValues (0).
     public int Documents { get; init; }
 
     public int Annotations { get; init; }
