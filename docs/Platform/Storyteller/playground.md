@@ -39,7 +39,7 @@ dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed --path src/P
 
 ### The demo data set
 
-The built-in data set `exhibit` of DbCreator (`src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/`) is a separate, much richer data set for demos: Fourth Wall Software and its customers Acme Corp and Globex, with custom type names, labels, values, key/value pairs, templates gated per company, schemas of all three kinds and configurations that use every binding form. Its `README.md` has the seed and import commands; the model is described in [the spec](specs/2026-11-13%20Demo%20Data%20Set%20of%20Acme%20Corp%20and%20Globex.md). It is meant for its own project (`fourth-wall.toons-and-tyrants`), not for the playground applications.
+The built-in data set `exhibit` of DbCreator (`src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/`) is a separate, much richer data set for demos: Fourth Wall Software and its customers Acme Corp and Globex, with custom type names, labels, values, key/value pairs, templates gated per company, schemas of all three kinds and configurations that use every binding form. Its `README.md` has the seed and import commands; the model is described in [the spec](specs/2026-11-13%20Demo%20Data%20Set%20of%20Acme%20Corp%20and%20Globex.md). It is meant for its own project (`fourth-wall.toons-and-tyrants`), not for the playground applications. It is also the set of a deployment's [exhibition](access.md#exhibition), the demo project that any user may join as a Reader: [data-sets.md](data-sets.md#exhibit) has the seed command.
 
 ## Run through the AppHost
 

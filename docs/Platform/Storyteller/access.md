@@ -42,6 +42,7 @@ A project can have a description, like a view. An organization has none.
 | POST | `v1/access/points` | Owner of the organization when it exists | `{ "Organization", "Project", "ProjectDescription" }` → `AccessPoint` of the new project |
 | PUT | `v1/access/points/{key}` | Administrator, users only | `{ "Description" }` → `AccessPoint` of the project |
 | GET | `v1/access/projects` | An account, users only | `ProjectSummary[]`: the caller's projects, ordered by key |
+| GET | `v1/access/exhibition` | A user, also without an account | `Exhibition`: the names and the description of the deployment's [exhibition](#exhibition) project; `404` when it is not offered |
 
 Every route needs the scope `User.Impersonation`. An `AccessPoint` has `Key`, `AccessMap` (the members and their roles), `MachineAuthentication` and `Description`. POST creates the project, and the organization when it does not exist yet; the caller becomes the `Owner` of what it creates. In an existing organization it needs `Owner` of the organization (`403`), and an existing project answers `409 AccessPointExists`.
 
@@ -67,6 +68,7 @@ Scopes describe machines, roles describe people. A user is authorized by the rol
 | List members, set roles, remove members, manage invitations | `Administrator` on the access point |
 | Give, change, or remove the role `Owner` | `Owner` |
 | Leave an access point (remove yourself) | any membership |
+| Join the [exhibition](#exhibition) project as a `Reader` | any user, also without an account; users only: machine credentials get `403` |
 | Read deleted annotations and the history of an annotation | `Reader` on the project; machines `Annotation.Read` |
 | Delete, restore, and re-create annotations | `Contributor` on the project; machines `Annotation.Write` and `Annotation.Manage`. A machine re-creates a single key (`PUT` or `POST …/annotations/{key}`) with `Annotation.Write` alone; a `PATCH` never re-creates |
 | Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
@@ -122,9 +124,11 @@ The restriction takes away only what the role gives. A user whose role gives no 
 | GET | `v1/access/points/{key}/members` | | `AccessPointMember[]`: `AccountId`, `UserName`, `Name`, `Role`; owners first |
 | PUT | `v1/access/points/{key}/members/{accountId}` | `{ "Role": "Contributor" }` | `AccessPointMember` with the new role |
 | DELETE | `v1/access/points/{key}/members/{accountId}` | | `204` |
+| POST | `v1/access/exhibition/join` | | The caller's `Account`, a `Reader` of the [exhibition](#exhibition) project |
 
-* PUT sets the exact role, up or down. The account must already be a member (`404`, `MemberNotFound`); new members join through an invitation or through grant. Nobody can change their own role (`409`, `SelfRoleChange`); leave and get invited again instead. `None` and a missing body are rejected with `400`.
+* PUT sets the exact role, up or down. The account must already be a member (`404`, `MemberNotFound`); new members join through an invitation, through grant, or, in the exhibition project, through its join. Nobody can change their own role (`409`, `SelfRoleChange`); leave and get invited again instead. `None` and a missing body are rejected with `400`.
 * DELETE removes a member. With the caller's own account ID it means "leave".
+* POST makes the caller a `Reader` of the deployment's [exhibition](#exhibition) project. It is the only way into an existing project without an invitation or a grant.
 * The older `POST v1/access/grant` and `POST v1/access/revoke` stay for `sform`. Grant only raises a role, and revoke must name the role the member holds.
 
 ## Invitations
@@ -156,11 +160,121 @@ A call through an [actor](#actors) never counts as email-verified, whatever the 
 
 **Email delivery.** With `Auth:Provider = AuthKit` and `Auth:AuthKit:ApiKey`, Storyteller creates a WorkOS application invitation (`POST /user_management/invitations`, no organization), and WorkOS sends the email. Its link signs the invitee up even when AuthKit sign-up is disabled. A WorkOS application invitation can be accepted with any email address, which is why Storyteller always compares the email of its own invitation with the signed-in user. Resending revokes the WorkOS invitation and sends a new one, because WorkOS resends keep the old expiry. Revoking or declining also revokes the WorkOS invitation. A failed send is logged and the invitation is kept with `IsEmailSent = false`; share the admin UI link instead. Entra ID and Keycloak deployments, and AuthKit without a management key, never send emails.
 
+## Exhibition
+
+The exhibition is the demo project of a deployment: a project with the data of a fictional company, which any signed-in user may join as a `Reader`, without an invitation. The onboarding of the admin UI offers it to a new user. A deployment has one exhibition or none, and the exhibition is the view `default` of its project. `sform` and the MCP server have no command or tool for it.
+
+| Method | Route | Needs | Result |
+| --- | --- | --- | --- |
+| GET | `v1/access/exhibition` | A user, also without an account | `Exhibition`: `Organization`, `Project` and `Description`; `404` when the exhibition is not offered |
+| POST | `v1/access/exhibition/join` | A user, also without an account | The caller's `Account`, with the membership; `404` when the exhibition is not offered, `409 Conflict` |
+
+Both routes are for users only: they need the scope `User.Impersonation`, and machine credentials get `403 AccessDenied`. Neither takes a request body. The code is in `Api.Functions/src/V1/ExhibitionHttp.cs` and `Api.Functions/src/Exhibitions/`.
+
+### Settings
+
+| Setting | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `Exhibition:Organization` | `Exhibition__Organization` | empty | The organization of the exhibition project |
+| `Exhibition:Project` | `Exhibition__Project` | empty | The exhibition project |
+| `Exhibition:Owner` | `Exhibition__Owner` | empty | The id of the account that owns the exhibition project: the `--owner` of its seed |
+
+- **All three or none.** With all three, the deployment has an exhibition. With none, it has none. A blank value counts as not set.
+- **The start validation.** The API does not start with one or two of the three, with an organization or a project that is not a valid [name](#names), or with an owner that has white space around it. The message names the three settings, never their values.
+- **Compared as written.** The API neither trims the values nor changes their case. A valid name is lower-case. An account id has no white space around it, because a registration and the seed trim it, so an owner pasted with a space or a line break would never match; it stops the start instead.
+- **Where they are set.** In production, `main.bicep` writes the three from its parameters `exhibitionOrganization`, `exhibitionProject` and `exhibitionOwner`, and leaves them out unless all three are set ([Deployment README](../../../src/Platform/Deployment/README.md#parameters)). `local.settings.json` has none of them (see [local development](../development.md#the-exhibition)).
+
+### The owner
+
+The join makes every caller a member of the project that the settings name, and anyone who signs in may register a free organization name and becomes its `Owner`. Without a check, settings that are live before the seed (a wrong order of the steps, a typo, a self-hosted deployment) would hand the exhibition to the first person who registers the names: their description would show in every newcomer's onboarding, and they would list the name and the email of everyone who joins.
+
+So both routes offer and join the exhibition only while both of these hold:
+
+1. The account of `Exhibition:Owner` is the `Owner` of the project. A lower role is not enough.
+2. No other account is an `Administrator` or an `Owner` of the project.
+
+The owner's role alone proves nothing: an `Owner` makes any existing account an `Owner` without its consent (`POST v1/access/grant`). Whoever registered the names first could add the configured account to a project of their own, and go on managing it. The second condition closes that:
+
+- A second `Administrator` or `Owner` switches the exhibition off: both routes answer `404` and log a Warning, until that role is removed or lowered.
+- A member below `Administrator` does not: the visitors, and a `Contributor` or a `ContributorWithSecrets` who writes the content.
+- Every request reads the access point of the project, so a change of its members counts from the next request. This is not a check of the caller's role, so Debug builds (`DEV_AUTH`) run it too.
+
+The rule tells who manages the project now, not who created it: the access map does not say who created a project. What somebody wrote into a project before they left it, such as the description and the content, stays. So the project is seeded before the settings are set (see [Turning it on](#turning-it-on)).
+
+### When the exhibition is not offered
+
+Both routes answer `404` without a body, and so without an `ErrorCode`, in four cases. A client cannot tell them apart; the log can:
+
+| Case | Log |
+| --- | --- |
+| The deployment has no `Exhibition` settings | Nothing: every newcomer of such a deployment asks |
+| The project of the settings does not exist | Warning: *"The exhibition is not offered: the project of Exhibition:Organization and Exhibition:Project doesn't exist. Seed the exhibition, or correct the settings."* |
+| The account of `Exhibition:Owner` is not the `Owner` of the project | Warning: *"The exhibition is not offered: the account of Exhibition:Owner is not the Owner of the project of Exhibition:Organization and Exhibition:Project. Seed the exhibition with that owner, or correct the settings."* |
+| Another account is an `Administrator` or an `Owner` of the project | Warning: *"The exhibition is not offered: the account of Exhibition:Owner is not the only Administrator or Owner of the project of Exhibition:Organization and Exhibition:Project. Remove the other Administrators and Owners or lower their roles, or correct the settings."* |
+
+The cases are checked in this order, and a request logs one Warning. A Warning names the settings, never their values. The join checks them before it writes anything, so nothing is created for an exhibition that cannot be joined.
+
+### Reading it
+
+`GET v1/access/exhibition` answers `200` with an `Exhibition`: `Organization` and `Project`, as the settings name them, and `Description`, the [description](#projects) of the project when it has one. It works before the caller's account exists, and writes nothing.
+
+### Joining
+
+`POST v1/access/exhibition/join` makes the caller a `Reader` of the exhibition project. After the checks above:
+
+1. **The account id** is the id a registration uses, as for [`POST v1/access/account`](#accounts) and the acceptance of an invitation: the lower-case `{tid}:{oid}` under Entra ID, and `sub` under AuthKit and Keycloak.
+2. **The account** is created when the caller has none: without an organization and without memberships, with the user name and the name that a registration takes from the token. A token without the names answers `401`, as for `POST v1/access/account`, and nothing is created: an account with empty names would be a blank row of the member list. A caller who has an account needs no names. When the create fails, the route reads the account again. An account that exists now was created by a concurrent request of the same caller, and the join goes on; otherwise the failure of the create is the answer.
+3. **The membership.** The account joins the project as `Reader`. The join is idempotent, and a higher role stays: a `Contributor` of the project who calls the route stays a `Contributor`. The role and the project never come from the request. The membership is the project's only: the account gets no role in the organization.
+4. **Retries.** Every newcomer writes the same document, the access point of the project, and a membership change gives up after its second attempt with `409 Conflict`. The route tries such a join again up to three more times, each time after a random delay of 50 to 250 ms. Then it answers `409` with `ErrorCode` `Conflict`: repeat the request. Any other failure is answered at once.
+5. **The answer** is `200` with the caller's `Account`, whose `AccessMap` holds the project.
+
+The account and the membership are two writes. A join that fails after it created the account leaves an account without memberships. A second call joins, and creates nothing.
+
+Through an [actor](#actors), such as the MCP server, both routes work as for the person, also under `NoSecretReveal`: an actor may give `Reader`, and its token names an account that exists.
+
+### What a visitor reads
+
+A visitor is a `Reader` of the project, with no role in its organization. Through the API, a `Reader` reads:
+
+- the annotations, their history and the deleted annotations;
+- the configurations with their versions, also resolved: a public key/value pair binds, and a binding of a secret stays as stored;
+- the schemas and the templates with their versions, and the binding catalog;
+- the views of the project;
+- the key/value pairs without the values of secrets, with their versions, and an export without secrets;
+- the key/value policy of the project and its recipients. The policy names the project's key in the vault of the deployment (`KeyId`: the URI of the vault and the name of the key, no key material).
+
+A `Reader` reads no member, invitation or machine, no key/value audit or usage and no secret value, and changes nothing.
+
+- **Names in the versions.** A stamp carries the name and the account id of whoever made the change ([audit stamps](audit-stamps.md)), and the versions carry stamps. So change the exhibition through its seed, which writes as `System`: a change by hand shows the name of its author to every visitor.
+- **Other visitors.** A visitor sees no other member. The owner sees every visitor in the list of members, with the name and the user name, which is usually the email.
+- **The admin UI shows less.** Its **Modeling** page, with the schemas, the templates and the deleted annotations, is locked below `Contributor` (see [Roles](#roles)).
+- **Leaving.** A visitor cannot leave in the admin UI: the action is in its list of members, which only Administrators see. `DELETE v1/access/points/{key}/members/{own account id}` removes the membership, because any member may remove themselves (see [Members](#members)). The account stays, and a later join adds the membership again.
+
+### Limits
+
+- Every visitor adds one entry to the access map of the project: an account id and a role, about 50 bytes. A Cosmos DB item holds 2 MB, and every join replaces the whole document. At the limit of the item, a join fails with `500`.
+- The list of members is not paged.
+- This fits a demo with thousands of visitors. It is not reviewed beyond that.
+- The exhibition holds what its seed holds (see [the set `exhibit`](data-sets.md#exhibit)).
+
+### Turning it on
+
+Seed first, then set the settings:
+
+1. Seed the project with the account of `Exhibition:Owner` as the owner. The built-in data set [`exhibit`](data-sets.md#exhibit) is made for it: `2sInitDb seed exhibit --organization <organization> --project <project> --owner <account id>`. The seed creates the organization and the project with that account as their `Owner`, and it refuses an organization or a project that exists and that the account does not own or administer (see [The owner and the creation of the target](data-sets.md#the-owner-and-the-creation-of-the-target)).
+2. Set the three settings. The API reads them at its start.
+
+Until the seed has run, the names are free for anyone who signs in. Settings that are set before the seed give nothing: every request answers `404` and logs a Warning. A visitor reads the project from the moment the settings are live, so the content is complete before them.
+
+The steps of production are in the runbook, [Turning the exhibition on](../Deployment/runbook-azure-production.md#turning-the-exhibition-on); those of a local API are in [The exhibition](../development.md#the-exhibition). Removing the three settings turns the exhibition off: the project and its members stay.
+
 ## Accounts
 
 `POST v1/access/account` creates the caller's account. With `Organization` and `Project` it also creates them and makes the caller their owner. Without both (`{}`, or both `null`), it creates an account with no memberships, for a user who joins through invitations. Giving only one of them is rejected with `400`. `ProjectDescription` is the [description](#projects) of the new project; the account and the organization get none, and a description that is not blank without `Organization` and `Project` is rejected with `400` (`A project description needs an organization and a project.`). The body is required: an empty body or `null` is rejected with `400` too (`The account is missing.`).
 
-The account id comes from the caller's token under the deployment's provider: the lower-case `{tid}:{oid}` under Entra ID, and `sub` under AuthKit and Keycloak (see [Account ids](authentication.md#account-ids)). An invitation acceptance that creates the account uses the same id. A Storyteller user token of an [actor](#actors) names an account that already exists: the exchange never creates one.
+An account also comes from two other calls, which create it without memberships when the caller has none: the acceptance of an [invitation](#invitations), and the join of the [exhibition](#exhibition), which then makes it a `Reader` of the exhibition project. `POST v1/access/account` answers `400` without a body to a caller who has an account. So a user whose account comes from an invitation or from the exhibition creates an organization with [`POST v1/access/points`](#projects).
+
+The account id comes from the caller's token under the deployment's provider: the lower-case `{tid}:{oid}` under Entra ID, and `sub` under AuthKit and Keycloak (see [Account ids](authentication.md#account-ids)). An invitation acceptance or a join of the exhibition that creates the account uses the same id. A Storyteller user token of an [actor](#actors) names an account that already exists: the exchange never creates one.
 
 ## Error codes
 
@@ -168,10 +282,12 @@ All errors use `ErrorResponse` without exception details, and the errors below c
 
 A route that takes a JSON body does not require a `Content-Type`, and answers `400` for an empty body, `null` or JSON that does not fit the documented type, unless it documents a default for a missing body. On the routes of this page, these `400`s name the problem in `Message` and have no `ErrorCode`. Each such route reads a limited number of bytes of its body, and answers `413` with `ErrorCode` `BodyTooLarge` for a larger body or a larger declared `Content-Length`, before it parses any JSON.
 
+The `404` of the two [exhibition](#exhibition) routes has no body, and so no `ErrorCode`: the deployment has no exhibition, or does not offer it.
+
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
 | `400` | `InvalidName` | A new organization, project, or view name breaks the [name rules](#names). |
-| `403` | `AccessDenied` | The caller's role on the access point is too low, a machine lacks a scope of the operation, or a machine calls an operation for users only (such as registering, describing or discovering views, a permanent delete, setting the description of a project or listing projects). |
+| `403` | `AccessDenied` | The caller's role on the access point is too low, a machine lacks a scope of the operation, or a machine calls an operation for users only (such as registering, describing or discovering views, a permanent delete, setting the description of a project, listing projects, or reading or joining the exhibition). |
 | `403` | `ActorRestricted` | The token acts for the person through an [actor](#actors) whose restrictions forbid the operation (under `NoSecretReveal`: reading secret values, or giving out what reads them). |
 | `403` | `EmailMismatch`, `EmailNotVerified` | Accepting or declining with another or an unverified email, or through an actor. |
 | `404` | `NotFound` | The access point, account, or invitation does not exist. |
@@ -180,5 +296,5 @@ A route that takes a JSON body does not require a `Content-Type`, and answers `4
 | `409` | `InvitationExists`, `InvitationNotPending`, `InvitationExpired` | Invitation rules above. |
 | `409` | `ViewExists` | The view is already registered, or is `default`. |
 | `409` | `AccessPointExists` | The project already exists. |
-| `409` | `Conflict` | The membership, the invitation, or the project whose description is set changed concurrently twice; repeat the request. |
+| `409` | `Conflict` | The membership, the invitation, or the project whose description is set changed concurrently twice; repeat the request. The join of the [exhibition](#exhibition) answers it only after it tried again three times. |
 | `413` | `BodyTooLarge` | The body is larger than its route reads: 64 KiB for a view, 8 KiB for an account, a new project, a project update, a member role or an invitation. |

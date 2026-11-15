@@ -199,6 +199,7 @@ DbCreator (`2sInitDb`) seeds [data sets](Storyteller/data-sets.md), folders in t
 | `showcase` | `fabrikam` / `invoicing-suite` / `default` | `db-seed` (`2sInitDb seed showcase`) |
 | `large` (16,017 annotations) | `acme` / `billing` / `default` | `2sInitDb seed large` |
 | `playground` | `42dotnet` / `main` / `default` | `2sInitDb seed --path src/Platform/Storyteller/Playground/data` |
+| `exhibit` | `fourth-wall` / `toons-and-tyrants` / `default` | `2sInitDb seed exhibit`, see [The exhibition](#the-exhibition) |
 
 From the command line, DbCreator reaches the Windows emulator of its `app.config.json`. For the container of the Aspire host, set `ConnectionStrings__cosmos` to the value the dashboard shows in the environment of `db-creator`, and `baseAccount__id` to your account id:
 
@@ -216,6 +217,28 @@ DbCreator has two test projects: `DbCreator/test`, the unit tests (no database),
 dotnet test --project src/Platform/Storyteller/DbCreator/test
 STORYTELLER_TESTS_USE_CONTAINER=true dotnet test --project src/Platform/Storyteller/DbCreator/testint
 ```
+
+### The exhibition
+
+The onboarding of the admin UI offers a new user the exhibition, a demo project they join as a Reader ([access](Storyteller/access.md#exhibition)). The API has one only with three settings, and `local.settings.json` stays without them, because the owner is your own account. Without them the onboarding has no exhibition step. To turn it on:
+
+1. Seed the set `exhibit` with your account as the owner (`baseAccount__id` as above, or `--owner`). It goes into its own names, `fourth-wall` / `toons-and-tyrants`, or into others with `--organization` and `--project`:
+
+   ```powershell
+   dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed exhibit
+   ```
+
+   The seed does not bring the key/value pairs of the set yet (424-265). Import them with `sform` as the set's [README](../../src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/README.md) says, or a resolved read of many of its configurations answers `422`.
+2. Give the API the organization, the project and the owner of the seed, as user secrets or as the environment variables `Exhibition__Organization`, `Exhibition__Project` and `Exhibition__Owner`, and restart it:
+
+   ```sh
+   cd src/Platform/Storyteller/Api.Functions/src
+   dotnet user-secrets set "Exhibition:Organization" "fourth-wall"
+   dotnet user-secrets set "Exhibition:Project" "toons-and-tyrants"
+   dotnet user-secrets set "Exhibition:Owner" "user_01…"
+   ```
+
+Set all three or none: one or two of them, a name that is not a valid name, or an owner with white space around it stop the API at its start. The API offers the exhibition only while the account of `Exhibition:Owner` is the Owner of the project and no other account is its Administrator or Owner; otherwise it answers `404` and logs a warning that says why. So give a second test user a role below Administrator in that project. The onboarding shows to a user without an account, so sign in as another user than the owner.
 
 ## UI automation tests
 

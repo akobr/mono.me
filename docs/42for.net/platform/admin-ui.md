@@ -7,7 +7,13 @@ The Administration UI is the browser application for the 2S Platform. Use it to 
 You sign in through AuthKit. When you sign in for the first time, the UI checks for invitations:
 
 - **You were invited:** the invitations page lists the projects you can join.
-- **You were not invited:** onboarding asks for an organization and a first project, with an optional description of the project. You become their Owner.
+- **You were not invited:** onboarding takes you through four short steps. Move between them with **Next**, **Back**, the step list or the browser's back button; nothing is saved before the last step.
+  1. **Welcome** says where your data lives: all customer data, configuration and secrets are stored and processed only in the EU (Sweden). It lists the sub-processors with their purpose and region.
+  2. **Security** says how machines and pipelines sign in without a stored secret, and how people sign in.
+  3. **Exhibition** is optional. Check **Join the exhibition** to become a **Reader** of the platform's demo project: you browse its annotations, their configurations and the graph, and you cannot change anything. Its administrators see your name and email among its members; other visitors do not. A platform without an exhibition has no such step.
+  4. **Organization** asks for an organization and a first project, with an optional description of the project. You become their Owner.
+
+  With the exhibition checked, **Create and continue** also joins it, and a message offers **Open the exhibition**. **Continue with the exhibition only** joins it without an organization of your own; create one later with **New organization** on the organizations page. The exhibition is offered only here.
 
 After that, the address bar always names the context, like GitHub:
 

@@ -61,6 +61,22 @@ Accepted exposure:
 
 - **The Key Vault is reachable from the public internet** (`publicNetworkAccess` on, network rules `Allow`). Every request still needs an Entra token with an RBAC role on the vault; the Flex Consumption API has no fixed outbound address to allow, and a virtual network is not part of this phase. When one comes (the NAT gateway for BYOK, spec section 13), restrict the vault to it with an IP firewall or a private endpoint: a setting, not a decision that can't change.
 
+### The exhibition
+
+The exhibition is the demo project that the onboarding of the admin UI offers to a new user, who joins it as a Reader (decided 2026-11-15, [424-267](https://linear.app/424fun/issue/424-267/admin-ui-onboarding-wizard-eu-hosting-security-and-federated-auth-join); [access](../Storyteller/access.md#exhibition)).
+
+- **Names:** the organization `exhibition` and the project `exhibition`, with the data set `exhibit` of DbCreator in the view `default`. Every visitor's membership holds them, and there is no rename (decision 10).
+- **Owner:** the operator's own production account. It is the `--owner` of the seed and the app setting `Exhibition__Owner`, and the API offers and joins the exhibition only while it is the Owner of the project and no other account is an Administrator or Owner of it. Anyone who signs in may register a free organization name, so without the owner, settings that are live before the seed would hand the exhibition to the first person who registers the names: their description would show in every newcomer's onboarding, and they would list the name and email of everyone who joins. The owner's role alone is not enough, because an Owner can make any existing account an Owner without its consent (`POST v1/access/grant`): whoever registered the names could add the operator's account to a project of their own. So the operator stays the only Administrator or Owner of the project. A second one switches the exhibition off (`404` and a warning) until that role is removed or lowered.
+- **What the check does not cover:** it tells who manages the project now, not who created it, because the access map does not say who created a project. What somebody wrote into a project before they left it stays. The order below covers that: the seed creates the project.
+- **Order:** the seed, the key/value pairs, one resolved read as a check, and only then the three parameters of `prod.bicepparam` ([runbook](runbook-azure-production.md#turning-the-exhibition-on)). Until then the parameter file does not set them, and production has no exhibition.
+
+### The wording about hosting and sign-in in the admin UI
+
+The onboarding of the admin UI repeats the hosting and sign-in facts of this environment to every new user: customer data is stored and processed only in the EU (Sweden, decision 5), the sub-processors are Microsoft Azure, Sentry and PostHog in the EU and WorkOS in the USA (decisions 3 and 4), and a dedicated deployment signs people in with Entra ID or Keycloak instead. The texts, the list of sub-processors and the links are the constants of `src/Platform/ui.admin/src/app/utils/onboarding.ts`.
+
+- **Change them together.** A change of a region, of a sub-processor, of what WorkOS receives, or of the identity providers changes that file in the same pull request. A merge to `main` publishes the admin UI at once.
+- **`safeguardsLive`**, a switch of the same file, is `false`: the onboarding says "Every authorization decision is made by 2S in the EU." and nothing about impersonation, a recent sign-in for secrets or the audit log. It becomes `true` only when [424-262](https://linear.app/424fun/issue/424-262), [424-263](https://linear.app/424fun/issue/424-263) and [424-264](https://linear.app/424fun/issue/424-264) are done, the production API runs a build with them (runbook, phase 11.1), and the WorkOS dashboard check of 424-262 is recorded.
+
 ## Must be decided before the first deployment
 
 | # | Decision | Why it can't change later | Recommendation |

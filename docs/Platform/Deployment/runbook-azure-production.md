@@ -113,7 +113,7 @@ az deployment sub what-if --name prod-2s-main --location swedencentral `
 - `prod-2s-42fornet-cdb` with **`enableFreeTier: true`**, `backupPolicy.type: Continuous`, `capacity.totalThroughputLimit: -1` (no limit until phase 11.2), and the lock `do-not-delete`;
 - `prod2s42fornetsa` with `allowSharedKeyAccess: false`, containers `deployments` and `configuration-transfers`, three role assignments;
 - `prod-2s-42fornet-kv` with `sku.name: premium`, `enablePurgeProtection: true`, `enableRbacAuthorization: true`, the lock, the secret `cosmos-connection`, three role assignments;
-- `prod-2s-api-asp` (`FC1`), `prod-2s-api-fa` with `siteScopedCertificatesEnabled: true` and its `appsettings` (**no** `Auth__AuthKit__ClientId`, **no** `KeyValues__Protection__Byok__ClientId` and **no** `Sentry__Dsn` yet), two `basicPublishingCredentialsPolicies`;
+- `prod-2s-api-asp` (`FC1`), `prod-2s-api-fa` with `siteScopedCertificatesEnabled: true` and its `appsettings` (**no** `Auth__AuthKit__ClientId`, **no** `KeyValues__Protection__Byok__ClientId`, **no** `Sentry__Dsn` and **no** `Exhibition__*` yet), two `basicPublishingCredentialsPolicies`;
 - `prod-2s-app-swa` (Free, `eastus2`: metadata only, West Europe, the only European one, refuses new tenants);
 - two role assignments for you (Key Vault Administrator, Storage Blob Data Contributor).
 
@@ -521,6 +521,62 @@ Tracked in [424-248](https://linear.app/424fun/issue/424-248/report-the-apis-err
 2. `parameters/prod.bicepparam`: `sentryDsn = '<dsn>'`; commit through a pull request; what-if (expect only a `Modify` of `prod-2s-api-fa/appsettings`: `+ Sentry__Dsn`, nothing removed), then create. Changing the app settings restarts the Function App.
 3. If the running build of the API predates the Sentry SDK (424-248), publish the API from an up-to-date `main` as in phase 11.1. The order of 2 and 3 doesn't matter: an older build ignores the setting, a newer one without it sends nothing.
 4. Check as in [error reporting](../Storyteller/error-reporting.md#check-it-in-production): one event in `2s-api` with the transaction `queue ProcessViewTransfer`, the environment `production` and the release `42.Platform.Storyteller.Api.Functions@<version>`.
+
+## Turning the exhibition on
+
+Tracked in [424-267](https://linear.app/424fun/issue/424-267/admin-ui-onboarding-wizard-eu-hosting-security-and-federated-auth-join). The exhibition is the demo project that the onboarding of the admin UI offers to a new user, who joins it as a Reader ([access](../Storyteller/access.md#exhibition)). The API has one only with the three app settings `Exhibition__Organization`, `Exhibition__Project` and `Exhibition__Owner`; until then it answers `404`, and the onboarding has no exhibition step. In production it is the data set `exhibit` of DbCreator ([data sets](../Storyteller/data-sets.md)) in the organization `exhibition` and the project `exhibition`, owned by your account ([decisions](decisions.md#the-exhibition)).
+
+**Keep the order: the seed first, the settings last.**
+
+- Anyone who signs in may register a free organization name and becomes its Owner. The seed takes the names for your account, and it refuses an organization that somebody else owns. So the seed is the first step: until it has run, the names are free for anyone.
+- `Exhibition__Owner` is the `--owner` of the seed. The API offers and joins the exhibition only while that account is the Owner of the project **and** no other account is its Administrator or Owner, so the settings never make newcomers members of a project that somebody else manages. The owner's role alone would prove nothing: an Owner can make any existing account an Owner without its consent. Set before the seed, the settings give nothing: every request answers `404` and logs a warning.
+- That check tells who manages the project now, not who created it. What somebody wrote into a project before they left it stays, so only the seed as the first step makes the content yours.
+- Keep your account the only Administrator or Owner of `exhibition.exhibition`. A second one switches the exhibition off (`404` and a warning) until that role is removed or lowered. A Contributor does not.
+- A visitor sees the project from the moment the settings are live, so the key/value pairs and the check come before them.
+
+1. **Seed** the set as `exhibition` / `exhibition`, with your WorkOS production user id (`user_01…`, phase 5) as the owner. From the repository root, on an up-to-date `main`:
+
+   ```powershell
+   & {
+     $ErrorActionPreference = 'Stop'
+     $PSNativeCommandUseErrorActionPreference = $true
+     try {
+       $env:CosmosDb__Connection = az keyvault secret show --vault-name prod-2s-42fornet-kv --name cosmos-connection --query value -o tsv
+       $env:CosmosDb__ShouldAcceptAnyCertificate = 'false'    # app.config.json accepts any certificate (the local emulator's)
+       dotnet run --project src/Platform/Storyteller/DbCreator/src -c Release -- `
+         seed exhibit --organization exhibition --project exhibition --owner '<user_01…>'
+     }
+     finally {
+       Remove-Item Env:CosmosDb__Connection, Env:CosmosDb__ShouldAcceptAnyCertificate -ErrorAction SilentlyContinue
+     }
+   }
+   ```
+
+   First run it with `--dry-run` added: it writes nothing of the organization, the project and the set, and prints `Would create the organization 'exhibition' and the project 'exhibition.exhibition'.`
+
+   **Expect:** `Created the organization 'exhibition' and the project 'exhibition.exhibition'.` and `1 set seeded`. **Stop** when the seed ends with exit code `2` because the organization `exhibition` exists and the owner is not its Owner: somebody else registered the name, and nothing was written. **Stop** also when the dry run would create `the account #…` too: the id is not the id of your account. **Stop** also when this first dry run prints `The project 'exhibition.exhibition' exists and is used as it is.`: you have not seeded it yet, so somebody created the project before you and made your account its member, and what they wrote would stay.
+
+2. **The key/value pairs.** The seed does not bring them until [424-265](https://linear.app/424fun/issue/424-265) is done. Import the 20 pairs of the set with `sform`, from the repository root, signed in to the production API (`https://api.2s.42for.net/api`) with the same account:
+
+   ```powershell
+   sform story kv import src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/key-values.json -p exhibition.exhibition -v default
+   ```
+
+   It shows the plan and asks for a confirmation. One pair is a `Standard` secret with a demo value: its import needs the right to write secrets, and it creates the project's key (`kek-…`) in the vault. The versions of the pairs carry your name, and every visitor reads them.
+
+3. **Check** one resolved read:
+
+   ```powershell
+   sform story config exe.acme.hr.rocket-skates --resolved -p exhibition.exhibition -v default
+   ```
+
+   **Expect** the resolved configuration. A binding that cannot be evaluated (`422`, exit code `2`) means a pair is missing: repeat step 2.
+
+4. **The parameters.** In `parameters/prod.bicepparam` set `exhibitionOrganization = 'exhibition'`, `exhibitionProject = 'exhibition'` and `exhibitionOwner = '<user_01…>'`, the owner of step 1; commit through a pull request; what-if (expect only a `Modify` of `prod-2s-api-fa/appsettings`: `+ Exhibition__Organization`, `+ Exhibition__Project`, `+ Exhibition__Owner`, nothing removed), then create. Set all three: the template leaves the settings out while one of them is empty. Write the owner without white space around it: the API does not start with an owner that has it, or with a name that is not a valid name. Changing the app settings restarts the Function App.
+5. If the running build of the API predates the exhibition (424-267), publish the API from an up-to-date `main` as in phase 11.1. An older build ignores the settings.
+6. Check: a person who signs up and has no account yet sees the step **Exhibition** in the onboarding of `https://app.2s.42for.net`, and after joining opens `exhibition` / `exhibition` as a Reader. In Application Insights (`prod-2s-api-appi`, **Logs → traces**) no warning names the `Exhibition` settings. Such a warning has one of three causes, and says which: the project does not exist, the account of `Exhibition__Owner` is not its Owner, or another account is an Administrator or Owner of the project ([access](../Storyteller/access.md#when-the-exhibition-is-not-offered)).
+
+To turn the exhibition off, remove the three parameters and run `main.bicep` again. The onboarding then has no exhibition step; the project and its members stay.
 
 ## Later
 
