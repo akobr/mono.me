@@ -29,6 +29,11 @@ public class MachineAuthenticationServiceTests
     private const string GitHubRequestUrl = "https://pipelines.actions.githubusercontent.com/abc/idtoken?api-version=2.0";
     private const string GitHubRunner = "https://pipelines.actions.githubusercontent.com/abc/idtoken";
     private const string GitHubRequestToken = "github-request-token-value";
+    private const string ManagedIdentityResource = "api://4f6a1c2e-7b3d-4e5f-8a9b-0c1d2e3f4a5b";
+    private const string UserAssignedClientId = "7c4d2b1a-0e9f-4a3b-8c7d-6e5f4a3b2c1d";
+    private const string IdentityEndpoint = "http://127.0.0.1:41741/MSI/token/";
+    private const string IdentityHeader = "identity-header-value";
+    private const string Imds = "http://169.254.169.254/metadata/identity/oauth2/token";
 
     private static readonly DateTimeOffset Start = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
 
@@ -512,6 +517,7 @@ public class MachineAuthenticationServiceTests
 
         exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
         exception.Message.ShouldStartWith("The machine got no token within ");
+        exception.Message.ShouldEndWith(": the token endpoint, the sign-in discovery or the GitHub Actions runner did not answer, or kept failing.");
     }
 
     [Fact]
@@ -758,12 +764,16 @@ public class MachineAuthenticationServiceTests
     [InlineData("file", new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.TOKEN_FILE })]
     [InlineData("deprecated file", new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.SUBJECT_TOKEN_FILE })]
     [InlineData("GitHub Actions", new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN })]
+    [InlineData("managed identity", new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.MANAGED_IDENTITY_RESOURCE })]
     public void Federated_Identity_NamesTheMachineAndTheVariablesButNoProject(string source, string[] variables)
     {
         switch (source)
         {
             case "GitHub Actions":
                 UseFederatedGitHub();
+                break;
+            case "managed identity":
+                UseFederatedManagedIdentity();
                 break;
             case "deprecated file":
                 UseFederatedFile(fileVariable: StorytellerVariables.SUBJECT_TOKEN_FILE);
@@ -798,6 +808,103 @@ public class MachineAuthenticationServiceTests
             (HttpMethod.Post, TokenEndpoint, null),
         ]);
         _http.Requests[1].Form["subject_token"].ShouldBe("gh-jwt-1");
+    }
+
+    // The request itself is the SDK's; sform reads the two variables of the host through the environment of the rest.
+    [Fact]
+    public async Task ManagedIdentity_AsksTheHostForTheResource_AndExchanges()
+    {
+        UseFederatedManagedIdentity();
+        _http.Respond(HttpStatusCode.OK, ManagedIdentityAnswer("mi-token-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+
+        _http.Requests.Select(request => (request.Method, request.Uri.OriginalString, request.Authorization)).ShouldBe(
+        [
+            (HttpMethod.Get, $"{IdentityEndpoint}?api-version=2019-08-01&resource={Uri.EscapeDataString(ManagedIdentityResource)}", null),
+            (HttpMethod.Post, TokenEndpoint, null),
+        ]);
+        _http.Requests[0].Headers!["X-IDENTITY-HEADER"].ShouldBe(IdentityHeader);
+        _http.Requests[1].Headers!.ContainsKey("X-IDENTITY-HEADER").ShouldBeFalse();
+        _http.Requests[1].Form["subject_token"].ShouldBe("mi-token-1");
+        _http.Requests[1].Form["subject_token_type"].ShouldBe("urn:ietf:params:oauth:token-type:access_token");
+    }
+
+    [Fact]
+    public async Task ManagedIdentity_OnAVirtualMachine_AsksImds_ForAUserAssignedIdentity()
+    {
+        UseFederatedManagedIdentity(isAppService: false);
+        _environment[StorytellerVariables.MANAGED_IDENTITY_CLIENT_ID] = UserAssignedClientId;
+        _http.Respond(HttpStatusCode.OK, ManagedIdentityAnswer("mi-token-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+
+        _http.Requests[0].Uri.OriginalString.ShouldBe(
+            $"{Imds}?api-version=2018-02-01&resource={Uri.EscapeDataString(ManagedIdentityResource)}&client_id={UserAssignedClientId}");
+        _http.Requests[0].Headers!["Metadata"].ShouldBe("true");
+        service.GetIdentity().Variables.ShouldBe([StorytellerVariables.CLIENT_ID, StorytellerVariables.MANAGED_IDENTITY_RESOURCE, StorytellerVariables.MANAGED_IDENTITY_CLIENT_ID]);
+    }
+
+    // A refusing host (3xx, 4xx, or no token) is 44, and a busy one 3, as for the runner.
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest, """{"error":"invalid_resource"}""", AuthenticationFailureReason.Denied, "was rejected with 400: invalid_resource.")]
+    [InlineData(HttpStatusCode.Found, "", AuthenticationFailureReason.Denied, "was answered with a redirect (302), which is not followed.")]
+    [InlineData(HttpStatusCode.OK, "{}", AuthenticationFailureReason.Denied, "returned no token.")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "", AuthenticationFailureReason.ServiceError, "failed with 503.")]
+    public async Task ManagedIdentity_UnusableAnswers_SayWhy(HttpStatusCode status, string body, AuthenticationFailureReason reason, string ending)
+    {
+        UseFederatedManagedIdentity();
+        _http.Respond(status, body);
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(reason);
+        exception.Message.ShouldBe(
+            $"The managed identity token request to {IdentityEndpoint} for the resource {ManagedIdentityResource} {ending} Does the host have a managed identity, and is the resource the identifier URI of the Storyteller app registration (api://<appId>)?");
+        exception.Message.ShouldNotContain(IdentityHeader);
+        _http.Requests.ShouldHaveSingleItem().Method.ShouldBe(HttpMethod.Get);
+    }
+
+    // The variables of the host are checked when the machine asks it, so the failure is the exchange's, with exit code 2.
+    [Fact]
+    public async Task ManagedIdentity_AnIdentityEndpointThatBreaksItsRule_IsAConfigurationError()
+    {
+        UseFederatedManagedIdentity();
+        _environment[StorytellerVariables.IDENTITY_ENDPOINT] = "http://identity.example.com/msi/token";
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe("IDENTITY_ENDPOINT must be an absolute URL without user info: https, or http to localhost or to a loopback, link-local or private address.");
+        _http.Requests.ShouldBeEmpty();
+    }
+
+    // The deadline names who was asked: the managed identity endpoint of the host, not the runner. A deadline of zero
+    // has passed before the first request, so the test waits for nothing.
+    [Fact]
+    public async Task ManagedIdentity_ThatDoesNotAnswer_IsAServiceErrorAtTheDeadline()
+    {
+        UseFederatedManagedIdentity();
+        var scripted = TestMachines.Hooks(new HangingHttpHandler());
+        var hooks = new MachineCredentialHooks { Decorate = scripted.Decorate, Resilience = scripted.Resilience, TokenDeadline = TimeSpan.Zero };
+        var service = TestMachines.Create(TestMachines.Settings(_environment), _fileSystem, hooks, _time);
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
+        exception.Message.ShouldBe(
+            "The machine got no token within 0 seconds, retries and Retry-After waits included: the token endpoint or the managed identity endpoint of the host did not answer, or kept failing.");
     }
 
     // Change against today's sform: a refusing runner (3xx, 4xx, or no token) is 44, was 3; 5xx and network failures stay 3.
@@ -1052,6 +1159,11 @@ public class MachineAuthenticationServiceTests
         return $$"""{"count":1,"value":"{{idToken}}"}""";
     }
 
+    private static string ManagedIdentityAnswer(string accessToken)
+    {
+        return $$"""{"access_token":"{{accessToken}}","expires_on":"1794816000","resource":"{{ManagedIdentityResource}}","token_type":"Bearer"}""";
+    }
+
     private string AddCertificate(string spiffeUri, string fileVariable = StorytellerVariables.CLIENT_CERTIFICATE)
     {
         var path = P(@"C:\ci\machine.pfx");
@@ -1087,6 +1199,20 @@ public class MachineAuthenticationServiceTests
         _environment[StorytellerVariables.CLIENT_ID] = MachineId;
         _environment[StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL] = GitHubRequestUrl;
         _environment[StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_TOKEN] = GitHubRequestToken;
+    }
+
+    // The variables of a machine on an Azure host, and the two that App Service, Functions and Container Apps set
+    // themselves; a virtual machine has neither, and IMDS answers.
+    private void UseFederatedManagedIdentity(bool isAppService = true)
+    {
+        _environment[StorytellerVariables.CLIENT_ID] = MachineId;
+        _environment[StorytellerVariables.MANAGED_IDENTITY_RESOURCE] = ManagedIdentityResource;
+
+        if (isAppService)
+        {
+            _environment[StorytellerVariables.IDENTITY_ENDPOINT] = IdentityEndpoint;
+            _environment[StorytellerVariables.IDENTITY_HEADER] = IdentityHeader;
+        }
     }
 
     private MachineAuthenticationService CreateService(HttpMessageHandler? handler = null, StorytellerResilienceOptions? resilience = null)

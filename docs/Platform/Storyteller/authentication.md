@@ -356,7 +356,7 @@ Entra ID sign-in still uses MSAL with the cache in `~/.42for.net/msal.cache`. Th
 
 `sform` reads the variables with the shared credential contract of the C# SDK (`StorytellerCredentialVariables`) and signs in with the SDK's `StorytellerCredential`. So one set of variables drives `sform`, `StorytellerCredential.FromEnvironment()` and the [configuration provider](configuration-provider.md#credentials), with the same names, rules and messages ([SDK readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md#machine-credentials)).
 
-The GitHub Actions variables `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN` are not credential variables. A job with `permissions: id-token: write` that sets no `STORYTELLER_*` credential still uses the user sign-in.
+The GitHub Actions variables `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN` are not credential variables. A job with `permissions: id-token: write` that sets no `STORYTELLER_*` credential still uses the user sign-in. Neither are `IDENTITY_ENDPOINT` and `IDENTITY_HEADER`, which Azure sets on a host with a managed identity.
 
 Commands keep their own confirmations, for example before overwriting an `-e` export file or deleting without `--yes`; a pipeline should not depend on them.
 
@@ -376,14 +376,17 @@ Commands keep their own confirmations, for example before overwriting an `-e` ex
 | `STORYTELLER_TOKEN_URL` | – | The token URL `machine create` printed. |
 | `STORYTELLER_TOKEN_SCOPE` | – | For client credentials, the token scope `machine create` printed; Entra ID needs it. For a `Federated` machine, optional: Storyteller scopes separated by spaces, a subset of the machine's (the `scope` of the exchange), for example `Annotation.Read Configuration.Read`. |
 | `STORYTELLER_TOKEN_FILE` | `STORYTELLER_SUBJECT_TOKEN_FILE`, of a `Federated` machine only | With `STORYTELLER_CLIENT_ID` and no client-credentials variable: a `Federated` machine's file holding the platform token, read again before every exchange. Without `STORYTELLER_CLIENT_ID`: a file holding a bearer token, read again before every request and sent as it is. |
-| `STORYTELLER_SUBJECT_TOKEN_TYPE` | – | A `Federated` machine, optional: `jwt` (default), `id_token` or `access_token`, in any case, or the full `urn:ietf:params:oauth:token-type:` URN. |
-| `ACTIONS_ID_TOKEN_REQUEST_URL`, `ACTIONS_ID_TOKEN_REQUEST_TOKEN` | – | Set by GitHub Actions in a job with `permissions: id-token: write`. The platform token source of a `Federated` machine without a token file. |
+| `STORYTELLER_SUBJECT_TOKEN_TYPE` | – | A `Federated` machine, optional: `jwt` (default), `id_token` or `access_token`, in any case, or the full `urn:ietf:params:oauth:token-type:` URN. With a managed identity the default is `access_token`. |
+| `STORYTELLER_MANAGED_IDENTITY_RESOURCE` | – | With `STORYTELLER_CLIENT_ID`: a `Federated` machine that gets its platform token from the managed identity of its Azure host, for this resource. The resource is the identifier URI of the app registration that stands for Storyteller, `api://<appId>` (see [Azure managed identity](#azure-managed-identity)). |
+| `STORYTELLER_MANAGED_IDENTITY_CLIENT_ID` | – | Optional, with the resource: the client id of a user-assigned identity. The system-assigned identity when unset. |
+| `ACTIONS_ID_TOKEN_REQUEST_URL`, `ACTIONS_ID_TOKEN_REQUEST_TOKEN` | – | Set by GitHub Actions in a job with `permissions: id-token: write`. The platform token source of a `Federated` machine without a token file and without a managed identity resource. |
+| `IDENTITY_ENDPOINT`, `IDENTITY_HEADER` | – | Set by Azure App Service, Functions and Container Apps on a host with a managed identity. Where a `Federated` machine with a managed identity resource asks for its platform token; without them it asks IMDS. |
 
 **Deprecated names.** The older `sform` names still work: a deprecated name is read when its canonical name is unset. Both names set to different values stop `sform` with exit code `2`, for example "STORYTELLER_ENDPOINT and STORYTELLER_API_URL are both set, to different values; set one of them." The same value in both is accepted. `STORYTELLER_SUBJECT_TOKEN_FILE` is no plain alias: set, it always makes a `Federated` machine, never a bearer token file, so it needs `STORYTELLER_CLIENT_ID`. `sform account` prints a line for each deprecated name that is set, also next to its canonical name and also when the sign-in fails, for example "STORYTELLER_API_URL is deprecated; use STORYTELLER_ENDPOINT." Other commands stay quiet about them.
 
-**URLs.** `STORYTELLER_ENDPOINT`, `STORYTELLER_TOKEN_URL` and `ACTIONS_ID_TOKEN_REQUEST_URL` must be `https`, or `http` to `localhost` or a loopback address literal (`127.0.0.1`, `[::1]`), and carry no user info. The endpoint, which paths are appended to, has no query or fragment either. Without an endpoint, `sform` stops with "Set STORYTELLER_ENDPOINT to the API base URL, for example https://<host>/api." Messages name a variable as it was set, a deprecated name by its own name, and never print a secret: they print file paths, and URLs without user info, query or fragment.
+**URLs.** `STORYTELLER_ENDPOINT`, `STORYTELLER_TOKEN_URL` and `ACTIONS_ID_TOKEN_REQUEST_URL` must be `https`, or `http` to `localhost` or a loopback address literal (`127.0.0.1`, `[::1]`), and carry no user info. The endpoint, which paths are appended to, has no query or fragment either. `IDENTITY_ENDPOINT`, which the platform sets, has a wider rule: also `http` to a link-local or private address literal (see **Platform token from an Azure managed identity** below). Without an endpoint, `sform` stops with "Set STORYTELLER_ENDPOINT to the API base URL, for example https://<host>/api." Messages name a variable as it was set, a deprecated name by its own name, and never print a secret: they print file paths, and URLs without user info, query or fragment.
 
-The credential variables decide the kind. Variables of two kinds at once, for example an API key and a client secret, stop `sform` before any call, with a message that names them ("Storyteller credential variables of different kinds are set: …"). `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_SCOPE` belong to client credentials or to federation, whichever of the two is set. So `STORYTELLER_CLIENT_SECRET` with `STORYTELLER_SUBJECT_TOKEN_FILE` stops, and so does an API key with `STORYTELLER_CLIENT_ID`. `STORYTELLER_TOKEN_FILE` with `STORYTELLER_CLIENT_ID` and no client-credentials variable is a `Federated` machine, as for the provider.
+The credential variables decide the kind. Variables of two kinds at once, for example an API key and a client secret, stop `sform` before any call, with a message that names them ("Storyteller credential variables of different kinds are set: …"). `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_SCOPE` belong to client credentials or to federation, whichever of the two is set. So `STORYTELLER_CLIENT_SECRET` with `STORYTELLER_SUBJECT_TOKEN_FILE` stops, and so does an API key with `STORYTELLER_CLIENT_ID`. `STORYTELLER_TOKEN_FILE` with `STORYTELLER_CLIENT_ID` and no client-credentials variable is a `Federated` machine, as for the provider. `STORYTELLER_MANAGED_IDENTITY_RESOURCE` belongs to federation alone: with a client secret, an API key or a certificate it stops as two kinds, and with a token file it stops with a message that names both.
 
 | Kind | Variables |
 |---|---|
@@ -391,7 +394,7 @@ The credential variables decide the kind. Variables of two kinds at once, for ex
 | `Certificate` | `STORYTELLER_CLIENT_CERTIFICATE` and, when the file has one, `STORYTELLER_CLIENT_CERTIFICATE_PASSWORD` |
 | `CertificateAndApiKey` | all three |
 | `ClientCredentials` | `STORYTELLER_CLIENT_ID`, `STORYTELLER_CLIENT_SECRET`, and usually `STORYTELLER_TOKEN_URL` and `STORYTELLER_TOKEN_SCOPE` |
-| `Federated` | `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_FILE`, without a client-credentials variable; or, in a GitHub Actions job with `permissions: id-token: write`, `STORYTELLER_CLIENT_ID` alone when it is a GUID. Optionally `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE`. |
+| `Federated` | `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_FILE`, without a client-credentials variable; or, in a GitHub Actions job with `permissions: id-token: write`, `STORYTELLER_CLIENT_ID` alone when it is a GUID; or, on an Azure host with a managed identity, `STORYTELLER_CLIENT_ID` and `STORYTELLER_MANAGED_IDENTITY_RESOURCE`, and `STORYTELLER_MANAGED_IDENTITY_CLIENT_ID` for a user-assigned identity. Optionally `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE`. |
 | token file | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID` |
 
 **Certificates.**
@@ -416,10 +419,10 @@ The credential variables decide the kind. Variables of two kinds at once, for ex
 
 **Token file.** The file is read before every request, so a token that another process rotates is picked up. The content is trimmed, and a leading `Bearer ` is removed; a file that holds nothing else stops with exit code `2`. Any bearer token the API accepts works, for example a Storyteller token or a client-credentials token, and it is sent as it is: `sform` never renews it.
 
-**Token requests.** The token request of client credentials, the exchange of a `Federated` machine, AuthKit discovery and the GitHub Actions ID token request go through the SDK's own HTTP client, which sends no `Authorization` header (except the runner's request token to the runner) and follows no redirect.
+**Token requests.** The token request of client credentials, the exchange of a `Federated` machine, AuthKit discovery, the GitHub Actions ID token request and the managed identity token request go through the SDK's own HTTP client, which sends no `Authorization` header (except the runner's request token to the runner) and follows no redirect. The managed identity request carries the header of its endpoint, to that endpoint only, and never goes through a proxy.
 
 * Each attempt times out after 5 seconds. A network failure, a timeout, `408`, `429` and a `5xx` other than `501` and `505` are retried up to 3 times, with exponential backoff, and `Retry-After` is honoured. A circuit breaker stops the requests for 30 seconds after half of at least three calls in a minute failed.
-* A token request ends after 100 seconds, retries and `Retry-After` waits included, with exit code `3`: "The machine got no token within 100 seconds, retries and Retry-After waits included: the token endpoint, the sign-in discovery or the GitHub Actions runner did not answer, or kept failing."
+* A token request ends after 100 seconds, retries and `Retry-After` waits included, with exit code `3`: "The machine got no token within 100 seconds, retries and Retry-After waits included: the token endpoint, the sign-in discovery or the GitHub Actions runner did not answer, or kept failing." For a machine with a managed identity the message names "the token endpoint or the managed identity endpoint of the host" instead.
 * A `4xx` other than `408` and `429` ends with exit code `44`: "The token request to {url} was rejected with 401." A redirect, which is not followed, ends with `44` too ("… was answered with a redirect (302), which is not followed."), and so does a `2xx` without a bearer token ("The token endpoint {url} returned no bearer token.").
 * A `408`, `429` or `5xx` after the retries ends with exit code `3` ("The token request to {url} failed with 503."), and so does a network failure ("The token request to {url} failed: {reason}").
 * Messages include the `error` and `error_description` of an OAuth answer. They name URLs without user info, query or fragment, and never contain a secret.
@@ -428,16 +431,24 @@ The credential variables decide the kind. Variables of two kinds at once, for ex
 
 * The endpoint is `{STORYTELLER_ENDPOINT}/v1/{organization}/{project}/access/token`, with a trailing `/` of the URL removed, and the organization and project escaped, in the case the command names them.
 * `sform` posts `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, `client_id`, `subject_token`, `subject_token_type` and, when it is set, `scope`.
-* `STORYTELLER_SUBJECT_TOKEN_TYPE` is sent as its URN. `jwt` fits GitHub Actions, Kubernetes, AWS and Vercel, `access_token` an Azure managed identity, and `id_token` Google Cloud.
+* `STORYTELLER_SUBJECT_TOKEN_TYPE` is sent as its URN. `jwt` fits GitHub Actions, Kubernetes, AWS and Vercel, `access_token` an Azure managed identity, and `id_token` Google Cloud. With `STORYTELLER_MANAGED_IDENTITY_RESOURCE` the default is `access_token`, so the variable is not needed there.
 * **Platform token from a file.** `STORYTELLER_TOKEN_FILE` (or the deprecated `STORYTELLER_SUBJECT_TOKEN_FILE`) is read again before every exchange and trimmed, so a token the platform rotates, such as a Kubernetes projected token, is picked up. A file that is missing, cannot be read or is empty stops the command with exit code `2`. Both names set to different files stop it too.
 * **Platform token from GitHub Actions.** Without the file, `sform` asks the runner for a new ID token before every exchange: `GET {ACTIONS_ID_TOKEN_REQUEST_URL}&audience={token endpoint, escaped}` (the runner's URL has a query already), with `ACTIONS_ID_TOKEN_REQUEST_TOKEN` as the bearer token. The request token goes on that request only, which follows no redirect, so it reaches no other host and never the token endpoint. A redirect, a `4xx` other than `408` and `429`, or an answer without a token ends with exit code `44` ("The GitHub Actions ID token request to {runner URL} was rejected with 403."); a network failure, a timeout, `408`, `429` or a `5xx`, after the retries, with `3`. Messages name the runner's URL without its query, never the request token.
 * **The GUID rule.** When neither a token file nor `STORYTELLER_SUBJECT_TOKEN_TYPE` is set, the GitHub variables make a federated machine only when `STORYTELLER_CLIENT_ID` is a GUID, as every federated machine id is, and no client-credentials variable is set. Both GitHub variables are in every step of a job with `id-token: write`, which many jobs have for other reasons, and a missing GitHub secret expands to an empty `STORYTELLER_CLIENT_SECRET`, which counts as unset. So an AuthKit (`client_…`) or Keycloak (`42.sform.…`) client id without its secret is never exchanged. `STORYTELLER_CLIENT_ID` with neither a secret nor a platform token stops with exit code `2`, and the message names both ways. An Entra ID appId is a GUID too: when the exchange of such a job is refused, the message ends with "; the GitHub Actions token of this job was requested for the audience {audience}, which a rule of the machine must name exactly. For client credentials, set STORYTELLER_CLIENT_SECRET instead."
 * **The audience.** `sform` asks GitHub for a token whose audience is the token endpoint it builds. The server compares the token's `aud` with the rule's audience ordinally, so the rule's audience must equal that endpoint byte for byte: the same base URL as `STORYTELLER_ENDPOINT` as it is written, and the organization and project in the same case. Use the machine's `TokenEndpoint` as the audience, and the `STORYTELLER_ENDPOINT` and `STORYTELLER_PROJECT` that `machine create` prints. A rule with another audience can still use a file that the job writes, but then the job renews the file itself. A projected Kubernetes token follows the same rule: its `audience` is the rule's.
+* **Platform token from an Azure managed identity.** With `STORYTELLER_MANAGED_IDENTITY_RESOURCE` next to `STORYTELLER_CLIENT_ID` (any id), `sform` asks the managed identity of its host for a token for that resource before every exchange. The GitHub variables are then ignored.
+  * **The request.** On App Service, Functions and Container Apps, which set `IDENTITY_ENDPOINT` and `IDENTITY_HEADER`: `GET {IDENTITY_ENDPOINT}?api-version=2019-08-01&resource={resource, escaped}` with the header `X-IDENTITY-HEADER`. Otherwise IMDS, on a virtual machine or a scale set: `GET http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={resource, escaped}` with the header `Metadata: true`. `STORYTELLER_MANAGED_IDENTITY_CLIENT_ID` adds `&client_id=` for a user-assigned identity. The token is the `access_token` of the answer.
+  * **The host's variables.** `sform` reads `IDENTITY_ENDPOINT` and `IDENTITY_HEADER` before every exchange, because the platform rotates the header. The header goes on that request only, which follows no redirect, and is never printed.
+  * **No proxy.** The request never goes through a proxy, also not the one of `HTTP_PROXY`: the endpoint is on the host or its network, and over `http` a proxy would get the header. `NO_PROXY` needs no entry for it. The proxy still serves the token endpoint.
+  * **The rule of `IDENTITY_ENDPOINT`.** `https`, or `http` to `localhost` or to an address literal that is loopback, link-local (`169.254.0.0/16`, `fe80::/10`) or private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`), with no user info; never `http` to a name that DNS resolves. The platform sets such an address: `127.0.0.1` on Windows App Service, `localhost` on Container Apps, a link-local address on Linux App Service. Another value stops the command with exit code `2`.
+  * **Exit codes.** A redirect, a `4xx` other than `408` and `429`, or an answer without a token ends with exit code `44`; a host without a managed identity answers `400`. A network failure, a timeout, `408`, `429` or a `5xx`, after the retries, ends with `3`, and so do `404` and `410` of IMDS, which it answers while it is updating. The message names the endpoint without its query, and the resource, and asks: "Does the host have a managed identity, and is the resource the identifier URI of the Storyteller app registration (api://<appId>)?" While the circuit breaker is open, the message does not ask: it ends with the last failure, which can be the token endpoint's.
+  * **Other Azure hosts.** On Service Fabric and Azure Arc the command stops with exit code `2`: their managed identity answers another protocol, which only code reaches (see [Federated credentials from code](#federated-credentials-from-code)).
+  * **The audience** of the machine's rule is the app registration's, not the token endpoint, see [Azure managed identity](#azure-managed-identity).
 * **Renewal.** The Storyteller token is kept in memory for the process, never on disk. It is reused until 60 seconds before it expires (after 14 minutes with the default 15-minute token), or until halfway through a token that lives less than two minutes; then `sform` gets a new platform token and exchanges again, so a long job keeps working. A renewal that fails before the token expires keeps the token until then. After a `401` of the API, `sform` exchanges once more and sends the request again, once; a burst of `401`s exchanges once. A second `401` ends with exit code `44`. A `403` is never retried, and neither is the `.zip` stream of `sform story import` nor a request that a redirect sent elsewhere.
 * A command exchanges only for the project it has checked. `sform account ca`, whose endpoint is anonymous, never exchanges.
 * A refused exchange (`400` or `401`, for example `invalid_request` or `invalid_scope`, but also `403`, `404`, a redirect or an answer without a bearer token) ends with exit code `44`. A `503 temporarily_unavailable` or another `5xx`, `408`, `429` or a network failure ends with `3`, after the retries.
 
-Other platforms (Azure, AWS, Google Cloud, Vercel) have no built-in source: write their token to a file and set `STORYTELLER_TOKEN_FILE` next to `STORYTELLER_CLIENT_ID`, see [Setting up a platform](#setting-up-a-platform).
+Other platforms (AWS, Google Cloud, Vercel) have no built-in source: write their token to a file and set `STORYTELLER_TOKEN_FILE` next to `STORYTELLER_CLIENT_ID`, see [Setting up a platform](#setting-up-a-platform).
 
 `STORYTELLER_CLIENT_ID` decides what `STORYTELLER_TOKEN_FILE` holds. Without it, the file holds a token the API accepts, which `sform` sends as it is; a Storyteller token that a job writes there expires after 15 minutes, and later calls fail with `401` unless the job renews the file. With it, the file holds a platform token, which the API never accepts: `sform` exchanges it for a Storyteller token and renews that token itself.
 
@@ -452,7 +463,7 @@ The default project and view of the settings (`sform.settings.json`, see `sform 
 
 `STORYTELLER_KEY` is the variable of the configuration provider, so a job whose application reads its configuration with the provider sets it once for both. A user sign-in never reads it. `STORYTELLER_PROJECT` wins over a key of another project, and the view of that key then does not apply. For a machine the key must be a full key, as the provider parses it (`FullKey`); any other value stops a command whose project the key would pick (no `-p` and no `STORYTELLER_PROJECT`) with exit code `2`: "STORYTELLER_KEY must be a full key, @{organization}.{project}.{view}.{annotation key}."
 
-`sform account` checks the variables without a prompt. For client credentials it also gets the token, and for a token file it refuses a JWT whose `exp` has passed. For a `Federated` machine it needs `STORYTELLER_PROJECT` or `STORYTELLER_KEY` first (`sform account` has no `-p`; without them, exit code `43` and no request), and then exchanges at that project's token endpoint, asking GitHub for the platform token first when that is the source. It then prints the machine, the project, the API URL and the expiry of the token, which is the `exp` of a JWT. For a client-credentials or Storyteller token without `exp` it prints "Signed in; the expiry of the token is unknown."; for an API key, a certificate and a token file without `exp`, "The API checks the credentials on the first call." A line for each deprecated name that is set comes last. A federated machine in GitHub Actions:
+`sform account` checks the variables without a prompt. For client credentials it also gets the token, and for a token file it refuses a JWT whose `exp` has passed. For a `Federated` machine it needs `STORYTELLER_PROJECT` or `STORYTELLER_KEY` first (`sform account` has no `-p`; without them, exit code `43` and no request), and then exchanges at that project's token endpoint, asking GitHub or the managed identity for the platform token first when that is the source. It then prints the machine, the project, the API URL and the expiry of the token, which is the `exp` of a JWT. For a client-credentials or Storyteller token without `exp` it prints "Signed in; the expiry of the token is unknown."; for an API key, a certificate and a token file without `exp`, "The API checks the credentials on the first call." A line for each deprecated name that is set comes last. A federated machine in GitHub Actions:
 
 ```
 Signed in as machine 3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07 with workload identity federation (STORYTELLER_CLIENT_ID, ACTIONS_ID_TOKEN_REQUEST_URL, ACTIONS_ID_TOKEN_REQUEST_TOKEN).
@@ -466,10 +477,10 @@ Token valid until 2026-10-18T14:15:00.0000000+00:00.
 | Exit code | Meaning |
 |---|---|
 | `0` | Signed in. |
-| `2` | The variables are missing or invalid: two kinds at once, a canonical and a deprecated name with different values, a URL the rule refuses, `STORYTELLER_API_KEY=ApiKey`, a `STORYTELLER_PROJECT` or `STORYTELLER_KEY` in another format, or a client id outside AuthKit without `STORYTELLER_TOKEN_URL`. Or the target project is wrong. Or a certificate, token file or platform token file is missing, cannot be read or is empty, or the certificate does not load. |
-| `3` | A token request failed after its retries: the token endpoint, AuthKit discovery or the GitHub Actions runner answered `408`, `429` or `5xx`, could not be reached, or gave no token within 100 seconds; a retry may help. |
+| `2` | The variables are missing or invalid: two kinds at once, a canonical and a deprecated name with different values, a URL the rule refuses, `STORYTELLER_API_KEY=ApiKey`, a `STORYTELLER_PROJECT` or `STORYTELLER_KEY` in another format, or a client id outside AuthKit without `STORYTELLER_TOKEN_URL`. Or the target project is wrong. Or a certificate, token file or platform token file is missing, cannot be read or is empty, or the certificate does not load. Or the managed identity of the host is not one `sform` can ask. |
+| `3` | A token request failed after its retries: the token endpoint, AuthKit discovery, the GitHub Actions runner or the managed identity endpoint answered `408`, `429` or `5xx`, could not be reached, or gave no token within 100 seconds; a retry may help. |
 | `43` | `sform account` only: no project is set. |
-| `44` | The credentials were rejected: a token request answered with a `4xx` other than `408` and `429`, a redirect or no token (the token endpoint, for a `Federated` machine the exchange, AuthKit discovery or the GitHub Actions runner); the server does not sign in with AuthKit; the token file has expired; or the API answered `401`. A `403` the command does not handle itself ends the same way. When the server sent a message with the `403`, for example "This operation needs the scope Annotation.Manage, which the machine was not created with.", `sform` prints it and its `ErrorCode` instead of the general sentence, and no hint about the credentials. |
+| `44` | The credentials were rejected: a token request answered with a `4xx` other than `408` and `429`, a redirect or no token (the token endpoint, for a `Federated` machine the exchange, AuthKit discovery, the GitHub Actions runner or the managed identity endpoint); the server does not sign in with AuthKit; the token file has expired; or the API answered `401`. A `403` the command does not handle itself ends the same way. When the server sent a message with the `403`, for example "This operation needs the scope Annotation.Manage, which the machine was not created with.", `sform` prints it and its `ErrorCode` instead of the general sentence, and no hint about the credentials. |
 
 **Changes against the earlier machine sign-in.** `sform` signs a machine in through the SDK's credential since the [alignment with the provider contract](specs/2026-10-26%20Align%20the%20OpenAPI%20Document%20and%20sform%20with%20the%20Provider%20Contract.md) (API 0.10). Against the earlier `sform`:
 
@@ -1454,7 +1465,7 @@ sform account machine issuer set github --issuer https://token.actions.githubuse
 sform account machine create --issuer github --audience https://api.example.com/api/v1/acme/billing/access/token --subject repo:acme@65/billing@74:environment:production --claim repository_id=74
 ```
 
-* `machine create` with `--issuer` (a trusted issuer's name), `--audience`, `--subject` and any `--claim key=value` creates a `Federated` machine with one rule; the rule options imply `-k federated`. `--audience` is the machine's `TokenEndpoint`, except for Azure, where it is the `aud` of the Storyteller app registration's tokens: `<appId>` with `requestedAccessTokenVersion` 2, `api://<appId>` with 1 (see [Azure managed identity](#azure-managed-identity)). `--rules-file <path>` takes a JSON array of rules instead, the body of the [rules `PUT`](#federation-rules); its strings are sent as written. A repeated `--claim` key adds an accepted value, and the key may be a JSON pointer (`--claim /kubernetes.io/namespace=billing`). `-k federated` without rules, rule options with another kind, both a file and rule options, an incomplete rule, or a rules file with a property other than `Issuer`, `Audience`, `Subject` and `Claims` (a misspelled `Claim`) or with a value that is not a JSON string (`[ true ]` as a claim value) fail before any request; the server validates the rules themselves and its `400` message is printed. The output shows the machine id (the `client_id` of an exchange), its `TokenEndpoint`, the rules and a `curl` exchange, and no secret. Then come the variables of a [pipeline sign-in](#machine-sign-in-for-pipelines): `STORYTELLER_ENDPOINT`, `STORYTELLER_PROJECT`, `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_FILE=<file with the platform token>`, with a note that a GitHub Actions job with `permissions: id-token: write` leaves out the file, and the optional `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE`. `STORYTELLER_ENDPOINT` is the `TokenEndpoint` without its `/v1/{organization}/{project}/access/token`, and `STORYTELLER_PROJECT` is printed in the case the command named the project in, which is the case the server built the endpoint with. So the endpoint `sform` builds equals the `TokenEndpoint` byte for byte, even when `PublicBaseUrl` names another host than `general.baseUrl`. When the `TokenEndpoint` is missing or ends differently, `general.baseUrl` is printed, with a note that the rule's audience must then be `{STORYTELLER_ENDPOINT}/v1/{organization}/{project}/access/token`.
+* `machine create` with `--issuer` (a trusted issuer's name), `--audience`, `--subject` and any `--claim key=value` creates a `Federated` machine with one rule; the rule options imply `-k federated`. `--audience` is the machine's `TokenEndpoint`, except for Azure, where it is the `aud` of the Storyteller app registration's tokens: `<appId>` with `requestedAccessTokenVersion` 2, `api://<appId>` with 1 (see [Azure managed identity](#azure-managed-identity)). `--rules-file <path>` takes a JSON array of rules instead, the body of the [rules `PUT`](#federation-rules); its strings are sent as written. A repeated `--claim` key adds an accepted value, and the key may be a JSON pointer (`--claim /kubernetes.io/namespace=billing`). `-k federated` without rules, rule options with another kind, both a file and rule options, an incomplete rule, or a rules file with a property other than `Issuer`, `Audience`, `Subject` and `Claims` (a misspelled `Claim`) or with a value that is not a JSON string (`[ true ]` as a claim value) fail before any request; the server validates the rules themselves and its `400` message is printed. The output shows the machine id (the `client_id` of an exchange), its `TokenEndpoint`, the rules and a `curl` exchange, and no secret. Then come the variables of a [pipeline sign-in](#machine-sign-in-for-pipelines): `STORYTELLER_ENDPOINT`, `STORYTELLER_PROJECT`, `STORYTELLER_CLIENT_ID` and `STORYTELLER_TOKEN_FILE=<file with the platform token>`, with a note that a GitHub Actions job with `permissions: id-token: write` leaves out the file, a note that an Azure host with a managed identity sets `STORYTELLER_MANAGED_IDENTITY_RESOURCE=api://<appId>` instead of the file (and `STORYTELLER_MANAGED_IDENTITY_CLIENT_ID` for a user-assigned identity), and the optional `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE`. `STORYTELLER_ENDPOINT` is the `TokenEndpoint` without its `/v1/{organization}/{project}/access/token`, and `STORYTELLER_PROJECT` is printed in the case the command named the project in, which is the case the server built the endpoint with. So the endpoint `sform` builds equals the `TokenEndpoint` byte for byte, even when `PublicBaseUrl` names another host than `general.baseUrl`. When the `TokenEndpoint` is missing or ends differently, `general.baseUrl` is printed, with a note that the rule's audience must then be `{STORYTELLER_ENDPOINT}/v1/{organization}/{project}/access/token`.
 * `machine rules <id>` shows the machine's rules. With the same rule options or `--rules-file` it replaces them.
 * `machine issuer` (or `machine issuer list`, alias `issuers`) lists the trusted issuers. `machine issuer set <name> --issuer <iss>` creates or replaces one and, like the issuer `PUT`, clears what it does not set. Its keys come from discovery, from `--jwks-uri <url>` (`JwksUri`), or from `--jwks-file <path>`, whose content is stored as `Jwks` (for example the output of `kubectl get --raw /openid/v1/jwks`). `--max-lifetime <seconds>`, a repeatable `--require-claim key=value` and `--description <text>` set the rest. `machine issuer delete <name>` deletes one.
 * `machine reset <id>` of a `Federated` or a `Certificate` machine prints the server's `400` message and its error code, `MachineAccessNotSupported`. A reset that lost to another reset of the same machine prints the server's `409` message, and the reset of a machine deleted meanwhile its `404` message; neither prints a key. `machine list` shows `–` instead of a secret for federated machines, and for certificate machines, which have none either.
@@ -1799,17 +1810,36 @@ az ad app create --display-name "Storyteller acme.billing"
 az ad app update --id <appId> --identifier-uris api://<appId>
 az ad sp create --id <appId>
 # then set "requestedAccessTokenVersion": 2 under "api" in its manifest
-
-# VM or VM scale set (IMDS); add client_id=<id> to pick a user-assigned identity
-curl -s -H "Metadata: true" \
-  "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=api://<appId>" | jq -r .access_token
-
-# App Service and Functions
-curl -s -H "X-IDENTITY-HEADER: $IDENTITY_HEADER" \
-  "$IDENTITY_ENDPOINT?api-version=2019-08-01&resource=api://<appId>" | jq -r .access_token
 ```
 
-On AKS, use the [Kubernetes](#kubernetes) path instead of workload identity.
+**The rule.** The audience of the machine's rule is the app registration's: `<appId>` with token version 2, `api://<appId>` with 1. It is not the token endpoint, and the server does not change for a managed identity. With token version 2:
+
+```
+sform account machine issuer set entra --issuer https://login.microsoftonline.com/<tenant-id>/v2.0 --max-lifetime 86400
+sform account machine create --issuer entra --audience <appId> --subject <object id of the managed identity>
+```
+
+With token version 1, the issuer is `https://sts.windows.net/<tenant-id>/` and the audience `api://<appId>`.
+
+**The variables.** The workload needs no secret, no file and no script. The C# SDK asks the managed identity for its token before every exchange, so `sform`, the [configuration provider](configuration-provider.md#credentials), [Hosting](hosting.md) and `IStorytellerDocuments` all do. An Azure Function, an App Service or a Container App needs only its app settings:
+
+```text
+STORYTELLER_ENDPOINT=https://api.example.com/api
+STORYTELLER_KEY=@acme.billing.default.rst.invoicing
+STORYTELLER_CLIENT_ID=<machine id>
+STORYTELLER_MANAGED_IDENTITY_RESOURCE=api://<appId>
+```
+
+* **The resource** is the identifier URI, `api://<appId>`, with either token version: the version changes the `aud` of the token, not the resource the workload asks for.
+* **A user-assigned identity:** add `STORYTELLER_MANAGED_IDENTITY_CLIENT_ID=<client id of the identity>`. Without it, the system-assigned identity answers. The subject of the rule is the object (principal) id of the identity that answers, not its client id.
+* **The token type:** `STORYTELLER_SUBJECT_TOKEN_TYPE` defaults to `access_token` with a managed identity, so it stays unset.
+* **`sform`** takes its project from `-p`, `STORYTELLER_PROJECT` or `STORYTELLER_KEY`, as for every `Federated` machine (see [Machine sign-in for pipelines](#machine-sign-in-for-pipelines)).
+* **The host.** App Service, Functions and Container Apps set `IDENTITY_ENDPOINT` and `IDENTITY_HEADER` themselves, and the SDK asks that endpoint. A virtual machine or a scale set has neither, and the SDK asks IMDS. The requests, the rule of `IDENTITY_ENDPOINT` and the failures are in the [SDK readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md#azure-managed-identity).
+* **The cache of the platform.** The SDK asks before every exchange, which a running process makes about every 14 minutes with the default token lifetime. The managed identity endpoint answers with the token it caches for about 24 hours.
+
+A workload without the C# SDK makes the same request itself and exchanges the `access_token` of the answer: `GET {IDENTITY_ENDPOINT}?api-version=2019-08-01&resource=api://<appId>` with the header `X-IDENTITY-HEADER: {IDENTITY_HEADER}` on App Service, Functions and Container Apps, or `GET http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=api://<appId>` with the header `Metadata: true` on a virtual machine or a scale set (IMDS). `&client_id=<id>` picks a user-assigned identity.
+
+On AKS, use the [Kubernetes](#kubernetes) path instead of workload identity. Azure Arc, Service Fabric and Cloud Shell have a managed identity protocol of their own: there, the application gets the token in code, see [Federated credentials from code](#federated-credentials-from-code).
 
 #### AWS
 
@@ -1842,6 +1872,46 @@ curl -sG -H "Metadata-Flavor: Google" --data-urlencode "audience=$AUD" -d format
 ```
 
 Compute Engine and Cloud Run serve this endpoint, and it returns the token. On GKE, use the [Kubernetes](#kubernetes) path: whether the GKE metadata server serves it to a workload without an IAM service account is not confirmed.
+
+### Federated credentials from code
+
+An application sets the credential of the C# SDK in code with `StorytellerCredential.FromFederatedToken(options)`, for the configuration provider, Hosting and any client. `FederatedTokenOptions` take the machine id (`ClientId`) and exactly one source of the platform token, which the credential asks again before every exchange:
+
+| Source | Use |
+|---|---|
+| `SubjectTokenPath` | A file that the platform renews, read again and trimmed: a projected Kubernetes token. |
+| `AzureManagedIdentity` | The managed identity of an Azure host, as [the variables](#azure-managed-identity) set it. `FederatedTokenOptions.ForAzureManagedIdentity(clientId, resource, managedIdentityClientId)` fills it and sets the token type to `access_token`. Options that set it themselves set `SubjectTokenType` too; its default is `jwt`. |
+| `SubjectTokenProvider` | A delegate of the application: any platform. |
+
+No source, or more than one, throws `ArgumentException`: "Set exactly one of SubjectTokenPath, SubjectTokenProvider and AzureManagedIdentity." `FromFederatedTokenFile`, the older name of the factory, takes every source too.
+
+```csharp
+options.Credential = StorytellerCredential.FromFederatedToken(
+    FederatedTokenOptions.ForAzureManagedIdentity(machineId, $"api://{appId}"));
+```
+
+**A provider.** `SubjectTokenProvider` gets a `StorytellerSubjectTokenRequest` and a cancellation token, and returns the platform token.
+
+* **The request** names the `Audience`, the token endpoint as the GitHub runner gets it, and the `ClientId`, the machine id. A provider whose rule names another audience, such as an Azure app registration, ignores the audience.
+* **The token** is trimmed. The provider is asked before every exchange, so it decides about its own cache.
+* **Failures.** A `StorytellerAuthenticationException` passes as it is. A cancellation that the caller did not request, a `TimeoutException` or an `HttpRequestException` is `Unavailable`, a transient failure for the configuration provider. An empty token, or any other exception, is `Rejected`, a definitive one. The message names the type of the exception, never its message, and the exception is the inner one. A cancellation that the caller requested stays a cancellation.
+* **The cache identity.** The credential cannot print a delegate, so two providers of one machine share a [cache identity](configuration-provider.md#the-fingerprint-of-a-credential) of the configuration provider.
+
+With Azure.Identity, for the Azure hosts the built-in source does not cover (Azure Arc, Service Fabric, Cloud Shell). The SDK references no Azure package; the application does:
+
+```csharp
+var azure = new DefaultAzureCredential();
+
+options.Credential = StorytellerCredential.FromFederatedToken(new FederatedTokenOptions
+{
+    ClientId = machineId,
+    SubjectTokenType = FederatedTokenOptions.AccessTokenType,
+    SubjectTokenProvider = async (request, cancellationToken) =>
+        (await azure.GetTokenAsync(new TokenRequestContext([$"api://{appId}/.default"]), cancellationToken)).Token,
+});
+```
+
+The [SDK readme](../../../src/Platform/Storyteller/Sdk.NSwag/README.md#workload-identity-federation) has the details.
 
 ## Caveats and scale of machine access
 

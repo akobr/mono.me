@@ -41,9 +41,17 @@ public abstract class StorytellerCredential : IDisposable
         return new TokenFileCredential(path, fileSystem ?? new FileSystem(), null);
     }
 
-    public static StorytellerCredential FromFederatedTokenFile(FederatedTokenOptions options)
+    // A Federated machine, with the platform token of the one source the options set: a file, a provider, or the managed
+    // identity of the Azure host.
+    public static StorytellerCredential FromFederatedToken(FederatedTokenOptions options)
     {
         return FederatedTokenCredential.Create(options, null, Environment.GetEnvironmentVariable);
+    }
+
+    // The older name of FromFederatedToken; it takes any source too.
+    public static StorytellerCredential FromFederatedTokenFile(FederatedTokenOptions options)
+    {
+        return FromFederatedToken(options);
     }
 
     // The credential the STORYTELLER_* variables describe, still unbound; null when they describe none. See

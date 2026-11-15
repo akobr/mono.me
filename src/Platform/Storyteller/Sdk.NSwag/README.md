@@ -175,15 +175,16 @@ A `DelegatingHandler` wraps the primary handler, which follows redirects: a hand
 | `FromCertificate(certificate)` | no `Authorization`; the certificate only. `StorytellerClientCertificate.Load(path, password)` loads a `.pfx` and refuses one without a private key. |
 | `FromClientCredentials(new ClientCredentialsOptions { … })` | `Bearer` from a `client_credentials` token request. Without `TokenUrl`, only an AuthKit client id (`client_…`) works: it reads the AuthKit domain from the endpoint's `v1/auth/configuration` and posts to `{domain}/oauth2/token`. |
 | `FromTokenFile(path)` | `Bearer` with the content of the file, read again before every request. It cannot renew, so a `401` is not retried: the rotated file is read by the next request. |
-| `FromFederatedTokenFile(new FederatedTokenOptions { … })` | `Bearer` from an RFC 8693 exchange at `{endpoint}/v1/{organization}/{project}/access/token`, with the platform token of the file, read again before every exchange. |
-| `FromEnvironment()` | the credential of the `STORYTELLER_*` variables below, or `null` when they describe none. A federated machine of a GitHub Actions job gets its platform token from the runner, see [GitHub Actions](#github-actions). |
+| `FromFederatedToken(new FederatedTokenOptions { … })` | `Bearer` from an RFC 8693 exchange at `{endpoint}/v1/{organization}/{project}/access/token`, with the platform token of the one source the options set, got again before every exchange: a file (`SubjectTokenPath`), the managed identity of an Azure host (`AzureManagedIdentity`) or a delegate of the application (`SubjectTokenProvider`). See [Workload identity federation](#workload-identity-federation). |
+| `FromFederatedTokenFile(new FederatedTokenOptions { … })` | The older name of `FromFederatedToken`; it takes every source too. |
+| `FromEnvironment()` | the credential of the `STORYTELLER_*` variables below, or `null` when they describe none. A federated machine of a GitHub Actions job gets its platform token from the runner, see [GitHub Actions](#github-actions), and one with `STORYTELLER_MANAGED_IDENTITY_RESOURCE` from the managed identity of its Azure host, see [Azure managed identity](#azure-managed-identity). |
 
 * **Token cache.** Client credentials and federation keep their token in memory. Concurrent callers share one token request, and its failure. The token is renewed 60 seconds before it expires, or halfway through a token that lives less than two minutes: `expires_in` capped at a day, else the JWT `exp`, else five minutes. A renewal that fails before the token expires keeps the token until then.
 * **Renewal.** `GetAuthorizationAsync(rejected, cancellationToken)` takes the value the API refused. The cached token is dropped only when it is that value, so a burst of `401`s makes one token request.
-* **Token requests** use their own `HttpClient`: no redirects, no `Authorization` header, and the [resilience pipeline](#resilience) with retries of the `POST`. The one exception is the ID token request to the GitHub Actions runner, which carries the runner's request token, on that request only. `ConfigureHandler` of the options (or of the binding) configures its `SocketsHttpHandler`, for a proxy; redirects stay off.
+* **Token requests** use their own `HttpClient`: no redirects, no `Authorization` header, and the [resilience pipeline](#resilience) with retries of the `POST`. The one exception is the ID token request to the GitHub Actions runner, which carries the runner's request token, on that request only. The managed identity request carries the header of its endpoint, on that request only, through a handler of its own that uses no proxy. `ConfigureHandler` of the options (or of the binding) configures the `SocketsHttpHandler`, for a proxy; redirects stay off. It is called for both handlers.
 * **Binding.** `credential.Bind(new StorytellerCredentialBinding(endpoint) { Organization = …, Project = … })` returns a copy that knows its endpoint and target project. Federation needs both; AuthKit discovery needs the endpoint. A value set in the options wins over the binding. An unbound credential falls back to `STORYTELLER_ENDPOINT` (or the deprecated `STORYTELLER_API_URL`) and to the organization and project of `STORYTELLER_KEY` (`@{organization}.{project}.…`). Bind once and reuse the result, as a singleton: every copy of a client-credentials or federated credential has its own token cache and its own connection pool for token requests, so a `Bind` per request or per scope makes a token request each time. `StorytellerCredential` is `IDisposable`: disposing a copy closes the connections of its token requests (not the client certificate, which stays yours), so an application that binds one copy per tenant disposes the copies it no longer uses.
-* **URLs** must be `https`, or `http` to `localhost` or a loopback address literal (`127.0.0.1`, `[::1]`), and carry no user info. An endpoint, which paths are appended to, has no query or fragment either.
-* **Failures** throw `StorytellerAuthenticationException` with a `Reason`: `Configuration` (variables, files, a missing binding, a URL), `Rejected` (a redirect or a `4xx` other than `408` and `429` from a token, discovery or GitHub Actions request, an answer without a token, or a platform that does not sign in with AuthKit) or `Unavailable` (a network error, a timeout, an open circuit, or `408`, `429` or `5xx`; all but `501` and `505` after retries). Messages include the `error` and `error_description` of an OAuth answer; neither they nor `ToString()` contain a secret.
+* **URLs** must be `https`, or `http` to `localhost` or a loopback address literal (`127.0.0.1`, `[::1]`), and carry no user info. An endpoint, which paths are appended to, has no query or fragment either. The endpoint of a managed identity, which the platform sets, has [a rule of its own](#azure-managed-identity).
+* **Failures** throw `StorytellerAuthenticationException` with a `Reason`: `Configuration` (variables, files, a missing binding, a URL), `Rejected` (a redirect or a `4xx` other than `408` and `429` from a token, discovery, GitHub Actions or managed identity request, an answer without a token, or a platform that does not sign in with AuthKit) or `Unavailable` (a network error, a timeout, an open circuit, or `408`, `429` or `5xx`; all but `501` and `505` after retries). `404` and `410` of IMDS are `Unavailable` too, see [Azure managed identity](#azure-managed-identity), and the failures of a `SubjectTokenProvider` are in [A provider of the platform token](#a-provider-of-the-platform-token). Messages include the `error` and `error_description` of an OAuth answer; neither they nor `ToString()` contain a secret.
 
 #### Variables
 
@@ -199,15 +200,18 @@ A `DelegatingHandler` wraps the primary handler, which follows redirects: a hand
 | `STORYTELLER_CLIENT_ID` | – | The client id of client credentials, or the federated machine id |
 | `STORYTELLER_CLIENT_SECRET`, `STORYTELLER_TOKEN_URL`, `STORYTELLER_TOKEN_SCOPE` | – | Client credentials; the scope also for federation |
 | `STORYTELLER_TOKEN_FILE` | `STORYTELLER_SUBJECT_TOKEN_FILE`, federation only | With `STORYTELLER_CLIENT_ID` and no client-credentials variable: the platform token a federated machine exchanges. Alone: a bearer token the API accepts |
-| `STORYTELLER_SUBJECT_TOKEN_TYPE` | – | `jwt` (the default), `id_token`, `access_token` or the full URN, in any case |
-| `ACTIONS_ID_TOKEN_REQUEST_URL`, `ACTIONS_ID_TOKEN_REQUEST_TOKEN` | – | Set by GitHub Actions in a job with `id-token: write`: the platform token source of a federated machine without a token file |
+| `STORYTELLER_SUBJECT_TOKEN_TYPE` | – | `jwt` (the default), `id_token`, `access_token` or the full URN, in any case; `access_token` is the default with a managed identity |
+| `STORYTELLER_MANAGED_IDENTITY_RESOURCE` | – | With `STORYTELLER_CLIENT_ID`: a federated machine that gets its platform token from the managed identity of its Azure host, for this resource (`api://<appId>`) |
+| `STORYTELLER_MANAGED_IDENTITY_CLIENT_ID` | – | Optional, with the resource: the client id of a user-assigned identity |
+| `ACTIONS_ID_TOKEN_REQUEST_URL`, `ACTIONS_ID_TOKEN_REQUEST_TOKEN` | – | Set by GitHub Actions in a job with `id-token: write`: the platform token source of a federated machine without a token file and without a managed identity resource |
+| `IDENTITY_ENDPOINT`, `IDENTITY_HEADER` | – | Set by Azure App Service, Functions and Container Apps on a host with a managed identity: where a federated machine with a managed identity resource asks for its platform token; without them it asks IMDS |
 
 | Kind | Variables |
 |---|---|
 | API key | `STORYTELLER_API_KEY` |
 | Certificate | `STORYTELLER_CLIENT_CERTIFICATE` and, when the file has one, its password; alone or with an API key |
 | Client credentials | `STORYTELLER_CLIENT_ID`, `STORYTELLER_CLIENT_SECRET`, `STORYTELLER_TOKEN_URL` (recommended; `sform account machine create` prints it), `STORYTELLER_TOKEN_SCOPE` |
-| Federation | `STORYTELLER_CLIENT_ID` (the machine id) with `STORYTELLER_TOKEN_FILE` and no client-credentials variable, or in a GitHub Actions job; optional `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE` |
+| Federation | `STORYTELLER_CLIENT_ID` (the machine id) with `STORYTELLER_TOKEN_FILE` and no client-credentials variable, or in a GitHub Actions job, or with `STORYTELLER_MANAGED_IDENTITY_RESOURCE` on an Azure host; optional `STORYTELLER_SUBJECT_TOKEN_TYPE` and `STORYTELLER_TOKEN_SCOPE` |
 | Token file | `STORYTELLER_TOKEN_FILE` without `STORYTELLER_CLIENT_ID` |
 
 * **One kind.** Variables of two kinds at once are an error that names them.
@@ -215,7 +219,8 @@ A `DelegatingHandler` wraps the primary handler, which follows redirects: a hand
 * **`STORYTELLER_TOKEN_FILE` with `STORYTELLER_SUBJECT_TOKEN_TYPE`** and no client id is two kinds.
 * **`STORYTELLER_CLIENT_ID` alone**, or with `STORYTELLER_TOKEN_SCOPE`, federates through GitHub Actions when the id is a GUID and both GitHub variables are set; otherwise it is an error that names both ways (a client secret, or a token file or a GitHub Actions job). `STORYTELLER_TOKEN_SCOPE` without a client id is an error.
 * **`STORYTELLER_SUBJECT_TOKEN_TYPE` without a file** needs `STORYTELLER_CLIENT_ID` (any id), then takes the platform token from GitHub Actions when both GitHub variables are set; otherwise it is an error that names `STORYTELLER_TOKEN_FILE` and GitHub Actions.
-* **The GitHub variables alone** describe no credential: `FromEnvironment` returns `null` in a job with `id-token: write` that sets no `STORYTELLER_*` credential variable.
+* **`STORYTELLER_MANAGED_IDENTITY_RESOURCE`** with `STORYTELLER_CLIENT_ID` (any id) is a federated machine whose source is the managed identity; the GitHub variables are then ignored. With a token file it is an error that names both, with a variable of another kind it is two kinds, and without a client id it is an error. `STORYTELLER_MANAGED_IDENTITY_CLIENT_ID` without the resource is an error.
+* **The GitHub variables alone** describe no credential: `FromEnvironment` returns `null` in a job with `id-token: write` that sets no `STORYTELLER_*` credential variable. The same holds for `IDENTITY_ENDPOINT` and `IDENTITY_HEADER` of an Azure host, which make no machine federated either.
 * **Client credentials** need `STORYTELLER_CLIENT_ID` and `STORYTELLER_CLIENT_SECRET`. Without `STORYTELLER_TOKEN_URL`, only an AuthKit client id (`client_…`) works, through discovery. **A certificate password** without a file is an error.
 
 #### GitHub Actions
@@ -228,11 +233,25 @@ A federated machine in a GitHub Actions job with `permissions: id-token: write` 
 * **A refused exchange.** When the exchange of a GitHub token is `Rejected`, its message ends with "; the GitHub Actions token of this job was requested for the audience {audience}, which a rule of the machine must name exactly. For client credentials, set STORYTELLER_CLIENT_SECRET instead."
 * `ToString()` is `StorytellerCredential { Kind = Federated, ClientId = {id}, SubjectTokenSource = GitHubActions }`.
 
+#### Azure managed identity
+
+A federated machine on an Azure host with a managed identity needs no token file and no secret: with `STORYTELLER_MANAGED_IDENTITY_RESOURCE` (or `FederatedTokenOptions.ForAzureManagedIdentity(clientId, resource, managedIdentityClientId)` in code), the credential asks the host for the identity's token before every exchange. The SDK makes the request itself, with no Azure package.
+
+* **The request.** With `IDENTITY_ENDPOINT` and `IDENTITY_HEADER` set (App Service, Functions, Container Apps): `GET {IDENTITY_ENDPOINT}?api-version=2019-08-01&resource={resource, escaped}`, with the header `X-IDENTITY-HEADER: {IDENTITY_HEADER}`. Otherwise IMDS (virtual machines and scale sets): `GET http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource={resource, escaped}`, with the header `Metadata: true`. A user-assigned identity adds `&client_id={STORYTELLER_MANAGED_IDENTITY_CLIENT_ID}`. The token is the `access_token` of the answer. The request has the settings of the token requests: no redirects, and the same resilience with the same circuit breaker.
+* **The host's variables** are read before every exchange, not once: the platform rotates `IDENTITY_HEADER`. The header goes to that endpoint only, and is in no message and no `ToString()`.
+* **The resource** is the identifier URI of the app registration that stands for Storyteller, `api://<appId>`. The token's audience is the registration's, not the token endpoint: `<appId>` with token version 2, `api://<appId>` with 1, and a rule of the machine names that audience (see [Azure managed identity](../../../../docs/Platform/Storyteller/authentication.md#azure-managed-identity)).
+* **The subject token type.** `STORYTELLER_SUBJECT_TOKEN_TYPE` defaults to `access_token` with the resource, and `ForAzureManagedIdentity` sets `AccessTokenType`. Options that set `AzureManagedIdentity` themselves keep the default of `SubjectTokenType`, `jwt`: set `AccessTokenType` there too.
+* **The rule of `IDENTITY_ENDPOINT`.** The platform sets it to `http` on an address of the host's own network: `127.0.0.1` on Windows App Service, `localhost` on Container Apps, a link-local address on Linux App Service. So it may be `https`, or `http` to `localhost` or to an address literal that is loopback, link-local (`169.254.0.0/16`, `fe80::/10`) or private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`); never `http` to a name that DNS resolves, and it carries no user info. Another value is a `Configuration` failure that names `IDENTITY_ENDPOINT`. `StorytellerUrlRule`, the rule of every other URL, does not change.
+* **Failures.** A network error, a timeout, `408`, `429` and `5xx` are `Unavailable` (after retries); so are `404` and `410` of IMDS, which it answers while it is updating, without a retry. A redirect, another `4xx` (a host without a managed identity answers `400`), or an answer without a token are `Rejected`. Messages name the endpoint without its query, and the resource, and end with "Does the host have a managed identity, and is the resource the identifier URI of the Storyteller app registration (api://<appId>)?" The message of an open circuit does not ask: it ends with the last failure, which can be the token endpoint's, as one circuit breaker serves both.
+* **Other Azure hosts.** The source covers these two protocols only. Service Fabric (`IDENTITY_SERVER_THUMBPRINT` is set) and Azure Arc (`IMDS_ENDPOINT` is set with `IDENTITY_ENDPOINT` and without `IDENTITY_HEADER`) answer another one, so there the credential fails with a `Configuration` message that names `FederatedTokenOptions.SubjectTokenProvider`. A provider serves them, and Cloud Shell, see [A provider of the platform token](#a-provider-of-the-platform-token). AKS keeps a projected token file.
+* **No proxy.** The request never goes through a proxy, neither the one of the environment (`HTTP_PROXY`) nor one that `ConfigureHandler` sets. The endpoint is on the host or its network, where a proxy cannot reach it, and over `http` a proxy would get the header. So `NO_PROXY` needs no entry for IMDS or for `IDENTITY_ENDPOINT`. The proxy still serves the token endpoint.
+* `ToString()` is `StorytellerCredential { Kind = Federated, ClientId = {id}, SubjectTokenSource = AzureManagedIdentity, Resource = {resource}, ManagedIdentityClientId = {client id, or empty} }`.
+
 #### The shared contract
 
 The rules above are public, so that `sform` and other tools read the same variables in the same way:
 
-* `StorytellerVariables`: the names as constants, `Credentials` (every name that makes a credential, deprecated ones included; not the endpoint, the key or the GitHub names) and `Deprecated` (a deprecated name and its canonical name).
+* `StorytellerVariables`: the names as constants, `Credentials` (every name that makes a credential, deprecated ones included; not the endpoint, the key, the GitHub names or the names of an Azure host) and `Deprecated` (a deprecated name and its canonical name).
 * `StorytellerVariableReader`: trimmed values, an empty value as unset, `ReadWithFallback` with the conflict error, and `SetNames`.
 * `StorytellerUrlRule`: `IsAllowed`, `IsLocalHttp`, `Require`, `RequireEndpoint` and `Describe` (a URL without user info, query or fragment, for messages).
 * `StorytellerCredentialVariables.Read(getVariable)`: `null` when no credential variable is set, otherwise the checked variables with their `Kind` (`StorytellerCredentialKind`), `SubjectTokenSource` (`StorytellerSubjectTokenSource`, federated only), `Names`, `DeprecatedNames`, `ApiKeyMachine` (the machine segment of a structured key, without the secret), `ClientId` and `TokenFile`. The secrets are not exposed, the API key included, and `ToString()` prints only the kind and the names. `CreateCredential(fileSystem, timeProvider)` builds the unbound credential and loads the certificate; `FromEnvironment` is `Read(getVariable)?.CreateCredential(fileSystem, timeProvider)`.
@@ -287,7 +306,48 @@ var token = await access.ExchangeMachineTokenAsync("acme", "billing", new Machin
 // token.Access_token for Authorization: Bearer, valid for token.Expires_in seconds
 ```
 
-`StorytellerCredential.FromFederatedTokenFile` (see [Machine credentials](#machine-credentials)) makes the exchange and caches its token, like `createFederatedTokenProvider` of the TypeScript SDK.
+`StorytellerCredential.FromFederatedToken` (see [Machine credentials](#machine-credentials)) makes the exchange and caches its token, like `createFederatedTokenProvider` of the TypeScript SDK. `FromFederatedTokenFile` is its older name.
+
+### The source of the platform token
+
+`FederatedTokenOptions` take exactly one source of the platform token, and the credential asks it again before every exchange. No source, or more than one, throws `ArgumentException`: "Set exactly one of SubjectTokenPath, SubjectTokenProvider and AzureManagedIdentity."
+
+| Source | `FederatedTokenOptions` | From the variables |
+|---|---|---|
+| A file | `SubjectTokenPath`: read again, and trimmed | `STORYTELLER_TOKEN_FILE` |
+| GitHub Actions | – | `STORYTELLER_CLIENT_ID` in a job with `id-token: write`, see [GitHub Actions](#github-actions) |
+| Azure managed identity | `AzureManagedIdentity` (`Resource`, `ManagedIdentityClientId`), or `FederatedTokenOptions.ForAzureManagedIdentity(clientId, resource, managedIdentityClientId)`, which also sets `SubjectTokenType` to `AccessTokenType` | `STORYTELLER_MANAGED_IDENTITY_RESOURCE`, see [Azure managed identity](#azure-managed-identity) |
+| Any platform, from code | `SubjectTokenProvider` | – |
+
+`StorytellerSubjectTokenSource` names them: `File`, `GitHubActions`, `AzureManagedIdentity` and `Provider`.
+
+```csharp
+options.Credential = StorytellerCredential.FromFederatedToken(
+    FederatedTokenOptions.ForAzureManagedIdentity(machineId, $"api://{appId}"));
+```
+
+### A provider of the platform token
+
+`SubjectTokenProvider` is a `StorytellerSubjectTokenProvider`: a delegate that takes a `StorytellerSubjectTokenRequest` and a cancellation token, and returns the platform token.
+
+* **The request** has the `Audience`, the token endpoint as the GitHub runner gets it, and the `ClientId`, the machine id. A provider whose rule names another audience, such as an Azure app registration, ignores the audience.
+* **When it is asked.** Before every exchange, and its token is trimmed. The provider decides about its own cache.
+* **Failures.** A `StorytellerAuthenticationException` passes as it is. An `OperationCanceledException` that the caller did not request, a `TimeoutException` or an `HttpRequestException` is `Unavailable`. An empty token, or any other exception, is `Rejected`. The message names the type of the exception, never its message, and the exception is the inner one. A cancellation that the caller requested stays a cancellation.
+* `ToString()` is `StorytellerCredential { Kind = Federated, ClientId = {id}, SubjectTokenSource = Provider }`. It cannot see the delegate, so two providers of one machine share a cache identity of the [configuration provider](../../../../docs/Platform/Storyteller/configuration-provider.md#the-fingerprint-of-a-credential).
+
+With Azure.Identity, for the Azure hosts the built-in source does not cover (Azure Arc, Service Fabric, Cloud Shell). The SDK references no Azure package; the application does:
+
+```csharp
+var azure = new DefaultAzureCredential();
+
+options.Credential = StorytellerCredential.FromFederatedToken(new FederatedTokenOptions
+{
+    ClientId = machineId,
+    SubjectTokenType = FederatedTokenOptions.AccessTokenType,
+    SubjectTokenProvider = async (request, cancellationToken) =>
+        (await azure.GetTokenAsync(new TokenRequestContext([$"api://{appId}/.default"]), cancellationToken)).Token,
+});
+```
 
 ## User token exchange
 

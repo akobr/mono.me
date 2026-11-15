@@ -26,7 +26,8 @@ public sealed class StorytellerCredentialVariables
     // Federated only.
     public StorytellerSubjectTokenSource? SubjectTokenSource { get; private init; }
 
-    // The credential variables that are set, as named (a deprecated name by its own name); never the GitHub Actions ones.
+    // The credential variables that are set, as named (a deprecated name by its own name); never the GitHub Actions ones,
+    // nor those of an Azure host.
     public IReadOnlyList<string> Names { get; }
 
     // The deprecated names among Names.
@@ -69,9 +70,15 @@ public sealed class StorytellerCredentialVariables
 
     internal string? GitHubRequestToken { get; private init; }
 
+    // The resource of the AzureManagedIdentity source, and the client id of a user-assigned identity. The endpoint of
+    // the host and its header are not kept: the credential reads them before every exchange.
+    internal string? ManagedIdentityResource { get; private init; }
+
+    internal string? ManagedIdentityClientId { get; private init; }
+
     // The process environment when getVariable is null. Null when no credential variable is set (the GitHub Actions
-    // variables do not count); StorytellerAuthenticationException (Configuration) when the variables do not describe
-    // one credential. Messages name the variables as they were set, never a value.
+    // variables and those of an Azure host do not count); StorytellerAuthenticationException (Configuration) when the
+    // variables do not describe one credential. Messages name the variables as they were set, never a value.
     public static StorytellerCredentialVariables? Read(Func<string, string?>? getVariable = null)
     {
         getVariable ??= Environment.GetEnvironmentVariable;
@@ -87,6 +94,8 @@ public sealed class StorytellerCredentialVariables
         var tokenFile = variables.Read(StorytellerVariables.TOKEN_FILE);
         var subjectTokenFile = variables.Read(StorytellerVariables.SUBJECT_TOKEN_FILE);
         var subjectTokenType = variables.Read(StorytellerVariables.SUBJECT_TOKEN_TYPE);
+        var managedIdentityResource = variables.Read(StorytellerVariables.MANAGED_IDENTITY_RESOURCE);
+        var managedIdentityClientId = variables.Read(StorytellerVariables.MANAGED_IDENTITY_CLIENT_ID);
 
         // Not among the names: they never make a credential on their own.
         var gitHubVariables = new StorytellerVariableReader(getVariable);
@@ -104,9 +113,11 @@ public sealed class StorytellerCredentialVariables
         var clientCredentials = clientSecret is not null || tokenUrl is not null;
 
         // With a client id and no client-credentials variable, the token file holds the platform token of an exchange;
-        // alone it is a bearer token. The deprecated subject token file is always the platform token of an exchange.
+        // alone it is a bearer token. The deprecated subject token file is always the platform token of an exchange, and
+        // the managed identity variables always name the source of one.
         var tokenFileIsSubject = tokenFile is not null && clientId is not null && !clientCredentials;
-        var federation = tokenFileIsSubject || subjectTokenFile is not null || subjectTokenType is not null;
+        var managedIdentity = managedIdentityResource is not null || managedIdentityClientId is not null;
+        var federation = tokenFileIsSubject || subjectTokenFile is not null || subjectTokenType is not null || managedIdentity;
         var bearerTokenFile = tokenFile is not null && !tokenFileIsSubject;
 
         // CLIENT_ID and TOKEN_SCOPE belong to client credentials or federation; alone they are one more kind, except a
@@ -146,7 +157,17 @@ public sealed class StorytellerCredentialVariables
 
         if (federation)
         {
-            return ReadFederated(getVariable, names, clientId, tokenFileIsSubject ? tokenFile : null, subjectTokenFile, subjectTokenType, tokenScope, gitHub);
+            return ReadFederated(
+                getVariable,
+                names,
+                clientId,
+                tokenFileIsSubject ? tokenFile : null,
+                subjectTokenFile,
+                subjectTokenType,
+                tokenScope,
+                managedIdentityResource,
+                managedIdentityClientId,
+                gitHub);
         }
 
         if (sharedOnly)
@@ -231,8 +252,16 @@ public sealed class StorytellerCredentialVariables
         string? subjectTokenFile,
         string? subjectTokenType,
         string? tokenScope,
+        string? managedIdentityResource,
+        string? managedIdentityClientId,
         GitHubRequest gitHub)
     {
+        if (managedIdentityResource is null && managedIdentityClientId is not null)
+        {
+            throw StorytellerAuthenticationException.Configuration(
+                $"{StorytellerVariables.MANAGED_IDENTITY_CLIENT_ID} is set without {StorytellerVariables.MANAGED_IDENTITY_RESOURCE}.");
+        }
+
         if (clientId is null)
         {
             throw StorytellerAuthenticationException.Configuration($"A federated machine needs {StorytellerVariables.CLIENT_ID}, the machine id.");
@@ -246,31 +275,50 @@ public sealed class StorytellerCredentialVariables
 
         var path = tokenFile ?? subjectTokenFile;
 
-        if (path is null && !gitHub.IsSet)
+        // The deprecated name only when it gave the path; the other sources have none.
+        var pathSource = tokenFile is null && subjectTokenFile is not null ? StorytellerVariables.SUBJECT_TOKEN_FILE : StorytellerVariables.TOKEN_FILE;
+
+        if (path is not null && managedIdentityResource is not null)
+        {
+            throw StorytellerAuthenticationException.Configuration(
+                $"{StorytellerVariables.MANAGED_IDENTITY_RESOURCE} and {pathSource} are both set; a federated machine takes its platform token from one of them.");
+        }
+
+        // A file wins over the runner, and so does a managed identity: both GitHub variables are in every job with
+        // id-token: write, also in one that runs on an Azure host.
+        var isGitHub = path is null && managedIdentityResource is null;
+
+        if (isGitHub && !gitHub.IsSet)
         {
             throw StorytellerAuthenticationException.Configuration(
                 $"A federated machine needs a platform token: set {StorytellerVariables.TOKEN_FILE} to the file with it, or run in a GitHub Actions job with permissions: id-token: write.");
         }
 
         // The request token goes to this URL; it has a query, so it is no endpoint.
-        var gitHubRequestUrl = path is null ? StorytellerUrlRule.Require(gitHub.Url!, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL) : null;
+        var gitHubRequestUrl = isGitHub ? StorytellerUrlRule.Require(gitHub.Url!, StorytellerVariables.ACTIONS_ID_TOKEN_REQUEST_URL) : null;
 
-        var normalizedType = FederatedTokenCredential.NormalizeSubjectTokenType(subjectTokenType)
-            ?? throw StorytellerAuthenticationException.Configuration(
-                $"{StorytellerVariables.SUBJECT_TOKEN_TYPE} must be jwt, id_token or access_token, or the full urn:ietf:params:oauth:token-type: URN.");
+        // A managed identity token is an access token, so that is its default; every other source defaults to jwt.
+        var normalizedType = subjectTokenType is null && managedIdentityResource is not null
+            ? FederatedTokenOptions.AccessTokenType
+            : FederatedTokenCredential.NormalizeSubjectTokenType(subjectTokenType)
+                ?? throw StorytellerAuthenticationException.Configuration(
+                    $"{StorytellerVariables.SUBJECT_TOKEN_TYPE} must be jwt, id_token or access_token, or the full urn:ietf:params:oauth:token-type: URN.");
 
         return new StorytellerCredentialVariables(getVariable, names)
         {
             Kind = StorytellerCredentialKind.Federated,
-            SubjectTokenSource = path is null ? StorytellerSubjectTokenSource.GitHubActions : StorytellerSubjectTokenSource.File,
+            SubjectTokenSource = path is not null
+                ? StorytellerSubjectTokenSource.File
+                : managedIdentityResource is not null ? StorytellerSubjectTokenSource.AzureManagedIdentity : StorytellerSubjectTokenSource.GitHubActions,
             ClientId = clientId,
             TokenScope = tokenScope,
             SubjectTokenPath = path,
-            // The deprecated name only when it gave the path; a GitHub Actions source has none.
-            SubjectTokenPathSource = tokenFile is null && subjectTokenFile is not null ? StorytellerVariables.SUBJECT_TOKEN_FILE : StorytellerVariables.TOKEN_FILE,
+            SubjectTokenPathSource = pathSource,
             SubjectTokenType = normalizedType,
             GitHubRequestUrl = gitHubRequestUrl,
-            GitHubRequestToken = path is null ? gitHub.Token : null,
+            GitHubRequestToken = isGitHub ? gitHub.Token : null,
+            ManagedIdentityResource = managedIdentityResource,
+            ManagedIdentityClientId = managedIdentityClientId,
         };
     }
 

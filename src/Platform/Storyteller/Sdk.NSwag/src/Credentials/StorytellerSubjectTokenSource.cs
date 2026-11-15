@@ -8,4 +8,11 @@ public enum StorytellerSubjectTokenSource
 
     // The ID token of the GitHub Actions job, requested again before every exchange.
     GitHubActions,
+
+    // STORYTELLER_MANAGED_IDENTITY_RESOURCE: the token of the Azure host's managed identity for that resource, requested
+    // again before every exchange.
+    AzureManagedIdentity,
+
+    // FederatedTokenOptions.SubjectTokenProvider, asked again before every exchange; set in code only.
+    Provider,
 }

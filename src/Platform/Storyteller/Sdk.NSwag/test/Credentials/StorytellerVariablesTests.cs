@@ -21,6 +21,8 @@ public class StorytellerVariablesTests
             "STORYTELLER_TOKEN_FILE",
             "STORYTELLER_SUBJECT_TOKEN_FILE",
             "STORYTELLER_SUBJECT_TOKEN_TYPE",
+            "STORYTELLER_MANAGED_IDENTITY_RESOURCE",
+            "STORYTELLER_MANAGED_IDENTITY_CLIENT_ID",
         ]);
     }
 
@@ -33,6 +35,17 @@ public class StorytellerVariablesTests
     public void Credentials_LeaveOutTheTargetAndTheGitHubActionsNames(string name)
     {
         StorytellerVariables.Credentials.ShouldNotContain(name);
+    }
+
+    // The platform's own names, as App Service, Functions and Container Apps set them.
+    [Theory]
+    [InlineData(StorytellerVariables.IDENTITY_ENDPOINT, "IDENTITY_ENDPOINT")]
+    [InlineData(StorytellerVariables.IDENTITY_HEADER, "IDENTITY_HEADER")]
+    public void Credentials_LeaveOutTheNamesOfAnAzureHost(string name, string expected)
+    {
+        name.ShouldBe(expected);
+        StorytellerVariables.Credentials.ShouldNotContain(name);
+        StorytellerVariables.Deprecated.Keys.ShouldNotContain(name);
     }
 
     [Fact]

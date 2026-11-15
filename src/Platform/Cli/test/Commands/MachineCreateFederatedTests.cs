@@ -179,7 +179,8 @@ public class MachineCreateFederatedTests
             $"  STORYTELLER_CLIENT_ID={MachineId}",
             "  STORYTELLER_TOKEN_FILE=<file with the platform token>",
             "In a GitHub Actions job with permissions: id-token: write, leave out STORYTELLER_TOKEN_FILE: sform asks the runner for a token for the token endpoint above.",
-            "Optional: STORYTELLER_SUBJECT_TOKEN_TYPE=jwt (access_token for Azure managed identity, id_token for Google Cloud) and STORYTELLER_TOKEN_SCOPE=<a subset of the machine's scopes>.",
+            "On an Azure host with a managed identity, set STORYTELLER_MANAGED_IDENTITY_RESOURCE=api://<appId> instead of STORYTELLER_TOKEN_FILE: sform asks the managed identity for a token of the Storyteller app registration; STORYTELLER_MANAGED_IDENTITY_CLIENT_ID=<client id> picks a user-assigned identity.",
+            "Optional: STORYTELLER_SUBJECT_TOKEN_TYPE=jwt (id_token for Google Cloud; a managed identity defaults to access_token) and STORYTELLER_TOKEN_SCOPE=<a subset of the machine's scopes>.",
         ]);
         _console.Lines.ShouldNotContain(line => line.Contains(StorytellerVariables.CLIENT_SECRET) || line.Contains(StorytellerVariables.API_KEY));
     }

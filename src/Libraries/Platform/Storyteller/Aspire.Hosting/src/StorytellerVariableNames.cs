@@ -21,13 +21,15 @@ internal static class StorytellerVariableNames
     public const string CLIENT_CERTIFICATE = "STORYTELLER_CLIENT_CERTIFICATE";
     public const string CLIENT_CERTIFICATE_PASSWORD = "STORYTELLER_CLIENT_CERTIFICATE_PASSWORD";
 
-    // The credential names a resource never sets: processes started by an AppHost have no projected or CI token, and the
-    // canonical names are read before the deprecated ones. WithReference writes them empty.
+    // The credential names a resource never sets: processes started by an AppHost have no projected or CI token and no
+    // managed identity, and the canonical names are read before the deprecated ones. WithReference writes them empty.
     public const string CERTIFICATE_FILE = "STORYTELLER_CERTIFICATE_FILE";
     public const string CERTIFICATE_PASSWORD = "STORYTELLER_CERTIFICATE_PASSWORD";
     public const string TOKEN_FILE = "STORYTELLER_TOKEN_FILE";
     public const string SUBJECT_TOKEN_FILE = "STORYTELLER_SUBJECT_TOKEN_FILE";
     public const string SUBJECT_TOKEN_TYPE = "STORYTELLER_SUBJECT_TOKEN_TYPE";
+    public const string MANAGED_IDENTITY_RESOURCE = "STORYTELLER_MANAGED_IDENTITY_RESOURCE";
+    public const string MANAGED_IDENTITY_CLIENT_ID = "STORYTELLER_MANAGED_IDENTITY_CLIENT_ID";
 
     // Every name that makes a credential, deprecated ones included, as the SDK's StorytellerVariables.Credentials.
     public static IReadOnlyList<string> Credentials { get; } =
@@ -44,6 +46,8 @@ internal static class StorytellerVariableNames
         TOKEN_FILE,
         SUBJECT_TOKEN_FILE,
         SUBJECT_TOKEN_TYPE,
+        MANAGED_IDENTITY_RESOURCE,
+        MANAGED_IDENTITY_CLIENT_ID,
     ];
 
     // Every name WithReference writes to a process that inherits the AppHost's environment: the endpoint, its

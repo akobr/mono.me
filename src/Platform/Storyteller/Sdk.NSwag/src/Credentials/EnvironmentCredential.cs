@@ -54,17 +54,22 @@ internal static class EnvironmentCredential
                 getVariable);
         }
 
+        // The managed identity asks the host through getVariable, which reads IDENTITY_ENDPOINT and IDENTITY_HEADER.
+        var isManagedIdentity = variables.SubjectTokenSource == StorytellerSubjectTokenSource.AzureManagedIdentity;
         var options = new FederatedTokenOptions
         {
             ClientId = variables.ClientId!,
-            SubjectTokenPath = variables.SubjectTokenPath!,
+            SubjectTokenPath = isManagedIdentity ? null : variables.SubjectTokenPath!,
+            AzureManagedIdentity = isManagedIdentity
+                ? new AzureManagedIdentityTokenOptions { Resource = variables.ManagedIdentityResource!, ManagedIdentityClientId = variables.ManagedIdentityClientId }
+                : null,
             SubjectTokenType = variables.SubjectTokenType,
             Scope = variables.TokenScope,
             FileSystem = fileSystem,
             TimeProvider = timeProvider,
         };
 
-        return FederatedTokenCredential.Create(options, variables.SubjectTokenPathSource, getVariable);
+        return FederatedTokenCredential.Create(options, isManagedIdentity ? null : variables.SubjectTokenPathSource, getVariable);
     }
 
     private static X509Certificate2 LoadCertificate(StorytellerCredentialVariables variables, IFileSystem fileSystem)
