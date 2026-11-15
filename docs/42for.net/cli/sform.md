@@ -141,9 +141,9 @@ A machine can do what its scopes allow, and it gets them when it is created. **R
 
 | `--scope` | Scope | Enum name | Group | Needed by |
 |---|---|---|---|---|
-| `annotation-read` | `Annotation.Read` | `AnnotationRead` | Runtime | `sform story` (the list), `get`, `deleted` and `history`, and the reads of `edit` |
+| `annotation-read` | `Annotation.Read` | `AnnotationRead` | Runtime | `sform story` (the list), `get`, `deleted` and `history`, and the reads of `edit`; `sform project settings`, as `configuration-read` also allows |
 | `annotation-write` | `Annotation.Write` | `AnnotationWrite` | Runtime | `sform story set` and `edit` |
-| `configuration-read` | `Configuration.Read` | `ConfigurationRead` | Runtime | the reads of `sform story config`, `schema`, `template` and `kv` |
+| `configuration-read` | `Configuration.Read` | `ConfigurationRead` | Runtime | the reads of `sform story config`, `schema`, `template` and `kv`; `sform project settings`, as `annotation-read` also allows |
 | `configuration-write` | `Configuration.Write` | `ConfigurationWrite` | Runtime | the writes of `sform story config` and `kv`; with `schema-write` or `template-write`, those of `schema` and `template` |
 | `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config <key> --resolved`, `sform story config export <key>`, `sform story kv export --include-secrets` |
 | `secrets-write` | `Secrets.Write` | `SecretsWrite` | Runtime | `sform story kv set` of a secret, and `sform story kv protect` |
@@ -409,6 +409,179 @@ A configuration has no custom properties or labels of its own: they belong to th
 | `3` | The service failed (`5xx` but `501` and `505`, `408`, `429`) or could not be reached |
 | `1` | The editor of `edit` or `patch` exited with a non-zero code |
 
+## Project settings
+
+The settings of a project say how clients show it: the names, colors and icons of its seven annotation types, its default time zone and its date format. They belong to the project and the API keeps them, so every member sees the same in `sform` and in [the admin UI](/platform/admin-ui). They are not your [Settings](#settings), the preferences in `sform.settings.json` that only you have. Two of those preferences, `output.projectSettings` and `output.icons`, decide whether and how your console shows the project settings (see [Turn them off](#turn-them-off)).
+
+::: warning
+`sform project` is newer than the `sform` on NuGet, which ends it as an unrecognized command, and it needs an API that has the settings routes. Until a release has it, install a `sform` packed from the repository, as [Until sform is published](/cli/github-action#until-sform-is-published) shows.
+:::
+
+``` text
+sform project settings [-f|--format text|json] [-e|--export <file>]
+sform project settings set [-i|--import <file>] [--replace]
+                           [--type <type> [--clear] [--label <text>] [--plural <text>] [--color <name>] [--icon <name>]]
+                           [--time-zone <iana-id>] [--date-format <format>]
+                           [--expected-version <n>] [--dry-run]
+sform project settings edit
+sform project settings reset [--types] [--time-zone] [--date-format] [-y|--yes]
+```
+
+Each command acts on the project of `-p <organization>.<project>`, or else on the project that the other commands use without `-p`: the default project (see [Settings](#settings)), or the project of a machine (see [Sign in from a pipeline](#sign-in-from-a-pipeline)). The commands ignore `-v`, because the settings belong to the project, not to a view. Reading the settings needs the Reader role; a machine needs `Annotation.Read` or `Configuration.Read`. Changing them needs the Administrator role, and a machine can never change them. The four commands always read the settings from the API, never from the [cache](#the-cache).
+
+**Read.** `sform project settings` prints a table of the seven types, with these columns:
+
+- the code and the built-in name;
+- the project's name and plural;
+- the color and the icon.
+
+After the table it prints the default time zone, the date format, the version and the last change (`Modified: 2026-11-15 14:02 by Ales Kobr`, or `Modified: never`). Values the project leaves at the built-in appearance or the defaults are dimmed:
+
+- `—` where the project gives no name;
+- the plural derived from the name (Job → Jobs, Policy → Policies, Batch → Batches);
+- the built-in color and icon;
+- `UTC (default)` and `yyyy-mm-dd (default)`.
+
+In a console, a swatch `■` in the color stands before each color name, unless `NO_COLOR` is set. Icons are listed by their names, such as `i-lucide-building-2`.
+
+- `-f json` writes the settings to standard output as the API answers them, with `Version` and `Modified`, for programs. A read that is refused or fails is reported on standard error, except a `401`.
+- `-e <file>` also writes them to a file in the file shape (`"Format": "2s.project-settings.v1"`, without `Version` and `Modified`). That is the shape of a data set's `project-settings.json`, and `set -i` reads it back. Like `-e` of the other `get` commands, it asks before it replaces a file in a terminal, and rewrites the file without asking when there is no terminal.
+- `-f yaml` or any other format ends with `2`: "Unknown format 'yaml'; use text or json."
+
+**Change.** `sform project settings set` merges a change into the settings, as a JSON Merge Patch (`PATCH`). The change is the file of `-i` first, then the options. With `--replace`, the result replaces the settings instead (`PUT`): a type left out goes back to its built-in appearance, and a time zone or date format left out goes back to its default. So `set --replace --type exe --label Job` leaves the project with that one name and nothing else.
+
+| Option | Changes |
+|---|---|
+| `-i\|--import <file>` | A settings file: the file of `-e`, the output of `-f json` (`Version` and `Modified` are ignored), or a data set's `project-settings.json`. Comments and trailing commas are allowed. `sform` checks the file by the rules before any call |
+| `--type <type>` | The type that `--clear`, `--label`, `--plural`, `--color` and `--icon` change. Give its code (`sbt`) or its built-in name (`subject`, `unit of execution`, `UnitOfExecution`), in any case; a name the project gave the type is not accepted. One type per run; change more types at once with `-i` or `edit` |
+| `--clear` | Removes the project's appearance of the type before the other options apply: `--clear` alone gives the type back its built-in appearance, and `--clear --label Firm` keeps only the name |
+| `--label <text>` | The project's name of the type, e.g. `Company`, at most 40 characters |
+| `--plural <text>` | The plural of that name, e.g. `Companies`, at most 40 characters; only with a name. Without it, clients derive the plural from the name |
+| `--color <name>` | `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose` or `gray` |
+| `--icon <name>` | One of the 65 Lucide icons of the catalog, by its name (`i-lucide-building-2`) or its short name (`building-2`) |
+| `--time-zone <iana-id>` | The default time zone, an IANA id such as `Europe/Prague` or `UTC`. A Windows name such as `Central Europe Standard Time` is refused |
+| `--date-format <format>` | `yyyy-mm-dd`, `dd.mm.yyyy`, `dd/mm/yyyy`, `mm/dd/yyyy` or `d mmm yyyy` |
+| `--expected-version <n>` | Saves only while the settings are at version `n` (sent as `If-Match`); otherwise nothing is written. Without it, the change applies to the settings as they are at that moment |
+| `--dry-run` | Applies the change to the current settings by the rules of the API and shows it, without saving it |
+
+- An empty value removes the setting. `--label ""` and `--plural ""` remove the name and the plural, `--color ""` and `--icon ""` restore the built-in color and icon, and `--time-zone ""` and `--date-format ""` restore `UTC` and `yyyy-mm-dd`.
+- Values match in any case and are stored as the catalog spells them: `europe/prague` is stored as `Europe/Prague`, and `DD.MM.YYYY` as `dd.mm.yyyy`.
+- After a save, the command prints the changes and "Saved the project settings, version 8.". When nothing changed, it prints "The project settings did not change; they stay at version 7.".
+- `sform` checks the `-i` file and `--dry-run` by the rules itself, before any write; the API checks every other change. A refused value is named by its path, as in `! $.Types.sbt.Color: 'chartreuse' is not a color of the catalog; use one of red, orange, …`, and nothing is saved.
+
+``` bash
+sform project settings -p acme.billing
+sform project settings -f json
+sform project settings -e project-settings.json
+sform project settings set --type sbt --label Company --plural Companies --color emerald --icon building-2
+sform project settings set --type "unit of execution" --label Run
+sform project settings set --time-zone Europe/Prague --date-format dd.mm.yyyy
+sform project settings set --type sbt --clear
+sform project settings set --date-format "d mmm yyyy" --dry-run
+sform project settings set -i project-settings.json --replace --expected-version 7
+sform project settings edit
+sform project settings reset --types -y
+```
+
+**Edit.** `sform project settings edit` opens the settings in the file shape in your editor (see [Settings](#settings) for which editor). It checks what you saved by the same rules, shows the changes and asks before it saves them. It saves only while the settings are at the version it opened (`If-Match`). If someone changed them in the meantime, it prints "The project settings changed meanwhile; they are at version 9.".
+
+In two cases `sform` keeps your edit in a file and prints the command that saves it, `sform project settings set -p <organization>.<project> -i "<file>" --replace`:
+
+- the save fails, for example because the settings changed in the meantime or the API refused it;
+- your edit breaks a rule and you choose not to fix it in the editor.
+
+`edit` needs a terminal. With the input or the output redirected, it ends with `43` before the editor opens. Instead, export the settings with `-e`, change the file, and save it with `set -i <file> --replace`.
+
+**Reset.** `sform project settings reset` resets the settings to the defaults: the built-in names, colors and icons, `UTC`, and `yyyy-mm-dd`. `--types`, `--time-zone` and `--date-format` reset only those parts.
+
+- The command shows the changes and asks first. `-y` resets without asking. Without a terminal and without `-y`, it ends with `43`.
+- It resets only the version it read.
+- Settings that are at the defaults already end with `42`.
+
+| Exit code | When |
+|---|---|
+| `0` | The settings were shown or saved, or `--dry-run` showed a change |
+| `42` | Nothing changed: the settings have the values of `set` or `edit` already (`--dry-run` too), or are at the defaults for `reset` |
+| `40` | You declined the confirmation of `edit` or `reset` |
+| `43` | `edit` with the input or the output redirected; `reset` without `-y` and without a terminal, see [Run without a terminal](#run-without-a-terminal) |
+| `2` | Nothing was written: an unknown `--format`; `set` without a change, `--label`, `--plural`, `--color`, `--icon` or `--clear` without `--type`, or `--type` alone or with an unknown type; a file that does not exist, is not JSON or holds no valid settings; a value the rules refuse (locally, or the API's `400` `InvalidSettings`); settings that are not at `--expected-version`, or that changed during `edit` or `reset` (`412` `SettingsPreconditionFailed`); a project that does not exist, or an API without the settings routes (`404`) |
+| `44` | The API refused (`401`, `403`): a change by a Reader or a Contributor ("No Administrator access to '`<organization>.<project>`'.") or by a machine ("Changing the project settings needs a user with the Administrator role."), or a read by a machine without `Annotation.Read` or `Configuration.Read` |
+| `3` | The service failed or could not be reached |
+| `1` | The editor of `edit` exited with a non-zero code |
+
+### Where they show
+
+Outside `sform project settings`, the settings change only what `sform` shows a person in a console:
+
+| Where | Built-in | With the project's settings |
+|---|---|---|
+| The headers of `sform story` (the list) | `# Subjects`, `# Responsibilities`, … | `# Companies`: the project's plural, else its name made plural |
+| The tags of `sform story -t` and `-b\|--tree-root` | `northwind [subject]`, dimmed | `northwind 🏢 [Company]`: the icon, then the project's name in the type's color; a status such as `[disabled]` stays dimmed |
+| The `Type` column of `sform story deleted` | `Responsibility`, `UnitOfExecution`, … | The project's name in the type's color, after the icon |
+| The `Source` column of `sform story config composition` | `template Unit` | `template Job` |
+| The `Document` column of the result of `sform story import` | The type | The project's name of the type |
+| Dates: the `When` of `story history`; the `Deleted` and `Purged on` of `story deleted`; the notices of a deleted annotation of `story get` and `story delete`; the `versions` of `story config`, `template` and `schema`; `story kv` (the list), `kv versions`, `kv recipients` and `kv audit`; the header of `story kv usage` | `2026-11-15 14:02`, `2026-11-15` | `15.11.2026 14:02`, `15/11/2026`, `11/15/2026` or `15 Nov 2026` (English month names) |
+
+- **Unchanged types.** A type the project leaves alone keeps its text, such as `[context]` or `Execution`. Once the project changes the name, color or icon of any type, every type shows a color and an icon: its own, or the built-in one where the project gives none. A project that sets only a date format changes only the dates.
+- **Times.** Times stay in the local time of your computer, as `HH:mm`. Only `sform project settings` shows the default time zone; `sform` converts no time to it and writes it nowhere (`story set` sets no time zone).
+- **What stays as it is.** The sentences, such as `No subject exists yet.` and the hint about the next page. The instants among the changes of `story history`. `story get`, which prints JSON. `story kv policy`, the dates of shared certificates, and the times of `account`, `machine` and the `Modified` line of `sform project settings`.
+- **What the settings never change:**
+  - what `sform` accepts: type codes and keys in arguments and options, `--tree-root subject|sbt|responsibility|rst`, the `--type` of `project settings set`, `-x` paths, input files, and dates in options;
+  - help and error texts;
+  - machine-readable output: `--format`, `--json`, `--content-only`, `-e` files, `story export`, `config export` and `kv export`;
+  - any output without a console (see [Run without a terminal](#run-without-a-terminal)). Without a console, `sform` prints the built-in names and dates without colors and icons, byte for byte as before.
+
+**Colors.** Tables use the nearest of the 16 console colors:
+
+- red and rose: red;
+- orange: dark yellow;
+- amber and yellow: yellow;
+- lime, green and emerald: green;
+- teal: dark cyan;
+- cyan and sky: cyan;
+- blue: blue;
+- indigo: dark blue;
+- violet and purple: dark magenta;
+- fuchsia and pink: magenta;
+- gray: gray.
+
+The tags of a tree use the admin UI's 24-bit colors when the terminal shows 24-bit color: `COLORTERM` is `truecolor` or `24bit`, or it is Windows Terminal (`WT_SESSION`). On Windows, the console must also accept escape codes. `NO_COLOR` with any value turns off the colors of the types: the tags are dimmed as before, and `project settings` shows no swatches. Other colors of `sform` stay.
+
+**Icons.** `sform` shows each of the 65 icons of the catalog as an emoji. For example, `building-2` is 🏢, and the built-in icons of rst, unt, sbt, usg, cnt, exe and uxe are 🎯 📦 ☀️ 🔗 📚 ▶️ 💻. An emoji takes two cells, so in `auto` mode icons appear only when the output encoding is UTF-8 and the terminal is known to draw emoji two cells wide. On Windows, UTF-8 means the console code page 65001, set by `chcp 65001` or by `[Console]::OutputEncoding = [Text.Encoding]::UTF8` in PowerShell. The known terminals are:
+
+- Windows Terminal (`WT_SESSION`);
+- `TERM_PROGRAM` set to `vscode`, `iTerm.app`, `WezTerm`, `ghostty`, `Apple_Terminal` or `Hyper`;
+- `TERM` set to `xterm-kitty`, `xterm-ghostty`, `wezterm`, `alacritty` or `foot`;
+- GNOME Terminal and other VTE terminals (`VTE_VERSION`), and Konsole (`KONSOLE_VERSION`).
+
+In other terminals, such as the classic Windows console host or an unknown terminal, icons are left out so the columns stay aligned. `SFORM_ICONS` or the preference `output.icons` overrides this, and the variable wins: `always` shows icons in any console, `never` in none, and `auto`, the default, detects the terminal.
+
+### Turn them off
+
+To see the built-in names and dates, without colors and icons, turn the project settings off:
+
+- for one run, with `--builtin` (every command takes it);
+- for a session, with `SFORM_PROJECT_SETTINGS=builtin`;
+- for good, with `sform account settings set output.projectSettings builtin`.
+
+When they are off, `sform` makes no request for them. The first switch that is set wins, in this order: `--builtin`, `SFORM_PROJECT_SETTINGS`, then the preference `output.projectSettings`. For example, `SFORM_PROJECT_SETTINGS=project` shows the project's settings although the preference says `builtin`. A value that is not one of a switch's values counts as not set. `sform project settings` always shows the stored settings.
+
+``` bash
+sform story -t --builtin
+SFORM_PROJECT_SETTINGS=builtin sform story history sbt.northwind
+SFORM_ICONS=never sform story -t
+sform account settings set output.icons always
+```
+
+### The cache
+
+A command that shows a type or a date reads the settings of the context's project once, after its own call of the API (`GET v1/{organization}/{project}/settings`). It keeps them in `project-settings.cache.json` next to `sform`, or in `SFORM_HOME` when that is set (see [Where sform keeps its files](#where-sform-keeps-its-files)). The cache has an entry per API address and project, with the settings' ETag.
+
+- For 10 minutes after a read, commands use the cache without a request. After that they ask again with `If-None-Match`, and an unchanged answer (`304`) keeps the cache.
+- `set`, `edit` and `reset` write their answer into the cache, so your own changes show at once, and a change by someone else shows within 10 minutes. Delete the file to read the settings on the next command.
+- If the read fails, the command shows the built-in names and dates, prints no message, and writes one debug line to the log. Failures include no answer within 5 seconds, an API that cannot be reached, a refusal (`401`, or `403` for a machine without a read scope), an older API without the route (`404`), and a broken cache file. A command never fails, and never changes its exit code, because of the settings.
+- Without a console, or with the settings turned off, no request is made.
+
 ## Run without a terminal
 
 `sform` never waits for an answer that cannot come. When its standard input is redirected, as in a pipe, from a file, in a CI job or in a script started by another program, a command that would ask something stops instead: it writes what it would have asked and the option that answers it to standard error, and ends with an exit code.
@@ -424,6 +597,8 @@ A configuration has no custom properties or labels of its own: they belong to th
 | `sform story delete --permanent`, `story kv delete --permanent`, `story kv purge`, `story kv import`, `story kv recipients remove` | a confirmation | pass `-y` (`--yes`); `kv import` also takes `--dry-run` | `43` |
 | `sform story config patch` | a confirmation of the patch | pass `-y` (`--yes`) | `43` |
 | `sform story config edit`, `template edit`, `schema type edit`, `schema annotation edit`, `schema descendant edit` | a confirmation of the changes | pass `-y` (`--yes`) | `43` |
+| `sform project settings reset` | a confirmation | pass `-y` (`--yes`) | `43` |
+| `sform project settings edit` | the edit and the confirmation of the changes; it also stops when only the output is redirected | export the settings with `sform project settings -e <file>`, change the file, and save it with `sform project settings set -i <file> --replace` | `43` |
 | `sform account register`, `sform account points create`, `sform assist` and `assist key` | names and choices without options | run them in a terminal | `43` |
 
 A missing value ends with `2`, as when it is missing on the command line; a confirmation, or a command that needs a terminal, with `43`. A command still checks what comes before its question and ends with that code: `sform account register` of a registered user says so and ends with `0`, `story kv import` with nothing to change and `story config patch -i` with an empty patch end with `42`, and an unknown key or a missing file with `2`; `story kv import` shows its plan before it stops. The edit commands, and `story config patch` without `-i`, stop before the editor opens, so no edit is lost to a question nobody can answer. An edit command without a configured editor (and without `$VISUAL` or `$EDITOR`) stops with `43` too and names `sform account settings editor` to set one. `-e` of a `get` command rewrites an existing file without asking. Standard input is read only where an option asks for it (`--stdin`, `--password-stdin`).
@@ -440,8 +615,9 @@ These commands write their payload to standard output as it is, in UTF-8, withou
 | `sform story kv export` without `-o` | The document in its format (`json`, `flat` or `env`), with LF line ends | The note on secrets without a value, which `flat` and `env` leave out |
 | `sform story kv get <key> --value-only` | The value, and a line end | Nothing |
 | `sform story schema type\|annotation\|descendant diff … --format unified` | The unified diff: `@@ -a,b +c,d @@` hunks of lines that start with `+`, `-` or a space, with LF line ends; nothing for a diff without changes | "No changes detected." |
+| `sform project settings -f json` without `-e` | The settings as the API answers them, see [Project settings](#project-settings) | A refused or failed read, except a `401` |
 
-Only the payload of a successful run is alone on standard output. A run that is refused or fails writes its message to standard output, as every other command does, and ends with a non-zero exit code (see [Exit codes](#exit-codes)): an unknown key or format, a refusal of the API, a value that cannot be decrypted. `config --content-only` is the exception: it writes its own messages to standard error, and only parsing errors, sign-in failures, refusals of the API (`401`, `403`) and crashes to standard output. `kv get --value-only` of a pair without a value, such as a secret without `--reveal`, prints "The value is a secret; add --reveal." or "The pair has no value." and ends with `44`. So a script checks the exit code before it uses what it captured:
+Only the payload of a successful run is alone on standard output. A run that is refused or fails writes its message to standard output, as every other command does, and ends with a non-zero exit code (see [Exit codes](#exit-codes)): an unknown key or format, a refusal of the API, a value that cannot be decrypted. `config --content-only` is the exception: it writes its own messages to standard error, and only parsing errors, sign-in failures, refusals of the API (`401`, `403`) and crashes to standard output. `project settings -f json` also writes a refused or failed read to standard error, except a `401`. `kv get --value-only` of a pair without a value, such as a secret without `--reveal`, prints "The value is a secret; add --reveal." or "The pair has no value." and ends with `44`. So a script checks the exit code before it uses what it captured:
 
 ``` bash
 set -e
@@ -481,8 +657,8 @@ Every command ends with one of these codes. A refusal or a failure of the API is
 
 | File | Default location |
 |---|---|
-| `sform.settings.json` (the editor and the default project, see [Settings](#settings)), the session (`authkit.cache`, or `msal.cache` for Entra ID) and `telemetry.json` | your `.42for.net` folder: `%LOCALAPPDATA%\.42for.net` on Windows, `~/.42for.net` elsewhere |
-| `auth.discovery.json` (the sign-in settings of the server), `logs/`, and the `access.default.json` and `editor.config.json` of earlier versions, which are still read | next to `sform` itself, the folder of the tool |
+| `sform.settings.json` (the editor, the default project and the output switches, see [Settings](#settings)), the session (`authkit.cache`, or `msal.cache` for Entra ID) and `telemetry.json` | your `.42for.net` folder: `%LOCALAPPDATA%\.42for.net` on Windows, `~/.42for.net` elsewhere |
+| `auth.discovery.json` (the sign-in settings of the server), `project-settings.cache.json` (the project settings that the console output last read, see [The cache](#the-cache)), `logs/`, and the `access.default.json` and `editor.config.json` of earlier versions, which are still read | next to `sform` itself, the folder of the tool |
 
 The log in `logs/` (`cli<date>.log`, one file a day) is for you and the support. It keeps the address of every request `sform` sends, with the names of the organization, project, view and key in its path (.NET hides the query), and a line for every failure `sform` reports (see [Error reports](#error-reports)): what happened, the command and the names of its options, the project and the view given with `-p` and `-v`, and the failure with its stack. The values of the other arguments and options, the secrets of the `STORYTELLER_*` variables, and whatever has the shape of a token, a key or a password never go into those lines: a value becomes `***`, a secret found by its shape `[Filtered]`. A failure a command handles itself, such as a key it refuses before any call, prints its message and leaves no line.
 
@@ -503,6 +679,9 @@ The session is encrypted for your user: with DPAPI on Windows, in the Keychain o
 | `SFORM_BROWSER`, then `BROWSER` | The program `sform account --browser` opens the sign-in page with, see [Sign in](#sign-in) |
 | `SFORM_<section>__<key>` | A setting of `app.config.json` for this run, e.g. `SFORM_general__baseUrl` for the address of the API; it wins over the files. Because it decides where your sign-in goes, every command says on standard error when the API address (`general.baseUrl`) or a sign-in setting (`authentication.*`) comes from the environment |
 | `COLUMNS` | The width of the output when `sform` has no console at all |
+| `SFORM_PROJECT_SETTINGS` | `project` or `builtin`: whether the console output follows the project settings. It wins over `output.projectSettings`, see [Turn them off](#turn-them-off) |
+| `SFORM_ICONS` | `auto`, `always` or `never`: the icons of the project's types in the console output. It wins over `output.icons`, see [Project settings](#project-settings) |
+| `NO_COLOR` | Any value: no colors of the project's types; the other colors of `sform` stay |
 | `DO_NOT_TRACK`, `SFORM_TELEMETRY_OPTOUT` | Turn telemetry and the error reports off, see [Telemetry](#telemetry) |
 
 ``` bash
@@ -562,16 +741,18 @@ Never sent: arguments and option values, the token of an unknown command or opti
 
 ## Settings
 
-`sform` keeps your preferences in `sform.settings.json`, in the same folder as the stored session and `telemetry.json`: `%LOCALAPPDATA%\.42for.net` on Windows and `~/.42for.net` elsewhere., or `SFORM_HOME` when it is set (see [Where sform keeps its files](#where-sform-keeps-its-files)). Tool updates keep it.
+`sform` keeps your preferences in `sform.settings.json`, in the same folder as the stored session and `telemetry.json`: `%LOCALAPPDATA%\.42for.net` on Windows and `~/.42for.net` elsewhere, or `SFORM_HOME` when it is set (see [Where sform keeps its files](#where-sform-keeps-its-files)). Tool updates keep it. These preferences are yours alone. The settings of a project, which every member of the project sees, are described in [Project settings](#project-settings).
 
 | Key | Values | When it is not set |
 |---|---|---|
-| `editor.type` | `vscode`, `neovim`, `vim` or `custom`: the editor of `story config edit`, `config patch`, `template edit` and the schema edit commands | `$VISUAL`, then `$EDITOR`, else `sform` asks on the first edit and saves the answer |
+| `editor.type` | `vscode`, `neovim`, `vim` or `custom`: the editor of `story config edit`, `config patch`, `template edit`, the schema edit commands and `project settings edit` | `$VISUAL`, then `$EDITOR`, else `sform` asks on the first edit and saves the answer |
 | `editor.command` | The command line of a `custom` editor, e.g. `code --wait`; `sform` appends the file path | – |
 | `access.project` | `<organization>.<project>`: the default project of the commands without `-p` | `house.main` |
 | `access.view` | The default view of the commands without `-v` | `default` |
+| `output.icons` | `auto`, `always` or `never`: the icons of the project's types in the console output, see [Project settings](#project-settings) | `auto`; `SFORM_ICONS` wins over the key |
+| `output.projectSettings` | `project` or `builtin`: whether the console output shows the project's type names, colors, icons and date format, or the built-in ones, see [Turn them off](#turn-them-off) | `project`; `SFORM_PROJECT_SETTINGS` and `--builtin` win over the key |
 
-`sform account settings` lists every key with the value the commands use and where it comes from: `settings`, a legacy file (see below), `$VISUAL` or `$EDITOR`, `STORYTELLER_PROJECT` or `STORYTELLER_VIEW`, a machine sign-in, which never uses the default project, or `default`. None of these commands needs a sign-in.
+`sform account settings` lists every key with the value the commands use and where it comes from: `settings`, a legacy file (see below), `$VISUAL` or `$EDITOR`, `STORYTELLER_PROJECT` or `STORYTELLER_VIEW`, a machine sign-in, which never uses the default project, `SFORM_ICONS` or `SFORM_PROJECT_SETTINGS`, or `default`. When one of the last two variables has a value that the key does not take, the list notes it and shows the value the key has without the variable. None of these commands needs a sign-in.
 
 ``` powershell
 sform account settings                                           # the keys, their values and sources
@@ -582,6 +763,8 @@ sform account settings editor vscode                             # or name it: v
 sform account settings editor custom --command "code --wait"    # any command; it should wait until you close the file
 sform account settings set access.project contoso.payments
 sform account settings set access.view preview
+sform account settings set output.icons never                    # no icons of the project's types
+sform account settings set output.projectSettings builtin        # the built-in type names and dates
 sform account settings unset editor.type                         # ask again on the next edit
 ```
 
