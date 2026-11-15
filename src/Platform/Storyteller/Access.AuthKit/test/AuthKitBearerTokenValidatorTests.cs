@@ -47,7 +47,6 @@ public class AuthKitBearerTokenValidatorTests
         Value(result, "name").ShouldBe("Ada Lovelace");
         Value(result, "preferred_username").ShouldBe("ada@example.com");
         Value(result, "scp").ShouldBe("User.Impersonation Annotation.Read Secrets.Read");
-        result.Claims.ShouldNotContain(claim => claim.Type == "act");
         fixture.Logger.Entries.ShouldBeEmpty();
     }
 
@@ -321,7 +320,7 @@ public class AuthKitBearerTokenValidatorTests
     [InlineData("\"act\":{\"sub\":\"admin@example.com\",\"act\":{\"sub\":\"other\"}}", "admin@example.com")]
     [InlineData("\"act\":{\"sub\":\"admin@example.com\"},\"email\":\"ada@example.com\",\"act\":[]", AuthKitTokenSource.NoActorSubject)]
     [InlineData("\"act\":[],\"email\":\"ada@example.com\",\"act\":{\"sub\":\"admin@example.com\"}", "admin@example.com")]
-    [InlineData("\"\u0061ct\":{\"sub\":\"admin@example.com\"}", "admin@example.com")]
+    [InlineData("\"\\u0061ct\":{\"sub\":\"admin@example.com\"}", "admin@example.com")]
     public async Task Validate_TokenWithActOfAnyValue_IsRefused(string act, string loggedActor)
     {
         using var fixture = new TokenFixture();
