@@ -394,5 +394,5 @@ A value returned by a tool enters the model's context, the client's transcript a
 
 - Under Entra ID: one tenant per deployment, and no dynamic client registration; clients use pre-registered client ids.
 - No sessions, subscriptions, server-initiated requests or elicitation. So no `notifications/tools/list_changed` either: a change of the tool list shows on the client's next `tools/list`.
-- Not offered: view and key/value export and import, BYOK setup, key rotation, Hyok writes and decryption, recipients, shared certificates, trusted issuers, invitations and members.
+- Not offered: view and key/value export and import, BYOK setup, key rotation, Hyok writes and decryption, recipients, shared certificates, trusted issuers, invitations and members, the access audit.
 - Search reads stored documents, not effective ones: a value inherited from an ancestor is found on the ancestor.

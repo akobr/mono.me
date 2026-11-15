@@ -45,6 +45,7 @@ A project can have a description, like a view. An organization has none.
 | PUT | `v1/access/points/{key}` | Administrator, users only | `{ "Description" }` → `AccessPoint` of the project |
 | GET | `v1/access/projects` | An account, users only | `ProjectSummary[]`: the caller's projects, ordered by key |
 | GET | `v1/access/exhibition` | A user, also without an account | `Exhibition`: the names and the description of the deployment's [exhibition](#exhibition) project; `404` when it is not offered |
+| GET | `v1/access/points/{key}/audit` | Administrator, users only | `AccessAuditResponse`: the [access audit](access-audit.md#reading-the-trail) of the organization or project, newest first |
 
 Every route needs the scope `User.Impersonation`. An `AccessPoint` has `Key`, `AccessMap` (the members and their roles), `MachineAuthentication` and `Description`. POST creates the project, and the organization when it does not exist yet; the caller becomes the `Owner` of what it creates. In an existing organization it needs `Owner` of the organization (`403`), and an existing project answers `409 AccessPointExists`. The access points, the owner's account and their access audit records are written in one transactional batch, so a failure leaves nothing half created; a project or organization created concurrently answers `409` (`AccessPointExists`, or `Conflict` after one retry).
 
@@ -67,7 +68,7 @@ Scopes describe machines, roles describe people. A user is authorized by the rol
 
 | Operation | Needs |
 | --- | --- |
-| List members, set roles, remove members, manage invitations | `Administrator` on the access point |
+| List members, set roles, remove members, manage invitations, read the [access audit](access-audit.md) | `Administrator` on the access point |
 | Give, change, or remove the role `Owner` | `Owner` |
 | Leave an access point (remove yourself) | any membership |
 | Join the [exhibition](#exhibition) project as a `Reader` | any user, also without an account; users only: machine credentials get `403` |
