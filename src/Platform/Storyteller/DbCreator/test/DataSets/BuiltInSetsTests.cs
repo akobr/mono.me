@@ -129,6 +129,12 @@ public class BuiltInSetsTests
             .Where(file => file.AnnotationKey is not null)
             .ShouldAllBe(file => keys.Contains(file.AnnotationKey!.ToString())
                 && file.AnnotationKey!.GetAllAncestorKeys().All(ancestor => keys.Contains(ancestor.ToString())));
+
+        // the pairs of the scope (424-265), written by the same test: both levels a seed writes, ordered by key as an
+        // export writes them
+        var pairs = content.KeyValues.ShouldNotBeNull();
+        pairs.Levels.Select(level => level.Level).ShouldBe([KeyValueProtection.Public, KeyValueProtection.Standard]);
+        pairs.Items.Select(item => item.Key).ShouldBe(pairs.Items.Select(item => item.Key).Order(StringComparer.Ordinal));
     }
 
     [Fact]

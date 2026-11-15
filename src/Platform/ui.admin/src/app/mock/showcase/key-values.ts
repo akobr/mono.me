@@ -9,6 +9,22 @@ const json = { contentType: 'application/json' }
 const reference = () => ({ contentType: secretReferenceContentType })
 
 const scopes: Record<string, () => StoredKeyValue[]> = {
+  // The data set showcase of DbCreator holds the current pairs of this scope (424-265): showcase-set.test.ts writes them,
+  // without the deleted one, to its key-values.json, which the seed imports. So every key follows the platform's key
+  // rule (letters, digits and '_' between the dots), and the Standard values are demo values, never real secrets.
+  'fabrikam/invoicing-suite/default': () => [
+    pair('smtp.host', 'Public', ['smtp.invoicing.fabrikam.example']),
+    pair('smtp.sender', 'Public', ['invoices@fabrikam.example', 'billing@invoicing-suite.example']),
+    pair('smtp.password', 'Standard', ['Is-smtp-2026-03', 'Is-smtp-2026-09']),
+    pair('pdf.rendererUrl', 'Public', ['https://pdf.invoicing-suite.example/render']),
+    pair('einvoice.peppol.participantId', 'Public', ['0088:5790000435968']),
+    pair('einvoice.peppol.apiKey', 'Public', ['kv://fabrikam-prod/peppol-api-key'], reference()),
+    pair('payments.adyen.merchantAccount', 'Public', ['FabrikamInvoicingEUR']),
+    pair('payments.adyen.hmacKey', 'Standard', ['demo-hmac-1f2e3d4c']),
+    pair('dunning.maxReminders', 'Public', ['3', '4']),
+    pair('features.flags', 'Public', ['{"eInvoice":false}', '{"eInvoice":true,"creditNotesV2":false}'], json),
+    pair('legacy.ftpHost', 'Public', ['ftp.old.fabrikam.example'], { deletedDaysAgo: 20 }),
+  ],
   'fabrikam/finance-cloud/default': () => [
     pair('smtp.host', 'Public', ['smtp.fabrikam.example', 'smtp.eu.fabrikam.example']),
     pair('smtp.password', 'Standard', ['Fc-smtp-2026-01', 'Fc-smtp-2026-07']),
