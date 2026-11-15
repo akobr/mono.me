@@ -6,6 +6,7 @@ using System.Net;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.Projects;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Sdk;
 using Alba.CsConsoleFormat;
@@ -24,9 +25,10 @@ public static class ProjectSettingsConsoleExtensions
     internal const string None = "—";
 
     // The settings as people read them: per type its code, its built-in name, the project's name and plural, its color
-    // (as a swatch in that color when colors are shown) and its icon, then the default time zone, the date format, the
-    // version and the last change. What the project leaves to the built-in appearance or the defaults is shown dimmed.
-    public static void WriteProjectSettings(this IExtendedConsole @this, string projectKey, SdkSettings settings, bool showColors)
+    // (as a swatch in that color when colors are shown) and its icon (after its symbol when icons are shown), then the
+    // default time zone, the date format, the version and the last change. What the project leaves to the built-in
+    // appearance or the defaults is shown dimmed.
+    public static void WriteProjectSettings(this IExtendedConsole @this, string projectKey, SdkSettings settings, bool showColors, bool showIcons)
     {
         var catalog = ProjectSettingsCatalog.Default;
         var theme = @this.Theme;
@@ -35,7 +37,7 @@ public static class ProjectSettingsConsoleExtensions
         @this.WriteHeader($"Project settings of {projectKey}");
         @this.WriteTable(
             catalog.TypeCodes,
-            code => TypeCells(code, Find(types, code), catalog.BuiltIn[code], theme, showColors),
+            code => TypeCells(code, Find(types, code), catalog.BuiltIn[code], theme, showColors, showIcons),
             new IHeaderColumn[]
             {
                 new HeaderColumn("Code"),
@@ -90,11 +92,21 @@ public static class ProjectSettingsConsoleExtensions
         }
     }
 
-    // Whether the table shows the colors of the types: on a console, unless NO_COLOR has a value.
+    // Whether the table shows the colors of the types: when its output goes to a console (not to a file or a pipe),
+    // unless NO_COLOR has a value.
     public static bool ShowsTypeColors(this IExtendedConsole @this, Func<string, string?> getVariable)
     {
-        return @this is SformConsole { HasConsole: true }
+        return @this is SformConsole { WritesToConsole: true }
             && string.IsNullOrEmpty(getVariable(SformVariables.NO_COLOR));
+    }
+
+    // Whether the table shows the symbols of the icons: when its output goes to a console, as the icon switches say
+    // (SFORM_ICONS, output.icons; in auto mode a UTF-8 output in a terminal that draws emoji two cells wide), as the
+    // console output of the other commands shows them.
+    public static bool ShowsTypeIcons(this IExtendedConsole @this, OutputSwitches switches)
+    {
+        return @this is SformConsole { WritesToConsole: true }
+            && switches.ShowsIcons(@this.Console.Out?.Encoding);
     }
 
     // The problems of an InvalidSettings answer (Details: Path, Rule, Message); null when it has none.
@@ -123,7 +135,7 @@ public static class ProjectSettingsConsoleExtensions
                 : null;
     }
 
-    internal static IEnumerable<Cell> TypeCells(string code, SdkAppearance? own, BuiltInAppearance builtIn, IConsoleTheme theme, bool showColors)
+    internal static IEnumerable<Cell> TypeCells(string code, SdkAppearance? own, BuiltInAppearance builtIn, IConsoleTheme theme, bool showColors, bool showIcons)
     {
         var label = string.IsNullOrWhiteSpace(own?.Label) ? null : own.Label;
         var plural = string.IsNullOrWhiteSpace(own?.Plural) ? null : own.Plural;
@@ -135,7 +147,7 @@ public static class ProjectSettingsConsoleExtensions
             ? new Span(plural)
             : (label is null ? None : ProjectSettingsDocuments.Pluralize(label)).ThemedLowlight(theme));
         yield return ColorCell(own?.Color, builtIn.Color!, theme, showColors);
-        yield return CellOf(own?.Icon is { Length: > 0 } icon ? new Span(icon) : builtIn.Icon!.ThemedLowlight(theme));
+        yield return IconCell(own?.Icon, builtIn.Icon!, theme, showIcons);
     }
 
     private static Cell ColorCell(string? own, string builtIn, IConsoleTheme theme, bool showColors)
@@ -145,6 +157,18 @@ public static class ProjectSettingsConsoleExtensions
 
         return showColors && TypeColors.TryGetConsoleColor(color, out var consoleColor)
             ? CellOf(Swatch.Colored(consoleColor), new Span(" "), name)
+            : CellOf(name);
+    }
+
+    // The icon's name; when icons are shown, after its symbol (two cells wide, as TypeIconSymbols makes each). An icon
+    // this version of sform has no symbol for is its name alone.
+    private static Cell IconCell(string? own, string builtIn, IConsoleTheme theme, bool showIcons)
+    {
+        var icon = string.IsNullOrEmpty(own) ? builtIn : own;
+        var name = string.IsNullOrEmpty(own) ? builtIn.ThemedLowlight(theme) : new Span(own);
+
+        return showIcons && TypeIconSymbols.TryGetSymbol(icon, out var symbol)
+            ? CellOf(new Span($"{symbol} "), name)
             : CellOf(name);
     }
 

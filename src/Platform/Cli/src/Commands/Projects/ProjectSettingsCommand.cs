@@ -4,6 +4,7 @@ using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
@@ -24,16 +25,19 @@ public class ProjectSettingsCommand : BaseContextCommand
 
     private readonly IAccessApiClient _accessApi;
     private readonly IFileSystem _fileSystem;
+    private readonly OutputSwitches _switches;
 
     public ProjectSettingsCommand(
         IExtendedConsole console,
         ICommandContext context,
         IAccessApiClient accessApi,
-        IFileSystem fileSystem)
+        IFileSystem fileSystem,
+        OutputSwitches switches)
         : base(console, context)
     {
         _accessApi = accessApi;
         _fileSystem = fileSystem;
+        _switches = switches;
     }
 
     [Option("-f|--format", CommandOptionType.SingleValue, ValueName = "format", Description = "text (the default): a table for people; json: the settings as the API answers them (with Version and Modified), for programs.")]
@@ -41,9 +45,6 @@ public class ProjectSettingsCommand : BaseContextCommand
 
     [Option("-e|--export", CommandOptionType.SingleValue, ValueName = "file", Description = "Also write the settings to this file in the file shape of data sets (the Format marker, without Version and Modified), which 'set -i' reads.")]
     public string? ExportFilePath { get; set; }
-
-    // The environment the colors of the table follow (NO_COLOR); a test gives its own.
-    internal Func<string, string?> GetVariable { get; init; } = Environment.GetEnvironmentVariable;
 
     protected override async Task<int> ExecuteAsync()
     {
@@ -73,7 +74,11 @@ public class ProjectSettingsCommand : BaseContextCommand
         }
         else
         {
-            Console.WriteProjectSettings(ProjectSettingsCommands.ProjectKeyOf(Context), settings, Console.ShowsTypeColors(GetVariable));
+            Console.WriteProjectSettings(
+                ProjectSettingsCommands.ProjectKeyOf(Context),
+                settings,
+                Console.ShowsTypeColors(_switches.GetVariable),
+                Console.ShowsTypeIcons(_switches));
         }
 
         if (!string.IsNullOrWhiteSpace(ExportFilePath))
