@@ -31,6 +31,10 @@ The document was exported with `OpenApiExportTests` (`0.10.40.62838`) to `Sdk.NS
 
 `access-audit.md` ("Reading the trail"), `access.md` (the route, and reading the audit in the table of roles) and `mcp.md` (the access audit among what the MCP server does not offer).
 
+## Review
+
+The adversarial review of the branch confirmed one defect of phase 2, fixed after it: **the query took the documents of a view named `aca`.** Annotation and configuration ids start with their view (`aca.sbt.web`, `aca.cnf.sbt.web`), so the organization-wide query of `organizations` matched them, and reading one as a record failed the page with `500`. Both queries now also require `IS_DEFINED(c.AccessPointKey) AND IS_DEFINED(c.Action)`, which only the records have. Test: `TheDocumentsOfAViewNamedAca_AreNoRecords`.
+
 ## Notes
 
 - `?action=3` is read as the fourth action, as `operation` of the key/value audit is: both go through `Enum.TryParse`; an undefined number is refused.

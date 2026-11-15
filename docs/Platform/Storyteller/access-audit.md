@@ -19,16 +19,16 @@ Every change of who can access what writes an **access audit record**: who chang
 | `MachineFederationRulesChanged` | `PUT …/access/machines/{id}/federation-rules` | the machine | the rules before → after |
 | `MachineAuthenticationPolicyChanged` | `PUT v1/access/points/{key}/machine-authentication` | | the policy before → after |
 | `KeyValuePolicyChanged` | the key/value policy of a project: its levels, default level, mTLS rule, HSM backend and rotation interval, customer key, and recipients | | the access view before → after |
-| `FederatedIssuerCreated`, `FederatedIssuerUpdated`, `FederatedIssuerDeleted` | `PUT` and `DELETE …/access/issuers/{name}` | the issuer | issuer, key source, JWKS URI, number of JWKS keys, lifetime, required claims, description |
+| `FederatedIssuerCreated`, `FederatedIssuerUpdated`, `FederatedIssuerDeleted` | `PUT` and `DELETE …/access/issuers/{name}` | the issuer | issuer, key source, JWKS URI, number of JWKS keys and a thumbprint of the key set, lifetime, required claims, description |
 | `SharedCertificateIssued`, `SharedCertificateRevoked` | `POST` and `DELETE …/access/certificates[/{thumbprint}]` | the certificate (thumbprint, label) | label, not before, not after, revoked |
 
 A change that changes nothing records nothing, as a membership that is already what the request asks for: a grant of a role the account has or exceeds, the same role set again, the same description, policy, rules or issuer saved again, a certificate revoked twice. The key/value policy is compared on its **access view** only (`AccessAuditValues.KeyValuePolicy`): key versions, key health, verifications, rotations and rewrap progress are not access changes, so the maintenance runs record nothing here; the [key/value audit](key-values.md#audit-trail) keeps recording them.
 
-DbCreator records as `System`: the access points its base seeding creates or changes, and the projects and owners its [data sets](data-sets.md) create.
+DbCreator records as `System`: the access points its base seeding creates or changes (each membership is one batch of the access point, the account and the record; a role only the access point still holds is repaired on the account and recorded), and the projects and owners its [data sets](data-sets.md) create.
 
 Not recorded: registering an account without a project (it gives no access), invitations (an invitation keeps its sender and status, and its acceptance is the `MemberJoined` record), and a machine renewing its own certificate over mTLS (it changes no access).
 
-**Never stored**: an API key, a client secret, a certificate or its password, a hash, the stored mask of a key (it keeps the first characters of a client secret), a JWKS key (only how many) and a recipient's public key (only its id, name, state and a thumbprint of the key). A value longer than 4,000 characters is cut and ends with `… (truncated, sha256 <16 hex digits>)`, so a full copy can still be matched.
+**Never stored**: an API key, a client secret, a certificate or its password, a hash, the stored mask of a key (it keeps the first characters of a client secret), a JWKS key (only how many, and a thumbprint of the set, so a key replaced by another is a change) and a recipient's public key (only its id, name, state and a thumbprint of the key). A value longer than 4,000 characters is cut and ends with `… (truncated, sha256 <16 hex digits>)`, so a full copy can still be matched.
 
 ## Where the records are, and why the change and its record are atomic
 
@@ -47,6 +47,7 @@ The record's `id` is `aca.{yyyyMMddHHmmssfffffff}.{guid}`, so the order of the i
 - **A machine's reset**: for the kinds with an API key, the change is the new hash, which `CosmosMergedApiKeyHashStore` patches several layers below the access service. The access service opens the record of the reset as a pending, ambient record (`PendingAccessAudit`, like a `TransactionScope`), and the hash store patches the hash in a batch with it. For `ClientCredentials`, the identity provider replaces the secret first, outside any transaction of Storyteller; the mask is then patched in a batch with the record, and the new secret is returned only after both are stored. A failed batch answers an error and the secret never leaves.
 - **A machine's creation** writes the full machine and its record in one batch, after the provider stored the credential (the API key's hash, the certificate, the identity provider's application); the credential is returned only after both, and a failed batch removes the credential again.
 - **A machine's delete** removes the credential first, as before, then deletes the document in a batch with the record. A delete that fails after the credential is gone leaves the machine listed, and is recorded when it is retried.
+- **A trusted issuer's delete** deletes the version it read (with its ETag) and reads it again once on a concurrent change, so the record describes what was deleted.
 - **The machine authentication policy** is replaced with its ETag (it used to be an upsert without one, which could lose a membership changed at the same moment) and retried once on a concurrent change.
 
 The partitions that hold records also hold what the API lists, so the lists skip them: the machines of a project (`GET …/access/machines` also skips the `mcert.` certificate records and the `scr.` shared certificates) and the trusted issuers, whose count of `FederationValidation.MaxIssuersPerProject` they do not take part in.

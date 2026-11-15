@@ -1357,7 +1357,7 @@ Both `PUT`s take a JSON body. An empty body or `null` is validated as an issuer 
 
 ### Trusted issuers
 
-Creating, changing and deleting a trusted issuer is recorded in the [access audit](access-audit.md) (`FederatedIssuerCreated`, `FederatedIssuerUpdated`, `FederatedIssuerDeleted`) in the same transaction, with the issuer's settings and the number of its keys, never the keys.
+Creating, changing and deleting a trusted issuer is recorded in the [access audit](access-audit.md) (`FederatedIssuerCreated`, `FederatedIssuerUpdated`, `FederatedIssuerDeleted`) in the same transaction, with the issuer's settings, the number of its keys and a thumbprint of the key set, never the keys.
 
 | Property | Type | Description |
 |---|---|---|
