@@ -1,7 +1,7 @@
 import { computed, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import type { ProjectSettings } from '@42for.net/2splatform.sdk'
-import { defaultProjectSettings, fromApi, type ProjectSettingsState } from '@/utils/project-settings'
+import { defaultProjectSettings, fromApi, usableTimeZone, type ProjectSettingsState } from '@/utils/project-settings'
 import { useContextStore } from './context'
 import { onSignOut } from './session'
 
@@ -47,7 +47,8 @@ export const useProjectSettingsStore = defineStore('project-settings', () => {
   }
 
   const current = computed(() => settingsOf(context.projectKey))
-  const defaultTimeZone = computed(() => current.value.defaultTimeZone)
+  // The zone new annotations start in, one this browser's Intl knows (UTC for a zone newer than the browser).
+  const defaultTimeZone = computed(() => usableTimeZone(current.value.defaultTimeZone))
   const dateFormat = computed(() => current.value.dateFormat)
 
   return { state, receive, settingsOf, loaded, version, clear, current, defaultTimeZone, dateFormat }

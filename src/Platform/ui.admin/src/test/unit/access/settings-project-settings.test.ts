@@ -20,6 +20,14 @@ import { mountScreen, settle } from '../../helpers'
 // the navbar needs the dashboard shell; the page is tested without it
 vi.mock('@/components/shell/AppNavbar.vue', () => ({ default: { name: 'AppNavbar', render: () => null } }))
 
+// A zone of the catalog newer than the browser's Intl (an older Safari or Chrome): isValidTimeZone refuses the zones in
+// this set.
+const unknownZones = vi.hoisted(() => new Set<string>())
+vi.mock('@/forms/annotation.schema', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/forms/annotation.schema')>()
+  return { ...original, isValidTimeZone: (zone: string) => !unknownZones.has(zone) && original.isValidTimeZone(zone) }
+})
+
 const server = setupServer(...mockHandlers)
 // unmounted before the body is cleared, so a closing toast does not patch removed nodes
 const mounted: { host: { unmount: () => void } }[] = []
@@ -32,6 +40,7 @@ afterEach(() => {
   unmountAll()
   server.events.removeAllListeners()
   server.resetHandlers()
+  unknownZones.clear()
 })
 afterAll(() => server.close())
 
@@ -276,6 +285,25 @@ describe('the project settings in Settings', () => {
     await settle()
     expect(writes[1]!.ifMatch).toBe('"1"')
     expect(settingsOf('acme.billing')).toMatchObject({ Types: { exe: { Label: 'Job' } }, Version: 2 })
+  })
+
+  it('keeps a stored zone this browser does not know when it saves another change', async () => {
+    unknownZones.add('America/Coyhaique')
+    storeSettings('acme.billing', { Types: {}, DefaultTimeZone: 'America/Coyhaique' })
+    const writes = recordWrites()
+    const view = await mountSettings()
+
+    expect(timeZone(view).props('modelValue')).toBe('America/Coyhaique')
+    expect(buttonNamed('Use the default: UTC')!.disabled).toBe(false)
+
+    typeEditor(view).vm.$emit('update:modelValue', { exe: { label: 'Job' } })
+    await settle()
+    saveButton()!.click()
+    await vi.waitFor(() => expect(writes).toHaveLength(1))
+    await settle()
+
+    expect(writes[0]!.body).toEqual({ Types: { exe: { Label: 'Job' } }, DefaultTimeZone: 'America/Coyhaique' })
+    expect(settingsOf('acme.billing')).toMatchObject({ DefaultTimeZone: 'America/Coyhaique', Version: 2 })
   })
 
   it('lists the problems of a 400 InvalidSettings and keeps the draft', async () => {
