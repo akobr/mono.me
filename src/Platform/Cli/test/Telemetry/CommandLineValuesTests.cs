@@ -108,7 +108,7 @@ public class CommandLineValuesTests
     }
 
     [Fact]
-    public void Merge_KeepsBoth_AndALocalValueStaysLocal()
+    public void Merge_KeepsBoth_WithoutTheNamesOfTheCommands_AndALocalValueStaysLocal()
     {
         var run = new CommandRun();
         string[] args = ["story", "kv", "set", "key", "s3cr3t-value", "-p", "acme.billing"];
@@ -116,9 +116,35 @@ public class CommandLineValuesTests
         SformApplication.Create(run).Parse(args);
 
         run.Values.Hidden.ShouldContain("s3cr3t-value");
-        run.Values.Hidden.ShouldContain("story");
+        run.Values.Hidden.ShouldContain("key");
+        run.Values.Hidden.ShouldNotContain("story");
+        run.Values.Hidden.ShouldNotContain("kv");
+        run.Values.Hidden.ShouldNotContain("set");
         run.Values.Hidden.ShouldNotContain("acme.billing");
         run.Values.All.ShouldContain("acme.billing");
+    }
+
+    [Fact]
+    public void AValueThatIsAlsoACommandName_StaysAValueOfTheModel()
+    {
+        var run = new CommandRun();
+        string[] args = ["story", "kv", "get", "story"];
+        run.RecordArguments(args);
+        SformApplication.Create(run).Parse(args);
+
+        run.Values.Hidden.ShouldBe(["story"]);
+    }
+
+    [Fact]
+    public void AnUnknownCommand_StaysAValue()
+    {
+        var run = new CommandRun();
+        string[] args = ["story", "kv", "sett", "key"];
+        run.RecordArguments(args);
+        var exception = Should.Throw<UnrecognizedCommandParsingException>(() => SformApplication.Create(run).Parse(args));
+        run.RecordFailedParsing(exception.Command);
+
+        run.Values.Hidden.ShouldBe(["sett", "key"], ignoreOrder: true);
     }
 
     [Fact]

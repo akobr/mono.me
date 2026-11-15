@@ -33,7 +33,6 @@
     <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
     <PackageReference Include="PostHog" />
     <PackageReference Include="Sentry" />
-    <PackageReference Include="Sentry.Serilog" />
     <PackageReference Include="Serilog.Extensions.Logging" />
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="TestableIO.System.IO.Abstractions" />

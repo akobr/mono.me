@@ -10,6 +10,7 @@ using _42.CLI.Toolkit;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.ErrorReporting;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Output.Exceptions;
 using _42.Platform.Cli.Services;
@@ -21,7 +22,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sentry;
 
 using Console = Colorful.Console;
 
@@ -42,6 +42,9 @@ public class Program
     private static IHost? _host;
     private static ILogger<Program>? _logger;
     private static LoggingOptions? _loggingOptions;
+
+    // The failures of the run, to the log file and Sentry; built in InitializeHost for the same reason as the telemetry.
+    private static ErrorReporter _reporter = ErrorReporter.None;
 
     // Captured before the run: the host is disposed before a command's exception reaches Main.
     private static MachineSignInSettings? _machineSignIn;
@@ -129,8 +132,17 @@ public class Program
     }
 
     // The run, and what its failures print and end with.
-    internal static async Task<int> RunAsync(Func<Task<int>> run, string[] args)
+    internal static Task<int> RunAsync(Func<Task<int>> run, string[] args)
     {
+        return RunAsync(run, args, CurrentRun, _reporter);
+    }
+
+    // The same with the record of the run and the reporter given, for a test. A report names the command and the options
+    // given, never a value: the run keeps the values of args and of the model, which the reporter scrubs from every text.
+    internal static async Task<int> RunAsync(Func<Task<int>> run, string[] args, CommandRun currentRun, ErrorReporter reporter)
+    {
+        currentRun.RecordArguments(args);
+
         try
         {
             return await run();
@@ -138,46 +150,38 @@ public class Program
         catch (OutputException exception)
         {
             // A command that wrote why it stopped, e.g. a prompt on redirected input (InteractionNeededException).
-            CurrentRun.Exception = exception;
+            currentRun.Exception = exception;
             return exception.ExitCode;
         }
         catch (UnrecognizedCommandParsingException parsingException)
         {
             // The parser throws before OnParsingComplete; the command is the deepest one it matched.
-            CurrentRun.Exception = parsingException;
-            CurrentRun.Command = CommandPath.Of(parsingException.Command);
+            currentRun.Exception = parsingException;
+            currentRun.RecordFailedParsing(parsingException.Command);
             parsingException.WriteOutput();
 
-            // Never the arguments: one may be a value of a key/value pair.
-            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
-                "Unrecognized input at {command}; NearestMatches: {nearestMatches}",
-                parsingException.Command.Name,
-                parsingException.NearestMatches.ToList())));
+            // Neither the message nor the nearest matches: the message quotes the token, which may be a value.
+            await reporter.ReportAsync(LogLevel.Warning, "Unrecognized input", currentRun);
             return ExitCodes.ERROR_INPUT_PARSING;
         }
         catch (CommandParsingException parsingException)
         {
             // A missing or an invalid option value, or a single value given twice: the input is wrong, not the tool.
-            CurrentRun.Exception = parsingException;
-            CurrentRun.Command = CommandPath.Of(parsingException.Command);
+            currentRun.Exception = parsingException;
+            currentRun.RecordFailedParsing(parsingException.Command);
+
             // On standard error, so a redirected standard output stays empty.
             WriteError(PlainOutputExtensions.ToPlainLine(parsingException.Message));
             WriteError($"  What happened, {ParsingErrorResponseMessages.GetRandom()}?");
 
-            // Neither the arguments nor the message, which quotes a value: it may be a value of a key/value pair.
-            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
-                "Invalid input at {command}",
-                parsingException.Command.Name)));
+            // Not the message, which quotes the value.
+            await reporter.ReportAsync(LogLevel.Warning, "Invalid input", currentRun);
             return ExitCodes.ERROR_INPUT_PARSING;
         }
         catch (UnauthorizedAccessException exception)
         {
-            CurrentRun.Exception = exception;
-            var reportedException = exception.InnerException ?? exception;
-            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
-                reportedException,
-                "Unauthorized access at {command}",
-                CurrentRun.Command)));
+            currentRun.Exception = exception;
+            await reporter.ReportAsync(LogLevel.Warning, "Unauthorized access", currentRun, exception.InnerException ?? exception);
 
             Console.Write("! ", Color.Magenta);
             Console.WriteLine(ApiRefusal.GeneralMessage);
@@ -185,12 +189,8 @@ public class Program
         }
         catch (AuthenticationException exception)
         {
-            CurrentRun.Exception = exception;
-            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
-                exception,
-                "Sign-in failed ({reason}) at {command}",
-                exception.Reason,
-                CurrentRun.Command)));
+            currentRun.Exception = exception;
+            await reporter.ReportAsync(LogLevel.Warning, $"Sign-in failed ({exception.Reason})", currentRun, exception);
 
             Console.Write("! ", Color.Magenta);
             Console.WriteLine(exception.Message);
@@ -203,11 +203,8 @@ public class Program
         }
         catch (ApiException exception) when (exception.StatusCode is (int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden)
         {
-            CurrentRun.Exception = exception;
-            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
-                "The API refused the request with {statusCode} at {command}",
-                exception.StatusCode,
-                CurrentRun.Command)));
+            currentRun.Exception = exception;
+            await reporter.ReportAsync(LogLevel.Warning, $"The API refused the request with {exception.StatusCode}", currentRun);
 
             var refusal = ApiRefusal.Of(exception);
             Console.Write("! ", Color.Magenta);
@@ -232,12 +229,9 @@ public class Program
         {
             // Any other refusal or failure of the API that the command left to Main, for example a 409 or a 501: the
             // server's message and code, and the exit code of its status (2 for a rejected request and a 501 or 505, 3 for
-            // a failure of the service). The tool is not broken. Neither the arguments nor the message are logged; an argument may
-            // be a value of a key/value pair.
-            CurrentRun.Exception = exception;
-            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
-                "The API answered {statusCode}",
-                exception.StatusCode)));
+            // a failure of the service). The tool is not broken. The message is not reported: it holds the response.
+            currentRun.Exception = exception;
+            await reporter.ReportAsync(LogLevel.Warning, $"The API answered {exception.StatusCode}", currentRun);
 
             var (message, errorCode) = KeyValueConsoleExtensions.ReadError(exception);
             var status = (HttpStatusCode)exception.StatusCode;
@@ -254,16 +248,16 @@ public class Program
         catch (HttpRequestException exception)
         {
             // The API did not answer at all: a refused connection, a name that does not resolve, a TLS failure.
-            return await ReportUnreachableServiceAsync(exception, exception.Message);
+            return await ReportUnreachableServiceAsync(exception, exception.Message, currentRun, reporter);
         }
         catch (TaskCanceledException exception) when (exception.InnerException is TimeoutException)
         {
             // The timeout of HttpClient.
-            return await ReportUnreachableServiceAsync(exception, "The request timed out.");
+            return await ReportUnreachableServiceAsync(exception, "The request timed out.", currentRun, reporter);
         }
         catch (Exception exception)
         {
-            CurrentRun.Exception = exception;
+            currentRun.Exception = exception;
 
             // TODO: [P2] Hot fix for bug https://github.com/natemcmaster/CommandLineUtils/issues/541
             if (exception.GetType() == typeof(InvalidOperationException)
@@ -278,7 +272,7 @@ public class Program
                 return ExitCodes.ERROR_INPUT_PARSING;
             }
 
-            CurrentRun.Crashed = true;
+            currentRun.Crashed = true;
             Console.WriteWithGradient("# Total mayhem", Color.Yellow, Color.Magenta);
             Console.WriteLine(", the tool is broken! ):", Color.Magenta);
 
@@ -288,7 +282,7 @@ public class Program
                 Console.WriteLine($"    {_paths.GetDailyLogFilePath(_loggingOptions.LogFilePath, DateTime.Now)}", Color.DarkGray);
             }
 
-            await Task.Run(() => LogWithSentry(() => _logger?.LogError(exception, "Unhandled exception occurred at {command}", CurrentRun.Command)));
+            await reporter.ReportAsync(LogLevel.Error, "Unhandled exception", currentRun, exception);
             return ExitCodes.ERROR_CRASH;
         }
     }
@@ -310,12 +304,12 @@ public class Program
             .UseStartup<Startup>();
     }
 
-    // A service failure, not a crash: the reason, and the address sform called. Neither the arguments nor the URL of the
-    // request are logged; an argument may be a value of a key/value pair.
-    private static async Task<int> ReportUnreachableServiceAsync(Exception exception, string reason)
+    // A service failure, not a crash: the reason, and the address sform called. The report has the exception, never the
+    // URL of the request.
+    private static async Task<int> ReportUnreachableServiceAsync(Exception exception, string reason, CommandRun currentRun, ErrorReporter reporter)
     {
-        CurrentRun.Exception = exception;
-        await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(exception, "The service could not be reached")));
+        currentRun.Exception = exception;
+        await reporter.ReportAsync(LogLevel.Warning, "The service could not be reached", currentRun, exception);
 
         // A request to another service than the API (the sign-in service or its discovery) names that service.
         if (UnreachableTargetOf(RequestTargetHandler.LastTarget, _baseUrl) is { } target)
@@ -355,13 +349,15 @@ public class Program
             _loggingOptions = Host.Services.GetService<IOptions<LoggingOptions>>()?.Value;
             _machineSignIn = Host.Services.GetService<MachineSignInSettings>();
             _baseUrl = Host.Services.GetService<IOptions<GeneralOptions>>()?.Value.BaseUrl;
+            var environment = Host.Services.GetRequiredService<IHostEnvironment>();
             _telemetry = CommandTelemetry.Create(
                 Host.Services.GetService<IOptions<TelemetryOptions>>()?.Value,
                 Host.Services.GetRequiredService<IFileSystem>(),
                 Host.Services.GetRequiredService<CliPaths>(),
-                Host.Services.GetRequiredService<IHostEnvironment>(),
+                environment,
                 _machineSignIn,
                 _logger);
+            _reporter = CreateErrorReporter(environment);
             return true;
         }
         catch (Exception exception)
@@ -424,29 +420,25 @@ public class Program
         }
     }
 
-    private static void LogWithSentry(Action logOperation)
+    // Never throws: without a reporter the failures are only printed.
+    private static ErrorReporter CreateErrorReporter(IHostEnvironment environment)
     {
-        if (_loggingOptions is null
-            || string.IsNullOrWhiteSpace(_loggingOptions.SentryDsn))
+        try
         {
-            logOperation();
-            return;
+            var access = Host.Services.GetService<IOptions<AccessDefaultOptions>>()?.Value;
+            var settings = new ErrorReportingSettings(
+                _loggingOptions?.SentryDsn,
+                TelemetrySettings.IsOptedOutBy(System.Environment.GetEnvironmentVariable),
+                _telemetry.InstallationId,
+                environment.EnvironmentName.ToLowerInvariant(),
+                $"{typeof(Program).Assembly.GetName().Name}@{PostHogCommandTelemetry.CliVersion}",
+                [access?.OrganizationName, access?.ProjectName, access?.ViewName, _machineSignIn?.Project, _machineSignIn?.View]);
+
+            return ErrorReporter.Create(_logger, settings);
         }
-
-        using (SentrySdk.Init(ConfigureSentry))
+        catch (Exception)
         {
-            logOperation();
-        }
-    }
-
-    private static void ConfigureSentry(SentryOptions options)
-    {
-        options.Dsn = _loggingOptions?.SentryDsn;
-
-        // Finds the run in PostHog; with telemetry off there is no id and no tag.
-        if (_telemetry.InstallationId is { } installationId)
-        {
-            options.DefaultTags["posthog_distinct_id"] = installationId;
+            return ErrorReporter.None;
         }
     }
 }

@@ -6,7 +6,7 @@ namespace _42.Platform.Cli.Telemetry;
 
 // Whether sform sends its usage event, from the telemetry section and the opt-out variables, read once per process.
 // Off with a blank token, a host that is not an absolute https URL (the SDK would fall back to its US cloud),
-// or DO_NOT_TRACK / SFORM_TELEMETRY_OPTOUT set to 1, true, yes or on.
+// or DO_NOT_TRACK / SFORM_TELEMETRY_OPTOUT set to 1, true, yes or on. The opt-out stops the error reports too.
 public sealed class TelemetrySettings
 {
     public const string DO_NOT_TRACK = "DO_NOT_TRACK";
@@ -30,6 +30,9 @@ public sealed class TelemetrySettings
 
     public bool IsContinuousIntegration { get; private init; }
 
+    // DO_NOT_TRACK or SFORM_TELEMETRY_OPTOUT is set: no usage event and no error report.
+    public bool IsOptedOut { get; private init; }
+
     public static TelemetrySettings Resolve(TelemetryOptions options, Func<string, string?> getVariable)
     {
         string? Read(string name)
@@ -39,7 +42,7 @@ public sealed class TelemetrySettings
         }
 
         var token = options.PostHogProjectToken?.Trim();
-        var isOptedOut = OptOutVariables.Any(name => Read(name) is { } value && OptOutValues.Contains(value, StringComparer.OrdinalIgnoreCase));
+        var isOptedOut = IsOptedOutBy(getVariable);
         var isContinuousIntegration = ContinuousIntegrationVariables.Any(name => Read(name) is not null);
 
         if (string.IsNullOrEmpty(token)
@@ -47,7 +50,7 @@ public sealed class TelemetrySettings
             || host.Scheme != Uri.UriSchemeHttps
             || isOptedOut)
         {
-            return new TelemetrySettings { IsContinuousIntegration = isContinuousIntegration };
+            return new TelemetrySettings { IsContinuousIntegration = isContinuousIntegration, IsOptedOut = isOptedOut };
         }
 
         return new TelemetrySettings
@@ -57,5 +60,12 @@ public sealed class TelemetrySettings
             Host = host,
             IsContinuousIntegration = isContinuousIntegration,
         };
+    }
+
+    // DO_NOT_TRACK or SFORM_TELEMETRY_OPTOUT set to 1, true, yes or on.
+    public static bool IsOptedOutBy(Func<string, string?> getVariable)
+    {
+        return OptOutVariables.Any(name => getVariable(name)?.Trim() is { Length: > 0 } value
+            && OptOutValues.Contains(value, StringComparer.OrdinalIgnoreCase));
     }
 }

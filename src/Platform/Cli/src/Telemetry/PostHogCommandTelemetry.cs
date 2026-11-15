@@ -24,7 +24,7 @@ internal sealed class PostHogCommandTelemetry : ICommandTelemetry
     internal static readonly TimeSpan DisposeTimeout = TimeSpan.FromSeconds(0.5);
 
     // Not the toolkit's version getter of sform --version: it reads the version of 42.CLI.Toolkit.
-    private static readonly string CliVersion = ReadCliVersion();
+    internal static readonly string CliVersion = ReadCliVersion();
 
     private readonly IPostHogClient _client;
     private readonly string _installationId;
