@@ -111,6 +111,30 @@ public sealed class UserTokenExchangeServiceTests : IDisposable
         _access.Verify(service => service.CreateAccountAsync(It.IsAny<Accessing.Model.AccountCreate>()), Times.Never);
     }
 
+    // The provider's user name against the stored one (AccountUserNameCheck): logged, and the token is still issued.
+    [Fact]
+    public async Task SubjectTokenWithAnotherUserName_IsLoggedAndExchanged()
+    {
+        _subjects.Result = Subject(claims: [new Claim("sub", AccountId), new Claim("preferred_username", "mallory@example.com")]);
+
+        var result = await _exchange.ExchangeAsync(Request());
+
+        result.Succeeded.ShouldBeTrue();
+        var entry = _logger.Entries.Where(candidate => candidate.Message.Contains("differs from the stored one")).ShouldHaveSingleItem();
+        entry.Level.ShouldBe(Microsoft.Extensions.Logging.LogLevel.Warning);
+        entry.Message.ShouldBe($"The user name of the account {AccountId} differs from the stored one at token-exchange: ada@example.com -> mallory@example.com");
+    }
+
+    [Fact]
+    public async Task SubjectTokenWithTheStoredUserName_IsNotLogged()
+    {
+        _subjects.Result = Subject(claims: [new Claim("sub", AccountId), new Claim("preferred_username", "ada@example.com")]);
+
+        (await _exchange.ExchangeAsync(Request())).Succeeded.ShouldBeTrue();
+
+        _logger.Entries.ShouldNotContain(candidate => candidate.Message.Contains("differs from the stored one"));
+    }
+
     // End to end: the API's validator accepts the issued token as the user of the account, acting through the actor.
     [Fact]
     public async Task ExchangedToken_IsAcceptedByTheValidator_AsTheUserThroughTheActor()

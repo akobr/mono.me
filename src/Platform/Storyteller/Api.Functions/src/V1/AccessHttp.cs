@@ -72,6 +72,13 @@ public class AccessHttp
         _logger.LogWarning("GET api/access/account call with accountId: {accountId}", accountId);
         var account = await _accessService.GetAccountAsync(accountId);
 
+        // The stored user name against the token's (log only). Not for a delegated request, which carries the stored
+        // names, nor under DEV_AUTH, whose tokens are not checked.
+        if (account is not null && !request.TryGetDelegatedActor(out _) && !BearerValidationMode.DecodeWithoutValidation)
+        {
+            AccountUserNameCheck.LogIfChanged(_logger, account, request.GetClaims(), "account");
+        }
+
         return account is null
             ? new NotFoundResult()
             : new OkObjectResult(account);

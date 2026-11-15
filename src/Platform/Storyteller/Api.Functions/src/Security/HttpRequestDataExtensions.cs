@@ -51,7 +51,8 @@ public static class HttpRequestDataExtensions
 
     private const string NameClaimType = "name";
 
-    private static readonly string[] UniqueNameClaimTypes = ["preferred_username", "unique_name", ClaimTypes.Upn];
+    // The same claims as the user name check of an account (AccountUserNameCheck).
+    private static readonly string[] UniqueNameClaimTypes = [.. AccountUserNameCheck.UserNameClaimTypes];
 
     public static IReadOnlyList<Claim> GetClaims(this HttpRequestData @this)
     {

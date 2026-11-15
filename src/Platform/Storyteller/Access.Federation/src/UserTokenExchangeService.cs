@@ -135,6 +135,9 @@ public sealed class UserTokenExchangeService : IUserTokenExchange, IDisposable
             return UserTokenExchangeResult.Failure(OAuthTokenExchange.Errors.InvalidGrant, UserTokenExchangeResult.NoAccountDescription);
         }
 
+        // The provider's current user name against the stored one (log only, AccountUserNameCheck).
+        AccountUserNameCheck.LogIfChanged(_logger, account, subject.Claims, "token-exchange");
+
         // 5. The replay limit, per actor and subject token. The client gets the generic text of a refused subject token;
         // the reason is only logged.
         if (!_exchanges.TryCount(GetReplayKey(actor.Id, subject.TokenId, request.SubjectToken!), ReplayWindow, exchangeOptions.MaxExchangesPerSubjectTokenPerMinute))
