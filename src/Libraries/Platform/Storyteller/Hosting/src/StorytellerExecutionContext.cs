@@ -15,7 +15,7 @@ public sealed class StorytellerExecutionContext
 {
     // The chain order of the ancestors: the nearer one first; at the same level the place before the capability
     // (context, then usage, then unit), and the subject before the responsibility.
-    private static readonly AnnotationType[] ChainOrder =
+    internal static readonly IReadOnlyList<AnnotationType> ChainOrder =
     [
         AnnotationType.UnitOfExecution,
         AnnotationType.Execution,

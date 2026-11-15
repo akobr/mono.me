@@ -8,10 +8,14 @@ namespace _42.Platform.Storyteller.Sdk.Hosting.Informer;
 
 // The informer of a catalog's target, by polling. A poll lists the descendants of the target's type under its ancestor,
 // keeps those that pass its filters, and diffs them against the held ones by the fingerprints of their list items.
-// Snapshots and removal reasons come from point reads, as list values are lossy. Reads run at most maxConcurrentReads
-// at once. Each complete poll yields one batch; a failed poll yields its failure, logs a warning and keeps what is held.
-// The next poll starts the interval, with the provider's jitter, after the previous one completed; a zero interval
-// polls once. The join of executions with their usages is PollingSubscriptionSource's; the two share ListPaging.
+// Snapshots and removal reasons come from point reads, as list values are lossy. For a target that requires active
+// ancestors, a poll also reads each distinct ancestor of the held and of the listed descendants once, after the list
+// and before the diff, as an ancestor's change moves no fingerprint of its descendants: a descendant is held only
+// while all its ancestors are active, and one that leaves for an ancestor names that ancestor. Reads run at most
+// maxConcurrentReads at once. Each complete poll yields one batch; a failed poll yields its failure, logs a warning and
+// keeps what is held. The next poll starts the interval, with the provider's jitter, after the previous one completed;
+// a zero interval polls once. The join of executions with their usages is PollingSubscriptionSource's; the two share
+// ListPaging.
 internal sealed class DescendantPollingSource
 {
     private readonly IAnnotationPages _pages;
@@ -85,16 +89,14 @@ internal sealed class DescendantPollingSource
     private async Task<DescendantBatch> PollAsync(PollState poll, CancellationToken cancellationToken)
     {
         var scope = poll.Scope;
-        IReadOnlyDictionary<string, Annotation> items;
+        Dictionary<string, Candidate> candidates;
+        PollAncestors? ancestors = null;
 
         try
         {
-            if (!poll.HasCompleted)
-            {
-                await CheckAncestorAsync(poll, cancellationToken).ConfigureAwait(false);
-            }
+            var own = poll.HasCompleted ? null : await CheckAncestorAsync(poll, cancellationToken).ConfigureAwait(false);
 
-            items = await ListPaging.ReadAllAsync(
+            var items = await ListPaging.ReadAllAsync(
                     token => PollReads.LimitAsync(
                         poll.Limiter,
                         () => _pages.ReadDescendantsPageAsync(scope.Ancestor, scope.Type, scope.IncludeInactive, token, cancellationToken),
@@ -102,6 +104,12 @@ internal sealed class DescendantPollingSource
                     scope.Ancestor.ToString(),
                     scope.ListText)
                 .ConfigureAwait(false);
+            candidates = Candidates(poll, items);
+
+            if (scope.RequireActiveAncestors)
+            {
+                ancestors = await ReadAncestorsAsync(poll, candidates, own, cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (StorytellerConfigurationException exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -114,8 +122,7 @@ internal sealed class DescendantPollingSource
             return DescendantBatch.Failed(exception);
         }
 
-        var candidates = Candidates(poll, items);
-        var changes = await DiffAsync(poll, candidates, cancellationToken).ConfigureAwait(false);
+        var changes = await DiffAsync(poll, candidates, ancestors, cancellationToken).ConfigureAwait(false);
         poll.HasCompleted = true;
 
         return new DescendantBatch(changes);
@@ -123,20 +130,25 @@ internal sealed class DescendantPollingSource
 
     // The list of an ancestor that does not exist is empty, which would read as no descendants for ever. A machine
     // restricted below the ancestor may not read it: the list answers the same 403, in the words of what listing needs.
-    private async Task CheckAncestorAsync(PollState poll, CancellationToken cancellationToken)
+    // Returns the read, which serves a target that requires active ancestors: the ancestor is one of every descendant.
+    private async Task<AncestorRead> CheckAncestorAsync(PollState poll, CancellationToken cancellationToken)
     {
-        try
+        var ancestor = await AncestorReader.ReadAsync(
+                poll.Scope.Ancestor,
+                key => PollReads.LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(key, includeDeleted: false, cancellationToken), cancellationToken))
+            .ConfigureAwait(false);
+
+        if (ancestor is { IsMissing: true, Failure: { } missing })
         {
-            await PollReads.LimitAsync(poll.Limiter, () => _pages.ReadAnnotationAsync(poll.Scope.Ancestor, includeDeleted: false, cancellationToken), cancellationToken).ConfigureAwait(false);
+            throw poll.Scope.DoesNotExist(missing);
         }
-        catch (StorytellerConfigurationException exception) when (CatalogReader.IsMissing(exception))
-        {
-            throw poll.Scope.DoesNotExist(exception);
-        }
-        catch (StorytellerConfigurationException exception) when (CatalogReader.IsRestricted(exception))
+
+        if (ancestor.IsRestricted)
         {
             _logger.LogDebug("The machine may not read {Key}; the list tells what it needs.", poll.Scope.Ancestor.ToString());
         }
+
+        return ancestor;
     }
 
     // The listed descendants that pass the filters, by full key.
@@ -163,9 +175,39 @@ internal sealed class DescendantPollingSource
         return candidates;
     }
 
+    // Each distinct ancestor of the held and of the listed descendants, read once, in any status but deleted, as who am
+    // I reads its own; and the time that tells their status, one for all of them. A read that fails is an answer: what
+    // is under that ancestor stays as it was. own: the target's ancestor as the existence check of this poll read it,
+    // null once a poll has completed. Until then a definitive failure, a machine that may not read an ancestor
+    // included, fails the poll: polling again would not fix it.
+    private async Task<PollAncestors> ReadAncestorsAsync(PollState poll, Dictionary<string, Candidate> candidates, AncestorRead? own, CancellationToken cancellationToken)
+    {
+        var descendants = candidates.Values.Select(candidate => candidate.Key)
+            .Concat(poll.Held.Where(held => !candidates.ContainsKey(held.Key)).Select(held => held.Value.Key));
+
+        // Every read ends before a cancellation is thrown.
+        var reads = await AncestorReader.ReadDistinctAsync(descendants, own, key => ReadAncestorAsync(poll, key, cancellationToken)).ConfigureAwait(false);
+        var failed = reads.Values.Where(read => read.IsUndecided).OrderBy(read => read.Key.ToString(), StringComparer.Ordinal).ToList();
+
+        // The first one by key, so the same failure ends the watch whatever the order the reads ended in.
+        if (!poll.HasCompleted && failed.FirstOrDefault(read => read.Failure is { IsTransient: false }) is { Failure: { } failure } definitive)
+        {
+            throw definitive.IsRestricted ? poll.Scope.CannotReadAncestor(definitive.Key, failure) : failure;
+        }
+
+        foreach (var read in failed)
+        {
+            LogFailedAncestor(poll.Scope, read);
+        }
+
+        return new PollAncestors(reads, _timeProvider.GetUtcNow());
+    }
+
     // The reads of a poll run at once, up to the limit; the changes are applied after all of them ended, Removed first,
-    // then Changed, then Added, each by key.
-    private async Task<IReadOnlyList<StorytellerAnnotationChange<StorytellerAnnotation>>> DiffAsync(PollState poll, Dictionary<string, Candidate> candidates, CancellationToken cancellationToken)
+    // then Changed, then Added, each by key. ancestors: of a target that requires them active, null otherwise. Under
+    // them a listed descendant that is not held is read only when all its ancestors are active, and a held one that an
+    // ancestor ends leaves without a read, so it is not Changed too.
+    private async Task<IReadOnlyList<StorytellerAnnotationChange<StorytellerAnnotation>>> DiffAsync(PollState poll, Dictionary<string, Candidate> candidates, PollAncestors? ancestors, CancellationToken cancellationToken)
     {
         var additions = new List<(string Key, Task<Held?> Read)>();
         var updates = new List<(string Key, Task<Held?> Read)>();
@@ -173,9 +215,27 @@ internal sealed class DescendantPollingSource
 
         foreach (var (key, candidate) in candidates)
         {
+            var ancestor = ancestors?.FindInactive(candidate.Key);
+
             if (!poll.Held.TryGetValue(key, out var held))
             {
-                additions.Add((key, ReadCandidateAsync(poll, candidate, cancellationToken)));
+                if (ancestor is null)
+                {
+                    additions.Add((key, ReadCandidateAsync(poll, candidate, cancellationToken)));
+                }
+                else
+                {
+                    _logger.LogDebug(
+                        "{Key} is listed, but its ancestor {Ancestor} is {Status}; it is not added, and the next poll decides again.",
+                        candidate.Key.ToString(),
+                        ancestor.Key.ToString(),
+                        ancestors?.RemovalBy(ancestor)?.Reason.ToString() ?? "not read");
+                }
+            }
+            else if (ancestors?.RemovalBy(ancestor) is { } removal)
+            {
+                // It is listed, so the descendant itself stays, and the ancestor ends it.
+                removals.Add((key, Task.FromResult<StorytellerRemoval?>(removal)));
             }
             else if (!string.Equals(held.Fingerprint, candidate.Fingerprint, StringComparison.Ordinal))
             {
@@ -187,7 +247,7 @@ internal sealed class DescendantPollingSource
         {
             if (!candidates.ContainsKey(key))
             {
-                removals.Add((key, ConfirmAsync(poll, held, cancellationToken)));
+                removals.Add((key, ConfirmAsync(poll, held, ancestors, cancellationToken)));
             }
         }
 
@@ -256,8 +316,9 @@ internal sealed class DescendantPollingSource
     }
 
     // A held annotation that is not listed any more: removed when it is gone, deleted, or inactive while inactive ones are
-    // not included. Otherwise the list missed it, and it stays.
-    private async Task<StorytellerRemoval?> ConfirmAsync(PollState poll, Held held, CancellationToken cancellationToken)
+    // not included. Otherwise the list missed it, and it stays, unless an ancestor ends it: its own end goes first, as
+    // the execution goes before the usage in a subscription. ancestors: as for DiffAsync.
+    private async Task<StorytellerRemoval?> ConfirmAsync(PollState poll, Held held, PollAncestors? ancestors, CancellationToken cancellationToken)
     {
         var read = await ReadAsync(poll, held.Key, includeDeleted: true, cancellationToken).ConfigureAwait(false);
 
@@ -270,6 +331,11 @@ internal sealed class DescendantPollingSource
         if (PollReads.ReasonOf(read.Annotation, poll.Scope.IncludeInactive, _timeProvider.GetUtcNow()) is { } reason)
         {
             return new StorytellerRemoval(held.Key.Annotation.ToString(), reason);
+        }
+
+        if (ancestors?.RemovalBy(ancestors.FindInactive(held.Key)) is { } removal)
+        {
+            return removal;
         }
 
         _logger.LogDebug("{Key} was not listed, but reads as listed; it stays.", held.Key.ToString());
@@ -290,6 +356,13 @@ internal sealed class DescendantPollingSource
         }
     }
 
+    // An ancestor of the descendants, in any status but deleted. Its failure is an answer too.
+    private async Task<AncestorRead> ReadAncestorAsync(PollState poll, FullKey key, CancellationToken cancellationToken)
+    {
+        var read = await ReadAsync(poll, key, includeDeleted: false, cancellationToken).ConfigureAwait(false);
+        return new AncestorRead(key, read.Annotation, read.Failure);
+    }
+
     // An annotation gone since the list is no surprise: the next poll's list tells.
     private void LogFailedRead(FullKey key, StorytellerConfigurationException failure)
     {
@@ -304,6 +377,22 @@ internal sealed class DescendantPollingSource
             key.ToString(),
             failure.IsTransient ? "transient" : "definitive",
             failure.Message);
+    }
+
+    // An ancestor whose read failed with anything but a 404. A machine that may not read it is told what requiring
+    // active ancestors needs.
+    private void LogFailedAncestor(DescendantScope scope, AncestorRead ancestor)
+    {
+        if (ancestor.Failure is not { } failure)
+        {
+            return;
+        }
+
+        _logger.LogWarning(
+            "Reading {Key} failed ({Class}); the descendants under it stay as they were, and the next poll reads it again. {Error}",
+            ancestor.Key.ToString(),
+            failure.IsTransient ? "transient" : "definitive",
+            ancestor.IsRestricted ? scope.CannotReadAncestor(ancestor.Key, failure).Message : failure.Message);
     }
 
     // What one enumeration holds: the annotations it reported, by full key, and whether a poll completed.
@@ -332,4 +421,23 @@ internal sealed class DescendantPollingSource
 
     // A point read: the annotation, or the failure.
     private sealed record PointRead(FullKey Key, StorytellerAnnotation? Annotation, StorytellerConfigurationException? Failure);
+
+    // The ancestors of the descendants of one poll as it read them, by full key, and the time that tells their status.
+    private sealed record PollAncestors(IReadOnlyDictionary<string, AncestorRead> Reads, DateTimeOffset Now)
+    {
+        // The ancestor that keeps a descendant from being under active ancestors; null when all of its are active.
+        public AncestorRead? FindInactive(FullKey descendant)
+        {
+            return AncestorReader.FindInactive(descendant, Reads, Now);
+        }
+
+        // Why an ancestor ends a descendant, as a confirmation read would tell it for the ancestor; null when none
+        // does: all are active, or the read of one failed, which is no answer.
+        public StorytellerRemoval? RemovalBy(AncestorRead? ancestor)
+        {
+            return ancestor is { IsUndecided: false } && PollReads.ReasonOf(ancestor.Annotation, includeInactive: false, Now) is { } reason
+                ? new StorytellerRemoval(ancestor.Key.Annotation.ToString(), reason)
+                : null;
+        }
+    }
 }

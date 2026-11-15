@@ -12,7 +12,8 @@ namespace _42.Platform.Storyteller.Sdk.Hosting.Catalog;
 
 // The annotations of any type and the descendants of any annotation, through point reads and list pages of the
 // catalog's transport, and the descendant informer: a polling source per enumeration over the same reader. The
-// ancestors of a key, and of the descendants of a list, are read as who am I reads its own, through AncestorReader.
+// ancestors of a key, and of the descendants of a list, are read as who am I reads its own, through AncestorReader; the
+// informer reads those of a target that requires them active in every poll.
 internal sealed class StorytellerCatalog : IStorytellerCatalog
 {
     // Reads at once: of one list, and of one poll.
@@ -138,8 +139,9 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
 
     // pollsOnce: the one poll has no next one to try again, so its failure is thrown rather than an empty answer. A
     // definitive failure before any poll completed (a target that does not exist, a credential or a machine that may not
-    // list it) is thrown too: polling again would not fix it, and a watch that never ends would read as an empty target.
-    // After a poll completed, every failure is logged and polled again, as a policy may change back.
+    // list it, or may not read an ancestor that the target requires active) is thrown too: polling again would not fix
+    // it, and a watch that never ends would read as an empty target. After a poll completed, every failure is logged and
+    // polled again, as a policy may change back.
     private static async IAsyncEnumerable<StorytellerAnnotationChange<TAnnotation>> WatchAsync<TAnnotation>(DescendantPollingSource source, DescendantScope scope, bool pollsOnce, [EnumeratorCancellation] CancellationToken cancellationToken)
         where TAnnotation : StorytellerAnnotation
     {
@@ -176,7 +178,7 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
 
         // A machine restricted below the ancestor goes on: the list answers the same 403, in the words of what listing
         // needs.
-        if (ancestor is { Annotation: null, IsRestricted: false, Failure: { } missing })
+        if (ancestor is { IsMissing: true, Failure: { } missing })
         {
             throw scope.DoesNotExist(missing);
         }
@@ -239,28 +241,12 @@ internal sealed class StorytellerCatalog : IStorytellerCatalog
 
     // Every distinct ancestor of the descendants, by full key, each read once, at most MaxConcurrentReads at once.
     // ancestor: the target's own, which the list read already and which is an ancestor of every descendant.
-    private async Task<IReadOnlyDictionary<string, AncestorRead>> ReadAncestorsAsync(IReadOnlyList<Listed> descendants, AncestorRead ancestor, SemaphoreSlim limiter, CancellationToken cancellationToken)
+    private Task<IReadOnlyDictionary<string, AncestorRead>> ReadAncestorsAsync(IReadOnlyList<Listed> descendants, AncestorRead ancestor, SemaphoreSlim limiter, CancellationToken cancellationToken)
     {
-        var known = ancestor.Key.ToString();
-        var reads = new Dictionary<string, Task<AncestorRead>>(StringComparer.Ordinal);
-
-        foreach (var key in descendants.SelectMany(descendant => AncestorReader.KeysOf(descendant.Key)))
-        {
-            var text = key.ToString();
-
-            if (reads.ContainsKey(text))
-            {
-                continue;
-            }
-
-            reads[text] = string.Equals(text, known, StringComparison.Ordinal)
-                ? Task.FromResult(ancestor)
-                : PollReads.LimitAsync(limiter, () => ReadAncestorAsync(key, cancellationToken), cancellationToken);
-        }
-
-        // Every read ends before the first failure is thrown, so none is left unobserved.
-        var results = await Task.WhenAll(reads.Values).ConfigureAwait(false);
-        return results.ToDictionary(read => read.Key.ToString(), StringComparer.Ordinal);
+        return AncestorReader.ReadDistinctAsync(
+            descendants.Select(descendant => descendant.Key),
+            ancestor,
+            key => PollReads.LimitAsync(limiter, () => ReadAncestorAsync(key, cancellationToken), cancellationToken));
     }
 
     // An ancestor of a list, in any status but deleted, as who am I reads its own: read, restricted or missing.

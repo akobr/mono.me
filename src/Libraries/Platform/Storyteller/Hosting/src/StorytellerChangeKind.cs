@@ -5,7 +5,7 @@ namespace _42.Platform.Storyteller.Sdk.Hosting;
 public enum StorytellerChangeKind
 {
     // A subscription the informer did not hold: its execution and its usage are active. Or an annotation of the target
-    // it did not hold.
+    // it did not hold, under active ancestors when the target requires them.
     Added = 0,
 
     // The execution or the usage of a held subscription changed, and both are still active. Or a held annotation of the
@@ -13,6 +13,7 @@ public enum StorytellerChangeKind
     Changed,
 
     // A held subscription ended: its execution or its usage is deleted, inactive or gone. Or a held annotation of the
-    // target is deleted, gone, or inactive while the target takes active ones only.
+    // target is deleted, gone, or inactive while the target takes active ones only; or an ancestor of it is inactive or
+    // gone while the target requires active ancestors.
     Removed,
 }

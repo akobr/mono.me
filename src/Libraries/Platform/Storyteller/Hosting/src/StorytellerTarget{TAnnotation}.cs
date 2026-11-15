@@ -126,12 +126,14 @@ public sealed class StorytellerTarget<TAnnotation>
         return new StorytellerTarget<TAnnotation>(this) { IncludeInactive = true };
     }
 
-    // Only the descendants whose ancestors are all active, in ListAsync and ListWithAncestorsAsync: the executions of a
-    // responsibility without those of a disabled subject or of an expired context. IncludingInactive() decides about
-    // the descendant's own status, this about its ancestors, and the two combine. The lists read each distinct ancestor
-    // of the descendants once. A missing ancestor leaves its descendants out, as they were deleted with it. An ancestor
-    // the machine may not read throws a definitive StorytellerConfigurationException, so this needs a machine that may
-    // read them.
+    // Only the descendants whose ancestors are all active, in ListAsync, ListWithAncestorsAsync and WatchAsync: the
+    // executions of a responsibility without those of a disabled subject or of an expired context. IncludingInactive()
+    // decides about the descendant's own status, this about its ancestors, and the two combine. The lists read each
+    // distinct ancestor of the descendants once, and a watch reads them again in every poll: a held descendant whose
+    // ancestor is inactive or gone is Removed with that ancestor's key, and Added again once all of them are active. A
+    // missing ancestor leaves its descendants out, as they were deleted with it. An ancestor the machine may not read
+    // throws a definitive StorytellerConfigurationException from a list, and from a watch until its first poll has
+    // completed, so this needs a machine that may read them.
     public StorytellerTarget<TAnnotation> RequiringActiveAncestors()
     {
         return new StorytellerTarget<TAnnotation>(this) { RequireActiveAncestors = true };

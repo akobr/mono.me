@@ -13,8 +13,8 @@ namespace _42.Platform.Storyteller.Sdk.Hosting.UnitTests.Informer;
 // members of the subtype (relation arrays, a unit's strings) go, and values are lossy ("list:" and the stored JSON).
 // Point reads honour includeInactive and includeDeleted. Put and Update stamp Modified, as the API's writes do; Relate
 // changes a relation array without, as the API's relation maintenance does. Answers on the fixture's handler before its
-// routes; the server's clock is the fixture's. Counts the answers in flight, and holds the point reads of executions
-// and usages on request.
+// routes; the server's clock is the fixture's. Counts the answers in flight, holds the point reads of executions
+// and usages on request, and tells when reads are held.
 internal sealed class FakeCatalog
 {
     public const string Responsibility = "invoicing";
@@ -46,6 +46,8 @@ internal sealed class FakeCatalog
     private readonly ConcurrentDictionary<string, Func<HttpResponseMessage>> _failures = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, bool> _unlisted = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, TaskCompletionSource> _keyGates = new(StringComparer.Ordinal);
+    private readonly List<(int Count, TaskCompletionSource Reached)> _heldWaiters = [];
+    private readonly Lock _heldLock = new();
     private TaskCompletionSource? _gate;
     private int _writes;
     private int _inFlight;
@@ -184,6 +186,20 @@ internal sealed class FakeCatalog
         }
     }
 
+    // Completes once as many point reads wait for their release, so a test goes on without a sleep.
+    public Task WhenHeldAsync(int count)
+    {
+        var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        lock (_heldLock)
+        {
+            _heldWaiters.Add((count, reached));
+        }
+
+        SignalHeld();
+        return reached.Task.WaitAsync(HostingFixture.Patience);
+    }
+
     // Gone, as after a purge: a point read answers 404 without a body.
     public void Purge(string annotationKey)
     {
@@ -293,6 +309,22 @@ internal sealed class FakeCatalog
         };
     }
 
+    // Completes the waits of WhenHeldAsync that the held reads have reached.
+    private void SignalHeld()
+    {
+        lock (_heldLock)
+        {
+            var held = HeldReads;
+
+            foreach (var (_, reached) in _heldWaiters.Where(waiter => waiter.Count <= held))
+            {
+                reached.TrySetResult();
+            }
+
+            _heldWaiters.RemoveAll(waiter => waiter.Count <= held);
+        }
+    }
+
     private bool IsActive(JObject json)
     {
         var now = _fixture.Time.GetUtcNow();
@@ -332,6 +364,7 @@ internal sealed class FakeCatalog
             if (slash < 0 && (_keyGates.TryGetValue(target, out var gate) || (target != ResponsibilityKey && (gate = Volatile.Read(ref _gate)) is not null)))
             {
                 Interlocked.Increment(ref _held);
+                SignalHeld();
 
                 try
                 {

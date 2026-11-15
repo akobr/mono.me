@@ -62,7 +62,12 @@ public interface IStorytellerCatalog
     // after every poll, Removed first, then Changed, then Added, each by key. Changed follows Modified, which a new
     // descendant of a descendant does not move, so watch that type itself to follow it. A failed poll emits nothing,
     // logs a warning and polls again; with a zero interval the one poll's failure is thrown, and so is a definitive
-    // failure before any poll completed (an ancestor that does not exist, a 401 or a 403). Each enumeration runs its
+    // failure before any poll completed (an ancestor that does not exist, a 401 or a 403). A target that requires active
+    // ancestors also reads each distinct ancestor of the held and of the listed descendants once in every poll: a
+    // descendant is Added only under active ancestors, and a held one whose ancestor is inactive or gone is Removed with
+    // that ancestor's key and its reason, the nearest one when several are; its own end is named before an ancestor's.
+    // A failed read of an ancestor logs a warning and keeps the descendants under it as they are; a definitive one
+    // before any poll completed, of an ancestor the machine may not read too, is thrown. Each enumeration runs its
     // own loop. pollInterval: 30 s when null, with a jitter of ±10 %, counted from the end of a poll; zero polls once;
     // otherwise 1 second to 45 days, or the call throws ArgumentOutOfRangeException. Without the options' Key, an
     // annotation key throws StorytellerConfigurationException at the call. Ends with OperationCanceledException when the
