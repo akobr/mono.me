@@ -25,7 +25,7 @@ const exhibitionTimeoutMs = 5_000
 const exhibition = shallowRef<Exhibition>()
 const exhibitionError = shallowRef<unknown>()
 const exhibitionLoading = ref(false)
-/** Undefined until the first answer, so the list of steps never changes under the user; false after a 404. */
+/** Undefined until the first answer, so the wizard shows no list of steps that it would change; false after a 404. */
 const hasExhibition = ref<boolean>()
 
 async function loadExhibition() {
@@ -37,6 +37,11 @@ async function loadExhibition() {
   } catch (error) {
     // Only a 404 says that the deployment has none. Anything else keeps the step, with Retry in it.
     const none = isNotFound(error)
+    if (none && hasExhibition.value && current.value === 'exhibition') {
+      // A Retry found that there is none after all. The step goes, and the user goes on to the one that followed it,
+      // not back to the first.
+      await router.replace({ query: { ...route.query, step: 'organization' } })
+    }
     exhibitionError.value = none ? undefined : error
     hasExhibition.value = !none
   } finally {
@@ -90,6 +95,11 @@ async function joinOnly() {
   } finally {
     joiningOnly.value = false
   }
+  // The button was disabled while it worked, which dropped the focus. After a failure it takes it back, to try again.
+  if (end.exhibitionOnlyError.value !== undefined) {
+    await nextTick()
+    content.value?.querySelector<HTMLElement>('[data-exhibition-only]')?.focus()
+  }
 }
 
 // After a change of step the focus goes to its heading, so a screen reader announces the step; on the last step to
@@ -109,12 +119,13 @@ watch(
   { flush: 'post' },
 )
 
-// In joinFailed the form is gone, and the focus with it: Try again takes it, so the keyboard goes on from there.
+// In joinFailed the form is gone, and the focus with it: Try again takes it, so the keyboard goes on from there. It
+// takes it again after a try that failed, because the button drops the focus while it works.
 const failed = useTemplateRef<HTMLElement>('failed')
 watch(
-  () => end.state.value,
-  async (state) => {
-    if (state === 'joinFailed') {
+  () => end.state.value === 'joinFailed' && !end.retrying.value,
+  async (ready) => {
+    if (ready) {
       await nextTick()
       failed.value?.querySelector<HTMLElement>('[data-try-again]')?.focus()
     }
@@ -209,6 +220,7 @@ watch(
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <p class="text-sm">{{ texts.organization.joining }}</p>
                 <UButton
+                  data-exhibition-only
                   :label="texts.organization.exhibitionOnly"
                   color="neutral"
                   variant="outline"
