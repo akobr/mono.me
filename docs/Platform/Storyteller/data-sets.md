@@ -1,8 +1,8 @@
 # Data Sets of DbCreator
 
-DbCreator (`src/Platform/Storyteller/DbCreator`, the tool `2sInitDb`) creates the Cosmos DB database of the platform and seeds **data sets** into it. A data set is a folder of documents in the format of a [view export](export-import.md), with a manifest `set.json`, an optional `annotations.jsonl` of simple or generated annotations, and an optional `key-values.json` of [key/value pairs](key-values.md). A seed writes a set into an organization, project and view, and creates them when they are missing.
+DbCreator (`src/Platform/Storyteller/DbCreator`, the tool `2sInitDb`) creates the Cosmos DB database of the platform and seeds **data sets** into it. A data set is a folder of documents in the format of a [view export](export-import.md), with a manifest `set.json`, an optional `annotations.jsonl` of simple or generated annotations, and an optional `key-values.json` of [key/value pairs](key-values.md), and an optional `project-settings.json` with the [project settings](access.md#project-settings) (the names, colors and icons of the annotation types, the time zone and the date format). A seed writes a set into an organization, project and view, and creates them when they are missing.
 
-A seed goes through the services of the API, as the `System` actor: the access model creates the organization and the project (with their [access audit](access-audit.md) records by `System`), the view registry registers the view, the [view importer](export-import.md#import-without-a-job) writes the documents, a bulk writer writes the lines of `annotations.jsonl` in transactional batches, and the [key/value import](key-values.md#import-and-export) writes the pairs. So seeded annotations have audit entries and relation arrays like any other, and a seed is idempotent: what exists stays, what is missing is created, and a set seeded already is not read again.
+A seed goes through the services of the API, as the `System` actor: the access model creates the organization and the project (with their [access audit](access-audit.md) records by `System`), the settings service stores the project settings, the view registry registers the view, the [view importer](export-import.md#import-without-a-job) writes the documents, a bulk writer writes the lines of `annotations.jsonl` in transactional batches, and the [key/value import](key-values.md#import-and-export) writes the pairs. So seeded annotations have audit entries and relation arrays like any other, and a seed is idempotent: what exists stays, what is missing is created, and a set seeded already is not read again.
 
 Use it for local development (the Aspire host seeds the set `showcase`), demos, the [exhibition](access.md#exhibition) of a deployment (the set `exhibit`), tests, and performance checks with many annotations.
 
@@ -10,7 +10,7 @@ The code is in:
 
 - `src/Platform/Storyteller/DbCreator/src/`:
   - `Commands/`: the root command `InitDbCommand` and its subcommands `SeedCommand` and `SetsCommand`, and `DataSetOutput`, which prints the results;
-  - `DataSets/`: the manifest (`DataSetManifest`), `annotations.jsonl` (`DataSetAnnotationLinesReader`), `key-values.json` (`DataSetKeyValues`, and `DataSetKeyValueSeeder`, which writes the pairs), the files and the hash (`DataSetFolder`), the catalog (`DataSetCatalog`), the target and the owner (`DataSetTarget`, `DataSetOwner`, `DataSetProvisioner`), the seed record (`DataSetSeedRecord`, `CosmosDataSetSeedRecordStore`) and the seeder (`DataSetSeeder`);
+  - `DataSets/`: the manifest (`DataSetManifest`), `annotations.jsonl` (`DataSetAnnotationLinesReader`), `key-values.json` (`DataSetKeyValues`, and `DataSetKeyValueSeeder`, which writes the pairs), `project-settings.json` (`DataSetProjectSettings`, `DataSetProjectSettingsResult`), the files and the hash (`DataSetFolder`), the catalog (`DataSetCatalog`), the target and the owner (`DataSetTarget`, `DataSetOwner`, `DataSetProvisioner`), the seed record (`DataSetSeedRecord`, `CosmosDataSetSeedRecordStore`) and the seeder (`DataSetSeeder`);
   - `Logic/CoreDbStructureBuilder.cs`: the layout check, the containers, the access of the base owner and the set `core`;
   - `DbCreatorEntryPoint.cs` (`AddDbCreator`), `Startup.cs` (the Standard vault, `AddKeyVaultKeyProtection`) and `ExitCodes.cs`;
   - `data-sets/`: the built-in sets;
@@ -18,10 +18,11 @@ The code is in:
 - `Backend.Core/src/Annotating/`: `IAnnotationBulkWriter` with `AnnotationBulkOptions`, `AnnotationBulkResult` and `AnnotationBulkItem`;
 - `Backend.CosmosDb/src/Annotating/CosmosAnnotationService.Bulk.cs`: the bulk writer;
 - `Backend.CosmosDb/src/KeyValues/CosmosKeyValueService.cs`: the key/value import, and `KeyValues.Azure.KeyVault`: the Standard vault;
+- `Abstractions.Annotations/src/Model/ProjectSettings/` (`ProjectSettingsJson`, `ProjectSettingsRules`) and `Backend.Core/src/Accessing/IProjectSettingsService.cs`: the rules and the service of the project settings, those of the API;
 - `DbCreator/test/` (unit tests, no database) and `DbCreator/testint/` (seeds against a Cosmos DB emulator, and Lowkey Vault for the `Standard` pairs);
 - `src/Platform/ui.admin/src/test/unit/mock/showcase-set.test.ts`: writes the set `showcase` from the admin UI's mock.
 
-The design and its decisions are in [the spec](specs/2026-11-12%20Data%20Sets%20in%20DbCreator.md) and its phase reviews; the key/value pairs in [their spec](specs/2026-11-15%20Key-Value%20Pairs%20in%20Data%20Sets%20of%20DbCreator.md) (424-265).
+The design and its decisions are in [the spec](specs/2026-11-12%20Data%20Sets%20in%20DbCreator.md) and its phase reviews; the key/value pairs in [their spec](specs/2026-11-15%20Key-Value%20Pairs%20in%20Data%20Sets%20of%20DbCreator.md) (424-265), and those of `project-settings.json` in section 8 of [Project Settings on the Server](specs/2026-11-15%20Project%20Settings%20on%20the%20Server.md).
 
 ## What DbCreator does
 
@@ -44,6 +45,7 @@ invoicing/
   set.json                    the manifest
   annotations.jsonl           optional: simple and generated annotations
   key-values.json             optional: the key/value pairs of the view
+  project-settings.json       optional: the settings of the project
   annotations/
     rst.payments.json
     unt.payments.ledger.json
@@ -57,7 +59,7 @@ invoicing/
 ```
 
 - **The documents** are named as in an export ([File names](export-import.md#file-names)). Only the file name tells the kind; the folders play no part. The reader is the import's (`ViewArchiveReader`), so a set reads as an archive does: annotation files keep the text of their numbers and their date strings, the first of two files of one document wins and the other fails with `DuplicateFile`, and a file that is not valid fails with its code.
-- **Ignored files** are counted and never fail a seed: version files (`rst.payments.conf.3.json`), `export.json`, a `set.json` or `key-values.json` below the root, and any other name, such as a `README.md`.
+- **Ignored files** are counted and never fail a seed: version files (`rst.payments.conf.3.json`), `export.json`, a `set.json`, `annotations.jsonl`, `key-values.json` or `project-settings.json` below the root, and any other name, such as a `README.md`.
 - **Skipped paths** are neither read, nor counted, nor hashed: a path with a segment that starts with `.` (`.git`, `.vscode`, `.DS_Store`), and a first folder `__MACOSX`.
 - **An unpacked export** of a view (`sform story export -x`, either format) is a set once it gets a `set.json`.
 - **Limits.** A set holds at most 1,000,000 files and 2 GiB of document files, and a document at most 2 MB (2,097,152 bytes), one Cosmos DB item; a file that is not a document, such as a version file or a `README.md`, may be of any size. The upload limits of an import job do not apply. A seed checks them from the sizes of the files before it writes anything, and a set beyond them is wrong input (exit `2`), for `sets` too: a document over 2 MB refuses the whole set, with the file in the message, where an import job fails only that file.
@@ -187,6 +189,35 @@ The identity needs the roles the API's identity has on that vault: **Key Vault C
 
 **Secrets in the repository.** A `Standard` value in a set is plain text in Git: in the repository, in every clone, and in the package of the tool. **A set holds demo and test values only, never real secrets.** For a real secret, use a reference: a `Public` pair whose value names a secret in the customer's own vault (`kv://{vault}/{name}` with the content type `application/vnd.2s.secret-reference`). It holds no secret, and the platform never resolves it.
 
+### project-settings.json
+
+The [project settings](access.md#project-settings) of the target project, in the file shape that `sform project settings -e <file>` writes ([sform](../../42for.net/cli/sform.md#project-settings)), so the settings of a project can be exported into a set and a set's file can be imported with `sform project settings set -i <file>`:
+
+```json
+{
+  "Format": "2s.project-settings.v1",
+  "Types": {
+    "rst": { "Label": "Module", "Color": "violet", "Icon": "i-lucide-puzzle" },
+    "sbt": { "Label": "Customer", "Plural": "Customers", "Color": "blue", "Icon": "i-lucide-building-2" }
+  },
+  "DefaultTimeZone": "Europe/Oslo",
+  "DateFormat": "dd.mm.yyyy"
+}
+```
+
+- **The rules are the API's** (`ProjectSettingsJson.Read`, the catalog of the [conformance kind `project-settings`](conformance.md#project-settings)): the seven type codes, the colors, icons, date formats and time zones of the catalog (IANA ids, so `Central Europe Standard Time` is refused), labels and plurals of at most 40 characters. Member names, type codes and values match in any case and are stored in the catalog's spelling; `Format` is optional and must be the marker; `Version` and `Modified` are ignored; any other member is refused. Comments and trailing commas are allowed, a member given twice is not, and the file holds at most 64 KiB.
+- **Wrong input.** A file that is not JSON or breaks a rule is wrong input (exit `2`), for `seed` before the database is touched and for `sets`, and the message names the file and every problem by its JSON path:
+
+  ```text
+  ! The project settings '/sets/invoicing/project-settings.json' are not valid (2 problems):
+    $.Types.sbt.Color: 'pinkish' is not a color of the catalog; use one of red, orange, …
+    $.DefaultTimeZone: 'Central Europe Standard Time' is not an IANA time zone id of the tz database, such as Europe/Prague or UTC.
+  ```
+
+- **One project, one set of settings.** Every set of a run seeds into one project, its dependencies too, so sets of one run whose settings differ (by `ProjectSettingsRules.SameValues`, so the spelling does not count) are wrong input (exit `2`): `The sets 'a' and 'b' carry different project settings (…), and they seed into one project, which has one set of settings: make the files equal, or seed the sets into different projects.` Equal settings are written once, by the first set; the later ones find them `Unchanged`.
+- **At the root only.** It is no document: the reader of the documents never sees it, so it is not an ignored file. A `project-settings.json` below the root is an ignored file. Like every file it is part of the [hash](#the-seed-record), so a change of it seeds the set again.
+- **Never overwritten.** A seed writes the settings only into a project whose settings were never set, and keeps any others (see [Seeding a set](#seeding-a-set)).
+
 ## The catalog
 
 A run can seed the sets of its catalog:
@@ -217,7 +248,7 @@ The seed makes the target exist through `IAccessService` and `IViewService`, as 
 1. It reads the access points of the organization (`apt.{organization}`) and the project (`apt.{organization}.{project}`) in `core`.
 2. A project that is missing in an organization that exists, and whose Owner is not the owner, is refused (exit `2`) before anything is written. A seed never takes over an organization. An existing project whose Administrator or Owner is not the owner is refused the same way, so a typo in the target never writes into a project of someone else.
 3. The owner's account is created when it is missing, first, so that creating the project mirrors the membership into it. This also happens when the project exists.
-4. A missing project is created with `CreateAccessPointAsync`, with the organization when that is missing too: the owner is their Owner, and the project gets the `ProjectDescription` of the first named set that has one, then of the dependencies. An existing project that the owner administers is used as it is: its access is not changed.
+4. A missing project is created with `CreateAccessPointAsync`, with the organization when that is missing too: the owner is their Owner, and the project gets the `ProjectDescription` of the first named set that has one, then of the dependencies. An existing project that the owner administers is used as it is: its access is not changed. The owner's role is also what the API asks of a change of the project settings (Administrator), which a set with `project-settings.json` gives a project that has none (see [Seeding a set](#seeding-a-set)).
 5. A view other than `default` is registered when it is missing (`CreateViewAsync`, with the `ViewDescription` and the `System` actor).
 
 What another writer created in the meantime is used as it is. A dry run reads, reports what it would create, and writes nothing. Sets define no users: the owner is the only member a seed adds.
@@ -233,8 +264,9 @@ After a set is seeded without a `Failed` outcome, the seed upserts its record in
 | `Set`, `View`, `Version` | The set, the view and the version of the set |
 | `Hash` | The hash of the set's files |
 | `Seeded` | An [audit stamp](audit-stamps.md) of the `System` actor |
+| `ProjectSettings` | The outcome of `project-settings.json` (`Created`, `Unchanged`, `Skipped`); absent for a set without one, and in records written before |
 | `Documents`, `Annotations`, `KeyValues` | The document files, the annotations of `annotations.jsonl` and the pairs of `key-values.json` the seed read (`KeyValues` is 0 in a record written before sets had pairs) |
-| `Created`, `Updated`, `Unchanged`, `Skipped`, `Warnings` | The outcomes of all of them together |
+| `Created`, `Updated`, `Unchanged`, `Skipped`, `Warnings` | The outcomes of all of them and of the project settings together |
 
 The record has no `ViewName`, `ProjectName` or `AnnotationType`, and its id does not start with `view.`, so view discovery, the view registry and the queries of annotations never see it.
 
@@ -254,11 +286,21 @@ A seed never overwrites and never deletes. To change a seeded document, change i
 `DataSetSeeder` seeds one set with the import options `Actor` = `System`, `Existing` = `Skip`, `Force` = `--force` and `DryRun` = `--dry-run`, and one [overlay](export-import.md#overlay) for the whole set, so each step sees what the steps before it made active or failed:
 
 1. The hash and the record decide whether the set is seeded at all (see [The seed record](#the-seed-record)).
-2. The documents and `annotations.jsonl` are read. A line that cannot be read is `Failed`, and its key joins the overlay's failed annotations before anything is written, so a file below it is `DependencyFailed` instead of creating the key with defaults.
-3. **The annotations, in rounds.** A round imports its annotation files through `IViewImporter` (one document at a time, ancestors first), then sends its lines to `IAnnotationBulkWriter`. A set without a line above a file has one round: the files, then the lines. A file below a line comes in a later round than the line, and a line below a file comes after the file. Both the importer and the bulk writer create a missing ancestor with defaults, and `Skip` would then keep the defaults over the line or the file of that key.
-4. A line on or below an annotation that failed, in a file or a line, is `Skipped` with `DependencyFailed` and is not sent.
-5. **The relation arrays of the annotation files are completed** (`IAnnotationBulkWriter.CompleteRelationsAsync`, also in a dry run, which only counts). A create commits the key first and the arrays of its active parents in its last wave, and an import that finds the key active again reports it `Unchanged` without a look at the parents. So a run that stopped between the two, by a crash, a stop or a request that failed after the retries of the Cosmos DB client, would leave a parent without the name of its child, and the next run would record the set so. The keys of the files and their ancestors are read in reads of many items, and an active parent that misses an active child gets the name in one replace under its ETag, without an audit entry and without a change of `Modified`. On a first seed nothing is missing, and the step costs a read of many items per 1,000 keys. The seed prints the number of annotations it completed, when there are any. The lines need no such step: the bulk writer does the same for the keys of every call.
-6. **The pairs of `key-values.json`** go through the key/value import (`IKeyValueService.ImportAsync`, from `DataSetKeyValueSeeder`) as the `System` caller (both secret rights, the `System` channel), before the configurations that bind them. The import's `Merge` would update a pair whose value differs and restore a deleted one, so the seed sends it neither. Per chunk of 1,000 pairs, the most one import takes:
+2. The documents, `annotations.jsonl` and `project-settings.json` are read. A line that cannot be read is `Failed`, and its key joins the overlay's failed annotations before anything is written, so a file below it is `DependencyFailed` instead of creating the key with defaults.
+3. **The project settings**, when the set has `project-settings.json`, before the documents. The seed reads the project's settings through `IProjectSettingsService` and compares them with the file's (`ProjectSettingsRules.SameValues`). A seed never overwrites or merges settings:
+
+   | The project's settings | Outcome | Writes |
+   | --- | --- | --- |
+   | Never set (version `0`), other than the file's | `Created` | `IProjectSettingsService.SetAsync` with the condition version `0` and the caller `KeyValueCaller.System()`: version `1`, `Modified` by `System`, and a `ProjectSettingsChange` event in the project's [audit trail](key-values.md#audit-trail) |
+   | The same values, at any version | `Unchanged` | Nothing |
+   | Other values at a version of `1` or more, also settings reset to the defaults | `Skipped` with `DocumentExists` (`The project has other settings (version 3); a seed never overwrites them.`) | Nothing |
+   | A write that fails | `Failed` with its error code | Nothing; the set is not recorded and the run exits `4` |
+
+   When someone sets the settings between the read and the write, the condition fails (`412`), and the seed decides again from the stored settings: `Unchanged` or `Skipped`. A skipped or failed outcome is listed with the other outcomes of the set; the documents are seeded either way.
+4. **The annotations, in rounds.** A round imports its annotation files through `IViewImporter` (one document at a time, ancestors first), then sends its lines to `IAnnotationBulkWriter`. A set without a line above a file has one round: the files, then the lines. A file below a line comes in a later round than the line, and a line below a file comes after the file. Both the importer and the bulk writer create a missing ancestor with defaults, and `Skip` would then keep the defaults over the line or the file of that key.
+5. A line on or below an annotation that failed, in a file or a line, is `Skipped` with `DependencyFailed` and is not sent.
+6. **The relation arrays of the annotation files are completed** (`IAnnotationBulkWriter.CompleteRelationsAsync`, also in a dry run, which only counts). A create commits the key first and the arrays of its active parents in its last wave, and an import that finds the key active again reports it `Unchanged` without a look at the parents. So a run that stopped between the two, by a crash, a stop or a request that failed after the retries of the Cosmos DB client, would leave a parent without the name of its child, and the next run would record the set so. The keys of the files and their ancestors are read in reads of many items, and an active parent that misses an active child gets the name in one replace under its ETag, without an audit entry and without a change of `Modified`. On a first seed nothing is missing, and the step costs a read of many items per 1,000 keys. The seed prints the number of annotations it completed, when there are any. The lines need no such step: the bulk writer does the same for the keys of every call.
+7. **The pairs of `key-values.json`** go through the key/value import (`IKeyValueService.ImportAsync`, from `DataSetKeyValueSeeder`) as the `System` caller (both secret rights, the `System` channel), before the configurations that bind them. The import's `Merge` would update a pair whose value differs and restore a deleted one, so the seed sends it neither. Per chunk of 1,000 pairs, the most one import takes:
    1. a dry run of the import plans the chunk: it validates the pairs with the project's policy and compares each with what the view holds, deleted pairs included (a `Standard` secret is decrypted for the comparison);
    2. the decisions:
 
@@ -272,14 +314,14 @@ A seed never overwrites and never deletes. To change a seeded document, change i
    3. a second import writes only the pairs decided `Created`, in transactional batches of 50. With nothing to create there is no call, so a run with `--again` writes no pair and no audit event.
 
    A pair the import refuses (`ProtectionNotAllowed` of the project's policy) is `Failed`, and the rest of its chunk is planned again without it. A failure of the vault (`KeyEncryptionUnavailable`, `ProtectionNotConfigured`, a `403` of the vault, a vault it cannot reach after the retries of the Azure SDK) fails the pairs of its call that are not stored: the import commits in batches of 50 and encrypts per batch, so the seed lists the active keys of the view after such a failure and reports the pairs of the earlier batches `Created` (that import writes no `Import` audit event); when the listing fails too, every pair of the call is `Failed` with the error of the write. A failed pair keeps the set from being recorded (exit `4`); the seed goes on with the configurations, and a run again writes the rest. A key that another writer creates between the plan and the write is updated by the write (`Updated`, listed). Each write is one `Import` event of the [audit trail](key-values.md#audit-trail), by `System`; the writes do not reach the [usage meters](key-values.md#usage-meters), because DbCreator never flushes its usage recorder.
-7. The schemas, templates and configurations go through `IViewImporter`, with the same overlay.
-8. The record is written (see above).
+8. The schemas, templates and configurations go through `IViewImporter`, with the same overlay.
+9. The record is written (see above).
 
 A run seeds its sets in the order of their dependencies. A set that depends on a set with failures is not seeded, and the run exits `4`; a set that does not depend on it is seeded. `seed` prints it under the heading of the set (`# b  version 1, built-in`) as `! Not seeded: the set 'a' it depends on failed.`
 
 The outcomes, codes and warnings are those of an import ([Outcomes, codes and warnings](export-import.md#outcomes-codes-and-warnings)): `Created` (with the warning `AncestorCreated` when missing ancestors are created with defaults), `Unchanged`, `Skipped` (`DocumentExists`, `AnnotationDeleted`, `DependencyFailed`, `AnnotationNotFound` for a document whose annotation is missing), and `Failed` (`InvalidDocument`, `InvalidKey`, `InvalidAnnotation`, `DuplicateFile`, `SchemaViolation`, …). A pair is `Created`, `Unchanged`, `Skipped` (`KeyValueExists`, `KeyValueDeleted`) or `Failed` (`ProtectionNotAllowed`, `KeyEncryptionUnavailable`, …), and `Updated` only after a race (see step 6). Warnings never fail a seed. A configuration is validated against its schemas as in an import; `--force` stores schemas and configurations that break each other, with a warning.
 
-**A dry run** decides every outcome and writes nothing. The overlay carries what the earlier steps of the set, and the sets before it in the run, would write, and the bulk writer is given those keys (`AnnotationBulkOptions.DryRunActiveKeys`), so a dry run reports the failures of the real run and exits as it would. The pairs are planned by the import's own dry run, which validates them with the project's policy as the real run does. The pairs an earlier set of the run would create are carried too, so a later set's pair of the same key is `Unchanged` or `Skipped` with `KeyValueExists`, as in the real run. One difference stays: when two sets of one run configure the same annotation differently, the dry run reports the later one `Created`, and the real run `Skipped` with `DocumentExists`. Neither is a failure.
+**A dry run** decides every outcome and writes nothing. The overlay carries what the earlier steps of the set, and the sets before it in the run, would write, and the bulk writer is given those keys (`AnnotationBulkOptions.DryRunActiveKeys`), so a dry run reports the failures of the real run and exits as it would. The pairs are planned by the import's own dry run, which validates them with the project's policy as the real run does. The pairs an earlier set of the run would create are carried too, so a later set's pair of the same key is `Unchanged` or `Skipped` with `KeyValueExists`, as in the real run. The project settings are decided from the stored ones, from the defaults for a project the dry run would create, and from those an earlier set of the run would create (so a later set with the same settings is `Unchanged`, as in the real run). One difference stays: when two sets of one run configure the same annotation differently, the dry run reports the later one `Created`, and the real run `Skipped` with `DocumentExists`. Neither is a failure.
 
 ### Bulk writing
 
@@ -344,11 +386,11 @@ The build of the database (see [What DbCreator does](#what-dbcreator-does)). Aft
 
 A seed:
 
-1. **Plans** from the files and the options alone, so wrong input exits `2` before the database is touched: an unknown set, an invalid manifest, a cycle, a missing name of the target, an invalid project, view or organization with a dot, an invalid owner id, a missing `--path` folder, a set beyond the limits (a document or a line over 2 MB included), a `key-values.json` that cannot be seeded (an item that breaks a rule, a level other than `Public` or `Standard`, an item without a value), and `Standard` pairs without a Standard vault.
+1. **Plans** from the files and the options alone, so wrong input exits `2` before the database is touched: an unknown set, an invalid manifest, a cycle, a missing name of the target, an invalid project, view or organization with a dot, an invalid owner id, a missing `--path` folder, a set beyond the limits (a document or a line over 2 MB included), a `key-values.json` that cannot be seeded (an item that breaks a rule, a level other than `Public` or `Standard`, an item without a value), `Standard` pairs without a Standard vault, a `project-settings.json` that breaks a rule, and sets with different project settings.
 2. Prints the plan (`Seeding the set 'large' into 'acme/billing/default' for the owner … (#…).`), and in a dry run that nothing is written.
 3. Checks the layout of the database and ensures the database and its containers, as the root command does (exit `3` for the earlier layout).
 4. Makes the target exist and seeds the sets in order. What only the database tells is checked here, before anything of the target is written (exit `2`): the name of an organization the seed creates, and a missing project in an organization whose Owner is not the owner (see [The owner and the creation of the target](#the-owner-and-the-creation-of-the-target)).
-5. Prints each set: its counts per kind, the line of `annotations.jsonl` with the ancestors the bulk writer created and the relation arrays it updated, the relation arrays it completed for the annotation files, the line of `key-values.json` (`key-values.json: 20 pairs (19 Public, 1 Standard): 20 created, 0 updated, 0 unchanged, 0 skipped, 0 failed`), the ignored files, the failures (at most 20, then `… and N more`; a pair as `key-values.json (smtp.host): ProtectionNotAllowed …`), the warnings by code, the other outcomes that are not `Created` or `Unchanged` by code, and the time. Then what the target got and the end:
+5. Prints each set: the line of its project settings (how many types they name, the time zone and the date format, with the outcome, and why settings are kept), its counts per kind, the line of `annotations.jsonl` with the ancestors the bulk writer created and the relation arrays it updated, the relation arrays it completed for the annotation files, the line of `key-values.json` (`key-values.json: 20 pairs (19 Public, 1 Standard): 20 created, 0 updated, 0 unchanged, 0 skipped, 0 failed`), the ignored files, the failures (at most 20, then `… and N more`; a pair as `key-values.json (smtp.host): ProtectionNotAllowed …`), the warnings by code, the other outcomes that are not `Created` or `Unchanged` by code, and the time. Then what the target got and the end:
 
 ```text
 Seeding the set 'large' into 'acme/billing/default' for the owner Aleš Kobr (#user_01…).
@@ -368,13 +410,31 @@ Created the organization 'acme' and the project 'acme.billing'.
 Done in 43.2 s: 1 set seeded, 0 sets seeded already.
 ```
 
+A set with project settings, into an existing project whose settings someone set already (only settings that were never set are written):
+
+```text
+# showcase  version 1, built-in
+  project settings: 7 types, time zone Europe/Oslo, date format dd.mm.yyyy: skipped DocumentExists
+    The project has other settings (version 2); a seed never overwrites them.
+  annotations: 242 created, 0 updated, 0 unchanged, 0 skipped, 0 failed, 0 with warnings
+  schemas: 2 created, 0 updated, 0 unchanged, 0 skipped, 0 failed, 0 with warnings
+  templates: 1 created, 0 updated, 0 unchanged, 0 skipped, 0 failed, 0 with warnings
+  configurations: 153 created, 0 updated, 0 unchanged, 0 skipped, 0 failed, 0 with warnings
+  Seeded and recorded in 24.6 s.
+
+The project 'fabrikam.invoicing-suite' exists: its access is used as it is.
+Done in 26.1 s: 1 set seeded, 0 sets seeded already.
+```
+
+A time zone or date format the file leaves out is shown with its default, such as `time zone UTC (default)`.
+
 ### sets
 
 ```
 2sInitDb sets [--path <folder>]…
 ```
 
-Lists the built-in sets and those of the `--path` folders: the name, the version and where it comes from (`built-in` or `--path`), the description, the default target (with a hint when the manifest names no organization or project), the dependencies (one that is not in the catalog is marked), the documents per kind with those that cannot be read and the ignored files, the lines, generators and annotations of `annotations.jsonl` with those that cannot be read, the pairs of `key-values.json` per level (`key-values.json: 20 pairs: 19 Public, 1 Standard (Standard pairs seed with a Standard vault only)`), and the folder. It reads the files only and never touches the database, so it lists `Standard` pairs without a vault. A set beyond the [limits](#a-set), or a `key-values.json` that a seed refuses, ends the listing as wrong input (exit `2`), as it ends a seed.
+Lists the built-in sets and those of the `--path` folders: the name, the version and where it comes from (`built-in` or `--path`), the description, the default target (with a hint when the manifest names no organization or project), the dependencies (one that is not in the catalog is marked), the project settings of `project-settings.json` (`Project settings: 7 types, time zone America/Phoenix, date format yyyy-mm-dd`), the documents per kind with those that cannot be read and the ignored files, the lines, generators and annotations of `annotations.jsonl` with those that cannot be read, the pairs of `key-values.json` per level (`key-values.json: 20 pairs: 19 Public, 1 Standard (Standard pairs seed with a Standard vault only)`), and the folder. It reads the files only and never touches the database, so it lists `Standard` pairs without a vault. A set beyond the [limits](#a-set), a `key-values.json` that a seed refuses, or a `project-settings.json` that breaks a rule, ends the listing as wrong input (exit `2`), as it ends a seed.
 
 ### Exit codes
 
@@ -383,9 +443,9 @@ Lists the built-in sets and those of the `--path` folders: the name, the version
 | `0` | Success, also for a set seeded already, and with warnings or skipped documents |
 | `-1` (`255` on Linux and macOS) | The command line cannot be parsed: an unknown command, option or argument, a missing value, a single value given twice |
 | `1` | The tool crashed, for example when the database cannot be reached or the bulk writer runs out of retries; the log file has the details |
-| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a `key-values.json` that cannot be seeded (it does not parse, more than 10,000 pairs, an item that breaks a rule of the import, a level `Hsm`, `Byok` or `Hyok`, an item without a value), `Standard` pairs without a Standard vault (unless `--public-pairs-only`), a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner, an existing project whose Administrator or Owner is not the owner, an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the ownership of the organization and the project are known only after the database and its containers are ensured |
+| `2` | Wrong input: an unknown set, an invalid manifest, an invalid `project-settings.json`, sets of one run with different project settings, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a `key-values.json` that cannot be seeded (it does not parse, more than 10,000 pairs, an item that breaks a rule of the import, a level `Hsm`, `Byok` or `Hyok`, an item without a value), `Standard` pairs without a Standard vault (unless `--public-pairs-only`), a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner, an existing project whose Administrator or Owner is not the owner, an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the ownership of the organization and the project are known only after the database and its containers are ensured |
 | `3` | The database has the containers of the earlier layout (one per organization); nothing was written |
-| `4` | A document, an annotation or a pair of a set failed (also in a dry run that would fail), or a set was not seeded because a set it depends on failed |
+| `4` | A document, an annotation, a pair or the project settings of a set failed (also in a dry run that would fail), or a set was not seeded because a set it depends on failed |
 | `40` | The seed was stopped (Ctrl+C, or the host shut down). The set that was running is not recorded, so a run again seeds what is missing |
 
 ## The built-in sets
@@ -394,8 +454,8 @@ Lists the built-in sets and those of the `--path` folders: the name, the version
 | --- | --- | --- |
 | `core` | `42dotnet` / `main` / `default` | The platform's own annotations: 11 annotation files and the configuration of `cnt.42.system` |
 | `large` | `acme` / `billing` / `default` | `annotations.jsonl` only: 49 lines, 32 of them generators, for 16,017 annotations |
-| `showcase` | `fabrikam` / `invoicing-suite` / `default` | The scope of the admin UI's showcase mock: about 240 annotations, 150 configurations, two descendant-type schemas, a template, and 10 pairs (8 `Public`, 2 `Standard`) |
-| `exhibit` | `fourth-wall` / `toons-and-tyrants` / `default` | The demo of Acme Corp and Globex: 30 annotations, 11 schemas, 3 templates gated per company with JSON-e, 30 configurations with every binding form, and 20 pairs (19 `Public`, 1 `Standard`); see its `README.md`. Also the content of a deployment's [exhibition](access.md#exhibition) |
+| `showcase` | `fabrikam` / `invoicing-suite` / `default` | The scope of the admin UI's showcase mock: about 240 annotations, 150 configurations, two descendant-type schemas, a template, 10 pairs (8 `Public`, 2 `Standard`) and the project settings |
+| `exhibit` | `fourth-wall` / `toons-and-tyrants` / `default` | The demo of Acme Corp and Globex: 30 annotations, 11 schemas, 3 templates gated per company with JSON-e, 30 configurations with every binding form, 20 pairs (19 `Public`, 1 `Standard`) and the project settings (the type names Company, Department, Solution, …); see its `README.md`. Also the content of a deployment's [exhibition](access.md#exhibition) |
 
 The data of the [playground](playground.md) is a set too, outside the catalog: `src/Platform/Storyteller/Playground/data` with the `set.json` of the set `playground`.
 
@@ -418,7 +478,7 @@ That is 6 + 11 + 500 × 32 = 16,017 annotations. Generators cannot draw, so the 
 
 The scope `fabrikam` / `invoicing-suite` / `default` of the admin UI's showcase mock (`npm run dev:mock`), the B2B SaaS of the documentation: the modules with their jobs, 22 customers with their environments, contracts, deployments and job runs, their configurations, a template and two descendant-type schemas. The Aspire resource `db-seed` seeds it.
 
-**The documents are generated; do not edit them.** `src/Platform/ui.admin/src/test/unit/mock/showcase-set.test.ts` builds the scope under a frozen clock and writes it as a Git export of the view would hold it: an annotation file per active annotation, and the current version of every document. It also writes `project-settings.json`, the project settings of the mock's `fabrikam` / `invoicing-suite` in the file shape: the marker `"Format": "2s.project-settings.v1"`, then the settings as the API stores them in PascalCase (the names, colors and icons of the seven types in the catalog's order, `DefaultTimeZone` `Europe/Oslo`, `DateFormat` `dd.mm.yyyy`). The seed does not apply that file yet: it counts as an ignored file until DbCreator applies the project settings of a data set. Each file is a file snapshot (`toMatchFileSnapshot`), so `npm test` fails when the mock and the set part, and a last test fails on the files the scope no longer gives. Change the mock instead, and regenerate the set:
+**The documents are generated; do not edit them.** `src/Platform/ui.admin/src/test/unit/mock/showcase-set.test.ts` builds the scope under a frozen clock and writes it as a Git export of the view would hold it: an annotation file per active annotation, and the current version of every document. It also writes `project-settings.json`, the project settings of the mock's `fabrikam` / `invoicing-suite` in the file shape: the marker `"Format": "2s.project-settings.v1"`, then the settings as the API stores them in PascalCase (the names, colors and icons of the seven types in the catalog's order, `DefaultTimeZone` `Europe/Oslo`, `DateFormat` `dd.mm.yyyy`), which the seed gives the project when its settings were never set. Each file is a file snapshot (`toMatchFileSnapshot`), so `npm test` fails when the mock and the set part, and a last test fails on the files the scope no longer gives. Change the mock instead, and regenerate the set:
 
 ```sh
 cd src/Platform/ui.admin/src
@@ -433,16 +493,9 @@ What the mock has and the set does not: the stamps of its personas, the version 
 
 ### exhibit
 
-The demo of the platform ([its spec](specs/2026-11-13%20Demo%20Data%20Set%20of%20Acme%20Corp%20and%20Globex.md)): Fourth Wall Software and its customers Acme Corp and Globex in `fourth-wall` / `toons-and-tyrants` / `default`, written by hand. Its configurations bind its pairs in every form (`@key`, `@public(…)`, `@(…, public)`, `@secret(…)`, interpolations `@[…]`), so a resolved read answers `422` without them; its `key-values.json` holds 18 public pairs, a secret reference and one `Standard` pair with a demo value, so it seeds with a Standard vault only. `README.md` and `project-settings.json` (the type names for the admin UI, which neither a seed nor an import stores) are ignored files.
+The demo of the platform ([its spec](specs/2026-11-13%20Demo%20Data%20Set%20of%20Acme%20Corp%20and%20Globex.md)): Fourth Wall Software and its customers Acme Corp and Globex in `fourth-wall` / `toons-and-tyrants` / `default`, written by hand. Its configurations bind its pairs in every form (`@key`, `@public(…)`, `@(…, public)`, `@secret(…)`, interpolations `@[…]`), so a resolved read answers `422` without them; its `key-values.json` holds 18 public pairs, a secret reference and one `Standard` pair with a demo value, so it seeds with a Standard vault only. `README.md` is an ignored file.
 
-### exhibit
-
-The demo of the platform: Fourth Wall Software delivers CRM, HR, CAD and Social solutions to its customers Acme Corp and Globex. The set holds 30 annotation files, 30 configurations that use every binding form, 11 schemas (type, annotation and descendant type) and 3 templates, gated per company with JSON-e. Its manifest targets `fourth-wall` / `toons-and-tyrants` / `default`. The model is in [the spec](specs/2026-11-13%20Demo%20Data%20Set%20of%20Acme%20Corp%20and%20Globex.md), and the commands are in the set's [README](../../../src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/README.md).
-
-Two files of the folder are not seeded. A seed counts them, and the `README.md`, as ignored files:
-
-- `key-values.json`: 20 key/value pairs, 19 public ones and one `Standard` pair with a demo value. A set cannot carry key/value pairs until 424-265 is done, so import them with `sform story kv import`. Many configurations interpolate them, and a resolved read of such a configuration answers `422` without them.
-- `project-settings.json`: the type names of the project (Company, Department, Solution, Application, AppUsage, Job, JobInstance) for the admin UI. Neither a seed nor an import stores them: until 424-266 is done, the admin UI keeps the settings of a project in the browser, where each user sets them.
+- `project-settings.json`, in the file shape: the names, plurals, colors and icons of the seven types (`sbt` Company, `cnt` Department, `rst` Solution, `usg` Application, `exe` AppUsage, `unt` Job, `uxe` JobInstance), the time zone `America/Phoenix` and the date format `yyyy-mm-dd`, which the seed gives the project when its settings were never set.
 
 **As the exhibition.** The set is also the content of a deployment's [exhibition](access.md#exhibition), the demo project that any user may join as a Reader. Seed it into the organization and the project that the `Exhibition` settings of the API name, with the account of `Exhibition:Owner` as the owner. In production the names are `exhibition` / `exhibition` ([decisions](../Deployment/decisions.md#the-exhibition)):
 
@@ -454,7 +507,6 @@ Two files of the folder are not seeded. A seed counts them, and the `README.md`,
 - `--owner` becomes the Owner of the organization and the project that the seed creates. The API offers the exhibition only while that account is the Owner of the project and no other account is its Administrator or Owner.
 - Seed before the settings are set, then import the key/value pairs, and set the settings last: [Turning the exhibition on](../Deployment/runbook-azure-production.md#turning-the-exhibition-on) has the steps of production, and [The exhibition](../development.md#the-exhibition) those of a local API.
 - Every visitor reads the versions of the documents with the name of whoever wrote them. The seed writes as `System`; a change by hand, the import of the key/value pairs included, carries the name of its author.
-- A visitor sees the default type names, because `project-settings.json` reaches no browser but the one where somebody sets them.
 
 ### The playground
 
@@ -465,10 +517,10 @@ Two files of the folder are not seeded. A seed counts them, and the `README.md`,
 A built-in set:
 
 1. Create `src/Platform/Storyteller/DbCreator/src/data-sets/<name>/` with a `set.json`: the name, a version, a description, the default target and a `ProjectDescription`. The project file copies every file of `data-sets/` to the output and into the tool package; it needs no change.
-2. Add the documents with the names of an export, or `annotations.jsonl`, and the pairs in `key-values.json`. An unpacked export of a view (`sform story export -x`) and an export of its values store with the secret values (`sform story kv export --include-secrets -o key-values.json`) are a good start; replace every real secret by a demo value or a reference (see [key-values.json](#key-valuesjson)).
+2. Add the documents with the names of an export, or `annotations.jsonl`, and the pairs in `key-values.json`. An unpacked export of a view (`sform story export -x`) and an export of its values store with the secret values (`sform story kv export --include-secrets -o key-values.json`) are a good start; replace every real secret by a demo value or a reference (see [key-values.json](#key-valuesjson)). `sform project settings -e project-settings.json` exports the settings of its project into the set.
 3. Pick a target of its own: not `42dotnet`, which every run of `2sInitDb` seeds, and not the organizations of the automation tests (`ui-tests`, `cli-tests`).
 4. Check it with `2sInitDb sets` and `2sInitDb seed <name> --dry-run`, which exits `4` when a document would fail.
-5. The unit tests read every built-in set (`BuiltInSetsTests.EveryBuiltInSet_ReadsWithoutFailures`) and parse every binding of every set of the repository (`EverySetOfTheRepository_HasBindingsThatParse`) without a change. Add a test of its shape to `BuiltInSetsTests` of `DbCreator/test`, and a seed into an organization of its own to `BuiltInSetsTests` of `DbCreator/testint`.
+5. The unit tests read every built-in set (`BuiltInSetsTests.EveryBuiltInSet_ReadsWithoutFailures`, its project settings included, and `ProjectSettings_AreInTheFileShape` for the sets that have them) and parse every binding of every set of the repository (`EverySetOfTheRepository_HasBindingsThatParse`) without a change. Add a test of its shape to `BuiltInSetsTests` of `DbCreator/test`, and a seed into an organization of its own to `BuiltInSetsTests` of `DbCreator/testint`.
 
 A set elsewhere is any folder with a `set.json`, seeded with `--path`.
 
@@ -504,8 +556,8 @@ Copy the vault's URI as the dashboard shows it, with `localhost`: Lowkey Vault p
 
 | Project | What it checks |
 | --- | --- |
-| `DbCreator/test` (`42.Platform.Storyteller.DbCreator.UnitTests`) | The manifest, `annotations.jsonl` and its generators, the files, the hash, the catalog, the target, the owner, the provisioning, `key-values.json` and its refusals, the seeder over fakes of the importer, the bulk writer, the key/value service and the record store (the step of the pairs: its place, decisions, chunks, re-plans and failures, and the refusal of `Standard` pairs without a vault), the command line and the commands, and every set of the repository (their shape, their pairs, that they read without failures, and that their bindings parse). No database |
-| `DbCreator/testint` (`42.Platform.Storyteller.DbCreator.IntegrationTests`) | Seeds against a Cosmos DB emulator through the tool's own registrations: a first seed with the target, the owner's access, the view and the documents; a second run that writes nothing; a partly seeded target and a run that stopped halfway (also between the creates of files and their relation arrays), completed without overwriting; a changed set; a dry run; the refusal of another owner's organization; 10,000 generated annotations in bulk with their relation arrays and audit entries; the pairs (`KeyValueSeedTests`): `Public` pairs without a vault and `Standard` pairs with Lowkey Vault (refused up front without it), existing and deleted pairs skipped, a changed set, a dry run, the refused levels, a project policy without `Standard`, and a resolved read that binds seeded pairs; and the sets `core`, `large`, `showcase` (with the vault), `exhibit` (with the vault, and resolved reads of its bindings) and the playground |
+| `DbCreator/test` (`42.Platform.Storyteller.DbCreator.UnitTests`) | The manifest, `annotations.jsonl` and its generators, the files, the hash, the catalog, `project-settings.json` (its rules and refusals, and sets that disagree), the target, the owner, the provisioning, `key-values.json` and its refusals, the seeder over fakes of the importer, the bulk writer, the key/value service, the project settings and the record store (settings created, unchanged, kept, decided again after a concurrent write, failed, and in a dry run; the step of the pairs: its place, decisions, chunks, re-plans and failures, and the refusal of `Standard` pairs without a vault), the command line and the commands, and every set of the repository (their shape, their pairs, that they read without failures, that their settings files are in the file shape, and that their bindings parse). No database |
+| `DbCreator/testint` (`42.Platform.Storyteller.DbCreator.IntegrationTests`) | Seeds against a Cosmos DB emulator through the tool's own registrations: a first seed with the target, the owner's access, the view and the documents; a second run that writes nothing; a partly seeded target and a run that stopped halfway (also between the creates of files and their relation arrays), completed without overwriting; a changed set; a dry run; the refusal of another owner's organization; the project settings (`ProjectSettingsSeedTests`: created with their audit event, unchanged on a run with `--again` with the access point's ETag unchanged, kept when different, a dry run, and wrong input); 10,000 generated annotations in bulk with their relation arrays and audit entries; the pairs (`KeyValueSeedTests`): `Public` pairs without a vault and `Standard` pairs with Lowkey Vault (refused up front without it), existing and deleted pairs skipped, a changed set, a dry run, the refused levels, a project policy without `Standard`, and a resolved read that binds seeded pairs; and the sets `core`, `large`, `showcase` (with the vault and its project settings), `exhibit` (with the vault, and resolved reads of its bindings, and its project settings) and the playground |
 | `Backend.CosmosDb/test` | The bulk writer (`CosmosAnnotationBulkWriterTests`: equal to an import of the same annotations, retries, throttles, cancellation, thousands of keys, the completion of relation arrays after an interrupted import), and `core` through `OrganizationsContainerStructureTests` |
 | `Backend.Core/test` | The importer (`ViewImporterTests`), the tally and the reader of loose files |
 

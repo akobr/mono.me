@@ -10,9 +10,9 @@ Fourth Wall Software builds CRM, HR, CAD and Social solutions for two customers:
 | `templates/` | 3 templates, gated per Company with JSON-e |
 | `configurations/` | 30 configurations |
 | `key-values.json` | 20 pairs: 18 public pairs, a secret reference (public too) and one `Standard` pair (a demo value, not a secret) |
-| `project-settings.json` | the type names (Company, Department, Solution, Application, AppUsage, Job, JobInstance) for the admin UI |
+| `project-settings.json` | the project settings in the file shape of `sform project settings -e`: the names, plurals, colors and icons of the seven types (Company, Department, Solution, Application, AppUsage, Job, JobInstance), the time zone `America/Phoenix` and the date format `yyyy-mm-dd` |
 
-A seed counts `README.md` and `project-settings.json` as ignored files. They are part of the set's hash, so changing them makes the next seed read the set again; that writes nothing, because a seed never overwrites.
+The seed gives the project these settings when its settings were never set, and keeps settings that someone set (`Skipped` with `DocumentExists`); a seed never overwrites. It counts `README.md` and `key-values.json` as ignored files. Every file is part of the set's hash, so changing one makes the next seed read the set again.
 
 ## Seed
 
@@ -41,7 +41,11 @@ sform story import src/Platform/Storyteller/DbCreator/src/data-sets/exhibit --dr
 sform story import src/Platform/Storyteller/DbCreator/src/data-sets/exhibit
 ```
 
-Then set the type names in the admin UI (Project settings → Type names) from `project-settings.json`; neither the seed nor the import stores them.
+Then store the project settings, which the import does not (an Administrator of the project):
+
+```sh
+sform project settings set -i src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/project-settings.json --replace
+```
 
 ## Things to try
 
