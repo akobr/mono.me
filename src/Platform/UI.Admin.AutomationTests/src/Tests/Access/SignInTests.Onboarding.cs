@@ -68,9 +68,10 @@ public sealed partial class SignInTests
     }
 
     // ACC-SGN-07: The first onboarding step states the EU hosting and lists the sub-processors.
-    // The first step says in its heading and in bold that customer data stays in the EU, and under it what WorkOS is
-    // used for, without the sentence about the three safeguards that are not live yet. Its list names the four
-    // sub-processors, each with its region and purpose, and its only link opens the details of the hosting in a new tab.
+    // The first step says in its heading and in bold that customer data and AI data processing stay in the EU. Its list
+    // names the four sub-processors, each with its region and purpose; the purpose of WorkOS says what it receives,
+    // without the sentence about the three safeguards that are not live yet. Its only link opens the details of the
+    // hosting in a new tab.
     [Test]
     [TestCase(492)]
     [MockOnly("the new-user scenario, a signed-in user without an account")]
@@ -91,7 +92,7 @@ public sealed partial class SignInTests
             ("Microsoft Azure", "EU only", "Hosting, database, storage, secrets"),
             ("Sentry", "EU only", "Error reporting"),
             ("PostHog", "EU only", "Product analytics"),
-            ("WorkOS", "USA", "Sign-in of the administrators of the 2S Admin UI and their invitation emails (name, email, IP address, session data)"),
+            ("WorkOS", "USA", OnboardingPage.HostingStatementText),
         };
         await Expect(onboarding.SubProcessors).ToHaveCountAsync(subProcessors.Length);
         for (var index = 0; index < subProcessors.Length; index++)

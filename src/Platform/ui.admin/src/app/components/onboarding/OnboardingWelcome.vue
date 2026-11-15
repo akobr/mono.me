@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { hostingLink, hostingStatement, onboardingTexts as texts, subProcessors } from '@/utils/onboarding'
+import { hostingLink, onboardingTexts as texts, subProcessors } from '@/utils/onboarding'
 
 // Step 1 of onboarding (424-267): where customer data lives, and who else processes what. The heading is the main
 // message, so it sits in a callout. The copy never says that WorkOS cannot gain access: whoever controls the identity
 // provider can sign in as a user.
-const statement = hostingStatement().join(' ')
 </script>
 
 <template>
@@ -13,11 +12,9 @@ const statement = hostingStatement().join(' ')
       <UIcon name="i-lucide-shield-check" class="mt-0.5 size-6 shrink-0 text-primary" />
       <div class="space-y-1">
         <h2 tabindex="-1" class="text-lg font-semibold text-primary outline-none">{{ texts.welcome.heading }}</h2>
-        <p class="text-sm font-semibold text-highlighted">{{ texts.welcome.lead }}</p>
+        <p class="text-sm font-semibold text-highlighted">{{ texts.welcome.lead }} {{ texts.welcome.ai }}</p>
       </div>
     </div>
-
-    <p class="text-sm">{{ statement }}</p>
 
     <div class="space-y-2">
       <h3 class="text-sm font-semibold text-highlighted">{{ texts.welcome.subProcessors }}</h3>

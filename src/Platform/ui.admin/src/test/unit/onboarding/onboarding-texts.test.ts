@@ -18,10 +18,11 @@ import {
 
 describe('the hosting statement', () => {
   const workos = [
-    'WorkOS (USA) is used only to sign in administrators of the 2S Admin UI and to send their invitation emails.',
+    'Signs in the operators of the 2S Platform and sends their invitation emails.',
     'It processes only their name, email, IP address and session data, and the email address of a person they invite.',
   ]
-  const identityProvider = 'Customers that need an EU-only identity provider can use Entra ID or Keycloak.'
+  const identityProvider =
+    'Customers that need an EU-only identity provider can use their own SSO provider or host the platform themselves.'
 
   it('does not claim the safeguards before they are live', () => {
     expect(hostingStatement(false)).toEqual([
@@ -51,6 +52,7 @@ describe('the hosting statement', () => {
     expect(onboardingTexts.welcome.lead).toBe(
       'All customer data, configuration and secrets are stored and processed only in the EU (Sweden).',
     )
+    expect(onboardingTexts.welcome.ai).toBe('The same applies to all AI data processing within the platform.')
   })
 })
 
@@ -62,8 +64,7 @@ describe('the sub-processors', () => {
       { name: 'PostHog', purpose: 'Product analytics', region: 'EU only' },
       {
         name: 'WorkOS',
-        purpose:
-          'Sign-in of the administrators of the 2S Admin UI and their invitation emails (name, email, IP address, session data)',
+        purpose: hostingStatement(false).join(' '),
         region: 'USA',
       },
     ])

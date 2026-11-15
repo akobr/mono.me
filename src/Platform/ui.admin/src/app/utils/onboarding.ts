@@ -31,10 +31,10 @@ export const welcomeLine = (name?: string) => (name ? `Welcome, ${name}` : 'Welc
  */
 export const safeguardsLive: boolean = false
 
-/** The sentences of the hosting statement under its bold first sentence, with or without the three safeguards. */
+/** What WorkOS does, the purpose of its entry in the sub-processors, with or without the three safeguards. */
 export function hostingStatement(live: boolean = safeguardsLive): string[] {
   return [
-    'WorkOS (USA) is used only to sign in administrators of the 2S Admin UI and to send their invitation emails.',
+    'Signs in the operators of the 2S Platform and sends their invitation emails.',
     'It processes only their name, email, IP address and session data, and the email address of a person they invite.',
     ...(live
       ? [
@@ -42,7 +42,7 @@ export function hostingStatement(live: boolean = safeguardsLive): string[] {
           'Impersonation is blocked, access to secrets requires a recent sign-in, and every access change is in an append-only audit log.',
         ]
       : ['Every authorization decision is made by 2S in the EU.']),
-    'Customers that need an EU-only identity provider can use Entra ID or Keycloak.',
+    'Customers that need an EU-only identity provider can use their own SSO provider or host the platform themselves.',
   ]
 }
 
@@ -58,12 +58,7 @@ export const subProcessors: readonly SubProcessor[] = [
   { name: 'Microsoft Azure', purpose: 'Hosting, database, storage, secrets', region: 'EU only' },
   { name: 'Sentry', purpose: 'Error reporting', region: 'EU only' },
   { name: 'PostHog', purpose: 'Product analytics', region: 'EU only' },
-  {
-    name: 'WorkOS',
-    purpose:
-      'Sign-in of the administrators of the 2S Admin UI and their invitation emails (name, email, IP address, session data)',
-    region: 'USA',
-  },
+  { name: 'WorkOS', purpose: hostingStatement().join(' '), region: 'USA' },
 ]
 
 export interface OnboardingLink {
@@ -98,6 +93,7 @@ export const onboardingTexts = {
   welcome: {
     heading: 'Customer data stays in the EU',
     lead: 'All customer data, configuration and secrets are stored and processed only in the EU (Sweden).',
+    ai: 'The same applies to all AI data processing within the platform.',
     subProcessors: 'Sub-processors',
   },
   security: {
