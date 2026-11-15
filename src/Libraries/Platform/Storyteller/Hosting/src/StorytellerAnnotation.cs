@@ -41,6 +41,7 @@ public class StorytellerAnnotation
         IsDisabled = source.IsDisabled;
         ValidFrom = source.ValidFrom;
         ExpiresAt = source.ExpiresAt;
+        TimeZone = source.TimeZone;
         DeletedAt = source.DeletedAt;
         _labels = source._labels;
         _values = source._values;
@@ -84,6 +85,11 @@ public class StorytellerAnnotation
     public DateTimeOffset? ValidFrom { get; init; }
 
     public DateTimeOffset? ExpiresAt { get; init; }
+
+    // The zone in which the validity window, or a unit's schedule, is meant, as stored: an IANA or a Windows id, neither
+    // checked nor converted. null when the annotation sets none. The status does not use it: ValidFrom and ExpiresAt
+    // are instants.
+    public string? TimeZone { get; init; }
 
     // The SDK's AuditStamp; a copy of what an initializer sets, and a copy per access.
     public AuditStamp? Created

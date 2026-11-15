@@ -26,6 +26,7 @@ public sealed class SnapshotTests : IDisposable
             json["IsDisabled"] = true;
             json["ValidFrom"] = "2026-10-01T00:00:00+02:00";
             json["ExpiresAt"] = "2027-10-01T00:00:00+02:00";
+            json["TimeZone"] = "Europe/Prague";
             json["Created"] = Stamp("2026-09-01T08:00:00Z", "user_0");
             json["Modified"] = Stamp("2026-10-19T08:30:00Z", "user_1");
         });
@@ -48,6 +49,7 @@ public sealed class SnapshotTests : IDisposable
         execution.IsDisabled.ShouldBeTrue();
         execution.ValidFrom.ShouldBe(DateTimeOffset.Parse("2026-10-01T00:00:00+02:00"));
         execution.ExpiresAt.ShouldBe(DateTimeOffset.Parse("2027-10-01T00:00:00+02:00"));
+        execution.TimeZone.ShouldBe("Europe/Prague");
         execution.Created.ShouldNotBeNull().By.Id.ShouldBe("user_0");
         execution.Modified.ShouldNotBeNull().At.ShouldBe(new DateTimeOffset(2026, 10, 19, 8, 30, 0, TimeSpan.Zero));
         execution.DeletedAt.ShouldBeNull();
@@ -66,7 +68,36 @@ public sealed class SnapshotTests : IDisposable
         execution.Created.ShouldBeNull();
         execution.Modified.ShouldBeNull();
         execution.Title.ShouldBeNull();
+        execution.TimeZone.ShouldBeNull();
         execution.IsDisabled.ShouldBeFalse();
+    }
+
+    // The platform stores the zone as text, without checking it: an IANA id, a Windows id, or anything else.
+    [Theory]
+    [InlineData("Europe/Prague")]
+    [InlineData("Central Europe Standard Time")]
+    [InlineData(" Europe/Prague ")]
+    [InlineData("no such zone")]
+    public async Task ATimeZone_IsKeptAsStored(string stored)
+    {
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, json => json["TimeZone"] = stored);
+
+        var execution = (await Catalog().GetExecutionAsync(HostingFixture.ExecutionKey)).ShouldNotBeNull();
+
+        execution.TimeZone.ShouldBe(stored);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t\r\n")]
+    public async Task ABlankTimeZone_IsNone(string stored)
+    {
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, json => json["TimeZone"] = stored);
+
+        var execution = (await Catalog().GetExecutionAsync(HostingFixture.ExecutionKey)).ShouldNotBeNull();
+
+        execution.TimeZone.ShouldBeNull();
     }
 
     [Fact]
@@ -172,6 +203,29 @@ public sealed class SnapshotTests : IDisposable
         annotation.GetStatus(DateTimeOffset.Parse("2026-10-27T08:00:00Z")).ShouldBe(AnnotationStatus.Disabled);
     }
 
+    // ValidFrom and ExpiresAt are instants: the zone says how to show and enter them, and moves neither.
+    [Fact]
+    public void TheTimeZone_ChangesNeitherTheStatusNorToString()
+    {
+        var annotation = new StorytellerAnnotation
+        {
+            Key = $"{HostingFixture.Scope}.usg.northwind.invoicing",
+            AnnotationKey = "usg.northwind.invoicing",
+            Type = AnnotationType.Usage,
+            Name = "invoicing",
+            ValidFrom = DateTimeOffset.Parse("2026-10-27T08:00:00Z"),
+            ExpiresAt = DateTimeOffset.Parse("2026-10-28T08:00:00Z"),
+            TimeZone = "Pacific/Kiritimati",
+        };
+
+        annotation.TimeZone.ShouldBe("Pacific/Kiritimati");
+        annotation.GetStatus(DateTimeOffset.Parse("2026-10-27T07:59:59Z")).ShouldBe(AnnotationStatus.Scheduled);
+        annotation.GetStatus(DateTimeOffset.Parse("2026-10-27T08:00:00Z")).ShouldBe(AnnotationStatus.Active);
+        annotation.GetStatus(DateTimeOffset.Parse("2026-10-28T07:59:59Z")).ShouldBe(AnnotationStatus.Active);
+        annotation.GetStatus(DateTimeOffset.Parse("2026-10-28T08:00:00Z")).ShouldBe(AnnotationStatus.Expired);
+        annotation.ToString().ShouldBe($"{HostingFixture.Scope}.usg.northwind.invoicing (Usage)");
+    }
+
     // Applications build snapshots for test doubles of the catalog and of who am I; the test project sees the internals,
     // so the accessors are checked by reflection.
     [Theory]
@@ -179,6 +233,7 @@ public sealed class SnapshotTests : IDisposable
     [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.Values))]
     [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.Created))]
     [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.Modified))]
+    [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.TimeZone))]
     [InlineData(typeof(StorytellerAnnotation), nameof(StorytellerAnnotation.DeletedAt))]
     [InlineData(typeof(StorytellerExecution), nameof(StorytellerExecution.UnitNames))]
     [InlineData(typeof(StorytellerExecutionContext), nameof(StorytellerExecutionContext.Ancestors))]

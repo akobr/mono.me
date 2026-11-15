@@ -13,14 +13,31 @@ namespace _42.Platform.Storyteller.Sdk.Hosting;
 // afterwards.
 public sealed class StorytellerExecutionContext
 {
+    // The chain order of the ancestors: the nearer one first; at the same level the place before the capability
+    // (context, then usage, then unit), and the subject before the responsibility.
+    private static readonly AnnotationType[] ChainOrder =
+    [
+        AnnotationType.UnitOfExecution,
+        AnnotationType.Execution,
+        AnnotationType.Context,
+        AnnotationType.Usage,
+        AnnotationType.Unit,
+        AnnotationType.Subject,
+        AnnotationType.Responsibility,
+    ];
+
     private readonly IReadOnlyDictionary<AnnotationType, StorytellerAnnotation> _ancestors = ReadOnlyDictionary<AnnotationType, StorytellerAnnotation>.Empty;
     private readonly IReadOnlyList<string> _unreadable = [];
+
+    // Built at the first access, once an initializer has set Annotation and Ancestors.
+    private IReadOnlyList<StorytellerAnnotation>? _chain;
 
     public StorytellerExecutionContext()
     {
     }
 
-    // A copy that differs only in what its initializer sets.
+    // A copy that differs only in what its initializer sets. The chain is not copied: the copy builds the one of its
+    // own annotation.
     [SetsRequiredMembers]
     private StorytellerExecutionContext(StorytellerExecutionContext source)
     {
@@ -68,6 +85,25 @@ public sealed class StorytellerExecutionContext
     // The key's own for an exe key, its parent for a uxe key.
     public StorytellerExecution? Execution => Find(AnnotationType.Execution) as StorytellerExecution;
 
+    // The key's annotation and its ancestors that were read, nearest first: the key's own, then the unit of execution,
+    // the execution, the context, the usage, the unit, the subject and the responsibility. It comes from Annotation and
+    // Ancestors, so a test double has it too, and an ancestor that is unreadable or missing is not in it. Never null,
+    // read-only.
+    public IReadOnlyList<StorytellerAnnotation> Chain
+    {
+        get
+        {
+            if (_chain is { } chain)
+            {
+                return chain;
+            }
+
+            // Calls at once build equal chains; the first one stays, for every caller.
+            var built = BuildChain();
+            return Interlocked.CompareExchange(ref _chain, built, null) ?? built;
+        }
+    }
+
     // The annotation of the type of TAnnotation, the key's own or an ancestor, such as Find<StorytellerUnit>() for the
     // unit of a uxe key: null when it was not read, or when it is not a TAnnotation (a test double's base snapshot).
     // StorytellerAnnotation itself names no type and throws ArgumentException.
@@ -75,6 +111,24 @@ public sealed class StorytellerExecutionContext
         where TAnnotation : StorytellerAnnotation
     {
         return Find(SnapshotTypes.Require<TAnnotation>(nameof(TAnnotation))) as TAnnotation;
+    }
+
+    // The time zone that applies to the key: the first TimeZone that is set along Chain, as stored, so the nearest
+    // annotation that sets one wins; null when none is set or read. It reads nothing: an ancestor in Unreadable is
+    // skipped, so a restricted machine may get another answer than an unrestricted one. The fallback is the caller's,
+    // such as ?? "UTC", as the project's default time zone is not in the API. Not the rule of the configuration, whose
+    // scalars take the subject after the usage, and the responsibility after the unit.
+    public string? GetEffectiveTimeZone()
+    {
+        foreach (var annotation in Chain)
+        {
+            if (!string.IsNullOrWhiteSpace(annotation.TimeZone))
+            {
+                return annotation.TimeZone;
+            }
+        }
+
+        return null;
     }
 
     // Is it active: Deleted when the key's annotation or its execution is deleted; else the first status that is not
@@ -140,6 +194,23 @@ public sealed class StorytellerExecutionContext
         return Annotation.Type == type
             ? Annotation
             : Ancestors.GetValueOrDefault(type);
+    }
+
+    // The key's annotation, then the ancestors in the chain order. An ancestor of the key's own type, which only a test
+    // double can put there, is left out, as Find leaves it out.
+    private IReadOnlyList<StorytellerAnnotation> BuildChain()
+    {
+        var chain = new List<StorytellerAnnotation>(_ancestors.Count + 1) { Annotation };
+
+        foreach (var type in ChainOrder)
+        {
+            if (type != Annotation.Type && _ancestors.GetValueOrDefault(type) is { } ancestor)
+            {
+                chain.Add(ancestor);
+            }
+        }
+
+        return chain.AsReadOnly();
     }
 
     private bool IsUnreadable(AnnotationType type)
