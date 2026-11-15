@@ -2,7 +2,7 @@
 
 The Storyteller API (`Api.Functions`) reports its errors to Sentry, next to Application Insights. Application Insights keeps every log entry and request as before; Sentry gets the errors, grouped by route and release, with alerts. Production reports to the Sentry project `2s-api` (EU, `de.sentry.io`); the admin UI reports to `2s-admin-ui` in the same organization.
 
-`sform` reports its failures to its own Sentry project, with stricter rules of its own: the command and the names of the options, the type and the stack of the failure, and the first line of its message without any value the user gave or customer data; no log entry reaches Sentry (`src/Platform/Cli/src/ErrorReporting/`, [Error reports of sform](../../42for.net/cli/sform.md#error-reports)).
+`sform` reports its failures to its own Sentry project, with stricter rules of its own: the command and the names of the options, the type and the stack of the failure, and the first line of its message without the values the user gave, the names of its configured target and credential, quoted text, paths, addresses, e-mail addresses, ids and secrets; no log entry reaches Sentry (`src/Platform/Cli/src/ErrorReporting/`, [Error reports of sform](../../42for.net/cli/sform.md#error-reports)).
 
 The code is in `src/Platform/Storyteller/Api.Functions/src/ErrorReporting/`; the design and its decisions are in the spec [Report the API Errors to Sentry](specs/2026-11-12%20Report%20the%20API%20Errors%20to%20Sentry.md).
 

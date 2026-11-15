@@ -459,7 +459,7 @@ Every command ends with one of these codes. A refusal or a failure of the API is
 | `sform.settings.json` (the editor and the default project, see [Settings](#settings)), the session (`authkit.cache`, or `msal.cache` for Entra ID) and `telemetry.json` | your `.42for.net` folder: `%LOCALAPPDATA%\.42for.net` on Windows, `~/.42for.net` elsewhere |
 | `auth.discovery.json` (the sign-in settings of the server), `logs/`, and the `access.default.json` and `editor.config.json` of earlier versions, which are still read | next to `sform` itself, the folder of the tool |
 
-The log in `logs/` (`cli<date>.log`, one file a day) is for you and the support: it names the command and the options of every failure, the project and the view a command was given with `-p` and `-v`, and the failure with its stack. It never keeps the values of the other arguments and options, and no secret: those become `***`, in the messages of a failure too.
+The log in `logs/` (`cli<date>.log`, one file a day) is for you and the support. It keeps the address of every request `sform` sends, with the names of the organization, project, view and key in its path (.NET hides the query), and a line for every failure `sform` reports (see [Error reports](#error-reports)): what happened, the command and the names of its options, the project and the view given with `-p` and `-v`, and the failure with its stack. The values of the other arguments and options, the secrets of the `STORYTELLER_*` variables, and whatever has the shape of a token, a key or a password never go into those lines: a value becomes `***`, a secret found by its shape `[Filtered]`. A failure a command handles itself, such as a key it refuses before any call, prints its message and leaves no line.
 
 `SFORM_HOME` moves every one of them into one folder, so that two sessions, two default projects or two users can live side by side, each in its own folder. It must be an absolute path: a relative one, or a path to a file, stops every command with exit code `2` before anything is read or written. A folder that does not exist yet is created by the first command that writes to it. `app.config.json` stays next to `sform`.
 
@@ -478,7 +478,7 @@ The session is encrypted for your user: with DPAPI on Windows, in the Keychain o
 | `SFORM_BROWSER`, then `BROWSER` | The program `sform account --browser` opens the sign-in page with, see [Sign in](#sign-in) |
 | `SFORM_<section>__<key>` | A setting of `app.config.json` for this run, e.g. `SFORM_general__baseUrl` for the address of the API; it wins over the files. Because it decides where your sign-in goes, every command says on standard error when the API address (`general.baseUrl`) or a sign-in setting (`authentication.*`) comes from the environment |
 | `COLUMNS` | The width of the output when `sform` has no console at all |
-| `DO_NOT_TRACK`, `SFORM_TELEMETRY_OPTOUT` | Turn telemetry off, see [Telemetry](#telemetry) |
+| `DO_NOT_TRACK`, `SFORM_TELEMETRY_OPTOUT` | Turn telemetry and the error reports off, see [Telemetry](#telemetry) |
 
 ``` bash
 # One run against the local API
@@ -522,17 +522,18 @@ In a pipeline, set the variable in the `env` of the job like the sign-in variabl
 
 ### Error reports
 
-When a command fails, `sform` reports the failure to Sentry in the EU cloud: a crash, a failed sign-in, a call the API refused or failed, a service it could not reach, or a command line it could not parse. A report says how the tool was used, never what you typed.
+`sform` reports these failures to Sentry in the EU cloud, once, when the command has failed: a crash (exit code `1`), a failed sign-in, a refusal or failure of the API that the command does not handle itself, a service it could not reach, and a command line it could not parse. A failure a command handles itself, such as a key it refuses before any call, is not reported. A report says how the tool was used, never what you typed.
 
 | Sent | Example |
 |---|---|
-| What happened, the command by its full name, and the names of the options you gave | `Unhandled exception at sform storyteller kv set --secret --projectKey` |
-| The type of the failure and where in `sform` it happened, the stack | `System.IO.FileNotFoundException` |
-| The first line of the message of the failure, without values: what you typed, the names of organizations, projects and views `sform` targets, quoted text, file paths, the path and query of addresses, e-mail addresses, ids and secrets become `***` | `Could not find file '***'.` |
-| The version of `sform`, release or development build, the operating system, the .NET version, the time zone and the culture | `42.Platform.Cli@0.8.85-alpha+0cab16204f`, `production` |
+| What happened, with the HTTP status of a refused or failed call, the command by its full name, and the names of the options you gave | `Unhandled exception at sform storyteller kv set --secret --projectKey` |
+| For a crash, a failed sign-in or a service it could not reach: the type of the failure and of each failure inside it, where in `sform` they happened (the stack), and the first line of each message, at most 300 characters, without values | `System.IO.FileNotFoundException`, `Could not find file '***'.` |
+| The version of `sform`, release or development build, the operating system, the .NET version, the time zone, the culture, the memory and thread-pool figures of the process, and the loaded assemblies with their versions | `42.Platform.Cli@0.8.85-alpha+0cab16204f`, `production` |
 | The installation id of the usage data, when telemetry is on | `3f1c2a9e5b7d4c119e0a2d4f6b8c1a07` |
 
-Never sent: arguments, option values, the token of an unknown command or option, the rest of a message, the server's answer, your name or e-mail, the name of the machine and the paths of your profile. A report is sent once, when the command has failed; `sform` keeps nothing for Sentry, in `SFORM_HOME` or anywhere else. `DO_NOT_TRACK` and `SFORM_TELEMETRY_OPTOUT` turn the error reports off with the usage data.
+Without values means that these become `***` in a message: what you typed on the command line; the names of the organizations, projects and views of your settings, of `STORYTELLER_PROJECT`, `STORYTELLER_VIEW` and `STORYTELLER_KEY`, and of a machine's credential, with its machine id; the values of the address, client and file variables (`STORYTELLER_ENDPOINT`, `STORYTELLER_CLIENT_ID`, `STORYTELLER_TOKEN_URL`, the certificate and token files), of `SFORM_HOME` and of the settings in `SFORM_<section>__<key>`; your user name, the name of the machine and your profile folder; quoted text, file paths, the path and query of addresses, e-mail addresses and ids. Tokens, keys, passwords and certificates become `[Filtered]`. A message `sform` cannot scrub in time is not sent at all.
+
+Never sent: arguments and option values, the token of an unknown command or option, the rest of a message, the API's answer, your name or e-mail, and the name of the machine. Of a sign-in service's error only the first line goes, scrubbed as above. `sform` keeps nothing for Sentry, in `SFORM_HOME` or anywhere else. `DO_NOT_TRACK` and `SFORM_TELEMETRY_OPTOUT` turn the error reports off with the usage data.
 
 ## Settings
 
