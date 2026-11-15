@@ -241,6 +241,43 @@ describe('the project settings in Settings', () => {
     expect(document.body.textContent).not.toContain('Someone changed the project settings meanwhile')
   })
 
+  it('saves under the version the draft started from, so a change read again meanwhile gets a 412', async () => {
+    const writes = recordWrites()
+    const view = await mountSettings()
+    typeEditor(view).vm.$emit('update:modelValue', { exe: { label: 'Job' } })
+    await settle()
+
+    // Someone else saves a date format, and the query reads the settings again (a reconnect refetches a stale query).
+    storeSettings('acme.billing', { Types: {}, DateFormat: 'dd.mm.yyyy' })
+    await view.queryClient.refetchQueries({ queryKey: getGetProjectSettingsQueryKey('acme', 'billing') })
+    await settle()
+    expect(view.queryClient.getQueryData(getGetProjectSettingsQueryKey('acme', 'billing'))).toMatchObject({
+      Version: 1,
+    })
+    // The draft stays as it was, with the date format it started from.
+    expect(typeEditor(view).props('modelValue')).toEqual({ exe: { label: 'Job' } })
+    expect(dateFormat(view).props('modelValue')).toBe('yyyy-mm-dd')
+    expect(document.body.textContent).not.toContain('Someone changed the project settings meanwhile')
+
+    saveButton()!.click()
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain(
+        'Someone changed the project settings meanwhile; your changes were not saved',
+      ),
+    )
+    await settle()
+    expect(writes.map((write) => write.ifMatch)).toEqual(['"0"'])
+    expect(settingsOf('acme.billing')).toMatchObject({ Types: {}, DateFormat: 'dd.mm.yyyy', Version: 1 })
+    expect(typeEditor(view).props('modelValue')).toEqual({ exe: { label: 'Job' } })
+
+    // Told of the change, a second Save stores the draft over it.
+    saveButton()!.click()
+    await vi.waitFor(() => expect(writes).toHaveLength(2))
+    await settle()
+    expect(writes[1]!.ifMatch).toBe('"1"')
+    expect(settingsOf('acme.billing')).toMatchObject({ Types: { exe: { Label: 'Job' } }, Version: 2 })
+  })
+
   it('lists the problems of a 400 InvalidSettings and keeps the draft', async () => {
     server.use(
       http.put('*/api/v1/:org/:project/settings', () =>
@@ -310,11 +347,24 @@ describe('the project settings in Settings', () => {
 
     timeZone(view).vm.$emit('update:modelValue', 'Asia/Tokyo')
     await settle()
+    const writes = recordWrites()
     useContextStore().set({ org: 'acme', project: 'shipping' })
     await settle(6)
 
     expect(timeZone(view).props('modelValue')).toBe('Europe/Oslo')
     expect(saveButton()!.disabled).toBe(true)
+
+    // A save there is under that project's version.
+    dateFormat(view).vm.$emit('update:modelValue', 'dd.mm.yyyy')
+    await settle()
+    saveButton()!.click()
+    await vi.waitFor(() => expect(writes).toHaveLength(1))
+    await settle()
+    expect(writes[0]).toMatchObject({
+      ifMatch: '"1"',
+      body: { DefaultTimeZone: 'Europe/Oslo', DateFormat: 'dd.mm.yyyy' },
+    })
+    expect(settingsOf('acme.billing')).toBeUndefined()
   })
 
   it.each([
