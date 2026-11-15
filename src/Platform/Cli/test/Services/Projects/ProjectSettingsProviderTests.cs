@@ -409,6 +409,33 @@ public class ProjectSettingsProviderTests
         OutputTerminal.Of(new SformConsole(inner, () => null, _ => null)).HasConsole().ShouldBeFalse();
     }
 
+    // sform story -t > tree.txt or | grep from a terminal: standard input or error is still the console, so it has a width,
+    // but the output goes to a file or a pipe, which gets no settings and no escape codes.
+    [Fact]
+    public void OutputTerminal_OfARedirectedOutput_HasNoConsole_AndTakesNoEscapeCodes()
+    {
+        var inner = new ColorRecordingConsole(new UTF8Encoding(false)) { IsOutputRedirected = true };
+
+        var terminal = OutputTerminal.Of(new SformConsole(inner, () => 120, _ => null));
+
+        terminal.HasConsole().ShouldBeFalse();
+        terminal.TakesEscapeCodes().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ARedirectedOutput_MakesNoRequest_AndShowsTheBuiltInDisplay()
+    {
+        var inner = new ColorRecordingConsole(new UTF8Encoding(false)) { IsOutputRedirected = true };
+        _environment["COLORTERM"] = "truecolor";
+
+        var display = await CreateProvider(terminal: OutputTerminal.Of(new SformConsole(inner, () => 120, _ => null)))
+            .GetDisplayAsync(TestContext.Current.CancellationToken);
+
+        display.ShouldBeSameAs(ProjectDisplay.BuiltIn);
+        _api.VerifyNoOtherCalls();
+        _fileSystem.File.Exists(CachePath).ShouldBeFalse();
+    }
+
     private static SdkSettings Settings(long version)
     {
         return new SdkSettings
@@ -471,7 +498,7 @@ public class ProjectSettingsProviderTests
         _fileSystem.AddFile(CachePath, new MockFileData(JsonSerializer.Serialize(file)));
     }
 
-    private ProjectSettingsProvider CreateProvider(Action<OutputSwitches>? configure = null)
+    private ProjectSettingsProvider CreateProvider(Action<OutputSwitches>? configure = null, OutputTerminal? terminal = null)
     {
         var switches = new OutputSwitches(_options, name => _environment.GetValueOrDefault(name));
         configure?.Invoke(switches);
@@ -483,7 +510,7 @@ public class ProjectSettingsProviderTests
             CachePath,
             BaseUrl,
             switches,
-            new OutputTerminal(() => _hasConsole, () => _encoding, () => _takesEscapeCodes),
+            terminal ?? new OutputTerminal(() => _hasConsole, () => _encoding, () => _takesEscapeCodes),
             _time,
             _logger);
     }

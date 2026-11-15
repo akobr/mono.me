@@ -7,7 +7,8 @@ namespace _42.Platform.Cli.AutomationTests.Running.Processes;
 // (script -q -e -f -c '<command>' /dev/null): what sform draws arrives on script's standard output, and what the test
 // writes to script's standard input is typed on the pty. -e returns sform's exit code, -f flushes every write, -q drops
 // script's own lines, /dev/null keeps no typescript. The command runs under /bin/sh with every argument single-quoted
-// (CommandLines.PosixShell) after stty sets the pty's size (script's standard input is no terminal to copy it from).
+// (CommandLines.PosixShell) after stty sets the pty's size (script's standard input is no terminal to copy it from); a
+// StandardOutputFile is a redirect of that shell, so standard input and error stay the pty.
 // macOS ships BSD script, whose options differ; it is not supported (TerminalSupport says why). script answers nothing
 // the program asks its terminal, so a TerminalResponder answers the cursor position requests of .NET and sends the arrows
 // in the cursor key mode the program set.
@@ -36,7 +37,8 @@ internal sealed class ScriptChild : ChildProcess
         var script = new[] { ScriptPath, "/bin/script" }.FirstOrDefault(fileSystem.File.Exists)
             ?? throw new PlatformNotSupportedException("A pseudo terminal on Linux needs util-linux script (/usr/bin/script, package util-linux or bsdutils).");
 
-        var command = $"stty cols {request.Columns} rows {request.Rows} 2>/dev/null; exec {CommandLines.PosixShell([request.FileName, .. request.Arguments])}";
+        var redirect = request.StandardOutputFile is { } output ? $" > {CommandLines.PosixQuote(output)}" : string.Empty;
+        var command = $"stty cols {request.Columns} rows {request.Rows} 2>/dev/null; exec {CommandLines.PosixShell([request.FileName, .. request.Arguments])}{redirect}";
         var environment = new Dictionary<string, string>(request.Environment, StringComparer.Ordinal)
         {
             ["SHELL"] = "/bin/sh",

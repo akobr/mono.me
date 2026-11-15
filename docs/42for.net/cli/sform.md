@@ -442,7 +442,7 @@ After the table it prints the default time zone, the date format, the version an
 - the built-in color and icon;
 - `UTC (default)` and `yyyy-mm-dd (default)`.
 
-In a console, a swatch `■` in the color stands before each color name, unless `NO_COLOR` is set. Icons are listed by their names, such as `i-lucide-building-2`.
+In a console, a swatch `■` in the color stands before each color name, unless `NO_COLOR` is set. Each icon is listed by its name, such as `i-lucide-building-2`; where icons are shown (see **Icons** in [Where they show](#where-they-show)), its emoji stands before the name: `🏢 i-lucide-building-2`. With the output redirected to a file or a pipe, the table has neither swatches nor emoji.
 
 - `-f json` writes the settings to standard output as the API answers them, with `Version` and `Modified`, for programs. A read that is refused or fails is reported on standard error, except a `401`.
 - `-e <file>` also writes them to a file in the file shape (`"Format": "2s.project-settings.v1"`, without `Version` and `Modified`). That is the shape of a data set's `project-settings.json`, and `set -i` reads it back. Like `-e` of the other `get` commands, it asks before it replaces a file in a terminal, and rewrites the file without asking when there is no terminal.
@@ -529,7 +529,7 @@ Outside `sform project settings`, the settings change only what `sform` shows a 
   - what `sform` accepts: type codes and keys in arguments and options, `--tree-root subject|sbt|responsibility|rst`, the `--type` of `project settings set`, `-x` paths, input files, and dates in options;
   - help and error texts;
   - machine-readable output: `--format`, `--json`, `--content-only`, `-e` files, `story export`, `config export` and `kv export`;
-  - any output without a console (see [Run without a terminal](#run-without-a-terminal)). Without a console, `sform` prints the built-in names and dates without colors and icons, byte for byte as before.
+  - any output without a console (see [Run without a terminal](#run-without-a-terminal)), and any output redirected to a file or a pipe, also from a terminal (`sform story -t > tree.txt`, `sform story history sbt.northwind | grep 2026`). There `sform` prints the built-in names and dates without colors and icons, byte for byte as before, and makes no request for the settings.
 
 **Colors.** Tables use the nearest of the 16 console colors:
 
@@ -554,7 +554,7 @@ The tags of a tree use the admin UI's 24-bit colors when the terminal shows 24-b
 - `TERM` set to `xterm-kitty`, `xterm-ghostty`, `wezterm`, `alacritty` or `foot`;
 - GNOME Terminal and other VTE terminals (`VTE_VERSION`), and Konsole (`KONSOLE_VERSION`).
 
-In other terminals, such as the classic Windows console host or an unknown terminal, icons are left out so the columns stay aligned. `SFORM_ICONS` or the preference `output.icons` overrides this, and the variable wins: `always` shows icons in any console, `never` in none, and `auto`, the default, detects the terminal.
+In other terminals, such as the classic Windows console host or an unknown terminal, icons are left out so the columns stay aligned. `SFORM_ICONS` or the preference `output.icons` overrides this, and the variable wins: `always` shows icons in any console, `never` in none, and `auto`, the default, detects the terminal. The same switches decide the emoji of the icons in the table of `sform project settings`. Output redirected to a file or a pipe never gets icons, not even with `always`.
 
 ### Turn them off
 
@@ -580,7 +580,7 @@ A command that shows a type or a date reads the settings of the context's projec
 - For 10 minutes after a read, commands use the cache without a request. After that they ask again with `If-None-Match`, and an unchanged answer (`304`) keeps the cache.
 - `set`, `edit` and `reset` write their answer into the cache, so your own changes show at once, and a change by someone else shows within 10 minutes. Delete the file to read the settings on the next command.
 - If the read fails, the command shows the built-in names and dates, prints no message, and writes one debug line to the log. Failures include no answer within 5 seconds, an API that cannot be reached, a refusal (`401`, or `403` for a machine without a read scope), an older API without the route (`404`), and a broken cache file. A command never fails, and never changes its exit code, because of the settings.
-- Without a console, or with the settings turned off, no request is made.
+- Without a console, with the output redirected to a file or a pipe, or with the settings turned off, no request is made.
 
 ## Run without a terminal
 

@@ -20,9 +20,10 @@ namespace _42.Platform.Cli.Services.Projects;
 // project-settings.cache.json of the state directory, per API and project, with their ETag and when they were read.
 // Within FreshFor of a read the cache is used without a request; after that GET …/settings asks with If-None-Match, and
 // a 304 keeps it. sform project settings set, edit and reset write their answer into it (IProjectSettingsCache).
-// Without a console, with --builtin, SFORM_PROJECT_SETTINGS=builtin or output.projectSettings=builtin, no request is
-// made. Any failure (offline, 401, a 403 of a machine without a read scope, a 404 of an older API, a broken cache file)
-// gives the built-in display and one debug line in the log: a command never fails because of the settings.
+// Without a console, with the output redirected to a file or a pipe (also from a terminal), with --builtin,
+// SFORM_PROJECT_SETTINGS=builtin or output.projectSettings=builtin, no request is made. Any failure (offline, 401, a 403
+// of a machine without a read scope, a 404 of an older API, a broken cache file) gives the built-in display and one
+// debug line in the log: a command never fails because of the settings.
 public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProjectSettingsCache
 {
     // How long a read is used without asking the API again.
@@ -174,12 +175,7 @@ public sealed class ProjectSettingsProvider : IProjectSettingsProvider, IProject
             : TerminalCapabilities.SupportsTrueColor(getVariable) && _terminal.TakesEscapeCodes()
                 ? TypeColorMode.TrueColor
                 : TypeColorMode.Console;
-        var icons = _switches.Icons switch
-        {
-            OutputOptions.ICONS_ALWAYS => true,
-            OutputOptions.ICONS_NEVER => false,
-            _ => TerminalCapabilities.IsUtf8(_terminal.OutputEncoding()) && TerminalCapabilities.DrawsEmojiWide(getVariable),
-        };
+        var icons = _switches.ShowsIcons(_terminal.OutputEncoding());
 
         return ProjectDisplay.Create(settings.ToAppearances(), settings.DateFormat, colors, icons);
     }

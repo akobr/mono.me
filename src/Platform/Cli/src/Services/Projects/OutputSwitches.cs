@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Cli.Services.Projects;
@@ -39,6 +41,18 @@ public sealed class OutputSwitches
     // False with --builtin, or with builtin from SFORM_PROJECT_SETTINGS or output.projectSettings.
     public bool UsesProjectSettings => !IsBuiltInRequested
         && Choose(SformVariables.PROJECT_SETTINGS, _options.ProjectSettings, OutputOptions.ProjectSettingsValues, OutputOptions.PROJECT_SETTINGS_PROJECT) == OutputOptions.PROJECT_SETTINGS_PROJECT;
+
+    // Whether a console whose output has the encoding shows the icons of the types: always or never as the switch says;
+    // in auto mode, when the output is UTF-8 and the terminal is known to draw emoji two cells wide.
+    public bool ShowsIcons(Encoding? outputEncoding)
+    {
+        return Icons switch
+        {
+            OutputOptions.ICONS_ALWAYS => true,
+            OutputOptions.ICONS_NEVER => false,
+            _ => TerminalCapabilities.IsUtf8(outputEncoding) && TerminalCapabilities.DrawsEmojiWide(GetVariable),
+        };
+    }
 
     private string Choose(string variable, string? configured, IReadOnlyList<string> values, string defaultValue)
     {

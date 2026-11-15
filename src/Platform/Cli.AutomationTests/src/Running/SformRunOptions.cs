@@ -38,6 +38,11 @@ public sealed record SformRunOptions
     // (mode T): stdout and stderr are one screen, the input is the keyboard. Not supported on macOS (the test skips).
     public bool Terminal { get; init; }
 
+    // Only with Terminal: the standard output of sform goes to this file (created or replaced), while its input and error
+    // stay the pseudo terminal, as sform … > file typed in a terminal; the result's output then holds only what went to
+    // the terminal. Read the file after the run.
+    public string? StandardOutputFile { get; init; }
+
     // The size of the pseudo terminal, columns and rows.
     public int TerminalColumns { get; init; } = 250;
 

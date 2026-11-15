@@ -82,6 +82,11 @@ public sealed class SformRunner
             throw new PlatformNotSupportedException(reason);
         }
 
+        if (runOptions.StandardOutputFile is not null && !runOptions.Terminal)
+        {
+            throw new InvalidOperationException("SformRunOptions.StandardOutputFile redirects the output of a run in a pseudo terminal; without Terminal every stream is redirected already.");
+        }
+
         foreach (var secret in runOptions.Secrets.Concat(runOptions.Machine?.Secrets ?? []))
         {
             options.AddSecret?.Invoke(secret);
@@ -95,7 +100,8 @@ public sealed class SformRunner
             workingDirectory,
             environment,
             runOptions.TerminalColumns,
-            runOptions.TerminalRows);
+            runOptions.TerminalRows,
+            runOptions.StandardOutputFile is { } output ? fileSystem.Path.GetFullPath(fileSystem.Path.Combine(workingDirectory, output)) : null);
 
         var number = Interlocked.Increment(ref runs);
         var timeout = runOptions.Timeout ?? options.Timeout;

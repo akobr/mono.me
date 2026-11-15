@@ -32,7 +32,8 @@ internal sealed class ColorRecordingConsole : IConsole
 
     public bool IsInputRedirected => false;
 
-    public bool IsOutputRedirected => false;
+    // A console whose output a shell sent to a file or a pipe, while its input and error stay the terminal.
+    public bool IsOutputRedirected { get; init; }
 
     public bool IsErrorRedirected => false;
 

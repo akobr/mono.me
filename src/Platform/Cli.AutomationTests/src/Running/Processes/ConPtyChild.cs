@@ -12,7 +12,10 @@ namespace _42.Platform.Cli.AutomationTests.Running.Processes;
 // terminal. No package: CreatePseudoConsole and CreateProcess with PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE through P/Invoke.
 //
 // The child gets STARTF_USESTDHANDLES with no handles: a test host whose own standard streams are redirected (dotnet test)
-// would otherwise hand them down, and the child would write there instead of the pseudo console. The output pipe is read
+// would otherwise hand them down, and the child would write there instead of the pseudo console. Windows gives a console
+// process every standard handle it gets as null as a handle of its console. A StandardOutputFile is the one handle it
+// inherits (PROC_THREAD_ATTRIBUTE_HANDLE_LIST), as its standard output, so input and error stay the pseudo console, as
+// with sform … > file in a terminal; this process closes its copy once the child has its own. The output pipe is read
 // all the time on a thread of its own (a pseudo console stops its client when nobody reads); once the process ended,
 // ClosePseudoConsole flushes the last frame and ends the pipe, which completes Exited.
 [SupportedOSPlatform("windows")]
@@ -21,7 +24,12 @@ internal sealed class ConPtyChild : ChildProcess
     private const uint ExtendedStartupInfoPresent = 0x00080000;
     private const uint CreateUnicodeEnvironment = 0x00000400;
     private const int StartfUseStdHandles = 0x00000100;
+    private const uint GenericWrite = 0x40000000;
+    private const uint FileShareAll = 0x00000007;
+    private const uint CreateAlways = 2;
+    private const uint FileAttributeNormal = 0x00000080;
     private static readonly IntPtr ProcThreadAttributePseudoConsole = 0x00020016;
+    private static readonly IntPtr ProcThreadAttributeHandleList = 0x00020002;
 
     private readonly IntPtr pseudoConsole;
     private readonly SafeProcessHandle processHandle;
@@ -57,11 +65,20 @@ internal sealed class ConPtyChild : ChildProcess
         SafeFileHandle? inputWrite = null;
         SafeFileHandle? outputRead = null;
         SafeFileHandle? outputWrite = null;
+        SafeFileHandle? standardOutput = null;
         var pseudoConsole = IntPtr.Zero;
         var attributes = IntPtr.Zero;
+        var handleList = IntPtr.Zero;
         var environment = IntPtr.Zero;
         try
         {
+            if (request.StandardOutputFile is { } outputFile)
+            {
+                var inheritable = new Native.SecurityAttributes { NLength = Marshal.SizeOf<Native.SecurityAttributes>(), BInheritHandle = true };
+                standardOutput = Native.CreateFileW(outputFile, GenericWrite, FileShareAll, ref inheritable, CreateAlways, FileAttributeNormal, IntPtr.Zero);
+                Check(!standardOutput.IsInvalid, $"CreateFile of {outputFile}");
+            }
+
             Check(Native.CreatePipe(out inputRead, out inputWrite, IntPtr.Zero, 0), "CreatePipe");
             Check(Native.CreatePipe(out outputRead, out outputWrite, IntPtr.Zero, 0), "CreatePipe");
 
@@ -76,13 +93,24 @@ internal sealed class ConPtyChild : ChildProcess
             inputRead.Dispose();
             outputWrite.Dispose();
 
+            var attributeCount = standardOutput is null ? 1 : 2;
             var attributesSize = IntPtr.Zero;
-            Native.InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref attributesSize);
+            Native.InitializeProcThreadAttributeList(IntPtr.Zero, attributeCount, 0, ref attributesSize);
             attributes = Marshal.AllocHGlobal(attributesSize);
-            Check(Native.InitializeProcThreadAttributeList(attributes, 1, 0, ref attributesSize), "InitializeProcThreadAttributeList");
+            Check(Native.InitializeProcThreadAttributeList(attributes, attributeCount, 0, ref attributesSize), "InitializeProcThreadAttributeList");
             Check(
                 Native.UpdateProcThreadAttribute(attributes, 0, ProcThreadAttributePseudoConsole, pseudoConsole, IntPtr.Size, IntPtr.Zero, IntPtr.Zero),
                 "UpdateProcThreadAttribute");
+
+            if (standardOutput is not null)
+            {
+                // The list must live until CreateProcess has read it.
+                handleList = Marshal.AllocHGlobal(IntPtr.Size);
+                Marshal.WriteIntPtr(handleList, standardOutput.DangerousGetHandle());
+                Check(
+                    Native.UpdateProcThreadAttribute(attributes, 0, ProcThreadAttributeHandleList, handleList, IntPtr.Size, IntPtr.Zero, IntPtr.Zero),
+                    "UpdateProcThreadAttribute");
+            }
 
             var startupInfo = new Native.StartupInfoEx
             {
@@ -90,6 +118,7 @@ internal sealed class ConPtyChild : ChildProcess
                 {
                     Cb = Marshal.SizeOf<Native.StartupInfoEx>(),
                     DwFlags = StartfUseStdHandles,
+                    HStdOutput = standardOutput?.DangerousGetHandle() ?? IntPtr.Zero,
                 },
                 LpAttributeList = attributes,
             };
@@ -104,7 +133,7 @@ internal sealed class ConPtyChild : ChildProcess
                     commandLine,
                     IntPtr.Zero,
                     IntPtr.Zero,
-                    false,
+                    standardOutput is not null,
                     ExtendedStartupInfoPresent | CreateUnicodeEnvironment,
                     environment,
                     request.WorkingDirectory,
@@ -128,6 +157,14 @@ internal sealed class ConPtyChild : ChildProcess
                 Native.DeleteProcThreadAttributeList(attributes);
                 Marshal.FreeHGlobal(attributes);
             }
+
+            if (handleList != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(handleList);
+            }
+
+            // the child has its own copy
+            standardOutput?.Dispose();
 
             if (environment != IntPtr.Zero)
             {
@@ -286,6 +323,16 @@ internal sealed class ConPtyChild : ChildProcess
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CreatePipe(out SafeFileHandle hReadPipe, out SafeFileHandle hWritePipe, IntPtr lpPipeAttributes, int nSize);
 
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern SafeFileHandle CreateFileW(
+            string lpFileName,
+            uint dwDesiredAccess,
+            uint dwShareMode,
+            ref SecurityAttributes lpSecurityAttributes,
+            uint dwCreationDisposition,
+            uint dwFlagsAndAttributes,
+            IntPtr hTemplateFile);
+
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool InitializeProcThreadAttributeList(IntPtr lpAttributeList, int dwAttributeCount, int dwFlags, ref IntPtr lpSize);
@@ -322,6 +369,15 @@ internal sealed class ConPtyChild : ChildProcess
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CloseHandle(IntPtr hObject);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct SecurityAttributes
+        {
+            public int NLength;
+            public IntPtr LpSecurityDescriptor;
+            [MarshalAs(UnmanagedType.Bool)]
+            public bool BInheritHandle;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         public struct Coord

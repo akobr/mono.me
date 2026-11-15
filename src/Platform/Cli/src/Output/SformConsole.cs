@@ -54,6 +54,11 @@ public sealed class SformConsole : IExtendedConsole
     // False when sform renders its documents as plain text at a fixed width.
     public bool HasConsole => _hasConsole.Value;
 
+    // True when the standard output itself goes to a console. HasConsole stays true while standard input or error is still
+    // a console (the width then comes from one of them), as in sform story -t > tree.txt or | grep from a terminal, so
+    // what only a person at a console sees (the project settings in the output) asks this instead.
+    public bool WritesToConsole => HasConsole && !Console.IsOutputRedirected;
+
     public void Write(params object[] elements)
     {
         if (HasConsole)
