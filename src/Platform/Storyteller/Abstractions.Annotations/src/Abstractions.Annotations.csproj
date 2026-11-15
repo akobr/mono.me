@@ -13,4 +13,9 @@
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The catalog of project settings, shared with the conformance suite and the SDKs (ProjectSettingsCatalog). -->
+    <EmbeddedResource Include="..\..\conformance\project-settings.json" LogicalName="_42.Platform.Storyteller.project-settings.json" Link="Catalog\project-settings.json" />
+  </ItemGroup>
+
 </Project>

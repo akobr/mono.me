@@ -14,9 +14,10 @@ public class SuiteTests
     // 2^53 - 1: the largest integer that a JavaScript number holds exactly.
     private const long MaxSafeInteger = 9007199254740991;
 
-    // The kinds the .NET reference runs: flattening and formats in ConfigurationFormats/test, errors and refresh here. A
-    // kind the suite adds fails until the reference runs it.
-    private static readonly string[] RunKinds = ["flattening", "formats", "errors", "refresh"];
+    // The kinds the .NET reference runs: flattening and formats in ConfigurationFormats/test, errors and refresh here,
+    // project-settings in src/Platform/Storyteller/Backend.Core/test (ProjectSettingsConformanceTests, through
+    // ProjectSettingsJson of Abstractions.Annotations). A kind the suite adds fails until the reference runs it.
+    private static readonly string[] RunKinds = ["flattening", "formats", "errors", "refresh", "project-settings"];
 
     // The study's rules of 3.3 that every target pins by name: numbers and booleans as JSON text, no null, empty
     // containers make no key.
@@ -117,6 +118,30 @@ public class SuiteTests
         var file = JObject.Parse($$"""{ "target": "{{target}}", "description": "x", "vectors": [ {{vector}} ] }""");
 
         schema.Validate(file).ShouldNotBeEmpty();
+    }
+
+    // The same for the vectors of project settings, on a copy of the catalog of the suite; the first one is valid.
+    [Theory]
+    [InlineData("""{ "name": "valid", "settings": null, "problems": [ { "path": "$", "rule": "type" } ] }""", true)]
+    [InlineData("""{ "name": "both", "settings": {}, "expected": { "Types": {} }, "problems": [ { "path": "$", "rule": "type" } ] }""", false)]
+    [InlineData("""{ "name": "neither", "settings": {} }""", false)]
+    [InlineData("""{ "name": "no settings", "expected": { "Types": {} } }""", false)]
+    [InlineData("""{ "name": "unknown rule", "settings": {}, "problems": [ { "path": "$", "rule": "unknown-color" } ] }""", false)]
+    [InlineData("""{ "name": "relative path", "settings": {}, "problems": [ { "path": "Types", "rule": "type" } ] }""", false)]
+    [InlineData("""{ "name": "no problem", "settings": {}, "problems": [] }""", false)]
+    [InlineData("""{ "name": "expected without types", "settings": {}, "expected": {} }""", false)]
+    [InlineData("""{ "name": "expected with a version", "settings": {}, "expected": { "Types": {}, "Version": 0 } }""", false)]
+    [InlineData("""{ "name": "empty type", "settings": {}, "expected": { "Types": { "sbt": {} } } }""", false)]
+    [InlineData("""{ "name": "extra field", "settings": {}, "expected": { "Types": {} }, "note": "x" }""", false)]
+    public async Task TheProjectSettingsSchema_RejectsAnInvalidVector(string vector, bool isValid)
+    {
+        var schema = await JsonSchema.FromJsonAsync(ConformanceFiles.ReadText($"{ConformanceFiles.SchemaFolder}project-settings.schema.json"));
+        var catalog = ConformanceFiles.Read("project-settings.json")["catalog"]!.ToString(Formatting.None);
+        var file = JObject.Parse($$"""{ "description": "x", "catalog": {{catalog}}, "vectors": [ {{vector}} ] }""");
+
+        var errors = schema.Validate(file);
+
+        (errors.Count == 0).ShouldBe(isValid, string.Join("; ", errors.Select(error => $"{error.Path}: {error.Kind}")));
     }
 
     // Each schema is self-contained, so the errors and the refresh schemas repeat the answer and the failure.

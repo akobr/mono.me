@@ -12,4 +12,7 @@ public record class AccessPoint : IAccessPoint
 
     // Only a project has a description; always null for an organization.
     public string? Description { get; init; }
+
+    // Only a project has settings; always null for an organization.
+    public ProjectSettings? Settings { get; init; }
 }
