@@ -10,8 +10,8 @@ using Microsoft.Azure.Cosmos.Scripts;
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 // A container that forwards every call to a real one, and lets a StorageInterceptor record and fail transactional
-// batches and run actions around them and after point reads, and answer reads of many items. Every operation that
-// the interceptor does not answer still runs against the emulator.
+// batches and run actions around them, record point reads and run actions after them, and record and answer reads of
+// many items. Every operation that the interceptor does not answer still runs against the emulator.
 public sealed class InterceptedContainer(Container inner, StorageInterceptor interceptor) : Container
 {
     public override string Id => inner.Id;
