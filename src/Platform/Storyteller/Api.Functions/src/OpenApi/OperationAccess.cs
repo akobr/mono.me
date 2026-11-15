@@ -28,6 +28,8 @@ internal static class OperationAccess
         Definitions.RouteIds.Access.GetMyInvitations,
         Definitions.RouteIds.Access.AcceptInvitation,
         Definitions.RouteIds.Access.DeclineInvitation,
+        Definitions.RouteIds.Access.GetExhibition,
+        Definitions.RouteIds.Access.JoinExhibition,
         Definitions.RouteIds.Access.GetMachineAccesses,
         Definitions.RouteIds.Access.GetMachineAccess,
         Definitions.RouteIds.Access.CreateMachineAccess,

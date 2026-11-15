@@ -51,6 +51,11 @@ public static class Definitions
                 public const string InvitationAccept = $"v1/access/invitations/{{{Parameters.Id}}}/accept";
                 public const string InvitationDecline = $"v1/access/invitations/{{{Parameters.Id}}}/decline";
 
+                // The exhibition (the deployment's demo project) and the caller's join of it as a Reader; "access" is a
+                // reserved organization name, so no organization route meets the literals.
+                public const string Exhibition = "v1/access/exhibition";
+                public const string ExhibitionJoin = $"{Exhibition}/join";
+
                 public const string Machines = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines";
                 public const string Machine = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}";
 
@@ -282,6 +287,9 @@ public static class Definitions
             public const string GetMyInvitations = nameof(GetMyInvitations);
             public const string AcceptInvitation = nameof(AcceptInvitation);
             public const string DeclineInvitation = nameof(DeclineInvitation);
+
+            public const string GetExhibition = nameof(GetExhibition);
+            public const string JoinExhibition = nameof(JoinExhibition);
 
             public const string GetMachineAccesses = nameof(GetMachineAccesses);
             public const string GetMachineAccess = nameof(GetMachineAccess);
