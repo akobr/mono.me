@@ -9,9 +9,12 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // textboxes "<Type> name" (at most 40 characters) and "<Type> plural" (disabled, titled "Set a name first", until the
 // row has a name of its own; its placeholder is the plural of that name), the combobox "<Type> color" ("Default
 // <inherited color>", then Red … Gray), the button "<Type> icon" with its search "Search icons…" and, once the row has
-// a value of its own, "Reset <Type>". Every name is the built-in type name, whatever the type is called now. A name
-// applies on change, so it is filled and then left with Tab; nothing is saved to the API and no toast shows. The
-// colors are the CSS variables --st-<code> of the document (App.ExpectTypeColorAsync).
+// a value of its own, "Reset <Type>" (none of them while the editor is read-only). Every name is the built-in type
+// name, whatever the type is called now. A name applies on change, so it is filled and then left with Tab; the preview
+// shows every change at once. On Settings the editor changes the draft of the project settings, which "Save project
+// settings" saves (ProjectSettingsPage.SaveSettingsAsync); on the account page the Preferences apply at once, without
+// a toast. The colors in effect are the CSS variables --st-<code> of the document (App.ExpectTypeColorAsync): they
+// follow the saved project settings and the Preferences, not an unsaved draft.
 public sealed partial class TypeAppearanceEditor(App app, ILocator card)
 {
     // The longest name or plural the fields and the stores keep.

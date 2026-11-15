@@ -8,9 +8,10 @@ namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 // A "Date format" select (a USelect, so a combobox with options): the project's on Settings (card "Dates") and the
 // personal one of Preferences on the account page, which starts with "Project default". Each format's option is named
 // by today's date in the format and the pattern, "2026-11-02 (yyyy-mm-dd)", in the order yyyy-mm-dd (the default),
-// dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy and d mmm yyyy (utils/dates.ts). The choice is kept in this browser and applies at
-// once, without a Save and without a toast: every date of the app follows it, a date and time as "<date> <HH:mm>
-// <zone>" ("2026-11-02 10:15 GMT+1"). The effective format is the personal one, else the project's, else yyyy-mm-dd.
+// dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy and d mmm yyyy (utils/dates.ts). The personal choice is kept in this browser and
+// applies at once, without a Save and without a toast; the project's is part of the draft of the project settings and
+// applies once "Save project settings" saved it. Every date of the app follows the format in effect, a date and time as
+// "<date> <HH:mm> <zone>" ("2026-11-02 10:15 GMT+1"): the personal one, else the project's, else yyyy-mm-dd.
 public sealed partial class DateFormatSelect(App app, ILocator combobox)
 {
     public const string IsoFormat = "yyyy-mm-dd";

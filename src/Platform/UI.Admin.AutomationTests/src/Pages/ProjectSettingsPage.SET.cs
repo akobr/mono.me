@@ -4,15 +4,20 @@ using static Microsoft.Playwright.Assertions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
-// The Settings section's members of the project's Settings: the values of the Project card (dt/dd), the cards kept in
-// this browser (the default time zone, the date format and the annotation types; localStorage '2s-admin:project-settings',
-// an entry per '<organization>.<project>' with only what was changed), the controls of Machine authentication and the
-// Certificate authority, and what the Secrets section shows to a member below Administrator: badges "Administrator",
-// disabled fields and no action buttons.
+// The Settings section's members of the project's Settings: the values of the Project card (dt/dd), the project
+// settings that the API keeps for everyone in the project (the default time zone, the date format and the annotation
+// types: one draft that an Administrator or Owner saves with "Save project settings"; read-only below Administrator,
+// with the badge "Administrator" in each of the three cards), the banner of the settings this browser kept before the
+// API stored them, the controls of Machine authentication and the Certificate authority, and what the Secrets section
+// shows to a member below Administrator: badges "Administrator", disabled fields and no action buttons. Saved project
+// settings stay for every later test and person: save them only in a disposable project.
 public sealed partial class ProjectSettingsPage
 {
-    // The localStorage key of every project's browser settings (stores/project-settings.ts).
-    public const string BrowserSettingsKey = "2s-admin:project-settings";
+    // The text under the header of each of the three cards of the project settings, below Administrator.
+    public const string AdministratorsOnlyText = "Only Administrators change the project settings.";
+
+    // The title of the banner of the settings this browser kept before the API stored them.
+    public const string LegacySettingsTitle = "Project settings of this browser";
 
     // "Access point", "Your role", "Members" (Administrators only) and, below Administrator, "Description".
     public ILocator ProjectCard => Card("Project", 2);
@@ -20,27 +25,57 @@ public sealed partial class ProjectSettingsPage
     // The field error of a description over 500 characters (a rule of the form only; the API has no limit).
     public ILocator DescriptionError => ProjectCard.GetByText("At most 500 characters.", new() { Exact = true });
 
-    public ILocator DefaultTimeZoneHelp => app.Page.GetByText("New annotations in this project start in this time zone. Saved in this browser.", new() { Exact = true });
+    public ILocator AnnotationsCard => Card("Annotations", 2);
+
+    public ILocator DefaultTimeZoneHelp => AnnotationsCard.GetByText("New annotations start in this time zone, for everyone in this project.", new() { Exact = true });
+
+    // The hint of "Default time zone" (Administrators): sets the draft's zone to UTC, which is saved as unset.
+    public ILocator UseDefaultTimeZoneButton => AnnotationsCard.GetByRole(AriaRole.Button, new() { Name = "Use the default: UTC", Exact = true });
 
     public ILocator DatesCard => Card("Dates", 2);
 
-    // The project's date format, for everyone who opens the project in this browser.
+    // The project's date format, for everyone in the project (unless their Preferences pick their own).
     public DateFormatSelect DateFormat => new(app, DatesCard.GetByRole(AriaRole.Combobox, new() { Name = "Date format", Exact = true }));
 
     public ILocator DateFormatHelp => DatesCard.GetByText(
-        "How dates are shown on every page of this project, for everyone who opens it in this browser. Each person can pick their own format in Preferences.",
+        "How dates are shown on every page, for everyone in this project. Each person can pick their own format in Preferences.",
         new() { Exact = true });
+
+    // The hint of "Date format" (Administrators): sets the draft's format to yyyy-mm-dd, which is saved as unset.
+    public ILocator UseDefaultDateFormatButton => DatesCard.GetByRole(AriaRole.Button, new() { Name = "Use the default: yyyy-mm-dd", Exact = true });
 
     // Shown in Dates and in Annotation types while Preferences override them.
     public ILocator DatesPreferencesLink => DatesCard.GetByRole(AriaRole.Link, new() { Name = "Open Preferences", Exact = true });
 
     public ILocator AnnotationTypesCard => Card("Annotation types", 2);
 
-    // The project's names, colors and icons of the types, for everyone who opens the project in this browser.
+    public ILocator AnnotationTypesHelp => AnnotationTypesCard.GetByText(
+        "Names, colors and icons of the annotation types on every page, for everyone in this project. Each person can override them in Preferences on the account page.",
+        new() { Exact = true });
+
+    // The project's names, colors and icons of the types, for everyone in the project: the draft of the page. Its
+    // previews show the draft at once, the rest of the app (and the CSS variables --st-<code>) once it is saved.
     public TypeAppearanceEditor ProjectTypes => new(app, AnnotationTypesCard);
 
-    // The footer of Annotation types, for Contributors and up; disabled while the project changes no type.
+    // The footer of Annotation types, for Administrators and Owners: empties the draft's types (saved with "Save project
+    // settings"); disabled while the draft changes no type.
     public ILocator ResetToBuiltInButton => AnnotationTypesCard.GetByRole(AriaRole.Button, new() { Name = "Reset to built-in", Exact = true });
+
+    // Below Annotation types, for Administrators and Owners: saves the draft of the three cards with one write (the toast
+    // "Project settings saved"); disabled while the draft equals the saved settings, and "Unsaved changes" beside it
+    // while it differs.
+    public ILocator SaveSettingsButton => app.Page.GetByRole(AriaRole.Button, new() { Name = "Save project settings", Exact = true });
+
+    public ILocator UnsavedSettingsNote => app.Page.GetByText("Unsaved changes", new() { Exact = true });
+
+    // The banner of the settings this browser kept for the project before the API stored them (localStorage
+    // '2s-admin:project-settings'), shown while the project has none on the server: "Save for the project" and
+    // "Discard" for an Administrator, a request to ask one for anyone else.
+    public ILocator LegacySettingsBanner => NuxtLocators.Alert(app.Page.Locator(":root"), LegacySettingsTitle);
+
+    public ILocator SaveLegacySettingsButton => LegacySettingsBanner.GetByRole(AriaRole.Button, new() { Name = "Save for the project", Exact = true });
+
+    public ILocator DiscardLegacySettingsButton => LegacySettingsBanner.GetByRole(AriaRole.Button, new() { Name = "Discard", Exact = true });
 
     public ILocator PersonalTypesNote => AnnotationTypesCard.GetByText("Your own Preferences override some of these for you.", new() { Exact = true });
 
@@ -68,6 +103,18 @@ public sealed partial class ProjectSettingsPage
 
     // The customer key of Bring your own key; disabled below Administrator.
     public ILocator CustomerKeyUri => SecretsSection.GetByRole(AriaRole.Textbox, new() { Name = "Key URI (versionless)", Exact = true });
+
+    // Below Administrator, in the header of a card of the project settings: "Annotations", "Dates" or "Annotation types".
+    public ILocator SettingsAdministratorBadge(string card)
+    {
+        return SettingsCard(card).GetByText("Administrator", new() { Exact = true });
+    }
+
+    // Below Administrator, the text under the header of a card of the project settings.
+    public ILocator SettingsAdministratorsOnly(string card)
+    {
+        return SettingsCard(card).GetByText(AdministratorsOnlyText, new() { Exact = true });
+    }
 
     // A button of the Secrets section by its exact name ("Rotate now", "Save key", "Verify", "Add recipient", …); none
     // of the administrator actions is there below Administrator. "Rotate now" may be there twice (Standard, HSM).
@@ -122,12 +169,21 @@ public sealed partial class ProjectSettingsPage
         await Expect(CertificateLifetime).ToHaveValueAsync(text);
     }
 
-    // Waits until this browser keeps the value at the path of the project's entry ("defaultTimeZone"; "types", "exe",
-    // "icon"), or none for null.
-    public async Task ExpectStoredAsync(string? expected, params string[] path)
+    // Waits until the project settings loaded, for an Administrator or Owner: until then the fields are disabled and show
+    // the defaults, so a check of the saved values after a page load comes after this.
+    public async Task WaitForEditableSettingsAsync()
     {
-        ArgumentNullException.ThrowIfNull(path);
-        await app.ExpectStoredSettingAsync(BrowserSettingsKey, [$"{routes.Organization}.{routes.Project}", .. path], expected);
+        await Expect(DefaultTimeZone.Button).ToBeEnabledAsync();
+        await Expect(DateFormat.Combobox).ToBeEnabledAsync();
+    }
+
+    // Saves the draft of the project settings with "Save project settings" and waits for the toast "Project settings
+    // saved" and the disabled button.
+    public async Task SaveSettingsAsync()
+    {
+        await SaveSettingsButton.ClickAsync();
+        await Expect(app.Toast("Project settings saved")).ToBeVisibleAsync();
+        await Expect(SaveSettingsButton).ToBeDisabledAsync();
     }
 
     // Loads the settings again, at the section when given, and waits like OpenAsync. Where the page shows them already,
@@ -154,5 +210,17 @@ public sealed partial class ProjectSettingsPage
         {
             await Expect(app.Page.Locator($"#{section}")).ToBeVisibleAsync();
         }
+    }
+
+    // A card of the project settings by its heading: "Annotations", "Dates" or "Annotation types".
+    private ILocator SettingsCard(string card)
+    {
+        return card switch
+        {
+            "Annotations" => AnnotationsCard,
+            "Dates" => DatesCard,
+            "Annotation types" => AnnotationTypesCard,
+            _ => throw new ArgumentException($"'{card}' is not a card of the project settings; use Annotations, Dates or Annotation types.", nameof(card)),
+        };
     }
 }

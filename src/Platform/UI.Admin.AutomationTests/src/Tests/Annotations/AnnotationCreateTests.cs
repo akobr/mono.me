@@ -13,7 +13,8 @@ namespace _42.Platform.UI.Admin.AutomationTests.Tests.Annotations;
 public sealed class AnnotationCreateTests : PlatformTest
 {
     // ANN-NEW-01: New annotation creates an execution with its missing ancestors.
-    // In a fresh browser the dialog starts at Execution in the project's default time zone, UTC. Three new names,
+    // The dialog starts at Execution in the project's default time zone, UTC: no test saves the project settings of the
+    // target project (the default time zone of SET-BRW-01 is a disposable project's). Three new names,
     // each through 'Create "<name>"', make the key, and the preview lists the four ancestors the API creates with it;
     // Create opens the new execution's detail with its title, as active and in UTC, and the subject's filter counts
     // the execution and its subject's three keys.

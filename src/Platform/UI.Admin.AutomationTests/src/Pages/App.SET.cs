@@ -2,12 +2,13 @@ using System.Text.RegularExpressions;
 
 namespace _42.Platform.UI.Admin.AutomationTests.Pages;
 
-// The Settings section's members of the shell: what the browser keeps (localStorage) and the type colors of the
-// document. The settings of this browser apply without a Save and without a toast, so the tests read their effect here.
+// The Settings section's members of the shell: what the browser keeps (localStorage: the Preferences, which apply
+// without a Save and without a toast) and the type colors of the document, which follow the saved project settings and
+// the Preferences, not the unsaved draft of Settings.
 public sealed partial class App
 {
-    // Waits until the JSON that localStorage keeps under the key has the text value at the path ("acme.billing",
-    // "defaultTimeZone"), or none for null, up to Execution:ActionTimeoutMs; the error shows what is stored.
+    // Waits until the JSON that localStorage keeps under the key has the text value at the path ("types", "exe",
+    // "label"), or none for null, up to Execution:ActionTimeoutMs; the error shows what is stored.
     public async Task ExpectStoredSettingAsync(string key, IReadOnlyList<string> path, string? expected)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
