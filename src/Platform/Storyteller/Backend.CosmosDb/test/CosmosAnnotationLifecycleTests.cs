@@ -92,6 +92,61 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
         (await Annotations.GetAnnotationAsync(Key("unt.de-r.de-u"))).Should().NotBeNull();
     }
 
+    // A context restored with its descendants brings back its execution while the usage, the execution's other parent,
+    // stays deleted (or expires) with the context still in its ContextNames. The delete of the execution then has an
+    // active and a deleted (or missing) outside parent: only the active one is changed.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Delete_WithAnOutsideParentDeletedOrExpired_ChangesOnlyTheActiveOne(bool isExpired)
+    {
+        var prefix = isExpired ? "dpx" : "dpd";
+        var (subject, responsibility, context, unit) = ($"{prefix}-s", $"{prefix}-r", $"{prefix}-c", $"{prefix}-u");
+        var usageKey = $"usg.{subject}.{responsibility}";
+        var executionKey = $"exe.{subject}.{responsibility}.{context}";
+        var unitOfExecutionKey = $"uxe.{subject}.{responsibility}.{context}.{unit}";
+        await CreateAsync(unitOfExecutionKey);
+        await Annotations.DeleteAnnotationAsync(Key($"sbt.{subject}"));
+
+        var restored = await RestoreAsync(includeDescendants: true, $"cnt.{subject}.{context}");
+
+        restored.Failed.Should().BeEmpty();
+        restored.Annotations.Select(a => a.AnnotationKey).Should().Equal($"sbt.{subject}", $"cnt.{subject}.{context}", executionKey, unitOfExecutionKey);
+        (await GetAsync<Context>($"cnt.{subject}.{context}")).ResponsibilityNames.Should().Contain(responsibility);
+        (await Annotations.GetDeletedAnnotationAsync(Key(usageKey))).Should().NotBeNull();
+
+        var usageId = $"default.{usageKey}";
+        var usagePartition = Key(usageKey).GetPartitionKey();
+        var usage = await ReadRawAsync(usageId, usagePartition);
+        Names(usage!.Value, "ContextNames").Should().Contain(context);
+
+        if (isExpired)
+        {
+            // the usage's ttl ran out before the delete
+            using (await Container.DeleteItemStreamAsync(usageId, OrganizationKeys.Key(TestConstants.Organization, usagePartition)))
+            {
+            }
+        }
+
+        var result = await Annotations.DeleteAnnotationAsync(Key(executionKey));
+
+        result.DeletedKeys.Should().Equal(unitOfExecutionKey, executionKey);
+        (await GetAsync<Context>($"cnt.{subject}.{context}")).ResponsibilityNames.Should().NotContain(responsibility);
+        (await Annotations.GetAnnotationAsync(Key($"unt.{responsibility}.{unit}"))).Should().NotBeNull();
+
+        var after = await ReadRawAsync(usageId, usagePartition);
+
+        if (isExpired)
+        {
+            after.Should().BeNull("a missing parent is skipped, not created");
+            return;
+        }
+
+        after!.Value.GetProperty("_etag").GetString().Should().Be(usage.Value.GetProperty("_etag").GetString(), "the deleted usage is not written");
+        Names(after.Value, "ContextNames").Should().Equal(Names(usage.Value, "ContextNames"));
+        after.Value.GetProperty("Deletion").GetRawText().Should().Be(usage.Value.GetProperty("Deletion").GetRawText());
+    }
+
     [Fact]
     public async Task Delete_Unit_RemovesTheUnitFromItsResponsibilityAndExecutions()
     {
@@ -576,6 +631,11 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
         });
 
         return response.Annotations.Select(a => a.AnnotationKey).ToList();
+    }
+
+    private static List<string> Names(JsonElement annotation, string array)
+    {
+        return annotation.GetProperty(array).EnumerateArray().Select(name => name.GetString()).ToList();
     }
 
     private async Task<JsonElement?> ReadRawAsync(string id, string partitionKey)
