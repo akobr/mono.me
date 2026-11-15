@@ -151,7 +151,7 @@ The scenarios cover:
 
 ### `project-settings`
 
-The catalog of [project settings](access.md#project-settings), and how a settings document of any client is validated and normalized. The file is `project-settings.json`, and it is also the catalog of the platform itself: `Abstractions.Annotations` embeds it (`ProjectSettingsCatalog`, with the rules in `ProjectSettingsRules` and `ProjectSettingsJson`), so the API checks every write against it, and the TypeScript SDK generates its catalog module from it.
+The catalog of [project settings](access.md#project-settings), and how a settings document of any client is validated and normalized. The file is `project-settings.json`, and it is also the catalog of the platform itself: `Abstractions.Annotations` embeds it (`ProjectSettingsCatalog`, with the rules in `ProjectSettingsRules` and `ProjectSettingsJson`), so the API checks every write against it, and `sform` and DbCreator read and check settings with the same types; the TypeScript SDK generates its catalog module from it, and the admin UI checks its own lists against it.
 
 ```json
 {
@@ -261,6 +261,7 @@ A runtime whose own text differs, as JavaScript's `String(1e20)` does, emulates 
 | .NET (reference) | `Configuration/test/Conformance`: `SuiteTests`, `ErrorVectorTests`, `RefreshScenarioTests` | the suite itself (manifest, schemas, coverage, portability); `errors` at startup and at refresh; `refresh` | |
 | .NET (reference) | `src/Platform/Storyteller/Backend.Core/test/ProjectSettings`: `ProjectSettingsConformanceTests` | `project-settings` through `ProjectSettingsJson.Read`: every vector, the normalized settings read again in both JSON shapes, a vector for every rule, and the file's catalog against the one `Abstractions.Annotations` embeds | |
 | TypeScript SDK | `sdk.typescript/src/test/conformance` | `flattening` through `flattenConfiguration`; `formats` for `flat` and `env` through `formatConfiguration`; `errors` through the conditional reads and `isTransientError`; `project-settings` through `validateProjectSettings`, and the catalog module (`generated/catalog/project-settings.ts`) against the file's catalog | `refresh`: the SDK has no configuration provider. `formats` for `properties` and `yaml`, whose count the runner reports |
+| Admin UI | `ui.admin/src/test/unit/utils/project-settings-catalog.test.ts` | `project-settings`: the UI's own colors, icons, date formats, limits, defaults and built-in names against the catalog, the browser's time zones in it, and every vector through the UI's reading and writing (`fromApi`, `toApi`, the type sanitizer), whose result `validateProjectSettings` accepts | the other kinds: the UI reads no configuration through a provider |
 
 **.NET.**
 
@@ -283,6 +284,9 @@ dotnet test --project src/Platform/Storyteller/Backend.Core/test --filter-class 
 
 cd src/Platform/Storyteller/sdk.typescript/src
 npx vitest run test/conformance
+
+cd ../../../ui.admin/src
+npx vitest run test/unit/utils/project-settings-catalog.test.ts
 ```
 
 A change of the catalog also changes the SDK's generated module: run `npm run generate` in `sdk.typescript/src` and commit `generated/catalog/project-settings.ts`, or the check "generated client matches the OpenAPI document" of `Platform.UI.Admin.yml` fails.
@@ -293,6 +297,7 @@ A change of the catalog also changes the SDK's generated module: run `npm run ge
 
 - The .NET job runs both test projects in full on Linux and Windows, and `ProjectSettingsConformanceTests` of `Backend.Core/test` (only that class: the rest of Backend.Core's tests are not part of the suite). Changes of `Abstractions.Annotations` and of the project settings tests of Backend.Core trigger it too.
 - The TypeScript job type-checks and tests the SDK.
+- The admin UI's catalog test runs in `Platform.UI.Admin.yml`, which a change of `project-settings.json` triggers too.
 
 **`.github/workflows/Platform.Storyteller.Sdk-release.yml`** releases the SDKs and is run by hand.
 
