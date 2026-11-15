@@ -459,6 +459,8 @@ Every command ends with one of these codes. A refusal or a failure of the API is
 | `sform.settings.json` (the editor and the default project, see [Settings](#settings)), the session (`authkit.cache`, or `msal.cache` for Entra ID) and `telemetry.json` | your `.42for.net` folder: `%LOCALAPPDATA%\.42for.net` on Windows, `~/.42for.net` elsewhere |
 | `auth.discovery.json` (the sign-in settings of the server), `logs/`, and the `access.default.json` and `editor.config.json` of earlier versions, which are still read | next to `sform` itself, the folder of the tool |
 
+The log in `logs/` (`cli<date>.log`, one file a day) is for you and the support: it names the command and the options of every failure, the project and the view a command was given with `-p` and `-v`, and the failure with its stack. It never keeps the values of the other arguments and options, and no secret: those become `***`, in the messages of a failure too.
+
 `SFORM_HOME` moves every one of them into one folder, so that two sessions, two default projects or two users can live side by side, each in its own folder. It must be an absolute path: a relative one, or a path to a file, stops every command with exit code `2` before anything is read or written. A folder that does not exist yet is created by the first command that writes to it. `app.config.json` stays next to `sform`.
 
 ``` bash
@@ -504,9 +506,9 @@ A build of `sform` from source (Debug) runs as `Development` and reads the user 
 
 Never sent: arguments, option values, error messages, names of organizations, projects, views or keys, addresses, file paths, your name or e-mail, the name of the machine, and tokens. The events create no person profile, and PostHog does not look up a location for them.
 
-The installation id is a random number, not derived from the machine or your account. It is kept in `telemetry.json`, next to the stored session: in `%LOCALAPPDATA%\.42for.net` on Windows and in `~/.42for.net` elsewhere, so it survives tool updates, or in `SFORM_HOME` when it is set. On the first run `sform` creates it and prints a notice to standard error. When `sform` reports a failure to Sentry, the report carries the same id.
+The installation id is a random number, not derived from the machine or your account. It is kept in `telemetry.json`, next to the stored session: in `%LOCALAPPDATA%\.42for.net` on Windows and in `~/.42for.net` elsewhere, so it survives tool updates, or in `SFORM_HOME` when it is set. On the first run `sform` creates it and prints a notice to standard error. When `sform` reports a failure to Sentry, the report carries the same id (see [Error reports](#error-reports)).
 
-Set `DO_NOT_TRACK` or `SFORM_TELEMETRY_OPTOUT` to `1`, `true`, `yes` or `on` to turn telemetry off. `DO_NOT_TRACK` is honoured by other tools too, `SFORM_TELEMETRY_OPTOUT` only by `sform`. With telemetry off, `sform` sends nothing and creates no id.
+Set `DO_NOT_TRACK` or `SFORM_TELEMETRY_OPTOUT` to `1`, `true`, `yes` or `on` to turn telemetry off. `DO_NOT_TRACK` is honoured by other tools too, `SFORM_TELEMETRY_OPTOUT` only by `sform`. With telemetry off, `sform` sends nothing, neither usage data nor error reports, and creates no id.
 
 ``` powershell
 # This session only
@@ -517,6 +519,20 @@ $env:DO_NOT_TRACK = "1"
 ```
 
 In a pipeline, set the variable in the `env` of the job like the sign-in variables above.
+
+### Error reports
+
+When a command fails, `sform` reports the failure to Sentry in the EU cloud: a crash, a failed sign-in, a call the API refused or failed, a service it could not reach, or a command line it could not parse. A report says how the tool was used, never what you typed.
+
+| Sent | Example |
+|---|---|
+| What happened, the command by its full name, and the names of the options you gave | `Unhandled exception at sform storyteller kv set --secret --projectKey` |
+| The type of the failure and where in `sform` it happened, the stack | `System.IO.FileNotFoundException` |
+| The first line of the message of the failure, without values: what you typed, the names of organizations, projects and views `sform` targets, quoted text, file paths, the path and query of addresses, e-mail addresses, ids and secrets become `***` | `Could not find file '***'.` |
+| The version of `sform`, release or development build, the operating system, the .NET version, the time zone and the culture | `42.Platform.Cli@0.8.85-alpha+0cab16204f`, `production` |
+| The installation id of the usage data, when telemetry is on | `3f1c2a9e5b7d4c119e0a2d4f6b8c1a07` |
+
+Never sent: arguments, option values, the token of an unknown command or option, the rest of a message, the server's answer, your name or e-mail, the name of the machine and the paths of your profile. A report is sent once, when the command has failed; `sform` keeps nothing for Sentry, in `SFORM_HOME` or anywhere else. `DO_NOT_TRACK` and `SFORM_TELEMETRY_OPTOUT` turn the error reports off with the usage data.
 
 ## Settings
 
