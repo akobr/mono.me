@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.34.56348
+ * OpenAPI spec version: 0.10.40.6327
  */
 import type {
   AccessPoint,
@@ -15,6 +15,7 @@ import type {
   AuthConfiguration,
   AuthorizationServerMetadata,
   CertificateRenewalResult,
+  Exhibition,
   FederatedIssuer,
   FederationRule,
   Invitation,
@@ -681,6 +682,38 @@ export const revokeSharedCertificate = async (
       method: "DELETE",
     },
   );
+};
+
+export const getGetExhibitionUrl = () => {
+  return `/v1/access/exhibition`;
+};
+
+/**
+ * The exhibition: the demo project of the deployment, which the caller may join as a Reader. Its view is default. Works before the account exists.
+ */
+export const getExhibition = async (
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Exhibition> => {
+  return storytellerFetch<Exhibition>(getGetExhibitionUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getJoinExhibitionUrl = () => {
+  return `/v1/access/exhibition/join`;
+};
+
+/**
+ * Makes the caller a Reader of the exhibition project: creates the account, without an organization, when needed, and keeps a higher role. No request body.
+ */
+export const joinExhibition = async (
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Account> => {
+  return storytellerFetch<Account>(getJoinExhibitionUrl(), {
+    ...options,
+    method: "POST",
+  });
 };
 
 export const getGetFederatedIssuersUrl = (

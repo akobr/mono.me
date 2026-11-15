@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.34.56348
+ * OpenAPI spec version: 0.10.40.6327
  */
 import { faker } from "@faker-js/faker";
 
@@ -18,6 +18,7 @@ import type {
   AuthConfiguration,
   AuthorizationServerMetadata,
   CertificateRenewalResult,
+  Exhibition,
   FederatedIssuer,
   Invitation,
   MachineAccess,
@@ -996,6 +997,44 @@ export const getIssueSharedCertificateResponseMock = (
   ]),
   CertificatePassword: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getGetExhibitionResponseMock = (
+  overrideResponse: Partial<Extract<Exhibition, object>> = {},
+): Exhibition => ({
+  Organization: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Project: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getJoinExhibitionResponseMock = (
+  overrideResponse: Partial<Extract<Account, object>> = {},
+): Account => ({
+  Id: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  UserName: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Name: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  AccessMap: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: faker.helpers.arrayElement(
+        Object.values(AccountRole),
+      ),
+    },
     undefined,
   ]),
   ...overrideResponse,
@@ -2299,6 +2338,54 @@ export const getRevokeSharedCertificateMockHandler = (
   );
 };
 
+export const getGetExhibitionMockHandler = (
+  overrideResponse?:
+    | Exhibition
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<Exhibition> | Exhibition),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/access/exhibition",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetExhibitionResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getJoinExhibitionMockHandler = (
+  overrideResponse?:
+    | Account
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<Account> | Account),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/access/exhibition/join",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getJoinExhibitionResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetFederatedIssuersMockHandler = (
   overrideResponse?:
     | FederatedIssuer[]
@@ -2725,6 +2812,8 @@ export const getAccessMock = () => [
   getGetSharedCertificatesMockHandler(),
   getIssueSharedCertificateMockHandler(),
   getRevokeSharedCertificateMockHandler(),
+  getGetExhibitionMockHandler(),
+  getJoinExhibitionMockHandler(),
   getGetFederatedIssuersMockHandler(),
   getGetFederatedIssuerMockHandler(),
   getSetFederatedIssuerMockHandler(),

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.10.34.56348
+ * OpenAPI spec version: 0.10.40.6327
  */
 import * as zod from "zod";
 
@@ -899,6 +899,37 @@ export const RevokeSharedCertificateParams = zod.object({
 });
 
 export const RevokeSharedCertificateResponse = zod.unknown();
+
+/**
+ * The exhibition: the demo project of the deployment, which the caller may join as a Reader. Its view is default. Works before the account exists.
+ */
+export const GetExhibitionResponse = zod.object({
+  Organization: zod.string(),
+  Project: zod.string(),
+  Description: zod.string().optional(),
+});
+
+/**
+ * Makes the caller a Reader of the exhibition project: creates the account, without an organization, when needed, and keeps a higher role. No request body.
+ */
+export const JoinExhibitionResponse = zod.object({
+  Id: zod.string().optional(),
+  UserName: zod.string().optional(),
+  Name: zod.string().optional(),
+  AccessMap: zod
+    .record(
+      zod.string(),
+      zod.enum([
+        "None",
+        "Reader",
+        "Contributor",
+        "ContributorWithSecrets",
+        "Administrator",
+        "Owner",
+      ]),
+    )
+    .optional(),
+});
 
 /**
  * The trusted issuers of the project: the OIDC issuers whose tokens its Federated machines exchange for Storyteller tokens. Contributor.
