@@ -1,3 +1,4 @@
+
 using ModelContextProtocol.Protocol;
 
 using Newtonsoft.Json.Linq;
@@ -6,7 +7,8 @@ namespace _42.Platform.Storyteller.Mcp.Tools;
 
 // Turns an SDK ApiException into an isError tool result the model can act on. The API's message and hint are copied
 // only where they are safe: a 500 can carry a raw storage or vault message, and a 422 binding error can quote an
-// evaluated secret. A stack trace (ErrorResponse.Error), Details and the raw response are never copied.
+// evaluated secret. A stack trace (ErrorResponse.Error), Details and the raw response are never copied. The step-up is
+// told by the SDK (StepUp.IsStepUpRequired), also from a body the client left as text; nothing of that text is copied.
 public static class ApiErrors
 {
     public const string BindingMessage = "A binding could not be evaluated.";
@@ -28,12 +30,53 @@ public static class ApiErrors
         + "(creating or resetting a machine with a Secrets scope, replacing its federation rules). Do this with sform or "
         + "the admin UI.";
 
+    // The API's ErrorCode for what needs a recent sign-in of the person (Auth:StepUp, RFC 9470): a 401 with the window in
+    // Details.MaxAge and in the WWW-Authenticate challenge.
+    public const string StepUpRequiredCode = Sdk.StepUp.ErrorCode;
+
+    // The MCP client signs the person in at the identity provider itself and cannot ask it for a new sign-in (max_age); a
+    // token exchange copies the old time of the sign-in.
+    public const string StepUpRemedy =
+        "A reconnect that reuses the person's browser session keeps the old sign-in: ask the person to sign out at the "
+        + "identity provider first (for AuthKit, Sign out in the admin UI), then reconnect the MCP server in the client and "
+        + "retry, or to make the change in the admin UI. The assistant cannot do this itself.";
+
+    // A restore or a purge answers 200 and refuses each secret it may not touch for a stale sign-in with this code.
+    public const string StepUpItemsNotice =
+        "The items with ErrorCode StepUpRequired were refused because the person's sign-in is not recent: the Storyteller "
+        + "API needs a recent sign-in of the person for secret values. " + StepUpRemedy;
+
+    // The text of a step-up, with the window written out when the API names it ("within the last 10 minutes").
+    public static string StepUpRequiredMessage(TimeSpan? maxAge)
+    {
+        var window = maxAge is { } value && value > TimeSpan.Zero ? $" (within the last {DescribeWindow(value)})" : string.Empty;
+
+        return $"The Storyteller API needs a recent sign-in of the person for this{window}: reading or writing secret values, "
+            + "creating or resetting machine credentials, changing federation rules. " + StepUpRemedy;
+    }
+
+    // "10 minutes", "1 hour", "90 seconds": the largest unit that divides the window, as the API writes it.
+    public static string DescribeWindow(TimeSpan duration)
+    {
+        return Sdk.StepUp.DescribeWindow(duration);
+    }
+
     public static CallToolResult ToResult(Sdk.ApiException exception)
     {
         var (errorCode, message, hint, errors) = Read(exception);
         var status = exception.StatusCode;
+        long? maxAgeSeconds = null;
 
-        if (string.Equals(errorCode, ActorRestrictedCode, StringComparison.Ordinal))
+        // First: the API answers the actor's refusal of a read before the step-up, so a step-up is never an actor's.
+        if (Sdk.StepUp.IsStepUpRequired(exception, out var maxAge))
+        {
+            errorCode = StepUpRequiredCode;
+            message = StepUpRequiredMessage(maxAge);
+            hint = null;
+            errors = null;
+            maxAgeSeconds = maxAge is { } window ? (long)Math.Floor(window.TotalSeconds) : null;
+        }
+        else if (string.Equals(errorCode, ActorRestrictedCode, StringComparison.Ordinal))
         {
             message = ActorRestrictedMessage;
             hint = null;
@@ -75,15 +118,21 @@ public static class ApiErrors
             details["Errors"] = errors;
         }
 
+        if (maxAgeSeconds is { } seconds)
+        {
+            details["MaxAge"] = seconds;
+        }
+
         var text = $"Storyteller API answered {status}{(string.IsNullOrEmpty(errorCode) ? string.Empty : " " + errorCode)}: {message}"
             + (string.IsNullOrEmpty(hint) ? string.Empty : $" Hint: {hint}");
 
         return ToolResults.Error(text, details);
     }
 
+    // The code for a log or a check: the step-up's known code, or the code of a body the client read.
     public static string? GetErrorCode(Sdk.ApiException exception)
     {
-        return Read(exception).ErrorCode;
+        return Sdk.StepUp.IsStepUpRequired(exception) ? StepUpRequiredCode : Read(exception).ErrorCode;
     }
 
     private static (string? ErrorCode, string? Message, string? Hint, JArray? Errors) Read(Sdk.ApiException exception)
@@ -104,6 +153,7 @@ public static class ApiErrors
             _ => (null, null, null, null),
         };
     }
+
 
     private static string DefaultMessage(int status)
     {

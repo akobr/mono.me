@@ -22,6 +22,7 @@ import { fallbackFunctions } from '@/utils/binding-language'
 import { accountTarget, recordAccessAudit } from './access-audit'
 import { stamp } from './audit'
 import { loadDb, saveDb, type MockDb } from './db'
+import { mockStepUpConfiguration } from './step-up'
 
 // Hand-written handlers for the operations the mock scenarios need to be coherent (accounts, access points,
 // views, …). Every other operation falls through to the Orval-generated Faker handlers.
@@ -97,7 +98,7 @@ function recordCreated(db: MockDb, key: string) {
 
 export const accessHandlers: HttpHandler[] = [
   http.get(`${api}/auth/configuration`, () =>
-    HttpResponse.json({ Provider: 'AuthKit', ClientId: 'client_mock', Scopes: [] }),
+    HttpResponse.json({ Provider: 'AuthKit', ClientId: 'client_mock', Scopes: [], StepUp: mockStepUpConfiguration }),
   ),
 
   http.get(

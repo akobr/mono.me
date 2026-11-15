@@ -6,15 +6,27 @@ namespace _42.Platform.Cli.Output;
 /// <summary>
 /// What <c>Program.Main</c> prints for a <c>401</c> or <c>403</c> of the API that the command left to it.
 /// </summary>
-/// <param name="Message">The server's message of a <c>403</c>, or the general sentence.</param>
-/// <param name="ErrorCode">The server's error code of a <c>403</c>, when it sent one.</param>
+/// <param name="Message">The server's message of a <c>403</c>, the sentence of the step-up, or the general sentence.</param>
+/// <param name="ErrorCode">The server's error code of a <c>403</c>, when it sent one, or <c>StepUpRequired</c>.</param>
 /// <param name="MayBeTheCredentials">The credentials may be the cause, so the hint of a machine sign-in helps.</param>
-internal sealed record ApiRefusal(string Message, string? ErrorCode, bool MayBeTheCredentials)
+/// <param name="Hint">What helps, when the refusal names it: a new sign-in for the step-up.</param>
+internal sealed record ApiRefusal(string Message, string? ErrorCode, bool MayBeTheCredentials, string? Hint = null)
 {
     public const string GeneralMessage = "You are not authorized to execute the command or you don't have access to requested resources.";
 
     public static ApiRefusal Of(ApiException exception)
     {
+        // The step-up (a 401 with StepUpRequired, or the challenge of RFC 9470): the user's sign-in is older than the
+        // window. The credentials are fine, and signing in again helps where a refresh does not.
+        if (exception.IsStepUpRequired(out var maxAge))
+        {
+            return new ApiRefusal(
+                StepUpRefusal.MessageOf(maxAge, KeyValueConsoleExtensions.ReadError(exception).Message),
+                StepUpRefusal.ErrorCode,
+                MayBeTheCredentials: false,
+                StepUpRefusal.Hint);
+        }
+
         // A 403 with the server's message names what is missing, for example a scope the machine was not
         // created with: the credentials were accepted. A 401, or a 403 without a message, says nothing more.
         // An operation that does not declare 403 leaves the body as text, so read both shapes.

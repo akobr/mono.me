@@ -39,6 +39,19 @@ internal static class ConfigurationReads
         return (await ReadAsync(api, context, key, isResolved: false)).Configuration;
     }
 
+    // What gets the secrets of a resolved read that the API withheld (X-2S-Secrets-Withheld), per reason; null for a
+    // reason this sform does not know.
+    public static string? WithheldHint(string? reason)
+    {
+        return reason switch
+        {
+            SecretsWithheldReasons.MtlsRequired => "A machine receives secrets over mTLS with its certificate, or from a project that does not require mTLS for secret delivery.",
+            SecretsWithheldReasons.ActorRestricted => "The sign-in acts through an actor that may not reveal secrets (NoSecretReveal), and a new sign-in does not change that: read it with a sign-in of your own.",
+            SecretsWithheldReasons.StepUpRequired => "Secrets need a recent sign-in: " + StepUpRefusal.Remedy,
+            _ => null,
+        };
+    }
+
     // json and no name are the JSON content (null); false for a name that is no format.
     public static bool TryParseFormat(string? name, out ConfigurationFormat? format)
     {

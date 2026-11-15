@@ -51,10 +51,7 @@ internal sealed class DocumentReader
         // The header depends on the caller's rights, not on the content: a document without secrets is withheld too.
         if (identity.Mode == StorytellerReadMode.Resolved && response.SecretsWithheld is { } reason)
         {
-            return new ReadOutcome.Withheld(
-                reason,
-                response.StatusCode,
-                $"The platform withheld the secrets of {identity.Key} ({reason}): the machine may read secrets, but it presented no client certificate. Present the machine certificate (STORYTELLER_CLIENT_CERTIFICATE), or remove Secrets.Read from the machine.");
+            return new ReadOutcome.Withheld(reason, response.StatusCode, WithheldMessage(identity.Key, reason));
         }
 
         return response.IsNotModified
@@ -89,6 +86,23 @@ internal sealed class DocumentReader
             identity.Key,
             paths.Count,
             listed);
+    }
+
+    // The message of a withheld read names the remedy of its reason (X-2S-Secrets-Withheld).
+    internal static string WithheldMessage(string key, string reason)
+    {
+        var withheld = $"The platform withheld the secrets of {key} ({reason})";
+
+        return reason switch
+        {
+            SecretsWithheldReasons.MtlsRequired => withheld
+                + ": the machine may read secrets, but it presented no client certificate. Present the machine certificate (STORYTELLER_CLIENT_CERTIFICATE), or remove Secrets.Read from the machine.",
+            SecretsWithheldReasons.ActorRestricted => withheld
+                + ": the user token acts through an actor that may not reveal secrets (NoSecretReveal), and a new sign-in does not change that. Read with a token of the user without the actor, or with a machine.",
+            SecretsWithheldReasons.StepUpRequired => withheld
+                + ": the user may read secrets, but signed in longer ago than the platform allows for them (step-up). Sign the user in again and use the new token, or read with a machine, which needs no recent sign-in.",
+            _ => withheld + ": the caller may read secrets, but the platform did not deliver them.",
+        };
     }
 
     // The classification lives in ReadFailures; kept here for the tests of the reader.

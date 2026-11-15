@@ -8,12 +8,13 @@ import type { Router } from 'vue-router'
 import App from './App.vue'
 import { configureApi } from './boot/api'
 import { loadAppConfig } from './boot/app-config'
-import { createAuth } from './boot/auth'
+import { createAuth, loadAuthConfiguration } from './boot/auth'
 import { createQueryClient } from './boot/query'
 import { setBootState, type BootState } from './boot/state'
 import { resetTelemetry, startTelemetry } from './boot/telemetry'
 import { createAppRouter } from './router'
 import { onSignOut, useSessionStore } from './stores/session'
+import { useStepUpStore } from './composables/useStepUp'
 
 // The e2e mode (vite --mode e2e) serves the API from MSW and signs in a fake user. The checks are static,
 // so production builds drop the mock modules entirely.
@@ -22,11 +23,16 @@ const isMock = import.meta.env.MODE === 'e2e'
 async function boot(router: Router): Promise<BootState> {
   try {
     const config = await loadAppConfig()
-    configureApi(config, () => void useSessionStore().signIn(router.currentRoute.value.fullPath))
+    configureApi(
+      config,
+      () => void useSessionStore().signIn(router.currentRoute.value.fullPath),
+      () => void useStepUpStore().ask(),
+    )
 
     if (isMock) {
       const { createMockAuth } = await import('./mock/auth')
-      return { status: 'ready', auth: createMockAuth(), config }
+      // The discovery is kept in mock mode too: the screens read StepUp from it.
+      return { status: 'ready', auth: createMockAuth(), authConfiguration: await loadAuthConfiguration(config), config }
     }
 
     return { ...(await createAuth(config)), config }

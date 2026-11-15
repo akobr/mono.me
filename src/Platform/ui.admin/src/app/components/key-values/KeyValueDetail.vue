@@ -5,6 +5,7 @@ import {
   getKeyValue,
   hasErrorCode,
   isPreconditionFailed,
+  isStepUpRequired,
   protectKeyValues,
   restoreKeyValues,
   setKeyValue,
@@ -12,6 +13,7 @@ import {
 } from '@42for.net/2splatform.sdk'
 import { encryptForRecipients, getHyokPlace } from '@42for.net/2splatform.sdk/hyok'
 import { useRevealedValue } from '@/composables/useRevealedValue'
+import { hasStepUpItems, useStepUpStore, type RevealTarget } from '@/composables/useStepUp'
 import { invalidateKeyValues } from '@/queries/invalidation'
 import { useKeyValue, useKeyValuePolicy, useRecipients } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
@@ -32,6 +34,8 @@ import {
 /**
  * The Value tab of a pair (spec 29.3): metadata, the binding to copy, the public value in an editor, a masked field
  * with Reveal for a server-side secret, the recipients of a HYOK value, and Set new value. Saves send ExpectedVersion.
+ * A Reveal and a secret's new value need a recent sign-in (424-264): the Reveal that asked for it is repeated once
+ * after the return, and Set new value asks first when the sign-in is about to be too old.
  */
 const props = defineProps<{ keyName: string }>()
 
@@ -39,6 +43,7 @@ const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const confirm = useConfirm()
+const stepUp = useStepUpStore()
 const canEdit = useCan('edit')
 const canSecrets = useCan('secrets')
 
@@ -92,6 +97,36 @@ const revealed = useRevealedValue(async () => {
   const fresh = await getKeyValue(org, project, view, props.keyName, { reveal: true, includeDeleted: true })
   return fresh.Value ?? undefined
 })
+
+const revealTarget = (): RevealTarget | undefined =>
+  context.scope ? { scope: `${context.scope.org}/${context.scope.project}/${context.scope.view}`, key: props.keyName } : undefined
+
+async function reveal() {
+  await revealed.reveal()
+  const target = revealTarget()
+  if (isStepUpRequired(revealed.error.value) && target) {
+    stepUp.rememberReveal(target)
+  }
+}
+
+// Back from the step-up that a Reveal asked for, the Reveal runs once more (never a write).
+watch(
+  () => !!pair.data.value && secret.value && !clientEncrypted.value && !deleted.value && canSecrets.value,
+  (ready) => {
+    const target = revealTarget()
+    if (ready && target && stepUp.takePendingReveal(target)) {
+      void reveal()
+    }
+  },
+  { immediate: true },
+)
+
+// The new value of a secret is typed only with a sign-in recent enough to save it.
+async function startNewValue() {
+  if (await stepUp.ensureRecentSignIn()) {
+    settingNew.value = true
+  }
+}
 
 const allowedLevels = computed(
   () => (policy.data.value?.AllowedProtections ?? ['Public', 'Standard']) as KeyValueProtection[],
@@ -212,6 +247,9 @@ async function restore() {
     } else {
       toast.add({ title: 'The key was not restored', description: item?.Message ?? item?.Outcome, color: 'warning' })
     }
+    if (hasStepUpItems(result.Items)) {
+      void stepUp.ask()
+    }
     await refresh()
   } catch (error) {
     toast.add({ title: writeFailureTitle(error, 'The key was not restored'), description: errorMessage(error), color: 'error' })
@@ -313,7 +351,7 @@ const protectTargets = computed(() =>
                 variant="outline"
                 size="sm"
                 :loading="revealed.loading.value"
-                @click="revealed.reveal()"
+                @click="reveal()"
               />
               <UButton v-else label="Hide" icon="i-lucide-eye-off" color="neutral" variant="outline" size="sm" @click="revealed.hide()" />
               <CopyButton v-if="revealed.value.value" :value="revealed.value.value" secret size="sm" />
@@ -343,7 +381,7 @@ const protectTargets = computed(() =>
 
       <!-- a new value for a secret -->
       <div v-if="secret && canSecrets && !deleted" class="space-y-3">
-        <UButton v-if="!settingNew" label="Set new value" icon="i-lucide-pencil" color="neutral" variant="outline" size="sm" @click="settingNew = true" />
+        <UButton v-if="!settingNew" label="Set new value" icon="i-lucide-pencil" color="neutral" variant="outline" size="sm" @click="startNewValue()" />
         <template v-else>
           <UFormField label="New level">
             <USelect v-model="newLevel" :items="levelItems" class="w-48" aria-label="New protection level" />

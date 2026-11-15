@@ -30,6 +30,7 @@ import {
   type ScopeRef,
 } from './documents'
 import { errorResponse, requireRole, withDb } from './handlers'
+import { isStaleSignIn } from './step-up'
 
 const api = '*/api/v1/:org/:project/:view'
 
@@ -543,7 +544,12 @@ export const configurationHandlers: HttpHandler[] = [
           string,
           unknown
         >
-        return HttpResponse.json(configurationResponse(db, scope, params.key, resolved))
+        // The mock never resolves secret bindings; like the API, a caller whose role reads secrets but whose sign-in is
+        // stale learns why (step-up-required, 424-264), on a 200.
+        const withheld = isStaleSignIn() && !requireRole(db, projectKey(params), 'ContributorWithSecrets')
+        return HttpResponse.json(configurationResponse(db, scope, params.key, resolved), {
+          headers: withheld ? { 'X-2S-Secrets-Withheld': 'step-up-required' } : undefined,
+        })
       } catch (error) {
         if (error instanceof BindingError) {
           return errorResponse(422, error.message, 'BindingFailed', 'Check the referenced annotation key and path.')

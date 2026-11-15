@@ -134,6 +134,7 @@ declare module 'vue' {
     SharedCertificatesTable: typeof import('./components/access/SharedCertificatesTable.vue')['default']
     ShortcutsHelp: typeof import('./components/shell/ShortcutsHelp.vue')['default']
     SidebarBrand: typeof import('./components/shell/SidebarBrand.vue')['default']
+    StepUpDialog: typeof import('./components/shell/StepUpDialog.vue')['default']
     TemplateDetail: typeof import('./components/templates/TemplateDetail.vue')['default']
     TextControl: typeof import('./components/configuration/renderers/TextControl.vue')['default']
     TimeZoneSelect: typeof import('./components/annotations/TimeZoneSelect.vue')['default']

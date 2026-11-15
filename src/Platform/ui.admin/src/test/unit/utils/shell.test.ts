@@ -4,7 +4,7 @@ import { groupMemberships, hasOrganization } from '@/utils/memberships'
 import { currentSection, projectTarget, viewLocation, viewTarget } from '@/utils/context-paths'
 import { accessibleContext, buildNavigation, mergeContext, navigationScope } from '@/utils/navigation'
 import { clampDetailWidth, detailMode } from '@/utils/detail-panel'
-import { describeError, writeFailureTitle } from '@/utils/errors'
+import { describeError, errorMessage, formatWindow, stepUpText, writeFailureTitle } from '@/utils/errors'
 import { StorytellerError } from '@42for.net/2splatform.sdk'
 
 describe('safeReturnTo', () => {
@@ -323,6 +323,38 @@ describe('describeError', () => {
     })
     expect(describeError(offline).title).toBe('The API is not reachable')
     expect(describeError(offline)).not.toHaveProperty('timedOut')
+  })
+
+  // 424-264: signing in again helps, unlike any other 401 or 403.
+  it('gives the step-up its own title and text, with the window of the API', () => {
+    const body = {
+      Message: 'This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.',
+      ErrorCode: 'StepUpRequired',
+      Details: { MaxAge: 600 },
+    }
+    const stepUp = StorytellerError.fromResponse(401, 'Unauthorized', body)
+
+    expect(describeError(stepUp)).toEqual({
+      title: 'Sign in again to continue',
+      message: 'For your security, this needs a recent sign-in. Sign in again, then repeat it. A sign-in counts for 10 minutes.',
+      status: 401,
+    })
+    expect(errorMessage(stepUp)).toBe(describeError(stepUp).message)
+    expect(describeError(StorytellerError.fromResponse(401, '', { ...body, Details: undefined })).message).toBe(
+      'For your security, this needs a recent sign-in. Sign in again, then repeat it.',
+    )
+    // the same code on another status is not the step-up
+    expect(describeError(StorytellerError.fromResponse(403, '', body)).title).toBe('No access')
+  })
+
+  it('writes the window out as the API does', () => {
+    expect(formatWindow(600)).toBe('10 minutes')
+    expect(formatWindow(60)).toBe('1 minute')
+    expect(formatWindow(3600)).toBe('1 hour')
+    expect(formatWindow(7200)).toBe('2 hours')
+    expect(formatWindow(90)).toBe('90 seconds')
+    expect(formatWindow(1)).toBe('1 second')
+    expect(stepUpText()).toBe('For your security, this needs a recent sign-in. Sign in again, then repeat it.')
   })
 })
 

@@ -35,6 +35,14 @@ public static class PlainOutputExtensions
     // The message and the code of an API error as plain lines, and the exit code WriteApiError would return.
     public static int WriteApiErrorLine(this IExtendedConsole @this, ApiException exception)
     {
+        if (exception.IsStepUpRequired(out var maxAge))
+        {
+            @this.WriteErrorLine(StepUpRefusal.MessageOf(maxAge, KeyValueConsoleExtensions.ReadError(exception).Message));
+            @this.WriteErrorLine($"Error code: {StepUpRefusal.ErrorCode}");
+            @this.WriteErrorLine(StepUpRefusal.Hint);
+            return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
+        }
+
         var (message, errorCode) = KeyValueConsoleExtensions.ReadError(exception);
         var status = (HttpStatusCode)exception.StatusCode;
 

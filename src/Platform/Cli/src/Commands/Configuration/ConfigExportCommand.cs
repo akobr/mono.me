@@ -90,10 +90,11 @@ public class ConfigExportCommand : BaseContextCommand
             return ConfigurationReads.WriteReadFailure(Console, IsPlainOutput, options.Key, exception);
         }
 
-        // study 3.7: a consumer that cannot get the secrets fails loudly
+        // study 3.7: a consumer that cannot get the secrets fails loudly, with the remedy of the reason
         if (secretsWithheld is not null)
         {
-            Console.WriteErrorLine($"The API withheld the secrets of the configuration ({secretsWithheld}): the values of secret bindings are their expressions. Nothing was exported. A machine receives secrets over mTLS with its certificate, or from a project that does not require mTLS for secret delivery.");
+            var hint = ConfigurationReads.WithheldHint(secretsWithheld);
+            Console.WriteErrorLine($"The API withheld the secrets of the configuration ({secretsWithheld}): the values of secret bindings are their expressions. Nothing was exported.{(hint is null ? string.Empty : " " + hint)}");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 

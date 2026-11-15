@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   getKeyValueVersion,
   getKeyValueVersionDiffCustom,
+  isStepUpRequired,
   type DiffResult,
   type KeyValueVersion,
 } from '@42for.net/2splatform.sdk'
+import { useStepUpStore, type RevealTarget } from '@/composables/useStepUp'
 import { useKeyValue, useKeyValueVersions } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { formatDateTime } from '@/utils/dates'
@@ -14,11 +16,13 @@ import { isClientEncrypted, isSecretLevel, maskedValue } from '@/utils/key-value
 
 /**
  * The Versions tab of a pair (spec 29.4): the timeline with the level of each version, View (a secret only after an
- * explicit reveal, never cached) and Compare with the previous version. HYOK shows the timeline only.
+ * explicit reveal, never cached) and Compare with the previous version. HYOK shows the timeline only. A View of a
+ * secret that asked for a recent sign-in (424-264) is repeated once after the return.
  */
 const props = defineProps<{ keyName: string }>()
 
 const context = useContextStore()
+const stepUp = useStepUpStore()
 const canSecrets = useCan('secrets')
 const pair = useKeyValue(() => props.keyName)
 const versions = useKeyValueVersions(() => props.keyName, true)
@@ -29,6 +33,9 @@ const clientEncrypted = computed(() => isClientEncrypted(pair.data.value?.Protec
 const viewed = ref<{ version: number; value?: string; error?: string }>()
 const compared = ref<{ version: number; from: number; diff?: DiffResult; error?: string }>()
 const busy = ref<number>()
+
+const revealTarget = (version: number): RevealTarget | undefined =>
+  context.scope ? { scope: `${context.scope.org}/${context.scope.project}/${context.scope.view}`, key: props.keyName, version } : undefined
 
 async function view(entry: KeyValueVersion) {
   if (!context.scope || entry.Version === undefined) {
@@ -42,10 +49,29 @@ async function view(entry: KeyValueVersion) {
     viewed.value = { version: entry.Version, value: result.Value ?? '' }
   } catch (error) {
     viewed.value = { version: entry.Version, error: errorMessage(error) }
+    const target = revealTarget(entry.Version)
+    if (isStepUpRequired(error) && target) {
+      stepUp.rememberReveal(target)
+    }
   } finally {
     busy.value = undefined
   }
 }
+
+// Back from the step-up that a View of a secret asked for, the View runs once more.
+watch(
+  () => (canSecrets.value ? rows.value : []),
+  (entries) => {
+    const pending = entries.find((entry) => {
+      const target = entry.Version === undefined || !isSecretLevel(entry.Protection) ? undefined : revealTarget(entry.Version)
+      return target !== undefined && stepUp.takePendingReveal(target)
+    })
+    if (pending) {
+      void view(pending)
+    }
+  },
+  { immediate: true },
+)
 
 async function compare(entry: KeyValueVersion) {
   if (!context.scope || entry.Version === undefined) {

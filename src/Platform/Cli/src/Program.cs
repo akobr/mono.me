@@ -214,6 +214,12 @@ public class Program
                 Console.WriteLine($"  Error code: {refusal.ErrorCode}", Color.DarkGray);
             }
 
+            // The step-up: what a new sign-in takes.
+            if (refusal.Hint is not null)
+            {
+                Console.WriteLine($"  {refusal.Hint}", Color.DarkGray);
+            }
+
             // A 403 with the server's message, for example a missing machine scope, is not about the credentials.
             if (refusal.MayBeTheCredentials && _machineSignIn is { IsConfigured: true })
             {

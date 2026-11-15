@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { importKeyValues, restoreKeyValues, type KeyValueImportResult, type KeyValueProtection } from '@42for.net/2splatform.sdk'
 import { encryptForRecipients, getHyokPlace } from '@42for.net/2splatform.sdk/hyok'
+import { hasStepUpItems, useStepUpStore } from '@/composables/useStepUp'
 import { useKeyValuePolicy, useRecipients } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
@@ -28,6 +29,7 @@ const emit = defineEmits<{ imported: [] }>()
 
 const context = useContextStore()
 const toast = useToast()
+const stepUp = useStepUpStore()
 const canSecrets = useCan('secrets')
 const policy = useKeyValuePolicy()
 const recipients = useRecipients()
@@ -190,10 +192,26 @@ async function undoDeletes() {
   busy.value = true
   try {
     const { org, project, view } = context.scope
-    await restoreKeyValues(org, project, view, { Keys: deletedKeys.value })
-    undone.value = true
+    const restored = await restoreKeyValues(org, project, view, { Keys: deletedKeys.value })
+    // The secrets among the deleted keys need a recent sign-in (424-264): the others are back, those stay deleted.
+    const refused = (restored.Items ?? []).filter((item) => item.Outcome !== 'Done' && item.Outcome !== 'Unchanged')
+    undone.value = refused.length === 0
     emit('imported')
-    toast.add({ title: `${deletedKeys.value.length} key(s) restored`, color: 'success', icon: 'i-lucide-undo-2' })
+    if (refused.length === 0) {
+      toast.add({ title: `${deletedKeys.value.length} key(s) restored`, color: 'success', icon: 'i-lucide-undo-2' })
+    } else {
+      toast.add({
+        title: `${refused.length} of ${deletedKeys.value.length} keys were not restored`,
+        description: refused
+          .slice(0, 5)
+          .map((item) => `${item.Key}: ${item.Message ?? item.Outcome}`)
+          .join('; '),
+        color: 'warning',
+      })
+    }
+    if (hasStepUpItems(restored.Items)) {
+      void stepUp.ask()
+    }
   } catch (error) {
     toast.add({ title: 'The keys were not restored', description: errorMessage(error), color: 'error' })
   } finally {

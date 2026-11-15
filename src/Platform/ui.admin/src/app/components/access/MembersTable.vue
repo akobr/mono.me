@@ -10,20 +10,23 @@ import {
   type AccountRoleName,
 } from '@42for.net/2splatform.sdk'
 import { useGetMembers } from '@42for.net/2splatform.sdk/vue-query'
+import { useStepUpStore } from '@/composables/useStepUp'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useSessionStore } from '@/stores/session'
-import { errorMessage } from '@/utils/errors'
+import { describeError, errorMessage } from '@/utils/errors'
 import { memberRules } from '@/utils/roles'
 
 /**
  * Members of an organization or project (companion spec E2): name, user name or email, role and remove. Role
- * changes set the exact role (`PUT …/members/{accountId}`); the member rules are checked here and by the API.
+ * changes set the exact role (`PUT …/members/{accountId}`); the member rules are checked here and by the API. A role
+ * change asks the person to confirm it is them first when the sign-in is about to be too old (424-264).
  */
 const props = withDefaults(defineProps<{ accessPointKey: string; highlight?: string }>(), { highlight: undefined })
 
 const session = useSessionStore()
 const queryClient = useQueryClient()
 const toast = useToast()
+const stepUp = useStepUpStore()
 
 const members = useGetMembers(() => props.accessPointKey, { query: { meta: { silent: true } } })
 const callerRole = computed<AccountRoleName>(() => getRole(session.accessMap, props.accessPointKey))
@@ -51,15 +54,19 @@ watch(
   { immediate: true },
 )
 
-const messages: Record<string, string> = {
+const messages: Record<string, string | ((error: unknown) => string)> = {
   LastOwner: 'The last Owner cannot be demoted or removed.',
   ElevatedRole: 'Only Owners can grant or revoke Owner.',
   SelfRoleChange: 'You cannot change your own role.',
   MemberNotFound: 'The member no longer exists.',
+  // with the window of the API
+  StepUpRequired: (error) => describeError(error).message,
 }
 
-const describe = (error: unknown) =>
-  Object.entries(messages).find(([code]) => hasErrorCode(error, code))?.[1] ?? errorMessage(error)
+function describe(error: unknown): string {
+  const message = Object.entries(messages).find(([code]) => hasErrorCode(error, code))?.[1]
+  return typeof message === 'function' ? message(error) : (message ?? errorMessage(error))
+}
 
 async function refresh(member: AccessPointMember) {
   await invalidateAccess(queryClient, props.accessPointKey)
@@ -69,6 +76,9 @@ async function refresh(member: AccessPointMember) {
 }
 
 async function changeRole(member: AccessPointMember, role: AccountRoleName) {
+  if (!(await stepUp.ensureRecentSignIn())) {
+    return
+  }
   busy.value = member.AccountId
   try {
     await setMemberRole(props.accessPointKey, member.AccountId!, { Role: role })

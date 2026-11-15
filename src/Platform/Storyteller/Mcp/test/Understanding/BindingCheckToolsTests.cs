@@ -31,12 +31,10 @@ public class BindingCheckToolsTests
               "rule": { "$binding": "jlogic", "$definition": { "if": [{ "var": "tier" }, { "var": "tier" }, "@plan.fallback"] }, "$context": { "tier": "@plan.tier" } }
             }
             """);
-        _configurations
-            .Setup(client => client.GetResolvedConfigurationAsync(Org, Project, View, Key, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Sdk.Configuration
-            {
-                Content = JObject.Parse($$"""{"password": "{{Secret}}", "host": "@db.host", "plain": "x", "list": ["{{Secret}}-region"], "rule": 5}"""),
-            });
+        Resolved(new Sdk.Configuration
+        {
+            Content = JObject.Parse($$"""{"password": "{{Secret}}", "host": "@db.host", "plain": "x", "list": ["{{Secret}}-region"], "rule": 5}"""),
+        });
 
         var result = await new BindingCheckTools(_configurations.Object).CheckConfigurationBindings(Org, Project, Key, View);
 
@@ -50,6 +48,24 @@ public class BindingCheckToolsTests
         bindings["/host"].ShouldBe(false);
         bindings["/list/0"].ShouldBe(true);
         bindings["/rule"].ShouldBe(true);
+        JObject.Parse(result.StructuredContent.Value.GetRawText()).ContainsKey(SecretsWithheldNotice.ReasonProperty).ShouldBeFalse();
+    }
+
+    // 424-264: a stale sign-in leaves the secret bindings as stored; the check says so instead of a bare false.
+    [Fact]
+    public async Task Check_WithSecretsWithheldForAStaleSignIn_SaysWhy()
+    {
+        Effective("""{"password": "@secret(db.password)", "host": "@db.host"}""");
+        Resolved(new Sdk.Configuration { Content = JObject.Parse("""{"password": "@secret(db.password)", "host": "db.local"}""") }, "step-up-required");
+
+        var result = await new BindingCheckTools(_configurations.Object).CheckConfigurationBindings(Org, Project, Key, View);
+
+        var content = JObject.Parse(result.StructuredContent!.Value.GetRawText());
+        content[SecretsWithheldNotice.ReasonProperty]!.Value<string>().ShouldBe("step-up-required");
+        content[SecretsWithheldNotice.PropertyName]!.Value<string>().ShouldBe(SecretsWithheldNotice.For("step-up-required"));
+        var bindings = Bindings(result);
+        bindings["/password"].ShouldBe(false);
+        bindings["/host"].ShouldBe(true);
     }
 
     [Fact]
@@ -57,7 +73,7 @@ public class BindingCheckToolsTests
     {
         Effective("""{"password": "@secret(db.password)"}""");
         _configurations
-            .Setup(client => client.GetResolvedConfigurationAsync(Org, Project, View, Key, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(client => client.GetResolvedConfigurationConditionalAsync(Org, Project, View, Key, null, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Sdk.ApiException<Sdk.ErrorResponse>(
                 $"Binding failed near {Secret}",
                 422,
@@ -83,13 +99,27 @@ public class BindingCheckToolsTests
         var result = await new BindingCheckTools(_configurations.Object).CheckConfigurationBindings(Org, Project, Key, View);
 
         JObject.Parse(result.StructuredContent!.Value.GetRawText())["Bindings"]!.ShouldBeEmpty();
-        _configurations.Verify(client => client.GetResolvedConfigurationAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _configurations.Verify(client => client.GetResolvedConfigurationConditionalAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     private static Dictionary<string, bool> Bindings(ModelContextProtocol.Protocol.CallToolResult result)
     {
         return JObject.Parse(result.StructuredContent!.Value.GetRawText())["Bindings"]!
             .ToDictionary(binding => binding["Pointer"]!.Value<string>()!, binding => binding["Resolved"]!.Value<bool>());
+    }
+
+    private void Resolved(Sdk.Configuration configuration, string? withheld = null)
+    {
+        var headers = new Dictionary<string, IEnumerable<string>>();
+
+        if (withheld is not null)
+        {
+            headers["X-2S-Secrets-Withheld"] = [withheld];
+        }
+
+        _configurations
+            .Setup(client => client.GetResolvedConfigurationConditionalAsync(Org, Project, View, Key, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Sdk.ConditionalResponse<Sdk.Configuration>(200, configuration, headers));
     }
 
     private void Effective(string json)
