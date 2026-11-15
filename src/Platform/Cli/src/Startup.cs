@@ -18,6 +18,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Serilog;
+using Serilog.Events;
 using IConfigurationBuilder = Microsoft.Extensions.Configuration.IConfigurationBuilder;
 
 namespace _42.Platform.Cli
@@ -25,6 +26,9 @@ namespace _42.Platform.Cli
     public class Startup : IStartup
     {
         private const string ClientCertificateHeaderName = "X-ARR-ClientCert";
+
+        // The categories of McMaster.Extensions.Hosting.CommandLine, one of which logs the raw arguments at Debug.
+        private const string CommandLineHostingCategory = "McMaster.Extensions.Hosting.CommandLine";
 
         // The paths come from Program.Main, which reports an invalid SFORM_HOME before the host is built; the
         // properties of the host builder carry them here.
@@ -215,7 +219,9 @@ namespace _42.Platform.Cli
         }
 
         /// <summary>
-        /// Configures the application's logging providers and sinks (Serilog, file sink, Sentry) and enables debug logging in the development environment.
+        /// Configures the application's logging providers (Serilog with the daily log file) and enables debug logging in the
+        /// development environment. No log entry goes to Sentry: only ErrorReporter sends, with what a report may carry.
+        /// The hosting of McMaster logs the raw arguments at Debug; below Warning it is left out whatever the levels.
         /// </summary>
         /// <param name="builder">The logging builder to configure.</param>
         /// <param name="configuration">Application configuration; the logging section is read from ConfigurationSections.LOGGING for file sink settings.</param>
@@ -230,12 +236,13 @@ namespace _42.Platform.Cli
                 builder.AddDebug();
             }
 
+            // Serilog decides its levels itself (AddSerilog lets every level through to it), so it gets the override too.
+            builder.AddFilter(CommandLineHostingCategory, LogLevel.Warning);
             builder.AddSerilog(
                 new LoggerConfiguration()
                     .MinimumLevel.Information()
+                    .MinimumLevel.Override(CommandLineHostingCategory, LogEventLevel.Warning)
                     .Enrich.FromLogContext()
-                    .WriteTo.Sentry(
-                        minimumEventLevel: Serilog.Events.LogEventLevel.Warning)
                     .WriteTo.File(
                         Paths.GetLogFilePath(options?.LogFilePath),
                         rollingInterval: RollingInterval.Day,

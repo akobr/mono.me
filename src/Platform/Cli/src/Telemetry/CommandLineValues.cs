@@ -10,9 +10,10 @@ namespace _42.Platform.Cli.Telemetry;
 // of an unknown command or option, which the model never saw). Each value also gives its parts (acme.billing: acme and
 // billing), so a message that names a part alone loses it too.
 // Only the project and the view may go to the local log, an allow-list: an option is hidden unless it is listed.
+// A token of args that names a command of the parsed chain (story, kv, set) is no value; a value of the model always is.
 internal sealed class CommandLineValues
 {
-    public static readonly CommandLineValues Empty = new([], []);
+    public static readonly CommandLineValues Empty = new([], [], new HashSet<string>());
 
     // The long names of the options whose values the local log may keep.
     internal static readonly IReadOnlySet<string> LocalOptions = new HashSet<string>(StringComparer.Ordinal)
@@ -27,10 +28,12 @@ internal sealed class CommandLineValues
     private static readonly char[] PartSeparators = ['=', ',', ';', '.', '/', '\\'];
 
     private readonly IReadOnlyList<string> _values;
+    private readonly IReadOnlySet<string> _commandNames;
 
-    private CommandLineValues(IReadOnlyList<string> values, IReadOnlyList<KeyValuePair<string, string>> localValues)
+    private CommandLineValues(IReadOnlyList<string> values, IReadOnlyList<KeyValuePair<string, string>> localValues, IReadOnlySet<string> commandNames)
     {
         _values = values;
+        _commandNames = commandNames;
         LocalValues = localValues;
 
         var local = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -63,11 +66,14 @@ internal sealed class CommandLineValues
 
         var values = new List<string>();
         var localValues = new List<KeyValuePair<string, string>>();
+        var commandNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         try
         {
             for (var current = command; current is not null; current = current.Parent)
             {
+                commandNames.UnionWith(current.Names);
+
                 foreach (var option in current.Options)
                 {
                     if (!CommandUsage.IsGiven(option))
@@ -101,7 +107,7 @@ internal sealed class CommandLineValues
             // What was read so far is kept; args adds every token anyway.
         }
 
-        return new CommandLineValues(Clean(values), localValues.AsReadOnly());
+        return new CommandLineValues(Clean(values), localValues.AsReadOnly(), commandNames);
     }
 
     // From the tokens of Main: a plain token, the value of --name=value or --name:value, what follows the first letter of
@@ -137,14 +143,18 @@ internal sealed class CommandLineValues
             values.Add(token[0] == '@' && token.Length > 1 ? token[1..] : token);
         }
 
-        return new CommandLineValues(Clean(values), []);
+        return new CommandLineValues(Clean(values), [], new HashSet<string>());
     }
 
-    public CommandLineValues Merge(CommandLineValues other)
+    // These values (of args) with those of the model: a token that names a command of the model's chain is left out.
+    public CommandLineValues Merge(CommandLineValues model)
     {
+        var commandNames = new HashSet<string>(_commandNames.Concat(model._commandNames), StringComparer.OrdinalIgnoreCase);
+
         return new CommandLineValues(
-            _values.Concat(other._values).Distinct(StringComparer.Ordinal).ToList().AsReadOnly(),
-            LocalValues.Concat(other.LocalValues).Distinct().ToList().AsReadOnly());
+            _values.Where(value => !commandNames.Contains(value)).Concat(model._values).Distinct(StringComparer.Ordinal).ToList().AsReadOnly(),
+            LocalValues.Concat(model.LocalValues).Distinct().ToList().AsReadOnly(),
+            commandNames);
     }
 
     // The value and its parts of four characters or more.

@@ -9,6 +9,7 @@ using McMaster.Extensions.CommandLineUtils.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Shouldly;
 using Xunit;
@@ -83,6 +84,21 @@ public class StartupTests
         app.Conventions.UseDefaultConventions().UseConstructorInjection(provider);
 
         app.Execute(args).ShouldBe(0);
+    }
+
+    // McMaster's hosting logs the raw arguments at Debug ("Constructing CommandLineApplication<…> with args […]"); below
+    // Warning nothing of it reaches a log, whatever the levels. No entry is written here, so no log file is created.
+    [Fact]
+    public void TheHostingOfMcMaster_LogsNothingBelowWarning()
+    {
+        using var provider = StartupServices().BuildServiceProvider();
+        var loggers = provider.GetRequiredService<ILoggerFactory>();
+
+        var hosting = loggers.CreateLogger("McMaster.Extensions.Hosting.CommandLine.Internal.CommandLineService");
+        hosting.IsEnabled(LogLevel.Information).ShouldBeFalse();
+        hosting.IsEnabled(LogLevel.Debug).ShouldBeFalse();
+        hosting.IsEnabled(LogLevel.Warning).ShouldBeTrue();
+        loggers.CreateLogger<Program>().IsEnabled(LogLevel.Information).ShouldBeTrue();
     }
 
     [Fact]
