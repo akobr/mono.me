@@ -242,7 +242,7 @@ The per-type code had gaps, which Phase 1 fixed:
 2. It loads every descendant with one query per `DescendantScope`: the annotation, `cnf` and `adt` items of the tree.
 3. It stamps every active item. The annotation gets `Deletion` and `ttl`. The configuration gets `AnnotationDeletionId` and `ttl`, and its content is copied to a `cfv` snapshot. The audit gets a `Deleted` entry and `ttl`.
 4. `BatchPlan` writes them deepest first, with the root last, so a failure leaves a valid state.
-5. Active parents outside the tree get the names removed by an ETag-guarded replace in the relations wave.
+5. Active parents outside the tree get the names removed by an ETag-guarded replace in the relations wave. They are read before the first batch, all in one read of many items.
 
 ```mermaid
 sequenceDiagram
@@ -253,11 +253,11 @@ sequenceDiagram
   Note over S,J: delete usg.s.r (after)
   S->>R: read usg, its cnf and its adt
   S->>R: query descendants (exe.s.r.*, uxe.s.r.*, their cnf and adt)
+  S->>J: read sbt and each cnt in one read of many items (parents outside the tree)
   S->>S: plan waves, deepest first, root last
   S->>R: batch, wave 0 [per uxe: replace +Deletion+ttl, upsert cfv, patch cnf, replace adt]
   S->>R: batch, wave 1 [per exe: the same]
   S->>R: batch, root wave [usg: the same, with DescendantCount]
-  S->>J: read sbt and each cnt (parents outside the tree)
   S->>J: batch, relations wave [replace sbt and cnt without the names, if-match]
   Note over S,J: 90 days later Cosmos TTL removes the stamped items in the background
 ```
