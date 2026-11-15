@@ -60,6 +60,7 @@ TAGS="product=2s-platform environment=prod managedBy=manual"
 - **Never run the Cosmos DB test suites against the production account**: they delete every database of the account they use.
 - **Never copy production data to a development machine** (decision 15): the `core` container holds the signing key of Storyteller tokens and the machine certificate authority.
 - **Never change `MachineAuth:TrustDomain` or the API domain after the first machine is created**: it rejects every token and breaks every federated machine.
+- **Never turn on WorkOS user impersonation** in an environment that signs people in to 2S. The API refuses impersonation tokens, but other applications of the environment may not ([decisions](decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary)).
 
 ## 1. Subscription (once)
 
@@ -493,6 +494,7 @@ In the WorkOS dashboard, environment **Production**:
 5. **CLI Auth** on, so `sform` can sign in with the device flow.
 6. **Invitation link**: `https://app.2s.42for.net/invitations/accept` (and the management key of step 8.3 for the emails).
 7. **Your own account**: sign up once in production. Its user id (`user_01…`) is `baseAccount__id` of DbCreator (step 16) and becomes the owner of the platform's first organization (decision 11).
+8. **User impersonation off** (**Authentication → Features**, the default) and **one or two named dashboard members** with the least role and MFA, or SSO with MFA ([decisions](decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary)).
 
 The checklist of the admin UI ([README](../../../src/Platform/ui.admin/README.md#workos-dashboard-checklist)) has the same items in more detail.
 
@@ -595,6 +597,7 @@ The UI's `staticwebapp.config.json` gives the SPA fallback and the headers, with
 | Storage key off | `az storage account show -n "$SA" --query allowSharedKeyAccess` | `false` |
 | Locks | `az lock list -g "$RG" -o table` | the Cosmos DB account and the vault |
 | Uptime | Sentry | the monitor is green |
+| Who can sign in | WorkOS dashboard as an Admin, every environment | impersonation off; the named members with their roles, each with MFA (or SSO enforced); recorded in the ISO 27001 supplier notes |
 | API errors | an invalid message on the queue `configuration-transfers` ([error reporting](../Storyteller/error-reporting.md#check-it-in-production)) | one event in `2s-api` with the transaction `queue ProcessViewTransfer`, the environment `production` and the API's release |
 
 ## 18. Costs to expect

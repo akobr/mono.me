@@ -87,10 +87,13 @@ Every failure is reported at startup at once. Example `local.settings.json` valu
 * `aud` is checked only when `Auth:AuthKit:Audience` is set.
 * `exp` and `nbf` are enforced with a 30-second clock skew.
 * `sub` must be a WorkOS user ID (`user_…`). Other subjects are rejected.
+* A user token must not carry a top-level `act`, whatever its value (an object, a string, `null`, even `[]`). WorkOS puts `act` into the tokens of an [impersonated session](https://workos.com/docs/authkit/impersonation): a dashboard member signed in as the person, and `act.sub` is the member's email. 2S does not support impersonation, because accepting the token would serve and record the person, not the impersonator. The validator reads the validated payload, not only its claims, because IdentityModel turns `"act": []` into no claim at all. Such a token gets **401** on every route, and the validator logs one Warning: `An AuthKit user token of {Subject} is refused: it names an actor (act.sub {Actor}), a WorkOS impersonation`, with the validated `sub` and `act.sub`. `act.sub` is cut to 256 characters, and control characters become `?`. A `null`, an array or an `act` without a string `sub` is logged as `(no act.sub)`. The log never holds the token or the `act` JSON. A token that fails the checks above (a wrong signature, expired) is not logged as an impersonation. The [user token exchange](#subject-tokens) refuses such a subject token too.
 
-An invalid token gets **401**. If the JWKS cannot be fetched, the response is **503** with `Retry-After: 5`, so clients keep their token and retry.
+An invalid token gets **401**. If the JWKS cannot be fetched, the response is **503** with `Retry-After: 5`, so clients keep their token and retry. A request that a machine credential (an API key, a certificate) already authenticated runs as that machine, and its bearer token is not read at all.
 
-Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens), of federated machines and of the [user token exchange](#user-token-exchange), are the exception: their signature, issuer, audience and lifetime are always checked, and so are the actor and the restrictions of a user token. A provider token issued to an actor of the exchange is refused in every build too (see [Storyteller user tokens](#storyteller-user-tokens)). For users, Debug builds also skip the `User.Impersonation` check and the project role check, so they also serve requests without an identity, which become `System`. The view transfer routes are the exception: they answer `401` to a request without credentials in every build. The checks of machines (the machine document, the credential policy, the annotation restriction and the [scopes](#scopes-of-machines), stored and carried), including the per-call checks of federated machines, run in every build, and so do the refusal of machines on the routes for users only and the [restrictions of actors](#restrictions-of-actors).
+Supporting impersonation would be a decision of its own. It would need `act.sub` as the `Via` of the [audit stamps](audit-stamps.md#the-actor), no secret read or write for the session (as the [restrictions of actors](#restrictions-of-actors) withhold them), and a log of every request. Until then, keep impersonation off in the WorkOS dashboard (see [AuthKit dashboard setup](#authkit-dashboard-setup)).
+
+Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens), of federated machines and of the [user token exchange](#user-token-exchange), are the exception: their signature, issuer, audience and lifetime are always checked, and so are the actor and the restrictions of a user token. A provider token issued to an actor of the exchange is refused in every build too (see [Storyteller user tokens](#storyteller-user-tokens)). The refusal of an AuthKit token with `act` is part of the validator, so Debug builds do not apply it. For users, Debug builds also skip the `User.Impersonation` check and the project role check, so they also serve requests without an identity, which become `System`. The view transfer routes are the exception: they answer `401` to a request without credentials in every build. The checks of machines (the machine document, the credential policy, the annotation restriction and the [scopes](#scopes-of-machines), stored and carried), including the per-call checks of federated machines, run in every build, and so do the refusal of machines on the routes for users only and the [restrictions of actors](#restrictions-of-actors).
 
 ## How Keycloak tokens are checked
 
@@ -133,6 +136,7 @@ AuthKit claims are mapped to the Entra-style claims the endpoints already read.
 | `preferred_username` | `preferred_username`, else `email`. |
 | `scp` | `DefaultUserScopes` plus each `permissions` entry mapped through `PermissionMap`, as one space-separated value. For a user only `User.Impersonation` counts. |
 | `org_id`, `sid`, `permissions`, `role`, … | Passed through unchanged. |
+| `act` | None: a user token with `act` is refused ([How AuthKit tokens are checked](#how-authkit-tokens-are-checked)). |
 
 Any `scp`, `roles` or `azp` claim in the token itself is dropped, so a JWT template cannot grant scopes directly. Permissions without a `PermissionMap` entry grant nothing, and slug lookup is case-sensitive.
 
@@ -153,6 +157,27 @@ Keycloak claims are mapped the same way, from the token alone:
 Any `scp`, `roles` or `…/scope` claim in the token itself is dropped, so a token mapper cannot grant scopes directly. Roles without a `RoleMap` entry (`default-roles-{realm}`, `offline_access`, `account:manage-account`, …) grant nothing, and role lookup is case-sensitive. Keycloak has no profile lookup, so registration needs `preferred_username` or `email` in the token (see [Registering a Keycloak user](#registering-a-keycloak-user)).
 
 Invitations under Keycloak are matched against the `email` claim only, never `preferred_username`, which a realm may let its users choose. The email counts as verified only when `email_verified` is `true`; a token without the claim counts as unverified, so its own invitations are not listed and cannot be accepted (see [Members and invitations](access.md)).
+
+### Changed user names
+
+Whoever can change a person's email at the identity provider can then sign in as that person, for example a WorkOS dashboard member who also deletes the person's MFA factors. The `sub`, and so the account and its roles, stays the same. The user name that registration stored on the account (`Account.UserName`) is the evidence. It is never refreshed, so the API compares it with the token's user name and logs a change. It only logs: the call is served, and the stored name stays.
+
+* **What is compared.** The token's user name is read as registration reads it: the first of `preferred_username`, `unique_name` and `upn`, trimmed. Under AuthKit that is the token's `email`. The names are compared ignoring case.
+* **Where.** `GET v1/access/account` compares them. The admin UI calls it at the start of each session, and `sform` in its account commands. So does step 4 of the [user token exchange](#the-user-token-endpoint), at each MCP sign-in. Both read the account anyway. Other routes do not compare.
+* **Not compared.** A delegated request is never compared, because it carries the stored names. Neither is a token decoded under `DEV_AUTH`, because it is not checked. A token without a user name gives no evidence, and neither does a blank stored name or a stored name that equals the account id (an owner DbCreator seeded before the person signed in).
+* **The log.** One Warning per call that sees a change, with `AccountId`, `Channel` (`account` or `token-exchange`), `StoredUserName` and `TokenUserName`:
+  * `The user name of the account {AccountId} differs from the stored one at {Channel}: {StoredUserName} -> {TokenUserName}`;
+  * for an account that is an `Administrator` or `Owner` of any organization or project (its own access map), `The user name of the elevated account {AccountId} differs from the stored one at {Channel}: {StoredUserName} -> {TokenUserName} (Administrator or Owner of {ElevatedAccessPoints})`, with at most 20 points named.
+
+  Both are Warnings, so Sentry gets them only as breadcrumbs, while Application Insights keeps both user names for its retention (30 days). An alert belongs on the elevated message:
+
+  ```kusto
+  traces
+  | where severityLevel == 2
+  | where message startswith "The user name of the elevated account"
+  ```
+
+* **Known false positives.** A rename at the provider is logged too, until the stored name matches again: an Entra ID UPN change, a Keycloak user name the realm lets its users choose, a new email of a WorkOS user. So is the base account that DbCreator seeds with its built-in user name, when the owner signs in under another email. Nothing updates `UserName` today, so such a log repeats at each check.
 
 ## Scopes for users
 
@@ -194,6 +219,8 @@ A `PermissionMap` value is exactly one scope string: `User.Impersonation`, or on
 5. Enable **CLI Auth** for the environment so `sform` can use the device sign-in. Without it, `POST /user_management/authorize/device` is rejected and `sform account` reports the WorkOS message.
 6. For invitation emails, set `Auth:AuthKit:ApiKey` (the management key) and point the environment's invitation link at the admin UI's accept page, for example `https://admin.42for.net/invitations/accept`. Without the key, invitations are still created, but no email is sent.
 7. For the admin UI, register its Redirect URI (`/callback`), its default Sign-out URI (`/login`) and its CORS origin in the same environment, as the [WorkOS dashboard checklist](../../../src/Platform/ui.admin/README.md#workos-dashboard-checklist) of the admin UI lists them. Without the Sign-out URI, a sign-out ends on WorkOS' error page `app-homepage-url-not-found`.
+8. Keep **user impersonation** off in every environment: Authentication → Features, the "User impersonation" card. It is off by default, it is set per environment, and only a dashboard Admin can turn it on. The API refuses impersonation tokens anyway ([How AuthKit tokens are checked](#how-authkit-tokens-are-checked)), but other applications of the environment may not.
+9. Keep the dashboard team small. Name one or two members, give each the least role, and require MFA for each, or SSO whose identity provider enforces MFA. A member can change a user's email or delete their MFA factors and then sign in as that user. The [user name check](#changed-user-names) logs such a change, and [Who can sign in as a user](../Deployment/decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary) describes the trust boundary.
 
 ## Discovery endpoint
 
@@ -723,7 +750,7 @@ Under Entra ID, `Auth:TenantId` decides which tenant a subject token may come fr
 - `common` accepts the token's own tenant. `organizations` does too, but refuses personal Microsoft accounts (the tenant `9188040d-6c67-4c5b-b112-36a304b66dad`).
 - Another name, such as a verified domain, is pinned to the tenant of its metadata issuer (`https://login.microsoftonline.com/{tenant GUID}/v2.0`). When that issuer names no tenant, every token is refused.
 
-For every provider, `aud` must be one of the actor's `SubjectAudiences`, `exp` is required, the token must not carry `act` (chained delegation is not exchanged), and its client must be one of the actor's `AllowedClientIds` when the list names any. AuthKit and Keycloak ask for a refresh of their keys on an unknown `kid` and refuse that token, as on API routes. When the provider's keys cannot be fetched, the exchange answers `503`.
+For every provider, `aud` must be one of the actor's `SubjectAudiences`, `exp` is required, the token must not carry `act` (chained delegation is not exchanged; under AuthKit a top-level `act` of any value counts, even `[]`, as on [API routes](#how-authkit-tokens-are-checked)), and its client must be one of the actor's `AllowedClientIds` when the list names any. AuthKit and Keycloak ask for a refresh of their keys on an unknown `kid` and refuse that token, as on API routes. When the provider's keys cannot be fetched, the exchange answers `503`.
 
 ### Storyteller user tokens
 
@@ -1759,7 +1786,7 @@ The two status codes mean different things, so a client knows whether signing in
 | Status | Meaning | Body |
 | --- | --- | --- |
 | `401` | The credentials are missing, invalid or expired, or a user token does not carry `User.Impersonation` (Debug builds skip this check). | none |
-| `401` | A user token that the provider's validator refuses under the Storyteller rules: an Entra ID token without a GUID `tid` and `oid` (see [Account ids](#account-ids)), or a Keycloak token of a client outside `Auth:Keycloak:AllowedClientIds` (see [How Keycloak tokens are checked](#how-keycloak-tokens-are-checked)). | none |
+| `401` | A user token that the provider's validator refuses under the Storyteller rules: an Entra ID token without a GUID `tid` and `oid` (see [Account ids](#account-ids)), a Keycloak token of a client outside `Auth:Keycloak:AllowedClientIds` (see [How Keycloak tokens are checked](#how-keycloak-tokens-are-checked)), or an AuthKit user token with `act`, the token of a WorkOS impersonation (see [How AuthKit tokens are checked](#how-authkit-tokens-are-checked); Debug builds do not check it). | none |
 | `401` | A provider token issued to an actor of the user token exchange: its `aud` is one of an actor's `SubjectAudiences`. This applies in every build, even when its provider accepts the token (see [Storyteller user tokens](#storyteller-user-tokens)). | none |
 | `401` | Machine credentials that fail their checks: a machine the project does not know or whose kind it does not enable, an API key or a certificate whose record has no scopes, or a Storyteller machine token whose machine is gone or no longer `Federated`, or whose project is not the route's. | none |
 | `401` | A [Storyteller user token](#storyteller-user-tokens) whose account is gone, whose actor is no longer configured, or which names an unknown restriction, and every Storyteller user token while the exchange is off. | none |

@@ -235,6 +235,8 @@ az role assignment list --assignee $deployment.PrincipalId --all --query "[].{ro
 6. **Invitation link**: `https://app.2s.42for.net/invitations/accept`.
 7. **Your own account**: sign up once in production; note its user id (`user_01…`): `baseAccount__id` in phase 11 and `-BaseAccountId` in phase 10.
 8. Optional, for invitation emails: create an **API key** (`sk_…`) and keep it for phase 8.
+9. **User impersonation off**: **Authentication → Features**, the "User impersonation" card stays disabled. That is the default. The setting is per environment, and only an Admin can turn it on. The API refuses impersonation tokens anyway ([How AuthKit tokens are checked](../Storyteller/authentication.md#how-authkit-tokens-are-checked)).
+10. **Dashboard members**: one or two named people, each with the least role that does the job and with MFA, or SSO through an identity provider that enforces MFA. SSO needs a verified domain, and with directory sync the members are managed in the identity provider. A member can change a user's email and then sign in as that user ([decisions](decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary)).
 
 ## 6. DNS records [C12]
 
@@ -493,6 +495,8 @@ az lock list -g prod-2s-eusec-rg -o table                               # the ac
 - **Settings → Machines**: enabling `Certificate` answers `400` "… is turned off in this deployment."
 - Application Insights (`prod-2s-api-appi`), **Logs → traces**: `KeyValueProtectionTimer` runs hourly without errors.
 - Sentry: the uptime monitor is green.
+- WorkOS dashboard, as an Admin, Production and Staging: user impersonation is off, the members and their roles are the named ones, and each member has MFA (or SSO is enforced). Record the date, the reviewer and the result in the ISO 27001 supplier notes ([decisions](decisions.md#who-can-sign-in-as-a-user-the-workos-trust-boundary)). Don't turn impersonation on to try the refusal: the API's tests cover it.
+- Application Insights, **Logs → traces**: `traces | where message startswith "An AuthKit user token of" or message startswith "The user name of the elevated account"` finds nothing you can't explain: refused impersonation tokens, and changed user names of Administrators and Owners ([Changed user names](../Storyteller/authentication.md#changed-user-names)).
 - Sentry, once `sentryDsn` is set: the check of [error reporting](../Storyteller/error-reporting.md#check-it-in-production) gives one event in `2s-api`.
 - **A day later**, Cost Management: Cosmos DB at 0.
 
