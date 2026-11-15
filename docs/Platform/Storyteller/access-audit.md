@@ -1,0 +1,62 @@
+# Access Audit
+
+Every change of who can access what writes an **access audit record**: who changed it (an [`AuditActor`](audit-stamps.md#the-actor), with `Via` when an [actor](access.md#actors) such as the MCP server acted for the person), when, what, on which organization or project, to whom, the value before and after, and the correlation id of the request. The record is written in the same Cosmos DB transaction as the change, and nothing updates or deletes it; it expires after the retention. The design and its alternatives are in [the spec](specs/2026-11-15%20Append-Only%20Access%20Audit%20Trail.md).
+
+## What is recorded
+
+| Action | Change | Target | Old → new value |
+| --- | --- | --- | --- |
+| `MemberGranted` | `POST v1/access/grant`, also when it raises a role | the account | the role before (none for a new member) → the role |
+| `MemberRevoked` | `POST v1/access/revoke` | the account | the role → none |
+| `MemberRoleChanged` | `PUT v1/access/points/{key}/members/{accountId}` | the account | the role before → the role |
+| `MemberRemoved` | `DELETE v1/access/points/{key}/members/{accountId}`; leaving is actor = target | the account | the role → none |
+| `MemberJoined` | accepting an invitation (`Detail`: the invitation and who sent it); the invitee is the actor | the account | the role before → the role |
+| `AccessPointCreated` | a new organization or project (`POST v1/access/points`, `POST v1/access/account` with a project, DbCreator); creating the first project of a new organization creates two access points and records two | the owner | → `Owner` (`Detail`: the project's description) |
+| `AccessPointUpdated` | `PUT v1/access/points/{key}` | | the description before → after |
+| `MachineCreated` | `POST …/access/machines` | the machine | → kind, scopes, annotation restriction, shared certificate, thumbprint |
+| `MachineReset` | `PUT …/access/machines/{id}` | the machine | → the kind (`Detail`: the API key or the client secret was replaced) |
+| `MachineDeleted` | `DELETE …/access/machines/{id}` | the machine | the kind, scopes, … → none |
+| `MachineFederationRulesChanged` | `PUT …/access/machines/{id}/federation-rules` | the machine | the rules before → after |
+| `MachineAuthenticationPolicyChanged` | `PUT v1/access/points/{key}/machine-authentication` | | the policy before → after |
+| `KeyValuePolicyChanged` | the key/value policy of a project: its levels, default level, mTLS rule, HSM backend and rotation interval, customer key, and recipients | | the access view before → after |
+| `FederatedIssuerCreated`, `FederatedIssuerUpdated`, `FederatedIssuerDeleted` | `PUT` and `DELETE …/access/issuers/{name}` | the issuer | issuer, key source, JWKS URI, number of JWKS keys, lifetime, required claims, description |
+| `SharedCertificateIssued`, `SharedCertificateRevoked` | `POST` and `DELETE …/access/certificates[/{thumbprint}]` | the certificate (thumbprint, label) | label, not before, not after, revoked |
+
+A change that changes nothing records nothing, as a membership that is already what the request asks for: a grant of a role the account has or exceeds, the same role set again, the same description, policy, rules or issuer saved again, a certificate revoked twice. The key/value policy is compared on its **access view** only (`AccessAuditValues.KeyValuePolicy`): key versions, key health, verifications, rotations and rewrap progress are not access changes, so the maintenance runs record nothing here; the [key/value audit](key-values.md#audit-trail) keeps recording them.
+
+DbCreator records as `System`: the access points its base seeding creates or changes, and the projects and owners its [data sets](data-sets.md) create.
+
+Not recorded: registering an account without a project (it gives no access), invitations (an invitation keeps its sender and status, and its acceptance is the `MemberJoined` record), and a machine renewing its own certificate over mTLS (it changes no access).
+
+**Never stored**: an API key, a client secret, a certificate or its password, a hash, the stored mask of a key (it keeps the first characters of a client secret), a JWKS key (only how many) and a recipient's public key (only its id, name, state and a thumbprint of the key). A value longer than 4,000 characters is cut and ends with `… (truncated, sha256 <16 hex digits>)`, so a full copy can still be matched.
+
+## Where the records are, and why the change and its record are atomic
+
+A record lives in the partition of the change it records, and is the last item of the same `TransactionalBatch`. A failed batch stores neither, and there is no write path for a record alone.
+
+| Changes | Partition |
+| --- | --- |
+| memberships, access points, both policies of a project, DbCreator's seeding | `core`, partition `access`, next to the accounts and the access points |
+| machines, shared certificates | `organizations`, (organization, `{project}.access`), next to the machines |
+| trusted issuers | `organizations`, (organization, `{project}.federation`), next to the issuers |
+
+The record's `id` is `aca.{yyyyMMddHHmmssfffffff}.{guid}`, so the order of the ids is the order of the times. It carries `Organization`, `Project` (none for an organization) and `AccessPointKey`, and a `ttl`.
+
+- **Memberships** replace the access point and the account in one batch (see [access.md](access.md)); the record is its third item.
+- **Creating an organization or a project** writes the access points, the owner's account (created, or replaced with its ETag) and their records in one batch, so a failure leaves nothing half created; a concurrent creation answers `409`.
+- **A machine's reset**: for the kinds with an API key, the change is the new hash, which `CosmosMergedApiKeyHashStore` patches several layers below the access service. The access service opens the record of the reset as a pending, ambient record (`PendingAccessAudit`, like a `TransactionScope`), and the hash store patches the hash in a batch with it. For `ClientCredentials`, the identity provider replaces the secret first, outside any transaction of Storyteller; the mask is then patched in a batch with the record, and the new secret is returned only after both are stored. A failed batch answers an error and the secret never leaves.
+- **A machine's creation** writes the full machine and its record in one batch, after the provider stored the credential (the API key's hash, the certificate, the identity provider's application); the credential is returned only after both, and a failed batch removes the credential again.
+- **A machine's delete** removes the credential first, as before, then deletes the document in a batch with the record. A delete that fails after the credential is gone leaves the machine listed, and is recorded when it is retried.
+- **The machine authentication policy** is replaced with its ETag (it used to be an upsert without one, which could lose a membership changed at the same moment) and retried once on a concurrent change.
+
+The partitions that hold records also hold what the API lists, so the lists skip them: the machines of a project (`GET …/access/machines` also skips the `mcert.` certificate records and the `scr.` shared certificates) and the trusted issuers, whose count of `FederationValidation.MaxIssuersPerProject` they do not take part in.
+
+## Retention
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `AccessAudit:RetentionDays` | `730` (two years) | Days a record is kept; between 1 and 3650, checked on start |
+
+Cosmos DB removes a record when its `ttl` runs out. This needs TTL on the container: `organizations` has it, and DbCreator turns it on for `core` too (`DefaultTimeToLive = -1`, no default expiry, so nothing else in `core` expires) when it creates the container and, for an existing one, on every start. Until DbCreator has run once after the deployment of this feature, the records in `core` do not expire; the retention can only get longer, never shorter.
+
+**Size.** The `access` partition of `core` is one logical partition of the whole platform, and a logical partition holds at most 20 GB. A record is about 1 KB, so 1,000 access changes a day for two years are about 0.7 GB next to the accounts and access points. An archive of the records (an export to Blob Storage with an immutability policy) is a follow-up.

@@ -932,8 +932,9 @@ A project enables one or more **machine credential kinds**, and each machine use
 * A project issues shared certificates (`POST …/access/certificates`) only while it enables `CertificateAndApiKey`; otherwise the call returns `400` with `ErrorCode` `MachineAccessNotSupported`. Listing and revoking work under every policy, so they can be cleaned up after the kind is disabled.
 * A shared certificate is accepted only together with the API key of a `CertificateAndApiKey` machine of the same project, and only while the project enables that kind. An API key whose machine kind is not recorded is refused with a shared certificate. A machine of another kind that sends a shared certificate is rejected, even if its API key alone would pass. So a shared certificate never makes an `ApiKey` machine look like an mTLS one, for example for [secret delivery](key-values.md#secret-delivery).
 * Disabling `CertificateAndApiKey` stops every shared certificate of the project at once, without revoking them; enabling it again lets them work again.
+* Issuing and revoking a shared certificate are recorded in the [access audit](access-audit.md) (`SharedCertificateIssued`, `SharedCertificateRevoked`) with its thumbprint, label and validity, never the PFX or its password. Revoking a revoked certificate changes and records nothing.
 
-The policy (`MachineAuthenticationPolicy`) is stored on the project's access point:
+The policy (`MachineAuthenticationPolicy`) is stored on the project's access point, replaced with its ETag so a membership changed at the same moment is kept, and every change is recorded in the [access audit](access-audit.md) (`MachineAuthenticationPolicyChanged`) in the same transaction:
 
 | Property | Description |
 |---|---|
@@ -1355,6 +1356,8 @@ Both `PUT`s take a JSON body. An empty body or `null` is validated as an issuer 
 `GET` and `DELETE` of a trusted issuer that does not exist answer `404` with no body, like `GET` and `DELETE` of a machine.
 
 ### Trusted issuers
+
+Creating, changing and deleting a trusted issuer is recorded in the [access audit](access-audit.md) (`FederatedIssuerCreated`, `FederatedIssuerUpdated`, `FederatedIssuerDeleted`) in the same transaction, with the issuer's settings and the number of its keys, never the keys.
 
 | Property | Type | Description |
 |---|---|---|

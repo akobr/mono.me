@@ -1,6 +1,8 @@
 # Access Points, Views, Members and Invitations
 
-Organizations and projects are **access points**. An organization has the key `{organization}` and a project the key `{organization}.{project}`. Each access point keeps a map of account IDs to roles, and each account keeps the same map from its side. Both documents live in the main partition (`access`) of the `core` container, so every membership change replaces them together in one transactional batch, guarded by their ETags. A concurrent change of either document makes the batch fail; the change is then evaluated once more on fresh data, and a second failure answers `409 Conflict`.
+Organizations and projects are **access points**. An organization has the key `{organization}` and a project the key `{organization}.{project}`. Each access point keeps a map of account IDs to roles, and each account keeps the same map from its side. Both documents live in the main partition (`access`) of the `core` container, so every membership change replaces them together in one transactional batch, guarded by their ETags, with its [access audit](access-audit.md) record. A concurrent change of either document makes the batch fail; the change is then evaluated once more on fresh data, and a second failure answers `409 Conflict`.
+
+Every change of members, access points, machines, the policies of a project, trusted issuers and shared certificates is recorded in the [access audit](access-audit.md), in the same transaction as the change.
 
 An organization role does not grant access to the organization's projects. Each project has its own members, and can have a [description](#projects).
 
@@ -44,7 +46,7 @@ A project can have a description, like a view. An organization has none.
 | GET | `v1/access/projects` | An account, users only | `ProjectSummary[]`: the caller's projects, ordered by key |
 | GET | `v1/access/exhibition` | A user, also without an account | `Exhibition`: the names and the description of the deployment's [exhibition](#exhibition) project; `404` when it is not offered |
 
-Every route needs the scope `User.Impersonation`. An `AccessPoint` has `Key`, `AccessMap` (the members and their roles), `MachineAuthentication` and `Description`. POST creates the project, and the organization when it does not exist yet; the caller becomes the `Owner` of what it creates. In an existing organization it needs `Owner` of the organization (`403`), and an existing project answers `409 AccessPointExists`.
+Every route needs the scope `User.Impersonation`. An `AccessPoint` has `Key`, `AccessMap` (the members and their roles), `MachineAuthentication` and `Description`. POST creates the project, and the organization when it does not exist yet; the caller becomes the `Owner` of what it creates. In an existing organization it needs `Owner` of the organization (`403`), and an existing project answers `409 AccessPointExists`. The access points, the owner's account and their access audit records are written in one transactional batch, so a failure leaves nothing half created; a project or organization created concurrently answers `409` (`AccessPointExists`, or `Conflict` after one retry).
 
 An access point carries the members and the machine authentication policy, so reading one needs `Administrator`, and `GET v1/access/points` lists only the access points the caller administers. Every member reads the descriptions of their projects with `GET v1/access/projects` instead, as every member reads the descriptions of views. A `ProjectSummary` has `Key` (`{organization}.{project}`), `Role` (the caller's role) and `Description`, and nothing of the members or the policies. The list holds every project where the account has a role above `None`; organizations are not listed, and a key whose project does not exist is left out. Without an account, `GET v1/access/points` and `GET v1/access/projects` answer `404`.
 
@@ -53,7 +55,7 @@ An access point carries the members and the machine authentication policy, so re
 * `ProjectDescription` of `POST v1/access/points` and [`POST v1/access/account`](#accounts) describes the new project. An organization created with it gets none.
 * PUT replaces the description of a project. A missing body (empty or `null`), `{}` or a blank `Description` clears it, as for views. The `Administrator` check comes first, so a key the caller does not administer answers `403`, also when the project does not exist. After it, an organization key answers `400` (`Access point key must be in organization.project format.`) and a body that is not a project update `400`. Debug builds (`DEV_AUTH`) skip the role check of users and answer `404` for a project that does not exist.
 * PUT and `GET v1/access/projects` are for users: machine credentials get `403`.
-* PUT changes only the description and keeps the members and the policies. It replaces the document guarded by its ETag; a concurrent change of the project (a member, a policy) makes it read the project again and retry once, and a second failure answers `409 Conflict`.
+* PUT changes only the description and keeps the members and the policies. It replaces the document guarded by its ETag, in a batch with its access audit record when the description changes; a concurrent change of the project (a member, a policy) makes it read the project again and retry once, and a second failure answers `409 Conflict`.
 
 The description is stored on the project's access point document (`apt.{organization}.{project}` in the `access` partition of `core`). `GET v1/access/projects` reads only the keys and the descriptions of the caller's projects, in one query.
 
@@ -129,7 +131,8 @@ The restriction takes away only what the role gives. A user whose role gives no 
 * PUT sets the exact role, up or down. The account must already be a member (`404`, `MemberNotFound`); new members join through an invitation, through grant, or, in the exhibition project, through its join. Nobody can change their own role (`409`, `SelfRoleChange`); leave and get invited again instead. `None` and a missing body are rejected with `400`.
 * DELETE removes a member. With the caller's own account ID it means "leave".
 * POST makes the caller a `Reader` of the deployment's [exhibition](#exhibition) project. It is the only way into an existing project without an invitation or a grant.
-* The older `POST v1/access/grant` and `POST v1/access/revoke` stay for `sform`. Grant only raises a role, and revoke must name the role the member holds.
+* The older `POST v1/access/grant` and `POST v1/access/revoke` stay for `sform`. Grant only raises a role, and revoke must name the role the member holds. The caller's own account is checked, as for the other routes; the `CreatedById` of the body is not read.
+* Every change is recorded in the [access audit](access-audit.md): `MemberGranted`, `MemberRevoked`, `MemberRoleChanged`, `MemberRemoved`, with the role before and after and the actor (with `Via` through an actor). A request that changes nothing records nothing.
 
 ## Invitations
 
@@ -154,7 +157,7 @@ An invitation offers a role on an access point to an email address. It is a Stor
 3. creates the account without memberships when it does not exist, with the name and email from the token;
 4. joins the access point with the offered role, or keeps a higher role the account already has. The inviter's current role is not checked again: the invitation was authorized when it was created.
 
-Accepting the same invitation twice returns the account without changes.
+Accepting the same invitation twice returns the account without changes. The join is recorded in the [access audit](access-audit.md) as `MemberJoined`, by the invitee, with the invitation and its sender.
 
 A call through an [actor](#actors) never counts as email-verified, whatever the token says: `GET v1/access/invitations/mine` answers an empty list, and accepting or declining answers `403` (`EmailMismatch` or `EmailNotVerified`). The invitee answers an invitation after signing in with the identity provider, not through an actor.
 
