@@ -331,6 +331,7 @@ az functionapp config appsettings set -g "$RG" -n "$FUNC" --settings \
 | `MachineAuth__TrustDomain`, `__Federation__PublicBaseUrl` | the issuer and audience of Storyteller tokens, and the token endpoint that federation rules pin; **final** (decisions 1 and 2) |
 | `AzureKeyVaults__default`, `__premium` | both vault names of the API point at the one Premium vault |
 | `Sentry__Dsn` | the API reports its errors to the Sentry project `2s-api` (step 14), next to Application Insights; without it, nothing is sent ([error reporting](../Storyteller/error-reporting.md)) |
+| `Exhibition__Organization`, `__Project`, `__Owner` | not set at first, so the deployment has no exhibition; added together after the seed of the exhibition (below) |
 
 Invitation emails need the WorkOS management key. When you want them, store it and add the setting:
 
@@ -340,6 +341,17 @@ Invitation emails need the WorkOS management key. When you want them, store it a
 az functionapp config appsettings set -g "$RG" -n "$FUNC" --output none \
   --settings "Auth__AuthKit__ApiKey=@Microsoft.KeyVault(VaultName=$KV;SecretName=authkit-api-key)"
 ```
+
+The exhibition is the demo project that the onboarding of the admin UI offers to a new user ([access](../Storyteller/access.md#exhibition)). It needs three settings: the organization and the project, and the id of the account that owns the project. The API offers the exhibition only while that account is the Owner of the project and no other account is its Administrator or Owner. Add the settings only after the project is seeded with that account as its owner, in the order of the runbook's [Turning the exhibition on](runbook-azure-production.md#turning-the-exhibition-on), and all three in one command: the API stops at its start with one or two of them, and with an owner that has white space around it.
+
+```sh
+az functionapp config appsettings set -g "$RG" -n "$FUNC" --output none --settings \
+  Exhibition__Organization=exhibition \
+  Exhibition__Project=exhibition \
+  Exhibition__Owner="<the account id of the seed's --owner>"
+```
+
+With the Bicep templates they are the parameters `exhibitionOrganization`, `exhibitionProject` and `exhibitionOwner` of `main.bicep`.
 
 ### 8.4 Storage by identity, then the key off
 

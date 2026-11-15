@@ -4,7 +4,7 @@ DbCreator (`src/Platform/Storyteller/DbCreator`, the tool `2sInitDb`) creates th
 
 A seed goes through the services of the API, as the `System` actor: the access model creates the organization and the project, the view registry registers the view, the [view importer](export-import.md#import-without-a-job) writes the documents, and a bulk writer writes the lines of `annotations.jsonl` in transactional batches. So seeded annotations have audit entries and relation arrays like any other, and a seed is idempotent: what exists stays, what is missing is created, and a set seeded already is not read again.
 
-Use it for local development (the Aspire host seeds the set `showcase`), demos, tests, and performance checks with many annotations.
+Use it for local development (the Aspire host seeds the set `showcase`), demos, the [exhibition](access.md#exhibition) of a deployment (the set `exhibit`), tests, and performance checks with many annotations.
 
 The code is in:
 
@@ -324,6 +324,7 @@ Lists the built-in sets and those of the `--path` folders: the name, the version
 | `core` | `42dotnet` / `main` / `default` | The platform's own annotations: 11 annotation files and the configuration of `cnt.42.system` |
 | `large` | `acme` / `billing` / `default` | `annotations.jsonl` only: 49 lines, 32 of them generators, for 16,017 annotations |
 | `showcase` | `fabrikam` / `invoicing-suite` / `default` | The scope of the admin UI's showcase mock: about 240 annotations, 150 configurations, two descendant-type schemas and a template |
+| `exhibit` | `fourth-wall` / `toons-and-tyrants` / `default` | The demo of Fourth Wall Software and its customers Acme Corp and Globex: 30 annotations, 30 configurations, 11 schemas of all three kinds and 3 templates. Also the content of a deployment's [exhibition](access.md#exhibition) |
 
 The data of the [playground](playground.md) is a set too, outside the catalog: `src/Platform/Storyteller/Playground/data` with the `set.json` of the set `playground`.
 
@@ -356,6 +357,27 @@ npx vitest run test/unit/mock/showcase-set.test.ts -u
 The path comes first, because `-u` takes an optional value in Vitest 4. Then delete the files the test reports as stale. `set.json` is the only file written by hand. The `Platform.UI.Admin` workflow also runs on changes of the set's folder, so a hand edit fails there. More in the [admin UI README](../../../src/Platform/ui.admin/README.md#mock-mode).
 
 What the mock has and the set does not: the stamps of its personas, the version histories, the deleted annotations, the project settings of the browser (type names, colors, time zone) and the members other than the owner. Its dates are absolute (from the frozen clock), so a scheduled annotation becomes active over time.
+
+### exhibit
+
+The demo of the platform: Fourth Wall Software delivers CRM, HR, CAD and Social solutions to its customers Acme Corp and Globex. The set holds 30 annotation files, 30 configurations that use every binding form, 11 schemas (type, annotation and descendant type) and 3 templates, gated per company with JSON-e. Its manifest targets `fourth-wall` / `toons-and-tyrants` / `default`. The model is in [the spec](specs/2026-11-13%20Demo%20Data%20Set%20of%20Acme%20Corp%20and%20Globex.md), and the commands are in the set's [README](../../../src/Platform/Storyteller/DbCreator/src/data-sets/exhibit/README.md).
+
+Two files of the folder are not seeded. A seed counts them, and the `README.md`, as ignored files:
+
+- `key-values.json`: 20 key/value pairs, 19 public ones and one `Standard` pair with a demo value. A set cannot carry key/value pairs until 424-265 is done, so import them with `sform story kv import`. Many configurations interpolate them, and a resolved read of such a configuration answers `422` without them.
+- `project-settings.json`: the type names of the project (Company, Department, Solution, Application, AppUsage, Job, JobInstance) for the admin UI. Neither a seed nor an import stores them: until 424-266 is done, the admin UI keeps the settings of a project in the browser, where each user sets them.
+
+**As the exhibition.** The set is also the content of a deployment's [exhibition](access.md#exhibition), the demo project that any user may join as a Reader. Seed it into the organization and the project that the `Exhibition` settings of the API name, with the account of `Exhibition:Owner` as the owner. In production the names are `exhibition` / `exhibition` ([decisions](../Deployment/decisions.md#the-exhibition)):
+
+```sh
+2sInitDb seed exhibit --organization exhibition --project exhibition --owner <account id>
+```
+
+- `--organization` and `--project` take the place of the names of the manifest. The view stays `default`, which is the view of the exhibition.
+- `--owner` becomes the Owner of the organization and the project that the seed creates. The API offers the exhibition only while that account is the Owner of the project and no other account is its Administrator or Owner.
+- Seed before the settings are set, then import the key/value pairs, and set the settings last: [Turning the exhibition on](../Deployment/runbook-azure-production.md#turning-the-exhibition-on) has the steps of production, and [The exhibition](../development.md#the-exhibition) those of a local API.
+- Every visitor reads the versions of the documents with the name of whoever wrote them. The seed writes as `System`; a change by hand, the import of the key/value pairs included, carries the name of its author.
+- A visitor sees the default type names, because `project-settings.json` reaches no browser but the one where somebody sets them.
 
 ### The playground
 
@@ -392,7 +414,7 @@ dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed --path src/P
 
 **The tool.** DbCreator packs as the dotnet tool `2sInitDb` (package `42.Platform.Storyteller.DbCreator`): `dotnet pack src/Platform/Storyteller/DbCreator/src` writes it to `.artifacts/`, the local feed of `nuget.config`. The package carries `app.config.json` and the built-in sets.
 
-**Production.** The [deployment cookbook](../Deployment/cookbook-azure-production.md#162-the-database-dbcreator-once-per-schema-change) runs the root command once per schema change, which seeds `core`. The other sets are for development, demos and tests.
+**Production.** The [deployment cookbook](../Deployment/cookbook-azure-production.md#162-the-database-dbcreator-once-per-schema-change) runs the root command once per schema change, which seeds `core`. The set `exhibit` is seeded there once, as the [exhibition](access.md#exhibition) of the deployment ([runbook](../Deployment/runbook-azure-production.md#turning-the-exhibition-on)). The other sets are for development, demos and tests.
 
 ## Tests
 
