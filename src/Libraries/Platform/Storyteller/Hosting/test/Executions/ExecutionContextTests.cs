@@ -24,6 +24,8 @@ public sealed class ExecutionContextTests : IDisposable
 
     private readonly HostingFixture _fixture = new();
 
+    private DateTimeOffset Now => _fixture.Time.GetUtcNow();
+
     [Fact]
     public async Task AnExecutionKey_ReadsTheKeyWithEverything_AndItsFourAncestorsWithInactiveOnes()
     {
@@ -762,6 +764,427 @@ public sealed class ExecutionContextTests : IDisposable
         context.GetEffectiveTimeZone().ShouldBe(" Europe/Prague ");
     }
 
+    // The chain scope counts every ancestor; the subscription scope counts none of these three.
+    [Theory]
+    [InlineData(Subject, "IsDisabled", true, StorytellerSubscriptionStatus.Disabled)]
+    [InlineData(Context, "ValidFrom", "2026-11-01T00:00:00Z", StorytellerSubscriptionStatus.Scheduled)]
+    [InlineData(Responsibility, "ExpiresAt", "2026-10-01T00:00:00Z", StorytellerSubscriptionStatus.Expired)]
+    public async Task WithTheChainScope_AnInactiveAncestor_DecidesTheStatus(string ancestor, string member, object value, StorytellerSubscriptionStatus status)
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteAnnotation(ancestor, json => json[member] = JToken.FromObject(value));
+
+        var context = await WhoAmI().GetAsync();
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(status);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldNotBeNull().AnnotationKey.ShouldBe(ancestor);
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Active);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Subscription).ShouldBeNull();
+        context.GetSubscriptionStatus(Now).ShouldBe(StorytellerSubscriptionStatus.Active);
+    }
+
+    [Fact]
+    public async Task FindInactiveAnnotation_GivesTheSnapshotOfTheContext_ForALogThatNamesIt()
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteAnnotation(Subject, json => json["IsDisabled"] = true);
+        var context = await WhoAmI().GetAsync();
+        var requests = _fixture.Http.Requests.Count;
+
+        var inactive = context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldNotBeNull();
+
+        inactive.ShouldBeSameAs(context.Subject);
+        $"{context.Annotation.AnnotationKey} is not run: {inactive.AnnotationKey} is {inactive.GetStatus(Now).ToString().ToLowerInvariant()}"
+            .ShouldBe("exe.northwind.invoicing.prod is not run: sbt.northwind is disabled");
+        _fixture.Http.Requests.Count.ShouldBe(requests);
+    }
+
+    [Theory]
+    [InlineData(-1, StorytellerSubscriptionStatus.Scheduled)]
+    [InlineData(0, StorytellerSubscriptionStatus.Active)]
+    public async Task WithTheChainScope_TheStatus_FollowsValidFromOfTheSubject(int seconds, StorytellerSubscriptionStatus status)
+    {
+        var validFrom = Now.AddHours(1);
+        _fixture.RouteExecution();
+        _fixture.RouteAnnotation(Subject, json => json["ValidFrom"] = validFrom.ToString("O"));
+
+        var context = await WhoAmI().GetAsync();
+
+        context.GetSubscriptionStatus(validFrom.AddSeconds(seconds), StorytellerStatusScope.Chain).ShouldBe(status);
+        (context.FindInactiveAnnotation(validFrom.AddSeconds(seconds), StorytellerStatusScope.Chain) is null).ShouldBe(status == StorytellerSubscriptionStatus.Active);
+    }
+
+    // In the chain order: the key's own, then the context before the usage, and the usage before the subject.
+    [Fact]
+    public async Task WithTheChainScope_TheNearestInactiveAnnotation_Wins()
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteAnnotation(Subject, json => json["IsDisabled"] = true);
+        _fixture.RouteAnnotation(Usage, json => json["ExpiresAt"] = "2026-10-01T00:00:00Z");
+        var whoAmI = WhoAmI();
+
+        var context = await whoAmI.GetAsync();
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Expired);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeSameAs(context.Usage);
+
+        _fixture.RouteAnnotation(Context, json => json["ValidFrom"] = "2026-11-01T00:00:00Z");
+        context = await whoAmI.RefreshAsync();
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Scheduled);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeSameAs(context.Context);
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Expired);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Subscription).ShouldBeSameAs(context.Usage);
+
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, json => json["IsDisabled"] = true);
+        context = await whoAmI.RefreshAsync();
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Disabled);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeSameAs(context.Annotation);
+    }
+
+    // With the subscription scope a key without an execution has the status of its own annotation, and a key with one
+    // counts its execution and its usage. With the chain scope a key of every type counts all its ancestors.
+    [Theory]
+    [InlineData(UnitOfExecution, Unit)]
+    [InlineData(UnitOfExecution, Context)]
+    [InlineData(UnitOfExecution, Subject)]
+    [InlineData(HostingFixture.ExecutionKey, Responsibility)]
+    [InlineData(Usage, Subject)]
+    [InlineData(Usage, Responsibility)]
+    [InlineData(Context, Subject)]
+    [InlineData(Unit, Responsibility)]
+    public async Task WithTheChainScope_AKeyOfEveryType_CountsItsAncestors(string annotationKey, string disabled)
+    {
+        RouteKey(annotationKey);
+        _fixture.RouteAnnotation(disabled, json => json["IsDisabled"] = true);
+
+        var context = await WhoAmI().GetAsync();
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Disabled);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldNotBeNull().AnnotationKey.ShouldBe(disabled);
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Active);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Subscription).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(Responsibility)]
+    [InlineData(Subject)]
+    public async Task WithTheChainScope_AKeyWithoutAncestors_HasTheStatusOfItsOwnAnnotation(string annotationKey)
+    {
+        RouteKey(annotationKey);
+        _fixture.RouteAnnotation(annotationKey, json => json["ExpiresAt"] = "2026-10-01T00:00:00Z");
+
+        var context = await WhoAmI().GetAsync();
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Expired);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeSameAs(context.Annotation);
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Expired);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Subscription).ShouldBeSameAs(context.Annotation);
+    }
+
+    [Theory]
+    [InlineData(HostingFixture.ExecutionKey)]
+    [InlineData(UnitOfExecution)]
+    [InlineData(Usage)]
+    [InlineData(Subject)]
+    public async Task WhenEverythingIsActive_BothScopesAreActive_AndNoAnnotationIsFound(string annotationKey)
+    {
+        RouteKey(annotationKey);
+
+        var context = await WhoAmI().GetAsync();
+
+        foreach (var scope in Enum.GetValues<StorytellerStatusScope>())
+        {
+            context.GetSubscriptionStatus(Now, scope).ShouldBe(StorytellerSubscriptionStatus.Active);
+            context.FindInactiveAnnotation(Now, scope).ShouldBeNull();
+        }
+    }
+
+    // Any ancestor: the subscription scope asks about the usage only, and about the execution of a unit of execution.
+    [Theory]
+    [InlineData(HostingFixture.ExecutionKey, Subject)]
+    [InlineData(HostingFixture.ExecutionKey, Context)]
+    [InlineData(UnitOfExecution, Unit)]
+    [InlineData(Usage, Responsibility)]
+    [InlineData(Context, Subject)]
+    public async Task WithTheChainScope_AnUnreadableAncestor_IsUnknown_WhileTheRestIsActive(string annotationKey, string restricted)
+    {
+        RouteKey(annotationKey);
+        _fixture.RouteStatus(restricted, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+
+        var context = await WhoAmI().GetAsync();
+
+        context.Unreadable.ShouldBe([Full(restricted)]);
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Unknown);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeNull();
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Active);
+    }
+
+    [Fact]
+    public async Task WithTheChainScope_AnUnreadableAncestor_DoesNotHideAnInactiveOne()
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteStatus(Subject, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+        _fixture.RouteAnnotation(Responsibility, json => json["IsDisabled"] = true);
+
+        var context = await WhoAmI().GetAsync();
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Disabled);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeSameAs(context.Responsibility);
+    }
+
+    // A machine restricted to its execution: unknown in both scopes, and no annotation decides it.
+    [Fact]
+    public async Task ARestrictedMachine_IsUnknownInBothScopes_AndNoAnnotationIsFound()
+    {
+        RouteRestrictedMachine();
+
+        var context = await WhoAmI().GetAsync();
+
+        foreach (var scope in Enum.GetValues<StorytellerStatusScope>())
+        {
+            context.GetSubscriptionStatus(Now, scope).ShouldBe(StorytellerSubscriptionStatus.Unknown);
+            context.FindInactiveAnnotation(Now, scope).ShouldBeNull();
+        }
+    }
+
+    // A missing ancestor was deleted after the key was read: it is in neither Ancestors nor Unreadable, and counts in no
+    // scope.
+    [Fact]
+    public async Task WithTheChainScope_AMissingAncestor_DoesNotCount()
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteStatus(Context, HttpStatusCode.NotFound);
+
+        var context = await WhoAmI().GetAsync();
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Active);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ADeletedKey_IsDeletedInBothScopes_BeforeAnInactiveAncestor_AndIsTheAnnotationFound()
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, TestAnnotations.Deleted());
+        _fixture.RouteAnnotation(Subject, json => json["IsDisabled"] = true);
+        _fixture.RouteStatus(Context, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+
+        var context = await WhoAmI().GetAsync();
+
+        foreach (var scope in Enum.GetValues<StorytellerStatusScope>())
+        {
+            context.GetSubscriptionStatus(Now, scope).ShouldBe(StorytellerSubscriptionStatus.Deleted);
+            context.FindInactiveAnnotation(Now, scope).ShouldBeSameAs(context.Annotation);
+        }
+    }
+
+    // A read leaves a deleted ancestor out, and a background read that finds the key gone deletes the key's own
+    // annotation, so only a context that an application built holds a deleted execution next to a key that is not.
+    [Fact]
+    public void ADeletedExecution_OfAUnitOfExecution_IsDeletedInBothScopes_AndIsTheAnnotationFound()
+    {
+        var execution = DeletedExecution(Now.AddDays(-1));
+        var context = new StorytellerExecutionContext
+        {
+            Key = Full(UnitOfExecution),
+            Annotation = Snapshot(UnitOfExecution),
+            Ancestors = new Dictionary<AnnotationType, StorytellerAnnotation>
+            {
+                [AnnotationType.Execution] = execution,
+                [AnnotationType.Unit] = Snapshot(Unit, isDisabled: true),
+            },
+            ReadAt = Now,
+        };
+
+        foreach (var scope in Enum.GetValues<StorytellerStatusScope>())
+        {
+            context.GetSubscriptionStatus(Now, scope).ShouldBe(StorytellerSubscriptionStatus.Deleted);
+            context.FindInactiveAnnotation(Now, scope).ShouldBeSameAs(execution);
+        }
+    }
+
+    // The chain scope counts the execution that the chain holds, so a base snapshot of it deletes the key as it would
+    // disable it. The subscription scope knows the typed execution only, as the status without a scope always did.
+    [Fact]
+    public void ADeletedExecution_ThatIsABaseSnapshot_IsDeletedInTheChainScope_AndDoesNotCountInTheSubscriptionScope()
+    {
+        var execution = new StorytellerAnnotation
+        {
+            Key = Full(HostingFixture.ExecutionKey),
+            AnnotationKey = HostingFixture.ExecutionKey,
+            Type = AnnotationType.Execution,
+            Name = "prod",
+            DeletedAt = Now.AddDays(-1),
+        };
+        var context = new StorytellerExecutionContext
+        {
+            Key = Full(UnitOfExecution),
+            Annotation = Snapshot(UnitOfExecution),
+            Ancestors = new Dictionary<AnnotationType, StorytellerAnnotation> { [AnnotationType.Execution] = execution },
+            ReadAt = Now,
+        };
+
+        context.Execution.ShouldBeNull();
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Deleted);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeSameAs(execution);
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Active);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Subscription).ShouldBeNull();
+        context.GetSubscriptionStatus(Now).ShouldBe(StorytellerSubscriptionStatus.Active);
+    }
+
+    // The key's own annotation is named first when both are deleted.
+    [Fact]
+    public void ADeletedUnitOfExecution_WithADeletedExecution_FindsItsOwnAnnotation()
+    {
+        var unitOfExecution = new StorytellerAnnotation
+        {
+            Key = Full(UnitOfExecution),
+            AnnotationKey = UnitOfExecution,
+            Type = AnnotationType.UnitOfExecution,
+            Name = "daily",
+            DeletedAt = Now.AddHours(-1),
+        };
+        var context = new StorytellerExecutionContext
+        {
+            Key = unitOfExecution.Key,
+            Annotation = unitOfExecution,
+            Ancestors = new Dictionary<AnnotationType, StorytellerAnnotation> { [AnnotationType.Execution] = DeletedExecution(Now.AddDays(-1)) },
+            ReadAt = Now,
+        };
+
+        foreach (var scope in Enum.GetValues<StorytellerStatusScope>())
+        {
+            context.GetSubscriptionStatus(Now, scope).ShouldBe(StorytellerSubscriptionStatus.Deleted);
+            context.FindInactiveAnnotation(Now, scope).ShouldBeSameAs(unitOfExecution);
+        }
+    }
+
+    // The subscription scope is the rule of GetSubscriptionStatus(now), and names the annotation that decides it: the
+    // first one of the key's annotation, its execution and its usage.
+    [Theory]
+    [InlineData(HostingFixture.ExecutionKey, HostingFixture.ExecutionKey, StorytellerSubscriptionStatus.Disabled, HostingFixture.ExecutionKey)]
+    [InlineData(HostingFixture.ExecutionKey, Usage, StorytellerSubscriptionStatus.Disabled, Usage)]
+    [InlineData(HostingFixture.ExecutionKey, Context, StorytellerSubscriptionStatus.Active, null)]
+    [InlineData(HostingFixture.ExecutionKey, Subject, StorytellerSubscriptionStatus.Active, null)]
+    [InlineData(UnitOfExecution, UnitOfExecution, StorytellerSubscriptionStatus.Disabled, UnitOfExecution)]
+    [InlineData(UnitOfExecution, HostingFixture.ExecutionKey, StorytellerSubscriptionStatus.Disabled, HostingFixture.ExecutionKey)]
+    [InlineData(UnitOfExecution, Usage, StorytellerSubscriptionStatus.Disabled, Usage)]
+    [InlineData(UnitOfExecution, Unit, StorytellerSubscriptionStatus.Active, null)]
+    [InlineData(Usage, Usage, StorytellerSubscriptionStatus.Disabled, Usage)]
+    [InlineData(Usage, Subject, StorytellerSubscriptionStatus.Active, null)]
+    [InlineData(Unit, Unit, StorytellerSubscriptionStatus.Disabled, Unit)]
+    [InlineData(Unit, Responsibility, StorytellerSubscriptionStatus.Active, null)]
+    public async Task TheSubscriptionScope_IsTheStatusWithoutAScope_AndFindsTheAnnotationThatDecidesIt(string annotationKey, string disabled, StorytellerSubscriptionStatus status, string? inactive)
+    {
+        RouteKey(annotationKey);
+        _fixture.RouteAnnotation(disabled, json => json["IsDisabled"] = true);
+
+        var context = await WhoAmI().GetAsync();
+
+        context.GetSubscriptionStatus(Now).ShouldBe(status);
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(status);
+        (context.FindInactiveAnnotation(Now, StorytellerStatusScope.Subscription)?.AnnotationKey).ShouldBe(inactive);
+    }
+
+    // The execution of the key comes before its usage, in both scopes.
+    [Fact]
+    public async Task TheSubscriptionScope_FindsTheExecution_BeforeTheUsage()
+    {
+        RouteUnitOfExecution();
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, json => json["ValidFrom"] = "2026-11-01T00:00:00Z");
+        _fixture.RouteAnnotation(Usage, json => json["IsDisabled"] = true);
+
+        var context = await WhoAmI().GetAsync();
+
+        foreach (var scope in Enum.GetValues<StorytellerStatusScope>())
+        {
+            context.GetSubscriptionStatus(Now, scope).ShouldBe(StorytellerSubscriptionStatus.Scheduled);
+            context.FindInactiveAnnotation(Now, scope).ShouldBeSameAs(context.Execution);
+        }
+    }
+
+    [Fact]
+    public async Task AScopeThatIsNotDefined_IsRefused()
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, TestAnnotations.Deleted());
+        var context = await WhoAmI().GetAsync();
+        var scope = (StorytellerStatusScope)2;
+
+        Should.Throw<ArgumentOutOfRangeException>(() => context.GetSubscriptionStatus(Now, scope)).ParamName.ShouldBe("scope");
+        Should.Throw<ArgumentOutOfRangeException>(() => context.FindInactiveAnnotation(Now, scope)).ParamName.ShouldBe("scope");
+    }
+
+    // A test double of who am I has the chain status too. An entry of Unreadable counts when it names an annotation of
+    // a type that the context does not hold.
+    [Fact]
+    public void AContextThatAnApplicationBuilt_HasItsChainStatus()
+    {
+        var usage = Snapshot(Usage);
+        var subject = Snapshot(Subject, isDisabled: true);
+
+        var active = Build([Full(Usage), "not a key"]);
+        var unknown = Build([Full(Responsibility)]);
+        var disabled = Build([Full(Responsibility)], subject);
+
+        active.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Active);
+        unknown.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Unknown);
+        unknown.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeNull();
+        unknown.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Active);
+        disabled.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(StorytellerSubscriptionStatus.Disabled);
+        disabled.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeSameAs(subject);
+        disabled.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Active);
+
+        StorytellerExecutionContext Build(string[] unreadable, StorytellerAnnotation? ancestor = null)
+        {
+            var ancestors = new Dictionary<AnnotationType, StorytellerAnnotation>();
+
+            if (ancestor is not null)
+            {
+                ancestors[ancestor.Type] = ancestor;
+            }
+
+            return new StorytellerExecutionContext
+            {
+                Key = usage.Key,
+                Annotation = usage,
+                Ancestors = ancestors,
+                Unreadable = unreadable,
+                ReadAt = Now,
+            };
+        }
+    }
+
+    // What counts of Unreadable in a context that an application built, a usage with its subject: a full key of a type
+    // that the context holds no annotation of, the type of a key that is no ancestor of the usage too. An annotation
+    // key, a text that is no key, and a full key of the key's own type or of a type in Ancestors do not count. A read
+    // puts only the full keys of the ancestors that it could not read there.
+    [Theory]
+    [InlineData(HostingFixture.Scope + "." + Responsibility, StorytellerSubscriptionStatus.Unknown)]
+    [InlineData(HostingFixture.Scope + "." + Unit, StorytellerSubscriptionStatus.Unknown)]
+    [InlineData(HostingFixture.Scope + "." + Usage, StorytellerSubscriptionStatus.Active)]
+    [InlineData(HostingFixture.Scope + "." + Subject, StorytellerSubscriptionStatus.Active)]
+    [InlineData(Responsibility, StorytellerSubscriptionStatus.Active)]
+    [InlineData("not a key", StorytellerSubscriptionStatus.Active)]
+    public void AContextThatAnApplicationBuilt_CountsAnUnreadableEntry_ThatIsAFullKeyOfATypeItDoesNotHold(string unreadable, StorytellerSubscriptionStatus status)
+    {
+        var usage = Snapshot(Usage);
+        var context = new StorytellerExecutionContext
+        {
+            Key = usage.Key,
+            Annotation = usage,
+            Ancestors = new Dictionary<AnnotationType, StorytellerAnnotation> { [AnnotationType.Subject] = Snapshot(Subject) },
+            Unreadable = [unreadable],
+            ReadAt = Now,
+        };
+
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Chain).ShouldBe(status);
+        context.FindInactiveAnnotation(Now, StorytellerStatusScope.Chain).ShouldBeNull();
+        context.GetSubscriptionStatus(Now, StorytellerStatusScope.Subscription).ShouldBe(StorytellerSubscriptionStatus.Active);
+    }
+
     public void Dispose()
     {
         _fixture.Dispose();
@@ -778,10 +1201,26 @@ public sealed class ExecutionContextTests : IDisposable
     }
 
     // A base snapshot, as an application builds one for a test double of who am I.
-    private static StorytellerAnnotation Snapshot(string annotationKey, string? timeZone = null)
+    private static StorytellerAnnotation Snapshot(string annotationKey, string? timeZone = null, bool isDisabled = false)
     {
         var key = AnnotationKey.Parse(annotationKey);
-        return new StorytellerAnnotation { Key = Full(annotationKey), AnnotationKey = annotationKey, Type = key.Type, Name = key.Name, TimeZone = timeZone };
+        return new StorytellerAnnotation { Key = Full(annotationKey), AnnotationKey = annotationKey, Type = key.Type, Name = key.Name, TimeZone = timeZone, IsDisabled = isDisabled };
+    }
+
+    // The typed snapshot of the execution, deleted: what the members of who am I count as the execution of a key.
+    private static StorytellerExecution DeletedExecution(DateTimeOffset deletedAt)
+    {
+        return new StorytellerExecution
+        {
+            Key = Full(HostingFixture.ExecutionKey),
+            AnnotationKey = HostingFixture.ExecutionKey,
+            Type = AnnotationType.Execution,
+            Name = "prod",
+            SubjectName = "northwind",
+            ResponsibilityName = "invoicing",
+            ContextName = "prod",
+            DeletedAt = deletedAt,
+        };
     }
 
     // The key of a unit of execution and its six ancestors, all active.

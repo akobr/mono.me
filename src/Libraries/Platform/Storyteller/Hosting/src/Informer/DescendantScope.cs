@@ -4,17 +4,19 @@ using _42.Platform.Storyteller.Sdk.Hosting.Reading;
 namespace _42.Platform.Storyteller.Sdk.Hosting.Informer;
 
 // A target of the catalog in the organization, project and view it reads in: the ancestor's full key, the descendants'
-// type and the filters. What the catalog's lists and the descendant informer read.
+// type, the filters, and what the target asks of the descendants' status and of their ancestors'. What the catalog's
+// lists and the descendant informer read.
 internal sealed class DescendantScope
 {
     private readonly Func<AnnotationKey, bool> _passes;
     private readonly Func<string, string> _describe;
 
-    private DescendantScope(FullKey ancestor, AnnotationType type, bool includeInactive, Func<AnnotationKey, bool> passes, Func<string, string> describe)
+    private DescendantScope(FullKey ancestor, AnnotationType type, bool includeInactive, bool requireActiveAncestors, Func<AnnotationKey, bool> passes, Func<string, string> describe)
     {
         Ancestor = ancestor;
         Type = type;
         IncludeInactive = includeInactive;
+        RequireActiveAncestors = requireActiveAncestors;
         _passes = passes;
         _describe = describe;
     }
@@ -25,6 +27,9 @@ internal sealed class DescendantScope
     public AnnotationType Type { get; }
 
     public bool IncludeInactive { get; }
+
+    // Only the descendants whose ancestors are all active.
+    public bool RequireActiveAncestors { get; }
 
     // What the messages of a list name, "the units of {ancestor}".
     public string ListText => $"the {AnnotationTypeFacts.Plural(Type)} of {Ancestor}";
@@ -37,7 +42,7 @@ internal sealed class DescendantScope
         ArgumentNullException.ThrowIfNull(target);
 
         var ancestor = target.FullAncestorKey ?? CatalogKeys.Parse(target.Of, view, nameof(target));
-        return new DescendantScope(ancestor, target.Type, target.IncludeInactive, target.Passes, target.Describe);
+        return new DescendantScope(ancestor, target.Type, target.IncludeInactive, target.RequireActiveAncestors, target.Passes, target.Describe);
     }
 
     // An item of the list, by its key: of the type and under the ancestor, as the platform lists them. A key that is
@@ -77,6 +82,23 @@ internal sealed class DescendantScope
             key,
             404,
             null,
+            false,
+            inner);
+    }
+
+    // Whether an ancestor that the machine may not read is active cannot be told, so neither can which descendants are
+    // under active ancestors. ancestor: of a descendant. inner: the 403 AnnotationRestricted of its read.
+    public StorytellerConfigurationException CannotReadAncestor(FullKey ancestor, StorytellerConfigurationException inner)
+    {
+        ArgumentNullException.ThrowIfNull(ancestor);
+        ArgumentNullException.ThrowIfNull(inner);
+
+        var key = ancestor.ToString();
+        return new StorytellerConfigurationException(
+            $"The machine may not read {key}, so the catalog cannot tell which of {ListText} are under active ancestors. Requiring active ancestors needs a machine that may read them: an unrestricted one for the executions of a responsibility, whose subjects and contexts are not under it.",
+            key,
+            inner.StatusCode,
+            inner.ErrorCode,
             false,
             inner);
     }

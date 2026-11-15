@@ -118,6 +118,20 @@ internal sealed class FakeCatalog
         _annotations[annotationKey] = json;
     }
 
+    // The annotation of the key, and every ancestor of it that the catalog does not hold yet, all active.
+    public void PutWithAncestors(string annotationKey, Action<JObject>? configure = null)
+    {
+        foreach (var ancestor in AnnotationKey.Parse(annotationKey).GetAllAncestorKeys().Select(ancestor => ancestor.ToString()))
+        {
+            if (!_annotations.ContainsKey(ancestor))
+            {
+                Put(ancestor);
+            }
+        }
+
+        Put(annotationKey, configure);
+    }
+
     // A usage and the execution of the subject in the context, both active.
     public void Subscribe(string subject, string context = Context, Action<JObject>? execution = null, Action<JObject>? usage = null, bool stamp = true)
     {

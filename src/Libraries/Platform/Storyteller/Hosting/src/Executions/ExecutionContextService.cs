@@ -225,40 +225,21 @@ internal sealed class ExecutionContextService : IExecutionContext, IDisposable
         }
     }
 
-    // The key with deleted and inactive annotations included, then its ancestors at once. skipped: ancestors the
-    // credential may not read, kept unread.
+    // The key with deleted and inactive annotations included, then its ancestors at once, as AncestorReader reads them: a
+    // restricted ancestor is unreadable, a missing one is left out, and any other failure fails the read as a whole.
+    // skipped: ancestors the credential may not read, kept unread.
     private async Task<StorytellerExecutionContext> ReadAsync(FullKey key, IReadOnlyList<string> skipped, DateTimeOffset readAt, CancellationToken cancellationToken)
     {
         var annotation = await _reader.ReadAsync(key, includeDeleted: true, _disposingToken, cancellationToken).ConfigureAwait(false);
-        var ancestorKeys = key.Annotation.GetAllAncestorKeys().Select(ancestor => FullKey.Create(ancestor, key)).ToList();
-        var reads = ancestorKeys
-            .Where(ancestor => !skipped.Contains(ancestor.ToString(), StringComparer.Ordinal))
-            .Select(ancestor => ReadAncestorAsync(ancestor, cancellationToken))
-            .ToList();
+        var reads = await AncestorReader.ReadAllAsync(
+                key,
+                skipped,
+                ancestor => _reader.ReadAsync(ancestor, includeDeleted: false, _disposingToken, cancellationToken))
+            .ConfigureAwait(false);
+        var context = AncestorReader.ContextOf(key, annotation, reads, readAt);
 
-        // Every read ends before the first failure is thrown, so none is left unobserved.
-        var results = (await Task.WhenAll(reads).ConfigureAwait(false)).ToDictionary(result => result.Key, StringComparer.Ordinal);
-        var ancestors = new Dictionary<AnnotationType, StorytellerAnnotation>();
-        var unreadable = new List<string>();
-        var restricted = new List<string>();
-
-        // In the order of the ancestors, roots first.
-        foreach (var ancestor in ancestorKeys.Select(ancestor => ancestor.ToString()))
-        {
-            if (!results.TryGetValue(ancestor, out var result))
-            {
-                unreadable.Add(ancestor);
-            }
-            else if (result.Annotation is { } read)
-            {
-                ancestors[read.Type] = read;
-            }
-            else if (result.IsRestricted)
-            {
-                unreadable.Add(ancestor);
-                restricted.Add(ancestor);
-            }
-        }
+        // The unreadable ones that this read asked for: those it skipped are not news.
+        var restricted = context.Unreadable.Where(ancestor => reads.ContainsKey(ancestor)).ToList();
 
         if (restricted.Count > 0)
         {
@@ -269,35 +250,6 @@ internal sealed class ExecutionContextService : IExecutionContext, IDisposable
                 string.Join(", ", restricted));
         }
 
-        return new StorytellerExecutionContext
-        {
-            Key = key.ToString(),
-            Annotation = annotation,
-            Ancestors = ancestors,
-            Unreadable = unreadable,
-            ReadAt = readAt,
-        };
+        return context;
     }
-
-    // A restricted ancestor is unreadable, a missing one (deleted after the key was read) is left out; any other failure
-    // fails the read as a whole.
-    private async Task<AncestorRead> ReadAncestorAsync(FullKey key, CancellationToken cancellationToken)
-    {
-        var text = key.ToString();
-
-        try
-        {
-            return new AncestorRead(text, await _reader.ReadAsync(key, includeDeleted: false, _disposingToken, cancellationToken).ConfigureAwait(false), false);
-        }
-        catch (StorytellerConfigurationException exception) when (CatalogReader.IsRestricted(exception))
-        {
-            return new AncestorRead(text, null, true);
-        }
-        catch (StorytellerConfigurationException exception) when (CatalogReader.IsMissing(exception))
-        {
-            return new AncestorRead(text, null, false);
-        }
-    }
-
-    private sealed record AncestorRead(string Key, StorytellerAnnotation? Annotation, bool IsRestricted);
 }

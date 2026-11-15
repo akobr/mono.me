@@ -6,9 +6,9 @@ using static _42.Platform.Storyteller.Sdk.Hosting.Reading.AnnotationTypeFacts;
 namespace _42.Platform.Storyteller.Sdk.Hosting;
 
 // A target of the catalog: the descendants of Type under the annotation Of, active ones only unless IncludingInactive(),
-// deleted ones never. The filters narrow them by a name of their keys, ordinally, in the process: the API has no filter
-// of descendants, so a filter does not make the list cheaper. Immutable: each With… returns a new target, and checks its
-// name at the call.
+// deleted ones never, and with RequiringActiveAncestors() only those under active ancestors. The filters narrow them by
+// a name of their keys, ordinally, in the process: the API has no filter of descendants, so a filter does not make the
+// list cheaper. Immutable: each With… returns a new target, and checks its name at the call.
 public sealed class StorytellerTarget<TAnnotation>
     where TAnnotation : StorytellerAnnotation
 {
@@ -63,6 +63,7 @@ public sealed class StorytellerTarget<TAnnotation>
         Context = source.Context;
         Unit = source.Unit;
         IncludeInactive = source.IncludeInactive;
+        RequireActiveAncestors = source.RequireActiveAncestors;
     }
 
     // The ancestor's key as given, a full key or an annotation key, trimmed, with the type code lower-cased.
@@ -82,6 +83,9 @@ public sealed class StorytellerTarget<TAnnotation>
 
     // Disabled, scheduled and expired descendants too; deleted ones never.
     public bool IncludeInactive { get; private init; }
+
+    // Only the descendants whose ancestors are all active; see RequiringActiveAncestors().
+    public bool RequireActiveAncestors { get; private init; }
 
     internal AnnotationKey AncestorKey { get; }
 
@@ -122,6 +126,17 @@ public sealed class StorytellerTarget<TAnnotation>
         return new StorytellerTarget<TAnnotation>(this) { IncludeInactive = true };
     }
 
+    // Only the descendants whose ancestors are all active, in ListAsync and ListWithAncestorsAsync: the executions of a
+    // responsibility without those of a disabled subject or of an expired context. IncludingInactive() decides about
+    // the descendant's own status, this about its ancestors, and the two combine. The lists read each distinct ancestor
+    // of the descendants once. A missing ancestor leaves its descendants out, as they were deleted with it. An ancestor
+    // the machine may not read throws a definitive StorytellerConfigurationException, so this needs a machine that may
+    // read them.
+    public StorytellerTarget<TAnnotation> RequiringActiveAncestors()
+    {
+        return new StorytellerTarget<TAnnotation>(this) { RequireActiveAncestors = true };
+    }
+
     // "the executions of sbt.northwind in the context production".
     public override string ToString()
     {
@@ -156,6 +171,11 @@ public sealed class StorytellerTarget<TAnnotation>
         if (IncludeInactive)
         {
             text.Append(", inactive ones included");
+        }
+
+        if (RequireActiveAncestors)
+        {
+            text.Append(", under active ancestors");
         }
 
         return text.ToString();

@@ -137,29 +137,26 @@ public sealed class StorytellerExecutionContext
     // chain (rst, sbt, unt, usg, cnt) has the status of its own annotation.
     public StorytellerSubscriptionStatus GetSubscriptionStatus(DateTimeOffset now)
     {
-        var execution = Execution;
+        return Decide(now, StorytellerStatusScope.Subscription).Status;
+    }
 
-        if (Annotation.DeletedAt is not null || execution?.DeletedAt is not null)
-        {
-            return StorytellerSubscriptionStatus.Deleted;
-        }
+    // The same in a scope. Subscription is GetSubscriptionStatus(now). Chain counts the key's annotation and every
+    // ancestor: Deleted when the key's annotation or its execution is deleted; else the status of the first annotation of
+    // Chain that is not active; else Unknown when an ancestor is in Unreadable; else Active. With Chain a key of every
+    // type counts its ancestors, so a usage under a disabled subject is Disabled. It reads nothing. A scope that is not
+    // defined throws ArgumentOutOfRangeException.
+    public StorytellerSubscriptionStatus GetSubscriptionStatus(DateTimeOffset now, StorytellerStatusScope scope)
+    {
+        return Decide(now, scope).Status;
+    }
 
-        if (Annotation.Type is not (AnnotationType.Execution or AnnotationType.UnitOfExecution))
-        {
-            return ToSubscriptionStatus(Annotation.GetStatus(now));
-        }
-
-        foreach (var annotation in new[] { Annotation, execution, Usage })
-        {
-            if (annotation?.GetStatus(now) is { } status and not AnnotationStatus.Active)
-            {
-                return ToSubscriptionStatus(status);
-            }
-        }
-
-        return IsUnreadable(AnnotationType.Usage) || IsUnreadable(AnnotationType.Execution)
-            ? StorytellerSubscriptionStatus.Unknown
-            : StorytellerSubscriptionStatus.Active;
+    // The annotation that decides a status other than Active and Unknown, the first one in the order of the scope, so a
+    // log can name it: "exe.… is not run: sbt.… is disabled". For Deleted the deleted one: the key's own when it is
+    // deleted, else its execution. null for Active and Unknown. A scope that is not defined throws
+    // ArgumentOutOfRangeException.
+    public StorytellerAnnotation? FindInactiveAnnotation(DateTimeOffset now, StorytellerStatusScope scope)
+    {
+        return Decide(now, scope).Annotation;
     }
 
     public override string ToString()
@@ -211,6 +208,72 @@ public sealed class StorytellerExecutionContext
         }
 
         return chain.AsReadOnly();
+    }
+
+    // The status in a scope and the annotation that decides it, from one routine, so GetSubscriptionStatus and
+    // FindInactiveAnnotation cannot disagree.
+    private (StorytellerSubscriptionStatus Status, StorytellerAnnotation? Annotation) Decide(DateTimeOffset now, StorytellerStatusScope scope)
+    {
+        if (scope is not (StorytellerStatusScope.Subscription or StorytellerStatusScope.Chain))
+        {
+            throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown status scope.");
+        }
+
+        var execution = Execution;
+
+        // Chain asks the execution that its chain holds, a test double's base snapshot too; Subscription the typed one,
+        // as GetSubscriptionStatus(now) always did.
+        var deletable = scope == StorytellerStatusScope.Chain ? Find(AnnotationType.Execution) : execution;
+
+        if (Annotation.DeletedAt is not null)
+        {
+            return (StorytellerSubscriptionStatus.Deleted, Annotation);
+        }
+
+        if (deletable?.DeletedAt is not null)
+        {
+            return (StorytellerSubscriptionStatus.Deleted, deletable);
+        }
+
+        foreach (var annotation in Counted(scope, execution))
+        {
+            if (annotation?.GetStatus(now) is { } status and not AnnotationStatus.Active)
+            {
+                return (ToSubscriptionStatus(status), annotation);
+            }
+        }
+
+        return (HasUnreadable(scope) ? StorytellerSubscriptionStatus.Unknown : StorytellerSubscriptionStatus.Active, null);
+    }
+
+    // The annotations that a scope counts, in its order. Subscription: a key without an execution in its chain counts its
+    // own annotation alone.
+    private IReadOnlyList<StorytellerAnnotation?> Counted(StorytellerStatusScope scope, StorytellerExecution? execution)
+    {
+        if (scope == StorytellerStatusScope.Chain)
+        {
+            return Chain;
+        }
+
+        return HasExecution() ? [Annotation, execution, Usage] : [Annotation];
+    }
+
+    // Whether the credential may not read an annotation that the scope counts. Chain: any ancestor, by the rule of
+    // IsUnreadable: an entry of Unreadable counts when it is a full key of a type the context holds no annotation of.
+    private bool HasUnreadable(StorytellerStatusScope scope)
+    {
+        if (scope == StorytellerStatusScope.Chain)
+        {
+            return Unreadable.Any(key => FullKey.TryParse(key, out var fullKey) && Find(fullKey.Annotation.Type) is null);
+        }
+
+        return HasExecution() && (IsUnreadable(AnnotationType.Usage) || IsUnreadable(AnnotationType.Execution));
+    }
+
+    // An execution is in the chain of the key: its own, or the one of a unit of execution.
+    private bool HasExecution()
+    {
+        return Annotation.Type is AnnotationType.Execution or AnnotationType.UnitOfExecution;
     }
 
     private bool IsUnreadable(AnnotationType type)
