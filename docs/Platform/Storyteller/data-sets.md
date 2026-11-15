@@ -1,8 +1,8 @@
 # Data Sets of DbCreator
 
-DbCreator (`src/Platform/Storyteller/DbCreator`, the tool `2sInitDb`) creates the Cosmos DB database of the platform and seeds **data sets** into it. A data set is a folder of documents in the format of a [view export](export-import.md), with a manifest `set.json` and an optional `annotations.jsonl` of simple or generated annotations. A seed writes a set into an organization, project and view, and creates them when they are missing.
+DbCreator (`src/Platform/Storyteller/DbCreator`, the tool `2sInitDb`) creates the Cosmos DB database of the platform and seeds **data sets** into it. A data set is a folder of documents in the format of a [view export](export-import.md), with a manifest `set.json`, an optional `annotations.jsonl` of simple or generated annotations, and an optional `key-values.json` of [key/value pairs](key-values.md). A seed writes a set into an organization, project and view, and creates them when they are missing.
 
-A seed goes through the services of the API, as the `System` actor: the access model creates the organization and the project, the view registry registers the view, the [view importer](export-import.md#import-without-a-job) writes the documents, and a bulk writer writes the lines of `annotations.jsonl` in transactional batches. So seeded annotations have audit entries and relation arrays like any other, and a seed is idempotent: what exists stays, what is missing is created, and a set seeded already is not read again.
+A seed goes through the services of the API, as the `System` actor: the access model creates the organization and the project, the view registry registers the view, the [view importer](export-import.md#import-without-a-job) writes the documents, a bulk writer writes the lines of `annotations.jsonl` in transactional batches, and the [key/value import](key-values.md#import-and-export) writes the pairs. So seeded annotations have audit entries and relation arrays like any other, and a seed is idempotent: what exists stays, what is missing is created, and a set seeded already is not read again.
 
 Use it for local development (the Aspire host seeds the set `showcase`), demos, the [exhibition](access.md#exhibition) of a deployment (the set `exhibit`), tests, and performance checks with many annotations.
 
@@ -10,17 +10,18 @@ The code is in:
 
 - `src/Platform/Storyteller/DbCreator/src/`:
   - `Commands/`: the root command `InitDbCommand` and its subcommands `SeedCommand` and `SetsCommand`, and `DataSetOutput`, which prints the results;
-  - `DataSets/`: the manifest (`DataSetManifest`), `annotations.jsonl` (`DataSetAnnotationLinesReader`), the files and the hash (`DataSetFolder`), the catalog (`DataSetCatalog`), the target and the owner (`DataSetTarget`, `DataSetOwner`, `DataSetProvisioner`), the seed record (`DataSetSeedRecord`, `CosmosDataSetSeedRecordStore`) and the seeder (`DataSetSeeder`);
+  - `DataSets/`: the manifest (`DataSetManifest`), `annotations.jsonl` (`DataSetAnnotationLinesReader`), `key-values.json` (`DataSetKeyValues`, and `DataSetKeyValueSeeder`, which writes the pairs), the files and the hash (`DataSetFolder`), the catalog (`DataSetCatalog`), the target and the owner (`DataSetTarget`, `DataSetOwner`, `DataSetProvisioner`), the seed record (`DataSetSeedRecord`, `CosmosDataSetSeedRecordStore`) and the seeder (`DataSetSeeder`);
   - `Logic/CoreDbStructureBuilder.cs`: the layout check, the containers, the access of the base owner and the set `core`;
-  - `DbCreatorEntryPoint.cs` (`AddDbCreator`) and `ExitCodes.cs`;
+  - `DbCreatorEntryPoint.cs` (`AddDbCreator`), `Startup.cs` (the Standard vault, `AddKeyVaultKeyProtection`) and `ExitCodes.cs`;
   - `data-sets/`: the built-in sets;
 - `Backend.Core/src/Transferring/`: the importer (`IViewImporter`, `ViewImporter`), `ViewImportTally` and the reader of loose files (`ViewArchiveEntry`), see [export-import.md](export-import.md#import-without-a-job);
 - `Backend.Core/src/Annotating/`: `IAnnotationBulkWriter` with `AnnotationBulkOptions`, `AnnotationBulkResult` and `AnnotationBulkItem`;
 - `Backend.CosmosDb/src/Annotating/CosmosAnnotationService.Bulk.cs`: the bulk writer;
-- `DbCreator/test/` (unit tests, no database) and `DbCreator/testint/` (seeds against a Cosmos DB emulator);
+- `Backend.CosmosDb/src/KeyValues/CosmosKeyValueService.cs`: the key/value import, and `KeyValues.Azure.KeyVault`: the Standard vault;
+- `DbCreator/test/` (unit tests, no database) and `DbCreator/testint/` (seeds against a Cosmos DB emulator, and Lowkey Vault for the `Standard` pairs);
 - `src/Platform/ui.admin/src/test/unit/mock/showcase-set.test.ts`: writes the set `showcase` from the admin UI's mock.
 
-The design and its decisions are in [the spec](specs/2026-11-12%20Data%20Sets%20in%20DbCreator.md) and its phase reviews.
+The design and its decisions are in [the spec](specs/2026-11-12%20Data%20Sets%20in%20DbCreator.md) and its phase reviews; the key/value pairs in [their spec](specs/2026-11-15%20Key-Value%20Pairs%20in%20Data%20Sets%20of%20DbCreator.md) (424-265).
 
 ## What DbCreator does
 
@@ -42,6 +43,7 @@ A set is a folder:
 invoicing/
   set.json                    the manifest
   annotations.jsonl           optional: simple and generated annotations
+  key-values.json             optional: the key/value pairs of the view
   annotations/
     rst.payments.json
     unt.payments.ledger.json
@@ -55,12 +57,12 @@ invoicing/
 ```
 
 - **The documents** are named as in an export ([File names](export-import.md#file-names)). Only the file name tells the kind; the folders play no part. The reader is the import's (`ViewArchiveReader`), so a set reads as an archive does: annotation files keep the text of their numbers and their date strings, the first of two files of one document wins and the other fails with `DuplicateFile`, and a file that is not valid fails with its code.
-- **Ignored files** are counted and never fail a seed: version files (`rst.payments.conf.3.json`), `export.json`, a `set.json` below the root, and any other name, such as a `README.md`.
+- **Ignored files** are counted and never fail a seed: version files (`rst.payments.conf.3.json`), `export.json`, a `set.json` or `key-values.json` below the root, and any other name, such as a `README.md`.
 - **Skipped paths** are neither read, nor counted, nor hashed: a path with a segment that starts with `.` (`.git`, `.vscode`, `.DS_Store`), and a first folder `__MACOSX`.
 - **An unpacked export** of a view (`sform story export -x`, either format) is a set once it gets a `set.json`.
 - **Limits.** A set holds at most 1,000,000 files and 2 GiB of document files, and a document at most 2 MB (2,097,152 bytes), one Cosmos DB item; a file that is not a document, such as a version file or a `README.md`, may be of any size. The upload limits of an import job do not apply. A seed checks them from the sizes of the files before it writes anything, and a set beyond them is wrong input (exit `2`), for `sets` too: a document over 2 MB refuses the whole set, with the file in the message, where an import job fails only that file.
 
-What a set cannot carry: key/value pairs, accounts and roles (a created organization and project get the owner only), the history of a document (only its current version is written), deleted annotations, and the stamps of other actors (everything is stamped by `System`).
+What a set cannot carry: accounts and roles (a created organization and project get the owner only), the history of a document or a pair (only its current version is written), deleted annotations and pairs, pairs of the levels `Hsm`, `Byok` and `Hyok` (see [key-values.json](#key-valuesjson)), the project's key/value policy, and the stamps of other actors (everything is stamped by `System`).
 
 ### set.json
 
@@ -131,6 +133,60 @@ A failed line fails what hangs on it: the lines and the annotation files below i
 
 Lines and files can be mixed: lines for many simple annotations, which the bulk writer writes fast, and files for detailed ones below or above them (see [Seeding a set](#seeding-a-set)).
 
+### key-values.json
+
+The key/value pairs of the set's view, in the format of the key/value [export and import](key-values.md#import-and-export), `2s.key-values.v1`:
+
+```json
+{
+  "Format": "2s.key-values.v1",
+  "Items": [
+    { "Key": "smtp.host", "Protection": "Public", "Value": "smtp.fabrikam.example" },
+    { "Key": "features.flags", "Protection": "Public", "Value": "{\"ksef\":true}", "ContentType": "application/json" },
+    { "Key": "peppol.apiKey", "Protection": "Public", "Value": "kv://fabrikam-prod/peppol-api-key", "ContentType": "application/vnd.2s.secret-reference" },
+    { "Key": "smtp.password", "Protection": "Standard", "Value": "demo-only-value" }
+  ]
+}
+```
+
+- The file sits at the root of the set, next to `set.json`; it is neither a document nor an ignored file. One at a deeper path is an ignored file. An export of a values store with its secret values (`sform story kv export --include-secrets`, or the admin UI's "Key/value document (JSON)") is a good start.
+- It is read as `set.json` is: member names and level names in any case, an unknown member refused, comments and trailing commas allowed. A missing `Format` counts as `2s.key-values.v1`, another is refused, and `Items` must be an array of pairs. At most 10,000 pairs and 32 MiB per file.
+- **Every item** follows the rules of the import, and the refusals of a seed:
+  1. the key: segments of letters, digits and `_` that start with a letter or `_`, joined by `.`, at most 128 characters (`smtp-host` is not a key);
+  2. the level `Public` or `Standard` (see below);
+  3. a `Value`: a seed creates the pair and has no existing secret to keep, so an item without one is refused (an export without secret values cannot be seeded);
+  4. a value of at most 24,576 bytes in UTF-8, and a content type of at most 255 characters;
+  5. a secret reference (the content type `application/vnd.2s.secret-reference`, or the Key Vault reference of App Configuration) is `Public` and has the shape of a reference (`kv://{vault}/{name}[/{version}]`, or the URI of a secret);
+  6. keys are unique, ignoring case.
+- A file that cannot be read or holds an item that breaks a rule makes the set wrong input (exit `2`), for `sets` too, before anything is written; the message lists every problem, at most 20:
+
+  ```text
+  ! The key/value pairs '…/key-values.json' cannot be seeded: 2 items are not valid; nothing was written.
+    item 3 'smtp-host': The key 'smtp-host' is not valid: use segments of letters, digits and '_' that start with a letter or '_', joined by '.', at most 128 characters.
+    item 5 'api.token': the level Hsm cannot be seeded: Hsm, Byok and Hyok need keys of the organization, a customer's tenant or the project's recipients, which a seed cannot set up; use Public or Standard
+  ```
+
+**The levels.**
+
+| Level | In a set |
+| --- | --- |
+| `Public` | Always |
+| `Standard` | Only when DbCreator has a Standard vault (below). Without one, a set with `Standard` pairs is wrong input (exit `2`) before anything is written, with a message that says what to configure; also when it is seeded already, because the plan decides from the files alone. Built-in sets and `--path` sets alike |
+| `Hsm`, `Byok`, `Hyok` | Refused (exit `2`): they need per-organization keys, a customer's tenant or the project's recipients, which a seed cannot set up |
+
+The policy of an existing project decides too: a level it does not allow fails its pair when the set is seeded (`ProtectionNotAllowed`, exit `4`), and the other pairs are written. The default policy, which a project the seed creates gets, allows `Public` and `Standard`.
+
+**The vault.** DbCreator registers the Key Vault providers as the API does (`AddKeyVaultKeyProtection` in `Startup`), so the API's settings configure it:
+
+| Variable | Meaning |
+| --- | --- |
+| `AzureKeyVaults__default` | The URI of the Standard vault (the vault named by `KeyValues__Protection__Standard__VaultName`, `default`). The API and the seed must use the same vault, or the API cannot decrypt what the seed wrote |
+| `KeyValues__Protection__Emulator` | `true` for Lowkey Vault: a dummy token and its self-signed certificate. Never in production |
+
+The identity needs the roles the API's identity has on that vault: **Key Vault Crypto Officer** (it creates the project's key on the first `Standard` pair) and **Key Vault Crypto Service Encryption User** (wrap and unwrap). A build of DbCreator in Release, the dotnet tool among them, runs as Production: it refuses the emulator at startup, and reaches the vault with a managed identity or a service principal of `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET` (`EnvironmentCredential`), as the API in Azure; a Debug build (`dotnet run`) uses `DefaultAzureCredential`, so an `az login` works. The Aspire resource `db-seed` gets the host's Lowkey Vault (see [Running it](#running-it)). The first `Standard` pair of a project creates its key in the vault and records it in the project's policy, as the first `Standard` write of the API does ([The Standard level and Key Vault](key-values.md#the-standard-level-and-key-vault)).
+
+**Secrets in the repository.** A `Standard` value in a set is plain text in Git: in the repository, in every clone, and in the package of the tool. **A set holds demo and test values only, never real secrets.** For a real secret, use a reference: a `Public` pair whose value names a secret in the customer's own vault (`kv://{vault}/{name}` with the content type `application/vnd.2s.secret-reference`). It holds no secret, and the platform never resolves it.
+
 ## The catalog
 
 A run can seed the sets of its catalog:
@@ -177,8 +233,8 @@ After a set is seeded without a `Failed` outcome, the seed upserts its record in
 | `Set`, `View`, `Version` | The set, the view and the version of the set |
 | `Hash` | The hash of the set's files |
 | `Seeded` | An [audit stamp](audit-stamps.md) of the `System` actor |
-| `Documents`, `Annotations` | The document files and the annotations of `annotations.jsonl` the seed read |
-| `Created`, `Updated`, `Unchanged`, `Skipped`, `Warnings` | The outcomes of both together |
+| `Documents`, `Annotations`, `KeyValues` | The document files, the annotations of `annotations.jsonl` and the pairs of `key-values.json` the seed read (`KeyValues` is 0 in a record written before sets had pairs) |
+| `Created`, `Updated`, `Unchanged`, `Skipped`, `Warnings` | The outcomes of all of them together |
 
 The record has no `ViewName`, `ProjectName` or `AnnotationType`, and its id does not start with `view.`, so view discovery, the view registry and the queries of annotations never see it.
 
@@ -188,10 +244,10 @@ The record has no `ViewName`, `ProjectName` or `AnnotationType`, and its id does
 | --- | --- |
 | No record of the set | Seeds the set |
 | A record with the same `Version` and `Hash` | Reports the set as seeded already and reads nothing more; exit `0`. `--again` seeds it anyway |
-| A record of another version or hash: the set changed | Seeds the set: new documents are created, what exists stays. A changed document is `Skipped` with `DocumentExists`, not updated |
+| A record of another version or hash: the set changed | Seeds the set: new documents and pairs are created, what exists stays. A changed document is `Skipped` with `DocumentExists`, a changed pair with `KeyValueExists`; neither is updated |
 | No record after a run that stopped halfway: a crash, a stop, a failed document | Seeds the set: what the earlier run wrote is `Unchanged`, the rest is created, and the relation arrays the earlier run left incomplete are completed (see [Seeding a set](#seeding-a-set)) |
 
-A seed never overwrites and never deletes. To change a seeded document, change it through the API, `sform` or the admin UI, or import it with `sform story import` (which overwrites by default). A deleted annotation is not re-created: it is `Skipped` with `AnnotationDeleted`, with what hangs on it. The record is written only by a real run without a `Failed` outcome; warnings and skipped documents do not keep a set from being recorded.
+A seed never overwrites and never deletes. To change a seeded document, change it through the API, `sform` or the admin UI, or import it with `sform story import` (which overwrites by default). A deleted annotation is not re-created: it is `Skipped` with `AnnotationDeleted`, with what hangs on it. A deleted pair is not restored: it is `Skipped` with `KeyValueDeleted` (a pair purged, or past the deleted retention of 90 days, is gone, and a later seed of a changed set creates it again). To change a seeded pair, set it through the API, `sform story kv` or the admin UI, or import it with `sform story kv import`. The record is written only by a real run without a `Failed` outcome; warnings and skipped documents do not keep a set from being recorded.
 
 ## Seeding a set
 
@@ -202,14 +258,28 @@ A seed never overwrites and never deletes. To change a seeded document, change i
 3. **The annotations, in rounds.** A round imports its annotation files through `IViewImporter` (one document at a time, ancestors first), then sends its lines to `IAnnotationBulkWriter`. A set without a line above a file has one round: the files, then the lines. A file below a line comes in a later round than the line, and a line below a file comes after the file. Both the importer and the bulk writer create a missing ancestor with defaults, and `Skip` would then keep the defaults over the line or the file of that key.
 4. A line on or below an annotation that failed, in a file or a line, is `Skipped` with `DependencyFailed` and is not sent.
 5. **The relation arrays of the annotation files are completed** (`IAnnotationBulkWriter.CompleteRelationsAsync`, also in a dry run, which only counts). A create commits the key first and the arrays of its active parents in its last wave, and an import that finds the key active again reports it `Unchanged` without a look at the parents. So a run that stopped between the two, by a crash, a stop or a request that failed after the retries of the Cosmos DB client, would leave a parent without the name of its child, and the next run would record the set so. The keys of the files and their ancestors are read in reads of many items, and an active parent that misses an active child gets the name in one replace under its ETag, without an audit entry and without a change of `Modified`. On a first seed nothing is missing, and the step costs a read of many items per 1,000 keys. The seed prints the number of annotations it completed, when there are any. The lines need no such step: the bulk writer does the same for the keys of every call.
-6. The schemas, templates and configurations go through `IViewImporter`, with the same overlay.
-7. The record is written (see above).
+6. **The pairs of `key-values.json`** go through the key/value import (`IKeyValueService.ImportAsync`, from `DataSetKeyValueSeeder`) as the `System` caller (both secret rights, the `System` channel), before the configurations that bind them. The import's `Merge` would update a pair whose value differs and restore a deleted one, so the seed sends it neither. Per chunk of 1,000 pairs, the most one import takes:
+   1. a dry run of the import plans the chunk: it validates the pairs with the project's policy and compares each with what the view holds, deleted pairs included (a `Standard` secret is decrypted for the comparison);
+   2. the decisions:
+
+      | The view holds | Outcome |
+      | --- | --- |
+      | No such key | `Created` |
+      | The key with the same level, content type and value | `Unchanged` |
+      | The key with another value, level or content type | `Skipped` with `KeyValueExists`; not changed |
+      | The key soft-deleted | `Skipped` with `KeyValueDeleted`; not restored. The plan cannot tell a deleted key from a missing one, so the seed lists the deleted keys of the view, once per set and only when a key is to be created |
+
+   3. a second import writes only the pairs decided `Created`, in transactional batches of 50. With nothing to create there is no call, so a run with `--again` writes no pair and no audit event.
+
+   A pair the import refuses (`ProtectionNotAllowed` of the project's policy) is `Failed`, and the rest of its chunk is planned again without it. A failure of the vault (`KeyEncryptionUnavailable`, `ProtectionNotConfigured`, a `403` of the vault) fails the pairs of its call. A failed pair keeps the set from being recorded (exit `4`); the seed goes on with the configurations, and a run again writes the rest. A key that another writer creates between the plan and the write is updated by the write (`Updated`, listed). Each write is one `Import` event of the [audit trail](key-values.md#audit-trail), by `System`; the writes do not reach the [usage meters](key-values.md#usage-meters), because DbCreator never flushes its usage recorder.
+7. The schemas, templates and configurations go through `IViewImporter`, with the same overlay.
+8. The record is written (see above).
 
 A run seeds its sets in the order of their dependencies. A set that depends on a set with failures is not seeded, and the run exits `4`; a set that does not depend on it is seeded. `seed` prints it under the heading of the set (`# b  version 1, built-in`) as `! Not seeded: the set 'a' it depends on failed.`
 
-The outcomes, codes and warnings are those of an import ([Outcomes, codes and warnings](export-import.md#outcomes-codes-and-warnings)): `Created` (with the warning `AncestorCreated` when missing ancestors are created with defaults), `Unchanged`, `Skipped` (`DocumentExists`, `AnnotationDeleted`, `DependencyFailed`, `AnnotationNotFound` for a document whose annotation is missing), and `Failed` (`InvalidDocument`, `InvalidKey`, `InvalidAnnotation`, `DuplicateFile`, `SchemaViolation`, …). Warnings never fail a seed. A configuration is validated against its schemas as in an import; `--force` stores schemas and configurations that break each other, with a warning.
+The outcomes, codes and warnings are those of an import ([Outcomes, codes and warnings](export-import.md#outcomes-codes-and-warnings)): `Created` (with the warning `AncestorCreated` when missing ancestors are created with defaults), `Unchanged`, `Skipped` (`DocumentExists`, `AnnotationDeleted`, `DependencyFailed`, `AnnotationNotFound` for a document whose annotation is missing), and `Failed` (`InvalidDocument`, `InvalidKey`, `InvalidAnnotation`, `DuplicateFile`, `SchemaViolation`, …). A pair is `Created`, `Unchanged`, `Skipped` (`KeyValueExists`, `KeyValueDeleted`) or `Failed` (`ProtectionNotAllowed`, `KeyEncryptionUnavailable`, …), and `Updated` only after a race (see step 6). Warnings never fail a seed. A configuration is validated against its schemas as in an import; `--force` stores schemas and configurations that break each other, with a warning.
 
-**A dry run** decides every outcome and writes nothing. The overlay carries what the earlier steps of the set, and the sets before it in the run, would write, and the bulk writer is given those keys (`AnnotationBulkOptions.DryRunActiveKeys`), so a dry run reports the failures of the real run and exits as it would. One difference stays: when two sets of one run configure the same annotation differently, the dry run reports the later one `Created`, and the real run `Skipped` with `DocumentExists`. Neither is a failure.
+**A dry run** decides every outcome and writes nothing. The overlay carries what the earlier steps of the set, and the sets before it in the run, would write, and the bulk writer is given those keys (`AnnotationBulkOptions.DryRunActiveKeys`), so a dry run reports the failures of the real run and exits as it would. The pairs are planned by the import's own dry run, which validates them with the project's policy as the real run does. One difference stays: when two sets of one run configure the same annotation differently, or hold the same key, the dry run reports the later one `Created`, and the real run `Skipped` with `DocumentExists` or `KeyValueExists` (or `Unchanged`). Neither is a failure.
 
 ### Bulk writing
 
@@ -242,7 +312,7 @@ The vNext emulator slows down as the database fills: after 26,000 other annotati
 
 ## Commands
 
-DbCreator reads `app.config.json` next to it, then the environment variables. The connection is `ConnectionStrings__cosmos` when set (the Aspire host sets it), otherwise `CosmosDb__Connection`; `app.config.json` points at the Windows emulator on `https://localhost:8081` and accepts its certificate (`CosmosDb__ShouldAcceptAnyCertificate`). The owner is `baseAccount__id`; `stagingSeed__enabled` is read by the root command only. No command asks anything on the console.
+DbCreator reads `app.config.json` next to it, then the environment variables. The connection is `ConnectionStrings__cosmos` when set (the Aspire host sets it), otherwise `CosmosDb__Connection`; `app.config.json` points at the Windows emulator on `https://localhost:8081` and accepts its certificate (`CosmosDb__ShouldAcceptAnyCertificate`). The owner is `baseAccount__id`; `stagingSeed__enabled` is read by the root command only. The Standard vault of the pairs is `AzureKeyVaults__default`, with `KeyValues__Protection__Emulator=true` for Lowkey Vault (see [key-values.json](#key-valuesjson)). No command asks anything on the console.
 
 ### 2sInitDb
 
@@ -273,11 +343,11 @@ The build of the database (see [What DbCreator does](#what-dbcreator-does)). Aft
 
 A seed:
 
-1. **Plans** from the files and the options alone, so wrong input exits `2` before the database is touched: an unknown set, an invalid manifest, a cycle, a missing name of the target, an invalid project, view or organization with a dot, an invalid owner id, a missing `--path` folder, a set beyond the limits (a document or a line over 2 MB included).
+1. **Plans** from the files and the options alone, so wrong input exits `2` before the database is touched: an unknown set, an invalid manifest, a cycle, a missing name of the target, an invalid project, view or organization with a dot, an invalid owner id, a missing `--path` folder, a set beyond the limits (a document or a line over 2 MB included), a `key-values.json` that cannot be seeded (an item that breaks a rule, a level other than `Public` or `Standard`, an item without a value), and `Standard` pairs without a Standard vault.
 2. Prints the plan (`Seeding the set 'large' into 'acme/billing/default' for the owner … (#…).`), and in a dry run that nothing is written.
 3. Checks the layout of the database and ensures the database and its containers, as the root command does (exit `3` for the earlier layout).
 4. Makes the target exist and seeds the sets in order. What only the database tells is checked here, before anything of the target is written (exit `2`): the name of an organization the seed creates, and a missing project in an organization whose Owner is not the owner (see [The owner and the creation of the target](#the-owner-and-the-creation-of-the-target)).
-5. Prints each set: its counts per kind, the line of `annotations.jsonl` with the ancestors the bulk writer created and the relation arrays it updated, the relation arrays it completed for the annotation files, the ignored files, the failures (at most 20, then `… and N more`), the warnings by code, the other outcomes that are not `Created` or `Unchanged` by code, and the time. Then what the target got and the end:
+5. Prints each set: its counts per kind, the line of `annotations.jsonl` with the ancestors the bulk writer created and the relation arrays it updated, the relation arrays it completed for the annotation files, the line of `key-values.json` (`key-values.json: 20 pairs (19 Public, 1 Standard): 20 created, 0 updated, 0 unchanged, 0 skipped, 0 failed`), the ignored files, the failures (at most 20, then `… and N more`; a pair as `key-values.json (smtp.host): ProtectionNotAllowed …`), the warnings by code, the other outcomes that are not `Created` or `Unchanged` by code, and the time. Then what the target got and the end:
 
 ```text
 Seeding the set 'large' into 'acme/billing/default' for the owner Aleš Kobr (#user_01…).
@@ -303,7 +373,7 @@ Done in 43.2 s: 1 set seeded, 0 sets seeded already.
 2sInitDb sets [--path <folder>]…
 ```
 
-Lists the built-in sets and those of the `--path` folders: the name, the version and where it comes from (`built-in` or `--path`), the description, the default target (with a hint when the manifest names no organization or project), the dependencies (one that is not in the catalog is marked), the documents per kind with those that cannot be read and the ignored files, the lines, generators and annotations of `annotations.jsonl` with those that cannot be read, and the folder. It reads the files only and never touches the database. A set beyond the [limits](#a-set) ends the listing as wrong input (exit `2`), as it ends a seed.
+Lists the built-in sets and those of the `--path` folders: the name, the version and where it comes from (`built-in` or `--path`), the description, the default target (with a hint when the manifest names no organization or project), the dependencies (one that is not in the catalog is marked), the documents per kind with those that cannot be read and the ignored files, the lines, generators and annotations of `annotations.jsonl` with those that cannot be read, the pairs of `key-values.json` per level (`key-values.json: 20 pairs: 19 Public, 1 Standard (Standard pairs seed with a Standard vault only)`), and the folder. It reads the files only and never touches the database, so it lists `Standard` pairs without a vault. A set beyond the [limits](#a-set), or a `key-values.json` that a seed refuses, ends the listing as wrong input (exit `2`), as it ends a seed.
 
 ### Exit codes
 
@@ -312,9 +382,9 @@ Lists the built-in sets and those of the `--path` folders: the name, the version
 | `0` | Success, also for a set seeded already, and with warnings or skipped documents |
 | `-1` (`255` on Linux and macOS) | The command line cannot be parsed: an unknown command, option or argument, a missing value, a single value given twice |
 | `1` | The tool crashed, for example when the database cannot be reached or the bulk writer runs out of retries; the log file has the details |
-| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner, an existing project whose Administrator or Owner is not the owner, an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the ownership of the organization and the project are known only after the database and its containers are ensured |
+| `2` | Wrong input: an unknown set, an invalid manifest, a set beyond the limits (its files, a document or a line of more than 2 MB, or more than 200,000 annotations), a `key-values.json` that cannot be seeded (it does not parse, more than 10,000 pairs, an item that breaks a rule of the import, a level `Hsm`, `Byok` or `Hyok`, an item without a value), `Standard` pairs without a Standard vault, a cycle, a name found twice, a missing or invalid name of the target, a missing project in an organization whose Owner is not the owner, an existing project whose Administrator or Owner is not the owner, an invalid account id, a `--path` folder that does not exist or holds no set. For the root command, an invalid `baseAccount:id`. All before anything of the target is written; an invalid name of a new organization and the ownership of the organization and the project are known only after the database and its containers are ensured |
 | `3` | The database has the containers of the earlier layout (one per organization); nothing was written |
-| `4` | A document or an annotation of a set failed (also in a dry run that would fail), or a set was not seeded because a set it depends on failed |
+| `4` | A document, an annotation or a pair of a set failed (also in a dry run that would fail), or a set was not seeded because a set it depends on failed |
 | `40` | The seed was stopped (Ctrl+C, or the host shut down). The set that was running is not recorded, so a run again seeds what is missing |
 
 ## The built-in sets
@@ -323,8 +393,8 @@ Lists the built-in sets and those of the `--path` folders: the name, the version
 | --- | --- | --- |
 | `core` | `42dotnet` / `main` / `default` | The platform's own annotations: 11 annotation files and the configuration of `cnt.42.system` |
 | `large` | `acme` / `billing` / `default` | `annotations.jsonl` only: 49 lines, 32 of them generators, for 16,017 annotations |
-| `showcase` | `fabrikam` / `invoicing-suite` / `default` | The scope of the admin UI's showcase mock: about 240 annotations, 150 configurations, two descendant-type schemas and a template |
-| `exhibit` | `fourth-wall` / `toons-and-tyrants` / `default` | The demo of Fourth Wall Software and its customers Acme Corp and Globex: 30 annotations, 30 configurations, 11 schemas of all three kinds and 3 templates. Also the content of a deployment's [exhibition](access.md#exhibition) |
+| `showcase` | `fabrikam` / `invoicing-suite` / `default` | The scope of the admin UI's showcase mock: about 240 annotations, 150 configurations, two descendant-type schemas, a template, and 10 pairs (8 `Public`, 2 `Standard`) |
+| `exhibit` | `fourth-wall` / `toons-and-tyrants` / `default` | The demo of Acme Corp and Globex: 30 annotations, 11 schemas, 3 templates gated per company with JSON-e, 30 configurations with every binding form, and 20 pairs (19 `Public`, 1 `Standard`); see its `README.md`. Also the content of a deployment's [exhibition](access.md#exhibition) |
 
 The data of the [playground](playground.md) is a set too, outside the catalog: `src/Platform/Storyteller/Playground/data` with the `set.json` of the set `playground`.
 
@@ -356,7 +426,13 @@ npx vitest run test/unit/mock/showcase-set.test.ts -u
 
 The path comes first, because `-u` takes an optional value in Vitest 4. Then delete the files the test reports as stale. `set.json` is the only file written by hand. The `Platform.UI.Admin` workflow also runs on changes of the set's folder, so a hand edit fails there. More in the [admin UI README](../../../src/Platform/ui.admin/README.md#mock-mode).
 
-What the mock has and the set does not: the stamps of its personas, the version histories, the deleted annotations, the project settings of the browser (type names, colors, time zone) and the members other than the owner. Its dates are absolute (from the frozen clock), so a scheduled annotation becomes active over time.
+`key-values.json` is written by the same test, from the mock's values store of the scope (`app/mock/showcase/key-values.ts`): the current value of every pair that is not deleted, ordered by key, as the key/value export lists them. The test checks that every key follows the platform's key rule and that the levels are `Public` and `Standard`; the two `Standard` values are demo values. The configurations of the set bind no pair yet.
+
+What the mock has and the set does not: the stamps of its personas, the version histories, the deleted annotations and pairs, the project settings of the browser (type names, colors, time zone) and the members other than the owner. Its dates are absolute (from the frozen clock), so a scheduled annotation becomes active over time.
+
+### exhibit
+
+The demo of the platform ([its spec](specs/2026-11-13%20Demo%20Data%20Set%20of%20Acme%20Corp%20and%20Globex.md)): Fourth Wall Software and its customers Acme Corp and Globex in `fourth-wall` / `toons-and-tyrants` / `default`, written by hand. Its configurations bind its pairs in every form (`@key`, `@public(…)`, `@(…, public)`, `@secret(…)`, interpolations `@[…]`), so a resolved read answers `422` without them; its `key-values.json` holds 18 public pairs, a secret reference and one `Standard` pair with a demo value, so it seeds with a Standard vault only. `README.md` and `project-settings.json` (the type names for the admin UI, which neither a seed nor an import stores) are ignored files.
 
 ### exhibit
 
@@ -388,7 +464,7 @@ Two files of the folder are not seeded. A seed counts them, and the `README.md`,
 A built-in set:
 
 1. Create `src/Platform/Storyteller/DbCreator/src/data-sets/<name>/` with a `set.json`: the name, a version, a description, the default target and a `ProjectDescription`. The project file copies every file of `data-sets/` to the output and into the tool package; it needs no change.
-2. Add the documents with the names of an export, or `annotations.jsonl`. An unpacked export of a view (`sform story export -x`) is a good start.
+2. Add the documents with the names of an export, or `annotations.jsonl`, and the pairs in `key-values.json`. An unpacked export of a view (`sform story export -x`) and an export of its values store with the secret values (`sform story kv export --include-secrets -o key-values.json`) are a good start; replace every real secret by a demo value or a reference (see [key-values.json](#key-valuesjson)).
 3. Pick a target of its own: not `42dotnet`, which every run of `2sInitDb` seeds, and not the organizations of the automation tests (`ui-tests`, `cli-tests`).
 4. Check it with `2sInitDb sets` and `2sInitDb seed <name> --dry-run`, which exits `4` when a document would fail.
 5. The unit tests read every built-in set (`BuiltInSetsTests.EveryBuiltInSet_ReadsWithoutFailures`) and parse every binding of every set of the repository (`EverySetOfTheRepository_HasBindingsThatParse`) without a change. Add a test of its shape to `BuiltInSetsTests` of `DbCreator/test`, and a seed into an organization of its own to `BuiltInSetsTests` of `DbCreator/testint`.
@@ -410,7 +486,12 @@ dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed large --orga
 dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed --path src/Platform/Storyteller/Playground/data
 ```
 
-**Aspire.** The host of [local development](../Aspire.Host/local-development.md) has two resources of DbCreator, both started from the dashboard: `db-creator` runs `2sInitDb`, and `db-seed` runs `2sInitDb seed showcase` against the same emulator. The host passes its `BaseAccount:Id` user secret to both as `baseAccount__id`, so the same account owns `42dotnet` and the organization `fabrikam` the seed creates. Without it, when the host seeds the AuthKit staging accounts (the container emulator, or `StagingSeed:Enabled`), `db-seed` runs with `--owner user_01M41P6G2TTSXXMM88WNVMRQKG`, the default staging user whom `db-creator` makes a second owner of `42dotnet`, so the same local sign-in opens both; otherwise the owner is DbCreator's legacy Entra ID `sub`, which matches no account. The owner of `fabrikam` is fixed by the seed that creates it: a later seed, also with `--again`, uses the project as it is. To change it, reset the emulator's volume, or seed into another organization with `--organization`. `db-seed` ensures the containers itself and needs nothing of `core`; a second start reports the set as seeded already. To seed another set into the Aspire emulator, run DbCreator from the command line with the `ConnectionStrings__cosmos` that the dashboard shows in the environment of `db-creator`.
+**Aspire.** The host of [local development](../Aspire.Host/local-development.md) has two resources of DbCreator, both started from the dashboard: `db-creator` runs `2sInitDb`, and `db-seed` runs `2sInitDb seed showcase` against the same emulator, with the API's Lowkey Vault (`AzureKeyVaults__default` and `KeyValues__Protection__Emulator=true`), so the `Standard` pairs of the set are encrypted with the key the API decrypts them with. The host passes its `BaseAccount:Id` user secret to both as `baseAccount__id`, so the same account owns `42dotnet` and the organization `fabrikam` the seed creates. Without it, when the host seeds the AuthKit staging accounts (the container emulator, or `StagingSeed:Enabled`), `db-seed` runs with `--owner user_01M41P6G2TTSXXMM88WNVMRQKG`, the default staging user whom `db-creator` makes a second owner of `42dotnet`, so the same local sign-in opens both; otherwise the owner is DbCreator's legacy Entra ID `sub`, which matches no account. The owner of `fabrikam` is fixed by the seed that creates it: a later seed, also with `--again`, uses the project as it is. To change it, reset the emulator's volume, or seed into another organization with `--organization`. `db-seed` ensures the containers itself and needs nothing of `core`; a second start reports the set as seeded already. To seed another set into the Aspire emulator, run DbCreator from the command line with the `ConnectionStrings__cosmos` that the dashboard shows in the environment of `db-creator`, and for `Standard` pairs the `AzureKeyVaults__default` and `KeyValues__Protection__Emulator` of `db-seed`:
+
+```sh
+ConnectionStrings__cosmos='<from the dashboard>' AzureKeyVaults__default=https://127.0.0.1:<port>/ KeyValues__Protection__Emulator=true \
+  dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed exhibit
+```
 
 **The tool.** DbCreator packs as the dotnet tool `2sInitDb` (package `42.Platform.Storyteller.DbCreator`): `dotnet pack src/Platform/Storyteller/DbCreator/src` writes it to `.artifacts/`, the local feed of `nuget.config`. The package carries `app.config.json` and the built-in sets.
 
@@ -420,8 +501,8 @@ dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed --path src/P
 
 | Project | What it checks |
 | --- | --- |
-| `DbCreator/test` (`42.Platform.Storyteller.DbCreator.UnitTests`) | The manifest, `annotations.jsonl` and its generators, the files, the hash, the catalog, the target, the owner, the provisioning, the seeder over fakes of the importer, the bulk writer and the record store, the command line and the commands, and every set of the repository (their shape, that they read without failures, and that their bindings parse). No database |
-| `DbCreator/testint` (`42.Platform.Storyteller.DbCreator.IntegrationTests`) | Seeds against a Cosmos DB emulator through the tool's own registrations: a first seed with the target, the owner's access, the view and the documents; a second run that writes nothing; a partly seeded target and a run that stopped halfway (also between the creates of files and their relation arrays), completed without overwriting; a changed set; a dry run; the refusal of another owner's organization; 10,000 generated annotations in bulk with their relation arrays and audit entries; and the sets `core`, `large`, `showcase` and the playground |
+| `DbCreator/test` (`42.Platform.Storyteller.DbCreator.UnitTests`) | The manifest, `annotations.jsonl` and its generators, the files, the hash, the catalog, the target, the owner, the provisioning, `key-values.json` and its refusals, the seeder over fakes of the importer, the bulk writer, the key/value service and the record store (the step of the pairs: its place, decisions, chunks, re-plans and failures, and the refusal of `Standard` pairs without a vault), the command line and the commands, and every set of the repository (their shape, their pairs, that they read without failures, and that their bindings parse). No database |
+| `DbCreator/testint` (`42.Platform.Storyteller.DbCreator.IntegrationTests`) | Seeds against a Cosmos DB emulator through the tool's own registrations: a first seed with the target, the owner's access, the view and the documents; a second run that writes nothing; a partly seeded target and a run that stopped halfway (also between the creates of files and their relation arrays), completed without overwriting; a changed set; a dry run; the refusal of another owner's organization; 10,000 generated annotations in bulk with their relation arrays and audit entries; the pairs (`KeyValueSeedTests`): `Public` pairs without a vault and `Standard` pairs with Lowkey Vault (refused up front without it), existing and deleted pairs skipped, a changed set, a dry run, the refused levels, a project policy without `Standard`, and a resolved read that binds seeded pairs; and the sets `core`, `large`, `showcase` (with the vault), `exhibit` (with the vault, and resolved reads of its bindings) and the playground |
 | `Backend.CosmosDb/test` | The bulk writer (`CosmosAnnotationBulkWriterTests`: equal to an import of the same annotations, retries, throttles, cancellation, thousands of keys, the completion of relation arrays after an interrupted import), and `core` through `OrganizationsContainerStructureTests` |
 | `Backend.Core/test` | The importer (`ViewImporterTests`), the tally and the reader of loose files |
 
