@@ -13,6 +13,8 @@ public static class UserSettingDefinitions
     public const string EDITOR_COMMAND = "editor.command";
     public const string ACCESS_PROJECT = "access.project";
     public const string ACCESS_VIEW = "access.view";
+    public const string OUTPUT_ICONS = "output.icons";
+    public const string OUTPUT_PROJECT_SETTINGS = "output.projectSettings";
 
     // The project of a user without a default project, as CommandContext picks it.
     private const string DefaultProjectKey = $"{Platform.Storyteller.Constants.DefaultTenantName}.{Platform.Storyteller.Constants.DefaultProjectName}";
@@ -86,6 +88,18 @@ public static class UserSettingDefinitions
             Parse = value => string.IsNullOrWhiteSpace(value) ? null : Changes(UserSettingsSchema.VIEW_NAME, value.Trim()),
             Read = section => UserSettingsSchema.ParseText(UserSettingsSchema.GetValue(section, UserSettingsSchema.VIEW_NAME)),
         },
+        Choice(
+            OUTPUT_ICONS,
+            UserSettingsSchema.ICONS,
+            OutputOptions.IconsValues,
+            OutputOptions.ICONS_AUTO,
+            "The icons of the project's annotation types in the console output: auto (where the terminal draws them), always or never."),
+        Choice(
+            OUTPUT_PROJECT_SETTINGS,
+            UserSettingsSchema.PROJECT_SETTINGS,
+            OutputOptions.ProjectSettingsValues,
+            OutputOptions.PROJECT_SETTINGS_PROJECT,
+            "Whether the console output shows the project's type names, colors, icons and date format (project) or the built-in ones (builtin)."),
     ];
 
     public static UserSettingDefinition? Find(string? key)
@@ -125,6 +139,24 @@ public static class UserSettingDefinitions
         return organization is null && project is null
             ? null
             : $"{organization ?? Platform.Storyteller.Constants.DefaultTenantName}.{project ?? Platform.Storyteller.Constants.DefaultProjectName}";
+    }
+
+    // A preference of the output section that takes one of a few values, in any case, stored as the list spells it.
+    private static UserSettingDefinition Choice(string key, string property, IReadOnlyList<string> values, string defaultValue, string description)
+    {
+        return new UserSettingDefinition
+        {
+            Key = key,
+            Section = ConfigurationSections.OUTPUT,
+            Properties = [property],
+            Description = description,
+            ValueFormat = string.Join(", ", values),
+            AllowedValues = values,
+            DefaultValue = defaultValue,
+            DefaultDisplay = defaultValue,
+            Parse = value => OutputOptions.Parse(value, values) is { } choice ? Changes(property, choice) : null,
+            Read = section => OutputOptions.Parse(UserSettingsSchema.ParseText(UserSettingsSchema.GetValue(section, property)), values),
+        };
     }
 
     private static Dictionary<string, JToken?> Changes(string property, string value)

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using Newtonsoft.Json.Linq;
@@ -170,7 +171,8 @@ internal static class SchemaOperations
         ICommandContext context,
         SchemaLayer layer,
         string? annotationType,
-        string? annotationKey)
+        string? annotationKey,
+        IProjectSettingsProvider? projectSettings = null)
     {
         var subject = Describe(layer, annotationType, annotationKey);
         ICollection<ConfigurationVersion> versions;
@@ -197,7 +199,7 @@ internal static class SchemaOperations
             return ExitCodes.SUCCESS;
         }
 
-        console.WriteVersions(versions);
+        console.WriteVersions(versions, await (projectSettings ?? BuiltInProjectSettings.Instance).GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 

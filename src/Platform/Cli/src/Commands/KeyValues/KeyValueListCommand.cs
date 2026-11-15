@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -29,12 +30,15 @@ namespace _42.Platform.Cli.Commands.KeyValues;
 public class KeyValueListCommand : KeyValueCommandBase
 {
     private readonly TimeProvider _timeProvider;
+    private readonly IProjectSettingsProvider _projectSettings;
 
-    // No optional parameter: McMaster's constructor injection ignores its default and fails on a type the container lacks.
-    public KeyValueListCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, TimeProvider timeProvider)
+    // TimeProvider is no optional parameter: McMaster's constructor injection ignores its default and fails on a type the
+    // container lacks. The container has the provider of the project settings too; without it the output is built-in.
+    public KeyValueListCommand(IExtendedConsole console, ICommandContext context, IKeyValuesApiClient keyValues, TimeProvider timeProvider, IProjectSettingsProvider? projectSettings = null)
         : base(console, context, keyValues)
     {
         _timeProvider = timeProvider;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Option("--prefix", CommandOptionType.SingleValue, Description = "Only keys starting with this prefix.")]
@@ -73,7 +77,7 @@ public class KeyValueListCommand : KeyValueCommandBase
             ContinuationToken);
 
         Console.WriteHeader($"Key/value pairs of {Context.OrganizationName}.{Context.ProjectName} / {Context.ViewName}");
-        Console.WriteKeyValues(response, IncludeValues, showDeleted: All || Deleted, _timeProvider.GetUtcNow());
+        Console.WriteKeyValues(response, IncludeValues, showDeleted: All || Deleted, _timeProvider.GetUtcNow(), await _projectSettings.GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 }

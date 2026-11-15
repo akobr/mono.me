@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using Alba.CsConsoleFormat;
 using Newtonsoft.Json.Linq;
@@ -29,10 +30,10 @@ public static class CompositionConsoleExtensions
     /// Writes the steps of a composition as a table, in the order of application, then the effective document with the
     /// step that set each line (the blame listing).
     /// </summary>
-    public static void WriteComposition(this IExtendedConsole @this, ConfigurationComposition composition)
+    public static void WriteComposition(this IExtendedConsole @this, ConfigurationComposition composition, ProjectDisplay? display = null)
     {
         @this.WriteHeader($"Composition of the configuration for '{composition.AnnotationKey}'");
-        @this.WriteTable(GetStepRows(composition), StepColumns);
+        @this.WriteTable(GetStepRows(composition, display), StepColumns);
 
         @this.WriteLine();
         @this.WriteHeader("Effective configuration, by step");
@@ -51,9 +52,10 @@ public static class CompositionConsoleExtensions
 
     /// <summary>
     /// One row per step: the order, the key of the node that applies it indented by its depth, the source, its version
-    /// and presence, and the number of values of the effective document that the step set.
+    /// and presence, and the number of values of the effective document that the step set. A template is named by the
+    /// project's name of its type.
     /// </summary>
-    public static IReadOnlyList<string[]> GetStepRows(ConfigurationComposition composition)
+    public static IReadOnlyList<string[]> GetStepRows(ConfigurationComposition composition, ProjectDisplay? display = null)
     {
         var nodes = new Dictionary<int, ConfigurationCompositionNode>();
         var sources = new Dictionary<string, ConfigurationCompositionSource>(StringComparer.Ordinal);
@@ -83,7 +85,7 @@ public static class CompositionConsoleExtensions
                 {
                     step.Order.ToString(CultureInfo.InvariantCulture),
                     new string(' ', (node?.Depth ?? 0) * 2) + (node?.AnnotationKey ?? string.Empty),
-                    FormatSource(source, step.SourceId),
+                    FormatSource(source, step.SourceId, display ?? ProjectDisplay.BuiltIn),
                     FormatVersion(source),
                     FormatPresence(source),
                     values.GetValueOrDefault(step.Order).ToString(CultureInfo.InvariantCulture),
@@ -92,12 +94,13 @@ public static class CompositionConsoleExtensions
             .ToList();
     }
 
-    // "template Execution" or "configuration"; the id when the source is not listed.
-    private static string FormatSource(ConfigurationCompositionSource? source, string sourceId)
+    // "template Execution" (or the project's name of the type: "template Job") or "configuration"; the id when the
+    // source is not listed.
+    private static string FormatSource(ConfigurationCompositionSource? source, string sourceId, ProjectDisplay display)
     {
         return source?.Kind switch
         {
-            ConfigurationCompositionSourceKind.Template => $"template {source.AnnotationType}",
+            ConfigurationCompositionSourceKind.Template => $"template {TypeNames.Of($"{source.AnnotationType}", display)}",
             ConfigurationCompositionSourceKind.Configuration => "configuration",
             _ => sourceId,
         };

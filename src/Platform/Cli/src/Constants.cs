@@ -9,6 +9,9 @@ public static class Constants
     public const string ACCESS_DEFAULT_JSON = "access.default.json";
     public const string EDITOR_CONFIG_JSON = "editor.config.json";
     public const string AUTH_DISCOVERY_JSON = "auth.discovery.json";
+
+    // The project settings that the console output last read, per API and project (ProjectSettingsProvider).
+    public const string PROJECT_SETTINGS_CACHE_JSON = "project-settings.cache.json";
     public const string TELEMETRY_JSON = "telemetry.json";
     public const string DIRECTORY_SEPARATOR = "/";
 }

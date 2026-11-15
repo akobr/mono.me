@@ -39,6 +39,18 @@ public class UserSettingsConfigurationTests
         _warnings.ShouldBeEmpty();
     }
 
+    // The output switches bind OutputOptions (ProjectSettingsProvider, OutputSwitches) in the spelling of their values.
+    [Fact]
+    public void TheSettingsFile_BindsTheOutputSwitches()
+    {
+        _fileSystem.AddFile(SettingsPath, new MockFileData("""{"output":{"icons":"NEVER","projectSettings":"Builtin"}}"""));
+
+        var output = Bind<OutputOptions>(Build(), ConfigurationSections.OUTPUT);
+
+        output.Icons.ShouldBe("never");
+        output.ProjectSettings.ShouldBe("builtin");
+    }
+
     [Fact]
     public void TheLegacyFiles_AreStillHonoured()
     {

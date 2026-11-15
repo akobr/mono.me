@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -18,9 +19,9 @@ public static class AuditConsoleExtensions
     private static readonly HashSet<string> InstantFields = new(StringComparer.OrdinalIgnoreCase) { "ValidFrom", "ExpiresAt" };
 
     /// <summary>
-    /// Writes the history of an annotation as a table, the newest entry first.
+    /// Writes the history of an annotation as a table, the newest entry first; the times in the project's date format.
     /// </summary>
-    public static void WriteHistory(this IExtendedConsole @this, AnnotationHistory history, int? top = null)
+    public static void WriteHistory(this IExtendedConsole @this, AnnotationHistory history, int? top = null, ProjectDisplay? display = null)
     {
         var entries = (history.Entries ?? []).OrderByDescending(entry => entry.At).ToList();
         var shown = top is > 0 ? entries.Take(top.Value).ToList() : entries;
@@ -34,7 +35,7 @@ public static class AuditConsoleExtensions
             shown,
             entry => new[]
             {
-                FormatTime(entry.At),
+                FormatTime(entry.At, display),
                 FormatActor(entry.Actor),
                 FormatAction(entry.Action),
                 FormatChanges(entry),
@@ -122,19 +123,21 @@ public static class AuditConsoleExtensions
     }
 
     // "2026-10-11 14:02 by Ales Kobr"
-    public static string FormatDeletion(AnnotationDeletion deletion)
+    public static string FormatDeletion(AnnotationDeletion deletion, ProjectDisplay? display = null)
     {
-        return $"{FormatTime(deletion.DeletedAt)} by {FormatActor(deletion.DeletedBy)}";
+        return $"{FormatTime(deletion.DeletedAt, display)} by {FormatActor(deletion.DeletedBy)}";
     }
 
-    public static string FormatTime(DateTimeOffset time)
+    // Local time, "2026-10-11 14:02", or the date in the project's format: "11.10.2026 14:02".
+    public static string FormatTime(DateTimeOffset time, ProjectDisplay? display = null)
     {
-        return time.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        return (display ?? ProjectDisplay.BuiltIn).FormatDateTime(time);
     }
 
-    public static string FormatDate(DateTimeOffset time)
+    // The local day, "2026-10-11", or in the project's format: "11.10.2026".
+    public static string FormatDate(DateTimeOffset time, ProjectDisplay? display = null)
     {
-        return time.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return (display ?? ProjectDisplay.BuiltIn).FormatDate(time);
     }
 
     private static string FormatField(AnnotationFieldChange field)

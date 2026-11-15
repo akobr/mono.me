@@ -340,7 +340,7 @@ public class UserSettingsStoreTests
         snapshot[ConfigurationSections.EDITOR].Layer.ShouldBe(UserSettingsLayer.Settings);
         snapshot[ConfigurationSections.EDITOR].Values.ShouldBeJson("""{"editorType":"Vim"}""");
         snapshot[ConfigurationSections.ACCESS].Layer.ShouldBe(UserSettingsLayer.Legacy);
-        snapshot.Sections.Select(section => section.Name).ShouldBe([ConfigurationSections.ACCESS, ConfigurationSections.EDITOR]);
+        snapshot.Sections.Select(section => section.Name).ShouldBe([ConfigurationSections.ACCESS, ConfigurationSections.EDITOR, ConfigurationSections.OUTPUT]);
     }
 
     [Fact]

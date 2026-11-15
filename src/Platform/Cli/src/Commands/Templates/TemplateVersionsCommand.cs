@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -10,14 +11,17 @@ namespace _42.Platform.Cli.Commands.Templates;
 public class TemplateVersionsCommand : BaseContextCommand
 {
     private readonly ITemplatesApiClient _templatesApi;
+    private readonly IProjectSettingsProvider _projectSettings;
 
     public TemplateVersionsCommand(
         IExtendedConsole console,
         ICommandContext context,
-        ITemplatesApiClient templatesApi)
+        ITemplatesApiClient templatesApi,
+        IProjectSettingsProvider? projectSettings = null)
         : base(console, context)
     {
         _templatesApi = templatesApi;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Argument(0, Description = "An annotation type code (rst, unt, sbt, usg, cnt, exe, uxe) to list the template versions for.")]
@@ -40,7 +44,7 @@ public class TemplateVersionsCommand : BaseContextCommand
             return ExitCodes.SUCCESS;
         }
 
-        Console.WriteVersions(versions);
+        Console.WriteVersions(versions, await _projectSettings.GetDisplayAsync());
         return ExitCodes.SUCCESS;
     }
 }

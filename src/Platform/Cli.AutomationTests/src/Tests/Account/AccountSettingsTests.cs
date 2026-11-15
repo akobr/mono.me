@@ -24,7 +24,7 @@ public sealed partial class AccountSettingsTests : CliTest
     private const string EditorCommand = "editor.command";
     private const string AccessProject = "access.project";
     private const string AccessView = "access.view";
-    private const string KnownSettings = "the settings are editor.type, editor.command, access.project, access.view.";
+    private const string KnownSettings = "the settings are editor.type, editor.command, access.project, access.view, output.icons, output.projectSettings.";
     private const string DamagedNote = "sform uses no editor and no default project from it until it is fixed (sform account settings --path).";
 
     // A custom editor of the cases that never start it.

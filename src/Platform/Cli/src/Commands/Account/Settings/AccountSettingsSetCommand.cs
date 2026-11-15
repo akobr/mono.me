@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Cli.Commands.Account.Settings;
 
-[Command(CommandNames.SET, Description = "Set a preference: editor.type, editor.command, access.project or access.view.")]
+[Command(CommandNames.SET, Description = "Set a preference: editor.type, editor.command, access.project, access.view, output.icons or output.projectSettings.")]
 public class AccountSettingsSetCommand : BaseCommand
 {
     private readonly IUserSettingsStore _settings;
@@ -19,7 +19,7 @@ public class AccountSettingsSetCommand : BaseCommand
         _settings = settings;
     }
 
-    [Argument(0, "key", Description = "editor.type, editor.command, access.project or access.view.")]
+    [Argument(0, "key", Description = "editor.type, editor.command, access.project, access.view, output.icons or output.projectSettings.")]
     public string? Key { get; set; }
 
     [Argument(1, "value", Description = "The value; see sform account settings --help for what each key takes.")]

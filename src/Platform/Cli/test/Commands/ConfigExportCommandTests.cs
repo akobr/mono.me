@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.Configuration;
 using _42.Platform.Cli.Commands.Storyteller;
 using _42.Platform.Cli.GitHubActions;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.ConfigurationFormats;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -961,7 +962,8 @@ public class ConfigExportCommandTests
             .AddSingleton(_fixture.Context.Object)
             .AddSingleton(_api.Object)
             .AddSingleton<IFileSystem>(_fileSystem)
-            .AddSingleton(_gitHubActions);
+            .AddSingleton(_gitHubActions)
+            .AddSingleton<IProjectSettingsProvider>(BuiltInProjectSettings.Instance);
     }
 
     // The command that config export selects, as the host builds it.

@@ -14,6 +14,7 @@ using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.Configuration;
 using _42.Platform.Cli.Commands.Storyteller;
 using _42.Platform.Cli.Services;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
@@ -669,6 +670,7 @@ public class StorytellerTransferCommandTests
             .AddSingleton(_api.Object)
             .AddSingleton<IFileSystem>(_fileSystem)
             .AddSingleton<TransferPolling>(new ImmediatePolling())
+            .AddSingleton<IProjectSettingsProvider>(BuiltInProjectSettings.Instance)
             .BuildServiceProvider();
         var app = new CommandLineApplication<TCommand>();
         app.Conventions.UseDefaultConventions().UseConstructorInjection(services);

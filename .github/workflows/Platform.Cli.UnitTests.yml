@@ -3,7 +3,8 @@ name: Platform.Cli.UnitTests
 # The checks of sform that need no deployment, on every pull request and push to main that touches the CLI or its tests:
 # the unit tests of the CLI, and the self tests and coverage checks of the CLI automation tests (every command, alias,
 # option, argument and fixed value of sform is covered by a case, and every case of the catalogue has its test). The case
-# tests themselves need a target and run in Platform.Cli.AutomationTests.yml. No secret is used.
+# tests themselves need a target and run in Platform.Cli.AutomationTests.yml. No secret is used. The catalog of project
+# settings is a trigger too: the unit tests check the type colors and icon symbols of sform against it.
 on:
   pull_request:
     paths:
@@ -13,6 +14,7 @@ on:
       - 'src/Libraries/Testing/UI.Automation.*/**'
       - 'src/Libraries/CLI/Toolkit/**'
       - 'src/Platform/Storyteller/Sdk.NSwag/**'
+      - 'src/Platform/Storyteller/conformance/project-settings.json'
       - 'docs/Platform/Cli.AutomationTests/test-cases.md'
       - 'Directory.Packages.props'
       - '.github/workflows/Platform.Cli.UnitTests.yml'
@@ -25,6 +27,7 @@ on:
       - 'src/Libraries/Testing/UI.Automation.*/**'
       - 'src/Libraries/CLI/Toolkit/**'
       - 'src/Platform/Storyteller/Sdk.NSwag/**'
+      - 'src/Platform/Storyteller/conformance/project-settings.json'
       - 'docs/Platform/Cli.AutomationTests/test-cases.md'
       - 'Directory.Packages.props'
       - '.github/workflows/Platform.Cli.UnitTests.yml'

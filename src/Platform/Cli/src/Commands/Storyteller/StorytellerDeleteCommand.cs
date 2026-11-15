@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Services;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
@@ -17,14 +18,17 @@ public class StorytellerDeleteCommand : BaseContextCommand
     private const string AnnotationNotDeleted = "AnnotationNotDeleted";
 
     private readonly IAnnotationsApiClient _annotationsApi;
+    private readonly IProjectSettingsProvider _projectSettings;
 
     public StorytellerDeleteCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAnnotationsApiClient annotationsApi)
+        IAnnotationsApiClient annotationsApi,
+        IProjectSettingsProvider? projectSettings = null)
         : base(console, context)
     {
         _annotationsApi = annotationsApi;
+        _projectSettings = projectSettings ?? BuiltInProjectSettings.Instance;
     }
 
     [Argument(0, Description = "An annotation key to delete.")]
@@ -69,16 +73,18 @@ public class StorytellerDeleteCommand : BaseContextCommand
             return Console.WriteApiError(e);
         }
 
+        var display = await _projectSettings.GetDisplayAsync();
+
         // a repeated delete returns the existing deletion and deletes nothing
         if (result.DeletedKeys is not { Count: > 0 })
         {
-            Console.WriteLine($"The annotation '{annotationKey}' is already deleted ({AuditConsoleExtensions.FormatDeletion(result.Deletion)}).");
-            WriteRestoreHint(annotationKey, result.Deletion);
+            Console.WriteLine($"The annotation '{annotationKey}' is already deleted ({AuditConsoleExtensions.FormatDeletion(result.Deletion, display)}).");
+            WriteRestoreHint(annotationKey, result.Deletion, display);
             return ExitCodes.WARNING_NO_WORK_NEEDED;
         }
 
         Console.WriteLine($"Deleted '{annotationKey}'{FormatDescendants(result.DeletedKeys.Count - 1)}.");
-        WriteRestoreHint(annotationKey, result.Deletion);
+        WriteRestoreHint(annotationKey, result.Deletion, display);
         return ExitCodes.SUCCESS;
     }
 
@@ -162,7 +168,7 @@ public class StorytellerDeleteCommand : BaseContextCommand
             {
                 // the soft delete stays: say so, with the way back, before the failure is reported
                 Console.WriteLine($"The annotation '{annotationKey}' was deleted, but not permanently.");
-                WriteRestoreHint(annotationKey, deletion.Deletion);
+                WriteRestoreHint(annotationKey, deletion.Deletion, await _projectSettings.GetDisplayAsync());
                 throw;
             }
         }
@@ -218,10 +224,10 @@ public class StorytellerDeleteCommand : BaseContextCommand
         };
     }
 
-    private void WriteRestoreHint(AnnotationKey annotationKey, AnnotationDeletion? deletion)
+    private void WriteRestoreHint(AnnotationKey annotationKey, AnnotationDeletion? deletion, ProjectDisplay display)
     {
         Console.WriteLine(deletion?.PurgeAt is { } purgeAt
-            ? $"Restore it with 'sform story restore {annotationKey}' before {AuditConsoleExtensions.FormatDate(purgeAt)}; it is purged automatically after that."
+            ? $"Restore it with 'sform story restore {annotationKey}' before {AuditConsoleExtensions.FormatDate(purgeAt, display)}; it is purged automatically after that."
             : $"Restore it with 'sform story restore {annotationKey}'.");
     }
 }

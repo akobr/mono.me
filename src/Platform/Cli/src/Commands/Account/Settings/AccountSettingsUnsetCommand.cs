@@ -19,7 +19,7 @@ public class AccountSettingsUnsetCommand : BaseCommand
         _settings = settings;
     }
 
-    [Argument(0, "key", Description = "editor.type, editor.command, access.project or access.view.")]
+    [Argument(0, "key", Description = "editor.type, editor.command, access.project, access.view, output.icons or output.projectSettings.")]
     public string? Key { get; set; }
 
     public override Task<int> OnExecuteAsync()

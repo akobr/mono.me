@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
@@ -26,6 +27,9 @@ public class AccountSettingsCommand : BaseCommand
           editor.command   The command line of a custom editor, e.g. "code --wait"; the file path is appended.
           access.project   <organization>.<project>: the default project of the commands without -p.
           access.view      The default view of the commands without -v; default when not set.
+          output.icons     auto, always or never: the icons of the project's types in the console output.
+          output.projectSettings  project or builtin: the project's type names, colors, icons and date format
+                           in the console output, or the built-in ones (--builtin for one run).
 
         They are kept in sform.settings.json in your .42for.net folder (--path prints where), which survives tool updates.
         Without an editor, sform uses $VISUAL or $EDITOR, else asks on the first edit.
@@ -34,6 +38,7 @@ public class AccountSettingsCommand : BaseCommand
           sform account settings editor
           sform account settings editor custom --command "code --wait"
           sform account settings set access.project contoso.payments
+          sform account settings set output.icons never
           sform account settings unset editor.type
         """;
 
@@ -55,6 +60,9 @@ public class AccountSettingsCommand : BaseCommand
     [Option("--json", CommandOptionType.NoValue, Description = "Write the values that sform uses as JSON.")]
     public bool Json { get; set; }
 
+    // The environment of SFORM_ICONS and SFORM_PROJECT_SETTINGS; a test gives its own.
+    internal Func<string, string?> GetVariable { get; init; } = Environment.GetEnvironmentVariable;
+
     public override Task<int> OnExecuteAsync()
     {
         if (ShowPath)
@@ -75,7 +83,7 @@ public class AccountSettingsCommand : BaseCommand
             return Task.FromResult(exception.ExitCode);
         }
 
-        var values = UserSettingValue.Resolve(snapshot, _environment, _target);
+        var values = UserSettingValue.Resolve(snapshot, _environment, _target, GetVariable);
 
         if (Json)
         {

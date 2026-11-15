@@ -8,7 +8,8 @@ namespace _42.Platform.Cli.Configuration;
 
 // The sections of sform.settings.json and their known properties. A section is read the same way for the configuration,
 // for the list of sform account settings and for the migration of the legacy files: only the known properties, matched
-// in any case and named in camelCase, with trimmed non-empty text, and the editor type by its enum name.
+// in any case and named in camelCase, with trimmed non-empty text, the editor type by its enum name, and the output
+// switches by their values (auto, always, never; project, builtin) in lower case.
 public static class UserSettingsSchema
 {
     public const string ORGANIZATION_NAME = "organizationName";
@@ -16,14 +17,17 @@ public static class UserSettingsSchema
     public const string VIEW_NAME = "viewName";
     public const string EDITOR_TYPE = "editorType";
     public const string CUSTOM_COMMAND = "customCommand";
+    public const string ICONS = "icons";
+    public const string PROJECT_SETTINGS = "projectSettings";
 
     private static readonly Dictionary<string, IReadOnlyList<string>> Properties = new(StringComparer.OrdinalIgnoreCase)
     {
         [ConfigurationSections.ACCESS] = [ORGANIZATION_NAME, PROJECT_NAME, VIEW_NAME],
         [ConfigurationSections.EDITOR] = [EDITOR_TYPE, CUSTOM_COMMAND],
+        [ConfigurationSections.OUTPUT] = [ICONS, PROJECT_SETTINGS],
     };
 
-    public static IReadOnlyList<string> SectionNames { get; } = [ConfigurationSections.ACCESS, ConfigurationSections.EDITOR];
+    public static IReadOnlyList<string> SectionNames { get; } = [ConfigurationSections.ACCESS, ConfigurationSections.EDITOR, ConfigurationSections.OUTPUT];
 
     public static IReadOnlyList<string> GetProperties(string section)
     {
@@ -38,9 +42,13 @@ public static class UserSettingsSchema
         foreach (var name in Properties[section])
         {
             var value = GetValue(raw, name);
-            var text = name == EDITOR_TYPE
-                ? ParseEditorType(value)?.ToString()
-                : ParseText(value);
+            var text = name switch
+            {
+                EDITOR_TYPE => ParseEditorType(value)?.ToString(),
+                ICONS => OutputOptions.Parse(ParseText(value), OutputOptions.IconsValues),
+                PROJECT_SETTINGS => OutputOptions.Parse(ParseText(value), OutputOptions.ProjectSettingsValues),
+                _ => ParseText(value),
+            };
 
             if (text is not null)
             {

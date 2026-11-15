@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.KeyValues;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using Newtonsoft.Json.Linq;
 
@@ -15,7 +16,7 @@ public static class KeyValueConsoleExtensions
 {
     internal const string MtlsRequiredHint = "This project delivers secrets to machines only over mTLS: call with a machine certificate, or sign in as a user with the ContributorWithSecrets role.";
 
-    public static void WriteKeyValues(this IExtendedConsole @this, KeyValuesResponse response, bool includeValues, bool showDeleted, DateTimeOffset now)
+    public static void WriteKeyValues(this IExtendedConsole @this, KeyValuesResponse response, bool includeValues, bool showDeleted, DateTimeOffset now, ProjectDisplay? display = null)
     {
         var items = response.Items ?? [];
 
@@ -50,7 +51,7 @@ public static class KeyValueConsoleExtensions
                     cells.Add(KeyValueLevels.IsSecret(item.Protection) ? KeyValueLevels.Mask : item.IsReference ? $"{item.Value} (reference)" : item.Value ?? string.Empty);
                 }
 
-                cells.AddRange([item.Version.ToString(CultureInfo.InvariantCulture), AuditConsoleExtensions.FormatActor(item.Modified?.By), KeyValueTimes.Format(item.Modified?.At)]);
+                cells.AddRange([item.Version.ToString(CultureInfo.InvariantCulture), AuditConsoleExtensions.FormatActor(item.Modified?.By), KeyValueTimes.Format(item.Modified?.At, display)]);
 
                 if (showDeleted)
                 {
@@ -68,7 +69,7 @@ public static class KeyValueConsoleExtensions
         }
     }
 
-    public static void WriteKeyValueVersions(this IExtendedConsole @this, IEnumerable<KeyValueVersion> versions)
+    public static void WriteKeyValueVersions(this IExtendedConsole @this, IEnumerable<KeyValueVersion> versions, ProjectDisplay? display = null)
     {
         @this.WriteTable(
             versions.OrderByDescending(version => version.Version),
@@ -77,8 +78,8 @@ public static class KeyValueConsoleExtensions
                 version.Version.ToString(CultureInfo.InvariantCulture) + (version.IsCurrent ? " (current)" : string.Empty),
                 version.Protection.ToString(),
                 AuditConsoleExtensions.FormatActor(version.Modified?.By),
-                KeyValueTimes.Format(version.Modified?.At),
-                version.IsCurrent ? "—" : KeyValueTimes.Format(version.ExpirationTime),
+                KeyValueTimes.Format(version.Modified?.At, display),
+                version.IsCurrent ? "—" : KeyValueTimes.Format(version.ExpirationTime, display),
             },
             new[] { "Version", "Level", "Author", "Created", "Expires" });
     }
@@ -155,7 +156,7 @@ public static class KeyValueConsoleExtensions
         return result.IsComplete ? ExitCodes.SUCCESS : ExitCodes.WARNING_PARTIAL_RESULT;
     }
 
-    public static void WriteRecipients(this IExtendedConsole @this, IEnumerable<ClientEncryptionRecipient> recipients)
+    public static void WriteRecipients(this IExtendedConsole @this, IEnumerable<ClientEncryptionRecipient> recipients, ProjectDisplay? display = null)
     {
         var list = recipients.ToList();
 
@@ -173,13 +174,13 @@ public static class KeyValueConsoleExtensions
                 recipient.Name,
                 recipient.IsEnabled ? "enabled" : "disabled",
                 $"RSA {ModulusBits(recipient.PublicKey)} bits",
-                KeyValueTimes.Format(recipient.Created?.At),
+                KeyValueTimes.Format(recipient.Created?.At, display),
                 AuditConsoleExtensions.FormatActor(recipient.Created?.By),
             },
             new[] { "Id", "Name", "State", "Key", "Added", "By" });
     }
 
-    public static void WriteAudit(this IExtendedConsole @this, KeyValueAuditResponse response)
+    public static void WriteAudit(this IExtendedConsole @this, KeyValueAuditResponse response, ProjectDisplay? display = null)
     {
         var items = response.Items ?? [];
 
@@ -193,7 +194,7 @@ public static class KeyValueConsoleExtensions
             items,
             item => new[]
             {
-                KeyValueTimes.Format(item.Time),
+                KeyValueTimes.Format(item.Time, display),
                 item.Operation.ToString() + (item.Count > 1 ? $" ×{item.Count}" : string.Empty),
                 string.IsNullOrEmpty(item.Key) ? item.View ?? string.Empty : $"{item.View}/{item.Key}" + (item.Version is null ? string.Empty : $"@{item.Version}"),
                 item.Protection?.ToString() ?? string.Empty,
@@ -210,9 +211,10 @@ public static class KeyValueConsoleExtensions
         }
     }
 
-    public static void WriteUsage(this IExtendedConsole @this, KeyValueUsageReport report)
+    public static void WriteUsage(this IExtendedConsole @this, KeyValueUsageReport report, ProjectDisplay? display = null)
     {
-        @this.WriteHeader($"Key/value usage {report.From:yyyy-MM-dd} to {report.To:yyyy-MM-dd} ({report.Days?.Count ?? 0} days with data)");
+        var days = display ?? ProjectDisplay.BuiltIn;
+        @this.WriteHeader($"Key/value usage {days.FormatDay(report.From)} to {days.FormatDay(report.To)} ({report.Days?.Count ?? 0} days with data)");
 
         var totals = report.Totals ?? new Dictionary<string, double>();
 
