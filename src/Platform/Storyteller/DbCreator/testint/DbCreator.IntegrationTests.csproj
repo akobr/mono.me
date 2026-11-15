@@ -24,10 +24,13 @@
     <PackageReference Include="Polly" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Testcontainers.CosmosDb" />
+    <PackageReference Include="Testcontainers.LowkeyVault" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- the bindings of the API, for the resolved reads of what a seed wrote -->
+    <ProjectReference Include="..\..\Binding.Core\src\Binding.Core.csproj" />
     <ProjectReference Include="..\src\DbCreator.csproj" />
   </ItemGroup>
 

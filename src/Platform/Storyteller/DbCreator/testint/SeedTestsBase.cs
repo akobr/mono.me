@@ -4,6 +4,7 @@ using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.DbCreator.Commands;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
+using _42.Platform.Storyteller.KeyValues;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace _42.Platform.Storyteller.DbCreator.IntegrationTests;
@@ -33,6 +34,8 @@ public abstract class SeedTestsBase(DbCreatorFixture fixture)
 
     protected IConfigurationTemplateService Templates => Services.GetRequiredService<IConfigurationTemplateService>();
 
+    protected IKeyValueService KeyValues => Services.GetRequiredService<IKeyValueService>();
+
     protected static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
     // valid by the name rules: 2 to 63 lower-case letters, digits or hyphens
@@ -51,9 +54,11 @@ public abstract class SeedTestsBase(DbCreatorFixture fixture)
         TestContext.Current.TestOutputHelper?.WriteLine(message);
     }
 
-    // The command as the tool runs it (the containers ensured, the output on the console), for its exit code.
-    protected SeedCommand Command()
+    // The command as the tool runs it (the containers ensured, the output on the console), for its exit code; with the
+    // given services, for example those with the vault (DbCreatorFixture.GetVaultServicesAsync).
+    protected SeedCommand Command(IServiceProvider? services = null)
     {
-        return new SeedCommand(Services.GetRequiredService<CoreDbStructureBuilder>(), Seeder);
+        services ??= Services;
+        return new SeedCommand(services.GetRequiredService<CoreDbStructureBuilder>(), services.GetRequiredService<DataSetSeeder>());
     }
 }
