@@ -71,6 +71,21 @@ public class StepUpTests
         maxAge.ShouldBe(TimeSpan.FromMinutes(15));
     }
 
+    // Whatever a proxy makes of the answer, the detection never throws: a window no TimeSpan holds, or a code that is
+    // no string, gives no window or no step-up.
+    [Theory]
+    [InlineData("""{ "ErrorCode": { "x": 1 } }""", "Bearer error=\"invalid_token\"", false)]
+    [InlineData("""{ "ErrorCode": "StepUpRequired", "Details": { "MaxAge": 99999999999999999 } }""", null, true)]
+    [InlineData("""{ "ErrorCode": "StepUpRequired" }""", "Bearer error=\"insufficient_user_authentication\", max_age=99999999999999999", true)]
+    public void MalformedAnswers_NeverThrow(string body, string? challenge, bool stepUp)
+    {
+        var exception = new ApiException("401", 401, body, Headers(challenge), null);
+
+        exception.IsStepUpRequired(out var maxAge).ShouldBe(stepUp);
+
+        maxAge.ShouldBeNull();
+    }
+
     [Theory]
     [InlineData(600, "10 minutes")]
     [InlineData(60, "1 minute")]

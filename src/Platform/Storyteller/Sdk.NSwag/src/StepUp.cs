@@ -21,6 +21,9 @@ public static class StepUp
 
     private const string WwwAuthenticateHeader = "WWW-Authenticate";
 
+    // Far beyond any window the API sends (at most a day), far below what TimeSpan overflows at.
+    private const long MaxWindowSeconds = 366L * 24 * 60 * 60;
+
     private static readonly Regex MaxAgeParameter = new(
         "max_age\\s*=\\s*\"?(?<seconds>\\d+)\"?",
         RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
@@ -89,7 +92,7 @@ public static class StepUp
     {
         return exception is ApiException<ErrorResponse> { Result.ErrorCode: { } code }
             ? code
-            : body?.Value<string>("ErrorCode");
+            : body?["ErrorCode"] is JValue { Type: JTokenType.String } bodyCode ? (string?)bodyCode : null;
     }
 
     private static JObject? ReadBody(ApiException exception)
@@ -133,16 +136,21 @@ public static class StepUp
 
         var match = MaxAgeParameter.Match(challenge);
         return match.Success && long.TryParse(match.Groups["seconds"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
-            ? TimeSpan.FromSeconds(seconds)
+            ? ToWindow(seconds)
             : null;
+    }
+
+    // A window no TimeSpan holds is no window: the detection never throws in an error handler, whatever a proxy sends.
+    private static TimeSpan? ToWindow(long seconds)
+    {
+        return seconds >= 0 && seconds <= MaxWindowSeconds ? TimeSpan.FromSeconds(seconds) : null;
     }
 
     private static TimeSpan? GetBodyMaxAge(JObject? body)
     {
         return body?["Details"] is JObject details
-            && details["MaxAge"] is JValue { Type: JTokenType.Integer } value
-            && value.Value<long>() is >= 0 and var seconds
-            ? TimeSpan.FromSeconds(seconds)
+            && details["MaxAge"] is JValue { Type: JTokenType.Integer, Value: long seconds }
+            ? ToWindow(seconds)
             : null;
     }
 }
