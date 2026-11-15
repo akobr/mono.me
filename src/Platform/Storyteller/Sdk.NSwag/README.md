@@ -151,7 +151,7 @@ catch (ApiException e) when (e.IsStepUpRequired(out var maxAge))
 * `SecretsWithheldReasons` holds the values of `X-2S-Secrets-Withheld`: `MtlsRequired`, `ActorRestricted` and `StepUpRequired`. A resolved read under the step-up that returns a body answers `200` with the secret bindings unresolved and `step-up-required`. A conditional read that sends back the `ETag` of such a `200` can get `304` with the same header and no body (`IsNotModified`): the cached document is still the unresolved one, so keep it and check `SecretsWithheld` on the `304` too.
 ## Project settings
 
-`IAccessApiClient` reads and writes the [settings of a project](../../../../docs/Platform/Storyteller/access.md) (the names, colors and icons of its annotation types, its default time zone and date format) with the generated `GetProjectSettingsAsync`, `SetProjectSettingsAsync` (`PUT`) and `PatchProjectSettingsAsync` (`PATCH`), and with three hand-written twins (`src/ApiSdk.ProjectSettings.cs`) that keep the `ETag`:
+`IAccessApiClient` reads and writes the [settings of a project](../../../../docs/Platform/Storyteller/access.md#project-settings) (the names, colors and icons of its annotation types, its default time zone and date format) with the generated `GetProjectSettingsAsync`, `SetProjectSettingsAsync` (`PUT`) and `PatchProjectSettingsAsync` (`PATCH`), and with three hand-written twins (`src/ApiSdk.ProjectSettings.cs`) that keep the `ETag`:
 
 ```csharp
 var read = await access.GetProjectSettingsConditionalAsync("acme", "billing", etag);

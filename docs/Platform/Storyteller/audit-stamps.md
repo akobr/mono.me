@@ -42,6 +42,7 @@ Audit-log entries have their own time and carry only `Actor`.
 | `KeyValue` | `Created`, `Modified`, `Deleted` |
 | `KeyValueSummary`, `KeyValueVersion` | `Modified` |
 | `KeyValuePolicy` | `Modified` (null for the defaults) |
+| `ProjectSettings` | `Modified` (null for the defaults); see [Project settings](access.md#project-settings) |
 | `ClientEncryptionRecipient` | `Created` |
 
 A configuration version keeps the time of its write. The configuration item is also rewritten by the platform when the effective document is cached or invalidated, but that changes neither `Modified` nor the listed time. A configuration that was never written (version 0, calculated on read) is stamped as the calculation by `System`.
