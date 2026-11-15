@@ -16,10 +16,11 @@ A seed counts `README.md` and `project-settings.json` as ignored files. They are
 
 ## Seed
 
-The seed writes the pairs of `key-values.json` too ([data sets](../../../../../../../docs/Platform/Storyteller/data-sets.md#key-valuesjson)). The `Standard` pair needs a Standard vault: without one, the seed refuses the set before it writes anything (exit `2`). Locally, give DbCreator the Lowkey Vault of the Aspire host (the endpoint of its `keyvault` resource, which the dashboard shows):
+The seed writes the pairs of `key-values.json` too ([data sets](../../../../../../../docs/Platform/Storyteller/data-sets.md#key-valuesjson)). The `Standard` pair needs a Standard vault: without one, the seed refuses the set before it writes anything (exit `2`). Locally, seed into the database and the Lowkey Vault of the Aspire host, with the values the dashboard shows: `ConnectionStrings__cosmos` in the environment of `db-creator`, and `AzureKeyVaults__default` in the environment of `db-seed`. Copy the vault's URI as it is (`https://localhost:<port>/`): Lowkey Vault puts the host of a request into the ids of its keys, and the API, which reaches it as `localhost`, refuses to unwrap with a key of another host such as `127.0.0.1`. See [Running it](../../../../../../../docs/Platform/Storyteller/data-sets.md#running-it).
 
 ```sh
-AzureKeyVaults__default=https://127.0.0.1:<port>/ KeyValues__Protection__Emulator=true   dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed exhibit
+ConnectionStrings__cosmos='<from the dashboard>' AzureKeyVaults__default=https://localhost:<port>/ KeyValues__Protection__Emulator=true \
+  dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed exhibit
 ```
 
 Many configurations interpolate the pairs (`@[...]`), so a resolved read answers `422` without them. To add the pairs to a project that was seeded or imported without them, import them through the API:

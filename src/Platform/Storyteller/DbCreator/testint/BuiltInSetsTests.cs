@@ -57,10 +57,9 @@ public class BuiltInSetsTests(DbCreatorFixture fixture) : SeedTestsBase(fixture)
         (await Access.GetAccessPointAsync($"{organization}.invoicing-suite"))!.Description.ShouldStartWith("The B2B SaaS of the documentation");
 
         // the pairs of its key-values.json, the Standard ones too, every one created
-        if (DataSetKeyValues.Read(new FileSystem(), result.Set.Folder) is { } pairs)
-        {
-            result.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = pairs.Items.Count });
-        }
+        var pairs = DataSetKeyValues.Read(new FileSystem(), result.Set.Folder).ShouldNotBeNull();
+        pairs.Count(KeyValueProtection.Standard).ShouldBeGreaterThan(0);
+        result.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = pairs.Items.Count });
     }
 
     [Fact]
