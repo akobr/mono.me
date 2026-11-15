@@ -256,3 +256,29 @@ test('a change by someone else meanwhile keeps the draft and loads the new setti
   await expect(page.getByRole('combobox', { name: 'Date format', exact: true })).toContainText('dd.mm.yyyy')
   await expect(page.getByRole('button', { name: 'Save project settings' })).toBeDisabled()
 })
+
+// The settings this browser kept before the API stored them (424-266): an Administrator saves them for the project.
+test('an Administrator saves the old settings of this browser for the project', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('2s-admin:e2e-old-settings')) {
+      sessionStorage.setItem('2s-admin:e2e-old-settings', '1')
+      localStorage.setItem(
+        '2s-admin:project-settings',
+        JSON.stringify({ 'acme.billing': { defaultTimeZone: 'Asia/Tokyo', types: { exe: { label: 'Job' } } } }),
+      )
+    }
+  })
+  await openApp(page, '/acme/billing/settings')
+  const offer = page.getByText('Save them for the whole project?')
+  await expect(offer).toBeVisible()
+
+  await page.getByRole('button', { name: 'Save for the project' }).click()
+  await expect(page.getByText('Project settings saved', { exact: true })).toBeVisible()
+  await expect(offer).toHaveCount(0)
+  expect(await page.evaluate(() => localStorage.getItem('2s-admin:project-settings'))).toBeNull()
+
+  await goto(page, '/acme/billing/settings')
+  await expect(page.getByRole('button', { name: 'Default time zone' })).toContainText('Asia/Tokyo')
+  await expect(page.getByTestId('type-preview-exe')).toHaveText('Job')
+  await expect(offer).toHaveCount(0)
+})

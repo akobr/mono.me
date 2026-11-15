@@ -5,6 +5,7 @@ import { getGetProjectsQueryKey, useGetProjectSettings } from '@42for.net/2splat
 import { useContextStore } from '@/stores/context'
 import { useProjectSettingsStore } from '@/stores/project-settings'
 import { useSessionStore } from '@/stores/session'
+import { removeLegacyProjectSettings } from '@/utils/legacy-project-settings'
 
 /** The project key of a settings query (`['v1', org, project, 'settings']`), or undefined for any other query. */
 function projectKeyOf(queryKey: readonly unknown[]): string | undefined {
@@ -54,7 +55,8 @@ export function useProjectSettingsQuery() {
 /**
  * The settings of the current project, mounted once in App.vue: the query of useProjectSettingsQuery, and every answer
  * of a settings query, also one a save writes into the cache, goes to the project settings store, which the type
- * appearance, the date format and the New annotation dialog read.
+ * appearance, the date format and the New annotation dialog read; a project with settings on the server (Version > 0)
+ * loses the settings this browser kept for it before.
  */
 export function useCurrentProjectSettings() {
   const store = useProjectSettingsStore()
@@ -64,6 +66,10 @@ export function useCurrentProjectSettings() {
     const projectKey = projectKeyOf(queryKey)
     if (projectKey && data) {
       store.receive(projectKey, data as ProjectSettings)
+      // The settings this browser kept before the API stored them go once the project has its own (424-266).
+      if (((data as ProjectSettings).Version ?? 0) > 0) {
+        removeLegacyProjectSettings(projectKey)
+      }
     }
   }
 
