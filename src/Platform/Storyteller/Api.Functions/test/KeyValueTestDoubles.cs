@@ -154,6 +154,9 @@ internal sealed class RecordingKeyValueService : IKeyValueService
 
     public bool DeleteResult { get; set; } = true;
 
+    // The items restore and purge answer; none by default.
+    public List<KeyValueBulkItemResult> BulkItems { get; set; } = [];
+
     public List<KeyValueVersion> Versions { get; set; } = [];
 
     public static KeyValue Public(string key, string value) => Create(key, KeyValueProtection.Public, value);
@@ -200,6 +203,12 @@ internal sealed class RecordingKeyValueService : IKeyValueService
         Calls.Add($"delete:{key}");
         LastDelete = options;
         LastCaller = caller;
+
+        if (Pair is { IsSecret: true } && Pair.Key == key && !caller.CanWriteSecrets)
+        {
+            throw KeyValueErrors.SecretRightsRequired(key);
+        }
+
         return Task.FromResult(DeleteResult);
     }
 
@@ -258,6 +267,12 @@ internal sealed class RecordingKeyValueService : IKeyValueService
         Calls.Add("import");
         LastImport = options;
         LastCaller = caller;
+
+        if (document.Items.FirstOrDefault(item => item.Protection is { } protection && protection.IsSecret()) is { } secret && !caller.CanWriteSecrets)
+        {
+            throw KeyValueErrors.SecretRightsRequired(secret.Key);
+        }
+
         return Task.FromResult(new KeyValueImportResult { IsDryRun = options.DryRun, IsComplete = true, Items = [] });
     }
 
@@ -278,7 +293,7 @@ internal sealed class RecordingKeyValueService : IKeyValueService
     {
         Calls.Add($"{operation}:{request.KeyPrefix ?? string.Join('|', request.Keys ?? [])}");
         LastCaller = caller;
-        return Task.FromResult(new KeyValueBulkResult { Items = [] });
+        return Task.FromResult(new KeyValueBulkResult { Items = operation == "protect" ? [] : [.. BulkItems] });
     }
 }
 
