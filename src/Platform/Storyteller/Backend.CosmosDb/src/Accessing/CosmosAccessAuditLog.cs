@@ -118,7 +118,11 @@ public partial class CosmosAccessAuditLog : IAccessAuditLog
 
     private static QueryDefinition BuildQuery(string organization, AccessAuditQuery query, string? before, int take)
     {
-        var text = new StringBuilder("SELECT TOP @take * FROM c WHERE STARTSWITH(c.id, @prefix) AND c.Organization = @organization");
+        // The prefix alone is not a type: the documents of a view named "aca" start with it too. Only the records have
+        // AccessPointKey and Action.
+        var text = new StringBuilder(
+            "SELECT TOP @take * FROM c WHERE STARTSWITH(c.id, @prefix) AND c.Organization = @organization"
+            + " AND IS_DEFINED(c.AccessPointKey) AND IS_DEFINED(c.Action)");
 
         if (!string.IsNullOrWhiteSpace(query.Project))
         {

@@ -47,11 +47,11 @@ public class InitDbCommandTests
 
         (await Command().OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
 
-        // the access is seeded before the set (the account, and each access point in a batch with its access audit
-        // record), the set is left without its record, and the review is not rendered
-        _fixture.Container.Verify(
-            container => container.CreateItemAsync(It.IsAny<It.IsAnyType>(), It.IsAny<PartitionKey?>(), It.IsAny<ItemRequestOptions>(), It.IsAny<CancellationToken>()),
-            Times.AtLeastOnce);
+        // the access is seeded before the set (each access point with the account and its access audit record in one
+        // batch), the set is left without its record, and the review is not rendered
+        _fixture.Batch.Verify(
+            batch => batch.CreateItem(It.IsAny<It.IsAnyType>(), It.IsAny<TransactionalBatchItemRequestOptions>()),
+            Times.AtLeast(3));
         _fixture.Batch.Verify(batch => batch.ExecuteAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         _fixture.Importer.Calls.ShouldHaveSingleItem().Organization.ShouldBe("42dotnet");
         _fixture.Records.Saves.ShouldBe(0);

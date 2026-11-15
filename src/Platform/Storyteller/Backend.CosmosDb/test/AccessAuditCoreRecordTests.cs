@@ -469,6 +469,38 @@ public class AccessAuditCoreRecordTests(Startup startup)
     }
 
     [Fact]
+    public async Task Seeding_WritesTheAccountInTheBatchOfItsRecord_AndRepairsARoleOnlyTheAccessPointHolds()
+    {
+        var organization = NewName("o");
+        var pointKey = $"{organization}.{NewName("p")}";
+        var accountId = $"acc-{Guid.NewGuid():N}";
+        var core = Repositories.GetCore().Container;
+        var partitionKey = new PartitionKey(AccessPointEntity.Partition);
+        var storage = new InterceptedRepositoryProvider(Repositories);
+
+        await Data.SeedAccountAccessAsync(storage.GetCore().Container, accountId, "seed@example.com", "Seed", Roles(organization, pointKey, AccountRole.Owner));
+
+        // every membership is one batch: the access point, the account and the record
+        storage.CoreInterceptor.Batches.Should().HaveCount(2).And.OnlyContain(batch => batch.Contains(BatchOperationKind.Create, accountId) || batch.Contains(BatchOperationKind.Replace, accountId));
+        (await core.ReadItemAsync<AccountEntity>(accountId, partitionKey)).Resource.AccessMap.Should().Contain(pointKey, AccountRole.Owner);
+
+        // the account lost the role behind the seed's back (the access point still has it): the role checks read the
+        // account, so the next seed repairs it and records the grant
+        var account = (await core.ReadItemAsync<AccountEntity>(accountId, partitionKey)).Resource;
+        await core.ReplaceItemAsync(account with { AccessMap = new Dictionary<string, AccountRole> { [organization] = AccountRole.Owner } }, accountId, partitionKey);
+
+        var repaired = await AddedAsync(pointKey, () => Data.SeedAccountAccessAsync(core, accountId, "seed@example.com", "Seed", Roles(organization, pointKey, AccountRole.Owner)));
+
+        repaired.Should().ContainSingle().Which.ShouldMatch(new ExpectedAccessAudit(AccessAuditAction.MemberGranted, pointKey, AccessCaller.System)
+        {
+            Target = AccessAuditTarget.Account(accountId, "Seed"),
+            NewValue = "Owner",
+            Detail = "Seeded by DbCreator.",
+        });
+        (await core.ReadItemAsync<AccountEntity>(accountId, partitionKey)).Resource.AccessMap.Should().Contain(pointKey, AccountRole.Owner);
+    }
+
+    [Fact]
     public async Task Core_HasTimeToLiveOnWithoutADefaultExpiry()
     {
         var core = (await Repositories.GetCore().Container.ReadContainerAsync()).Resource;
