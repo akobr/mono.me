@@ -100,6 +100,31 @@ export const isPreconditionFailed = hasStatus(412)
 export const hasErrorCode = (error: unknown, errorCode: string): error is StorytellerError =>
   isStorytellerError(error) && error.errorCode === errorCode
 
+/** The ErrorCode of the 401 that asks for a recent sign-in (step-up), and of the bulk items it refused. */
+export const stepUpRequiredCode = 'StepUpRequired'
+
+/**
+ * True for the 401 of an operation that needs a recent sign-in: reading or writing secret values, changing roles and
+ * members, creating or resetting machine credentials. A token refresh keeps the time of the sign-in, so only signing
+ * in again (with max_age) helps; the fetcher neither refreshes nor retries it and calls onStepUpRequired instead.
+ */
+export const isStepUpRequired = (error: unknown): error is StorytellerError =>
+  isUnauthorized(error) && error.errorCode === stepUpRequiredCode
+
+/**
+ * The longest a sign-in counts for the step-up, in seconds (Details.MaxAge of the 401, 600 by default on the API);
+ * undefined for any other error or when the body has no whole non-negative number there.
+ */
+export function stepUpMaxAge(error: unknown): number | undefined {
+  if (!isStepUpRequired(error) || !isRecord(error.body)) {
+    return undefined
+  }
+
+  const details = error.body.Details
+  const maxAge = isRecord(details) ? details.MaxAge : undefined
+  return typeof maxAge === 'number' && Number.isInteger(maxAge) && maxAge >= 0 ? maxAge : undefined
+}
+
 /**
  * True for a failure worth trying again later, as the .NET configuration provider classifies it: a network failure or
  * a timeout (status 0), 408, 424, 429, a 5xx other than 501 and 505, and a 2xx that was not the answer the SDK
