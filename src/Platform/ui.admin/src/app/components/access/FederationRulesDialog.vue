@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { setMachineFederationRules, type MachineAccess } from '@42for.net/2splatform.sdk'
 import { useGetFederatedIssuers } from '@42for.net/2splatform.sdk/vue-query'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
@@ -46,14 +47,20 @@ const audience = computed(() =>
 const rules = ref<RuleDraft[]>([])
 const saving = ref(false)
 const failure = ref<string>()
+/** The rules as the dialog opened with them, to tell the edits. */
+let opened = ''
 
 watch(open, (value) => {
   if (value) {
     failure.value = undefined
     const stored = props.machine.FederationRules ?? []
     rules.value = stored.length ? stored.map((rule) => ruleDraft(rule)) : [ruleDraft(undefined, audience.value)]
+    opened = JSON.stringify(rules.value)
   }
 })
+
+// The edited rules, which the step-up's confirmation says its sign-in loses (424-264).
+useDirtySource(() => open.value && JSON.stringify(rules.value) !== opened)
 
 const complete = computed(() => rules.value.length > 0 && rules.value.every(isRuleComplete))
 

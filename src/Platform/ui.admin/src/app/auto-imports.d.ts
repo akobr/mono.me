@@ -23,6 +23,7 @@ declare global {
   const injectBindingAssist: typeof import('./composables/useBindingAssist').injectBindingAssist
   const isRememberedSection: typeof import('./stores/page-memory').isRememberedSection
   const isSignInStale: typeof import('./composables/useStepUp').isSignInStale
+  const isSignInTooOld: typeof import('./composables/useStepUp').isSignInTooOld
   const leaveWithoutPrompt: typeof import('./composables/useUnsavedChanges').leaveWithoutPrompt
   const markSidebarStarted: typeof import('./composables/useSidebar').markSidebarStarted
   const onSignOut: typeof import('./stores/session').onSignOut
@@ -56,6 +57,7 @@ declare global {
   const useDeletedKeyCheck: typeof import('./composables/useDeletedKeyCheck').useDeletedKeyCheck
   const useDeletionToast: typeof import('./composables/useDeletionToast').useDeletionToast
   const useDetailPanel: typeof import('./composables/useDetailPanel').useDetailPanel
+  const useDirtySource: typeof import('./composables/useUnsavedChanges').useDirtySource
   const useFileUpload: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFileUpload').useFileUpload
   const useFormField: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFormField').useFormField
   const useHashScroll: typeof import('./composables/useHashScroll').useHashScroll

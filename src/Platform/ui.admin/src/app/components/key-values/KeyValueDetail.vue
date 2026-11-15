@@ -109,12 +109,14 @@ async function reveal() {
   }
 }
 
-// Back from the step-up that a Reveal asked for, the Reveal runs once more (never a write).
+// Back from the step-up that a Reveal asked for, the Reveal runs once more (never a write). The pending Reveal is taken
+// once the pair is there, also when this pair can no longer show it.
 watch(
-  () => !!pair.data.value && secret.value && !clientEncrypted.value && !deleted.value && canSecrets.value,
-  (ready) => {
+  () => !!pair.data.value,
+  (loaded) => {
     const target = revealTarget()
-    if (ready && target && stepUp.takePendingReveal(target)) {
+    const revealable = secret.value && !clientEncrypted.value && !deleted.value && canSecrets.value
+    if (loaded && target && stepUp.takePendingReveal([target]) && revealable) {
       void reveal()
     }
   },

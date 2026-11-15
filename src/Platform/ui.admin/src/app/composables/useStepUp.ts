@@ -36,7 +36,21 @@ export function signedInSince(returned: StepUpReturn, authTime: number | undefin
  * sign-in moved, the browser's time of the return counts too, so a browser clock ahead of the provider's does not ask
  * again at once. False while the API has no step-up (StepUp.Enabled).
  */
-export async function isSignInStale(now = Date.now()): Promise<boolean> {
+export function isSignInStale(now = Date.now()): Promise<boolean> {
+  return isSignInOlderThan(now, (maxAge) => Math.min(60, maxAge / 2))
+}
+
+/**
+ * Whether the API finds the sign-in too old at `now`: older than StepUp.MaxAge itself, without the margin of the hint
+ * (isSignInStale asks before a write a minute early; this tells whether a read had something withheld). Only a hint
+ * too (two clocks); false while the API has no step-up.
+ */
+export function isSignInTooOld(now = Date.now()): Promise<boolean> {
+  return isSignInOlderThan(now, () => 0)
+}
+
+/** Whether the sign-in is older than StepUp.MaxAge less the margin (in seconds) at `now`; see isSignInStale. */
+async function isSignInOlderThan(now: number, marginOf: (maxAge: number) => number): Promise<boolean> {
   const settings = getStepUpSettings()
   const auth = getAuthService()
 
@@ -52,8 +66,7 @@ export async function isSignInStale(now = Date.now()): Promise<boolean> {
 
   const returned = auth.getStepUpReturn()
   const signedInAt = returned && signedInSince(returned, authTime) ? Math.max(authTime, returned.returnedAt) : authTime
-  const margin = Math.min(60, settings.maxAge / 2)
-  return now - signedInAt > (settings.maxAge - margin) * 1000
+  return now - signedInAt > (settings.maxAge - marginOf(settings.maxAge)) * 1000
 }
 
 /** True for the items of a bulk call (restore, purge) that the API refused for the step-up. */
@@ -138,6 +151,21 @@ export const useStepUpStore = defineStore('step-up', () => {
     }
   }
 
+  /**
+   * The page came back from the back/forward cache as confirm() left it (Back on the provider's page): that sign-in
+   * was abandoned. The confirmation works again (Sign in again, Cancel), the browser asks again before unsaved changes
+   * go, and the Reveal stored for the return is dropped; the one in memory stays for another Sign in again.
+   */
+  function abandonRedirect(): void {
+    if (!redirecting.value) {
+      return
+    }
+
+    redirecting.value = false
+    leaveWithoutPrompt(false)
+    sessionStorage.removeItem(pendingRevealKey)
+  }
+
   /** Closes the confirmation; the screen keeps its error. */
   function cancel(): void {
     open.value = false
@@ -149,12 +177,23 @@ export const useStepUpStore = defineStore('step-up', () => {
     pendingReveal = target
   }
 
-  /** True once for the Reveal that failed before the step-up the page came back from. */
-  function takePendingReveal(target: RevealTarget): boolean {
+  /**
+   * The Reveal that failed before the step-up the page came back from, when it is one of the candidates (the Reveals
+   * of the asking screen). Taken once: the first screen that asks once its data is there takes it, its own or not, so
+   * it never replays on a later screen without a click. None, and dropped, on a visit that is not that return (a
+   * sign-in abandoned at the provider).
+   */
+  function takePendingReveal(candidates: readonly RevealTarget[]): RevealTarget | undefined {
     const stored = sessionStorage.getItem(pendingRevealKey)
 
     if (!stored) {
-      return false
+      return undefined
+    }
+
+    sessionStorage.removeItem(pendingRevealKey)
+
+    if (!getAuthService()?.getStepUpReturn()) {
+      return undefined
     }
 
     let pending: RevealTarget | undefined
@@ -165,30 +204,25 @@ export const useStepUpStore = defineStore('step-up', () => {
       pending = undefined
     }
 
-    // Only right after the return: a sign-in abandoned at the provider leaves no reveal for a later visit.
-    if (!getAuthService()?.getStepUpReturn() || !pending) {
-      sessionStorage.removeItem(pendingRevealKey)
-      return false
-    }
-
-    if (!sameTarget(pending, target)) {
-      return false
-    }
-
-    sessionStorage.removeItem(pendingRevealKey)
-    return true
+    return pending && candidates.find((candidate) => sameTarget(candidate, pending))
   }
 
   let returnAnnounced = false
 
-  /** True once per page load after a step-up return, for the toast that says a change is not repeated. */
-  function takeReturnNotice(): boolean {
-    if (returnAnnounced || !getAuthService()?.getStepUpReturn()) {
+  /**
+   * True once per page load after a step-up return whose sign-in moved, for the toast that says a change is not
+   * repeated. A return without a newer sign-in gets none: the loop guard's error tells it when the API asks again.
+   */
+  async function takeReturnNotice(): Promise<boolean> {
+    const auth = getAuthService()
+    const returned = auth?.getStepUpReturn()
+
+    if (returnAnnounced || !auth || !returned) {
       return false
     }
 
     returnAnnounced = true
-    return true
+    return signedInSince(returned, await auth.getAuthTime())
   }
 
   return {
@@ -200,6 +234,7 @@ export const useStepUpStore = defineStore('step-up', () => {
     ask,
     ensureRecentSignIn,
     confirm,
+    abandonRedirect,
     cancel,
     rememberReveal,
     takePendingReveal,
