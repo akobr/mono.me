@@ -8,5 +8,7 @@ declare module 'vue-router' {
     layout?: 'default' | 'bare'
     /** Reachable by a signed-in user who has no Storyteller account yet (onboarding, invitations). */
     allowWithoutAccount?: boolean
+    /** A wider column of the bare layout (the onboarding wizard). */
+    wide?: boolean
   }
 }

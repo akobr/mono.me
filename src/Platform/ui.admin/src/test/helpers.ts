@@ -2,9 +2,9 @@
 import { defineComponent, h, nextTick, watch, type Component } from 'vue'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ui from '@nuxt/ui/vue-plugin'
-import { createMemoryHistory, createRouter, type Router, type RouteRecordRaw } from 'vue-router'
+import { createMemoryHistory, createRouter, type NavigationGuard, type Router, type RouteRecordRaw } from 'vue-router'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import type { AccountAccessMap } from '@42for.net/2splatform.sdk'
+import type { Account, AccountAccessMap } from '@42for.net/2splatform.sdk'
 import { useContextStore } from '@/stores/context'
 import { useSessionStore } from '@/stores/session'
 import UApp from '@nuxt/ui/components/App.vue'
@@ -86,7 +86,10 @@ export function mountInApp<T extends Component>(
   const host = mount(Host, {
     attrs: props,
     attachTo: document.body,
-    global: { plugins: [ui, ...(plugins as [])], stubs: { CodeEditor: CodeEditorStub, DiffEditor: DiffEditorStub, ...stubs } },
+    global: {
+      plugins: [ui, ...(plugins as [])],
+      stubs: { CodeEditor: CodeEditorStub, DiffEditor: DiffEditorStub, ...stubs },
+    },
   })
 
   return {
@@ -114,11 +117,15 @@ export interface AppMountOptions {
   routes?: RouteRecordRaw[]
   /** Replaces the default stubs (`CodeEditor`, `DiffEditor`) or adds others. */
   stubs?: Record<string, Component>
+  /** The account of the session; an account with `accessMap` by default, and none with `null` (onboarding). */
+  account?: Account | null
+  /** Guards of the router, in the order of `beforeEach`; none by default. They run for the first navigation too. */
+  guards?: NavigationGuard[]
 }
 
 /**
  * Mounts a screen component with everything it expects: a memory router at `path`, Vue Query (no retries), the
- * context store set to `scope` and an account with `accessMap`.
+ * context store set to `scope` and an account with `accessMap` (or `account`).
  */
 export async function mountScreen<T extends Component>(
   component: T,
@@ -130,14 +137,21 @@ export async function mountScreen<T extends Component>(
     history: createMemoryHistory(),
     routes: options.routes ?? [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
   })
+  for (const guard of options.guards ?? []) {
+    router.beforeEach(guard)
+  }
   await router.push(options.path ?? `/${scope.org}/${scope.project}/${scope.view}`)
   await router.isReady()
 
   useContextStore().set(scope)
-  useSessionStore().setAccount({
-    Id: 'user_1',
-    AccessMap: (options.accessMap ?? { [`${scope.org}.${scope.project}`]: 'Owner' }) as AccountAccessMap,
-  })
+  if (options.account !== null) {
+    useSessionStore().setAccount(
+      options.account ?? {
+        Id: 'user_1',
+        AccessMap: (options.accessMap ?? { [`${scope.org}.${scope.project}`]: 'Owner' }) as AccountAccessMap,
+      },
+    )
+  }
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
   const view = mountInApp(component, props, [router, [VueQueryPlugin, { queryClient }]], options.stubs)

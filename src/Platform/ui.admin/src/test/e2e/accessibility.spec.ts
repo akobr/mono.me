@@ -91,8 +91,36 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
-    test('onboarding has no serious accessibility violations', async ({ page }) => {
-      await openApp(page, '/onboarding', 'new-user')
+    // The onboarding wizard (424-267), each step by its address; the step is checked, not the loading state before it.
+    for (const [name, path, heading] of [
+      ['welcome', '/onboarding', 'Customer data stays in the EU'],
+      ['security', '/onboarding?step=security', 'Security first'],
+      ['exhibition', '/onboarding?step=exhibition', 'Join the exhibition'],
+      ['organization', '/onboarding?step=organization', 'Create your organization'],
+    ] as const) {
+      test(`the ${name} step of onboarding has no serious accessibility violations`, async ({ page }) => {
+        await openApp(page, path, 'new-user')
+        await expect(page.getByRole('heading', { name: heading, level: 2 })).toBeVisible()
+        await expectAccessible(page)
+      })
+    }
+
+    // The choice of the exhibition (join=1 in the address): the checked box of its step, and the second way to end
+    // under the form of the last step.
+    test('the exhibition step of onboarding with the box checked has no serious accessibility violations', async ({
+      page,
+    }) => {
+      await openApp(page, '/onboarding?step=exhibition&join=1', 'new-user')
+      await expect(page.getByRole('checkbox', { name: 'Join the exhibition' })).toBeChecked()
+      await expectAccessible(page)
+    })
+
+    test('the organization step of onboarding with the exhibition chosen has no serious accessibility violations', async ({
+      page,
+    }) => {
+      await openApp(page, '/onboarding?step=organization&join=1', 'new-user')
+      await expect(page.getByText('You are joining the exhibition.')).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Continue with the exhibition only' })).toBeVisible()
       await expectAccessible(page)
     })
 
@@ -106,7 +134,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
     test('the trusted issuer dialog has no serious accessibility violations', async ({ page }) => {
       await openApp(page, '/acme/billing/machines')
       await page.getByRole('button', { name: 'Add trusted issuer' }).click()
-      await expect(page.getByRole('dialog', { name: 'Add a trusted issuer' }).getByText('Required claims')).toBeVisible()
+      await expect(
+        page.getByRole('dialog', { name: 'Add a trusted issuer' }).getByText('Required claims'),
+      ).toBeVisible()
       await expectAccessible(page)
     })
 
