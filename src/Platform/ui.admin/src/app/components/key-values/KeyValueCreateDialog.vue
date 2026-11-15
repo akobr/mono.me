@@ -6,6 +6,7 @@ import { encryptForRecipients, getHyokPlace } from '@42for.net/2splatform.sdk/hy
 import { keyValueFormSchema, type KeyValueForm } from '@/forms/key-value.schema'
 import { toTypedSchema } from '@/forms/typed-schema'
 import { useStepUpStore } from '@/composables/useStepUp'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { useKeyValuePolicy, useRecipients } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
@@ -57,6 +58,9 @@ watch(secretDefault, (secret) => {
   const fallback = (policy.data.value?.DefaultSecretProtection ?? 'Standard') as KeyValueProtection
   protection.value = secret ? (allowed.value.includes(fallback) ? fallback : (allowed.value.find(isSecretLevel) ?? 'Public')) : 'Public'
 })
+
+// The typed key and value, which the step-up's confirmation says its sign-in loses.
+useDirtySource(() => open.value && (!!values.key?.trim() || !!values.value))
 
 // Before the secret is typed: the redirect of the step-up would lose it.
 watch(protection, (level) => {

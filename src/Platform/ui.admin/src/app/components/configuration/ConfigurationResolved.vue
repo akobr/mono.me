@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { isNotFound, isStorytellerError } from '@42for.net/2splatform.sdk'
 import { useGetResolvedConfiguration } from '@42for.net/2splatform.sdk/vue-query'
-import { isSignInStale, useStepUpStore } from '@/composables/useStepUp'
+import { isSignInTooOld, useStepUpStore } from '@/composables/useStepUp'
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 
 /**
@@ -18,12 +18,20 @@ const scope = useScope()
 const preferences = usePreferencesStore()
 const canSeeSecrets = useCan('secrets')
 const stepUp = useStepUpStore()
-// Whether the sign-in is too old for the secrets, by the token's auth_time; asked again with every visit of the tab.
+const revealed = ref(false)
+const format = ref<DocumentFormat>(preferences.state.editorFormat)
+
+const resolved = useGetResolvedConfiguration(scope.org, scope.project, scope.view, () => props.annotationKey, {
+  query: { gcTime: 0, staleTime: 0, enabled: () => !!props.annotationKey, meta: { silent: true } },
+})
+
+// Whether the API withheld the secrets of the response shown: the token's auth_time older than the window itself when
+// it answered (no margin: the hint before a write asks a minute early), asked again with every response.
 const staleSignIn = ref(false)
 watch(
-  canSeeSecrets,
-  async (can) => {
-    staleSignIn.value = can && (await isSignInStale())
+  [canSeeSecrets, () => resolved.dataUpdatedAt.value],
+  async ([can, answeredAt]) => {
+    staleSignIn.value = can && (await isSignInTooOld(answeredAt || Date.now()))
   },
   { immediate: true },
 )
@@ -31,12 +39,6 @@ const secretsWithheld = computed(() => canSeeSecrets.value && staleSignIn.value)
 const confirmActions = [
   { label: "Confirm it's you", icon: 'i-lucide-log-in', color: 'warning' as const, onClick: () => void stepUp.ask() },
 ]
-const revealed = ref(false)
-const format = ref<DocumentFormat>(preferences.state.editorFormat)
-
-const resolved = useGetResolvedConfiguration(scope.org, scope.project, scope.view, () => props.annotationKey, {
-  query: { gcTime: 0, staleTime: 0, enabled: () => !!props.annotationKey, meta: { silent: true } },
-})
 
 const bindingError = computed(() => {
   const error = resolved.error.value

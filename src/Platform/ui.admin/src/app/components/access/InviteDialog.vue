@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { createInvitation, getRole, hasErrorCode } from '@42for.net/2splatform.sdk'
+import { useDirtySource } from '@/composables/useUnsavedChanges'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useSessionStore } from '@/stores/session'
 import { emailDelimiter, isEmail, normalizeEmails } from '@/utils/emails'
@@ -34,6 +35,9 @@ watch(open, (value) => {
     empty.value = false
   }
 })
+
+// The addresses entered, which the step-up's confirmation says its sign-in loses (424-264).
+useDirtySource(() => open.value && emails.value.length > 0)
 
 // Every commit of the tags input (a typed address, a pasted list, the text left when sending) goes through
 // normalizeEmails (424-41): a list becomes one tag per address, and duplicates go, also those in another case. With
