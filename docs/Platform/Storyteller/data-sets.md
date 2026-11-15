@@ -376,7 +376,7 @@ The build of the database (see [What DbCreator does](#what-dbcreator-does)). Aft
 | `<set>…` | The sets of the `--path` folders | The sets to seed, built-in or of the `--path` folders; their dependencies are seeded first. Without names and without `--path`, nothing is seeded (exit `2`) |
 | `--path <folder>` | | A folder with `set.json`, or a folder of such folders. Repeatable |
 | `--organization` | The `Organization` of the named sets | The organization to seed into, created with the owner when missing |
-| `--project` | The `Project` of the named sets | The project to seed into, created when missing; an existing one is used as it is when the owner is its Administrator or Owner |
+| `--project` | The `Project` of the named sets | The project to seed into, created when missing; an existing one is used when the owner is its Administrator or Owner, keeps its access, and gets the set's project settings only when its settings were never set |
 | `--view` | The `View` of the named sets, otherwise `default` | The view to seed into, registered when missing |
 | `--owner` | `baseAccount:id` | The account that owns a created organization and project |
 | `--dry-run` | Off | Decide every outcome and write nothing of the target and the sets. The database and the containers are still ensured |
