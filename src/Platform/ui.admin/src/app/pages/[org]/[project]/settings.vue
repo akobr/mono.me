@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, ref, shallowRef, toRaw, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
   getCertificateAuthority,
@@ -11,6 +11,7 @@ import {
   setProjectSettings,
   updateAccessPoint,
   type MachineCredentialKind,
+  type ProjectSettings,
 } from '@42for.net/2splatform.sdk'
 import {
   getGetProjectSettingsQueryKey,
@@ -62,8 +63,21 @@ const canManageSettings = useCan('manageProject')
 // settings: it follows the saved ones until it is changed, and starts again from them in another project. The rest of
 // the app keeps the saved settings until Save; only the previews of the type editor show the draft.
 const settingsQuery = useProjectSettingsQuery()
-const settingsLoaded = computed(() => !!settingsQuery.data.value)
-const savedSettings = computed(() => fromApi(settingsQuery.data.value))
+/**
+ * The answer of the settings query when it is the current project's. The page stays on a project switch (the context
+ * switcher keeps the section), and for a moment the query still holds the previous project's answer: vue-query moves
+ * to the new key in a watcher of its own, which may run after the watchers of this page. Only the answer cached under
+ * the current project's key counts, so nothing is decided on another project's settings.
+ */
+const settingsAnswer = computed<ProjectSettings | undefined>(() => {
+  const data = settingsQuery.data.value
+  const { org, project } = context
+  return data && org && project && toRaw(data) === queryClient.getQueryData(getGetProjectSettingsQueryKey(org, project))
+    ? data
+    : undefined
+})
+const settingsLoaded = computed(() => !!settingsAnswer.value)
+const savedSettings = computed(() => fromApi(settingsAnswer.value))
 
 const draftOf = (settings: ProjectSettingsDraft): ProjectSettingsDraft => ({
   types: structuredClone({ ...settings.types }),
@@ -185,17 +199,14 @@ function loadSavedSettings() {
 
 // The settings this browser kept for the project before the API stored them (424-266, spec section 4): while the
 // project has none on the server (Version 0), an Administrator can save them for everyone or discard them, and anyone
-// else is asked to have an Administrator save them. Once the server has settings, the entry goes.
+// else is asked to have an Administrator save them. Once the server has settings, useCurrentProjectSettings removes
+// the entry, keyed by the query of each answer; this page only reads it again with each answer of the current project,
+// never removes it on the strength of an answer that may still be another project's.
 const legacySettings = shallowRef<LegacyProjectSettings>()
 watch(
-  [() => context.projectKey, () => settingsQuery.data.value] as const,
-  ([key, data]) => {
-    if (key && (data?.Version ?? 0) > 0) {
-      removeLegacyProjectSettings(key)
-      legacySettings.value = undefined
-    } else {
-      legacySettings.value = key ? readLegacyProjectSettings(key) : undefined
-    }
+  [() => context.projectKey, settingsAnswer] as const,
+  ([key]) => {
+    legacySettings.value = key ? readLegacyProjectSettings(key) : undefined
   },
   { immediate: true },
 )

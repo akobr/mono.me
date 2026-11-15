@@ -1,10 +1,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { setupServer } from 'msw/node'
 import { getGetProjectSettingsQueryKey } from '@42for.net/2splatform.sdk/vue-query'
 import { mockHandlers } from '@/mock/all-handlers'
 import { createSeed, loadDb, saveDb } from '@/mock/db'
 import { storeProjectSettings } from '@/mock/project-settings'
 import SettingsPage from '@/pages/[org]/[project]/settings.vue'
+import { useCurrentProjectSettings } from '@/queries/project-settings'
 import { useContextStore } from '@/stores/context'
 import { legacyProjectSettingsKey } from '@/utils/legacy-project-settings'
 import { mountScreen, settle } from '../../helpers'
@@ -42,9 +44,19 @@ const storeOldSettings = () => localStorage.setItem(legacyProjectSettingsKey, JS
 const storedOldSettings = () =>
   JSON.parse(localStorage.getItem(legacyProjectSettingsKey) ?? '{}') as Record<string, unknown>
 
+// The page as App.vue runs it: the app-wide query of the current project settings subscribes first, and it removes the
+// old settings of a project once that project's own answer has a version above 0.
+const AppWithSettings = defineComponent({
+  name: 'AppWithSettings',
+  setup() {
+    useCurrentProjectSettings()
+    return () => h(SettingsPage)
+  },
+})
+
 async function mountSettings(org = 'acme', project = 'billing') {
   const view = await mountScreen(
-    SettingsPage,
+    AppWithSettings,
     {},
     { path: `/${org}/${project}/settings`, scope: { org, project, view: 'default' }, accessMap },
   )
@@ -182,5 +194,22 @@ describe('the project settings of this browser in Settings', () => {
     expect(document.body.textContent).toContain('they are at version 1')
     expect(loadDb().accessPoints['acme.billing']?.Settings).toMatchObject({ DateFormat: 'mm/dd/yyyy', Version: 1 })
     expect(storedOldSettings()).toEqual({ 'acme.shipping': oldSettings['acme.shipping'] })
+  })
+
+  it('keeps them for another project opened from Settings, while that project has no settings on the server', async () => {
+    storeOldSettings()
+    const db = loadDb()
+    storeProjectSettings(db, 'acme.billing', { Types: {}, DateFormat: 'mm/dd/yyyy' })
+    saveDb(db)
+    await mountSettings()
+    expect(banner()).toBeUndefined()
+    expect(storedOldSettings()).toEqual({ 'acme.shipping': oldSettings['acme.shipping'] })
+
+    // The context switcher keeps the section: the same page shows the other project.
+    useContextStore().set({ org: 'acme', project: 'shipping' })
+    await settle(6)
+
+    expect(storedOldSettings()).toEqual({ 'acme.shipping': oldSettings['acme.shipping'] })
+    expect(banner()?.textContent).toContain('Time zone Europe/Oslo.')
   })
 })
