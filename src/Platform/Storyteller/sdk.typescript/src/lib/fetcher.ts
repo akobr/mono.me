@@ -1,4 +1,4 @@
-import { StorytellerError } from './errors'
+import { isStepUpRequired, StorytellerError } from './errors'
 
 export interface StorytellerConfig {
   /** API root including the "/api" prefix, for example https://host/api. */
@@ -8,8 +8,15 @@ export interface StorytellerConfig {
    * forceRefresh is true for the one retry after a 401, so the provider can skip its cached token.
    */
   getAccessToken?: (options: { forceRefresh: boolean }) => Promise<string | undefined> | string | undefined
-  /** Called once a 401 survived one token refresh, for example to start a new sign-in. */
+  /** Called once a 401 survived one token refresh, for example to start a new sign-in. Not called for a step-up 401. */
   onUnauthorized?: () => void
+  /**
+   * Called for a 401 StepUpRequired (isStepUpRequired), right before the request fails with it: the operation needs a
+   * recent sign-in, and a token refresh keeps the time of the last one, so the request is neither refreshed nor
+   * retried and onUnauthorized is not called. For example to ask the person to sign in again with max_age
+   * (stepUpMaxAge gives the window the API counts).
+   */
+  onStepUpRequired?: (error: StorytellerError) => void
   /** Transport override for tests and special hosts. Defaults to the global fetch. */
   fetch?: typeof globalThis.fetch
   /** Extra headers on every request, for example X-Client. */
@@ -57,7 +64,8 @@ export function getStorytellerConfig(): StorytellerConfig {
 /**
  * The Orval mutator: every generated request goes through this function.
  * - prefixes the base URL to the generated "/v1/..." path (absolute URLs are kept),
- * - adds the bearer token, retries once after a 401 with a fresh token,
+ * - adds the bearer token, retries once after a 401 with a fresh token; a step-up 401 (StepUpRequired) calls
+ *   onStepUpRequired and fails at once,
  * - ends the request after timeoutMs (the per-call option, else the configured one),
  * - parses JSON bodies by content type, returns zip and octet-stream bodies as a Blob and any other content type as text,
  * - throws StorytellerError for non-2xx responses, network failures, timeouts and aborts.
@@ -154,11 +162,13 @@ async function perform<T>(
   attempt: Attempt,
 ): Promise<T> {
   let response = await send(current, target, init, false, attempt)
+  await failOnStepUp(current, response, attempt)
 
   if (response.status === 401 && current.getAccessToken) {
     // The unread body would keep the first connection busy.
     await race(() => response.body?.cancel() ?? Promise.resolve(), attempt.signal).catch(() => undefined)
     response = await send(current, target, init, true, attempt)
+    await failOnStepUp(current, response, attempt)
 
     if (response.status === 401) {
       current.onUnauthorized?.()
@@ -177,6 +187,41 @@ async function perform<T>(
 
     throw error
   }
+}
+
+/**
+ * Throws the StorytellerError of a step-up 401 after onStepUpRequired. Only a 401 with a JSON body can be one; it is
+ * read on a clone within the attempt's signal, so the response itself stays unread for read and for the cancel before
+ * the retry. An abort or the deadline during that read is the request's failure; a body that cannot be read is no
+ * step-up, and the 401 takes its usual path.
+ */
+async function failOnStepUp(current: StorytellerConfig, response: Response, attempt: Attempt): Promise<void> {
+  if (response.status !== 401 || !response.body || !isJson(response.headers.get('content-type') ?? '')) {
+    return
+  }
+
+  let error: StorytellerError
+
+  try {
+    const body = await race(() => readBody(response.clone()), attempt.signal)
+    error = StorytellerError.fromResponse(response.status, response.statusText, body)
+  } catch (caught) {
+    if (!attempt.signal?.aborted) {
+      return
+    }
+
+    discard(response)
+    throw failure(caught, attempt)
+  }
+
+  if (!isStepUpRequired(error)) {
+    return
+  }
+
+  // The clone read the whole body; the response's own copy of it is not needed.
+  discard(response)
+  current.onStepUpRequired?.(error)
+  throw error
 }
 
 async function send(current: StorytellerConfig, target: string, init: RequestInit, forceRefresh: boolean, attempt: Attempt): Promise<Response> {
@@ -345,10 +390,7 @@ export async function readBody(response: Response): Promise<unknown> {
     return undefined
   }
 
-  const contentType = response.headers.get('content-type') ?? ''
-  const isJson = /^application\/(?:[\w.+-]+\+)?json\b/i.test(contentType)
-
-  if (!isJson) {
+  if (!isJson(response.headers.get('content-type') ?? '')) {
     // PEM certificates (application/x-pem-file), unified diffs (text/plain) and any other text.
     return text
   }
@@ -358,6 +400,10 @@ export async function readBody(response: Response): Promise<unknown> {
   } catch {
     return text
   }
+}
+
+function isJson(contentType: string): boolean {
+  return /^application\/(?:[\w.+-]+\+)?json\b/i.test(contentType)
 }
 
 function isBinary(contentType: string): boolean {

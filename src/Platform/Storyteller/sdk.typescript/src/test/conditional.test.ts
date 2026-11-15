@@ -13,6 +13,7 @@ import {
   StorytellerError,
   type Configuration,
   type ConfigurationFormat,
+  type SecretsWithheldReason,
   type StorytellerConfig,
 } from '../index'
 
@@ -153,6 +154,17 @@ describe('conditional reads', () => {
     }
     expect(first.value).toEqual(configuration)
     expect(second.notModified).toBe(true)
+  })
+
+  it('reads every withheld reason of the header, a stale sign-in and the reasons of a newer API too', async () => {
+    const reasons: SecretsWithheldReason[] = ['step-up-required', 'actor-restricted', 'mtls-required', 'some-later-reason']
+    const { fetch } = fakeFetch(...reasons.map((reason) => json(configuration, 200, { 'cache-control': 'no-store', 'x-2s-secrets-withheld': reason })))
+    configure({ fetch })
+
+    for (const reason of reasons) {
+      const result = await getResolvedConfigurationConditional('acme', 'billing', 'default', 'exe.billing.api.prod')
+      expect(result).toMatchObject({ status: 200, value: configuration, secretsWithheld: reason })
+    }
   })
 
   it('sends ifNoneMatch over an If-None-Match of options.headers and keeps the other headers', async () => {
@@ -346,6 +358,9 @@ describe('conditional reads', () => {
     expect(sdk.getConfigurationFormattedConditional).toBeTypeOf('function')
     expect(sdk.getResolvedConfigurationFormattedConditional).toBeTypeOf('function')
     expect(sdk.isTimedOut).toBeTypeOf('function')
+    expect(sdk.isStepUpRequired).toBeTypeOf('function')
+    expect(sdk.stepUpMaxAge).toBeTypeOf('function')
+    expect(sdk.stepUpRequiredCode).toBe('StepUpRequired')
     expect(sdk).not.toHaveProperty('runRequest')
     expect(sdk).not.toHaveProperty('storytellerRequest')
     expect(sdk).not.toHaveProperty('readBody')
