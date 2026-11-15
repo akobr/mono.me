@@ -134,6 +134,34 @@ public class ReportScrubberTests
             .ShouldBe("Machine *** not found");
     }
 
+    // From the fuzz of the scrubber: a value with mask characters in it, one that starts with its own end next to a mask,
+    // a value a shape cut where it has a bracket, and the rest of an unquoted JSON member.
+    [Theory]
+    [InlineData("ab****cdef", "ab****cdef")]
+    [InlineData("login with hunter****2024 failed", "hunter****2024")]
+    [InlineData("x secretXsecreteyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln y", "secretXsecret")]
+    [InlineData("Bearer /aaaaaaZ 7[Filt", "Z 7[Filt")]
+    [InlineData("{\"value\":1,sulx.4648/}", "1,sulx.4648/")]
+    public void ScrubSecrets_KeepsNothingOfAValueGivenWhole(string text, string value)
+    {
+        ReportScrubber.ScrubSecrets(text, [value]).ShouldNotContain(value[^4..]);
+    }
+
+    [Fact]
+    public void ScrubForSentry_AShapeThatCutAValueAtABracket_LeavesNothingOfIt()
+    {
+        ReportScrubber.ScrubForSentry(@"see lwZMLf]C:\x\y", ["lwZMLf]C"]).ShouldBe("see ***");
+    }
+
+    [Fact]
+    public void ScrubForSentry_CutsNoSurrogatePairInHalf()
+    {
+        var scrubbed = ReportScrubber.ScrubForSentry($"{new string('a', ReportScrubber.MaxSentryMessageLength - 2)}𝒜𝒜𝒜", []);
+
+        char.IsHighSurrogate(scrubbed[^2]).ShouldBeFalse();
+        scrubbed.ShouldEndWith("…");
+    }
+
     // A value of mask characters, or one next to the mask a longer value left, ends.
     [Theory]
     [InlineData("Value ***** rejected", "*****")]

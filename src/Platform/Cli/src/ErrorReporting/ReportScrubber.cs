@@ -131,7 +131,7 @@ internal static class ReportScrubber
     ];
 
     // The masks the rules write, for what a shape left of a value next to one.
-    private static readonly string[] Masks = [Mask, Filtered];
+    private static readonly string[] Masks = [Mask, Filtered, $"\"{Filtered}\"", $"\\\"{Filtered}\\\""];
 
     private static readonly Regex AdjacentMasks = Create(@"(?:\*\*\*|\[Filtered\])(?:\*\*\*|\[Filtered\])+");
 
@@ -193,7 +193,14 @@ internal static class ReportScrubber
         }
 
         text = ScrubValues(original, text, values).Trim();
-        return text.Length <= MaxSentryMessageLength ? text : $"{text[..(MaxSentryMessageLength - 1)]}…";
+        if (text.Length <= MaxSentryMessageLength)
+        {
+            return text;
+        }
+
+        // Never half of a surrogate pair.
+        var cut = char.IsHighSurrogate(text[MaxSentryMessageLength - 2]) ? MaxSentryMessageLength - 2 : MaxSentryMessageLength - 1;
+        return $"{text[..cut]}…";
     }
 
     // Before an event is sent. The message is ErrorReporter's own, of fixed texts and the names of the model, so it is not
@@ -277,14 +284,15 @@ internal static class ReportScrubber
 
         foreach (var value in forms)
         {
+            // The whole value first: a remnant rewrite could eat part of an occurrence that is still whole.
+            text = value.Length < MinimumSubstringLength
+                ? Regex.Replace(text, $"{ShortValueBefore}{Regex.Escape(value)}{ShortValueAfter}", Mask, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, MatchTimeout)
+                : text.Replace(value, Mask, StringComparison.OrdinalIgnoreCase);
+
             if (value.Length > 1 && original.Contains(value, StringComparison.OrdinalIgnoreCase))
             {
                 text = ScrubRemnants(text, value);
             }
-
-            text = value.Length < MinimumSubstringLength
-                ? Regex.Replace(text, $"{ShortValueBefore}{Regex.Escape(value)}{ShortValueAfter}", Mask, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, MatchTimeout)
-                : text.Replace(value, Mask, StringComparison.OrdinalIgnoreCase);
         }
 
         return AdjacentMasks.Replace(text, Mask);
@@ -297,9 +305,9 @@ internal static class ReportScrubber
         {
             for (var at = text.IndexOf(mask, StringComparison.Ordinal); at >= 0; at = text.IndexOf(mask, at + mask.Length, StringComparison.Ordinal))
             {
-                var before = LongestEnd(text[..at], value, isStart: true);
                 var afterStart = at + mask.Length;
-                var after = LongestEnd(text[afterStart..], value, isStart: false);
+                var before = LongestEnd(text, at, value, isStart: true);
+                var after = LongestEnd(text, afterStart, value, isStart: false);
 
                 if (before + after == 0)
                 {
@@ -316,22 +324,40 @@ internal static class ReportScrubber
         return text;
     }
 
-    // The length of the longest start (or end) of value, of two characters or more and shorter than value, that text ends
-    // with (or starts with). An edge with a character of a mask is none: it would match the masks written before.
-    private static int LongestEnd(string text, string value, bool isStart)
+    // The length of the longest start of value that text has just before position (isStart), or of the longest end of value
+    // it has from position on: two characters or more, shorter than value, and no part of a mask, which would match the
+    // masks written before and never end. Every rewrite takes characters outside the masks, so the rewrites end.
+    private static int LongestEnd(string text, int position, string value, bool isStart)
     {
-        for (var length = Math.Min(Math.Min(value.Length - 1, text.Length), MaxRemnantLength); length >= 2; length--)
-        {
-            var piece = isStart ? value.AsSpan(0, length) : value.AsSpan(value.Length - length);
-            var edge = isStart ? text.AsSpan(text.Length - length) : text.AsSpan(0, length);
+        var room = isStart ? position : text.Length - position;
 
-            if (edge.IndexOfAny('*', '[', ']') < 0 && piece.Equals(edge, StringComparison.OrdinalIgnoreCase))
+        for (var length = Math.Min(Math.Min(value.Length - 1, room), MaxRemnantLength); length >= 2; length--)
+        {
+            var start = isStart ? position - length : position;
+            var piece = isStart ? value.AsSpan(0, length) : value.AsSpan(value.Length - length);
+
+            if (piece.Equals(text.AsSpan(start, length), StringComparison.OrdinalIgnoreCase) && !OverlapsMask(text, start, start + length))
             {
                 return length;
             }
         }
 
         return 0;
+    }
+
+    private static bool OverlapsMask(string text, int start, int end)
+    {
+        foreach (var mask in Masks)
+        {
+            var at = text.IndexOf(mask, Math.Max(0, start - mask.Length + 1), StringComparison.Ordinal);
+
+            if (at >= 0 && at < end)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string? FileNameOf(string? path)
