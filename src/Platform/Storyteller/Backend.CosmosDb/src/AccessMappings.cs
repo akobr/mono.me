@@ -26,7 +26,16 @@ internal static class AccessMappings
         AccessMap = e.AccessMap,
         MachineAuthentication = e.MachineAuthentication,
         Description = e.Description,
+        Settings = e.ToProjectSettings(),
     };
+
+    // The settings of a project, the defaults (Version 0) when none were stored; null for an organization.
+    public static ProjectSettings? ToProjectSettings(this AccessPointEntity e)
+    {
+        return e.Key.Contains('.')
+            ? e.Settings?.ToModel() ?? new ProjectSettings()
+            : null;
+    }
 
     public static AccessPointEntity ToEntity(this AccessPoint m) => new()
     {

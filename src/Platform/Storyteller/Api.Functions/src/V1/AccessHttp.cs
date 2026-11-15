@@ -167,7 +167,7 @@ public class AccessHttp
     }
 
     [Function(nameof(GetAccessPoint))]
-    [OpenApiOperation(Definitions.RouteIds.Access.GetAccessPoint, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetAccessPoint, Definitions.Tags.Access, Description = "An organization or a project, with its members and policies, and for a project its description and settings (the defaults, Version 0, when none were set). Needs a user with the Administrator role.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The key of requested access point.")]
@@ -262,7 +262,7 @@ public class AccessHttp
     }
 
     [Function(nameof(GetProjects))]
-    [OpenApiOperation(Definitions.RouteIds.Access.GetProjects, Definitions.Tags.Access, Description = "Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.")]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetProjects, Definitions.Tags.Access, Description = "Every project where the caller has a role, with the role, the description and the settings (the defaults, Version 0, when none were set), ordered by key. The members and the policies of a project are not included.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<ProjectSummary>), Description = "The caller's projects.")]
@@ -641,6 +641,7 @@ public class AccessHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No kind is enabled, a kind doesn't exist, the default kind is not enabled, or the certificate lifetime is out of the deployment's bounds.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The project changed concurrently twice in a row (Conflict); try again.")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutMachineAuthentication(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.MachineAuthentication)]

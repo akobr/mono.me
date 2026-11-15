@@ -111,6 +111,33 @@ public class RequestBodyLimitsTests
         Bytes(request).ShouldBeLessThanOrEqualTo(RequestBodyLimits.AnnotationKeys);
     }
 
+    // Every type with a label and a plural at their limit, the longest color and icon, the longest time zone and date
+    // format, and the Version and Modified of a read sent back as it is (an actor name of 200 characters).
+    [Fact]
+    public void ProjectSettings_HoldsEveryTypeAtItsLimits()
+    {
+        var catalog = ProjectSettingsCatalog.Default;
+        var appearance = new ProjectTypeAppearance
+        {
+            Label = new string('"', catalog.LabelMaxLength),
+            Plural = new string('"', catalog.PluralMaxLength),
+            Color = catalog.Colors.MaxBy(color => color.Length),
+            Icon = catalog.Icons.MaxBy(icon => icon.Length),
+        };
+        var settings = new ProjectSettings
+        {
+            Types = catalog.TypeCodes.ToDictionary(code => code, _ => appearance),
+            DefaultTimeZone = catalog.TimeZones.MaxBy(zone => zone.Length),
+            DateFormat = catalog.DateFormats.MaxBy(format => format.Length),
+            Version = long.MaxValue,
+            Modified = AuditStamp.Of(
+                new AuditActor { Kind = AuditActorKind.Account, Id = new string('"', 200), Name = new string('"', 200), Via = new string('"', 200) },
+                DateTimeOffset.MaxValue),
+        };
+
+        Bytes(settings).ShouldBeLessThanOrEqualTo(RequestBodyLimits.ProjectSettings);
+    }
+
     // Claim pointers of the longest length, each with the most values of the longest length.
     private static Dictionary<string, IReadOnlyList<string>> ClaimsAtTheirLimits()
     {

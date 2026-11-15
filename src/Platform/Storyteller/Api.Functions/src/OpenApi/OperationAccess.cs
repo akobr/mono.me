@@ -15,6 +15,8 @@ internal static class OperationAccess
         Definitions.RouteIds.Access.GetAccessPoint,
         Definitions.RouteIds.Access.UpdateAccessPoint,
         Definitions.RouteIds.Access.GetProjects,
+        Definitions.RouteIds.Access.SetProjectSettings,
+        Definitions.RouteIds.Access.PatchProjectSettings,
         Definitions.RouteIds.Access.CreateAccessPoint,
         Definitions.RouteIds.Access.GrantUserAccess,
         Definitions.RouteIds.Access.RevokeUserAccess,

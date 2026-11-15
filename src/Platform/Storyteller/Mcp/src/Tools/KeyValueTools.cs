@@ -340,9 +340,9 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
     [McpServerTool(Name = "get_key_value_audit", Title = "Get the audit trail of secrets", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(
         "Lists the audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, purged, "
-        + "re-protected, exported or imported secrets, changed the policy, the keys or the recipients, and the binding reads of "
-        + "secrets counted per hour (BindingRead with Count). Each event has Time, View, Key, Version, Protection, Operation, "
-        + "Actor, Channel and CorrelationId; never a value. Administrator only.")]
+        + "re-protected, exported or imported secrets, changed the policy, the keys, the recipients or the project "
+        + "settings, and the binding reads of secrets counted per hour (BindingRead with Count). Each event has Time, View, "
+        + "Key, Version, Protection, Operation, Actor, Channel and CorrelationId; never a value. Administrator only.")]
     public async Task<CallToolResult> GetKeyValueAudit(
         [Description(ToolText.Organization)] string organization,
         [Description(ToolText.Project)] string project,
@@ -350,8 +350,8 @@ public sealed class KeyValueTools(Sdk.IKeyValuesApiClient keyValues)
         [Description("Only events of this key.")] string? key = null,
         [Description(
             "Only this operation: Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, "
-            + "Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged "
-            + "or RecipientRemoved.")]
+            + "Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, "
+            + "RecipientRemoved or ProjectSettingsChange.")]
         string? operation = null,
         [Description("Only events at or after this time (ISO 8601; UTC when no offset is given).")] string? from = null,
         [Description("Only events before this time (ISO 8601; UTC when no offset is given).")] string? to = null,

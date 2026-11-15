@@ -20,7 +20,8 @@ public interface IAccessService
     // The owner (model.OwnerId) is not always the caller: DbCreator creates projects for an owner as System.
     Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model, AccessCaller caller);
 
-    // Every project where the account has a role, with its description, ordered by key.
+    // Every project where the account has a role, with its description and settings (the defaults when none were
+    // stored), ordered by key.
     // NotFoundException when the account doesn't exist.
     Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync(string accountId)
         => throw new NotSupportedException("This access service does not support project summaries.");

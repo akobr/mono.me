@@ -34,7 +34,7 @@ public class KeyValueAuditCommand : KeyValueCommandBase
     [Option("--key", CommandOptionType.SingleValue, Description = "Only events of this key.")]
     public string? Key { get; set; }
 
-    [Option("--operation", CommandOptionType.SingleValue, Description = "Only this operation (reveal, export, bindingread, create, update, delete, restore, permanentdelete, purge, reprotect, import, policychange, rotate, rewrap, byokverify, byokunavailable, recipientadded, recipientchanged, recipientremoved).")]
+    [Option("--operation", CommandOptionType.SingleValue, Description = "Only this operation (reveal, export, bindingread, create, update, delete, restore, permanentdelete, purge, reprotect, import, policychange, rotate, rewrap, byokverify, byokunavailable, recipientadded, recipientchanged, recipientremoved, projectsettingschange).")]
     public string? Operation { get; set; }
 
     [Option("--from", CommandOptionType.SingleValue, Description = "Only events at or after this time (ISO 8601).")]

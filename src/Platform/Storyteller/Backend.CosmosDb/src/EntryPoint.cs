@@ -147,6 +147,10 @@ public static class EntryPoint
         services.AddSingleton<IAccessAuditLog, CosmosAccessAuditLog>();
 
         services.AddSingleton<IAccessService, CosmosAccessService>();
+
+        // The settings of a project, on its access point; their changes go to the project's audit trail.
+        services.AddSingleton<IProjectSettingsService, CosmosProjectSettingsService>();
+
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();
         services.AddSingleton<IConfigurationSchemaService, CosmosConfigurationSchemaService>();

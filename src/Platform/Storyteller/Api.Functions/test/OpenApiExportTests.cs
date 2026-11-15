@@ -35,6 +35,8 @@ public class OpenApiExportTests
         Definitions.RouteIds.Access.GetAccessPoint,
         Definitions.RouteIds.Access.UpdateAccessPoint,
         Definitions.RouteIds.Access.GetProjects,
+        Definitions.RouteIds.Access.SetProjectSettings,
+        Definitions.RouteIds.Access.PatchProjectSettings,
         Definitions.RouteIds.Access.CreateAccessPoint,
         Definitions.RouteIds.Access.GrantUserAccess,
         Definitions.RouteIds.Access.RevokeUserAccess,
@@ -776,6 +778,8 @@ public class OpenApiExportTests
         PropertyNames(schemas, "ProjectSummary").ShouldBe(["Key", "Role", "Description", "Settings"], ignoreOrder: true);
         PropertyNames(schemas, "AccessPointUpdate").ShouldBe(["Description"]);
         PropertyNames(schemas, "AccessPoint").ShouldContain("Description");
+        PropertyNames(schemas, "AccessPoint").ShouldContain("Settings");
+        schemas.GetProperty("ProjectSummary").GetProperty("properties").GetProperty("Settings").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ProjectSettings");
         PropertyNames(schemas, "AccessPointCreate").ShouldContain("ProjectDescription");
         PropertyNames(schemas, "AccountCreate").ShouldContain("ProjectDescription");
     }
@@ -826,6 +830,78 @@ public class OpenApiExportTests
         RequiredNames(schemas, "Exhibition").ShouldBe(["Organization", "Project"], ignoreOrder: true);
     }
 
+    // The settings of a project (424-266): three operations of one path under the Access tag, so the C# SDK keeps them
+    // on its access client; the ETag of the reads and writes, the conditions and the answers; the merge patch with every
+    // member optional and nullable, and members that describe the catalog rather than repeat it as enums.
+    [Fact]
+    public async Task Document_ProjectSettingsOperations_ArePublished()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var get = PathOperation(document, Definitions.RouteIds.Access.GetProjectSettings);
+        var put = PathOperation(document, Definitions.RouteIds.Access.SetProjectSettings);
+        var patch = PathOperation(document, Definitions.RouteIds.Access.PatchProjectSettings);
+
+        new[] { get, put, patch }.Select(operation => $"{operation.Method.ToUpperInvariant()} {operation.Path}").ShouldBe(
+        [
+            "GET /v1/{organization}/{project}/settings",
+            "PUT /v1/{organization}/{project}/settings",
+            "PATCH /v1/{organization}/{project}/settings",
+        ]);
+
+        foreach (var (_, _, operation) in new[] { get, put, patch })
+        {
+            operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access]);
+            Reference(operation, "200").ShouldBe("#/components/schemas/ProjectSettings");
+            operation.GetProperty("responses").GetProperty("200").GetProperty("headers").TryGetProperty("ETag", out _).ShouldBeTrue();
+        }
+
+        ResponseNames(get.Operation).ShouldBe(["200", "304", "401", "403", "404", "500"], ignoreOrder: true);
+        ResponseNames(put.Operation).ShouldBe(["200", "400", "401", "403", "404", "409", "412", "413", "500"], ignoreOrder: true);
+        ResponseNames(patch.Operation).ShouldBe(["200", "400", "401", "403", "404", "409", "412", "413", "415", "500"], ignoreOrder: true);
+        get.Operation.GetProperty("responses").GetProperty("304").GetProperty("headers").TryGetProperty("ETag", out _).ShouldBeTrue();
+        HeaderParameters(get.Operation).ShouldBe([Definitions.Parameters.IfNoneMatch]);
+        HeaderParameters(put.Operation).ShouldBe([Definitions.Parameters.IfMatch]);
+        HeaderParameters(patch.Operation).ShouldBe([Definitions.Parameters.IfMatch]);
+
+        put.Operation.GetProperty("requestBody").GetProperty("content").GetProperty(Definitions.ContentTypes.Json)
+            .GetProperty("schema").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ProjectSettings");
+        var patchContent = patch.Operation.GetProperty("requestBody").GetProperty("content");
+        patchContent.EnumerateObject().Select(type => type.Name).ShouldBe([Definitions.ContentTypes.MergePatch]);
+        patchContent.GetProperty(Definitions.ContentTypes.MergePatch).GetProperty("schema").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ProjectSettingsMergePatch");
+
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        PropertyNames(schemas, nameof(ProjectSettings)).ShouldBe(["Types", "DefaultTimeZone", "DateFormat", "Version", "Modified"], ignoreOrder: true);
+        PropertyNames(schemas, nameof(ProjectTypeAppearance)).ShouldBe(["Label", "Plural", "Color", "Icon"], ignoreOrder: true);
+        var appearance = schemas.GetProperty(nameof(ProjectTypeAppearance)).GetProperty("properties");
+        appearance.GetProperty("Color").TryGetProperty("enum", out _).ShouldBeFalse();
+        appearance.GetProperty("Color").GetProperty("description").GetString()!.ShouldContain("conformance/project-settings.json");
+        schemas.GetProperty(nameof(ProjectSettings)).GetProperty("properties").GetProperty("Types")
+            .GetProperty("additionalProperties").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ProjectTypeAppearance");
+
+        var mergePatch = schemas.GetProperty("ProjectSettingsMergePatch");
+        mergePatch.TryGetProperty("required", out _).ShouldBeFalse();
+        PropertyNames(schemas, "ProjectSettingsMergePatch").ShouldBe(["Types", "DefaultTimeZone", "DateFormat"], ignoreOrder: true);
+
+        foreach (var member in mergePatch.GetProperty("properties").EnumerateObject())
+        {
+            member.Value.GetProperty("nullable").GetBoolean().ShouldBeTrue(member.Name);
+        }
+
+        var type = mergePatch.GetProperty("properties").GetProperty("Types").GetProperty("additionalProperties");
+        type.GetProperty("nullable").GetBoolean().ShouldBeTrue();
+        type.GetProperty("properties").EnumerateObject().Select(member => (member.Name, member.Value.GetProperty("nullable").GetBoolean()))
+            .ShouldBe([("Label", true), ("Plural", true), ("Color", true), ("Icon", true)]);
+
+        static List<string?> ResponseNames(JsonElement operation) => operation.GetProperty("responses").EnumerateObject().Select(response => (string?)response.Name).ToList();
+
+        static List<string?> HeaderParameters(JsonElement operation) => operation.GetProperty("parameters").EnumerateArray()
+            .Where(parameter => parameter.GetProperty("in").GetString() == "header")
+            .Select(parameter => parameter.GetProperty("name").GetString())
+            .ToList();
+    }
+
     // These handlers read their JSON bodies themselves, not through [FromBody], so [OpenApiRequestBody] alone documents
     // them: each keeps its application/json body, its schema and its required flag, and the SDKs do not change. The
     // generator writes "required" only when it is true; ExportKeyValues sets Required = false and the others nothing.
@@ -849,6 +925,7 @@ public class OpenApiExportTests
             (Definitions.RouteIds.Access.SetMemberRole, Reference("MemberRoleUpdate"), false),
             (Definitions.RouteIds.Views.CreateView, Reference("ViewCreate"), false),
             (Definitions.RouteIds.Views.UpdateView, Reference("ViewUpdate"), false),
+            (Definitions.RouteIds.Access.SetProjectSettings, Reference("ProjectSettings"), true),
             (Definitions.RouteIds.KeyValues.SetKeyValue, Reference("KeyValueWrite"), true),
             (Definitions.RouteIds.KeyValues.RestoreKeyValues, Reference("KeyValueBulkRequest"), true),
             (Definitions.RouteIds.KeyValues.PurgeKeyValues, Reference("KeyValueBulkRequest"), true),
@@ -1039,6 +1116,7 @@ public class OpenApiExportTests
             [Definitions.RouteIds.Template.RestoreTemplateVersion] = templateWrite,
             [Definitions.RouteIds.Bindings.GetBindingCatalog] = (Definitions.Descriptions.ResponseForbiddenBindingCatalog, [Scopes.Configuration.Read]),
             [Definitions.RouteIds.Views.GetViews] = (Definitions.Descriptions.ResponseForbiddenViews, [Scopes.Annotation.Read, Scopes.Configuration.Read]),
+            [Definitions.RouteIds.Access.GetProjectSettings] = (Definitions.Descriptions.ResponseForbiddenProjectSettings, [Scopes.Annotation.Read, Scopes.Configuration.Read]),
             [Definitions.RouteIds.KeyValues.GetKeyValues] = configurationRead,
             [Definitions.RouteIds.KeyValues.GetKeyValue] = secretRead,
             [Definitions.RouteIds.KeyValues.GetKeyValueVersions] = configurationRead,

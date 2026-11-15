@@ -15,6 +15,11 @@ internal static class RequestBodyLimits
     // request.
     public const int Control = 8 * 1024;
 
+    // The settings of a project: seven types of a label and a plural of 40 characters, a color and an icon, a time zone
+    // and a date format, and the read-only Version and Modified of a read sent back as it is. With every character
+    // escaped they are near 8 KiB, too close to Control.
+    public const int ProjectSettings = 16 * 1024;
+
     // A view and its description, which has no limit of its own (the admin UI takes 500 characters).
     public const int View = 64 * 1024;
 

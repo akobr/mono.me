@@ -165,10 +165,14 @@ public partial class RouteTableTests
         routes.ShouldBe(["GET v1/access/points/{}/audit"]);
     }
 
-    // "projects" is a literal segment under v1/access/; "access" is a reserved organization name.
+    // "projects" is a literal segment under v1/access/; "access" is a reserved organization name. The settings of a
+    // project are its own route, read by every member, changed by Administrators.
     [Theory]
     [InlineData("PUT v1/access/points/{}")]
     [InlineData("GET v1/access/projects")]
+    [InlineData("GET v1/{}/{}/settings")]
+    [InlineData("PUT v1/{}/{}/settings")]
+    [InlineData("PATCH v1/{}/{}/settings")]
     public void ProjectRoutes_AreRegistered(string expected)
     {
         var routes = typeof(AccessHttp).Assembly
