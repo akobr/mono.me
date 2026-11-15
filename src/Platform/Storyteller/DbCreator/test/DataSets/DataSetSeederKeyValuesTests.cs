@@ -51,14 +51,17 @@ public class DataSetSeederKeyValuesTests
         AddSet(
             Pairs(("smtp.host", "Public", "smtp.fabrikam.example"), ("smtp.port", "Public", "587")),
             ("annotations/rst.invoicing.json", "{}"),
+            ("annotations.jsonl", """{"AnnotationKey":"sbt.acme"}"""),
             ("configurations/rst.invoicing.conf.json", """{ "smtp": "@smtp.host" }"""));
-        var (importsBefore, completionsBefore) = (-1, -1);
-        _keyValues.OnImport = () => (importsBefore, completionsBefore) = (_importer.Calls.Count, _bulkWriter.Completions.Count);
+        _bulkWriter.AncestorsCreated = [];
+        var (importsBefore, linesBefore, completionsBefore) = (-1, -1, -1);
+        _keyValues.OnImport = () => (importsBefore, linesBefore, completionsBefore) = (_importer.Calls.Count, _bulkWriter.Calls.Count, _bulkWriter.Completions.Count);
 
         var run = await Seeder().SeedAsync(Request, TestContext.Current.CancellationToken);
 
-        // the annotation file and the completion of its relation arrays before the pairs, the configuration after them
-        (importsBefore, completionsBefore).ShouldBe((1, 1));
+        // the annotation file, the lines of annotations.jsonl and the completion of the relation arrays before the pairs,
+        // the configuration after them
+        (importsBefore, linesBefore, completionsBefore).ShouldBe((1, 1, 1));
         _importer.Calls.Count.ShouldBe(2);
         _importer.Calls[1].Files.Single().Path.ShouldBe("configurations/rst.invoicing.conf.json");
 
@@ -79,7 +82,7 @@ public class DataSetSeederKeyValuesTests
 
         // the record counts the pairs with the documents
         var record = _records.Records.Values.Single();
-        (record.Documents, record.Annotations, record.KeyValues, record.Created).ShouldBe((2, 0, 2, 4));
+        (record.Documents, record.Annotations, record.KeyValues, record.Created).ShouldBe((2, 1, 2, 5));
     }
 
     [Fact]
@@ -240,6 +243,57 @@ public class DataSetSeederKeyValuesTests
     }
 
     [Fact]
+    public async Task Seed_AVaultItCannotReach_FailsThePairs_AndTheSeedGoesOn()
+    {
+        AddSet(Pairs(("a", "Public", "1"), ("b", "Standard", "2")), ("configurations/rst.x.conf.json", """{ "a": 1 }"""));
+        _providers.Add(StandardProvider());
+
+        // what Azure.Core's retry policy throws for a vault it cannot reach: the failed tries
+        static AggregateException Unreachable() => new(
+            "Retry failed after 2 tries.",
+            new RequestFailedException(0, "Connection refused (127.0.0.1:8443)"),
+            new RequestFailedException(0, "Connection refused (127.0.0.1:8443)"));
+        _keyValues.WriteException = Unreachable();
+
+        var run = await Seeder().SeedAsync(Request, TestContext.Current.CancellationToken);
+
+        var set = run.Sets.Single();
+        set.Failures.Select(item => (item.KeyValueKey, item.ErrorCode, item.Message)).ShouldBe(
+        [
+            ("a", ErrorCodes.KeyEncryptionUnavailable, "The key vault failed after 2 tries: Connection refused (127.0.0.1:8443)"),
+            ("b", ErrorCodes.KeyEncryptionUnavailable, "The key vault failed after 2 tries: Connection refused (127.0.0.1:8443)"),
+        ]);
+        _importer.Calls.ShouldHaveSingleItem().Files.Single().Path.ShouldBe("configurations/rst.x.conf.json");
+        ExitCodes.Of(run).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
+
+        // the plan of a seed again decrypts stored secrets, and fails the chunk the same way
+        _keyValues.PlanException = Unreachable();
+        var again = (await Seeder().SeedAsync(Request with { Options = new DataSetSeedOptions { Again = true } }, TestContext.Current.CancellationToken)).Sets.Single();
+        again.Failures.Select(item => item.ErrorCode).ShouldBe([ErrorCodes.KeyEncryptionUnavailable, ErrorCodes.KeyEncryptionUnavailable]);
+        _keyValues.Imports.Count(call => !call.Options.DryRun).ShouldBe(1);
+
+        // an aggregate of anything else is no failure of a pair
+        _keyValues.WriteException = new AggregateException(new InvalidOperationException("The storage broke."));
+        await Should.ThrowAsync<AggregateException>(() => Seeder().SeedAsync(Request with { Options = new DataSetSeedOptions { Again = true } }, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Seed_AWriteThatFailsAfterSomeBatches_ReportsTheStoredPairsCreated()
+    {
+        AddSet(Pairs(Enumerable.Range(1, 60).Select(index => ($"key{index:00}", "Public", $"{index}")).ToArray()));
+        _keyValues.WriteException = new RequestFailedException(403, "Forbidden by the vault.");
+        _keyValues.WrittenBeforeException = 50;
+
+        var set = (await Seeder().SeedAsync(Request, TestContext.Current.CancellationToken)).Sets.Single();
+
+        // the first batch of 50 is stored, the rest failed; the listing of the active pairs tells them apart
+        set.KeyValues!.Summary.ShouldBe(new ViewImportSummary { Created = 50, Failed = 10 });
+        set.Failures.Select(item => item.KeyValueKey).ShouldBe(Enumerable.Range(51, 10).Select(index => $"key{index}"));
+        _keyValues.Pairs.Count.ShouldBe(50);
+        set.IsRecorded.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Seed_ASetWithoutPairsCallsNoImport()
     {
         AddSet(null, ("annotations/rst.x.json", "{}"));
@@ -264,7 +318,9 @@ public class DataSetSeederKeyValuesTests
         var exception = await Should.ThrowAsync<DataSetException>(() => Seeder().SeedAsync(Request, TestContext.Current.CancellationToken));
 
         exception.Message.ShouldStartWith("The set 'pairs' has 1 Standard pair in key-values.json, and DbCreator has no Standard vault to encrypt them; nothing was written.");
-        exception.Message.ShouldContain("Set AzureKeyVaults__default to the URI of the vault (locally Lowkey Vault, with KeyValues__Protection__Emulator=true)");
+        exception.Message.ShouldContain("Set AzureKeyVaults__default to the URI of the API's Standard vault");
+        exception.Message.ShouldContain("a Release build (the dotnet tool) signs in with a managed identity or AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET");
+        exception.Message.ShouldContain("a Debug build (dotnet run) also takes Lowkey Vault, with KeyValues__Protection__Emulator=true.");
         _access.Invocations.ShouldBeEmpty();
         _importer.Calls.ShouldBeEmpty();
         _keyValues.Imports.ShouldBeEmpty();

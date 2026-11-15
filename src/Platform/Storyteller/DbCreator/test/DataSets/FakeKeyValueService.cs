@@ -4,7 +4,8 @@ namespace _42.Platform.Storyteller.DbCreator.UnitTests.DataSets;
 
 // The import and the listing of one values store in memory, as CosmosKeyValueService plans them: a missing or deleted key
 // is Create, the same level, content type and value Unchanged, anything else Update. It refuses the keys it is told to
-// (KeyValueImportInvalidException, nothing written), fails the writes of others, and records every call.
+// (KeyValueImportInvalidException, nothing written), fails the writes of others, throws what it is told to (a write
+// after storing some of its items), lists the active or deleted pairs in pages, and records every call.
 internal sealed class FakeKeyValueService : IKeyValueService
 {
     public Dictionary<string, StoredPair> Pairs { get; } = new(StringComparer.Ordinal);
@@ -15,8 +16,14 @@ internal sealed class FakeKeyValueService : IKeyValueService
     // keys whose writes fail, with KeyValueBusy
     public HashSet<string> FailingWriteKeys { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    // thrown by the next write instead of writing
+    // thrown by the next write, after it stored the first WrittenBeforeException items (as the import commits batches
+    // before a later one fails)
     public Exception? WriteException { get; set; }
+
+    public int WrittenBeforeException { get; set; }
+
+    // thrown by the next plan (a dry run) instead of planning
+    public Exception? PlanException { get; set; }
 
     public List<ImportCall> Imports { get; } = [];
 
@@ -53,9 +60,21 @@ internal sealed class FakeKeyValueService : IKeyValueService
                 }).ToList());
         }
 
+        if (options.DryRun && PlanException is { } planException)
+        {
+            PlanException = null;
+            throw planException;
+        }
+
         if (!options.DryRun && WriteException is { } exception)
         {
             WriteException = null;
+
+            foreach (var item in document.Items.Take(WrittenBeforeException))
+            {
+                Pairs[KeyValueRules.Normalize(item.Key)] = new StoredPair(item, IsDeleted: false, 1);
+            }
+
             throw exception;
         }
 
@@ -91,10 +110,11 @@ internal sealed class FakeKeyValueService : IKeyValueService
     public Task<KeyValuesResponse> ListAsync(string organization, string project, string view, KeyValueListRequest request)
     {
         Lists++;
-        request.State.ShouldBe(KeyValueState.Deleted);
+        request.State.ShouldNotBe(KeyValueState.All);
+        var isDeleted = request.State == KeyValueState.Deleted;
         var skip = request.ContinuationToken is null ? 0 : int.Parse(request.ContinuationToken, System.Globalization.CultureInfo.InvariantCulture);
-        var deleted = Pairs.Values.Where(pair => pair.IsDeleted).OrderBy(pair => pair.Item.Key, StringComparer.Ordinal).ToList();
-        var page = deleted.Skip(skip).Take(PageSize).ToList();
+        var listed = Pairs.Values.Where(pair => pair.IsDeleted == isDeleted).OrderBy(pair => pair.Item.Key, StringComparer.Ordinal).ToList();
+        var page = listed.Skip(skip).Take(PageSize).ToList();
 
         return Task.FromResult(new KeyValuesResponse
         {
@@ -104,9 +124,9 @@ internal sealed class FakeKeyValueService : IKeyValueService
                 Protection = pair.Item.Protection,
                 Version = pair.Version,
                 Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UnixEpoch),
-                IsDeleted = true,
+                IsDeleted = isDeleted,
             }).ToList(),
-            ContinuationToken = skip + PageSize < deleted.Count ? (skip + PageSize).ToString(System.Globalization.CultureInfo.InvariantCulture) : null,
+            ContinuationToken = skip + PageSize < listed.Count ? (skip + PageSize).ToString(System.Globalization.CultureInfo.InvariantCulture) : null,
             Count = page.Count,
         });
     }

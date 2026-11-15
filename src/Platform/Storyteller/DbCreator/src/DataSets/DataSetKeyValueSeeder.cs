@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -64,8 +65,9 @@ public sealed class DataSetKeyValueSeeder
         var vault = _options.Protection.Standard.VaultName;
         throw new DataSetException(
             $"The set '{set.Name}' has {standard} Standard {(standard == 1 ? "pair" : "pairs")} in {DataSetKeyValues.FileName}, and DbCreator has no Standard vault to encrypt them; nothing was written. "
-            + $"Set AzureKeyVaults__{vault} to the URI of the vault (locally Lowkey Vault, with KeyValues__Protection__Emulator=true), "
-            + "for an identity with the roles the API's identity has on it (Key Vault Crypto Officer and Key Vault Crypto Service Encryption User).");
+            + $"Set AzureKeyVaults__{vault} to the URI of the API's Standard vault, for an identity with the roles the API's identity has on it (Key Vault Crypto Officer and Key Vault Crypto Service Encryption User): "
+            + "a Release build (the dotnet tool) signs in with a managed identity or AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET; "
+            + "a Debug build (dotnet run) also takes Lowkey Vault, with KeyValues__Protection__Emulator=true.");
     }
 
     // The pairs into the target in chunks of the import, in the order of the file: each chunk planned with a dry run,
@@ -105,7 +107,7 @@ public sealed class DataSetKeyValueSeeder
 
                     case KeyValueImportAction.Create:
                         // the plan restores a deleted key as it creates a missing one; only the listing tells them apart
-                        deleted ??= await GetDeletedKeysAsync(target);
+                        deleted ??= await GetKeysAsync(target, KeyValueState.Deleted);
 
                         if (deleted.Contains(KeyValueRules.Normalize(pairs.Items[index].Key)))
                         {
@@ -149,13 +151,38 @@ public sealed class DataSetKeyValueSeeder
         return new KeyValueDocument { Items = indexes.Select(index => pairs.Items[index]).ToList() };
     }
 
+    // A failure of a pair, not of the storage: an error of the platform, a ciphertext that does not decrypt, and the
+    // vault's errors, also as Azure.Core's retry policy reports a vault it cannot reach (connection refused, a name that
+    // does not resolve, a timeout): an AggregateException of the failed tries.
     private static bool IsPairFailure(Exception exception)
     {
-        return exception is StorytellerException or KeyValueIntegrityException or RequestFailedException or AuthenticationFailedException;
+        return exception is StorytellerException or KeyValueIntegrityException or RequestFailedException or AuthenticationFailedException
+            || IsVaultRetryFailure(exception);
+    }
+
+    private static bool IsVaultRetryFailure(Exception exception)
+    {
+        if (exception is not AggregateException aggregate)
+        {
+            return false;
+        }
+
+        var tries = aggregate.Flatten().InnerExceptions;
+        return tries.Count > 0
+            && tries.All(inner => inner is RequestFailedException or AuthenticationFailedException or IOException or OperationCanceledException);
     }
 
     private static PairOutcome Failed(Exception exception)
     {
+        if (IsVaultRetryFailure(exception))
+        {
+            var tries = ((AggregateException)exception).Flatten().InnerExceptions;
+            return new PairOutcome(
+                ViewImportOutcome.Failed,
+                ErrorCodes.KeyEncryptionUnavailable,
+                $"The key vault failed after {tries.Count} {(tries.Count == 1 ? "try" : "tries")}: {tries[^1].Message}");
+        }
+
         return exception switch
         {
             StorytellerException storyteller => new PairOutcome(ViewImportOutcome.Failed, storyteller.ErrorCode, storyteller.Message),
@@ -337,13 +364,23 @@ public sealed class DataSetKeyValueSeeder
         }
         catch (Exception exception) when (IsPairFailure(exception))
         {
+            // the import commits in batches of 50 and encrypts per batch, so a failure of a later batch leaves the
+            // earlier ones stored; the listing (no vault) tells them, as the pairs planned missing that are active now
             _logger.LogWarning(exception, "The write of {Count} pairs of {Target} failed.", missing.Count, target);
-            FailAll(missing, outcomes, Failed(exception));
+            var active = await GetKeysAsync(target, KeyValueState.Active);
+            var failed = Failed(exception);
+
+            foreach (var index in missing)
+            {
+                outcomes[index] = active.Contains(KeyValueRules.Normalize(pairs.Items[index].Key))
+                    ? new PairOutcome(ViewImportOutcome.Created)
+                    : failed;
+            }
         }
     }
 
-    // The normalized keys of the soft-deleted pairs of the view, every page.
-    private async Task<HashSet<string>> GetDeletedKeysAsync(DataSetTarget target)
+    // The normalized keys of the pairs of the view in the state (active or soft-deleted), every page.
+    private async Task<HashSet<string>> GetKeysAsync(DataSetTarget target, KeyValueState state)
     {
         var keys = new HashSet<string>(StringComparer.Ordinal);
         string? continuation = null;
@@ -354,7 +391,7 @@ public sealed class DataSetKeyValueSeeder
                 target.Organization,
                 target.Project,
                 target.View,
-                new KeyValueListRequest { State = KeyValueState.Deleted, ContinuationToken = continuation });
+                new KeyValueListRequest { State = state, ContinuationToken = continuation });
 
             foreach (var summary in page.Items)
             {
