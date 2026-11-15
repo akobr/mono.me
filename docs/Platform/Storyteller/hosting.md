@@ -459,7 +459,7 @@ IReadOnlyList<StorytellerExecutionContext> executions = await catalog.ListWithAn
 - **Filters.** `WithSubject`, `WithResponsibility`, `WithContext` and `WithUnit` keep the descendants whose key has that name, compared ordinally. A filter is one key segment; an empty one, or one with a `.`, throws `ArgumentException`. So does a filter of a name the descendants' keys do not have (`WithContext` on units), or one the ancestor names already (`WithResponsibility` on the executions of `rst.invoicing`).
 - **Filters run in the process.** The API has no filter of descendants, so a filter narrows what was listed, and the list costs the same.
 - **Status.** A target takes active descendants. `IncludingInactive()` adds disabled, scheduled and expired ones. Deleted ones are never listed.
-- **Active ancestors.** `RequiringActiveAncestors()` keeps, in the lists, the descendants whose ancestors are all active. `IncludingInactive()` decides about the descendant's own status, and this about its ancestors; the two combine. See [Requiring active ancestors](#requiring-active-ancestors).
+- **Active ancestors.** `RequiringActiveAncestors()` keeps the descendants whose ancestors are all active, in the lists and in a watch. `IncludingInactive()` decides about the descendant's own status, and this about its ancestors; the two combine. See [Requiring active ancestors](#requiring-active-ancestors).
 - **Immutable.** Each `With…`, `IncludingInactive()` and `RequiringActiveAncestors()` returns a new target. `Of`, `Type`, the filters, `IncludeInactive` and `RequireActiveAncestors` read it back; `ToString()` describes it: "the executions of sbt.northwind in the context production", with ", under active ancestors" at its end for a target that requires them.
 
 ### Lists
@@ -504,11 +504,12 @@ var executions = await catalog.ListAsync(StorytellerTarget.ExecutionsOf("rst.inv
 ```
 
 - **In `ListAsync` and `ListWithAncestorsAsync`**, a descendant is kept when every ancestor of its chain is active, at the time that the descendants' own status is told by. The ancestors are read as `ListWithAncestorsAsync` reads them: each distinct one once.
+- **In `WatchAsync`**, every poll reads the ancestors again. A held descendant whose ancestor is inactive or gone leaves as `Removed`, with that ancestor's key, and comes back as `Added` once all its ancestors are active. See [Watching under active ancestors](#watching-under-active-ancestors).
 - **The target's own ancestor counts.** A disabled responsibility has no executions under active ancestors.
 - **A missing ancestor** leaves its descendants out: they were deleted with it.
-- **A restricted ancestor** fails the call with a definitive `StorytellerConfigurationException`, with status `403`, `AnnotationRestricted` and the ancestor's key: whether it is active cannot be told. See [Scopes and restricted machines](#scopes-and-restricted-machines).
+- **A restricted ancestor** fails a list with a definitive `StorytellerConfigurationException`, with status `403`, `AnnotationRestricted` and the ancestor's key: whether it is active cannot be told. A watch ends with the same exception while no poll has completed, and logs it as a warning after that. See [Scopes and restricted machines](#scopes-and-restricted-machines).
 - **With `IncludingInactive()`** the inactive descendants under active ancestors are kept too.
-- **Without `RequiringActiveAncestors()`**, `ListAsync` reads no ancestor but the target's own, and `ListWithAncestorsAsync` returns every descendant of the list with its chain: the caller decides by `GetSubscriptionStatus(now, StorytellerStatusScope.Chain)`.
+- **Without `RequiringActiveAncestors()`**, `ListAsync` and `WatchAsync` read no ancestor but the target's own, and `ListWithAncestorsAsync` returns every descendant of the list with its chain: the caller decides by `GetSubscriptionStatus(now, StorytellerStatusScope.Chain)`.
 
 ### Test doubles of the catalog
 
@@ -528,7 +529,7 @@ var executions = await catalog.ListAsync(StorytellerTarget.ExecutionsOf("rst.inv
 | --- | --- |
 | `Kind` | `Added`, `Changed` or `Removed` |
 | `Annotation` | The snapshot: of a point read for `Added` and `Changed`, the one held before for `Removed` |
-| `Removal` | For `Removed`: the annotation's own key and the [reason](#the-informer) |
+| `Removal` | For `Removed`: the annotation that ended it, by its annotation key, and the [reason](#the-informer). It is the descendant itself, or for a target that [requires active ancestors](#watching-under-active-ancestors), one of them |
 
 A poll:
 
@@ -540,11 +541,44 @@ A poll:
    - a held one that is not listed any more is read, deleted ones included: gone gives `Removed` with `Missing`, deleted with `Deleted`, and, unless the target includes inactive ones, disabled, scheduled or expired with that reason. Otherwise the list missed it, and it stays without an event.
 4. **Order.** `Removed`, then `Changed`, then `Added`, each by key.
 
+A target that requires active ancestors also reads the ancestors of the descendants, between steps 2 and 3: see [Watching under active ancestors](#watching-under-active-ancestors).
+
 The interval, the jitter, the zero interval, the checks at the call, failed polls and point reads, and cancellation are those of [`WatchExecutionsAsync`](#the-informer). Each enumeration runs its own loop and holds its own annotations.
 
 - **A target that cannot work ends the watch.** A definitive failure before any poll has completed, such as an ancestor that does not exist (`404`), a `401`, or a `403` of a machine that may not list the target, is thrown from the enumeration: polling again would not fix it, and a watch that never ends would look like an empty target. A transient failure is logged and polled again.
 - **After a poll has completed**, every failure is logged and polled again, definitive ones included, as a policy may change back; what is held stays.
 - **An ancestor deleted later.** The list of a deleted ancestor answers what is not deleted under it, and a deletion cascades, so its held descendants leave as `Removed` with `Deleted`.
+
+### Watching under active ancestors
+
+A watch of a target with `RequiringActiveAncestors()` holds a descendant only while every ancestor of its chain is active:
+
+```csharp
+// The executions of the responsibility that may run. A disabled subject, an expired usage or a context that is not
+// valid yet takes its executions away, and gives them back when it is active again.
+var target = StorytellerTarget.ExecutionsOf("rst.invoicing").RequiringActiveAncestors();
+
+await foreach (var change in catalog.WatchAsync(target, TimeSpan.FromMinutes(1), cancellationToken))
+{
+    // Removed exe.northwind.invoicing.production: sbt.northwind is Disabled
+    Console.WriteLine(change.Removal is { } removal
+        ? $"{change.Kind} {change.Annotation.AnnotationKey}: {removal.AnnotationKey} is {removal.Reason}"
+        : $"{change.Kind} {change.Annotation.AnnotationKey}");
+}
+```
+
+A change of an ancestor moves no fingerprint of its descendants, so there is nothing to diff it by. Every poll reads the ancestors again, after the list and before the diff: each distinct ancestor of the held and of the listed descendants once, in any status but deleted, within the 4 reads at once of the poll. Their status is told by the process's clock, at one time per poll. Until a poll has completed, the read of step 1 of [a poll](#watching-a-target) serves for the target's own ancestor, so that one is read before the list.
+
+- **Removed.** A held descendant whose ancestor is disabled, scheduled, expired or missing leaves as `Removed`. Its `Removal` has the ancestor's annotation key, such as `sbt.northwind`, and the ancestor's reason. A descendant that is still listed is not read for it, and is not `Changed` in that poll.
+- **The nearest ancestor is named.** With several such ancestors it is the first one in [the chain order](#the-chain): for an execution the context, then the usage, the subject and the responsibility.
+- **The descendant's own end goes first**, as the execution goes before the usage in a subscription. A held descendant that is not listed any more is read as in any watch, and what that read tells (deleted, missing or inactive) names the descendant itself. An ancestor is named when the descendant itself stays. When that read fails, nothing is told in that poll, also under an inactive ancestor: the next poll reads it again.
+- **A deleted ancestor.** A deletion cascades, so its descendants leave with their own key and `Deleted`. An ancestor is read without deleted ones, so one that is deleted while its descendant still stands gives `Missing`.
+- **Added.** A listed descendant that is not held is read, and `Added`, only when all its ancestors are active. Under an inactive or a missing ancestor it is not read at all. So the first poll adds only the descendants under active ancestors, and a later poll adds the others once all their ancestors are active.
+- **Time counts.** An `ExpiresAt` of an ancestor that passes removes its descendants at the next poll, and a `ValidFrom` that passes adds them, without a write.
+- **A failed read of an ancestor**, with any failure but a `404`, is no answer. The descendants under that ancestor stay as they are: a held one is not removed for any of its ancestors, also not for another one that was read as inactive, and still follows its own diff (`Changed`, or `Removed` by its own read), and one that is not held is not added, nor read. The read logs a warning, and the next poll decides again. With a zero interval there is no next poll: the descendants under that ancestor are left out, as one whose own read failed is.
+- **A definitive failure before the first completed poll** fails that poll, so the watch ends as it does for [a target that cannot work](#watching-a-target): a `401`, a `403`, and an ancestor that the machine may not read, which throws the exception that a list throws (see [Scopes and restricted machines](#scopes-and-restricted-machines)). After a poll has completed it is logged as any failed read of an ancestor, and the watch polls again.
+- **The order of events** does not change: `Removed`, then `Changed`, then `Added`, each by key. The removals for an ancestor and those of a descendant's own read are one group.
+- **With `IncludingInactive()`** an inactive descendant is held while its ancestors are active, and an inactive ancestor still ends it.
 
 ### Freshness
 
@@ -594,7 +628,7 @@ A **subscription** of responsibility R in context C is an execution `exe.{subjec
 | `Expired` | Has an `ExpiresAt` at or before now |
 | `Missing` | Answered `404`: purged, or gone without a trace of a deletion |
 
-The execution is checked before the usage.
+The execution is checked before the usage. In a watch of a target of `IStorytellerCatalog`, the annotation that ended it is the descendant itself, or for a target that requires active ancestors, one of them: see [Watching under active ancestors](#watching-under-active-ancestors).
 
 - **The scope.** The organization, project and view come from the options' `Key`, which may be any full key of the view, for example `@house.main.default.rst.invoicing` for a worker. Without a `Key`, the call throws `StorytellerConfigurationException` naming `STORYTELLER_KEY`.
 - **Names.** `responsibility` and `context` are names, one key segment each, compared ordinally. An empty name, or one with a `.`, throws `ArgumentException`. The arguments are checked at the call, not at the first `MoveNextAsync`.
@@ -805,7 +839,7 @@ The subscriptions' documents are not served by `IStorytellerDocuments`. Its `Get
 - **A worker's machine.** `sform account machine create -a rst.invoicing` restricts a machine to the responsibility. It lists and reads the executions and usages of `rst.invoicing`, and their configurations. Add `--scope secrets-read` when the documents need their secrets.
 - **What a restricted machine can target.** A machine restricted to an annotation reads that annotation and its descendants. Its targets are that annotation and the annotations under it: one restricted to `rst.invoicing` lists the units and executions of `rst.invoicing`, and the units of execution of `exe.northwind.invoicing.production`. It cannot target an ancestor of its annotation, nor the other descendants of that ancestor: a machine restricted to `usg.northwind.invoicing` cannot list the executions of `sbt.northwind`. The read answers `403 AnnotationRestricted`, which throws a `StorytellerConfigurationException` saying that listing needs a machine restricted to the ancestor or to an annotation above it, or an unrestricted one.
 - **The ancestors a restricted machine may not read.** `GetWithAncestorsAsync` and `ListWithAncestorsAsync` put them in `Unreadable`, as who am I does. A machine restricted to `rst.invoicing` gets the executions of `rst.invoicing` with the responsibility and their usages, which it may read, and without their subjects and contexts, which are not under `rst.invoicing`. Their status in the `Chain` scope is then `Unknown` while everything that was read is active.
-- **Requiring active ancestors needs a machine that may read them.** A list of a target with `RequiringActiveAncestors()` fails when the machine may not read an ancestor of a descendant: a definitive `StorytellerConfigurationException` with status `403` and `AnnotationRestricted`, whose `Key` is the ancestor's, and whose message says so. The executions of a responsibility need an unrestricted machine, as their subjects and contexts are not under the responsibility. A restricted machine can require active ancestors where every ancestor is the annotation it is restricted to, or under it: one restricted to `rst.invoicing` for the units of `rst.invoicing`, but not for its usages or executions.
+- **Requiring active ancestors needs a machine that may read them.** A list of a target with `RequiringActiveAncestors()` fails when the machine may not read an ancestor of a descendant: a definitive `StorytellerConfigurationException` with status `403` and `AnnotationRestricted`, whose `Key` is the ancestor's, and whose message says so. A watch of such a target ends with the same exception while no poll has completed. After a completed poll it logs a warning with that message at every poll, keeps the held descendants under that ancestor, and adds none under it. The executions of a responsibility need an unrestricted machine, as their subjects and contexts are not under the responsibility. A restricted machine can require active ancestors where every ancestor is the annotation it is restricted to, or under it: one restricted to `rst.invoicing` for the units of `rst.invoicing`, but not for its usages or executions.
 - **A machine restricted to its execution** gets who am I without ancestors and the status `Unknown`, and cannot run the informer. The informer's first read, of `rst.{responsibility}`, answers `403` `AnnotationRestricted`, so every poll fails with "The machine may not read …" before any list is requested. The failure is definitive: `WaitUntilReadyAsync`, and a start with `WaitUntilReadyOnStart`, throw it.
 
 See [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines) and [Scopes of machines](authentication.md#scopes-of-machines).
@@ -819,7 +853,7 @@ See [Annotation restriction of machines](authentication.md#annotation-restrictio
 | Category | Logs |
 | --- | --- |
 | `_42.Platform.Storyteller.Sdk.Hosting.ExecutionContext` | Information: the ancestors the machine may not read. Warning: a failed background read, a key that is gone. Error: an unexpected failure of a background read. |
-| `_42.Platform.Storyteller.Sdk.Hosting.Informer` | Warning: a failed poll, a failed point read, executions only in other contexts. Debug: a subscription or an annotation the list missed, an annotation gone since the list. The informers of `IStorytellerCatalog.WatchAsync`, of `WatchExecutionsAsync` and of the subscriptions log here. |
+| `_42.Platform.Storyteller.Sdk.Hosting.Informer` | Warning: a failed poll, a failed point read, a failed read of an ancestor that a target requires active, executions only in other contexts. Debug: a subscription or an annotation the list missed, an annotation gone since the list, a descendant that is not added for an ancestor. The informers of `IStorytellerCatalog.WatchAsync`, of `WatchExecutionsAsync` and of the subscriptions log here. |
 | `_42.Platform.Storyteller.Sdk.Hosting.Subscriptions` | Information: the counts of a poll that changed something. Warning: a failed read of a document, a listener or named options that failed. Error: an informer that broke. |
 | `_42.Platform.Storyteller.Sdk.Configuring.StorytellerDocuments` | The reads of the documents, as for `IStorytellerDocuments` |
 
@@ -837,7 +871,8 @@ See [Annotation restriction of machines](authentication.md#annotation-restrictio
 - `ListAsync`: one read of the ancestor, one request per page of its descendants of the type, and one point read per descendant that passes the filters, 4 at a time. The filters run in the process, so the pages list every descendant of the type, and `ListAsync(StorytellerTarget.ExecutionsOf("rst.…"))` of a responsibility with thousands of executions makes thousands of reads. Target the narrowest ancestor that holds what you need (`usg.{S}.{R}` rather than `rst.{R}` with a subject filter), and prefer `WatchAsync`, which reads again only what changed;
 - `GetWithAncestorsAsync`: one read of the key and one of each ancestor, on every call: 5 for an execution, 7 for a unit of execution, 1 for a responsibility or a subject;
 - `ListWithAncestorsAsync`, and `ListAsync` of a target that requires active ancestors: the cost of `ListAsync`, and one point read of each distinct ancestor of the descendants it kept, 4 at a time. The executions of `rst.R` of 10 subjects in 20 contexts cost the pages of the list, 20 point reads of the executions, and 1 + 10 + 10 + 20 reads of the responsibility, the subjects, the usages and the contexts. The read of the responsibility is the one that `ListAsync` makes anyway, so the ancestors add 40 reads. Nothing is cached between two calls;
-- a poll of `WatchAsync`: one request per page, one read of the ancestor until a poll has completed, and point reads for changes only: one per added, changed or removed annotation.
+- a poll of `WatchAsync`: one request per page, one read of the ancestor until a poll has completed, and point reads for changes only: one per added, changed or removed annotation;
+- a poll of `WatchAsync` of a target that requires active ancestors: the same, and one point read of each distinct ancestor of the held and of the listed descendants, in every poll, as a change of an ancestor moves no fingerprint of its descendants. The executions of `rst.R` of 10 subjects in 20 contexts cost 1 + 10 + 10 + 20 reads of ancestors per poll, also when nothing changed. Until a poll has completed, the read of the target's ancestor is the one that the poll makes anyway. A listed descendant that leaves for an ancestor is not read, and neither is a listed one that is not held under an inactive ancestor. Poll such a target less often, or target a narrower ancestor.
 
 **Limits:**
 

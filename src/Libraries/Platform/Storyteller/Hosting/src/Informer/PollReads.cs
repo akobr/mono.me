@@ -21,7 +21,8 @@ internal static class PollReads
 
     // Why a confirmation read ends a held annotation; null while it stays. annotation: null for a read that answered 404.
     // includeInactive: disabled, scheduled and expired ones stay. A failure other than a 404 has no answer and is handled
-    // before.
+    // before. The read of an ancestor that a target requires active ends the descendants under it by the same reasons,
+    // never with includeInactive.
     public static StorytellerRemovalReason? ReasonOf(StorytellerAnnotation? annotation, bool includeInactive, DateTimeOffset now)
     {
         if (annotation is null)
