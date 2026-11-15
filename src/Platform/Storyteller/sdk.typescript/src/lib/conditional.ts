@@ -5,6 +5,16 @@ import type { Configuration } from '../generated/model'
 import { StorytellerError } from './errors'
 import { readBody, runRequest, type StorytellerRequestInit } from './fetcher'
 
+/**
+ * Why a resolved read left its secret bindings unresolved (X-2S-Secrets-Withheld); the read is a 200 either way, and the
+ * header holds one reason:
+ * - mtls-required: a machine with Secrets.Read but no mTLS, when the project delivers secrets only over mTLS;
+ * - actor-restricted: a user acting through an actor (the MCP server) whose restrictions withhold secret values;
+ * - step-up-required: a user whose role reads secrets, but whose last sign-in is older than the API's step-up window.
+ * Any other value is a reason of a newer API.
+ */
+export type SecretsWithheldReason = 'mtls-required' | 'actor-restricted' | 'step-up-required' | (string & {})
+
 export interface ConditionalResult<T> {
   status: 200 | 304
   notModified: boolean
@@ -14,8 +24,11 @@ export interface ConditionalResult<T> {
   value?: T
   /** no-store on a resolved read by a caller that may read secrets, otherwise private, no-cache. */
   cacheControl?: string
-  /** mtls-required on every resolved read by a machine with Secrets.Read but no mTLS when the project requires it for secrets. */
-  secretsWithheld?: string
+  /**
+   * Why a resolved read left its secret bindings unresolved (SecretsWithheldReason); undefined when nothing was withheld
+   * or the header is not readable (cross-origin without exposure).
+   */
+  secretsWithheld?: SecretsWithheldReason
 }
 
 /** The options of storytellerFetch (RequestInit, timeoutMs) and the tag of the last read. */

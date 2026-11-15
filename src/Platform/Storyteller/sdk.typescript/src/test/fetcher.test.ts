@@ -1,7 +1,19 @@
 import { getEventListeners } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { configureStoryteller, getStorytellerConfig, runRequest, storytellerFetch, type StorytellerConfig } from '../lib/fetcher'
-import { hasErrorCode, isAborted, isForbidden, isPreconditionFailed, isTimedOut, isTransientError, StorytellerError } from '../lib/errors'
+import {
+  hasErrorCode,
+  isAborted,
+  isForbidden,
+  isPreconditionFailed,
+  isStepUpRequired,
+  isTimedOut,
+  isTransientError,
+  isUnauthorized,
+  stepUpMaxAge,
+  stepUpRequiredCode,
+  StorytellerError,
+} from '../lib/errors'
 import { deleteAnnotation } from '../generated/client/annotations/annotations'
 import { getViewExportArchive, startViewExport, startViewImport } from '../generated/client/transfers/transfers'
 
@@ -268,13 +280,31 @@ describe('storytellerFetch', () => {
   })
 
   it('cancels the body of the rejected 401 response before retrying', async () => {
-    const rejected = new Response('{"Message":"expired"}', { status: 401, headers: { 'content-type': 'application/json' } })
+    // A body that is not JSON is never cloned for the step-up check, so the spy sits on the stream the retry cancels.
+    const rejected = new Response('expired', { status: 401, headers: { 'content-type': 'text/plain' } })
     const cancel = vi.spyOn(rejected.body!, 'cancel')
     const { fetch } = fakeFetch(rejected, json({ Id: 'user-1' }))
     configure({ fetch, getAccessToken: () => 'token' })
 
     await expect(storytellerFetch('/v1/access/account')).resolves.toEqual({ Id: 'user-1' })
     expect(cancel).toHaveBeenCalledOnce()
+  })
+
+  it('cancels the body of a rejected 401 with JSON after the step-up check read its clone', async () => {
+    // The check reads a clone, which tees the body: the response's own branch (its body after the clone) is cancelled.
+    const rejected = new Response('{"Message":"expired"}', { status: 401, headers: { 'content-type': 'application/json' } })
+    const cancel = vi.spyOn(ReadableStream.prototype, 'cancel')
+    const onStepUpRequired = vi.fn()
+    const { fetch } = fakeFetch(rejected, json({ Id: 'user-1' }))
+    configure({ fetch, getAccessToken: () => 'token', onStepUpRequired })
+
+    try {
+      await expect(storytellerFetch('/v1/access/account')).resolves.toEqual({ Id: 'user-1' })
+      expect(cancel.mock.contexts).toEqual([rejected.body])
+      expect(onStepUpRequired).not.toHaveBeenCalled()
+    } finally {
+      cancel.mockRestore()
+    }
   })
 
   it('encodes path parameters of the generated functions, so "#", "?" and "%" stay in the key', async () => {
@@ -331,6 +361,139 @@ describe('storytellerFetch', () => {
 
   it('requires configuration first', () => {
     expect(getStorytellerConfig().baseUrl).toBe('http://unused')
+  })
+})
+
+const stepUpMessage = 'This operation needs a recent sign-in: sign in again, then repeat it. A sign-in counts for 10 minutes.'
+
+/** The API's 401 of an operation that needs a recent sign-in: the ErrorResponse and the RFC 9470 challenge. */
+const stepUp = (maxAge = 600) =>
+  new Response(JSON.stringify({ Message: stepUpMessage, ErrorCode: 'StepUpRequired', Details: { MaxAge: maxAge } }), {
+    status: 401,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'www-authenticate': `Bearer error="insufficient_user_authentication", error_description="A recent sign-in is required", max_age="${maxAge}"`,
+    },
+  })
+
+describe('storytellerFetch step-up', () => {
+  it('fails a step-up 401 at once: no refresh, no retry, no onUnauthorized, but onStepUpRequired', async () => {
+    const getAccessToken = vi.fn(() => 'token')
+    const onUnauthorized = vi.fn()
+    const onStepUpRequired = vi.fn()
+    const { fetch, calls } = fakeFetch(stepUp())
+    configure({ fetch, getAccessToken, onUnauthorized, onStepUpRequired })
+
+    const error = await storytellerFetch('/v1/acme/billing/default/key-values/db.password?reveal=true').catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(StorytellerError)
+    expect(error).toMatchObject({ status: 401, errorCode: 'StepUpRequired', message: stepUpMessage })
+    expect(isStepUpRequired(error)).toBe(true)
+    expect(isUnauthorized(error)).toBe(true)
+    expect(stepUpMaxAge(error)).toBe(600)
+    expect(calls).toHaveLength(1)
+    expect(getAccessToken.mock.calls).toEqual([[{ forceRefresh: false }]])
+    expect(onUnauthorized).not.toHaveBeenCalled()
+    expect(onStepUpRequired).toHaveBeenCalledExactlyOnceWith(error)
+  })
+
+  it('classifies the retried response the same way', async () => {
+    const onUnauthorized = vi.fn()
+    const onStepUpRequired = vi.fn()
+    const { fetch, calls } = fakeFetch(new Response(null, { status: 401 }), stepUp(300))
+    configure({ fetch, getAccessToken: () => 'token', onUnauthorized, onStepUpRequired })
+
+    const error = await storytellerFetch('/v1/access/points/acme/members/user_1', { method: 'PUT' }).catch((caught: unknown) => caught)
+
+    expect(calls).toHaveLength(2)
+    expect(isStepUpRequired(error)).toBe(true)
+    expect(stepUpMaxAge(error)).toBe(300)
+    expect(onStepUpRequired).toHaveBeenCalledOnce()
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
+
+  it('calls onStepUpRequired also without a token provider', async () => {
+    const onStepUpRequired = vi.fn()
+    const { fetch, calls } = fakeFetch(stepUp())
+    configure({ fetch, onStepUpRequired })
+
+    await expect(storytellerFetch('/v1/a')).rejects.toMatchObject({ status: 401, errorCode: 'StepUpRequired' })
+    expect(calls).toHaveLength(1)
+    expect(onStepUpRequired).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the usual path for every other 401, and read still gets the whole body', async () => {
+    const onUnauthorized = vi.fn()
+    const onStepUpRequired = vi.fn()
+    const rejected = () => json({ Message: 'The credentials were not accepted.', ErrorCode: 'AccessDenied' }, 401)
+    const { fetch, calls } = fakeFetch(rejected(), rejected(), rejected(), new Response('{"Message":', { status: 401, headers: { 'content-type': 'application/json' } }), json({ ok: true }))
+    configure({ fetch, getAccessToken: () => 'token', onUnauthorized, onStepUpRequired })
+
+    // the body of the second 401 was read on a clone and is still whole for the error
+    const error = await storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ status: 401, errorCode: 'AccessDenied', message: 'The credentials were not accepted.' })
+    expect(isStepUpRequired(error)).toBe(false)
+    expect(stepUpMaxAge(error)).toBeUndefined()
+    expect(calls).toHaveLength(2)
+    expect(onUnauthorized).toHaveBeenCalledOnce()
+
+    // without a token provider, read gets the original as it was
+    configure({ fetch, onStepUpRequired })
+    await expect(storytellerFetch('/v1/b')).rejects.toMatchObject({ status: 401, message: 'The credentials were not accepted.' })
+
+    // a JSON body that does not parse is no step-up either
+    configure({ fetch, getAccessToken: () => 'token', onStepUpRequired })
+    await expect(storytellerFetch('/v1/c')).resolves.toEqual({ ok: true })
+    expect(onStepUpRequired).not.toHaveBeenCalled()
+  })
+
+  it('reads the body of a 401 within the deadline, and a step-up read through runRequest fails as well', async () => {
+    useFakeTimers()
+    const stalled401 = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"ErrorCode":'))
+        },
+      }),
+      { status: 401, headers: { 'content-type': 'application/json' } },
+    )
+    const onStepUpRequired = vi.fn()
+    const { fetch, calls } = fakeFetch(stalled401, stepUp())
+    configure({ fetch, getAccessToken: () => 'token', onStepUpRequired, timeoutMs: 1000 })
+
+    const pending = storytellerFetch('/v1/a').catch((caught: unknown) => caught)
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(await pending).toMatchObject({ status: 0, timedOut: true, message: 'The Storyteller API did not answer within 1 s (/api/v1/a).' })
+    expect(calls).toHaveLength(1)
+    expect(onStepUpRequired).not.toHaveBeenCalled()
+
+    // runRequest (the conditional reads) never hands a step-up 401 to its read
+    const read = vi.fn(async () => 'read')
+    const error = await runRequest('/v1/b', {}, read).catch((caught: unknown) => caught)
+    expect(isStepUpRequired(error)).toBe(true)
+    expect(read).not.toHaveBeenCalled()
+    expect(onStepUpRequired).toHaveBeenCalledOnce()
+  })
+})
+
+const errorOf = (status: number, body: unknown) => StorytellerError.fromResponse(status, '', body)
+
+describe('step-up errors', () => {
+  it('tells a step-up by its status and code, and reads MaxAge only from its Details', () => {
+    expect(isStepUpRequired(errorOf(401, { ErrorCode: 'StepUpRequired' }))).toBe(true)
+    expect(isStepUpRequired(errorOf(403, { ErrorCode: 'StepUpRequired' }))).toBe(false)
+    expect(isStepUpRequired(errorOf(401, { ErrorCode: 'AccessDenied' }))).toBe(false)
+    expect(isStepUpRequired(errorOf(401, undefined))).toBe(false)
+    expect(isStepUpRequired(new Error('StepUpRequired'))).toBe(false)
+
+    expect(stepUpMaxAge(errorOf(401, { ErrorCode: 'StepUpRequired', Details: { MaxAge: 0 } }))).toBe(0)
+    expect(stepUpMaxAge(errorOf(401, { ErrorCode: 'StepUpRequired' }))).toBeUndefined()
+    expect(stepUpMaxAge(errorOf(401, { ErrorCode: 'StepUpRequired', Details: { MaxAge: '600' } }))).toBeUndefined()
+    expect(stepUpMaxAge(errorOf(401, { ErrorCode: 'StepUpRequired', Details: { MaxAge: 1.5 } }))).toBeUndefined()
+    expect(stepUpMaxAge(errorOf(401, { ErrorCode: 'StepUpRequired', Details: { MaxAge: -1 } }))).toBeUndefined()
+    expect(stepUpMaxAge(errorOf(403, { ErrorCode: 'StepUpRequired', Details: { MaxAge: 600 } }))).toBeUndefined()
+    expect(stepUpRequiredCode).toBe('StepUpRequired')
   })
 })
 

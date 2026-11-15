@@ -54,7 +54,7 @@ etag = response.ETag;             // W/"r.…", sent back as it is
 
 * `ifNoneMatch` is optional and sent unchanged as `If-None-Match`; `null` (the default) or an empty string sends none.
 * A `304` returns with `IsNotModified` and no `Result`; it does not throw. Every other status throws what `GetConfigurationAsync` and `GetResolvedConfigurationAsync` throw for it, with the same messages: `ApiException<ErrorResponse>` for a `400`, `403`, `404` with a body, `422` or `500`, and a plain `ApiException` for a `401`, a `404` without a body (a missing configuration) and anything else. A `422` is a format error (`format.<rule>`) on both reads, and on the resolved read also a binding that fails (`binding.evaluation`, `binding.limit.<kind>`).
-* `ConditionalResponse<T>` keeps the headers of a `200` and a `304`: `ETag` (raw, weak prefix included), `CacheControl` (raw), `IsNoStore`, `SecretsWithheld` (`X-2S-Secrets-Withheld`: `mtls-required` for a machine with `Secrets.Read` but no certificate), and all `Headers`, with case-insensitive names. `Cache-Control` and `X-2S-Secrets-Withheld` depend on the caller's rights, not on the document: a caller that may read secrets gets `no-store` on every resolved read.
+* `ConditionalResponse<T>` keeps the headers of a `200` and a `304`: `ETag` (raw, weak prefix included), `CacheControl` (raw), `IsNoStore`, `SecretsWithheld` (`X-2S-Secrets-Withheld`, one of `SecretsWithheldReasons`: `mtls-required` for a machine with `Secrets.Read` but no certificate, `actor-restricted` for a person through an actor under `NoSecretReveal`, `step-up-required` for a person whose sign-in is not recent; see [Step-up](#step-up)), and all `Headers`, with case-insensitive names. `Cache-Control` and `X-2S-Secrets-Withheld` depend on the caller's rights, not on the document: a caller that may read secrets gets `no-store` on every resolved read.
 * Date-like strings of `Content` stay strings, as in the other reads of the client.
 * The client keeps no state of a read; one instance serves concurrent calls.
 
@@ -131,6 +131,22 @@ if (!patch.IsEmpty)
 **A breaking change of 0.10.31:** the generated `SetAnnotationAsync` takes `body` as a required argument, and `if_Match` and `if_None_Match` come before `cancellationToken`. A call that passed its cancellation token by position, `SetAnnotationAsync(organization, project, view, key, body, cancellationToken)`, no longer compiles: pass it by name (`cancellationToken: cancellationToken`). A test double that overrides the method or a Moq setup of it needs the two new arguments.
 
 The generated `SetAnnotationAsync(organization, project, view, key, body, if_Match, if_None_Match)` sends the same conditions, by `POST`, and throws `ApiException<ErrorResponse>` for a `412`, but it returns the body without the `ETag`. The generated `PatchAnnotationAsync(organization, project, view, key, body, if_Match)` sends an `AnnotationMergePatch` as a merge patch: it sets members, values and the whole `Labels`, but it cannot clear anything, because the DTO leaves its `null`s out. Use `PatchAnnotationVersionedAsync` with a `JObject` or an `AnnotationJsonPatch` to clear.
+
+## Step-up
+
+The API needs a recent sign-in of a user for secret values, role and member changes and machine credentials ([Recent sign-in](../../../../docs/Platform/Storyteller/authentication.md#recent-sign-in-step-up)). A user whose sign-in is older than the window gets `401` with the `ErrorCode` `StepUpRequired`, the window in `Details.MaxAge` and `WWW-Authenticate: Bearer error="insufficient_user_authentication", max_age`. The operations that answer it document that `401` with an `ErrorResponse`, so the generated methods throw `ApiException<ErrorResponse>` for it; any other `401` has no body and stays a plain `ApiException`. `StepUp.cs` tells them apart:
+
+```csharp
+catch (ApiException e) when (e.IsStepUpRequired(out var maxAge))
+{
+    // Sign the person in again (with max_age where the provider takes it), then repeat the call.
+}
+```
+
+* `IsStepUpRequired(out TimeSpan? maxAge)` is true for a `401` whose error code is `StepUpRequired`, in the typed result or in the JSON text of a plain `ApiException`, or whose `WWW-Authenticate` names `insufficient_user_authentication` (`StepUp.ErrorCode`, `StepUp.ChallengeError`). `maxAge` is the challenge's `max_age`, quoted or not, else `Details.MaxAge`, else `null`. `IsStepUpRequired()` drops the window.
+* A refresh of the token does not help: it keeps the time of the sign-in.
+* Machines never get it, so the [machine credentials](#machine-credentials) and their handler are not affected.
+* `SecretsWithheldReasons` holds the values of `X-2S-Secrets-Withheld`: `MtlsRequired`, `ActorRestricted` and `StepUpRequired`. A resolved read under the step-up answers `200` with the secret bindings unresolved and `step-up-required`.
 
 ## Credentials
 
