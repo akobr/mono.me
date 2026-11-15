@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using _42.Platform.Cli.Commands.Storyteller;
 using McMaster.Extensions.CommandLineUtils;
-using McMaster.Extensions.CommandLineUtils.HelpText;
 using Shouldly;
 using Xunit;
 
@@ -14,8 +12,6 @@ namespace _42.Platform.Cli.UnitTests.Commands;
 // detail at the end of their own help, after the options. Rendered at 80 columns, the width of a redirected output.
 public class TransferHelpTests
 {
-    private const int Width = 80;
-
     // The detail is written as it is, without wrapping, so it is wrapped by hand for an 80-column terminal.
     private const int DetailWidth = 79;
 
@@ -125,31 +121,11 @@ public class TransferHelpTests
     // The command of sform story at the path, for example "kv export".
     private static CommandLineApplication Command(string path)
     {
-        var story = new CommandLineApplication<StorytellerListCommand>();
-        story.Conventions.UseDefaultConventions();
-
-        CommandLineApplication command = story;
-
-        foreach (var name in HelpTexts.Words(path))
-        {
-            command = command.Commands.Single(subcommand => subcommand.Name == name);
-        }
-
-        return command;
+        return HelpTexts.Command<StorytellerListCommand>(path);
     }
 
     private static List<string> Render(CommandLineApplication command)
     {
-        using var writer = new StringWriter();
-        new FixedWidthHelp().Generate(command, writer);
-        return HelpTexts.Lines(writer.ToString());
-    }
-
-    private sealed class FixedWidthHelp : DefaultHelpTextGenerator
-    {
-        public FixedWidthHelp()
-        {
-            MaxLineLength = Width;
-        }
+        return HelpTexts.Render(command);
     }
 }
