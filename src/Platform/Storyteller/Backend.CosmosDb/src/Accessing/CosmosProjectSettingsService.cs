@@ -94,7 +94,7 @@ public sealed class CosmosProjectSettingsService : IProjectSettingsService
             project,
             condition,
             caller,
-            stored => Valid(ProjectSettingsJson.Read(ProjectSettingsJson.ApplyMergePatch(ProjectSettingsJson.ToJson(stored, ProjectSettingsJsonShape.Api), patch))),
+            stored => Valid(ProjectSettingsJson.ReadMergePatch(stored, patch)),
             cancellationToken);
     }
 

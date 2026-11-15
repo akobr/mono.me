@@ -420,6 +420,29 @@ public class ProjectSettingsHttpTests
             .ShouldBe([ProjectSettingsRules.PluralWithoutLabel, ProjectSettingsRules.TimeZone], ignoreOrder: true);
     }
 
+    // Names of the patch that differ only in case are refused as PUT refuses them (the parse refuses only exact
+    // duplicates), at the root, under Types and in a type; the stored settings stay.
+    [Theory]
+    [InlineData("""{ "DateFormat": "dd.mm.yyyy", "dateFormat": "mm/dd/yyyy" }""", "$.DateFormat", ProjectSettingsRules.CaseCollision)]
+    [InlineData("""{ "Types": { "sbt": { "Color": "pink" }, "SBT": null } }""", "$.Types.sbt", ProjectSettingsRules.TypeCode)]
+    [InlineData("""{ "Types": { "sbt": { "Color": "pink", "COLOR": "blue" } } }""", "$.Types.sbt.Color", ProjectSettingsRules.CaseCollision)]
+    public async Task Patch_WithNamesThatDifferOnlyInCase_IsABadRequestAsPut(string body, string path, string rule)
+    {
+        var settings = new FakeProjectSettings { Stored = Stored };
+        var http = Http(settings, new RoleAccess(AccountRole.Administrator));
+
+        var patched = await http.PatchProjectSettings(WithContext(MergePatchRequest(body)), Org, Project);
+        var put = await http.SetProjectSettings(WithContext(TestRequests.User("PUT", body)), Org, Project);
+
+        foreach (var result in new[] { patched, put })
+        {
+            BadRequest(result, ErrorCodes.InvalidSettings).Details.ShouldBeAssignableTo<IReadOnlyList<ProjectSettingsProblem>>().ShouldNotBeNull()
+                .Select(problem => (problem.Path, problem.Rule)).ShouldBe([(path, rule)]);
+        }
+
+        settings.Stored.ShouldBe(Stored);
+    }
+
     private static ProjectSettingsHttp Http(IProjectSettingsService settings, IAccessService access) => new(settings, access);
 
     private static TestHttpRequestData MergePatchRequest(string body) => PatchRequest(body, "application/merge-patch+json");
@@ -490,7 +513,7 @@ public class ProjectSettingsHttpTests
             Calls.Add($"patch:{organization}.{project}");
             (LastPatch, LastCondition, LastCaller) = (patch, condition, caller);
             EnsureHolds(condition);
-            return Task.FromResult(Write(condition, ProjectSettingsJson.Read(ProjectSettingsJson.ApplyMergePatch(ProjectSettingsJson.ToJson(Stored, ProjectSettingsJsonShape.Api), patch))));
+            return Task.FromResult(Write(condition, ProjectSettingsJson.ReadMergePatch(Stored, patch)));
         }
 
         private void EnsureHolds(ProjectSettingsCondition condition)
