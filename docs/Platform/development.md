@@ -196,7 +196,8 @@ DbCreator (`2sInitDb`) seeds [data sets](Storyteller/data-sets.md), folders in t
 | Set | Into | Seeded by |
 | --- | --- | --- |
 | `core` | `42dotnet` / `main` / `default` | Every run of `db-creator` (`2sInitDb`) |
-| `showcase` | `fabrikam` / `invoicing-suite` / `default` | `db-seed` (`2sInitDb seed showcase`) |
+| `showcase` (with 10 key/value pairs) | `fabrikam` / `invoicing-suite` / `default` | `db-seed` (`2sInitDb seed showcase`) |
+| `exhibit` (the demo of Acme Corp and Globex) | `fourth-wall` / `toons-and-tyrants` / `default` | `2sInitDb seed exhibit`, with the vault below |
 | `large` (16,017 annotations) | `acme` / `billing` / `default` | `2sInitDb seed large` |
 | `playground` | `42dotnet` / `main` / `default` | `2sInitDb seed --path src/Platform/Storyteller/Playground/data` |
 | `exhibit` | `fourth-wall` / `toons-and-tyrants` / `default` | `2sInitDb seed exhibit`, see [The exhibition](#the-exhibition) |
@@ -210,6 +211,8 @@ dotnet run --project src/Platform/Storyteller/DbCreator/src -- sets
 dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed large --dry-run
 dotnet run --project src/Platform/Storyteller/DbCreator/src -- seed large
 ```
+
+A set with `Standard` key/value pairs (`showcase`, `exhibit`) needs the vault of the API too, or the seed refuses it before it writes anything: set `AzureKeyVaults__default` to the endpoint of `keyvault` that the dashboard shows in the environment of `db-seed`, and `KeyValues__Protection__Emulator` to `true` (see [key-values.json](Storyteller/data-sets.md#key-valuesjson)).
 
 DbCreator has two test projects: `DbCreator/test`, the unit tests (no database), and `DbCreator/testint`, which seeds against a Cosmos DB emulator and deletes its database `42.Platform.2S`, so give it a container (see [1. Tools](#1-tools)):
 
