@@ -81,6 +81,8 @@ Scopes describe machines, roles describe people. A user is authorized by the rol
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 
+**A recent sign-in.** Some operations also need the user's sign-in to be recent: at most `Auth:StepUp:MaxAge` old, 10 minutes by default, on by default under AuthKit (see [Recent sign-in](authentication.md#recent-sign-in-step-up)). They are a grant or revoke, a member's role change, the removal of another member, a new invitation, creating or resetting a machine, replacing its federation rules or a trusted issuer, a shared certificate, the recipients of client-encrypted values, and every read or write of a secret value. A stale sign-in gets `401 StepUpRequired` there, and a resolved configuration without its secrets (`X-2S-Secrets-Withheld: step-up-required`); restore and purge report the secret keys as `Forbidden` with `StepUpRequired`. Leaving an access point needs no recent sign-in, and machines are never affected. The checks a new sign-in cannot fix come first, the role checks of the route and the actor's restriction included, so a user without the role still gets `403`; the role checks of grant, revoke, a role change and a removal run in the service, after the step-up.
+
 The [MCP server](mcp.md) acts with the role of the signed-in person: its calls carry a Storyteller user token of that person, whose `act` names the server as the actor. The role decides as on a direct call, so an assistant never does more than the person may do, and the audit names the person, with the server's actor id in `Via` (see [Audit Stamps](audit-stamps.md#the-actor)). The actor's restrictions apply on top of the role (see [Actors](#actors)). The server offers a part of the API only (see [its limits](mcp.md#limits)).
 
 The API reads schemas, templates, deleted annotations and what the comparison of views needs (the views, the configurations and their diffs) with `Reader`. The admin UI locks its **Modeling** page, where they are, below `Contributor`; that lock is a choice of the admin UI. Its **Export & Import** tab is locked below `Administrator`, as the API requires (see [export-import.md](export-import.md#administration-ui)). Its **Machines** page and the detail of a machine show **No access** below `Contributor` without asking the API, so a Debug build, which skips the role check, shows a Reader no machine either.
@@ -92,7 +94,7 @@ Machines have no role; their [scopes](authentication.md#scopes-of-machines) deci
 
 A read needs `X.Read`, a write `X.Write`, and a management operation its runtime scope and its management scope. Creating a machine with `Annotation.Write`, `Configuration.Write` or `Secrets.Write` adds the matching `X.Read`. A scope counts only when it is stored on the machine and carried by its credentials; otherwise the operation answers `403 AccessDenied` with a message that names the scope, in every build. Routes for users only refuse every machine with `403 AccessDenied`, whatever its credentials carry.
 
-The creator of a machine can use its credentials, so a user gives a machine no more than the user may do. Creating a machine, resetting it, replacing its federation rules or deleting it needs `Contributor`, `ContributorWithSecrets` when the machine has a `Secrets.*` scope, and `Administrator` when it has a management scope: a delete stops whatever runs with the scopes. These are role checks of users, so Debug builds skip them. Through an actor under `NoSecretReveal` they are refused for a machine with a `Secrets.*` scope, except the delete, in every build (see [Actors](#actors)).
+The creator of a machine can use its credentials, so a user gives a machine no more than the user may do. Creating a machine, resetting it, replacing its federation rules or deleting it needs `Contributor`, `ContributorWithSecrets` when the machine has a `Secrets.*` scope, and `Administrator` when it has a management scope: a delete stops whatever runs with the scopes. These are role checks of users, so Debug builds skip them. Through an actor under `NoSecretReveal` they are refused for a machine with a `Secrets.*` scope, except the delete, in every build (see [Actors](#actors)). Creating, resetting and replacing the federation rules also need a [recent sign-in](authentication.md#recent-sign-in-step-up), whatever the scopes; deleting does not.
 
 A machine created with an `AnnotationKey` reaches only that annotation and its descendants, and gets `403` `AnnotationRestricted` for other annotations and for operations of the whole project (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)).
 
@@ -105,6 +107,7 @@ An actor is a service that calls the API for a person, such as the [MCP server](
 - The person's role on the access point decides, as on a direct call. The token carries `User.Impersonation`, and Debug builds (`DEV_AUTH`) skip the role checks as for any user.
 - The audit names the person and records the actor as `Via` (see [Audit stamps](audit-stamps.md#the-actor)).
 - The actor's restrictions apply on top of the role, in every build, `DEV_AUTH` included. The API enforces the restrictions in the token together with those the actor has now, so a restriction added to an actor reaches tokens already issued once the API runs with the new settings.
+- The token carries the time of the person's sign-in at the actor (`auth_time`), so the [step-up](authentication.md#recent-sign-in-step-up) judges it as for a direct call. For reads the restriction comes first: a new sign-in does not lift it, so the person gets `ActorRestricted`, not `StepUpRequired`.
 
 The list of restrictions is closed, and has one entry, `NoSecretReveal`. Every actor has it unless its configuration sets `AllowSecrets: true`. A secret read through an assistant would enter the model's context, the client's transcript and the model provider, so `NoSecretReveal` takes the reading of secret values away from the person, also from a `ContributorWithSecrets`, an `Administrator` or an `Owner`:
 
@@ -129,6 +132,7 @@ The restriction takes away only what the role gives. A user whose role gives no 
 * PUT sets the exact role, up or down. The account must already be a member (`404`, `MemberNotFound`); new members join through an invitation, through grant, or, in the exhibition project, through its join. Nobody can change their own role (`409`, `SelfRoleChange`); leave and get invited again instead. `None` and a missing body are rejected with `400`.
 * DELETE removes a member. With the caller's own account ID it means "leave".
 * POST makes the caller a `Reader` of the deployment's [exhibition](#exhibition) project. It is the only way into an existing project without an invitation or a grant.
+* PUT, and DELETE of another member, need a [recent sign-in](authentication.md#recent-sign-in-step-up) (`401 StepUpRequired` otherwise); leaving does not.
 * The older `POST v1/access/grant` and `POST v1/access/revoke` stay for `sform`. Grant only raises a role, and revoke must name the role the member holds.
 
 ## Invitations
@@ -144,6 +148,8 @@ An invitation offers a role on an access point to an email address. It is a Stor
 | GET | `v1/access/invitations/mine` | Any signed-in user: pending invitations for the verified email in the token |
 | POST | `v1/access/invitations/{id}/accept` | The invitee: joins with the offered role |
 | POST | `v1/access/invitations/{id}/decline` | The invitee |
+
+Creating an invitation needs a [recent sign-in](authentication.md#recent-sign-in-step-up) of the Administrator (`401 StepUpRequired` otherwise), because it grants a role once accepted; resending and revoking do not.
 
 **Lifecycle.** A new invitation is `Pending` and valid for 7 days by default (1 to 30, `Invitations:DefaultExpiresInDays` and `Invitations:MaxExpiresInDays`). It ends as `Accepted`, `Declined`, or `Revoked`. A pending invitation past its `ExpiresAt` is reported as `Expired`; it can still be resent or revoked, but not accepted (`409`, `InvitationExpired`). Answering an invitation that is no longer pending returns `409`, `InvitationNotPending`. Only one pending invitation per email and access point exists at a time (`409`, `InvitationExists`). Emails are trimmed and stored in lower case; a display-name form such as `Ada <ada@example.com>` is rejected with `400`.
 
@@ -287,6 +293,7 @@ The `404` of the two [exhibition](#exhibition) routes has no body, and so no `Er
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
 | `400` | `InvalidName` | A new organization, project, or view name breaks the [name rules](#names). |
+| `401` | `StepUpRequired` | The operation needs a [recent sign-in](authentication.md#recent-sign-in-step-up) and the user's is older than `Auth:StepUp:MaxAge`: a grant, a revoke, a role change, the removal of another member, a new invitation, machine credentials, secret values. `Details.MaxAge` and the `WWW-Authenticate` header name the window in seconds; sign in again and repeat the request. |
 | `403` | `AccessDenied` | The caller's role on the access point is too low, a machine lacks a scope of the operation, or a machine calls an operation for users only (such as registering, describing or discovering views, a permanent delete, setting the description of a project, listing projects, or reading or joining the exhibition). |
 | `403` | `ActorRestricted` | The token acts for the person through an [actor](#actors) whose restrictions forbid the operation (under `NoSecretReveal`: reading secret values, or giving out what reads them). |
 | `403` | `EmailMismatch`, `EmailNotVerified` | Accepting or declining with another or an unverified email, or through an actor. |

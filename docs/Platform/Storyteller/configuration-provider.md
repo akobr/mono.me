@@ -183,7 +183,15 @@ The first `Load()` of a source runs the startup read. It blocks the caller, runs
 
 Every failure is a `StorytellerConfigurationException` with `Key`, `StatusCode`, `ErrorCode` (from the platform's `ErrorResponse`), `IsTransient`, and the inner exception. Messages name the key, the status and the fix, never a secret. `conformance/errors.json` in the [conformance suite](conformance.md) pins the mapping of each answer, at the startup and at a refresh, for the providers of every language.
 
-- **Withheld secrets fail loudly.** The platform sends the header to a machine with `Secrets.Read` that presented no certificate, under a project policy that delivers secrets only over mTLS. The header depends on the caller, not on the document, so such a machine fails even on a document without secrets. The message names the fix: present the machine certificate (`STORYTELLER_CLIENT_CERTIFICATE`), or remove `Secrets.Read` from the machine.
+- **Withheld secrets fail loudly.** The platform sends the header to a caller that may read secrets but gets none in this read. The header depends on the caller, not on the document, so such a caller fails even on a document without secrets. The message names the reason and its fix:
+
+  | `X-2S-Secrets-Withheld` | The caller | The fix |
+  | --- | --- | --- |
+  | `mtls-required` | A machine with `Secrets.Read` that presented no certificate, under a project policy that delivers secrets only over mTLS | Present the machine certificate (`STORYTELLER_CLIENT_CERTIFICATE`), or remove `Secrets.Read` from the machine |
+  | `actor-restricted` | A person's token that acts through an actor under `NoSecretReveal` (a token file) | Read with a machine credential, or with a token of the person's own |
+  | `step-up-required` | A person's token (a token file) whose sign-in is older than the API's window ([step-up](authentication.md#recent-sign-in-step-up)) | Sign in again, or use a machine credential, which the step-up never affects |
+
+  An application usually reads with a machine credential, and a machine meets only `mtls-required`. A reason the provider does not know fails the same way, with the reason named.
 - **Unbound bindings.** A machine without `Secrets.Read` gets secret bindings as their `@…` expressions, without the header. In `Resolved` mode the provider logs one warning per applied document, with the count and up to 20 JSON paths of the strings that start with `@`, never their values. The strings are applied as written.
 
 ## Flattening

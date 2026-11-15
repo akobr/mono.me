@@ -132,3 +132,5 @@ Decided 2026-11-15 ([424-262](https://linear.app/424fun/issue/424-262/refuse-wor
 ## Can change any time (no need to decide now)
 
 Function App plan and instance size, always-ready instances, Static Web App plan, the Log Analytics cap, Sentry and PostHog projects, which machine credential kinds are turned off (`MachineAuth:DisabledCredentialKinds`), the projects' key/value policies, adding the development subscription, the MCP server, the NAT gateway and mTLS.
+
+The window of the [step-up](../Storyteller/authentication.md#recent-sign-in-step-up) can change any time too: `stepUpMaxAge` of `parameters/prod.bicepparam` (`Auth:StepUp:MaxAge`, 10 minutes by default). `stepUpEnabled = 'false'` is the escape hatch when a client cannot satisfy the step-up: it turns it off until the client is fixed, and nothing else changes. Turning MFA on in WorkOS production (the [MFA policy](../Storyteller/authentication.md#mfa-policy)) changes how people sign in, not their accounts.

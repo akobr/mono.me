@@ -41,6 +41,18 @@ The overview of an organization has a card for each of its projects you are a me
 
 Selecting the screen you are already on in the sidebar goes back to its start: the filter, the open annotation or configuration, the mode, the layout and the focus start over, and **Modeling** opens **Schemas**. The other things above stay as they were. The memory lasts until you reload the page or sign out. An address you type or open from a bookmark is shown as it is.
 
+### Signing in again to confirm
+
+Some actions need a recent sign-in, not only an open session: revealing, setting or exporting secret values, changing roles, removing members, inviting people, and creating or resetting machines, their federation rules and shared certificates. The platform counts a sign-in for 10 minutes unless the deployment sets another window. When yours is older, the UI asks you to **Confirm it's you**, once however many requests failed:
+
+- Confirming signs you in again. The sign-in page asks you to authenticate even while you are still signed in, with a second factor where the environment requires one, and brings you back to the page you were on.
+- The page loads again, so what you were reading shows with its secret values, and a reveal you asked for is repeated once. A change is never repeated for you: the toast **You signed in again** reminds you to repeat it if it did not finish.
+- Unsaved changes on the page are lost, and the dialog says so first. Before you type something the sign-in would lose, such as a new secret value, a new machine, an invitation or a role change, the UI checks your sign-in and asks first.
+- Cancelling leaves the screen and its error as they are.
+- When the new sign-in still does not count, the dialog says **Your sign-in could not be confirmed** and asks you to sign out and sign in again, instead of sending you to the sign-in page once more.
+
+**Resolved** of a configuration says **Secret values are hidden** when your role gives them but your sign-in is too old: they stay as their bindings until you confirm it's you, from the same alert.
+
 ## The catalog
 
 **Annotations** lists the catalog of the view in two modes:
@@ -243,6 +255,8 @@ The CLI does the same with `sform story export` and `sform story import` (see [C
 | Machines | Contributor (machines with secrets scopes: ContributorWithSecrets; with management scopes, shared certificates and trusted issuers: Administrator) | Credentials for services: runtime and management scopes, an optional annotation restriction (the machine then reaches only that annotation and its descendants), the credential kind and certificate lifetime (or, for a federated machine, its federation rules), reset and delete. Below the machines, **Shared certificates**: issue, revoke, expiry warnings; and **Trusted issuers**: the platforms whose tokens federated machines exchange. A Reader who opens the page or the detail of a machine by its address sees **No access** instead of the machines; **Retry** reads the role again, so a role granted since shows them. |
 | Settings | Everyone (description and policies: Administrator, time zone, date format and types: Contributor) | The description of the project, the default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy, the CA certificate download and, in the **Secrets** section, how the key values of the project are protected. |
 | Monitor | Administrator | The **Usage** of the key values (totals, estimated charges, a daily chart) and the **Audit** trail of secrets, one tab each. |
+
+Role changes, removing someone else, invitations, new machines, resets, new federation rules, replacing a trusted issuer and shared certificates need a recent sign-in: an older one asks you to [confirm it's you](#signing-in-again-to-confirm) first. Leaving a project and deleting a machine do not.
 
 The **Project** card on Settings shows the description of the project to every member, or **No description**. Administrators edit it there instead: **Save description** stores the text trimmed, and saving an empty text removes the description. The organization overview shows the same text.
 

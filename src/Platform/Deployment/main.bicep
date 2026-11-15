@@ -70,6 +70,17 @@ param exhibitionProject string = ''
 @description('The id of the account that owns the exhibition project: the --owner of its seed.')
 param exhibitionOwner string = ''
 
+@description('Auth__StepUp__Enabled: whether secrets, roles and machine credentials need a recent sign-in of users. Empty leaves the setting out, and the API decides (on under AuthKit); \'false\' is the escape hatch when a client cannot satisfy the step-up.')
+@allowed([
+  ''
+  'true'
+  'false'
+])
+param stepUpEnabled string = ''
+
+@description('Auth__StepUp__MaxAge: the oldest sign-in that still counts, as a TimeSpan from 00:01:00 to 1.00:00:00 (24 hours; 24:00:00 would be 24 days and stop the API). Empty leaves the setting out (00:10:00).')
+param stepUpMaxAge string = ''
+
 @description('The object id of the owner: Key Vault Administrator, Storage Blob Data Contributor.')
 @minLength(36)
 @maxLength(36)
@@ -270,6 +281,8 @@ module functions 'modules/functions.bicep' = {
     exhibitionOrganization: exhibitionOrganization
     exhibitionProject: exhibitionProject
     exhibitionOwner: exhibitionOwner
+    stepUpEnabled: stepUpEnabled
+    stepUpMaxAge: stepUpMaxAge
     disabledCredentialKinds: disabledCredentialKinds
     runtimeEnvironment: runtimeEnvironment
     maximumInstanceCount: functionMaximumInstanceCount
