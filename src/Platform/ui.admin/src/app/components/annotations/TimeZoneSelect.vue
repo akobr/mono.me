@@ -5,6 +5,8 @@ import { isCatalogTimeZone } from '@42for.net/2splatform.sdk'
 /**
  * Searchable IANA time zones with their current offset (spec section 11.1): the zones the browser knows that the API
  * accepts too (the time zones of the catalog of project settings, 424-266), so no zone is offered that a save refuses.
+ * A zone of the catalog that the browser does not list (a project's zone newer than its Intl) is offered too while it is
+ * the value, without an offset, so it shows as chosen.
  */
 const model = defineModel<string>({ default: '' })
 withDefaults(defineProps<{ disabled?: boolean }>(), { disabled: false })
@@ -20,13 +22,15 @@ const offset = (timeZone: string) => {
   }
 }
 
+const zoneItem = (name: string) => ({ label: name, value: name, suffix: offset(name) })
+const names = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
+const listed = ['UTC', ...names.filter((name) => name !== 'UTC' && isCatalogTimeZone(name))]
+const listedNames = new Set(listed)
+const listedZones = listed.map(zoneItem)
+
 const zones = computed(() => {
-  const names = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
-  return ['UTC', ...names.filter((name) => name !== 'UTC' && isCatalogTimeZone(name))].map((name) => ({
-    label: name,
-    value: name,
-    suffix: offset(name),
-  }))
+  const value = model.value
+  return value && !listedNames.has(value) && isCatalogTimeZone(value) ? [...listedZones, zoneItem(value)] : listedZones
 })
 
 const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone

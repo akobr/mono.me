@@ -8,6 +8,14 @@ import { useSessionStore } from '@/stores/session'
 
 // The settings of the projects as the API serves them (424-266): received from the settings query, per project.
 
+// A zone of the catalog newer than the browser's Intl (an older Safari or Chrome): isValidTimeZone refuses the zones in
+// this set.
+const unknownZones = vi.hoisted(() => new Set<string>())
+vi.mock('@/forms/annotation.schema', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/forms/annotation.schema')>()
+  return { ...original, isValidTimeZone: (zone: string) => !unknownZones.has(zone) && original.isValidTimeZone(zone) }
+})
+
 const defaults = { types: {}, defaultTimeZone: 'UTC', dateFormat: 'yyyy-mm-dd', version: 0 }
 
 describe('project settings store', () => {
@@ -99,6 +107,20 @@ describe('project settings store', () => {
       dateFormat: 'yyyy-mm-dd',
       version: 0,
     })
+  })
+
+  it('keeps a zone of the catalog that this browser does not know, and starts new annotations in UTC', () => {
+    unknownZones.add('America/Coyhaique')
+    try {
+      useContextStore().set({ org: 'acme', project: 'billing', view: 'default' })
+      const settings = useProjectSettingsStore()
+      settings.receive('acme.billing', { Types: {}, DefaultTimeZone: 'America/Coyhaique', Version: 2 })
+
+      expect(settings.current.defaultTimeZone).toBe('America/Coyhaique')
+      expect(settings.defaultTimeZone).toBe('UTC')
+    } finally {
+      unknownZones.clear()
+    }
   })
 
   it('forgets every project on sign-out', async () => {

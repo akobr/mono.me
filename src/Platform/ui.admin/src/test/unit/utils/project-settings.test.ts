@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest'
-import { validateProjectSettings } from '@42for.net/2splatform.sdk'
-import { defaultProjectSettings, fromApi, toApi } from '@/utils/project-settings'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { isCatalogTimeZone, validateProjectSettings } from '@42for.net/2splatform.sdk'
+import { defaultProjectSettings, fromApi, toApi, usableTimeZone } from '@/utils/project-settings'
 
 // The mapping between the API's project settings (PascalCase) and the UI's (424-266, spec section 1).
+
+// A zone of the catalog newer than the browser's Intl (an older Safari or Chrome): isValidTimeZone refuses the zones in
+// this set.
+const unknownZones = vi.hoisted(() => new Set<string>())
+vi.mock('@/forms/annotation.schema', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/forms/annotation.schema')>()
+  return { ...original, isValidTimeZone: (zone: string) => !unknownZones.has(zone) && original.isValidTimeZone(zone) }
+})
+afterEach(() => unknownZones.clear())
 
 describe('project settings mapping', () => {
   it('reads the defaults of a project that has none', () => {
@@ -74,6 +83,29 @@ describe('project settings mapping', () => {
     // back to the default: sent as unset
     const set = fromApi({ Types: {}, DefaultTimeZone: 'Europe/Oslo', DateFormat: 'dd.mm.yyyy', Version: 2 })
     expect(toApi({ ...set, defaultTimeZone: 'UTC', dateFormat: 'yyyy-mm-dd' }, set)).toEqual({ Types: {} })
+  })
+
+  it('keeps a zone of the catalog that this browser does not know, so saving another change keeps it', () => {
+    unknownZones.add('America/Coyhaique')
+    expect(isCatalogTimeZone('America/Coyhaique')).toBe(true)
+
+    const stored = fromApi({ Types: {}, DefaultTimeZone: 'America/Coyhaique', Version: 4 })
+    expect(stored).toMatchObject({ defaultTimeZone: 'America/Coyhaique', storedTimeZone: 'America/Coyhaique' })
+    expect(toApi(stored, stored)).toEqual({ Types: {}, DefaultTimeZone: 'America/Coyhaique' })
+    expect(toApi({ ...stored, types: { exe: { label: 'Job' } } }, stored)).toEqual({
+      Types: { exe: { Label: 'Job' } },
+      DefaultTimeZone: 'America/Coyhaique',
+    })
+    // Where the UI computes times in the zone, it uses UTC instead.
+    expect(usableTimeZone('America/Coyhaique')).toBe('UTC')
+    expect(usableTimeZone('Europe/Oslo')).toBe('Europe/Oslo')
+  })
+
+  it('falls back to UTC for a zone outside the catalog', () => {
+    expect(fromApi({ Types: {}, DefaultTimeZone: '+01:00', Version: 1 })).toMatchObject({
+      defaultTimeZone: 'UTC',
+      storedTimeZone: '+01:00',
+    })
   })
 
   it('reads its own body back as the same settings', () => {

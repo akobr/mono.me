@@ -24,4 +24,21 @@ describe('TimeZoneSelect', () => {
 
     view.host.unmount()
   })
+
+  it('offers a zone of the catalog the browser does not list while it is the value, so it shows as chosen', async () => {
+    vi.spyOn(Intl, 'supportedValuesOf').mockReturnValue(['Europe/Prague', 'UTC'])
+    const view = mountInApp(TimeZoneSelect, { modelValue: 'America/Coyhaique' })
+    await settle()
+
+    const menu = view.host.findComponent({ name: 'SelectMenu' }) as VueWrapper
+    const zones = () => (menu.props() as { items: { value: string }[] }).items.map((item) => item.value)
+    expect(zones()).toEqual(['UTC', 'Europe/Prague', 'America/Coyhaique'])
+    expect(view.host.text()).toContain('America/Coyhaique')
+
+    // Not a value outside the catalog.
+    await view.setProps({ modelValue: 'Mars/Olympus' })
+    expect(zones()).toEqual(['UTC', 'Europe/Prague'])
+
+    view.host.unmount()
+  })
 })

@@ -18,7 +18,10 @@ import { sanitizeTypeAppearances, type TypeAppearances } from './type-appearance
 export interface ProjectSettingsDraft {
   /** Names, colors and icons of the annotation types; Preferences can override them per field. */
   types: TypeAppearances
-  /** IANA time zone that new annotations of the project start in. */
+  /**
+   * IANA time zone of the catalog that new annotations of the project start in. A zone newer than this browser's Intl
+   * stays as it is, so a save keeps it; where the UI computes times in it, usableTimeZone gives UTC instead.
+   */
   defaultTimeZone: string
   /** How dates are shown in this project; Preferences can override it. */
   dateFormat: DateFormat
@@ -46,6 +49,14 @@ export function isProjectTimeZone(value: unknown): value is string {
   return isCatalogTimeZone(value) && isValidTimeZone(value)
 }
 
+/**
+ * The zone where the UI computes times in it (the New annotation dialog): the zone itself when this browser's Intl knows
+ * it, else UTC. A project can store a zone of the catalog that an older browser does not know yet.
+ */
+export function usableTimeZone(zone: string): string {
+  return isValidTimeZone(zone) ? zone : defaultTimeZone
+}
+
 /** The settings of a project that has none: every type built-in, UTC and yyyy-mm-dd, version 0. */
 export const defaultProjectSettings: Readonly<ProjectSettingsState> = Object.freeze({
   types: Object.freeze({}),
@@ -56,7 +67,9 @@ export const defaultProjectSettings: Readonly<ProjectSettingsState> = Object.fre
 
 /**
  * The UI's settings of an answer of the API: the defaults for what it leaves out, and, as defense in depth, only what
- * the UI can show (sanitized types, a zone of the catalog that Intl knows, a known date format).
+ * the UI can show (sanitized types, a zone of the catalog, a known date format). A zone of the catalog stays even when
+ * this browser's Intl does not know it: falling back to UTC here would make the next save of any other change send the
+ * project's zone back to UTC for everyone.
  */
 export function fromApi(settings: ProjectSettings | undefined): ProjectSettingsState {
   const types: Record<string, unknown> = {}
@@ -76,7 +89,7 @@ export function fromApi(settings: ProjectSettings | undefined): ProjectSettingsS
   const version = settings?.Version
   return {
     types: sanitizeTypeAppearances(types),
-    defaultTimeZone: isProjectTimeZone(zone) ? zone : defaultTimeZone,
+    defaultTimeZone: isCatalogTimeZone(zone) ? zone : defaultTimeZone,
     dateFormat: isDateFormat(format) ? format : defaultDateFormat,
     version: typeof version === 'number' && Number.isSafeInteger(version) && version >= 0 ? version : 0,
     ...(settings?.Modified ? { modified: settings.Modified } : {}),
