@@ -32,12 +32,12 @@ public static class DataSetFolder
         return files;
     }
 
-    // The files for the reader: every file but the manifest and annotations.jsonl at the root of the set, which are
-    // not documents and would count as ignored.
+    // The files for the reader: every file but the manifest, annotations.jsonl and key-values.json at the root of the
+    // set, which are not documents and would count as ignored.
     public static IReadOnlyList<ViewArchiveEntry> GetEntries(IFileSystem fileSystem, string folder)
     {
         return GetFiles(fileSystem, folder)
-            .Where(file => file.Path is not DataSetManifest.FileName and not DataSetAnnotationLinesReader.FileName)
+            .Where(file => file.Path is not DataSetManifest.FileName and not DataSetAnnotationLinesReader.FileName and not DataSetKeyValues.FileName)
             .Select(file => new ViewArchiveEntry(
                 file.Path,
                 fileSystem.FileInfo.New(file.FullPath).Length,

@@ -152,6 +152,27 @@ public class BuiltInSetsTests
     }
 
     [Fact]
+    public void Exhibit_HasThePairsOfItsConfigurations()
+    {
+        var exhibit = new DataSetCatalog(FileSystem).GetSets().Single(set => set.Name == "exhibit");
+        var target = DataSetTarget.Resolve([exhibit]);
+
+        target.ShouldBe(new DataSetTarget("fourth-wall", "toons-and-tyrants", "default"));
+
+        var content = DataSetContent.Read(FileSystem, exhibit.Folder, target);
+
+        // README.md and project-settings.json are ignored; key-values.json is the set's pairs, not an ignored file
+        content.Documents.IgnoredFiles.ShouldBe(2);
+        var pairs = content.KeyValues.ShouldNotBeNull();
+        pairs.Levels.ShouldBe([(KeyValueProtection.Public, 19), (KeyValueProtection.Standard, 1)]);
+        pairs.Items.Single(item => item.Protection == KeyValueProtection.Standard).Key.ShouldBe("globex.lairforce.escrowPin");
+        pairs.Items.Single(item => item.Key == "acme.boomdesk.apiKeyRef").ContentType.ShouldBe(KeyValueContentTypes.SecretReference);
+
+        // ordered by key, as an export writes them
+        pairs.Items.Select(item => item.Key).ShouldBe(pairs.Items.Select(item => item.Key).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void EveryBuiltInSet_ReadsWithoutFailures()
     {
         var catalog = new DataSetCatalog(FileSystem);

@@ -26,7 +26,11 @@ public sealed record class DataSetOverview
 
     public int FailedAnnotations => Lines?.Annotations.Count(annotation => annotation.Annotation is null) ?? 0;
 
-    // DataSetException for a folder beyond the limits; a document or a line that cannot be read is counted.
+    // Null without key-values.json.
+    public DataSetKeyValues? KeyValues { get; init; }
+
+    // DataSetException for a folder beyond the limits and for a key-values.json that a seed refuses, as a seed refuses
+    // them; a document or a line that cannot be read is counted.
     public static DataSetOverview Read(IFileSystem fileSystem, DataSet set)
     {
         var documents = DataSetFolder.ReadDocuments(fileSystem, set.Folder);
@@ -49,6 +53,7 @@ public sealed record class DataSetOverview
             FailedDocuments = documents.Files.Count(file => file.ErrorCode is not null),
             IgnoredFiles = documents.IgnoredFiles,
             Lines = lines is null ? null : DataSetContent.WithoutDuplicates(documents, lines),
+            KeyValues = DataSetKeyValues.Read(fileSystem, set.Folder),
         };
     }
 }

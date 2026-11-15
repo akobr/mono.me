@@ -58,5 +58,36 @@ public class DataSetOverviewTests
         overview.Documents.Sum(pair => pair.Count).ShouldBe(1);
         overview.Lines.ShouldBeNull();
         (overview.Annotations, overview.FailedAnnotations).ShouldBe((0, 0));
+        overview.KeyValues.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Read_CountsThePairsPerLevel_AndRefusesPairsASeedCannotWrite()
+    {
+        var folder = SetFiles.Folder("pairs");
+        var fileSystem = SetFiles.Create(
+            folder,
+            ("set.json", "{}"),
+            ("key-values.json", """
+                {
+                  "Format": "2s.key-values.v1",
+                  "Items": [
+                    { "Key": "smtp.host", "Protection": "Public", "Value": "smtp.example" },
+                    { "Key": "smtp.password", "Protection": "Standard", "Value": "demo" },
+                    { "Key": "smtp.port", "Protection": "Public", "Value": "587" }
+                  ]
+                }
+                """));
+
+        var overview = DataSetOverview.Read(fileSystem, new DataSet(DataSetManifest.Read(fileSystem, folder), folder, DataSetSource.Path));
+
+        // the file is not a document, so neither counted nor ignored
+        overview.IgnoredFiles.ShouldBe(0);
+        overview.KeyValues.ShouldNotBeNull().Levels.ShouldBe([(KeyValueProtection.Public, 2), (KeyValueProtection.Standard, 1)]);
+
+        // a set a seed refuses is refused by the listing too
+        fileSystem.AddFile(Path.Combine(folder, "key-values.json"), """{ "Items": [ { "Key": "api.token", "Protection": "Hsm", "Value": "x" } ] }""");
+        Should.Throw<DataSetException>(() => DataSetOverview.Read(fileSystem, new DataSet(DataSetManifest.Read(fileSystem, folder), folder, DataSetSource.Path)))
+            .Message.ShouldContain("the level Hsm cannot be seeded");
     }
 }

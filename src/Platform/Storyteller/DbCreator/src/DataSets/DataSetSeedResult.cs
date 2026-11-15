@@ -7,7 +7,8 @@ namespace _42.Platform.Storyteller.DbCreator.DataSets;
 
 // The seed of one set. Already seeded: its record has its version and hash, so nothing was read further. Not seeded:
 // a set it depends on failed (FailedDependency). Otherwise Documents counts the document files per kind, Lines the
-// annotations of annotations.jsonl, Items lists every outcome but Created and Unchanged, RelationsCompleted counts the
+// annotations of annotations.jsonl, KeyValues the pairs of key-values.json, Items lists every outcome but Created and
+// Unchanged (of the documents, the lines and the pairs), RelationsCompleted counts the
 // stored parents whose relation arrays got the names of annotation files an earlier run left out (in a dry run: would
 // get), and IsRecorded tells whether the record was written (never in a dry run or after a failure).
 public sealed record class DataSetSeedResult
@@ -23,6 +24,8 @@ public sealed record class DataSetSeedResult
     public ViewImportTally? Documents { get; init; }
 
     public DataSetLinesResult? Lines { get; init; }
+
+    public DataSetKeyValuesResult? KeyValues { get; init; }
 
     public IReadOnlyList<DataSetSeedItem> Items { get; init; } = [];
 

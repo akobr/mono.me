@@ -1,6 +1,7 @@
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Storyteller.DbCreator.Configuration;
+using _42.Platform.Storyteller.KeyValues;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -28,6 +29,10 @@ namespace _42.Platform.Storyteller.DbCreator
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
 
             services.AddCosmosDbAnnotations(configuration, "cosmos");
+
+            // the vault of Standard pairs, as the API has it: AzureKeyVaults:default, and locally Lowkey Vault with
+            // KeyValues:Protection:Emulator (refused in Production, a Release build)
+            services.AddKeyVaultKeyProtection(configuration, Environment);
             services.AddDbCreator(configuration);
         }
 

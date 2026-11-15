@@ -6,6 +6,8 @@ using _42.Platform.Storyteller.DbCreator.Configuration;
 using _42.Platform.Storyteller.DbCreator.DataSets;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using _42.Platform.Storyteller.DbCreator.UnitTests.DataSets;
+using _42.Platform.Storyteller.KeyValues;
+using _42.Platform.Storyteller.KeyValues.Protection;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -14,7 +16,8 @@ using Moq;
 namespace _42.Platform.Storyteller.DbCreator.UnitTests.Commands;
 
 // The services of the commands over fakes: built-in sets in a MockFileSystem, the access model and the views of Moq
-// (nothing exists, every write succeeds), the importer, bulk writer and record store of the seeder tests, and a
+// (nothing exists, every write succeeds), the importer, bulk writer, key/value service and record store of the seeder
+// tests (no key-encryption provider), and a
 // container factory that finds the layout fine unless told otherwise, with a container where every item is missing
 // (the access seed of the root reads and creates).
 internal sealed class SeedFixture
@@ -47,6 +50,11 @@ internal sealed class SeedFixture
 
     public FakeRecordStore Records { get; } = new();
 
+    public FakeKeyValueService KeyValues { get; } = new();
+
+    // the key-encryption providers of the tool: none, so Standard pairs are refused
+    public List<IKeyEncryptionProvider> Providers { get; } = [];
+
     public List<string> LayoutProblems { get; } = [];
 
     public BaseAccountOptions BaseAccount { get; } = new();
@@ -61,6 +69,7 @@ internal sealed class SeedFixture
             new DataSetProvisioner(Access.Object, Views.Object, NullLogger<DataSetProvisioner>.Instance),
             Importer,
             BulkWriter,
+            new DataSetKeyValueSeeder(KeyValues, Providers, Options.Create(new KeyValueOptions()), NullLogger<DataSetKeyValueSeeder>.Instance),
             Records,
             Options.Create(BaseAccount),
             TimeProvider.System,

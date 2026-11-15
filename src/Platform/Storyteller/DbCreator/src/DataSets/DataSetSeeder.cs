@@ -22,6 +22,7 @@ public sealed class DataSetSeeder
     private readonly DataSetProvisioner _provisioner;
     private readonly IViewImporter _importer;
     private readonly IAnnotationBulkWriter _bulkWriter;
+    private readonly DataSetKeyValueSeeder _keyValues;
     private readonly IDataSetSeedRecordStore _records;
     private readonly BaseAccountOptions _baseAccount;
     private readonly TimeProvider _time;
@@ -33,6 +34,7 @@ public sealed class DataSetSeeder
         DataSetProvisioner provisioner,
         IViewImporter importer,
         IAnnotationBulkWriter bulkWriter,
+        DataSetKeyValueSeeder keyValues,
         IDataSetSeedRecordStore records,
         IOptions<BaseAccountOptions> baseAccount,
         TimeProvider time,
@@ -43,6 +45,7 @@ public sealed class DataSetSeeder
         _provisioner = provisioner;
         _importer = importer;
         _bulkWriter = bulkWriter;
+        _keyValues = keyValues;
         _records = records;
         _baseAccount = baseAccount.Value;
         _time = time;
@@ -81,11 +84,17 @@ public sealed class DataSetSeeder
         target.EnsureNames(isNewOrganization: false);
 
         // the limits of every set's files and of its annotations.jsonl, without reading the documents or expanding a
-        // generator, so a set beyond them is refused before the target is provisioned and the sets before it are seeded
+        // generator, and its key-values.json with the levels the tool can encrypt, so a set beyond them is refused
+        // before the target is provisioned and the sets before it are seeded
         foreach (var set in sets)
         {
             DataSetFolder.Validate(_fileSystem, set.Folder);
             DataSetAnnotationLinesReader.CountAnnotations(_fileSystem, set.Folder);
+
+            if (DataSetKeyValues.Read(_fileSystem, set.Folder) is { } pairs)
+            {
+                _keyValues.EnsureSeedable(set, pairs);
+            }
         }
 
         // the descriptions of the named sets first: a dependency such as core is not what the project is about
@@ -145,10 +154,10 @@ public sealed class DataSetSeeder
 
     // One set into a target that exists: the annotation files (ancestors first) and the annotations of
     // annotations.jsonl in bulk, in rounds so that neither creates an annotation of the other with defaults (GetRounds),
-    // the relation arrays of the files completed (what an earlier run that stopped left out), then the schemas,
-    // templates and configurations, all with one overlay, so each step sees what the earlier ones
-    // made active or failed (also in a dry run). The record is written after a seed without failures; a set whose
-    // record has its version and hash is not read further, unless Again.
+    // the relation arrays of the files completed (what an earlier run that stopped left out), the pairs of
+    // key-values.json, then the schemas, templates and configurations, the documents all with one overlay, so each
+    // step sees what the earlier ones made active or failed (also in a dry run). The record is written after a seed
+    // without failures; a set whose record has its version and hash is not read further, unless Again.
     public Task<DataSetSeedResult> SeedSetAsync(DataSet set, DataSetTarget target, DataSetSeedOptions options, CancellationToken cancellationToken = default)
     {
         return SeedSetAsync(set, target, options, null, cancellationToken);
@@ -202,10 +211,18 @@ public sealed class DataSetSeeder
             });
     }
 
-    private static DataSetSeedRecord CreateRecord(DataSet set, DataSetTarget target, string hash, ViewImportTally documents, DataSetLinesResult? lines, DateTimeOffset seeded)
+    private static DataSetSeedRecord CreateRecord(
+        DataSet set,
+        DataSetTarget target,
+        string hash,
+        ViewImportTally documents,
+        DataSetLinesResult? lines,
+        DataSetKeyValuesResult? keyValues,
+        DateTimeOffset seeded)
     {
         var total = documents.Summary;
         var bulk = lines?.Summary ?? new ViewImportSummary();
+        var pairs = keyValues?.Summary ?? new ViewImportSummary();
 
         return new DataSetSeedRecord
         {
@@ -218,10 +235,11 @@ public sealed class DataSetSeeder
             Seeded = AuditStamp.Of(AuditActor.System, seeded),
             Documents = documents.Total,
             Annotations = lines?.Annotations ?? 0,
-            Created = total.Created + bulk.Created,
-            Updated = total.Updated + bulk.Updated,
-            Unchanged = total.Unchanged + bulk.Unchanged,
-            Skipped = total.Skipped + bulk.Skipped,
+            KeyValues = keyValues?.Pairs ?? 0,
+            Created = total.Created + bulk.Created + pairs.Created,
+            Updated = total.Updated + bulk.Updated + pairs.Updated,
+            Unchanged = total.Unchanged + bulk.Unchanged + pairs.Unchanged,
+            Skipped = total.Skipped + bulk.Skipped + pairs.Skipped,
             Warnings = total.Warnings + bulk.Warnings,
         };
     }
@@ -419,6 +437,11 @@ public sealed class DataSetSeeder
 
         var relationsCompleted = await CompleteRelationsAsync(target, files, options, cancellationToken);
         var lines = content.Lines is null ? null : CompleteLines(content.Lines, results, totals, items);
+
+        // the pairs before the configurations that bind them
+        var keyValues = content.KeyValues is null
+            ? null
+            : await _keyValues.SeedAsync(target, content.KeyValues, options.DryRun, items, cancellationToken);
         await ImportAsync(target, content.Documents.Files.Where(file => !IsAnnotation(file)).ToList(), importOptions, overlay, documents, items, cancellationToken);
 
         if (written is not null)
@@ -430,7 +453,7 @@ public sealed class DataSetSeeder
 
         if (!options.DryRun && items.All(item => item.Outcome != ViewImportOutcome.Failed))
         {
-            await _records.SaveAsync(CreateRecord(set, target, hash, documents, lines, _time.GetUtcNow()), cancellationToken);
+            await _records.SaveAsync(CreateRecord(set, target, hash, documents, lines, keyValues, _time.GetUtcNow()), cancellationToken);
             isRecorded = true;
         }
 
@@ -440,6 +463,7 @@ public sealed class DataSetSeeder
             Hash = hash,
             Documents = documents,
             Lines = lines,
+            KeyValues = keyValues,
             Items = items,
             RelationsCompleted = relationsCompleted,
             IsRecorded = isRecorded,
