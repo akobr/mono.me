@@ -169,6 +169,7 @@ Every WorkOS environment has its own settings. The `localhost` entries belong to
 - JWT template with `aud`, `email`, `name` and `email_verified` (see `docs/Platform/Storyteller/authentication.md`).
 - Invitation accept URL: `https://<admin-host>/invitations/accept`.
 - A custom authentication domain (`auth.42for.net`) for every deployed environment.
+- User impersonation off (**Authentication → Features**): the API refuses impersonation tokens (see `docs/Platform/Storyteller/authentication.md`).
 
 The admin origin must also be in the CORS settings of the Function App.
 

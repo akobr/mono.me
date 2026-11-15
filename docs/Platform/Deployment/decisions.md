@@ -77,6 +77,33 @@ The onboarding of the admin UI repeats the hosting and sign-in facts of this env
 - **Change them together.** A change of a region, of a sub-processor, of what WorkOS receives, or of the identity providers changes that file in the same pull request. A merge to `main` publishes the admin UI at once.
 - **The three safeguards show always.** The switch `safeguardsLive` of the same file is gone (2026-11-16): the security step names the safeguards of [424-262](https://linear.app/424fun/issue/424-262), [424-263](https://linear.app/424fun/issue/424-263) and [424-264](https://linear.app/424fun/issue/424-264) without a condition, and the entry of WorkOS says that every authorization decision is made and recorded by 2S in the EU. The platform opens to the public only once all three run in production (the production API runs a build with them, runbook phase 11.1, and the WorkOS dashboard check of 424-262 is recorded), so no public user sees the claim before it holds. The owner and the testers of production may see it earlier; their onboarding does not wait for the safeguards.
 
+### Who can sign in as a user (the WorkOS trust boundary)
+
+Decided 2026-11-15 ([424-262](https://linear.app/424fun/issue/424-262/refuse-workos-impersonation-tokens-in-the-api-and-lock-down-who-can)).
+
+**The boundary.** WorkOS authenticates a person. Only the roles that 2S keeps in Cosmos DB (EU) authorize them. A valid WorkOS token for `user_X` gets X's roles, so this split holds only while nobody but X can get such a token. Three paths give someone else one:
+
+1. **Impersonation.** A dashboard Admin can turn on user impersonation for an environment and then sign in as any user. The token carries `act`, with the impersonator's email as `act.sub`. **Covered:** the API refuses every AuthKit user token with `act`, answering `401` and logging a Warning with the subject and `act.sub` ([How AuthKit tokens are checked](../Storyteller/authentication.md#how-authkit-tokens-are-checked)). Impersonation also stays off in every environment. Production and Staging had it off when checked through the WorkOS API on 2026-11-15.
+2. **Account takeover through the dashboard or the management API.** A dashboard member, or whoever holds the management key (`authkit-api-key`), can change a user's email or delete their MFA factors, then sign in as that user. The `sub`, and so the account and its roles, stays the same. **Mitigated:**
+   - one or two named dashboard members, each with the least role and MFA, or SSO through an identity provider that enforces MFA;
+   - the management key only in the vault;
+   - a Warning from the API when a token's user name differs from the stored one, with its own message for an Administrator or Owner ([Changed user names](../Storyteller/authentication.md#changed-user-names)).
+3. **WorkOS itself.** A leaked signing key, an insider, or a legal order to WorkOS, Inc., a US company, could produce a valid token for any user. **Accepted, and disclosed** on the trust page and in the DPA annex: such a token can't be told from a real one.
+
+**Privacy.** The refusal logs the impersonator's email, and the user name check logs the old and the new user name. Both go to Application Insights, which keeps them for the workspace's 30 days (`monitoring.bicep`). Both are Warnings, so Sentry gets them only as breadcrumbs, with emails scrubbed.
+
+**For customers who refuse a US identity provider.** `Auth:Provider` also takes `EntraId` (the customer's own tenant) and `Keycloak` (for example one hosted in the EU). That means a deployment of its own, with these limits today:
+
+- A deployment has one provider at a time.
+- Switching a deployment's provider orphans its accounts. The account ids differ by provider, and nothing migrates them ([Account ids](../Storyteller/authentication.md#account-ids)).
+- The admin UI signs in through AuthKit only. `sform` signs in under Entra ID but not under Keycloak, where people call the API with tokens of the realm.
+
+**Wording for the trust page and the DPA annex.** Both are kept outside the repository. Their owner copies this text and keeps it in step with this entry:
+
+> Sign-in to the 2S Platform is provided by WorkOS, Inc. (USA). WorkOS verifies who a person is. What a person may do is decided only by the roles that the 2S Platform stores in the European Union. WorkOS's user impersonation is turned off, and the 2S API refuses impersonated sessions. Access to the WorkOS dashboard is limited to named members who use multi-factor authentication, and the 2S API logs when a person signs in under another email than the one it has stored. One risk remains: WorkOS itself could issue a valid sign-in for any person, through a compromise of its signing keys or under a legal order, and the 2S Platform cannot tell such a sign-in from a real one. Customers who do not accept a US identity provider can use a dedicated deployment that signs people in with their own Microsoft Entra ID tenant or a Keycloak server instead. Such a deployment uses one identity provider, and its administration then works through the API and the CLI, not the admin web application.
+
+**Evidence.** At each production verification ([runbook step 12](runbook-azure-production.md#12-verify-c17)), a WorkOS Admin checks the dashboard: impersonation is off in every environment, the members and their roles are the named ones, and each member has MFA (or SSO is enforced). The Admin records the date, the reviewer and the result in the ISO 27001 supplier notes, which are also kept outside the repository.
+
 ## Must be decided before the first deployment
 
 | # | Decision | Why it can't change later | Recommendation |
