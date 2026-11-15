@@ -93,11 +93,14 @@ public class ConfigSetCommand : BaseContextCommand
 
             if (IsResolvedRetrievalRequested)
             {
-                data = await _configurationApi.GetResolvedConfigurationAsync(
-                    Context.OrganizationName,
-                    Context.ProjectName,
-                    Context.ViewName,
-                    AnnotationKey);
+                // The conditional twin keeps X-2S-Secrets-Withheld, so a withheld secret is named as by config get -r.
+                (data, var secretsWithheld) = await ConfigurationReads.ReadAsync(_configurationApi, Context, AnnotationKey, isResolved: true);
+
+                if (secretsWithheld is not null)
+                {
+                    var hint = ConfigurationReads.WithheldHint(secretsWithheld);
+                    Console.WriteErrorLine($"Warning: the API withheld the secrets of the configuration ({secretsWithheld}): the values of secret bindings are their expressions.{(hint is null ? string.Empty : " " + hint)}");
+                }
             }
         }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
