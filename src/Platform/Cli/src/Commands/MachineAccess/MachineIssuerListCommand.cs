@@ -6,7 +6,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
 
-[Command(CommandNames.LIST, Description = "List the trusted issuers of the project (Contributor).")]
+[Command(CommandNames.LIST, Description = "List the trusted issuers of the project (for contributors).")]
 public class MachineIssuerListCommand : FederationCommandBase
 {
     public MachineIssuerListCommand(

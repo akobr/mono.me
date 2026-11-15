@@ -7,9 +7,21 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Platform.Cli.Commands.MachineAccess;
 
 // The kill switch of a trusted issuer: allowed while rules reference it.
-[Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete a trusted issuer of the project (Administrator), even while federation rules reference it.")]
+[Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete a trusted issuer (for administrators).", ExtendedHelpText = HelpDetail)]
 public class MachineIssuerDeleteCommand : FederationCommandBase
 {
+    // After the options of 'sform account machine issuer delete --help', as it is: the empty first line separates it
+    // from them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        The issuer is deleted even while federation rules reference it: it is the
+        kill switch. Those rules stop matching within a minute, so their machines can
+        no longer exchange tokens of the issuer.
+
+        A user needs the Administrator role on the project. A machine cannot delete a
+        trusted issuer, whatever its scopes.
+        """;
+
     public MachineIssuerDeleteCommand(
         IExtendedConsole console,
         ICommandContext context,

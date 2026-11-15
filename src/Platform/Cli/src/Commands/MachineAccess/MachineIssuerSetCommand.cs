@@ -9,9 +9,21 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 
 // Sets the whole trusted issuer, like the issuer PUT: settings not given are cleared. The keys come from the
 // issuer's discovery document unless --jwks-uri or --jwks-file says otherwise.
-[Command(CommandNames.SET, CommandNames.CREATE, Description = "Create or replace a trusted issuer of the project (Administrator): settings not given are cleared, and the issuer URL of an existing one cannot change.")]
+[Command(CommandNames.SET, CommandNames.CREATE, Description = "Create or replace a trusted issuer (for administrators).", ExtendedHelpText = HelpDetail)]
 public class MachineIssuerSetCommand : FederationCommandBase
 {
+    // After the options of 'sform account machine issuer set --help', as it is: the empty first line separates it
+    // from them, and no line is longer than 79 characters.
+    internal const string HelpDetail = """
+
+        Settings not given are cleared, and the issuer URL (--issuer) of an existing
+        issuer cannot change. The keys come from the issuer's discovery document,
+        unless --jwks-uri or --jwks-file gives them.
+
+        A user needs the Administrator role on the project. A machine cannot change
+        the trusted issuers, whatever its scopes.
+        """;
+
     private readonly IFileSystem _fileSystem;
 
     public MachineIssuerSetCommand(

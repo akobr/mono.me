@@ -31,7 +31,7 @@ public class StorytellerDeleteCommand : BaseContextCommand
     public string AnnotationKey { get; set; } = string.Empty;
 
     // -p is taken by --projectKey of every context command
-    [Option("--permanent", CommandOptionType.NoValue, Description = "Delete permanently, without a way to restore it (Administrator or Owner).")]
+    [Option("--permanent", CommandOptionType.NoValue, Description = "Delete permanently (for administrators).")]
     public bool Permanent { get; set; }
 
     [Option("-y|--yes", CommandOptionType.NoValue, Description = "Don't ask for confirmation of a permanent delete.")]

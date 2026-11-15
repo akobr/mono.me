@@ -49,7 +49,7 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("--scope", CommandOptionType.MultipleValue, ValueName = "scope", Description = "A scope to grant: " + MachineScopes.Names + ", also as the scope string (Secrets.Read) or in kebab case (secrets-read). Repeat it or separate the values with commas; it adds to -r and -w. The server adds the read scope of a write scope. A secrets scope needs the ContributorWithSecrets role, a management scope the Administrator role.")]
     public string[]? Scope { get; set; }
 
-    [Option("-m|--manage", CommandOptionType.MultipleValue, ValueName = "scope", Description = "A management scope to grant: " + MachineScopes.ManagementNames + ". Repeat it or separate the values with commas. Needs the Administrator role; never part of -r or -w.")]
+    [Option("-m|--manage", CommandOptionType.MultipleValue, ValueName = "scope", Description = "A management scope to grant (for administrators). One of " + MachineScopes.ManagementNames + "; repeat it or separate the values with commas. Never part of -r or -w.")]
     public string[]? ManagementScope { get; set; }
 
     [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "One of the kinds the project enables: " + CredentialKinds.Names + ". Default: the project's default kind.")]
