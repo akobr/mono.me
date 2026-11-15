@@ -128,6 +128,13 @@ public static class DataSetOutput
                 $"  {DataSetAnnotationLinesReader.FileName}: {Count(lines.Lines, "line")} ({Count(lines.GeneratorLines, "generator")}), {Count(overview.Annotations, "annotation")}{failed}");
         }
 
+        if (overview.KeyValues is { } pairs)
+        {
+            var levels = pairs.Levels.Count > 0 ? $": {Levels(pairs.Levels)}" : string.Empty;
+            var vault = pairs.Count(KeyValueProtection.Standard) > 0 ? " (Standard pairs seed with a Standard vault only)" : string.Empty;
+            Console.WriteLine($"  {DataSetKeyValues.FileName}: {Count(pairs.Items.Count, "pair")}{levels}{vault}");
+        }
+
         Console.WriteLine($"  Folder: {set.Folder}", Muted);
     }
 
@@ -242,7 +249,15 @@ public static class DataSetOutput
                 Muted);
         }
 
-        if (documents.Total == 0 && result.Lines is null)
+        if (result.KeyValues is { } pairs)
+        {
+            var levels = pairs.Levels.Count > 0 ? $" ({Levels(pairs.Levels)})" : string.Empty;
+            var summary = pairs.Summary;
+            Console.WriteLine(
+                $"  {DataSetKeyValues.FileName}: {Count(pairs.Pairs, "pair")}{levels}: {N(summary.Created)} created, {N(summary.Updated)} updated, {N(summary.Unchanged)} unchanged, {N(summary.Skipped)} skipped, {N(summary.Failed)} failed");
+        }
+
+        if (documents.Total == 0 && result.Lines is null && result.KeyValues is null)
         {
             Console.WriteLine("  No documents.", Muted);
         }
@@ -311,6 +326,11 @@ public static class DataSetOutput
 
     private static string Where(DataSetSeedItem item)
     {
+        if (item.KeyValueKey is { } key)
+        {
+            return $"{item.Path} ({key})";
+        }
+
         return item.Line is { } line
             ? $"{item.Path} line {line}{(item.AnnotationKey is null ? string.Empty : $" ({item.AnnotationKey})")}"
             : item.Path;
@@ -320,16 +340,23 @@ public static class DataSetOutput
     {
         var documents = result.Documents?.Summary ?? new ViewImportSummary();
         var lines = result.Lines?.Summary ?? new ViewImportSummary();
+        var pairs = result.KeyValues?.Summary ?? new ViewImportSummary();
 
         return new ViewImportSummary
         {
-            Created = documents.Created + lines.Created,
-            Updated = documents.Updated + lines.Updated,
-            Unchanged = documents.Unchanged + lines.Unchanged,
-            Skipped = documents.Skipped + lines.Skipped,
-            Failed = documents.Failed + lines.Failed,
+            Created = documents.Created + lines.Created + pairs.Created,
+            Updated = documents.Updated + lines.Updated + pairs.Updated,
+            Unchanged = documents.Unchanged + lines.Unchanged + pairs.Unchanged,
+            Skipped = documents.Skipped + lines.Skipped + pairs.Skipped,
+            Failed = documents.Failed + lines.Failed + pairs.Failed,
             Warnings = documents.Warnings + lines.Warnings,
         };
+    }
+
+    // "19 Public, 1 Standard"
+    private static string Levels(IReadOnlyList<(KeyValueProtection Level, int Count)> levels)
+    {
+        return string.Join(", ", levels.Select(entry => $"{N(entry.Count)} {entry.Level}"));
     }
 
     private static bool HasAny(ViewImportSummary summary)

@@ -28,6 +28,8 @@
     <ProjectReference Include="..\..\..\..\Libraries\CLI\Toolkit\src\Toolkit.csproj" />
     <ProjectReference Include="..\..\..\..\Libraries\Testing\System.IO.Abstractions.Trace\src\System.IO.Abstractions.Trace.csproj" />
     <ProjectReference Include="..\..\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
+    <!-- the Standard vault of the key/value pairs of a set (AddKeyVaultKeyProtection) -->
+    <ProjectReference Include="..\..\KeyValues.Azure.KeyVault\src\KeyValues.Azure.KeyVault.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -12,14 +12,15 @@ public static class ExitCodes
     // errors 1 - 39
     public const int ERROR_CRASH = 1;
 
-    // wrong input: an unknown set, an invalid manifest or annotations.jsonl, a set beyond the limits, a cycle, a bad
-    // name, a missing project in an organization whose Owner is not the owner, an invalid account id (DataSetException)
+    // wrong input: an unknown set, an invalid manifest, annotations.jsonl or key-values.json, a level a seed cannot
+    // write (Hsm, Byok, Hyok, or Standard without a vault), a set beyond the limits, a cycle, a bad name, a missing
+    // project in an organization whose Owner is not the owner, an invalid account id (DataSetException)
     public const int ERROR_WRONG_INPUT = 2;
 
     // the database does not have the layout of the shared container organizations, see DatabaseLayoutException
     public const int ERROR_DATABASE_LAYOUT = 3;
 
-    // a document or an annotation of a data set failed, or a set was not seeded because a set it depends on failed
+    // a document, an annotation or a pair of a data set failed, or a set was not seeded because a set it depends on failed
     public const int ERROR_SEED_FAILED = 4;
 
     // warnings from 40

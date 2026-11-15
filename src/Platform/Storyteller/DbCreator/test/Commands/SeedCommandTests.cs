@@ -98,6 +98,39 @@ public class SeedCommandTests
         _fixture.Records.Saves.ShouldBe(0);
     }
 
+    [Theory]
+    [InlineData("""{ "Key": "smtp.password", "Protection": "Standard", "Value": "demo" }""")]
+    [InlineData("""{ "Key": "api.token", "Protection": "Hsm", "Value": "x" }""")]
+    [InlineData("""{ "Key": "db.password", "Protection": "Standard" }""")]
+    [InlineData("""{ "Key": "bad-key", "Protection": "Public", "Value": "x" }""")]
+    public async Task Seed_PairsASeedCannotWrite_ExitWithTwoBeforeTheDatabaseIsTouched(string item)
+    {
+        // no key-encryption provider, so Standard is refused as Hsm is
+        _fixture.AddSet("base", Manifest, ("annotations/sbt.base.json", "{}"), ("key-values.json", $$"""{ "Items": [ {{item}} ] }"""));
+
+        (await Command(sets: ["base"]).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        (await Command(sets: ["base"], dryRun: true).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+
+        _fixture.Containers.Verify(factory => factory.FindLayoutProblemsAsync(), Times.Never);
+        _fixture.Access.Invocations.ShouldBeEmpty();
+        _fixture.KeyValues.Imports.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Seed_PublicPairs_SeedWithoutAVault_AndAFailedPairExitsWithFour()
+    {
+        _fixture.AddSet("base", Manifest, ("key-values.json", """{ "Items": [ { "Key": "smtp.host", "Protection": "Public", "Value": "smtp.example" } ] }"""));
+
+        (await Command(sets: ["base"]).OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
+        _fixture.KeyValues.Pairs.Keys.ShouldBe(["smtp.host"]);
+
+        _fixture.AddSet("other", Manifest, ("key-values.json", """{ "Items": [ { "Key": "smtp.port", "Protection": "Public", "Value": "25" } ] }"""));
+        _fixture.KeyValues.FailingWriteKeys.Add("smtp.port");
+
+        (await Command(sets: ["other"]).OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
+        _fixture.Records.Saves.ShouldBe(1);
+    }
+
     [Fact]
     public async Task Seed_ADryRun_WritesNothing()
     {
@@ -153,6 +186,11 @@ public class SeedCommandTests
         ExitCodes.Of(Run(new DataSetSeedResult { Set = set, Items = [Item(ViewImportOutcome.Skipped), Item(ViewImportOutcome.Updated)] })).ShouldBe(ExitCodes.SUCCESS);
         ExitCodes.Of(Run(new DataSetSeedResult { Set = set, Items = [Item(ViewImportOutcome.Failed)] })).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
         ExitCodes.Of(Run(new DataSetSeedResult { Set = set, FailedDependency = "b" })).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
+
+        // a pair as any other item
+        DataSetSeedItem Pair(ViewImportOutcome outcome) => new() { Path = "key-values.json", KeyValueKey = "smtp.host", Protection = KeyValueProtection.Public, Outcome = outcome };
+        ExitCodes.Of(Run(new DataSetSeedResult { Set = set, Items = [Pair(ViewImportOutcome.Skipped)] })).ShouldBe(ExitCodes.SUCCESS);
+        ExitCodes.Of(Run(new DataSetSeedResult { Set = set, Items = [Pair(ViewImportOutcome.Failed)] })).ShouldBe(ExitCodes.ERROR_SEED_FAILED);
     }
 
     private SeedCommand Command(

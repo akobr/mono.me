@@ -4,6 +4,7 @@ using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.DbCreator.Configuration;
 using _42.Platform.Storyteller.DbCreator.DataSets;
+using _42.Platform.Storyteller.KeyValues;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -464,6 +465,7 @@ public class DataSetSeederTests
             new DataSetProvisioner(_access.Object, _views.Object, NullLogger<DataSetProvisioner>.Instance),
             _importer,
             _bulkWriter,
+            new DataSetKeyValueSeeder(new FakeKeyValueService(), [], Options.Create(new KeyValueOptions()), NullLogger<DataSetKeyValueSeeder>.Instance),
             _records,
             Options.Create(new BaseAccountOptions()),
             TimeProvider.System,

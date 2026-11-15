@@ -40,19 +40,21 @@ public class DataSetFolderTests
     }
 
     [Fact]
-    public void GetEntries_LeavesTheManifestAndTheLinesAtTheRootOut()
+    public void GetEntries_LeavesTheManifestTheLinesAndThePairsAtTheRootOut()
     {
         var fileSystem = SetFiles.Create(
             Folder,
             ("set.json", "{}"),
             ("annotations.jsonl", "{}"),
+            ("key-values.json", """{ "Items": [] }"""),
             ("nested/set.json", "{}"),
             ("nested/annotations.jsonl", "{}"),
+            ("nested/key-values.json", "{}"),
             ("annotations/sbt.a.json", """{ "Title": "A" }"""));
 
         var entries = DataSetFolder.GetEntries(fileSystem, Folder);
 
-        entries.Select(entry => entry.Path).ShouldBe(["annotations/sbt.a.json", "nested/annotations.jsonl", "nested/set.json"]);
+        entries.Select(entry => entry.Path).ShouldBe(["annotations/sbt.a.json", "nested/annotations.jsonl", "nested/key-values.json", "nested/set.json"]);
         entries[0].Length.ShouldBe(16);
         using var reader = new StreamReader(entries[0].Open());
         reader.ReadToEnd().ShouldBe("""{ "Title": "A" }""");
@@ -141,6 +143,11 @@ public class DataSetFolderTests
         DataSetFolder.ComputeHash(SetFiles.Create(Folder, files[..2]), Folder).ShouldNotBe(hash);
         DataSetFolder.ComputeHash(SetFiles.Create(Folder, [files[0], ("annotations/sbt.c.json", "{}"), files[2]]), Folder).ShouldNotBe(hash);
         DataSetFolder.ComputeHash(SetFiles.Create(Folder, [files[0], ("annotations/sbt.a.json", "{ }"), files[2]]), Folder).ShouldNotBe(hash);
+
+        // the pairs: a new key-values.json, and a changed one
+        var withPairs = DataSetFolder.ComputeHash(SetFiles.Create(Folder, [.. files, ("key-values.json", """{ "Items": [] }""")]), Folder);
+        withPairs.ShouldNotBe(hash);
+        DataSetFolder.ComputeHash(SetFiles.Create(Folder, [.. files, ("key-values.json", """{ "Items": [ ] }""")]), Folder).ShouldNotBe(withPairs);
     }
 
     [Fact]

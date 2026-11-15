@@ -22,6 +22,21 @@ public class SetsCommandTests
     }
 
     [Fact]
+    public async Task Sets_ListsTheLevelsOfThePairs_AndRefusesPairsASeedCannotWrite()
+    {
+        _fixture.AddSet(
+            "base",
+            """{ "Organization": "fabrikam", "Project": "invoicing-suite" }""",
+            ("key-values.json", """{ "Items": [ { "Key": "a", "Protection": "Public", "Value": "1" }, { "Key": "b", "Protection": "Standard", "Value": "2" } ] }"""));
+
+        // the listing reads the files only: Standard pairs are listed without a vault
+        (await Command().OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);
+
+        _fixture.AddSet("bad", "{}", ("key-values.json", """{ "Items": [ { "Key": "a", "Protection": "Byok", "Value": "1" } ] }"""));
+        (await Command().OnExecuteAsync()).ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+    }
+
+    [Fact]
     public async Task Sets_WithoutAnySet_Succeeds()
     {
         (await Command().OnExecuteAsync()).ShouldBe(ExitCodes.SUCCESS);

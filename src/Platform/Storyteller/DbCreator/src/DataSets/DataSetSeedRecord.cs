@@ -31,10 +31,13 @@ public sealed record class DataSetSeedRecord
 
     public required AuditStamp Seeded { get; init; }
 
-    // The document files and the annotations of annotations.jsonl the seed read, and the outcomes of both together.
+    // The document files, the annotations of annotations.jsonl and the pairs of key-values.json the seed read, and the
+    // outcomes of all of them together. A record written before sets had pairs has no KeyValues (0).
     public int Documents { get; init; }
 
     public int Annotations { get; init; }
+
+    public int KeyValues { get; init; }
 
     public int Created { get; init; }
 
