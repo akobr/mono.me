@@ -30,6 +30,9 @@ public static class SformVariables
     // The width of the output when sform has no console at all (SformConsole).
     public const string COLUMNS = "COLUMNS";
 
+    // Any non-empty value turns the colors of annotation types off (https://no-color.org).
+    public const string NO_COLOR = "NO_COLOR";
+
     // The values.
     public const string TOKEN_STORE_FILE = "file";
     public const string DEVICE_CODE_OUTPUT_JSON = "json";

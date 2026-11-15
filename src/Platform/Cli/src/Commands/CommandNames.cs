@@ -15,6 +15,8 @@ public static class CommandNames
     public const string SETTINGS = "settings";
     public const string EDITOR = "editor";
 
+    public const string PROJECT = "project";
+
     public const string STORYTELLER = "storyteller";
     public const string SUPERVISOR = "supervisor";
     public const string SCHEDULER = "scheduler";

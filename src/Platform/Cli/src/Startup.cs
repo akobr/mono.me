@@ -9,6 +9,7 @@ using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.GitHubActions;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Services;
+using _42.Platform.Cli.Services.Projects;
 using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller.Sdk.Credentials;
 using Microsoft.Extensions.Configuration;
@@ -78,6 +79,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IUserSettingsStore, UserSettingsStore>();
             services.AddSingleton(EnvironmentEditor.FromEnvironment(System.Environment.GetEnvironmentVariable));
             services.AddSingleton<IEditorService, EditorService>();
+            services.AddSingleton<IProjectSettingsCache, NoProjectSettingsCache>();
             services.AddSingleton<IBrowserLauncher, BrowserLauncher>();
             services.AddSingleton<TransferPolling>();
 
