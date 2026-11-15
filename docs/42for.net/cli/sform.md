@@ -6,6 +6,8 @@ The platform is under development, see [the road map](/platform/road-map).
 
 A simple CLI interface for developers, dev ops engineers, and your infrastructure specialists to interact with the **2S** platform, consisting of a storyteller, supervisor, and scheduler, no matter where they are hosted and how.
 
+Every command has a help: `sform <command> --help` (or `-h`, `-?`) shows what it does, its options and its commands. When a command or an option needs a role on the project, the first sentence of its description ends with a note, such as "(for contributors)" or "(for administrators)". The note names the lowest role, and a higher role may run it too: an Owner runs what is for administrators. A machine has no role. Where it matters, the help of the command says after the options what a machine needs or that it cannot, as for `sform story export` and `sform story kv audit`.
+
 ## Sign in
 
 Sign in with your account. The tool prints an address and a code, and waits while you confirm them in a browser. `-b` or `--browser` opens the address for you, without a shell:
