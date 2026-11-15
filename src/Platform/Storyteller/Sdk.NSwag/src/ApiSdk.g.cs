@@ -29,6 +29,21 @@ namespace _42.Platform.Storyteller.Sdk
     {
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The access audit trail, newest first: every change of members, access points, machines, the machine authentication and key/value policies, trusted issuers and shared certificates, with the actor (and Via, the actor that acted for the person), the target, the value before and after, and the correlation id. Never a secret. With an organization key, the whole trail of the organization for its Owners and Administrators; with organization.project, the records of the project for its Owners and Administrators. Users only.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="project">Only the records of this project; the organization's own records (its members) are left out. With a project key, only that project.</param>
+        /// <param name="action">Only this action (MemberGranted, MemberRevoked, MemberRoleChanged, MemberRemoved, MemberJoined, AccessPointCreated, AccessPointUpdated, MachineCreated, MachineReset, MachineDeleted, MachineFederationRulesChanged, MachineAuthenticationPolicyChanged, KeyValuePolicyChanged, FederatedIssuerCreated, FederatedIssuerUpdated, FederatedIssuerDeleted, SharedCertificateIssued, SharedCertificateRevoked).</param>
+        /// <param name="target">Only the records of this target: an account id, a machine id, a trusted issuer's name or a shared certificate's thumbprint.</param>
+        /// <param name="from">Only records at or after this time.</param>
+        /// <param name="to">Only records at or before this time.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of records, newest first, at most 100.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AccessAuditResponse> GetAccessAuditAsync(string key, string project = null, string action = null, string target = null, System.DateTimeOffset? from = null, System.DateTimeOffset? to = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>Details about the log in account, contains all accessible access points.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<Account> GetAccountAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
@@ -437,6 +452,154 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, string url);
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The access audit trail, newest first: every change of members, access points, machines, the machine authentication and key/value policies, trusted issuers and shared certificates, with the actor (and Via, the actor that acted for the person), the target, the value before and after, and the correlation id. Never a secret. With an organization key, the whole trail of the organization for its Owners and Administrators; with organization.project, the records of the project for its Owners and Administrators. Users only.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="project">Only the records of this project; the organization's own records (its members) are left out. With a project key, only that project.</param>
+        /// <param name="action">Only this action (MemberGranted, MemberRevoked, MemberRoleChanged, MemberRemoved, MemberJoined, AccessPointCreated, AccessPointUpdated, MachineCreated, MachineReset, MachineDeleted, MachineFederationRulesChanged, MachineAuthenticationPolicyChanged, KeyValuePolicyChanged, FederatedIssuerCreated, FederatedIssuerUpdated, FederatedIssuerDeleted, SharedCertificateIssued, SharedCertificateRevoked).</param>
+        /// <param name="target">Only the records of this target: an account id, a machine id, a trusted issuer's name or a shared certificate's thumbprint.</param>
+        /// <param name="from">Only records at or after this time.</param>
+        /// <param name="to">Only records at or before this time.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of records, newest first, at most 100.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AccessAuditResponse> GetAccessAuditAsync(string key, string project = null, string action = null, string target = null, System.DateTimeOffset? from = null, System.DateTimeOffset? to = null, string continuationToken = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/audit"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/audit");
+                    urlBuilder_.Append('?');
+                    if (project != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("project")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (action != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("action")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(action, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (target != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("target")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(target, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (from != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("from")).Append('=').Append(System.Uri.EscapeDataString(from.Value.ToString("s", System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (to != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("to")).Append('=').Append(System.Uri.EscapeDataString(to.Value.ToString("s", System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (continuationToken != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AccessAuditResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A filter does not parse, the project of the query is not the project of the key, or the continuation token is not one of this trail (InvalidQuery).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing).", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>Details about the log in account, contains all accessible access points.</returns>
@@ -23241,6 +23404,101 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AccessAuditEntry
+    {
+
+        [Newtonsoft.Json.JsonProperty("Id", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Id { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Time", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset Time { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Action", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AccessAuditEntryAction Action { get; set; } = _42.Platform.Storyteller.Sdk.AccessAuditEntryAction.MemberGranted;
+
+        [Newtonsoft.Json.JsonProperty("Actor", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditActor Actor { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("AccessPointKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AccessPointKey { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Target", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AccessAuditTarget Target { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("OldValue", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string OldValue { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("NewValue", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string NewValue { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Detail", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Detail { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("CorrelationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AccessAuditResponse
+    {
+
+        [Newtonsoft.Json.JsonProperty("Items", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AccessAuditEntry> Items { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ContinuationToken", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ContinuationToken { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Count", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Count { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AccessAuditTarget
+    {
+
+        [Newtonsoft.Json.JsonProperty("Kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AccessAuditTargetKind Kind { get; set; } = _42.Platform.Storyteller.Sdk.AccessAuditTargetKind.Account;
+
+        [Newtonsoft.Json.JsonProperty("Id", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Id { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Name { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class AccessPoint
     {
 
@@ -27235,6 +27493,84 @@ namespace _42.Platform.Storyteller.Sdk
 
         [System.Runtime.Serialization.EnumMember(Value = @"Skip")]
         Skip = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AccessAuditEntryAction
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MemberGranted")]
+        MemberGranted = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MemberRevoked")]
+        MemberRevoked = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MemberRoleChanged")]
+        MemberRoleChanged = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MemberRemoved")]
+        MemberRemoved = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MemberJoined")]
+        MemberJoined = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"AccessPointCreated")]
+        AccessPointCreated = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"AccessPointUpdated")]
+        AccessPointUpdated = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MachineCreated")]
+        MachineCreated = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MachineReset")]
+        MachineReset = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MachineDeleted")]
+        MachineDeleted = 9,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MachineFederationRulesChanged")]
+        MachineFederationRulesChanged = 10,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"MachineAuthenticationPolicyChanged")]
+        MachineAuthenticationPolicyChanged = 11,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"KeyValuePolicyChanged")]
+        KeyValuePolicyChanged = 12,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"FederatedIssuerCreated")]
+        FederatedIssuerCreated = 13,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"FederatedIssuerUpdated")]
+        FederatedIssuerUpdated = 14,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"FederatedIssuerDeleted")]
+        FederatedIssuerDeleted = 15,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"SharedCertificateIssued")]
+        SharedCertificateIssued = 16,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"SharedCertificateRevoked")]
+        SharedCertificateRevoked = 17,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AccessAuditTargetKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Account")]
+        Account = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Machine")]
+        Machine = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Issuer")]
+        Issuer = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Certificate")]
+        Certificate = 3,
 
     }
 
