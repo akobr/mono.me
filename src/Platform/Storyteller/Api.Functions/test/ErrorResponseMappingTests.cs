@@ -27,6 +27,8 @@ public class ErrorResponseMappingTests
         { new JsonPatchException("stale", JsonPatchFailureKind.TestFailed, 0), HttpStatusCode.PreconditionFailed, ErrorCodes.PatchTestFailed },
         { new JsonPatchException("unknown op", JsonPatchFailureKind.Invalid), HttpStatusCode.BadRequest, ErrorCodes.PatchInvalid },
         { new JsonPatchException("no path", JsonPatchFailureKind.OperationFailed, 1), HttpStatusCode.BadRequest, ErrorCodes.PatchInvalid },
+        { new ProjectSettingsInvalidException([new ProjectSettingsProblem("$.DateFormat", ProjectSettingsRules.DateFormat, "not a format")]), HttpStatusCode.BadRequest, ErrorCodes.InvalidSettings },
+        { new ProjectSettingsPreconditionFailedException(7), HttpStatusCode.PreconditionFailed, ErrorCodes.SettingsPreconditionFailed },
     };
 
     [Theory]
@@ -65,6 +67,33 @@ public class ErrorResponseMappingTests
         var objectResult = result.ShouldBeOfType<ObjectResult>();
         objectResult.StatusCode.ShouldBe((int)HttpStatusCode.PreconditionFailed);
         objectResult.Value.ShouldBeOfType<Models.ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.PatchTestFailed);
+    }
+
+    // Every problem, with its path and rule; the message names the first one and their count.
+    [Fact]
+    public void TryMap_InvalidProjectSettings_DetailsEveryProblem()
+    {
+        ProjectSettingsProblem[] problems =
+        [
+            new("$.Types.sbt.Color", ProjectSettingsRules.Color, "'beige' is not a color of the catalog."),
+            new("$.DateFormat", ProjectSettingsRules.DateFormat, "'yy' is not a date format."),
+        ];
+
+        ErrorResponseMapping.TryMap(new ProjectSettingsInvalidException(problems), out _, out var response).ShouldBeTrue();
+
+        response!.Details.ShouldBe(problems);
+        response.Message.ShouldBe("The project settings have 2 problems; the first is $.Types.sbt.Color: 'beige' is not a color of the catalog.");
+        new ProjectSettingsInvalidException([problems[1]]).Message.ShouldBe("The project settings are not valid: $.DateFormat: 'yy' is not a date format.");
+    }
+
+    [Fact]
+    public void TryMap_ProjectSettingsPreconditionFailed_DetailsTheCurrentVersion()
+    {
+        ErrorResponseMapping.TryMap(new ProjectSettingsPreconditionFailedException(7), out _, out var response).ShouldBeTrue();
+
+        response!.Message.ShouldBe("The project settings changed meanwhile; they are at version 7.");
+        response.Details.ShouldBe(new Models.ProjectSettingsVersionDetails(7));
+        FunctionTestDoubles.ToJsonBody(response.Details).ShouldBe("""{"Version":7}""");
     }
 
     [Fact]

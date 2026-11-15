@@ -27,6 +27,9 @@ public enum KeyValueAuditOperation
     RecipientAdded,
     RecipientChanged,
     RecipientRemoved,
+
+    // A change of the project's settings (IProjectSettingsService); Detail names the versions and the changed parts.
+    ProjectSettingsChange,
 }
 
 // One entry of a project's secret audit trail. Never a value.

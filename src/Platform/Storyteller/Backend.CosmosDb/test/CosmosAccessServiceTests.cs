@@ -818,7 +818,7 @@ public class CosmosAccessServiceTests(Startup startup)
             var description = role is AccountRole.Contributor or AccountRole.Administrator ? null : $"A project of a {role}.";
             var pointKey = await CreateProjectAsync(description);
             await GrantAsync(OwnerId, memberId, pointKey, role);
-            expected.Add(new ProjectSummary { Key = pointKey, Role = role, Description = description });
+            expected.Add(new ProjectSummary { Key = pointKey, Role = role, Description = description, Settings = new ProjectSettings() });
         }
 
         // a role on the organization is not a project
@@ -838,7 +838,7 @@ public class CosmosAccessServiceTests(Startup startup)
 
         var projects = await Access.GetProjectsAsync(memberId);
 
-        projects.Should().Equal(new ProjectSummary { Key = pointKey, Role = AccountRole.Reader, Description = "Present." });
+        projects.Should().Equal(new ProjectSummary { Key = pointKey, Role = AccountRole.Reader, Description = "Present.", Settings = new ProjectSettings() });
     }
 
     [Fact]

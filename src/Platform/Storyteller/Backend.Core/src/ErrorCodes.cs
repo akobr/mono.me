@@ -66,6 +66,11 @@ public static class ErrorCodes
     public const string AnnotationPreconditionFailed = "AnnotationPreconditionFailed";
     public const string InvalidPrecondition = "InvalidPrecondition";
 
+    // Project settings: a document that breaks the rules of the catalog (400, Details hold every problem with its JSON
+    // path and rule), and an If-Match of a settings write that names another version (412, Details hold the current one).
+    public const string InvalidSettings = "InvalidSettings";
+    public const string SettingsPreconditionFailed = "SettingsPreconditionFailed";
+
     public const string ValueRequired = "ValueRequired";
     public const string ValueTooLarge = "ValueTooLarge";
     public const string InvalidContentType = "InvalidContentType";

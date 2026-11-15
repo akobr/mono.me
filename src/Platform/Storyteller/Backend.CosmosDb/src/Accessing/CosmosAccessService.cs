@@ -190,10 +190,10 @@ public class CosmosAccessService : IAccessService
             return [];
         }
 
-        // Only the key and the description: the members and the policies of the projects stay unread.
+        // Only the key, the description and the settings: the members and the policies of the projects stay unread.
         // A key whose access point is missing finds no document and is left out.
         var repository = _repositoryProvider.GetCore();
-        var query = new QueryDefinition("SELECT ap.Key, ap.Description FROM ap WHERE ARRAY_CONTAINS(@ids, ap.id)")
+        var query = new QueryDefinition("SELECT ap.Key, ap.Description, ap.Settings FROM ap WHERE ARRAY_CONTAINS(@ids, ap.id)")
             .WithParameter("@ids", roles.Keys.Select(key => $"apt.{key}").ToList());
         using var iterator = repository.Container.GetItemQueryIterator<ProjectDescriptionRow>(
             query,
@@ -207,7 +207,13 @@ public class CosmosAccessService : IAccessService
             {
                 if (roles.TryGetValue(project.Key, out var role))
                 {
-                    projects.Add(new ProjectSummary { Key = project.Key, Role = role, Description = project.Description });
+                    projects.Add(new ProjectSummary
+                    {
+                        Key = project.Key,
+                        Role = role,
+                        Description = project.Description,
+                        Settings = project.Settings?.ToModel() ?? new ProjectSettings(),
+                    });
                 }
             }
         }
@@ -1158,5 +1164,8 @@ public class CosmosAccessService : IAccessService
         public required string Key { get; init; }
 
         public string? Description { get; init; }
+
+        // Absent until the first settings write: the defaults.
+        public ProjectSettingsEntity? Settings { get; init; }
     }
 }

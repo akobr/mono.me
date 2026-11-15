@@ -41,12 +41,7 @@ public static class ErrorResponseMapping
         {
             ErrorCode = errorCode,
             Hint = exception.TryGetErrorHint(),
-            Details = exception switch
-            {
-                KeyValueImportInvalidException e => e.Items,
-                StepUpRequiredException e => new StepUpDetails(e.MaxAgeSeconds),
-                _ => null,
-            },
+            Details = DetailsOf(exception),
         };
         return true;
     }
@@ -59,5 +54,19 @@ public static class ErrorResponseMapping
         }
 
         return new ObjectResult(response) { StatusCode = (int)statusCode };
+    }
+
+    // The failing items of an import, the problems of invalid project settings, and the current version of project
+    // settings whose If-Match named another.
+    private static object? DetailsOf(Exception exception)
+    {
+        return exception switch
+        {
+            KeyValueImportInvalidException e => e.Items,
+            StepUpRequiredException e => new StepUpDetails(e.MaxAgeSeconds),
+            ProjectSettingsInvalidException e => e.Problems,
+            ProjectSettingsPreconditionFailedException e => new ProjectSettingsVersionDetails(e.CurrentVersion),
+            _ => null,
+        };
     }
 }

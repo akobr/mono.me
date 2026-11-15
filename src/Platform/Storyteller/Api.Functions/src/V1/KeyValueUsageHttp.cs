@@ -32,14 +32,14 @@ public class KeyValueUsageHttp
     }
 
     [Function(nameof(GetKeyValueAudit))]
-    [OpenApiOperation(Definitions.RouteIds.KeyValues.GetKeyValueAudit, Definitions.Tags.KeyValues, Description = "The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy or the keys, and the aggregated binding reads. Never a value. Administrator only.")]
+    [OpenApiOperation(Definitions.RouteIds.KeyValues.GetKeyValueAudit, Definitions.Tags.KeyValues, Description = "The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy, the keys or the project settings, and the aggregated binding reads. Never a value. Administrator only.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "Only events of this view.")]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "Only events of this key.")]
-    [OpenApiParameter(Definitions.Parameters.Operation, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved).")]
+    [OpenApiParameter(Definitions.Parameters.Operation, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved, ProjectSettingsChange).")]
     [OpenApiParameter(Definitions.Parameters.From, In = ParameterLocation.Query, Required = false, Type = typeof(DateTimeOffset), Description = "Only events at or after this time.")]
     [OpenApiParameter(Definitions.Parameters.To, In = ParameterLocation.Query, Required = false, Type = typeof(DateTimeOffset), Description = "Only events before this time.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]

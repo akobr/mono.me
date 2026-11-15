@@ -27,4 +27,8 @@ public record class AccessPointEntity
 
     // The description of a project; absent for an organization and in documents stored before descriptions.
     public string? Description { get; init; }
+
+    // The settings of a project (IProjectSettingsService); absent for an organization and until the first settings write,
+    // which the readers take as the defaults.
+    public ProjectSettingsEntity? Settings { get; init; }
 }

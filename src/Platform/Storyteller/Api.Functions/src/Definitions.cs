@@ -38,6 +38,10 @@ public static class Definitions
                 // The caller's projects; "access" is a reserved organization name, so no organization route meets it.
                 public const string Projects = "v1/access/projects";
 
+                // The settings of a project. The constraint keeps v1/access/points/settings for GetAccessPoint and
+                // PutAccessPoint; "settings" is a reserved project and view name, so no view route meets it.
+                public const string ProjectSettings = $"v1/{{{Parameters.Organization}{Constraints.Organization}}}/{{{Parameters.Project}}}/settings";
+
                 public const string Grant = "v1/access/grant";
                 public const string Revoke = "v1/access/revoke";
 
@@ -274,6 +278,10 @@ public static class Definitions
             public const string CreateAccessPoint = nameof(CreateAccessPoint);
             public const string UpdateAccessPoint = nameof(UpdateAccessPoint);
             public const string GetProjects = nameof(GetProjects);
+
+            public const string GetProjectSettings = nameof(GetProjectSettings);
+            public const string SetProjectSettings = nameof(SetProjectSettings);
+            public const string PatchProjectSettings = nameof(PatchProjectSettings);
 
             public const string GrantUserAccess = nameof(GrantUserAccess);
             public const string RevokeUserAccess = nameof(RevokeUserAccess);
@@ -567,6 +575,10 @@ public static class Definitions
         // Project metadata: every machine of the project reads it, also one restricted to an annotation.
         public const string ResponseForbiddenViews = MetadataForbidden + " A machine needs one of the scopes " + Scopes.Annotation.Read + " or " + Scopes.Configuration.Read + " (AccessDenied); discovering the views (discover=true) is for users only.";
         public const string ResponseForbiddenBindingCatalog = MetadataForbidden + MachineNeedsScope + Scopes.Configuration.Read + MachineDenied;
+        public const string ResponseForbiddenProjectSettings = MetadataForbidden + " A machine needs one of the scopes " + Scopes.Annotation.Read + " or " + Scopes.Configuration.Read + " (AccessDenied).";
+
+        // The writes of project settings: users with the Administrator role only, a machine is refused first.
+        public const string ResponseForbiddenProjectSettingsWrite = ResponseForbiddenUserOnly + " Changing the project settings needs the Administrator role.";
 
         // Create, reset and the federation rules: a machine's scopes may not exceed what its creator may do or grant.
         public const string ResponseForbiddenMachineScopes = ResponseForbiddenUserOnly + " Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied). Creating, resetting or replacing the federation rules of a machine with a Secrets scope is refused when the token acts through an actor that may not reveal secrets (ErrorCode ActorRestricted).";
@@ -634,6 +646,19 @@ public static class Definitions
         public const string StepUpUnauthorized = " These have no body. A user whose sign-in is older than Auth:StepUp:MaxAge, or whose token carries no usable sign-in time (auth_time), gets an ErrorResponse with ErrorCode " + ErrorCodes.StepUpRequired + " and Details.MaxAge in seconds, and WWW-Authenticate: Bearer error=\"insufficient_user_authentication\", max_age; sign in again (with max_age) and repeat the request: a new token needs a recent auth_time, a refreshed one does not count (RFC 9470).";
 
         public const string StepUpChallenge = "With " + ErrorCodes.StepUpRequired + ": Bearer error=\"insufficient_user_authentication\", error_description, and max_age, the seconds a sign-in counts (RFC 9470). Cross-origin browser code cannot read it; the body carries the same max age.";
+
+        // The project settings (access.md, Project settings): a strong tag of their Version, conditions of the writes.
+        public const string ProjectSettingsEntityTag = "Strong entity tag of the project settings: their Version in quotes, such as \"7\" (\"0\" before the first write), so a client that cannot read the header (a browser on another origin) builds it from the body. For If-None-Match of a read and If-Match of a write.";
+        public const string CacheControlProjectSettings = "private, no-cache: shared caches do not store the response, and a client revalidates its copy before each use.";
+        public const string IfNoneMatchProjectSettings = "One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.";
+        public const string IfMatchProjectSettings = "* or one or more entity tags of reads of the settings (their Version in quotes, such as \"7\"). The write happens only when the settings are at one of these versions (* matches any, as the settings always exist); otherwise 412 (ErrorCode SettingsPreconditionFailed, Details.Version is the current version). The comparison is strong, so a weak tag never matches. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition), and so is If-None-Match, as the settings always exist.";
+        public const string ResponseNotModifiedProjectSettings = "The settings are unchanged since the ETag sent in If-None-Match.";
+        public const string ResponseBadRequestProjectSettings = "The settings break a rule of the catalog (ErrorCode InvalidSettings; Details list every problem with its Path, Rule and Message, and Message names the first and their count), or a condition header is not valid (ErrorCode InvalidPrecondition).";
+        public const string ResponseBadRequestProjectSettingsPatch = "The body is not JSON or not a JSON object (ErrorCode PatchInvalid), the patched settings break a rule of the catalog (ErrorCode InvalidSettings; Details list every problem with its Path, Rule and Message, and Message names the first and their count), or a condition header is not valid (ErrorCode InvalidPrecondition).";
+        public const string ResponsePreconditionFailedProjectSettings = "If-Match names another version of the settings (ErrorCode SettingsPreconditionFailed); Details.Version is the current version. Read them again and retry.";
+        public const string ResponseConflictProjectSettings = "The project changed concurrently twice in a row (ErrorCode Conflict); try again.";
+        public const string ResponseNotFoundProjectSettings = "The project doesn't exist.";
+        public const string ResponseBodyTooLargeProjectSettings = "The request body is larger than 16 KiB (ErrorCode BodyTooLarge).";
 
         // ?format= of the effective and resolved reads (configuration-formats.md, API).
         public const string ConfigurationFormat = "The representation of the body, in any casing. json, the default (also when empty), is the Configuration model. flat, properties, env and yaml are its Content alone, without the envelope: a JSON object of IConfiguration keys and string values, Spring Boot properties, a .env file or YAML. Each format has its own ETag. Any other value, or the parameter repeated, answers 400 (ErrorCode InvalidQuery).";

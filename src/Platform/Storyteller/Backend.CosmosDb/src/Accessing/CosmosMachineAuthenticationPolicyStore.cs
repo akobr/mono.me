@@ -61,7 +61,7 @@ public class CosmosMachineAuthenticationPolicyStore : IMachineAuthenticationPoli
         var accessPointId = $"apt.{organization}.{project}";
         var partitionKey = new PartitionKey(Partition);
 
-        // Replaced with its ETag, so a membership or a key/value policy saved meanwhile is never overwritten; such a
+        // Replaced with its ETag, so a membership, the settings or a key/value policy saved meanwhile is never overwritten; such a
         // write only moves the ETag, so one retry suffices.
         for (var attempt = 1; ; attempt++)
         {
