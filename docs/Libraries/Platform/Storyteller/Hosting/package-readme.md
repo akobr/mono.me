@@ -43,6 +43,7 @@ builder.Services.AddStoryteller()
 
 - `IStorytellerSubscriptions.WatchAsync` gives `Added` for every current subscription, then `Added`, `Changed` and `Removed` as they happen, each with the subject's execution, usage and document.
 - A watcher catches the failures of `Get(subject)` per subject: `OptionsValidationException` for a subject that left since the event, `StorytellerConfigurationException` for a document that does not bind. One tenant's document must not stop the host that serves every tenant.
+- Who am I's `GetEffectiveTimeZone()` gives the time zone of the key: the first `TimeZone` that is set on its annotation or on an ancestor, the nearest first. It is `null` when none sets one, so the fallback is the caller's, for example `?? "UTC"`.
 - The settings are the provider's: `STORYTELLER_ENDPOINT`, `STORYTELLER_KEY` and the variables of the machine's credential, or the same options in code.
 - Who am I and the catalogs need `Annotation.Read`; the subscriptions also need `Configuration.Read`, and `Secrets.Read` for secrets. The informer needs an unrestricted machine, or one restricted to the responsibility. A machine restricted to an annotation targets that annotation and those under it.
 - A new child does not move its parent's `Modified`, so a watch raises no change of the parent for it: watch the children's type instead.

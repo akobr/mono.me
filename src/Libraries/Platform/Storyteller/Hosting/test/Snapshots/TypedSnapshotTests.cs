@@ -204,6 +204,47 @@ public sealed class TypedSnapshotTests
         deleted.ShouldBeOfType<StorytellerResponsibility>().UnitNames.ShouldBe(["daily"]);
     }
 
+    // The SDK's TimeZone as the mapper takes it: a blank one is none, and any other one stays as stored, untrimmed.
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", null)]
+    [InlineData("   ", null)]
+    [InlineData("\t\r\n", null)]
+    [InlineData("Europe/Prague", "Europe/Prague")]
+    [InlineData("Central Europe Standard Time", "Central Europe Standard Time")]
+    [InlineData(" Europe/Prague ", " Europe/Prague ")]
+    public void TheTimeZone_IsTheOneOfTheBody_AndNullForABlankOne(string? stored, string? timeZone)
+    {
+        var annotation = JObject.Parse(TestAnnotations.Json("sbt.northwind")).ToObject<Annotation>()!;
+        annotation.TimeZone = stored;
+
+        var snapshot = AnnotationMapper.Map(FullKey.Parse($"{HostingFixture.Scope}.sbt.northwind"), annotation);
+
+        snapshot.TimeZone.ShouldBe(timeZone);
+    }
+
+    // The snapshot of a type is a copy of the base one, and who am I's deleted snapshot a copy of that.
+    [Theory]
+    [InlineData("rst.invoicing")]
+    [InlineData("unt.invoicing.daily")]
+    [InlineData("sbt.northwind")]
+    [InlineData("usg.northwind.invoicing")]
+    [InlineData("cnt.northwind.prod")]
+    [InlineData("exe.northwind.invoicing.prod")]
+    [InlineData("uxe.northwind.invoicing.prod.daily")]
+    public void TheSnapshotOfEachType_AndItsDeletedCopy_KeepTheTimeZone(string annotationKey)
+    {
+        var snapshot = Map(annotationKey, json => json["TimeZone"] = "Europe/Prague");
+
+        var deleted = snapshot.WithDeletedAt(DeletedAt);
+
+        snapshot.GetType().ShouldBe(SnapshotTypes.Of(AnnotationKey.Parse(annotationKey).Type));
+        snapshot.TimeZone.ShouldBe("Europe/Prague");
+        deleted.GetType().ShouldBe(snapshot.GetType());
+        deleted.DeletedAt.ShouldBe(DeletedAt);
+        deleted.TimeZone.ShouldBe("Europe/Prague");
+    }
+
     // Applications build them for test doubles: what an initializer sets is copied, and null gives an empty list.
     [Fact]
     public void SnapshotsThatAnApplicationBuilt_CopyTheirLists()

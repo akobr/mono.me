@@ -13,10 +13,14 @@ public sealed class ExecutionContextTests : IDisposable
     private const string Responsibility = "rst.invoicing";
     private const string Usage = "usg.northwind.invoicing";
     private const string Context = "cnt.northwind.prod";
+    private const string Unit = "unt.invoicing.daily";
     private const string UnitOfExecution = "uxe.northwind.invoicing.prod.daily";
     private const string LogCategory = "_42.Platform.Storyteller.Sdk.Hosting.ExecutionContext";
 
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(5);
+
+    // One per place of the longest chain.
+    private static readonly string[] Zones = ["Europe/Prague", "America/New_York", "Asia/Tokyo", "Australia/Sydney", "Africa/Cairo", "Europe/Oslo", "Pacific/Auckland"];
 
     private readonly HostingFixture _fixture = new();
 
@@ -534,6 +538,230 @@ public sealed class ExecutionContextTests : IDisposable
         Should.Throw<ArgumentException>(() => context.Find<StorytellerAnnotation>()).Message.ShouldContain("StorytellerAnnotation names no annotation type");
     }
 
+    // The chain order: the nearer annotation first; at the same level the context, then the usage, then the unit, and
+    // the subject before the responsibility.
+    [Theory]
+    [InlineData(UnitOfExecution, new[] { UnitOfExecution, HostingFixture.ExecutionKey, Context, Usage, Unit, Subject, Responsibility })]
+    [InlineData(HostingFixture.ExecutionKey, new[] { HostingFixture.ExecutionKey, Context, Usage, Subject, Responsibility })]
+    [InlineData(Usage, new[] { Usage, Subject, Responsibility })]
+    [InlineData(Context, new[] { Context, Subject })]
+    [InlineData(Unit, new[] { Unit, Responsibility })]
+    [InlineData(Responsibility, new[] { Responsibility })]
+    [InlineData(Subject, new[] { Subject })]
+    public async Task TheChain_IsTheAnnotationOfTheKeyAndItsAncestors_NearestFirst(string annotationKey, string[] chain)
+    {
+        RouteKey(annotationKey);
+
+        var context = await WhoAmI().GetAsync();
+
+        context.Chain.Select(annotation => annotation.AnnotationKey).ShouldBe(chain);
+        context.Chain[0].ShouldBeSameAs(context.Annotation);
+        context.Chain.Skip(1).ShouldBe(context.Ancestors.Values, ignoreOrder: true);
+        context.Chain.ShouldBeSameAs(context.Chain);
+        context.Unreadable.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(UnitOfExecution, new[] { HostingFixture.ExecutionKey, Usage }, new[] { UnitOfExecution, Context, Unit, Subject, Responsibility })]
+    [InlineData(HostingFixture.ExecutionKey, new[] { Context, Subject }, new[] { HostingFixture.ExecutionKey, Usage, Responsibility })]
+    [InlineData(HostingFixture.ExecutionKey, new[] { Context, Usage, Subject, Responsibility }, new[] { HostingFixture.ExecutionKey })]
+    [InlineData(Usage, new[] { Subject }, new[] { Usage, Responsibility })]
+    [InlineData(Context, new[] { Subject }, new[] { Context })]
+    [InlineData(Unit, new[] { Responsibility }, new[] { Unit })]
+    public async Task AnUnreadableAncestor_IsNotInTheChain(string annotationKey, string[] restricted, string[] chain)
+    {
+        RouteKey(annotationKey);
+
+        foreach (var ancestor in restricted)
+        {
+            _fixture.RouteStatus(ancestor, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+        }
+
+        var context = await WhoAmI().GetAsync();
+
+        context.Unreadable.ShouldBe(restricted.Select(Full), ignoreOrder: true);
+        context.Chain.Select(annotation => annotation.AnnotationKey).ShouldBe(chain);
+    }
+
+    [Theory]
+    [InlineData(UnitOfExecution, new[] { Context, Unit }, new[] { UnitOfExecution, HostingFixture.ExecutionKey, Usage, Subject, Responsibility })]
+    [InlineData(HostingFixture.ExecutionKey, new[] { Usage }, new[] { HostingFixture.ExecutionKey, Context, Subject, Responsibility })]
+    [InlineData(Usage, new[] { Responsibility }, new[] { Usage, Subject })]
+    [InlineData(Context, new[] { Subject }, new[] { Context })]
+    [InlineData(Unit, new[] { Responsibility }, new[] { Unit })]
+    public async Task AMissingAncestor_IsNotInTheChain(string annotationKey, string[] missing, string[] chain)
+    {
+        RouteKey(annotationKey);
+
+        foreach (var ancestor in missing)
+        {
+            _fixture.RouteStatus(ancestor, HttpStatusCode.NotFound);
+        }
+
+        var context = await WhoAmI().GetAsync();
+
+        context.Unreadable.ShouldBeEmpty();
+        context.Chain.Select(annotation => annotation.AnnotationKey).ShouldBe(chain);
+    }
+
+    // A test double of who am I has the chain too: it comes from Annotation and Ancestors, not from a read.
+    [Fact]
+    public void AContextThatAnApplicationBuilt_HasItsChain()
+    {
+        var execution = Snapshot(HostingFixture.ExecutionKey);
+        var usage = Snapshot(Usage);
+        var subject = Snapshot(Subject);
+        var responsibility = Snapshot(Responsibility);
+        var ancestors = new Dictionary<AnnotationType, StorytellerAnnotation>
+        {
+            [AnnotationType.Responsibility] = responsibility,
+            [AnnotationType.Subject] = subject,
+            [AnnotationType.Usage] = usage,
+        };
+        var context = new StorytellerExecutionContext
+        {
+            Key = execution.Key,
+            Annotation = execution,
+            Ancestors = ancestors,
+            Unreadable = [Full(Context)],
+            ReadAt = _fixture.Time.GetUtcNow(),
+        };
+
+        ancestors.Clear();
+
+        context.Chain.ShouldBe([execution, usage, subject, responsibility]);
+        context.Chain.ShouldBeSameAs(context.Chain);
+        Should.Throw<NotSupportedException>(() => ((IList<StorytellerAnnotation>)context.Chain).Add(usage));
+    }
+
+    [Fact]
+    public void AContextBuiltWithoutAncestors_HasTheChainOfItsAnnotationAlone()
+    {
+        var usage = Snapshot(Usage);
+        var context = new StorytellerExecutionContext { Key = usage.Key, Annotation = usage, ReadAt = _fixture.Time.GetUtcNow() };
+
+        context.Chain.ShouldHaveSingleItem().ShouldBeSameAs(usage);
+        context.GetEffectiveTimeZone().ShouldBeNull();
+    }
+
+    // Only a test double can put an ancestor of the key's own type there. The members give the key's annotation for
+    // that type, so the chain leaves the ancestor out, and its zone with it.
+    [Fact]
+    public void AnAncestorOfTheTypeOfTheKey_IsNotInTheChain()
+    {
+        var usage = Snapshot(Usage);
+        var context = new StorytellerExecutionContext
+        {
+            Key = usage.Key,
+            Annotation = usage,
+            Ancestors = new Dictionary<AnnotationType, StorytellerAnnotation> { [AnnotationType.Usage] = Snapshot("usg.other.invoicing", "Europe/Oslo") },
+            ReadAt = _fixture.Time.GetUtcNow(),
+        };
+
+        context.Usage.ShouldBeSameAs(usage);
+        context.Chain.ShouldHaveSingleItem().ShouldBeSameAs(usage);
+        context.GetEffectiveTimeZone().ShouldBeNull();
+    }
+
+    // The deleted copy of who am I builds its own chain, also when the chain of the previous snapshot was read before.
+    [Fact]
+    public async Task ABackgroundReadThatFindsTheKeyGone_HeadsTheChainWithTheDeletedAnnotation_AndKeepsItsTimeZone()
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteAnnotation(HostingFixture.ExecutionKey, json => json["TimeZone"] = "Europe/Prague");
+        var whoAmI = WhoAmI();
+        var first = await whoAmI.GetAsync();
+        var chain = first.Chain;
+        _fixture.Time.Advance(RefreshInterval);
+        _fixture.RouteStatus(HostingFixture.ExecutionKey, HttpStatusCode.NotFound);
+
+        await whoAmI.GetAsync();
+        await Background(whoAmI);
+        var gone = await whoAmI.GetAsync();
+
+        gone.Chain[0].ShouldBeSameAs(gone.Annotation);
+        gone.Chain[0].DeletedAt.ShouldBe(_fixture.Time.GetUtcNow());
+        gone.Chain.Skip(1).ShouldBe(chain.Skip(1));
+        gone.GetEffectiveTimeZone().ShouldBe("Europe/Prague");
+        first.Chain.ShouldBeSameAs(chain);
+        chain[0].DeletedAt.ShouldBeNull();
+    }
+
+    // Every annotation of the chain sets a zone of its own; then they lose it one by one, the nearest first.
+    [Theory]
+    [InlineData(UnitOfExecution, new[] { UnitOfExecution, HostingFixture.ExecutionKey, Context, Usage, Unit, Subject, Responsibility })]
+    [InlineData(HostingFixture.ExecutionKey, new[] { HostingFixture.ExecutionKey, Context, Usage, Subject, Responsibility })]
+    [InlineData(Usage, new[] { Usage, Subject, Responsibility })]
+    [InlineData(Context, new[] { Context, Subject })]
+    [InlineData(Unit, new[] { Unit, Responsibility })]
+    [InlineData(Responsibility, new[] { Responsibility })]
+    [InlineData(Subject, new[] { Subject })]
+    public async Task TheEffectiveTimeZone_IsTheFirstOneSetAlongTheChain(string annotationKey, string[] chain)
+    {
+        _fixture.Environment["STORYTELLER_KEY"] = Full(annotationKey);
+        var whoAmI = WhoAmI();
+
+        for (var without = 0; without <= chain.Length; without++)
+        {
+            RouteZones(chain, without);
+
+            var context = await whoAmI.RefreshAsync();
+
+            context.GetEffectiveTimeZone().ShouldBe(without < chain.Length ? Zones[without] : null);
+        }
+    }
+
+    [Fact]
+    public async Task TheEffectiveTimeZone_SkipsAnUnreadableAncestor_AndReadsNothing()
+    {
+        _fixture.RouteExecution();
+        _fixture.RouteStatus(Context, HttpStatusCode.Forbidden, TestAnnotations.RestrictedJson);
+        _fixture.RouteAnnotation(Usage, json => json["TimeZone"] = "America/New_York");
+        _fixture.RouteAnnotation(Subject, json => json["TimeZone"] = "Europe/Oslo");
+        var context = await WhoAmI().GetAsync();
+        var requests = _fixture.Http.Requests.Count;
+
+        var zone = context.GetEffectiveTimeZone();
+
+        zone.ShouldBe("America/New_York");
+        context.Unreadable.ShouldBe([Full(Context)]);
+        _fixture.Http.Requests.Count.ShouldBe(requests);
+    }
+
+    // A machine restricted to its execution reads no ancestor, so their zones do not reach it.
+    [Fact]
+    public async Task ARestrictedMachine_WithoutAZoneOfItsOwn_HasNoEffectiveTimeZone()
+    {
+        RouteRestrictedMachine();
+
+        var context = await WhoAmI().GetAsync();
+
+        context.Chain.ShouldHaveSingleItem().ShouldBeSameAs(context.Annotation);
+        context.GetEffectiveTimeZone().ShouldBeNull();
+    }
+
+    // The mapper gives no blank zone, but a snapshot that an application built may carry one: it is not set. The
+    // zone that is set comes back as it is.
+    [Fact]
+    public void TheEffectiveTimeZone_SkipsABlankOne_AndIsAsStored()
+    {
+        var execution = Snapshot(HostingFixture.ExecutionKey, "   ");
+        var context = new StorytellerExecutionContext
+        {
+            Key = execution.Key,
+            Annotation = execution,
+            Ancestors = new Dictionary<AnnotationType, StorytellerAnnotation>
+            {
+                [AnnotationType.Context] = Snapshot(Context, string.Empty),
+                [AnnotationType.Usage] = Snapshot(Usage, " Europe/Prague "),
+                [AnnotationType.Subject] = Snapshot(Subject, "Europe/Oslo"),
+            },
+            ReadAt = _fixture.Time.GetUtcNow(),
+        };
+
+        context.GetEffectiveTimeZone().ShouldBe(" Europe/Prague ");
+    }
+
     public void Dispose()
     {
         _fixture.Dispose();
@@ -549,11 +777,34 @@ public sealed class ExecutionContextTests : IDisposable
         return ((ExecutionContextService)whoAmI).BackgroundRead.WaitAsync(HostingFixture.Patience);
     }
 
+    // A base snapshot, as an application builds one for a test double of who am I.
+    private static StorytellerAnnotation Snapshot(string annotationKey, string? timeZone = null)
+    {
+        var key = AnnotationKey.Parse(annotationKey);
+        return new StorytellerAnnotation { Key = Full(annotationKey), AnnotationKey = annotationKey, Type = key.Type, Name = key.Name, TimeZone = timeZone };
+    }
+
     // The key of a unit of execution and its six ancestors, all active.
     private void RouteUnitOfExecution()
     {
-        _fixture.Environment["STORYTELLER_KEY"] = Full(UnitOfExecution);
-        _fixture.RouteExecution(UnitOfExecution);
+        RouteKey(UnitOfExecution);
+    }
+
+    // A key of any type and its ancestors, all active.
+    private void RouteKey(string annotationKey)
+    {
+        _fixture.Environment["STORYTELLER_KEY"] = Full(annotationKey);
+        _fixture.RouteExecution(annotationKey);
+    }
+
+    // The annotations of a chain, each with the zone of its place in it, but the first ones, which have none.
+    private void RouteZones(string[] chain, int without)
+    {
+        for (var index = 0; index < chain.Length; index++)
+        {
+            var zone = Zones[index];
+            _fixture.RouteAnnotation(chain[index], index < without ? null : json => json["TimeZone"] = zone);
+        }
     }
 
     // A machine restricted to its execution: every ancestor answers 403 AnnotationRestricted.

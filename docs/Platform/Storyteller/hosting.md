@@ -11,7 +11,7 @@ The package `42.Platform.Storyteller.Hosting` adds the catalog to the [configura
 
 The code is in `src/Libraries/Platform/Storyteller/Hosting/src/`: the public types at its root, the registration (`Container/` and the extension classes), who am I (`Executions/`), the catalogs (`Catalog/`), the reads (`Reading/`), the polling informers (`Informer/`), and the subscriptions with their named options (`Subscriptions/`).
 
-The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md). The typed snapshots and `IStorytellerCatalog` are in [their own spec](../../Libraries/Platform/Storyteller/specs/2026-11-08%20Hosting%20-%20who%20am%20I%20for%20any%20annotation,%20and%20a%20catalog%20and%20informer%20for%20any%20descendants.md). An Aspire AppHost passes the variables with [the Aspire integration](aspire.md). `DotNet.SimpleExecutor` of [the playground](playground.md) runs who am I and both catalogs.
+The design and its decisions are in [the spec](specs/2026-10-27%20Hosting,%20Informer%20and%20Aspire%20for%20.NET.md). The typed snapshots and `IStorytellerCatalog` are in [their own spec](../../Libraries/Platform/Storyteller/specs/2026-11-08%20Hosting%20-%20who%20am%20I%20for%20any%20annotation,%20and%20a%20catalog%20and%20informer%20for%20any%20descendants.md), and the time zone and the chain of a key in [a third one](../../Libraries/Platform/Storyteller/specs/2026-11-12%20Hosting%20-%20time%20zone,%20chain%20status%20and%20managed%20identity%20federation.md). An Aspire AppHost passes the variables with [the Aspire integration](aspire.md). `DotNet.SimpleExecutor` of [the playground](playground.md) runs who am I and both catalogs.
 
 ## Package
 
@@ -226,6 +226,8 @@ Any other key works the same way, `unt`, `sbt`, `usg` and `cnt` included. Each a
 | `Subject`, `Responsibility`, `Usage`, `Context` | The annotation of that type: the key's own, or an ancestor; `null` when it was not read. Typed `StorytellerAnnotation`; a read puts the snapshot of the type there |
 | `Execution` | The key's own for an `exe` key, its parent for a `uxe` key |
 | `Find<T>()` | The annotation of the snapshot type `T`, the key's own or an ancestor: `context.Find<StorytellerUnit>()?.UnitType`, `context.Find<StorytellerResponsibility>()?.UnitNames`. `null` when it was not read, or when it is not a `T`, as a test double's base snapshot. `Find<StorytellerAnnotation>()` throws `ArgumentException` |
+| `Chain` | The key's annotation and its ancestors that were read, nearest first; see [The chain](#the-chain) |
+| `GetEffectiveTimeZone()` | The time zone that applies to the key: the first `TimeZone` that is set along `Chain`, `null` when none is; see [The time zone](#the-time-zone) |
 | `GetSubscriptionStatus(now)` | Whether the subscription is in effect; see below |
 
 ### Reads
@@ -262,6 +264,41 @@ builder.Services.Configure<StorytellerExecutionContextOptions>(options => option
 
 `SwitchKeyAsync` of the provider's refresher does not move who am I. It follows the options' key.
 
+### The chain
+
+`Chain` is the annotation of the key and its ancestors that were read, nearest first:
+
+| Key | Chain |
+| --- | --- |
+| `uxe.{subject}.{responsibility}.{context}.{unit}` | `uxe`, `exe`, `cnt`, `usg`, `unt`, `sbt`, `rst` |
+| `exe.{subject}.{responsibility}.{context}` | `exe`, `cnt`, `usg`, `sbt`, `rst` |
+| `usg.{subject}.{responsibility}` | `usg`, `sbt`, `rst` |
+| `cnt.{subject}.{context}` | `cnt`, `sbt` |
+| `unt.{responsibility}.{unit}` | `unt`, `rst` |
+| `rst.{responsibility}`, `sbt.{subject}` | The key alone |
+
+- **The order.** The nearer annotation comes first. At the same level, the place comes before the capability (the context, then the usage, then the unit), and the subject before the responsibility.
+- **Only what was read.** The chain comes from `Annotation` and `Ancestors`. An ancestor in `Unreadable`, or one that is missing, is not in it.
+- **Read-only**, and never `null`: a key without ancestors has the chain of its own annotation.
+- **Test doubles.** A `StorytellerExecutionContext` that a test built with an initializer has its chain too. An entry of `Ancestors` under the key's own type, which only a test can set, is not in it: the members, such as `Usage` of a `usg` key, give the key's annotation for that type.
+
+### The time zone
+
+An annotation may store a `TimeZone`: the zone in which its validity window, or a unit's schedule, is meant. `GetEffectiveTimeZone()` gives the first one that is set along [the chain](#the-chain), so the nearest annotation that sets one wins. It is `null` when none is set or read.
+
+```csharp
+var context = await self.GetAsync(cancellationToken);
+
+// The platform stores the zone as text and does not check it, so an unknown id is the application's to handle.
+var zone = TimeZoneInfo.TryFindSystemTimeZoneById(context.GetEffectiveTimeZone() ?? "UTC", out var found) ? found : TimeZoneInfo.Utc;
+```
+
+- **As stored.** A zone is an IANA or a Windows id. Hosting neither checks nor converts it; `TimeZoneInfo.TryFindSystemTimeZoneById` takes both on .NET with ICU. A blank one is `null`.
+- **It reads nothing.** An ancestor in `Unreadable` is skipped, so a restricted machine may get another answer than an unrestricted one, or `null`.
+- **The fallback is the caller's**, for example `?? "UTC"`. The project's default time zone is not in the API.
+- **It is not the configuration's rule.** A scalar of the configuration takes the subject after the usage, and the responsibility after the unit (see [What an ancestor changes](inheritance.md#what-an-ancestor-changes)). A time zone takes the nearest annotation that sets one: the usage's before the subject's, and the unit's before the responsibility's.
+- **The status does not use it.** `ValidFrom` and `ExpiresAt` are instants, so a status is the same in every zone.
+
 ### The status of the subscription
 
 `GetSubscriptionStatus(now)` answers the study's "is it active" from the key's annotation, its execution and its usage:
@@ -295,6 +332,7 @@ Who am I and the catalogs hand out immutable snapshots of what the API answered:
 | `Labels` | Never `null` |
 | `Values` | Strings (date-like ones as stored), numbers, booleans and `null`s as Newtonsoft.Json reads them, and `JObject` or `JArray` for objects and arrays. Never `null`. A deep copy per access. |
 | `IsDisabled`, `ValidFrom`, `ExpiresAt` | What the status is evaluated from |
+| `TimeZone` | The zone in which the validity window, or a unit's schedule, is meant: an IANA or a Windows id as stored, neither checked nor converted. `null` when the annotation sets none. See [The time zone](#the-time-zone) |
 | `Created`, `Modified` | The SDK's `AuditStamp`, a copy per access |
 | `DeletedAt` | Set only on a deleted annotation, which only who am I reads |
 | `GetStatus(now)` | The `AnnotationStatus` at `now` |

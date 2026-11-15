@@ -3,8 +3,9 @@ namespace _42.Platform.Storyteller.Sdk.Hosting.Reading;
 // The one mapper of what a point read answered to a snapshot. The type and the names come from the key that was read,
 // and so does the snapshot's type (SnapshotTypes); the rest comes from the body. The relation names and the strings of a
 // unit come from the body only when it is the SDK's type of the key, which its AnnotationType discriminator decides: a
-// body without it, or with another one, gives empty lists and nulls. The snapshot's initializers copy labels, values and
-// audit stamps, so the SDK's mutable objects stay behind.
+// body without it, or with another one, gives empty lists and nulls. A blank TimeZone is none; any other one is kept as
+// stored, untrimmed. The snapshot's initializers copy labels, values and audit stamps, so the SDK's mutable objects stay
+// behind.
 internal static class AnnotationMapper
 {
     // key: as read, the type code lower-cased.
@@ -27,6 +28,7 @@ internal static class AnnotationMapper
             IsDisabled = annotation.IsDisabled == true,
             ValidFrom = annotation.ValidFrom,
             ExpiresAt = annotation.ExpiresAt,
+            TimeZone = string.IsNullOrWhiteSpace(annotation.TimeZone) ? null : annotation.TimeZone,
             Created = annotation.Created,
             Modified = annotation.Modified,
             DeletedAt = annotation.Deletion?.DeletedAt,
