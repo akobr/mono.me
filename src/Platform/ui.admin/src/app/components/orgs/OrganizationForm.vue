@@ -11,9 +11,17 @@ import { errorMessage } from '@/utils/errors'
  * names are asked for together (onboarding and "New organization"), with the description of the project.
  */
 const props = withDefaults(
-  defineProps<{ submitLabel?: string; submit: (values: OrganizationForm) => Promise<void> }>(),
+  defineProps<{
+    submitLabel?: string
+    submit: (values: OrganizationForm) => Promise<void>
+    /** The first field takes the focus when the form shows; the onboarding wizard moves the focus itself. */
+    autofocus?: boolean
+    /** No submit, while the page has another request in flight. */
+    disabled?: boolean
+  }>(),
   {
     submitLabel: 'Create',
+    autofocus: true,
   },
 )
 
@@ -27,7 +35,7 @@ const [project, projectAttrs] = defineField('project')
 const [description, descriptionAttrs] = defineField('description')
 const formError = ref<string>()
 
-const onSubmit = handleSubmit(async (values) => {
+const submitValues = handleSubmit(async (values) => {
   formError.value = undefined
 
   try {
@@ -42,6 +50,15 @@ const onSubmit = handleSubmit(async (values) => {
     }
   }
 })
+
+// The disabled button stops a click and Enter; this stops a submit that comes any other way.
+function onSubmit(event: Event) {
+  if (props.disabled) {
+    event.preventDefault()
+    return
+  }
+  return submitValues(event)
+}
 </script>
 
 <template>
@@ -53,7 +70,13 @@ const onSubmit = handleSubmit(async (values) => {
       :error="errors.organization"
       help="Lower-case letters, digits and hyphens, for example acme."
     >
-      <UInput v-model="organization" v-bind="organizationAttrs" class="w-full" autocomplete="off" autofocus />
+      <UInput
+        v-model="organization"
+        v-bind="organizationAttrs"
+        class="w-full"
+        autocomplete="off"
+        :autofocus="autofocus"
+      />
     </UFormField>
     <UFormField
       label="First project"
@@ -70,7 +93,7 @@ const onSubmit = handleSubmit(async (values) => {
     <UAlert v-if="formError" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="formError" />
     <div class="flex justify-end gap-2">
       <slot name="actions" />
-      <UButton type="submit" :label="submitLabel" :loading="isSubmitting" />
+      <UButton type="submit" :label="submitLabel" :loading="isSubmitting" :disabled="disabled" />
     </div>
   </form>
 </template>

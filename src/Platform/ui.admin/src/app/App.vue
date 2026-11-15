@@ -14,7 +14,10 @@ useDateFormatStore()
 
 // Nothing renders before the first navigation resolves, so the shell never flashes on the login page.
 const ready = computed(() => route.matched.length > 0)
-const layout = computed(() => (route.meta.layout === 'bare' ? BareLayout : DefaultLayout))
+const bare = computed(() => route.meta.layout === 'bare')
+const layout = computed(() => (bare.value ? BareLayout : DefaultLayout))
+// Only the bare layout has a column to widen; the layout itself stays free of the router.
+const layoutProps = computed(() => (bare.value ? { wide: route.meta.wide === true } : {}))
 
 // Not in the e2e mode, so screenshots and Playwright runs see the app only.
 const QueryDevtools =
@@ -26,7 +29,7 @@ const QueryDevtools =
 <template>
   <UApp :toaster="{ position: 'bottom-right' }" :tooltip="{ delayDuration: 300 }">
     <ApiErrorToaster />
-    <component :is="layout" v-if="ready">
+    <component :is="layout" v-if="ready" v-bind="layoutProps">
       <RouterView />
     </component>
     <component :is="QueryDevtools" v-if="QueryDevtools" button-position="bottom-left" />

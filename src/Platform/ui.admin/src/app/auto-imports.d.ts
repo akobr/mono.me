@@ -21,6 +21,7 @@ declare global {
   const hasUnsavedChanges: typeof import('./composables/useUnsavedChanges').hasUnsavedChanges
   const injectBindingAssist: typeof import('./composables/useBindingAssist').injectBindingAssist
   const isRememberedSection: typeof import('./stores/page-memory').isRememberedSection
+  const markSidebarStarted: typeof import('./composables/useSidebar').markSidebarStarted
   const onSignOut: typeof import('./stores/session').onSignOut
   const pollDelays: typeof import('./stores/transfers').pollDelays
   const projectSettingsKey: typeof import('./stores/project-settings').projectSettingsKey
@@ -28,6 +29,7 @@ declare global {
   const rememberedSections: typeof import('./stores/page-memory').rememberedSections
   const runLimited: typeof import('./composables/useAnnotationActions').runLimited
   const shortcutGroups: typeof import('./composables/useShortcutsHelp').shortcutGroups
+  const sidebarStorage: typeof import('./composables/useSidebar').sidebarStorage
   const staticBindingAssist: typeof import('./composables/useBindingAssist').staticBindingAssist
   const typeColorsStyleId: typeof import('./stores/type-appearance').typeColorsStyleId
   const undoKeys: typeof import('./composables/useAnnotationActions').undoKeys
@@ -55,6 +57,7 @@ declare global {
   const useHashScroll: typeof import('./composables/useHashScroll').useHashScroll
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd
   const useNavigationContext: typeof import('./composables/useNavigationContext').useNavigationContext
+  const useOnboardingEnd: typeof import('./composables/useOnboardingEnd').useOnboardingEnd
   const useOverlay: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useOverlay').useOverlay
   const usePageMemory: typeof import('./composables/usePageMemory').usePageMemory
   const usePageMemoryStore: typeof import('./stores/page-memory').usePageMemoryStore
@@ -93,6 +96,9 @@ declare global {
   // @ts-ignore
   export type { DeletedKeyChoice, DeletedKeyCheck } from './composables/useDeletedKeyCheck'
   import('./composables/useDeletedKeyCheck')
+  // @ts-ignore
+  export type { OnboardingEndState } from './composables/useOnboardingEnd'
+  import('./composables/useOnboardingEnd')
   // @ts-ignore
   export type { Capability, RoleScope } from './composables/useRole'
   import('./composables/useRole')

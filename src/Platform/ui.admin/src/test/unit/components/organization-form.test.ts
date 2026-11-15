@@ -4,8 +4,12 @@ import ui from '@nuxt/ui/vue-plugin'
 import { StorytellerError } from '@42for.net/2splatform.sdk'
 import OrganizationForm from '@/components/orgs/OrganizationForm.vue'
 
-function mountForm(submit = vi.fn(async () => {})) {
-  const wrapper = mount(OrganizationForm, { props: { submit }, global: { plugins: [ui] }, attachTo: document.body })
+function mountForm(submit = vi.fn(async () => {}), props: { autofocus?: boolean; disabled?: boolean } = {}) {
+  const wrapper = mount(OrganizationForm, {
+    props: { submit, ...props },
+    global: { plugins: [ui] },
+    attachTo: document.body,
+  })
   const [organization, project] = wrapper.findAll('input')
   return { wrapper, organization: organization!, project: project!, description: wrapper.find('textarea'), submit }
 }
@@ -73,6 +77,56 @@ describe('OrganizationForm (VeeValidate + Zod)', () => {
     await wrapper.find('form').trigger('submit')
 
     await vi.waitFor(() => expect(wrapper.text()).toContain('This organization already exists'))
+    wrapper.unmount()
+  })
+
+  // The dialog of "New organization" opens with the cursor in the first field; the onboarding wizard moves the focus
+  // itself and focuses nothing on its first load (424-267).
+  it('focuses the first field by default', async () => {
+    const { wrapper, organization } = mountForm()
+
+    await vi.waitFor(() => expect(document.activeElement).toBe(organization.element))
+    wrapper.unmount()
+  })
+
+  it('leaves the focus alone without autofocus', async () => {
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    const { wrapper, organization } = mountForm(undefined, { autofocus: false })
+
+    // The autofocus of the input waits for a timer.
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(document.activeElement).not.toBe(organization.element)
+    expect(document.activeElement).toBe(document.body)
+    wrapper.unmount()
+  })
+
+  it('submits with an enabled button by default', () => {
+    const { wrapper } = mountForm()
+
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('does not submit while it is disabled, however the submit comes', async () => {
+    const { wrapper, organization, project, submit } = mountForm(undefined, { disabled: true })
+
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+    await organization.setValue('acme')
+    await project.setValue('billing')
+    const event = new Event('submit', { bubbles: true, cancelable: true })
+    wrapper.find('form').element.dispatchEvent(event)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(submit).not.toHaveBeenCalled()
+    // The page does not reload either.
+    expect(event.defaultPrevented).toBe(true)
+
+    await wrapper.setProps({ disabled: false })
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
+    await wrapper.find('form').trigger('submit')
+    await vi.waitFor(() =>
+      expect(submit).toHaveBeenCalledWith({ organization: 'acme', project: 'billing', description: '' }),
+    )
     wrapper.unmount()
   })
 })

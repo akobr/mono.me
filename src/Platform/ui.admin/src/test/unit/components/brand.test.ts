@@ -51,4 +51,18 @@ describe('brand', () => {
     expect(layout.text()).toContain('Sign in')
     layout.unmount()
   })
+
+  // The onboarding wizard asks for a wider column (424-267); every other bare page keeps the narrow one.
+  it('widens the column of the bare pages only when asked', () => {
+    const column = (props: { wide?: boolean }) => {
+      const layout = mount(BareLayout, { props, slots: { default: () => h('p', 'Sign in') } })
+      const classes = layout.get('p').element.parentElement!.classList
+      layout.unmount()
+      return [...classes].filter((name) => name.startsWith('max-w-'))
+    }
+
+    expect(column({})).toEqual(['max-w-md'])
+    expect(column({ wide: false })).toEqual(['max-w-md'])
+    expect(column({ wide: true })).toEqual(['max-w-2xl'])
+  })
 })
