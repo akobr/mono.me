@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Text.RegularExpressions;
-using _42.Platform.Cli.Commands;
-using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Telemetry;
 using McMaster.Extensions.CommandLineUtils;
-using Moq;
 using Shouldly;
 using Xunit;
 
@@ -19,7 +15,7 @@ public class CommandPathTests
     [Fact]
     public void AnAlias_ReportsThePrimaryNames_AndNoArgument()
     {
-        var result = CreateApplication().Parse("story", "kv", "get", "some-key");
+        var result = SformApplication.Create().Parse("story", "kv", "get", "some-key");
 
         CommandPath.Of(result.SelectedCommand).ShouldBe("sform storyteller kv get");
     }
@@ -27,7 +23,7 @@ public class CommandPathTests
     [Fact]
     public void Login_ReportsAccount()
     {
-        var result = CreateApplication().Parse("login");
+        var result = SformApplication.Create().Parse("login");
 
         CommandPath.Of(result.SelectedCommand).ShouldBe("sform account");
     }
@@ -35,7 +31,7 @@ public class CommandPathTests
     [Fact]
     public void EveryCommandOfTheTree_GivesAPathOfSafeNames()
     {
-        var paths = Descendants(CreateApplication()).Select(CommandPath.Of).ToList();
+        var paths = Descendants(SformApplication.Create()).Select(CommandPath.Of).ToList();
 
         paths.Count.ShouldBeGreaterThan(50);
         paths.ShouldAllBe(path => Regex.IsMatch(path, "^sform( [a-z][a-z0-9-]{0,31}){0,7}$"));
@@ -82,54 +78,18 @@ public class CommandPathTests
     {
         var run = new CommandRun();
 
-        run.RecordParsing(CreateApplication().Parse("story", "kv", "get", "--help").SelectedCommand);
+        run.RecordParsing(SformApplication.Create().Parse("story", "kv", "get", "--help").SelectedCommand);
         (run.Command, run.Information).ShouldBe(("sform storyteller kv get", CommandOutcome.HELP));
 
-        run.RecordParsing(CreateApplication().Parse("--version").SelectedCommand);
+        run.RecordParsing(SformApplication.Create().Parse("--version").SelectedCommand);
         (run.Command, run.Information).ShouldBe(("sform", CommandOutcome.VERSION));
 
-        run.RecordParsing(CreateApplication().Parse("story", "kv", "get", "some-key").SelectedCommand);
+        run.RecordParsing(SformApplication.Create().Parse("story", "kv", "get", "some-key").SelectedCommand);
         (run.Command, run.Information).ShouldBe(("sform storyteller kv get", null));
-    }
-
-    // As the host builds it, without its services: every constructor dependency is a mock.
-    private static CommandLineApplication<PlatformCommand> CreateApplication()
-    {
-        var app = new CommandLineApplication<PlatformCommand>(NullConsole.Singleton);
-        app.Conventions.UseDefaultConventions().UseConstructorInjection(new MockingServiceProvider());
-        return app;
     }
 
     private static IEnumerable<CommandLineApplication> Descendants(CommandLineApplication command)
     {
         return new[] { command }.Concat(command.Commands.SelectMany(Descendants));
-    }
-
-    private sealed class MockingServiceProvider : IServiceProvider
-    {
-        public object? GetService(Type serviceType)
-        {
-            if (serviceType == typeof(IServiceProvider))
-            {
-                return this;
-            }
-
-            // The settings of the process are plain classes, not mocked.
-            var paths = CliPaths.Create(new MockFileSystem(), null, MockUnixSupport.Path(@"C:\tools\sform"), () => MockUnixSupport.Path(@"C:\Users\ada"));
-
-            if (serviceType == typeof(CliPaths))
-            {
-                return paths;
-            }
-
-            if (serviceType == typeof(SformEnvironment))
-            {
-                return SformEnvironment.FromEnvironment(_ => null, paths);
-            }
-
-            return serviceType.IsInterface || serviceType.IsAbstract
-                ? ((Mock)Activator.CreateInstance(typeof(Mock<>).MakeGenericType(serviceType))!).Object
-                : null;
-        }
     }
 }
