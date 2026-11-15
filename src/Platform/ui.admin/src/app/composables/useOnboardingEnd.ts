@@ -55,10 +55,16 @@ export function useOnboardingEnd(exhibition: () => Exhibition | undefined) {
     }
 
     session.setAccount(account!)
-    await router.replace(path)
+    try {
+      await router.replace(path)
+    } catch {
+      // The navigation itself failed (a page that did not load, for one). The account exists and is in the session, so
+      // the wizard cannot go on; a full load of the target ends it as well.
+      window.location.replace(router.resolve(path).href)
+    }
   }
 
-  /** The join of a user who has an account by now. It never throws: its failure belongs to the page, not to the form. */
+  /** The join of a user who has an account by now. Its failure is never thrown: it belongs to the page, not the form. */
   async function join(target: Exhibition): Promise<void> {
     try {
       account = await joinExhibition()

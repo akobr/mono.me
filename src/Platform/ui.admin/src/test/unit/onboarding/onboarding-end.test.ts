@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from 'vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
@@ -82,6 +82,25 @@ describe('useOnboardingEnd', () => {
     // The account stays out of the session until the wizard leaves.
     expect(session.account).toBeNull()
     expect(router.currentRoute.value.path).toBe('/onboarding')
+  })
+
+  // A navigation rejects when a guard throws or a page does not load. By then the session has the account, and the
+  // guard would send every further step of the wizard to "/": a full load of the target ends the wizard instead.
+  it('ends with a full load of the target when the last navigation fails', async () => {
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => undefined)
+    const { end, router, session } = await mountEnd()
+    router.beforeEach((to) => {
+      if (to.path !== '/onboarding') {
+        throw new Error('The page did not load.')
+      }
+    })
+
+    // Nothing is thrown for the form to show as its own.
+    await expect(end.createOrganization(values, false)).resolves.toBeUndefined()
+
+    expect(session.account?.AccessMap).toEqual({ globex: 'Owner', 'globex.portal': 'Owner' })
+    expect(replace).toHaveBeenCalledExactlyOnceWith('/globex/portal/default/annotations')
+    replace.mockRestore()
   })
 
   it('does nothing in a state that has no such way on', async () => {

@@ -349,6 +349,24 @@ describe('the steps of the onboarding wizard', () => {
     expect(count('GET /access/exhibition')).toBe(3)
   })
 
+  it('goes on to the organization when a Retry finds that the deployment has no exhibition', async () => {
+    server.use(http.get(exhibitionUrl, () => HttpResponse.json({ Message: 'The database is down.' }, { status: 500 })))
+    const view = await mountWizard('/onboarding?step=exhibition')
+    expect(stepHeadings()).toEqual(['Join the exhibition'])
+    expect(stepLabels()).toHaveLength(4)
+
+    server.use(http.get(exhibitionUrl, () => new HttpResponse(null, { status: 404 })))
+    await click(button('Retry'))
+
+    // The step is gone; the one that followed it shows, not the first one.
+    await eventually(() =>
+      expect(stepLabels()).toEqual(['Step 1: Welcome', 'Step 2: Security', 'Step 3: Organization']),
+    )
+    await eventually(() => expect(stepHeadings()).toEqual(['Create your organization']))
+    expect(view.route().query.step).toBe('organization')
+    expect(currentSteps()).toEqual(['Step 3: Organization'])
+  })
+
   it('waits 5 seconds for the exhibition, then goes on with Retry in step 3', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     hold('get', exhibitionUrl)
@@ -809,6 +827,8 @@ describe('the failures of the end of the wizard', () => {
     expect(button('Continue without the exhibition')?.disabled).toBe(false)
     expect(alerts()).toHaveLength(1)
     expect(view.route().path).toBe('/onboarding')
+    // The button dropped the focus while it worked, and has it back.
+    await eventually(() => expect(document.activeElement).toBe(button('Try again')))
 
     server.resetHandlers()
     await click(button('Try again'))
@@ -956,6 +976,8 @@ describe('the failures of the end of the wizard', () => {
     expect(fields().map((field) => field.value)).toEqual(['globex', 'portal', ''])
     expect(button('Create and continue')?.disabled).toBe(false)
     expect(button('Continue with the exhibition only')?.disabled).toBe(false)
+    // The button to try again has the focus back, which it dropped while it worked.
+    await eventually(() => expect(document.activeElement).toBe(button('Continue with the exhibition only')))
     expect(setAccount).not.toHaveBeenCalled()
     expect(session.accountStatus).toBe('missing')
     await click(button('Back'))
