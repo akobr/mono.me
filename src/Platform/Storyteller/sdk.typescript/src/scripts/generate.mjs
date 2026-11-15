@@ -1,10 +1,12 @@
-// Regenerates src/generated from an OpenAPI document and sets the package version from info.version.
+// Regenerates src/generated from an OpenAPI document and the catalog of project settings, and sets the package version
+// from info.version.
 // Usage: npm run generate                       (newest ../open.api.v*.json)
 //        SPEC=../open.api.v0.9.0.json npm run generate
 import { execSync } from 'node:child_process'
 import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { writeCatalog } from './generate-catalog.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const specDirectory = resolve(root, '..')
@@ -36,6 +38,9 @@ console.log(`Generating the SDK from ${spec}`)
 
 rmSync(join(root, 'generated'), { recursive: true, force: true })
 execSync('npx orval --config orval.config.ts', { cwd: root, stdio: 'inherit', env: { ...process.env, SPEC: spec } })
+
+// generated/catalog/project-settings.ts from ../../conformance/project-settings.json, after Orval: the folder was removed.
+await writeCatalog()
 
 // "0.8.91.29486" → "0.8.91": the npm version follows the API's major.minor.patch.
 const document = JSON.parse(readFileSync(resolve(root, spec), 'utf8'))

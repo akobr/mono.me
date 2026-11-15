@@ -8,9 +8,11 @@ namespace _42.Platform.Storyteller.Api.OpenApi.Filters;
 // The schemas of project settings. Their members describe the catalog they come from (conformance/project-settings.json)
 // instead of listing its values as enums, so the SDKs carry no second copy of the colors, icons, date formats and time
 // zones. The merge patch has every member optional and nullable (RFC 7396: null removes), also the members of a type,
-// which it states inline: a reference to ProjectTypeAppearance cannot be nullable in OpenAPI 3.0.
+// which ProjectTypeAppearanceMergePatch states: a reference to ProjectTypeAppearance cannot be nullable in OpenAPI 3.0.
 public class ProjectSettingsDocumentFilter : IDocumentFilter
 {
+    public const string AppearancePatchSchema = "ProjectTypeAppearanceMergePatch";
+
     private const string Catalog = "the catalog of project settings (conformance/project-settings.json)";
 
     private static readonly Dictionary<string, string> SettingsMembers = new(StringComparer.Ordinal)
@@ -62,6 +64,17 @@ public class ProjectSettingsDocumentFilter : IDocumentFilter
             property.Nullable = true;
         }
 
+        // A schema of its own, nullable itself, rather than an inline one, which NSwag would name Anonymous.
+        schemas[AppearancePatchSchema] = new OpenApiSchema
+        {
+            Type = "object",
+            Nullable = true,
+            Description = "A merge patch of the appearance of one annotation type: a member left out keeps its value, null goes back to its built-in value; a null type goes back to its built-in appearance.",
+            Properties = AppearanceMembers.ToDictionary(
+                member => member.Key,
+                member => new OpenApiSchema { Type = "string", Nullable = true, Description = member.Value }),
+        };
+
         patch.Properties[nameof(ProjectSettingsMergePatch.Types)] = new OpenApiSchema
         {
             Type = "object",
@@ -69,11 +82,7 @@ public class ProjectSettingsDocumentFilter : IDocumentFilter
             Description = SettingsMembers[nameof(ProjectSettings.Types)] + " A null type goes back to its built-in appearance, a null member of a type to its built-in value.",
             AdditionalProperties = new OpenApiSchema
             {
-                Type = "object",
-                Nullable = true,
-                Properties = AppearanceMembers.ToDictionary(
-                    member => member.Key,
-                    member => new OpenApiSchema { Type = "string", Nullable = true, Description = member.Value }),
+                Reference = new OpenApiReference { Type = ReferenceType.Schema, Id = AppearancePatchSchema },
             },
         };
     }

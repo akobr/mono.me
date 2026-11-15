@@ -218,7 +218,7 @@
     {
       "command": "storyteller kv audit",
       "option": "--operation",
-      "values": [ "Reveal", "Export", "BindingRead", "Create", "Update", "Delete", "Restore", "PermanentDelete", "Purge", "Reprotect", "Import", "PolicyChange", "Rotate", "Rewrap", "ByokVerify", "ByokUnavailable", "RecipientAdded", "RecipientChanged", "RecipientRemoved" ],
+      "values": [ "Reveal", "Export", "BindingRead", "Create", "Update", "Delete", "Restore", "PermanentDelete", "Purge", "Reprotect", "Import", "PolicyChange", "Rotate", "Rewrap", "ByokVerify", "ByokUnavailable", "RecipientAdded", "RecipientChanged", "RecipientRemoved", "ProjectSettingsChange" ],
       "enum": "_42.Platform.Storyteller.Sdk.KeyValueAuditEventOperation",
       "source": "KeyValueAuditCommand.ParseOperation: Enum.TryParse<KeyValueAuditEventOperation>(ignoreCase) and Enum.IsDefined."
     },

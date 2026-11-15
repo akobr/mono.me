@@ -15,13 +15,17 @@ import {
   getKeyValues,
   getMembers,
   getProjects,
+  getProjectSettings,
   getTemplates,
   getViewExport,
   getViewExportArchive,
   getViewImport,
   getViews,
   joinExhibition,
+  patchProjectSettings,
+  projectSettingsEntityTag,
   setMemberRole,
+  setProjectSettings,
   startViewExport,
   startViewImport,
   StorytellerError,
@@ -41,12 +45,16 @@ import {
   GetKeyValuesResponse,
   GetMembersResponse,
   GetProjectsResponse,
+  GetProjectSettingsResponse,
   GetTemplatesResponse,
   GetViewExportResponse,
   GetViewImportResponse,
   GetViewsResponse,
   JoinExhibitionResponse,
+  PatchProjectSettingsBody,
+  PatchProjectSettingsResponse,
   SetMemberRoleBody,
+  SetProjectSettingsResponse,
   StartViewExportResponse,
   StartViewImportResponse,
   UpdateAccessPointResponse,
@@ -72,6 +80,9 @@ describe('generated client against generated mocks', () => {
     ['getExhibition', () => getExhibition(), GetExhibitionResponse],
     ['joinExhibition', () => joinExhibition(), JoinExhibitionResponse],
     ['updateAccessPoint', () => updateAccessPoint('acme.billing', { Description: 'Billing of Acme.' }), UpdateAccessPointResponse],
+    ['getProjectSettings', () => getProjectSettings('acme', 'billing'), GetProjectSettingsResponse],
+    ['setProjectSettings', () => setProjectSettings('acme', 'billing', { Types: { sbt: { Label: 'Company' } } }), SetProjectSettingsResponse],
+    ['patchProjectSettings', () => patchProjectSettings('acme', 'billing', { DateFormat: 'dd.mm.yyyy' }), PatchProjectSettingsResponse],
     ['getViews', () => getViews('acme', 'billing'), GetViewsResponse],
     ['getConfigurations', () => getConfigurations('acme', 'billing', 'default'), GetConfigurationsResponse],
     ['getConfigurationComposition', () => getConfigurationComposition('acme', 'billing', 'default', 'exe.a.b.c'), GetConfigurationCompositionResponse],
@@ -128,6 +139,24 @@ describe('generated client against generated mocks', () => {
     // The leading "*" of the handler URL adds a positional parameter "0" next to the named ones.
     expect(received).toMatchObject({ body: { Role: 'Reader' }, params: { key: 'acme.billing', accountId: 'user_02' }, authorization: 'Bearer token' })
     expect(SetMemberRoleBody.safeParse({ Role: 'Reader' }).success).toBe(true)
+  })
+
+  // The PATCH documents only application/merge-patch+json, so the generated function sends it; null removes a member.
+  it('sends a merge patch of the project settings with its nulls and the If-Match of a version', async () => {
+    let received: unknown
+    server.use(
+      http.patch('*/api/v1/:organization/:project/settings', async ({ request }) => {
+        received = { contentType: request.headers.get('content-type'), ifMatch: request.headers.get('if-match'), body: await request.json() }
+        return HttpResponse.json({ Types: {}, Version: 8 }, { headers: { ETag: '"8"' } })
+      }),
+    )
+    const patch = { Types: { sbt: null, unt: { Label: 'Job', Icon: null } }, DefaultTimeZone: null }
+
+    const settings = await patchProjectSettings('acme', 'billing', patch, { headers: { 'If-Match': projectSettingsEntityTag(7) } })
+
+    expect(settings).toEqual({ Types: {}, Version: 8 })
+    expect(received).toEqual({ contentType: 'application/merge-patch+json', ifMatch: '"7"', body: patch })
+    expect(PatchProjectSettingsBody.safeParse(patch).success).toBe(true)
   })
 
   it('overrides a single operation and surfaces API errors as StorytellerError', async () => {

@@ -4,8 +4,8 @@ using System.Linq;
 
 namespace _42.Platform.Storyteller.Sdk;
 
-// The answer of an annotation read or write with the version it carries: the body, and its ETag to send back in
-// If-Match (a write of only that version) or If-None-Match.
+// The answer of an annotation or project settings read or write with the version it carries: the body, and its ETag to
+// send back in If-Match (a write of only that version) or If-None-Match.
 public sealed class VersionedResponse<TResult>
     where TResult : class
 {

@@ -4,6 +4,7 @@ using System.Text.Json;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.OpenApi;
+using _42.Platform.Storyteller.Api.OpenApi.Filters;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1;
 
@@ -889,7 +890,10 @@ public class OpenApiExportTests
             member.Value.GetProperty("nullable").GetBoolean().ShouldBeTrue(member.Name);
         }
 
-        var type = mergePatch.GetProperty("properties").GetProperty("Types").GetProperty("additionalProperties");
+        // a schema of its own, so NSwag names it (an inline one would be Anonymous)
+        mergePatch.GetProperty("properties").GetProperty("Types").GetProperty("additionalProperties")
+            .GetProperty("$ref").GetString().ShouldBe("#/components/schemas/" + ProjectSettingsDocumentFilter.AppearancePatchSchema);
+        var type = schemas.GetProperty(ProjectSettingsDocumentFilter.AppearancePatchSchema);
         type.GetProperty("nullable").GetBoolean().ShouldBeTrue();
         type.GetProperty("properties").EnumerateObject().Select(member => (member.Name, member.Value.GetProperty("nullable").GetBoolean()))
             .ShouldBe([("Label", true), ("Plural", true), ("Color", true), ("Icon", true)]);

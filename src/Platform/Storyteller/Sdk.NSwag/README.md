@@ -37,6 +37,8 @@ Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (
 
 `src/ApiSdk.Annotations.cs` is hand-written too: it copies the route, the `includeInactive` query, the hooks and the exceptions, with their messages per status, of `GetAnnotationAsync`, `SetAnnotationAsync` and `PatchAnnotationAsync` (see [Annotation versions](#annotation-versions)). After a regeneration, compare it with the three generated methods: a new documented status or a changed message has to be copied by hand.
 
+`src/ApiSdk.ProjectSettings.cs` is hand-written in the same way: it copies the route, the hooks and the exceptions, with their messages per status, of `GetProjectSettingsAsync`, `SetProjectSettingsAsync` and `PatchProjectSettingsAsync` (see [Project settings](#project-settings)). Compare it with the three generated methods after a regeneration.
+
 ## Conditional reads
 
 `IConfigurationsApiClient` has a conditional twin of each configuration read:
@@ -147,6 +149,46 @@ catch (ApiException e) when (e.IsStepUpRequired(out var maxAge))
 * A refresh of the token does not help: it keeps the time of the sign-in.
 * Machines never get it, so the [machine credentials](#machine-credentials) and their handler are not affected.
 * `SecretsWithheldReasons` holds the values of `X-2S-Secrets-Withheld`: `MtlsRequired`, `ActorRestricted` and `StepUpRequired`. A resolved read under the step-up that returns a body answers `200` with the secret bindings unresolved and `step-up-required`. A conditional read that sends back the `ETag` of such a `200` can get `304` with the same header and no body (`IsNotModified`): the cached document is still the unresolved one, so keep it and check `SecretsWithheld` on the `304` too.
+## Project settings
+
+`IAccessApiClient` reads and writes the [settings of a project](../../../../docs/Platform/Storyteller/access.md) (the names, colors and icons of its annotation types, its default time zone and date format) with the generated `GetProjectSettingsAsync`, `SetProjectSettingsAsync` (`PUT`) and `PatchProjectSettingsAsync` (`PATCH`), and with three hand-written twins (`src/ApiSdk.ProjectSettings.cs`) that keep the `ETag`:
+
+```csharp
+var read = await access.GetProjectSettingsConditionalAsync("acme", "billing", etag);
+
+if (!read.IsNotModified)
+{
+    settings = read.Result;          // Types, DefaultTimeZone, DateFormat, Version, Modified
+}
+
+etag = read.ETag;                    // "7": the Version in quotes
+
+settings.Types["sbt"] = new ProjectTypeAppearance { Label = "Company", Color = "pink", Icon = "i-lucide-building-2" };
+
+try
+{
+    var written = await access.SetProjectSettingsVersionedAsync("acme", "billing", settings, ifMatch: etag);
+    etag = written.ETag;             // "8", or "7" again for a write that changed nothing
+}
+catch (ApiException<ErrorResponse> e) when (e.StatusCode == 412)
+{
+    // SettingsPreconditionFailed: they changed since the read (Details.Version is the current version); read them again
+}
+
+// A merge patch with its nulls: the type goes back to its built-in appearance, the time zone to UTC.
+await access.PatchProjectSettingsVersionedAsync("acme", "billing", new JObject
+{
+    ["Types"] = new JObject { ["sbt"] = JValue.CreateNull() },
+    ["DefaultTimeZone"] = JValue.CreateNull(),
+});
+```
+
+* `GetProjectSettingsConditionalAsync(organization, project, ifNoneMatch, cancellationToken)` is `GET v1/{organization}/{project}/settings` with an optional `If-None-Match`, and returns a `ConditionalResponse<ProjectSettings>`: a `304` returns with `IsNotModified` and no `Result`, as the [conditional reads](#conditional-reads) of configurations do. The settings of a project that set none are `Types` `{}`, no `DefaultTimeZone` (UTC), no `DateFormat` (`yyyy-mm-dd`) and `Version` `0`, never a `404`.
+* `SetProjectSettingsVersionedAsync(organization, project, body, ifMatch, cancellationToken)` is the `PUT`: the body replaces the settings, a type left out goes back to its built-in appearance, and `Version` and `Modified` of the body are ignored, so a read can go back as it is.
+* `PatchProjectSettingsVersionedAsync(organization, project, patch, ifMatch, cancellationToken)` is the `PATCH` of a `JObject`, sent as `application/merge-patch+json` as it is: its explicit `null`s stay, so it can remove a type, a member of a type, the time zone or the date format. Any other token throws `ArgumentException` before a request. The generated `PatchProjectSettingsAsync` sends a `ProjectSettingsMergePatch` (a type is a `ProjectTypeAppearanceMergePatch`) as the same media type, but it leaves its `null`s out, so it can set but never remove.
+* Both writes return a `VersionedResponse<ProjectSettings>` with the stored settings and the `ETag` of their version, also for a write that changed nothing. `ifMatch` is `*` or the tags of earlier reads; `null` (the default) or an empty string sends none, and a tag is sent as it came. Without an `ETag` at hand, `"\"" + settings.Version + "\""` is the tag of a read.
+* The methods go through the client's `PrepareRequest` and `ProcessResponse` hooks and throw what the generated methods throw, with the same messages: `ApiException<ErrorResponse>` for a documented status with a body (a `400` `InvalidSettings` whose `Details` list every problem with its `Path`, `Rule` and `Message`, a `403` for a machine or a user without the Administrator role, `404`, `409`, `412`, `413`, a `415` of the patch, `500`), and a plain `ApiException` for a `401`, a body-less status and anything else, a `304` of a write included.
+* Colors, icons, date formats and time zones are strings of the catalog of project settings (`src/Platform/Storyteller/conformance/project-settings.json`); `ProjectSettingsRules` and `ProjectSettingsJson` of `42.Platform.Storyteller.Abstractions.Annotations` check a document as the API does.
 
 ## Credentials
 

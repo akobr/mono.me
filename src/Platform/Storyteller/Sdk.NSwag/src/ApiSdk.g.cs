@@ -66,6 +66,9 @@ namespace _42.Platform.Storyteller.Sdk
         System.Threading.Tasks.Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate body = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// An organization or a project, with its members and policies, and for a project its description and settings (the defaults, Version 0, when none were set). Needs a user with the Administrator role.
+        /// </remarks>
         /// <param name="key">The key of requested access point.</param>
         /// <returns>The access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -83,7 +86,7 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
+        /// Every project where the caller has a role, with the role, the description and the settings (the defaults, Version 0, when none were set), ordered by key. The members and the policies of a project are not included.
         /// </remarks>
         /// <returns>The caller's projects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -393,6 +396,41 @@ namespace _42.Platform.Storyteller.Sdk
         /// <returns>The member was removed.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The settings of the project: the names, colors and icons of its annotation types, the time zone new annotations start in and the date format, for every client to show the project the same way. When nothing was set: Types {}, no DefaultTimeZone (UTC), no DateFormat (yyyy-mm-dd) and Version 0. Every member of the project reads them, also a machine restricted to an annotation; the ETag is the Version in quotes.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
+        /// <returns>The settings of the project, with the ETag of their version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ProjectSettings> GetProjectSettingsAsync(string organization, string project, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version, Modified and Format in the body are ignored, so a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="body">The new settings of the project.</param>
+        /// <param name="if_Match">* or one or more entity tags of reads of the settings (their Version in quotes, such as "7"). The write happens only when the settings are at one of these versions (* matches any, as the settings always exist); otherwise 412 (ErrorCode SettingsPreconditionFailed, Details.Version is the current version). The comparison is strong, so a weak tag never matches. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition), and so is If-None-Match, as the settings always exist.</param>
+        /// <returns>The stored settings, with the ETag of their version; also for a write that changed nothing.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ProjectSettings> SetProjectSettingsAsync(string organization, string project, ProjectSettings body, string if_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Changes members of the settings of the project, merged on the server against their current state. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json; application/json is taken too): a member left out keeps its value, null removes it (a type goes back to its built-in appearance, DefaultTimeZone to UTC, DateFormat to yyyy-mm-dd), Types merge type by type and the members of a type one by one; member names and type codes match case-insensitively. The result is checked as a full write; a patch that changes nothing keeps the version. Needs a user with the Administrator role.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="body">A JSON Merge Patch of the settings (application/merge-patch+json).</param>
+        /// <param name="if_Match">* or one or more entity tags of reads of the settings (their Version in quotes, such as "7"). The write happens only when the settings are at one of these versions (* matches any, as the settings always exist); otherwise 412 (ErrorCode SettingsPreconditionFailed, Details.Version is the current version). The comparison is strong, so a weak tag never matches. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition), and so is If-None-Match, as the settings always exist.</param>
+        /// <returns>The stored settings, with the ETag of their version; also for a patch that changed nothing.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ProjectSettings> PatchProjectSettingsAsync(string organization, string project, ProjectSettingsMergePatch body, string if_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
@@ -1012,6 +1050,9 @@ namespace _42.Platform.Storyteller.Sdk
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// An organization or a project, with its members and policies, and for a project its description and settings (the defaults, Version 0, when none were set). Needs a user with the Administrator role.
+        /// </remarks>
         /// <param name="key">The key of requested access point.</param>
         /// <returns>The access point (organization or project).</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -1255,7 +1296,7 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
+        /// Every project where the caller has a role, with the role, the description and the settings (the defaults, Version 0, when none were set), ordered by key. The members and the policies of a project are not included.
         /// </remarks>
         /// <returns>The caller's projects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
@@ -2513,6 +2554,16 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The project changed concurrently twice in a row (Conflict); try again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -5477,6 +5528,496 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("The last owner can\'t be removed (LastOwner).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The settings of the project: the names, colors and icons of its annotation types, the time zone new annotations start in and the date format, for every client to show the project the same way. When nothing was set: Types {}, no DefaultTimeZone (UTC), no DateFormat (yyyy-mm-dd) and Version 0. Every member of the project reads them, also a machine restricted to an annotation; the ETag is the Version in quotes.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="if_None_Match">One or more entity tags of earlier reads, or *. The comparison is weak. A header that is not a valid list of entity tags is ignored, and the read answers 200.</param>
+        /// <returns>The settings of the project, with the ETag of their version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ProjectSettings> GetProjectSettingsAsync(string organization, string project, string if_None_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (if_None_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-None-Match", ConvertToString(if_None_Match, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/settings"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/settings");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProjectSettings>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 304)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The settings are unchanged since the ETag sent in If-None-Match.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the project does not allow the operation (ErrorCode AccessDenied). A machine needs one of the scopes Annotation.Read or Configuration.Read (AccessDenied).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The project doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Replaces the settings of the project: a type left out goes back to its built-in appearance, a missing DefaultTimeZone or DateFormat to its default. Version, Modified and Format in the body are ignored, so a read or a data set's project-settings.json can be sent back as it is. Every value is checked against the catalog of project settings; a write that changes nothing keeps the version. Needs a user with the Administrator role.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="body">The new settings of the project.</param>
+        /// <param name="if_Match">* or one or more entity tags of reads of the settings (their Version in quotes, such as "7"). The write happens only when the settings are at one of these versions (* matches any, as the settings always exist); otherwise 412 (ErrorCode SettingsPreconditionFailed, Details.Version is the current version). The comparison is strong, so a weak tag never matches. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition), and so is If-None-Match, as the settings always exist.</param>
+        /// <returns>The stored settings, with the ETag of their version; also for a write that changed nothing.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ProjectSettings> SetProjectSettingsAsync(string organization, string project, ProjectSettings body, string if_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (if_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-Match", ConvertToString(if_Match, System.Globalization.CultureInfo.InvariantCulture));
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PUT");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/settings"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/settings");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProjectSettings>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The settings break a rule of the catalog (ErrorCode InvalidSettings; Details list every problem with its Path, Rule and Message, and Message names the first and their count), or a condition header is not valid (ErrorCode InvalidPrecondition).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing).", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Changing the project settings needs the Administrator role.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The project doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The project changed concurrently twice in a row (ErrorCode Conflict); try again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 412)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("If-Match names another version of the settings (ErrorCode SettingsPreconditionFailed); Details.Version is the current version. Read them again and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 413)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request body is larger than 16 KiB (ErrorCode BodyTooLarge).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Changes members of the settings of the project, merged on the server against their current state. The body is a JSON Merge Patch (RFC 7396, application/merge-patch+json; application/json is taken too): a member left out keeps its value, null removes it (a type goes back to its built-in appearance, DefaultTimeZone to UTC, DateFormat to yyyy-mm-dd), Types merge type by type and the members of a type one by one; member names and type codes match case-insensitively. The result is checked as a full write; a patch that changes nothing keeps the version. Needs a user with the Administrator role.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="body">A JSON Merge Patch of the settings (application/merge-patch+json).</param>
+        /// <param name="if_Match">* or one or more entity tags of reads of the settings (their Version in quotes, such as "7"). The write happens only when the settings are at one of these versions (* matches any, as the settings always exist); otherwise 412 (ErrorCode SettingsPreconditionFailed, Details.Version is the current version). The comparison is strong, so a weak tag never matches. A header that is not * or a valid list of entity tags is a 400 (ErrorCode InvalidPrecondition), and so is If-None-Match, as the settings always exist.</param>
+        /// <returns>The stored settings, with the ETag of their version; also for a patch that changed nothing.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ProjectSettings> PatchProjectSettingsAsync(string organization, string project, ProjectSettingsMergePatch body, string if_Match = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (if_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-Match", ConvertToString(if_Match, System.Globalization.CultureInfo.InvariantCulture));
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/merge-patch+json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PATCH");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/settings"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/settings");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProjectSettings>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The body is not JSON or not a JSON object (ErrorCode PatchInvalid), the patched settings break a rule of the catalog (ErrorCode InvalidSettings; Details list every problem with its Path, Rule and Message, and Message names the first and their count), or a condition header is not valid (ErrorCode InvalidPrecondition).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope User.Impersonation is missing).", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Changing the project settings needs the Administrator role.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The project doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The project changed concurrently twice in a row (ErrorCode Conflict); try again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 412)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("If-Match names another version of the settings (ErrorCode SettingsPreconditionFailed); Details.Version is the current version. Read them again and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 413)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request body is larger than 16 KiB (ErrorCode BodyTooLarge).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 415)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The body is neither application/merge-patch+json nor application/json (ErrorCode InvalidContentType); Accept-Patch names the patch format.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -16810,13 +17351,13 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy or the keys, and the aggregated binding reads. Never a value. Administrator only.
+        /// The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy, the keys or the project settings, and the aggregated binding reads. Never a value. Administrator only.
         /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">Only events of this view.</param>
         /// <param name="key">Only events of this key.</param>
-        /// <param name="operation">Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved).</param>
+        /// <param name="operation">Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved, ProjectSettingsChange).</param>
         /// <param name="from">Only events at or after this time.</param>
         /// <param name="to">Only events before this time.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
@@ -20320,13 +20861,13 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <remarks>
-        /// The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy or the keys, and the aggregated binding reads. Never a value. Administrator only.
+        /// The audit trail of the project's secrets, newest first: who revealed, wrote, deleted, restored, exported, imported, re-protected, changed the policy, the keys or the project settings, and the aggregated binding reads. Never a value. Administrator only.
         /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">Only events of this view.</param>
         /// <param name="key">Only events of this key.</param>
-        /// <param name="operation">Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved).</param>
+        /// <param name="operation">Only this operation (Reveal, Export, BindingRead, Create, Update, Delete, Restore, PermanentDelete, Purge, Reprotect, Import, PolicyChange, Rotate, Rewrap, ByokVerify, ByokUnavailable, RecipientAdded, RecipientChanged, RecipientRemoved, ProjectSettingsChange).</param>
         /// <param name="from">Only events at or after this time.</param>
         /// <param name="to">Only events before this time.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
@@ -23598,6 +24139,9 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Description", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Description { get; set; }
 
+        [Newtonsoft.Json.JsonProperty("Settings", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public ProjectSettings Settings { get; set; }
+
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
@@ -26606,6 +27150,81 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectSettings
+    {
+
+        /// <summary>
+        /// The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Types", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.IDictionary<string, ProjectTypeAppearance> Types { get; set; }
+
+        /// <summary>
+        /// The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("DefaultTimeZone", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string DefaultTimeZone { get; set; }
+
+        /// <summary>
+        /// How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("DateFormat", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string DateFormat { get; set; }
+
+        /// <summary>
+        /// Raised by every change, 0 before the first; the ETag is this number in quotes. Ignored in a write.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long Version { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectSettingsMergePatch
+    {
+
+        /// <summary>
+        /// The appearance of each annotation type the project changed, keyed by its lower-case type code (rst, unt, sbt, usg, cnt, exe, uxe; any case in a write). A type left out has its built-in appearance. A null type goes back to its built-in appearance, a null member of a type to its built-in value.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Types", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.IDictionary<string, ProjectTypeAppearanceMergePatch> Types { get; set; }
+
+        /// <summary>
+        /// The IANA time zone id new annotations start in, one of the timeZones of the catalog of project settings (conformance/project-settings.json) in any case, stored in its canonical spelling; absent for UTC. A default of the clients: the API never applies it.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("DefaultTimeZone", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string DefaultTimeZone { get; set; }
+
+        /// <summary>
+        /// How clients show dates: yyyy-mm-dd, dd.mm.yyyy, dd/mm/yyyy, mm/dd/yyyy or d mmm yyyy, the dateFormats of the catalog of project settings (conformance/project-settings.json), in any case; absent for yyyy-mm-dd.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("DateFormat", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string DateFormat { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ProjectSummary
     {
 
@@ -26618,6 +27237,48 @@ namespace _42.Platform.Storyteller.Sdk
 
         [Newtonsoft.Json.JsonProperty("Description", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Description { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Settings", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public ProjectSettings Settings { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectTypeAppearance
+    {
+
+        /// <summary>
+        /// The singular name of the type, such as Company: trimmed, at most 40 characters; absent for the built-in name.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Label", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Label { get; set; }
+
+        /// <summary>
+        /// The plural, only with a Label: trimmed, at most 40 characters; clients derive it from the label when it is absent.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Plural", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Plural { get; set; }
+
+        /// <summary>
+        /// One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Color", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Color { get; set; }
+
+        /// <summary>
+        /// One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Icon", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Icon { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -27490,6 +28151,48 @@ namespace _42.Platform.Storyteller.Sdk
 
     }
 
+    /// <summary>
+    /// A merge patch of the appearance of one annotation type: a member left out keeps its value, null goes back to its built-in value; a null type goes back to its built-in appearance.
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectTypeAppearanceMergePatch
+    {
+
+        /// <summary>
+        /// The singular name of the type, such as Company: trimmed, at most 40 characters; absent for the built-in name.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Label", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Label { get; set; }
+
+        /// <summary>
+        /// The plural, only with a Label: trimmed, at most 40 characters; clients derive it from the label when it is absent.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Plural", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Plural { get; set; }
+
+        /// <summary>
+        /// One of the colors of the catalog of project settings (conformance/project-settings.json), such as pink, in any case; absent for the built-in color.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Color", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Color { get; set; }
+
+        /// <summary>
+        /// One of the icons of the catalog of project settings (conformance/project-settings.json), such as i-lucide-building-2, in any case; absent for the built-in icon.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("Icon", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Icon { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum AccountRole
     {
@@ -28180,6 +28883,9 @@ namespace _42.Platform.Storyteller.Sdk
 
         [System.Runtime.Serialization.EnumMember(Value = @"RecipientRemoved")]
         RecipientRemoved = 18,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ProjectSettingsChange")]
+        ProjectSettingsChange = 19,
 
     }
 

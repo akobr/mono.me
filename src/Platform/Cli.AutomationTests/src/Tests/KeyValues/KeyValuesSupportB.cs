@@ -21,7 +21,7 @@ internal static partial class KeyValuesSupportB
     [
         "Reveal", "Export", "BindingRead", "Create", "Update", "Delete", "Restore", "PermanentDelete", "Purge", "Reprotect",
         "Import", "PolicyChange", "Rotate", "Rewrap", "ByokVerify", "ByokUnavailable", "RecipientAdded", "RecipientChanged",
-        "RecipientRemoved",
+        "RecipientRemoved", "ProjectSettingsChange",
     ];
 
     // An RSA key pair of a recipient: the public key as PEM (SubjectPublicKeyInfo) and as a JWK, the private key as PEM
