@@ -418,7 +418,7 @@ That is 6 + 11 + 500 × 32 = 16,017 annotations. Generators cannot draw, so the 
 
 The scope `fabrikam` / `invoicing-suite` / `default` of the admin UI's showcase mock (`npm run dev:mock`), the B2B SaaS of the documentation: the modules with their jobs, 22 customers with their environments, contracts, deployments and job runs, their configurations, a template and two descendant-type schemas. The Aspire resource `db-seed` seeds it.
 
-**The documents are generated; do not edit them.** `src/Platform/ui.admin/src/test/unit/mock/showcase-set.test.ts` builds the scope under a frozen clock and writes it as a Git export of the view would hold it: an annotation file per active annotation, and the current version of every document. Each file is a file snapshot (`toMatchFileSnapshot`), so `npm test` fails when the mock and the set part, and a last test fails on the files the scope no longer gives. Change the mock instead, and regenerate the set:
+**The documents are generated; do not edit them.** `src/Platform/ui.admin/src/test/unit/mock/showcase-set.test.ts` builds the scope under a frozen clock and writes it as a Git export of the view would hold it: an annotation file per active annotation, and the current version of every document. It also writes `project-settings.json`, the project settings of the mock's `fabrikam` / `invoicing-suite` in the file shape: the marker `"Format": "2s.project-settings.v1"`, then the settings as the API stores them in PascalCase (the names, colors and icons of the seven types in the catalog's order, `DefaultTimeZone` `Europe/Oslo`, `DateFormat` `dd.mm.yyyy`). The seed does not apply that file yet: it counts as an ignored file until DbCreator applies the project settings of a data set. Each file is a file snapshot (`toMatchFileSnapshot`), so `npm test` fails when the mock and the set part, and a last test fails on the files the scope no longer gives. Change the mock instead, and regenerate the set:
 
 ```sh
 cd src/Platform/ui.admin/src
@@ -429,7 +429,7 @@ The path comes first, because `-u` takes an optional value in Vitest 4. Then del
 
 `key-values.json` is written by the same test, from the mock's values store of the scope (`app/mock/showcase/key-values.ts`): the current value of every pair that is not deleted, ordered by key, as the key/value export lists them. The test checks that every key follows the platform's key rule and that the levels are `Public` and `Standard`; the two `Standard` values are demo values. The modules bind them: `rst.invoicing` its mail (`@smtp.host`, `@smtp.sender`, `@(smtp.password, secret)`) and PDF renderer, `rst.payments` its Adyen account and HMAC key, and `rst.dunning` its reminders, so a resolved read of a seeded showcase shows the values. The bindings are top-level strings: in the mock's other views of the project, which have no pairs, they stay as stored.
 
-What the mock has and the set does not: the stamps of its personas, the version histories, the deleted annotations and pairs, the project settings of the browser (type names, colors, time zone) and the members other than the owner. Its dates are absolute (from the frozen clock), so a scheduled annotation becomes active over time.
+What the mock has and the set does not: the stamps of its personas, the version histories, the deleted annotations and pairs and the members other than the owner. Its dates are absolute (from the frozen clock), so a scheduled annotation becomes active over time.
 
 ### exhibit
 
