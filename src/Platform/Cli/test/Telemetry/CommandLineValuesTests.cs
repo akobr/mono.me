@@ -76,7 +76,7 @@ public class CommandLineValuesTests
         values.Hidden.ShouldContain("prod");
         values.Hidden.ShouldContain("acme.billing");
         values.Hidden.ShouldContain("C:\\in\\args.rsp");
-        values.Hidden.ShouldContain("args");
+        values.Hidden.ShouldNotContain("args");
         values.Hidden.ShouldContain("after");
         values.Hidden.ShouldNotContain("--secret");
         values.Hidden.ShouldNotContain("secret");
@@ -89,7 +89,7 @@ public class CommandLineValuesTests
         var values = Record("story", "export", "-o", "C:\\Users\\ada\\out.zip");
 
         values.Hidden.ShouldContain("C:\\Users\\ada\\out.zip");
-        values.Hidden.ShouldContain("Users");
+        values.Hidden.ShouldNotContain("Users");
         values.LocalValues.ShouldBeEmpty();
     }
 

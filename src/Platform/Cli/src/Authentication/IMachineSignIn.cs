@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +11,10 @@ public interface IMachineSignIn
     bool IsConfigured { get; }
 
     MachineSignInSettings Settings { get; }
+
+    // The organizations, projects and machine ids the credential named while it loaded, also when it failed (a certificate
+    // of another project than its API key): the error reports never show them. Empty before the credential was loaded.
+    IReadOnlyList<string> KnownNames => [];
 
     // What the credential tells about the machine, without network calls.
     // Throws AuthenticationException when the variables are invalid.

@@ -31,6 +31,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
 
     // Copies replaced by a binding to another target; a call may still use one, so they are disposed with the service.
     private readonly List<StorytellerCredential> _replaced = [];
+    private readonly List<string> _knownNames = [];
     private volatile BoundCredential? _bound;
     private volatile ExchangeTarget? _target;
 
@@ -55,6 +56,18 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     public MachineSignInSettings Settings { get; }
 
     public bool IsConfigured => Settings.IsConfigured;
+
+    // Never loads the credential: only what a load already read.
+    public IReadOnlyList<string> KnownNames
+    {
+        get
+        {
+            lock (_knownNames)
+            {
+                return [.. _knownNames];
+            }
+        }
+    }
 
     public MachineIdentity GetIdentity()
     {
@@ -258,10 +271,12 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 ? MachineApiKey.TryParseMachine(variables.ApiKeyMachine)
                 : null;
             MachineCertificateIdentity? certificateIdentity = null;
+            KeepNames(key?.Organization, key?.Project, key?.MachineId);
 
             if (credential.ClientCertificate is { } certificate)
             {
                 certificateIdentity = MachineCertificate.ReadIdentity(certificate);
+                KeepNames(certificateIdentity?.Organization, certificateIdentity?.Project, certificateIdentity?.MachineId);
 
                 // As set: the deprecated name when the canonical one is unset.
                 var certificateVariable = variables.Names.Contains(StorytellerVariables.CLIENT_CERTIFICATE)
@@ -297,6 +312,14 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
             credential?.Dispose();
             credential?.ClientCertificate?.Dispose();
             return new LoadResult(null, exception);
+        }
+    }
+
+    private void KeepNames(params string?[] names)
+    {
+        lock (_knownNames)
+        {
+            _knownNames.AddRange(names.OfType<string>().Where(name => name.Length > 0));
         }
     }
 

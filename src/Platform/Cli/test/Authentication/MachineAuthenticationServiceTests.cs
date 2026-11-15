@@ -188,6 +188,10 @@ public class MachineAuthenticationServiceTests
 
         exception.Message.ShouldBe(message);
         service.TryGetCertificate().ShouldBeNull();
+
+        // For the error reports, which never show them: the credential failed, its names are known.
+        service.TryGetIdentity().ShouldBeNull();
+        service.KnownNames.ShouldBe([organization, project, machineId, "acme", "billing", "3f2c"]);
     }
 
     [Fact]

@@ -14,7 +14,8 @@ namespace _42.Platform.Cli.ErrorReporting;
 // - ScrubEvent, the BeforeSend of ErrorReporter: the exception messages, and what the SDK adds on its own (user,
 //   server name, assembly paths, tags, extras, contexts, Exception.Data).
 // The shapes go first: a value replaced inside one ("acme" of ada@acme.com, "https:" of a URL, "password" of
-// Password=…) would hide the shape from its rule and leave the rest of it.
+// Password=…) would hide the shape from its rule and leave the rest of it. A value a shape covered in part loses the
+// rest too: what is left of it next to a mask (kV9# of kV9#[Filtered]) is masked with it.
 // A regex that times out throws: RedactedException writes the chain without messages, and BeforeSend drops the event.
 internal static class ReportScrubber
 {
@@ -29,9 +30,13 @@ internal static class ReportScrubber
     // A shorter value is replaced as a whole word only: "v1", "dev" or "a" would cut every other word.
     private const int MinimumSubstringLength = 4;
 
-    // The rest of a file path: a space only before a part that has a separator further on (C:\Users\Ada Lovelace\x.pfx
-    // in …), an apostrophe only inside a word (O'Brien).
-    private const string PathRest = @"(?:[^\s'""<>|]|(?<=\p{L})'(?=\p{L})|[ ](?=[^\s'""<>|\\/]*[\\/]))*";
+    // The rest of a file path: a space only while a separator follows further on the line (C:\Users\Ada B Lovelace\x.pfx
+    // in …, OneDrive - Contoso\x), an apostrophe only inside a word (O'Brien).
+    private const string PathRest = @"(?:[^\s'""<>|]|(?<=\p{L})'(?=\p{L})|[ ](?=[^'""<>|\r\n\\/]*[\\/]))*";
+
+    // A value shorter than MinimumSubstringLength stands alone: no letter or digit next to it, but an escape (%22, \n) may be.
+    private const string ShortValueBefore = @"(?:(?<![\p{L}\p{N}])|(?<=%[0-9A-Fa-f]{2})|(?<=\\[A-Za-z]))";
+    private const string ShortValueAfter = @"(?:(?![\p{L}\p{N}])|(?=%[0-9A-Fa-f]{2})|(?=\\))";
 
     // The start of an absolute file path.
     private const string PathStart = @"(?:[A-Za-z]:[\\/]|\\\\|~[\\/]|/)";
@@ -104,18 +109,27 @@ internal static class ReportScrubber
     // valid number"); an apostrophe inside a word ("can't") opens no quote.
     private static readonly (Regex Pattern, string Replacement)[] QuoteRules =
     [
-        // a quoted file path up to the last closing quote of the line, so an apostrophe in it (O'Brien) does not end it
-        (Create($@"(?<![\p{{L}}\p{{N}}])'(?={PathStart})[^\r\n]*'(?![\p{{L}}\p{{N}}])"), $"'{Mask}'"),
+        // a quoted file path up to the first closing quote, so an apostrophe in a word (O'Brien) does not end it
+        (Create($@"(?<![\p{{L}}\p{{N}}])'(?={PathStart})[^\r\n]*?'(?![\p{{L}}\p{{N}}])"), $"'{Mask}'"),
 
         (Create(@"(?<![\p{L}\p{N}])'[^'\r\n]*'(?![\p{L}\p{N}])"), $"'{Mask}'"),
         (Create(@"""[^""\r\n]*"""), $"\"{Mask}\""),
         (Create(@"‘[^’\r\n]*’"), $"‘{Mask}’"),
         (Create(@"“[^”\r\n]*”"), $"“{Mask}”"),
+    ];
 
-        // a quote the first line cut off, up to the end: an opening quote (after a space or a bracket) with no other after it
+    // A quote the first line cut off, up to the end: an opening quote (after a space or a bracket) with no other after it.
+    // Only on a cut line: Newtonsoft writes a lone quote character into its messages ("Expected delimiter: \". Path …").
+    private static readonly (Regex Pattern, string Replacement)[] CutQuoteRules =
+    [
         (Create(@"(?<![^\s(\[{:=,])'[^'\r\n]+$"), $"'{Mask}"),
         (Create(@"(?<![^\s(\[{:=,])""[^""\r\n]+$"), $"\"{Mask}"),
     ];
+
+    // The masks the rules write, for what a shape left of a value next to one.
+    private static readonly string[] Masks = [Mask, Filtered];
+
+    private static readonly Regex AdjacentMasks = Create(@"(?:\*\*\*|\[Filtered\])(?:\*\*\*|\[Filtered\])+");
 
     // A URL keeps its scheme, host and port; the user information, the path and the query go.
     private static readonly Regex Url = Create(@"\b([A-Za-z][A-Za-z0-9+.-]*://)(?:[^\s/@'""<>]*@)?([^\s/?#'""<>@]+)([^\s'""<>]*)");
@@ -146,7 +160,7 @@ internal static class ReportScrubber
             return text ?? string.Empty;
         }
 
-        return ScrubValues(ScrubShapesOfSecrets(text), values);
+        return ScrubValues(text, ScrubShapesOfSecrets(text), values);
     }
 
     public static string ScrubForSentry(string? text, IEnumerable<string> values)
@@ -157,9 +171,10 @@ internal static class ReportScrubber
         }
 
         var lineEnd = text.IndexOfAny(['\r', '\n']);
-        text = ScrubShapesOfSecrets(lineEnd < 0 ? text : text[..lineEnd]);
+        var original = lineEnd < 0 ? text : text[..lineEnd];
+        text = ScrubShapesOfSecrets(original);
 
-        foreach (var (pattern, replacement) in QuoteRules)
+        foreach (var (pattern, replacement) in lineEnd < 0 ? QuoteRules : [.. QuoteRules, .. CutQuoteRules])
         {
             text = pattern.Replace(text, replacement);
         }
@@ -173,7 +188,7 @@ internal static class ReportScrubber
             text = pattern.Replace(text, replacement);
         }
 
-        text = ScrubValues(text, values).Trim();
+        text = ScrubValues(original, text, values).Trim();
         return text.Length <= MaxSentryMessageLength ? text : $"{text[..(MaxSentryMessageLength - 1)]}…";
     }
 
@@ -199,13 +214,17 @@ internal static class ReportScrubber
             }
         }
 
-        // The full path of an assembly is under the user's profile for an installed tool; the file name is enough.
+        // The full path of an assembly is under the user's profile for an installed tool, and a build from source has its
+        // paths in the PDB: the file names are enough.
         foreach (var image in sentryEvent.DebugImages ?? [])
         {
-            if (image.CodeFile is { } codeFile)
-            {
-                image.CodeFile = codeFile[(codeFile.LastIndexOfAny(['/', '\\']) + 1)..];
-            }
+            image.CodeFile = FileNameOf(image.CodeFile);
+            image.DebugFile = FileNameOf(image.DebugFile);
+        }
+
+        foreach (var frame in sentryEvent.SentryExceptions?.SelectMany(exception => exception.Stacktrace?.Frames ?? []) ?? [])
+        {
+            frame.AbsolutePath = null;
         }
 
         foreach (var tag in sentryEvent.Tags.Keys.Where(tag => !AllowedTags.Contains(tag)).ToList())
@@ -242,8 +261,9 @@ internal static class ReportScrubber
         return TokenRun.Replace(text, match => ScrubRun(match.Value));
     }
 
-    // Longest first, so a value goes before its parts; case-insensitive, also JSON-escaped and URL-encoded.
-    private static string ScrubValues(string text, IEnumerable<string> values)
+    // Longest first, so a value goes before its parts; case-insensitive, also JSON-escaped and URL-encoded. original: the text
+    // before the shapes, where a value is still whole.
+    private static string ScrubValues(string original, string text, IEnumerable<string> values)
     {
         var forms = values
             .SelectMany(FormsOf)
@@ -253,12 +273,64 @@ internal static class ReportScrubber
 
         foreach (var value in forms)
         {
+            if (value.Length > 1 && original.Contains(value, StringComparison.OrdinalIgnoreCase))
+            {
+                text = ScrubRemnants(text, value);
+            }
+
             text = value.Length < MinimumSubstringLength
-                ? Regex.Replace(text, $@"(?<![\p{{L}}\p{{N}}]){Regex.Escape(value)}(?![\p{{L}}\p{{N}}])", Mask, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, MatchTimeout)
+                ? Regex.Replace(text, $"{ShortValueBefore}{Regex.Escape(value)}{ShortValueAfter}", Mask, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, MatchTimeout)
                 : text.Replace(value, Mask, StringComparison.OrdinalIgnoreCase);
         }
 
+        return AdjacentMasks.Replace(text, Mask);
+    }
+
+    // A value a shape covered in part: its start just before a mask, and its end just after one, are masked too.
+    private static string ScrubRemnants(string text, string value)
+    {
+        foreach (var mask in Masks)
+        {
+            for (var at = text.IndexOf(mask, StringComparison.Ordinal); at >= 0; at = text.IndexOf(mask, at + mask.Length, StringComparison.Ordinal))
+            {
+                var before = LongestEnd(text[..at], value, isStart: true);
+                var afterStart = at + mask.Length;
+                var after = LongestEnd(text[afterStart..], value, isStart: false);
+
+                if (before + after == 0)
+                {
+                    continue;
+                }
+
+                text = $"{text[..(at - before)]}{Mask}{mask}{Mask}{text[(afterStart + after)..]}";
+                at = at - before + Mask.Length;
+            }
+        }
+
         return text;
+    }
+
+    // The length of the longest start (or end) of value, of two characters or more and shorter than value, that text ends
+    // with (or starts with).
+    private static int LongestEnd(string text, string value, bool isStart)
+    {
+        for (var length = Math.Min(value.Length - 1, text.Length); length >= 2; length--)
+        {
+            var piece = isStart ? value[..length] : value[^length..];
+            var edge = isStart ? text[^length..] : text[..length];
+
+            if (string.Equals(piece, edge, StringComparison.OrdinalIgnoreCase))
+            {
+                return length;
+            }
+        }
+
+        return 0;
+    }
+
+    private static string? FileNameOf(string? path)
+    {
+        return path is null ? null : path[(path.LastIndexOfAny(['/', '\\']) + 1)..];
     }
 
     private static IEnumerable<string> FormsOf(string value)
